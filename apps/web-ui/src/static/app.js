@@ -881,7 +881,7 @@ function renderConfigField(sectionKey, field, value) {
 
   let revealBtn = "";
   if (isSensitive) {
-    revealBtn = ' <button type="button" class="reveal-btn" data-action="config-reveal" data-target="' + fieldId + '">reveal</button>';
+    revealBtn = ' <button type="button" class="reveal-btn" data-action="config-reveal" data-target="' + fieldId + '" data-section="' + sectionKey + '" data-field="' + field.name + '">reveal</button>';
   }
 
   return (
@@ -1433,11 +1433,29 @@ export async function handleConfigSave(ctx, section) {
   }
 }
 
-export function handleConfigReveal(ctx, targetId) {
+export async function handleConfigReveal(ctx, targetId, section, field) {
   const el = ctx.doc && ctx.doc.getElementById ? ctx.doc.getElementById(targetId) : null;
   if (!el) return;
-  if (el.type === "password") el.type = "text";
-  else if (el.type === "text") el.type = "password";
+  if (el.type === "text" && el.dataset.revealed === "true") {
+    el.type = "password";
+    el.value = "***";
+    el.dataset.revealed = "";
+    return;
+  }
+  if (!ctx.api || !section || !field) {
+    if (el.type === "password") el.type = "text";
+    return;
+  }
+  try {
+    const res = await ctx.api.request("/api/v1/config/reveal?section=" + encodeURIComponent(section) + "&field=" + encodeURIComponent(field));
+    if (res && res.success !== false && res.data) {
+      el.value = res.data.value || "";
+      el.type = "text";
+      el.dataset.revealed = "true";
+    }
+  } catch {
+    if (el.type === "password") el.type = "text";
+  }
 }
 
 // ── Profiles tab switcher + switch handler (Component 2) ─────────────────────
@@ -2056,7 +2074,7 @@ function startApp(opts) {
       btn.addEventListener("click", () => {
         const target = btn.dataset.target;
         if (!target) return;
-        handleConfigReveal(ctx, target);
+        handleConfigReveal(ctx, target, btn.dataset.section, btn.dataset.field);
       });
     });
     // admin-portal-enhancements: profiles tab switcher + switch

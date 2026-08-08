@@ -35,7 +35,7 @@ const {
 } = { ...mod, ...UI } as {
   showBanner: (root: MockRoot, type: string, message: string) => void;
   handleConfigSave: (ctx: any, section: string) => Promise<void>;
-  handleConfigReveal: (ctx: any, targetId: string) => void;
+  handleConfigReveal: (ctx: any, targetId: string, section?: string, field?: string) => Promise<void>;
   handleProfileSwitch: (ctx: any, profile: string, host: string) => Promise<void>;
   handleProfilesTabSwitch: (ctx: any, tab: string) => void;
   handleRegistryCellEdit: (ctx: any, profile: string, host: string, tier: string, field: string, value: string) => void;
@@ -287,25 +287,53 @@ describe("handleConfigSave — confirm + PUT + banner (CFG-01..05)", () => {
 
 // ── Config reveal handler (CFG-06) ───────────────────────────────────────────
 
-describe("handleConfigReveal — toggle input type (CFG-06)", () => {
-  it("toggles password input to text", () => {
+describe("handleConfigReveal — toggle input type + fetch real value (CFG-06, CFG-02)", () => {
+  it("toggles password input to text (fallback without api)", async () => {
     const input: MockElement = { dataset: { id: "config-database-url" }, type: "password", value: "secret", addEventListener: () => {}, querySelectorAll: () => [], querySelector: () => null, insertBefore: (n) => n, remove: () => {} };
     const ctx = makeCtx({
       rootChildren: [input],
       doc: { getElementById: mock(() => input) },
     });
-    handleConfigReveal(ctx, "config-database-url");
+    await handleConfigReveal(ctx, "config-database-url");
     expect(input.type).toBe("text");
   });
 
-  it("toggles text back to password on second call", () => {
-    const input: MockElement = { dataset: { id: "config-database-url" }, type: "text", value: "secret", addEventListener: () => {}, querySelectorAll: () => [], querySelector: () => null, insertBefore: (n) => n, remove: () => {} };
+  it("toggles text back to password on second call", async () => {
+    const input: MockElement = { dataset: { id: "config-database-url", revealed: "true" }, type: "text", value: "real-val", addEventListener: () => {}, querySelectorAll: () => [], querySelector: () => null, insertBefore: (n) => n, remove: () => {} };
     const ctx = makeCtx({
       rootChildren: [input],
       doc: { getElementById: mock(() => input) },
     });
-    handleConfigReveal(ctx, "config-database-url");
+    await handleConfigReveal(ctx, "config-database-url");
     expect(input.type).toBe("password");
+    expect(input.value).toBe("***");
+    expect(input.dataset.revealed).toBe("");
+  });
+
+  it("fetches real value from reveal endpoint (CFG-02)", async () => {
+    const input: MockElement = { dataset: { id: "config-database-url" }, type: "password", value: "***", addEventListener: () => {}, querySelectorAll: () => [], querySelector: () => null, insertBefore: (n) => n, remove: () => {} };
+    const request = mock(async () => ({ success: true, data: { section: "database", field: "url", value: "postgres://real" } }));
+    const ctx = makeCtx({
+      rootChildren: [input],
+      doc: { getElementById: mock(() => input) },
+      api: { request },
+    });
+    await handleConfigReveal(ctx, "config-database-url", "database", "url");
+    expect(request).toHaveBeenCalled();
+    expect(input.value).toBe("postgres://real");
+    expect(input.type).toBe("text");
+    expect(input.dataset.revealed).toBe("true");
+  });
+
+  it("toggles back to password + restores mask on second call after fetch", async () => {
+    const input: MockElement = { dataset: { id: "config-database-url", revealed: "true" }, type: "text", value: "postgres://real", addEventListener: () => {}, querySelectorAll: () => [], querySelector: () => null, insertBefore: (n) => n, remove: () => {} };
+    const ctx = makeCtx({
+      rootChildren: [input],
+      doc: { getElementById: mock(() => input) },
+    });
+    await handleConfigReveal(ctx, "config-database-url", "database", "url");
+    expect(input.type).toBe("password");
+    expect(input.value).toBe("***");
   });
 });
 
