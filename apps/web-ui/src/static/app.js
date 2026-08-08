@@ -1544,17 +1544,14 @@ export async function handleProfileSwitch(ctx, profile, host) {
 // F2 fold: registryLoaded guard prevents re-init on every render. beforeunload
 // guard when dirty (added in startApp).
 //
-// BUG FIX: The original implementation seeded the overlay from source.overlay
-// only (the user's saved overlay file). When no overlay existed, the in-memory
-// overlay started empty — so editing a builtin profile cell created a partial
-// overlay with just that one cell. On save, mergeOverlayForValidation replaced
-// the ENTIRE builtin profile with that single cell, which then failed
-// validation (missing tiers, missing hosts, broken hostDefaults).
-//
-// Fix: seed the in-memory overlay from the EFFECTIVE (merged) registry so every
-// profile, host, tier, hostDefault, and workflowTier is present. The overlay
-// sent to the server now contains full profiles, and the shallow per-profile
-// merge in mergeOverlayForValidation produces a valid result.
+// APCR-01 (design D-1): the server now deep-merges the overlay against the
+// builtin as a real delta (absent key = inherit, null = delete). Seeding the
+// in-memory overlay from the EFFECTIVE registry — as a prior fix here did —
+// writes a full copy of the builtin back to the overlay file on every save,
+// which freezes that operator against every future builtin addition (F1).
+// Seed from source.overlay ONLY: an empty/absent overlay starts as an empty
+// delta, and mergeRegistryForDisplay (below) is what makes add/duplicate/
+// delete/edit visible before save without requiring a full-registry seed.
 
 export function initRegistryOverlay(ctx, registry, source) {
   if (ctx.state.registryLoaded) return;
@@ -1562,27 +1559,29 @@ export function initRegistryOverlay(ctx, registry, source) {
   const src = source || {};
   const overlayData = src.overlay || null;
 
-  // Start from a deep copy of the effective registry (builtin + any saved
-  // overlay). Strip the _delete flag from any tombstoned profiles so the
-  // in-memory copy is clean (tombstones are re-applied on delete).
-  const seed = JSON.parse(JSON.stringify(reg));
-  if (seed.profiles) {
-    for (const p of Object.keys(seed.profiles)) {
-      if (seed.profiles[p] && seed.profiles[p]._delete) {
-        delete seed.profiles[p]._delete;
-      }
-    }
-  }
+  const seed = overlayData ? JSON.parse(JSON.stringify(overlayData)) : {};
 
   ctx.state.registryOverlay = {
     profiles: seed.profiles || {},
     hostDefaults: seed.hostDefaults || {},
     workflowTiers: seed.workflowTiers || {},
-    tiers: seed.tiers || ["light", "standard", "deep"],
+    tiers: seed.tiers || reg.tiers || ["light", "standard", "deep"],
   };
-  void overlayData; // retained for API compat; not needed for seeding
   ctx.state.registryDirty = false;
   ctx.state.registryLoaded = true;
+}
+
+/** Merge a flat `{key: value}` overlay delta over the server's map, per key —
+ *  never a truthiness fallback (an empty-but-present overlay object must not
+ *  blank the server's map, APCR-11.4). A `null` overlay value tombstones the
+ *  key (design D-1). */
+function mergeFlatMapForDisplay(serverMap, overlayMap) {
+  const merged = { ...(serverMap || {}) };
+  for (const [key, value] of Object.entries(overlayMap || {})) {
+    if (value === null) delete merged[key];
+    else merged[key] = value;
+  }
+  return merged;
 }
 
 /** Build the display registry = server registry merged with in-memory overlay.
@@ -1592,9 +1591,9 @@ export function mergeRegistryForDisplay(serverData, overlay) {
   const base = (serverData && serverData.registry) || {};
   if (!overlay || !overlay.profiles) return serverData || { registry: {}, source: {} };
   const merged = JSON.parse(JSON.stringify(base));
-  merged.tiers = overlay.tiers || merged.tiers || ["light", "standard", "deep"];
-  merged.hostDefaults = overlay.hostDefaults || merged.hostDefaults || {};
-  merged.workflowTiers = overlay.workflowTiers || merged.workflowTiers || {};
+  merged.tiers = (overlay.tiers && overlay.tiers.length > 0) ? overlay.tiers : (merged.tiers || ["light", "standard", "deep"]);
+  merged.hostDefaults = mergeFlatMapForDisplay(merged.hostDefaults, overlay.hostDefaults);
+  merged.workflowTiers = mergeFlatMapForDisplay(merged.workflowTiers, overlay.workflowTiers);
   // Merge profiles: skip _delete tombstones, keep everything else from overlay
   merged.profiles = merged.profiles || {};
   for (const [key, val] of Object.entries(overlay.profiles)) {
@@ -1663,7 +1662,10 @@ export function handleRegistryWorkflowTierAdd(ctx) {
 export function handleRegistryWorkflowTierRemove(ctx, workflow) {
   if (!ctx.state.registryOverlay) return;
   if (!ctx.state.registryOverlay.workflowTiers) return;
-  delete ctx.state.registryOverlay.workflowTiers[workflow];
+  // A `null` tombstone (design D-1), not a deleted key: under the server's deep merge, an
+  // absent overlay key means "inherit the builtin's value" — deleting the key here would
+  // make removal a silent no-op the next time the builtin still has this workflow tier.
+  ctx.state.registryOverlay.workflowTiers[workflow] = null;
   ctx.state.registryDirty = true;
   ctx.render();
 }

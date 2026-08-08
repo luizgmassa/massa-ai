@@ -428,10 +428,14 @@ export interface OverlayProfile {
   readonly _delete?: true;
 }
 
+/** `null` is the nested-deletion tombstone (design D-1): key absent means "inherit the
+ *  builtin's value", key present non-null means "override", key present `null` means
+ *  "delete this key from the merged registry". Scoped to the two flat maps — `tiers`
+ *  is an ordered array and stays a whole-value replace. */
 export interface OverlayData {
   readonly profiles?: Record<string, OverlayProfile>;
-  readonly hostDefaults?: Record<string, string>;
-  readonly workflowTiers?: Record<string, string>;
+  readonly hostDefaults?: Record<string, string | null>;
+  readonly workflowTiers?: Record<string, string | null>;
   readonly tiers?: string[];
 }
 
@@ -442,6 +446,10 @@ export interface EffectiveRegistryResult {
     readonly overlay: OverlayData | null;
     readonly tombstoned: string[];
   };
+  /** Count of overlay entries that survive normalization (APCR-01.10) — how much of the
+   *  registry the operator's overlay is actually overriding, after collapsing entries that
+   *  are byte-identical to the current builtin. `0` when there is no overlay. */
+  readonly overlayOverrideCount: number;
   readonly overlayError?: string;
 }
 
@@ -460,6 +468,7 @@ export function loadEffectiveRegistry(opts?: {
     return {
       registry: builtin,
       source: { builtin, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
     };
   }
 
@@ -472,6 +481,7 @@ export function loadEffectiveRegistry(opts?: {
     return {
       registry: builtin,
       source: { builtin, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
       overlayError: `overlay parse failed: ${(e as Error).message}`,
     };
   }
@@ -481,6 +491,7 @@ export function loadEffectiveRegistry(opts?: {
     return {
       registry: builtin,
       source: { builtin, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
       overlayError: "overlay root is not an object",
     };
   }
@@ -491,19 +502,22 @@ export function loadEffectiveRegistry(opts?: {
 
   try {
     const validated = validateRegistry(merged);
+    const normalizedOverlay = normalizeOverlay(builtin, overlay);
     return {
       registry: validated,
       source: {
         builtin,
-        overlay,
+        overlay: normalizedOverlay,
         tombstoned: collectTombstoned(builtin, overlay),
       },
+      overlayOverrideCount: countOverlayEntries(normalizedOverlay),
     };
   } catch (e) {
     console.warn(`[massa-ai] Overlay merge validation failed: ${(e as Error).message}`);
     return {
       registry: builtin,
       source: { builtin, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
       overlayError: `overlay validation failed: ${(e as Error).message}`,
     };
   }
@@ -520,7 +534,18 @@ function collectTombstoned(builtin: Registry, overlay: OverlayData): string[] {
   return tombstoned;
 }
 
-function mergeOverlay(builtin: Registry, overlay: OverlayData): Record<string, unknown> {
+/**
+ * Overlay + builtin -> merged registry (design D-1). The overlay is a *delta*: deep-merged
+ * per profile/host/tier, and per key for the two flat maps (`hostDefaults`,
+ * `workflowTiers`) — an absent key inherits the builtin's value, a `null` value tombstones
+ * it. `tiers` is an ordered array and stays a whole-value replace. A profile's `_delete:
+ * true` tombstones the whole profile, unchanged from before.
+ *
+ * The route (`apps/tools-api/src/routes/model-registry.ts`) calls this directly through
+ * `profilesLib()` rather than keeping a hand-copied twin (APCR-01.7) — identical input
+ * cannot produce differing output when there is only one implementation.
+ */
+export function mergeOverlay(builtin: Registry, overlay: OverlayData): Record<string, unknown> {
   const result: Record<string, unknown> = JSON.parse(JSON.stringify(builtin));
 
   if (overlay.tiers) {
@@ -528,11 +553,11 @@ function mergeOverlay(builtin: Registry, overlay: OverlayData): Record<string, u
   }
 
   if (overlay.hostDefaults) {
-    result.hostDefaults = { ...overlay.hostDefaults };
+    result.hostDefaults = mergeFlatMap(builtin.hostDefaults, overlay.hostDefaults);
   }
 
   if (overlay.workflowTiers) {
-    result.workflowTiers = { ...overlay.workflowTiers };
+    result.workflowTiers = mergeFlatMap(builtin.workflowTiers, overlay.workflowTiers);
   }
 
   if (overlay.profiles) {
@@ -543,12 +568,172 @@ function mergeOverlay(builtin: Registry, overlay: OverlayData): Record<string, u
         delete profiles[key];
         continue;
       }
-      const { _delete: _unused, ...profileData } = val;
-      void _unused;
-      profiles[key] = profileData;
+      profiles[key] = mergeProfile(builtin.profiles[key], val);
     }
     result.profiles = profiles;
   }
 
   return result;
+}
+
+/** Per-key merge of a flat `{host/workflow: value}` map against the builtin. A `null`
+ *  overlay value deletes the key from the result; every other builtin key not mentioned in
+ *  the overlay is retained (APCR-01.2). */
+function mergeFlatMap(
+  builtin: { readonly [key: string]: string },
+  overlay: Record<string, string | null>,
+): Record<string, string> {
+  const result: Record<string, string> = { ...builtin };
+  for (const [key, value] of Object.entries(overlay)) {
+    if (value === null) {
+      delete result[key];
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/** Merge one overlay profile against its builtin counterpart, per host and per tier
+ *  (APCR-01.1). A host or tier the overlay does not mention is retained from the builtin.
+ *  A profile the builtin does not have (a genuinely new profile) passes through as-is. */
+function mergeProfile(
+  builtinProfile: Profile | undefined,
+  overlayProfile: OverlayProfile,
+): Record<string, unknown> {
+  const { _delete: _unused, ...rest } = overlayProfile;
+  void _unused;
+  if (!builtinProfile) {
+    return rest as Record<string, unknown>;
+  }
+  const mergedHosts: Record<string, unknown> = { ...builtinProfile.hosts };
+  if (rest.hosts) {
+    for (const [host, tierMap] of Object.entries(rest.hosts)) {
+      const builtinTierMap = builtinProfile.hosts[host];
+      mergedHosts[host] = builtinTierMap ? { ...builtinTierMap, ...tierMap } : tierMap;
+    }
+  }
+  return {
+    description: rest.description !== undefined ? rest.description : builtinProfile.description,
+    hosts: mergedHosts,
+  };
+}
+
+/**
+ * Read-path normalization (design D-1, TD-4): drop overlay entries whose value is
+ * byte-identical to the current builtin's value at the same path, and drop `null`
+ * tombstones for keys the builtin does not have. Read-only — it never rewrites the overlay
+ * file; a full-copy overlay collapses to a real delta only once the UI re-seeds from
+ * `source.overlay` (which now carries the normalized form) and saves.
+ */
+function normalizeOverlay(builtin: Registry, overlay: OverlayData): OverlayData {
+  const result: { -readonly [K in keyof OverlayData]?: OverlayData[K] } = {};
+
+  if (overlay.tiers) {
+    result.tiers = overlay.tiers;
+  }
+
+  if (overlay.hostDefaults) {
+    const normalized = normalizeFlatMap(builtin.hostDefaults, overlay.hostDefaults);
+    if (Object.keys(normalized).length > 0) result.hostDefaults = normalized;
+  }
+
+  if (overlay.workflowTiers) {
+    const normalized = normalizeFlatMap(builtin.workflowTiers, overlay.workflowTiers);
+    if (Object.keys(normalized).length > 0) result.workflowTiers = normalized;
+  }
+
+  if (overlay.profiles) {
+    const normalized: Record<string, OverlayProfile> = {};
+    for (const [key, val] of Object.entries(overlay.profiles)) {
+      if (!isOverlayProfile(val)) continue;
+      if (val._delete === true) {
+        normalized[key] = val;
+        continue;
+      }
+      const normalizedProfile = normalizeProfile(builtin.profiles[key], val);
+      if (normalizedProfile) normalized[key] = normalizedProfile;
+    }
+    if (Object.keys(normalized).length > 0) result.profiles = normalized;
+  }
+
+  return result;
+}
+
+function normalizeFlatMap(
+  builtin: { readonly [key: string]: string },
+  overlay: Record<string, string | null>,
+): Record<string, string | null> {
+  const result: Record<string, string | null> = {};
+  for (const [key, value] of Object.entries(overlay)) {
+    if (value === null) {
+      if (key in builtin) result[key] = null; // tombstone for a real key — kept
+      continue; // tombstone for a key the builtin lacks — dropped, it is a no-op
+    }
+    if (!(key in builtin) || JSON.stringify(value) !== JSON.stringify(builtin[key])) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function normalizeProfile(
+  builtinProfile: Profile | undefined,
+  overlayProfile: OverlayProfile,
+): OverlayProfile | null {
+  if (!builtinProfile) return overlayProfile; // a genuinely new profile — nothing to collapse
+
+  const result: { description?: string; hosts?: Record<string, HostTierMap> } = {};
+
+  if (overlayProfile.description !== undefined && overlayProfile.description !== builtinProfile.description) {
+    result.description = overlayProfile.description;
+  }
+
+  if (overlayProfile.hosts) {
+    const hosts: Record<string, HostTierMap> = {};
+    for (const [host, tierMap] of Object.entries(overlayProfile.hosts)) {
+      const builtinTierMap = builtinProfile.hosts[host];
+      if (!builtinTierMap) {
+        hosts[host] = tierMap;
+        continue;
+      }
+      const normalizedTiers: Record<string, Resolved> = {};
+      for (const [tier, resolved] of Object.entries(tierMap)) {
+        const builtinResolved = builtinTierMap[tier];
+        if (!builtinResolved || JSON.stringify(resolved) !== JSON.stringify(builtinResolved)) {
+          normalizedTiers[tier] = resolved;
+        }
+      }
+      if (Object.keys(normalizedTiers).length > 0) hosts[host] = normalizedTiers;
+    }
+    if (Object.keys(hosts).length > 0) result.hosts = hosts;
+  }
+
+  if (result.description === undefined && result.hosts === undefined) return null;
+  return result;
+}
+
+/** APCR-01.10: count of leaf overlay entries surviving normalization — the size of what the
+ *  operator's overlay is actually overriding. */
+function countOverlayEntries(overlay: OverlayData): number {
+  let n = 0;
+  if (overlay.hostDefaults) n += Object.keys(overlay.hostDefaults).length;
+  if (overlay.workflowTiers) n += Object.keys(overlay.workflowTiers).length;
+  if (overlay.tiers) n += 1;
+  if (overlay.profiles) {
+    for (const val of Object.values(overlay.profiles)) {
+      if (!isOverlayProfile(val)) continue;
+      if (val._delete === true) {
+        n += 1;
+        continue;
+      }
+      if (val.description !== undefined) n += 1;
+      if (val.hosts) {
+        for (const tierMap of Object.values(val.hosts)) {
+          n += Object.keys(tierMap).length;
+        }
+      }
+    }
+  }
+  return n;
 }

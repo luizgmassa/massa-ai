@@ -536,6 +536,25 @@ describe("initRegistryOverlay — lazy init with guard (F2 fold)", () => {
     expect(ctx.state.registryOverlay.profiles).toEqual({});
     expect(ctx.state.registryOverlay.tiers).toEqual(["light", "standard", "deep"]);
   });
+
+  it("seeds ONLY from source.overlay, never from the effective registry (APCR-01.8)", () => {
+    // The effective (merged) registry carries a profile the overlay never mentions. A
+    // full-registry seed here is the exact F1 defect: it would write that builtin profile
+    // into the overlay file on the next save, freezing this operator against any future
+    // builtin change to it.
+    const ctx = makeRegistryCtx();
+    const registryWithBuiltinOnlyProfile = {
+      ...SAMPLE_OVERLAY_SOURCE.registry,
+      profiles: {
+        ...SAMPLE_OVERLAY_SOURCE.registry.profiles,
+        builtinOnly: { description: "never in the overlay", hosts: {} },
+      },
+    };
+    initRegistryOverlay(ctx, registryWithBuiltinOnlyProfile, SAMPLE_OVERLAY_SOURCE.source);
+    expect(ctx.state.registryOverlay.profiles.builtinOnly).toBeUndefined();
+    // The overlay's own profile is still seeded.
+    expect(ctx.state.registryOverlay.profiles.balanced).toBeDefined();
+  });
 });
 
 describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
@@ -568,6 +587,34 @@ describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
     expect(result.registry.tiers).toEqual(["light", "standard", "deep"]);
     expect(result.registry.hostDefaults.codex).toBe("p");
     expect(result.registry.workflowTiers.search).toBe("deep");
+  });
+
+  it("does not blank hostDefaults/workflowTiers when the overlay-only seed carries empty objects (APCR-01.8 / APCR-11.4)", () => {
+    // With initRegistryOverlay now seeding from source.overlay only, an overlay with no
+    // saved hostDefaults/workflowTiers edits arrives here as {} — truthy. A `||` fallback
+    // on that object blanks the server's map instead of retaining it.
+    const server = {
+      registry: {
+        profiles: { p: { hosts: {} } },
+        tiers: ["light", "standard", "deep"],
+        hostDefaults: { claude: "p", codex: "p" },
+        workflowTiers: { search: "deep" },
+      },
+      source: {},
+    };
+    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: [] };
+    const result = mergeRegistryForDisplay(server, overlay);
+    expect(result.registry.hostDefaults.claude).toBe("p");
+    expect(result.registry.hostDefaults.codex).toBe("p");
+    expect(result.registry.workflowTiers.search).toBe("deep");
+    expect(result.registry.tiers).toEqual(["light", "standard", "deep"]);
+  });
+
+  it("hides a null-tombstoned workflowTiers key from the display merge", () => {
+    const server = { registry: { profiles: {}, tiers: ["light"], hostDefaults: {}, workflowTiers: { search: "deep" } }, source: {} };
+    const overlay = { profiles: {}, hostDefaults: {}, workflowTiers: { search: null }, tiers: ["light"] };
+    const result = mergeRegistryForDisplay(server, overlay);
+    expect(result.registry.workflowTiers.search).toBeUndefined();
   });
 });
 
@@ -665,13 +712,16 @@ describe("handleRegistryWorkflowTierAdd — add workflow tier (REG-03)", () => {
   });
 });
 
-describe("handleRegistryWorkflowTierRemove — remove workflow tier (REG-03)", () => {
-  it("removes a workflow tier from the overlay + sets dirty + re-renders", () => {
+describe("handleRegistryWorkflowTierRemove — remove workflow tier (REG-03 / APCR-01.6 tombstone)", () => {
+  it("writes a null tombstone (not a deleted key) + sets dirty + re-renders", () => {
     const ctx = makeRegistryCtx({
       state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard", index: "light" }, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
     });
     handleRegistryWorkflowTierRemove(ctx, "search");
-    expect(ctx.state.registryOverlay.workflowTiers.search).toBeUndefined();
+    // A deleted key means "absent" under the server's deep merge, which under APCR-01 means
+    // "inherit the builtin" — the exact no-op regression design D-1 exists to prevent.
+    expect(Object.prototype.hasOwnProperty.call(ctx.state.registryOverlay.workflowTiers, "search")).toBe(true);
+    expect(ctx.state.registryOverlay.workflowTiers.search).toBeNull();
     expect(ctx.state.registryOverlay.workflowTiers.index).toBe("light");
     expect(ctx.state.registryDirty).toBe(true);
   });

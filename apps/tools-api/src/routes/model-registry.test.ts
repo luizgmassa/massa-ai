@@ -40,9 +40,11 @@ const builtinRegistry = {
 const loadEffectiveRegistry = mock((..._args: unknown[]): unknown => ({
   registry: builtinRegistry,
   source: { builtin: builtinRegistry, overlay: null, tombstoned: [] },
+  overlayOverrideCount: 0,
 }));
 const loadRegistry = mock((..._args: unknown[]): unknown => builtinRegistry);
 const validateRegistry = mock((..._args: unknown[]): unknown => builtinRegistry);
+const mergeOverlay = mock((..._args: unknown[]): unknown => builtinRegistry);
 const RegistryValidationError = class extends Error {
   violations: string[];
   constructor(violations: string[]) {
@@ -65,6 +67,7 @@ mock.module("../../../../scripts/lib/model-profiles.ts", () => ({
   loadEffectiveRegistry: (...args: unknown[]) => loadEffectiveRegistry(...args),
   loadRegistry: (...args: unknown[]) => loadRegistry(...args),
   validateRegistry: (...args: unknown[]) => validateRegistry(...args),
+  mergeOverlay: (...args: unknown[]) => mergeOverlay(...args),
   RegistryValidationError,
   DEFAULT_REGISTRY_PATH: "/dev/null",
 }));
@@ -86,6 +89,7 @@ beforeEach(() => {
   loadEffectiveRegistry.mockClear();
   loadRegistry.mockClear();
   validateRegistry.mockClear();
+  mergeOverlay.mockClear();
   configDir.mockClear();
 });
 
@@ -164,6 +168,22 @@ describe("PUT /api/v1/model-registry", () => {
     expect(res.status).toBe(200);
     expect(res.json.success).toBe(true);
     expect(res.json.data.registry).toBeDefined();
+  });
+
+  test("uses the shared library merge, not a hand-copied twin (APCR-01.7)", async () => {
+    validateRegistry.mockImplementationOnce(() => builtinRegistry);
+    loadEffectiveRegistry.mockImplementationOnce(() => ({
+      registry: builtinRegistry,
+      source: { builtin: builtinRegistry, overlay: { profiles: {} }, tombstoned: [] },
+      overlayOverrideCount: 0,
+    }));
+
+    const overlay = { profiles: { balanced: { description: "overlay modified" } } };
+    await put("/api/v1/model-registry", overlay);
+    expect(mergeOverlay).toHaveBeenCalledTimes(1);
+    const call = mergeOverlay.mock.calls[0] as unknown[];
+    expect(call[0]).toEqual(builtinRegistry);
+    expect(call[1]).toEqual(overlay);
   });
 
   test("400 with all violations on validation failure", async () => {

@@ -62,7 +62,10 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
       const overlay = body as Record<string, unknown>;
 
       const builtin = (lib.loadRegistry as (file?: string) => any)(lib.DEFAULT_REGISTRY_PATH as string);
-      const merged = mergeOverlayForValidation(builtin, overlay);
+      const merged = (lib.mergeOverlay as (b: unknown, o: unknown) => Record<string, unknown>)(
+        builtin,
+        overlay,
+      );
 
       try {
         (lib.validateRegistry as (raw: unknown) => void)(merged);
@@ -181,37 +184,6 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
       },
     },
   );
-
-function mergeOverlayForValidation(builtin: unknown, overlay: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = JSON.parse(JSON.stringify(builtin));
-
-  if (overlay.tiers && Array.isArray(overlay.tiers)) {
-    result.tiers = [...(overlay.tiers as unknown[])];
-  }
-  if (overlay.hostDefaults) {
-    result.hostDefaults = { ...overlay.hostDefaults };
-  }
-  if (overlay.workflowTiers) {
-    result.workflowTiers = { ...overlay.workflowTiers };
-  }
-  if (overlay.profiles) {
-    const profiles = result.profiles as Record<string, unknown>;
-    for (const [key, val] of Object.entries(overlay.profiles)) {
-      if (val && typeof val === "object" && !Array.isArray(val)) {
-        if ((val as { _delete?: true })._delete === true) {
-          delete profiles[key];
-          continue;
-        }
-        const { _delete: _unused, ...profileData } = val as Record<string, unknown>;
-        void _unused;
-        profiles[key] = profileData;
-      }
-    }
-    result.profiles = profiles;
-  }
-
-  return result;
-}
 
 function writeOverlayAtomically(overlayPath: string, data: unknown): void {
   const dir = path.dirname(overlayPath);
