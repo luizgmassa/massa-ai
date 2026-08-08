@@ -740,6 +740,8 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(html).toContain("claude");
     expect(html).not.toContain("Not installed");
     expect(html).toContain("marketplace");
+    expect(html).toContain("MASSA_AI_MODEL_PROFILE");
+    expect(html).toContain("Regenerate Artifacts");
   });
 
   it("renderProfiles shows Not installed when installed is false", () => {
@@ -1009,8 +1011,27 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       disableWrite();
       const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
       const html = renderProjects(data);
-      expect(html).not.toContain("Index Project");
       expect(html).not.toContain('data-action="project-reset"');
+      expect(html).not.toContain('data-create="projectPath"');
+    });
+
+    it("renders field helper section with Index Project guide", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain("<details");
+      expect(html).toContain("Index Project");
+      expect(html).toContain("projectPath");
+      expect(html).toContain("forceReindex");
+      expect(html).toContain("warmCache");
+    });
+
+    it("renders field helper in read mode too", () => {
+      disableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain("<details");
+      expect(html).toContain("Embedding Dimension Note");
     });
   });
 });

@@ -125,7 +125,14 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
     async () => {
       try {
         const vectorStore = await getVectorStore();
-        const projects = await vectorStore.listProjects();
+        let projects;
+        try {
+          projects = await vectorStore.listProjects();
+        } catch {
+          // Embedding dimension mismatch or model unavailable — fall back to
+          // listing projects across ALL dimension tables.
+          projects = await (vectorStore as any).listAllProjectsAcrossDimensions?.() ?? [];
+        }
         return {
           success: true,
           data: {

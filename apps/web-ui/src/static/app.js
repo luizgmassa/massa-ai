@@ -299,6 +299,21 @@ export function renderProjects(data, opts) {
     indexProgress +
     body +
     indexForm +
+    '<details class="registry-help"><summary>?</summary>' +
+    '<div class="registry-help-body">' +
+    '<h4>Index Project</h4>' +
+    '<dl>' +
+    '<dt>projectPath</dt><dd>Absolute path to the project directory to index. Must be a git repository or a directory with source files.</dd>' +
+    '<dt>projectId</dt><dd>Unique identifier for the project. Defaults to the directory basename. Used to scope all indexed data (memories, search, symbols).</dd>' +
+    '<dt>forceReindex</dt><dd>When checked, re-indexes all files even if they have not changed since the last index. Use after changing embedding models or when the index is corrupted.</dd>' +
+    '<dt>warmCache</dt><dd>When checked, pre-warms the search cache after indexing. Speeds up the first search query but adds time to the indexing process.</dd>' +
+    '</dl>' +
+    '<h4>Project Table</h4>' +
+    '<p>The table lists all indexed projects with their document count. Use the reset button to remove all indexed data for a project (vectors, keywords, symbols). This is irreversible.</p>' +
+    '<h4>Embedding Dimension Note</h4>' +
+    '<p>If a project is missing from the list, the current embedding model dimension may not match the dimension used when the project was indexed. Check the Embedding section in Config for the correct dimensions value, or reindex the project.</p>' +
+    '</div>' +
+    '</details>' +
     "</section>"
   );
 }
@@ -1013,7 +1028,7 @@ export function renderProfiles(data, opts) {
       return (
         '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
         "<h3>" + escapeHtml(hostName) + "</h3>" +
-        '<p class="muted">Installed (marketplace route — no variant profiles available). Use MASSA_AI_MODEL_PROFILE + regenerate for profile switching.</p>' +
+        '<p class="muted">Installed via marketplace (no per-profile variant directories). To switch profiles, set <code>MASSA_AI_MODEL_PROFILE</code> and run Regenerate Artifacts in Edit Registry.</p>' +
         "</div>"
       );
     }
