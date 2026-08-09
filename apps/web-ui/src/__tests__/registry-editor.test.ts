@@ -2,8 +2,10 @@ import { describe, it, expect } from "bun:test";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
-const { renderModelRegistry } = { ...mod, ...UI } as {
+const { renderModelRegistry, splitModelId, joinModelId } = { ...mod, ...UI } as {
   renderModelRegistry: (data: unknown, opts?: { writeMode?: boolean }) => string;
+  splitModelId: (model: string | null | undefined) => { provider: string; model: string };
+  joinModelId: (provider: string | null | undefined, model: string | null | undefined) => string | null;
 };
 
 const SAMPLE_REGISTRY = {
@@ -19,7 +21,7 @@ const SAMPLE_REGISTRY = {
           claude: { light: { model: "claude-sonnet", effort: "low" }, standard: { model: "claude-sonnet", effort: "medium" }, deep: { model: "claude-opus", effort: "high" } },
           codex: { light: { model: "gpt-4o-mini", effort: "minimal" }, standard: { model: "gpt-4o", effort: "medium" }, deep: { model: "o1", effort: "high" } },
           cursor: { light: { model: null, effort: null }, standard: { model: "claude-sonnet", effort: null }, deep: { model: "claude-opus", effort: null } },
-          opencode: { light: { model: "qwen-mini", effort: "low" }, standard: { model: "qwen", effort: "medium" }, deep: { model: "qwen-max", effort: "high" } },
+          opencode: { light: { model: "qwen-mini", effort: "low" }, standard: { model: "opencode-go/glm-5.2", effort: "medium" }, deep: { model: "qwen-max", effort: "high" } },
         },
       },
       work: {
@@ -105,6 +107,74 @@ describe("renderModelRegistry — Tool + Tier leading columns (T4, APUX-06, P1-B
   it("wraps the grid in a .grid-scroll horizontal-scroll container", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain('<div class="grid-scroll"><table class="registry-grid">');
+  });
+});
+
+describe("splitModelId / joinModelId — provider/model split-join (T5, APUX-14, P1-B AC2-AC5)", () => {
+  it("splits on the FIRST slash only, keeping the remainder in model", () => {
+    expect(splitModelId("a/b/c")).toEqual({ provider: "a", model: "b/c" });
+  });
+
+  it("splits a bare model id (no slash) into an empty provider", () => {
+    expect(splitModelId("m")).toEqual({ provider: "", model: "m" });
+  });
+
+  it("splits null/empty into two empty strings", () => {
+    expect(splitModelId(null)).toEqual({ provider: "", model: "" });
+    expect(splitModelId("")).toEqual({ provider: "", model: "" });
+    expect(splitModelId(undefined)).toEqual({ provider: "", model: "" });
+  });
+
+  it("joins provider + model with a single slash", () => {
+    expect(joinModelId("a", "b/c")).toBe("a/b/c");
+  });
+
+  it("joins a bare model when provider is blank", () => {
+    expect(joinModelId("", "m")).toBe("m");
+  });
+
+  it("joins both-blank to null, never '' or the string 'null'", () => {
+    expect(joinModelId("", "")).toBeNull();
+    expect(joinModelId(null, null)).toBeNull();
+    expect(joinModelId("  ", "  ")).toBeNull();
+  });
+
+  it("round-trips split -> join back to the original string", () => {
+    for (const original of ["opencode-go/glm-5.2", "sonnet", "a/b/c/d"]) {
+      const { provider, model } = splitModelId(original);
+      expect(joinModelId(provider, model)).toBe(original);
+    }
+  });
+});
+
+describe("renderModelRegistry — Provider/Model split fields + hints (T5, APUX-14, APUX-05, P1-B AC2-AC5)", () => {
+  it("renders separate Provider and Model inputs for the opencode/standard/balanced cell", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('data-action="registry-provider"');
+    expect(html).toContain('data-action="registry-model"');
+    // opencode/standard/balanced is "opencode-go/glm-5.2" in SAMPLE_REGISTRY.
+    expect(html).toContain('class="registry-provider-input" data-action="registry-provider" data-profile="balanced" data-host="opencode" data-tier="standard" value="opencode-go"');
+    expect(html).toContain('class="registry-model-input" data-action="registry-model" data-profile="balanced" data-host="opencode" data-tier="standard" value="glm-5.2"');
+  });
+
+  it("renders empty Provider and Model inputs for a null-model cell", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('data-profile="balanced" data-host="cursor" data-tier="light" value=""');
+  });
+
+  it("carries placeholder + title hints on both Provider and Model inputs", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('placeholder="e.g. opencode-go, zai-coding-plan, local — leave blank for Claude/Codex"');
+    expect(html).toContain('title="e.g. opencode-go, zai-coding-plan, local — leave blank for Claude/Codex"');
+    expect(html).toContain('placeholder="e.g. sonnet · gpt-5.6-terra · glm-5.2"');
+    expect(html).toContain('title="e.g. sonnet · gpt-5.6-terra · glm-5.2"');
+  });
+
+  it("renders read mode as a plain joined string, no split inputs", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(html).not.toContain('data-action="registry-provider"');
+    expect(html).not.toContain('data-action="registry-model"');
+    expect(html).toContain("opencode-go/glm-5.2");
   });
 });
 

@@ -34,6 +34,7 @@ const {
   mergeRegistryForDisplay,
   renderProfilesView,
   renderModelRegistry,
+  joinModelId,
 } = { ...mod, ...UI } as {
   showBanner: (root: MockRoot, type: string, message: string) => void;
   handleConfigSave: (ctx: any, section: string) => Promise<void>;
@@ -58,6 +59,7 @@ const {
   mergeRegistryForDisplay: (serverData: any, overlay: any) => any;
   renderProfilesView: (profilesData: any, registryData: any, opts?: any) => string;
   renderModelRegistry: (data: any, opts?: any) => string;
+  joinModelId: (provider: string | null | undefined, model: string | null | undefined) => string | null;
 };
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
@@ -840,6 +842,31 @@ describe("handleRegistryCellEdit — in-memory cell edit (REGWIRE-01)", () => {
     expect(ctx.state.registryOverlay.profiles["builtin-only"].hosts.claude.light.model).toBe("new-model");
     expect(ctx.state.registryOverlay.profiles["builtin-only"].description).toBeUndefined();
     expect(Object.prototype.hasOwnProperty.call(ctx.state.registryOverlay.profiles["builtin-only"], "description")).toBe(false);
+  });
+
+  // ── Provider/Model split-join (T5, APUX-14, P1-B AC2-AC5) ──────────────────
+  // The DOM change listener (wireViewHandlers) reads both sibling Provider/Model
+  // inputs, joins via `joinModelId`, and routes through this same handler with
+  // field "model" — these tests exercise that join contract directly.
+
+  it("stores the joined provider/model string produced by joinModelId (T5)", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { opencode: { standard: { model: "old", effort: "medium" } } } } } }, registryDirty: false, registryLoaded: true } });
+    const joined = joinModelId("opencode-go", "glm-5.2");
+    handleRegistryCellEdit(ctx, "balanced", "opencode", "standard", "model", joined);
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.opencode.standard.model).toBe("opencode-go/glm-5.2");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("stores a bare model string when provider is blank", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "old", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "model", joinModelId("", "sonnet"));
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.model).toBe("sonnet");
+  });
+
+  it("stores null (inherit) when both provider and model are blank", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "old", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "model", joinModelId("", ""));
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.model).toBeNull();
   });
 });
 

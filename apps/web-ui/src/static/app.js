@@ -1088,6 +1088,44 @@ function capitalizeLabel(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// Hints (placeholder + title) for the Provider/Model split fields (design D-4.2, APUX-05).
+const REGISTRY_PROVIDER_HINT = "e.g. opencode-go, zai-coding-plan, local — leave blank for Claude/Codex";
+const REGISTRY_MODEL_HINT = "e.g. sonnet · gpt-5.6-terra · glm-5.2";
+
+/**
+ * Splits a stored registry model string into its Provider + Model display parts
+ * (design D-4.2, APUX-14). Splits on the FIRST "/" only, so a multi-segment
+ * OpenCode id like "a/b/c" keeps its remainder intact as the Model part.
+ * `null`/`""`/`undefined` (the "inherit" sentinel) render as two empty fields.
+ *
+ *   splitModelId("a/b/c") -> { provider: "a", model: "b/c" }
+ *   splitModelId("m")     -> { provider: "", model: "m" }
+ *   splitModelId(null)    -> { provider: "", model: "" }
+ */
+export function splitModelId(model) {
+  if (!model) return { provider: "", model: "" };
+  const idx = model.indexOf("/");
+  if (idx === -1) return { provider: "", model };
+  return { provider: model.slice(0, idx), model: model.slice(idx + 1) };
+}
+
+/**
+ * Joins Provider + Model back into the single string the overlay stores
+ * (design D-4.2, APUX-14, P1-B AC5). Both blank -> `null` (never `""` or the
+ * string `"null"`), so a cleared cell round-trips to the "inherit" sentinel.
+ *
+ *   joinModelId("a", "b/c") -> "a/b/c"
+ *   joinModelId("", "m")    -> "m"
+ *   joinModelId("", "")     -> null
+ */
+export function joinModelId(provider, model) {
+  const p = (provider || "").trim();
+  const m = (model || "").trim();
+  if (!p && !m) return null;
+  if (!p) return m;
+  return p + "/" + m;
+}
+
 /** Frontend copy of the live workflow inventory (basenames from
  *  skills/massa-ai/workflows/ - all .md files). Kept in sync manually; the
  *  frontend cannot import from scripts/lib. Used by the Workflow Tiers picker. */
@@ -1189,8 +1227,14 @@ export function renderModelRegistry(data, opts) {
       } else {
         effortInput = '<span class="muted">n/a</span>';
       }
+      // Provider input above Model input above Effort (design D-4.2, APUX-14):
+      // the overlay still stores one joined model string per cell — split only
+      // for display, joined back on change by the wireViewHandlers listener.
+      const modelIdParts = splitModelId(model);
+      const providerModelAttrs = ' data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '"';
       const modelInput = writeMode
-        ? '<input type="text" data-action="registry-model" data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '" value="' + escapeHtml(model) + '" />'
+        ? '<input type="text" class="registry-provider-input" data-action="registry-provider"' + providerModelAttrs + ' value="' + escapeHtml(modelIdParts.provider) + '" placeholder="' + escapeHtml(REGISTRY_PROVIDER_HINT) + '" title="' + escapeHtml(REGISTRY_PROVIDER_HINT) + '" />' +
+          '<input type="text" class="registry-model-input" data-action="registry-model"' + providerModelAttrs + ' value="' + escapeHtml(modelIdParts.model) + '" placeholder="' + escapeHtml(REGISTRY_MODEL_HINT) + '" title="' + escapeHtml(REGISTRY_MODEL_HINT) + '" />'
         : '<span>' + escapeHtml(model || "—") + "</span>";
       return '<td class="registry-cell' + overlayClass + '">' + modelInput + effortInput + "</td>";
     }).join("");
@@ -2342,9 +2386,24 @@ function startApp(opts) {
       });
     });
     // admin-portal-enhancements: registry in-memory CRUD + save/clear
-    root.querySelectorAll('[data-action="registry-model"], [data-action="registry-effort"]').forEach((el) => {
+    root.querySelectorAll('[data-action="registry-effort"]').forEach((el) => {
       el.addEventListener("change", () => {
-        handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, el.dataset.action === "registry-model" ? "model" : "effort", el.value);
+        handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, "effort", el.value);
+      });
+    });
+    // Provider + Model split fields (design D-4.2, APUX-14): either input's
+    // change reads BOTH sibling fields from their shared .registry-cell and
+    // joins them into the one string the overlay stores. `closest` is guarded
+    // (absent/no-match in the test fake DOM) rather than assumed present.
+    root.querySelectorAll('[data-action="registry-provider"], [data-action="registry-model"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        const cell = typeof el.closest === "function" ? el.closest(".registry-cell") : null;
+        const sibling = cell && cell.querySelectorAll
+          ? cell.querySelectorAll('[data-action="' + (el.dataset.action === "registry-provider" ? "registry-model" : "registry-provider") + '"]')[0]
+          : null;
+        const providerVal = el.dataset.action === "registry-provider" ? el.value : (sibling ? sibling.value : "");
+        const modelVal = el.dataset.action === "registry-model" ? el.value : (sibling ? sibling.value : "");
+        handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, "model", joinModelId(providerVal, modelVal));
       });
     });
     root.querySelectorAll('[data-action="registry-hostDefault"]').forEach((el) => {
@@ -2681,6 +2740,8 @@ const MASSA_AI_UI = {
   buildConfigSectionBody,
   renderProfiles,
   renderModelRegistry,
+  splitModelId,
+  joinModelId,
   initTheme,
   toggleTheme,
   isWriteModeEnabled,
