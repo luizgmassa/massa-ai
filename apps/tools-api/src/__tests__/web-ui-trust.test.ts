@@ -6,6 +6,8 @@
  */
 
 import { describe, test, expect, afterEach } from "bun:test";
+import fs from "fs";
+import path from "path";
 import {
   isLoopbackAddress,
   isTrustedWebUiCaller,
@@ -146,5 +148,42 @@ describe("injectAccessMarkup", () => {
   test("markup is injected even when the shell has no head or body tag", () => {
     expect(injectAccessMarkup("<p>bare</p>", "k", true)).toContain(API_KEY_META_NAME);
     expect(injectAccessMarkup("<p>bare</p>", "k", false)).toContain("massa-ai-configure-access");
+  });
+});
+
+// ── Amendment A5 (APCR-08.8) ─────────────────────────────────────────────────
+// warnIfTrustOverrideEnabled() already one-shots correctly in isolation (tested
+// above via an injected `warn`); what nothing asserted was that index.ts's real
+// startup path actually calls it. Booting index.ts for real needs a live
+// Postgres + a bound port, so this checks the wiring at the source level: a
+// real (uncommented) call reachable after initAuthOrExit() runs, not merely a
+// mention of the name in a comment or a string.
+
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "") // block comments
+    .replace(/(^|[^:])\/\/.*$/gm, "$1"); // line comments (not "://")
+}
+
+describe("index.ts reaches warnIfTrustOverrideEnabled() at startup", () => {
+  const indexSource = fs.readFileSync(
+    path.join(import.meta.dirname, "..", "index.ts"),
+    "utf8",
+  );
+  const code = stripComments(indexSource);
+
+  test("imports warnIfTrustOverrideEnabled from web-ui-trust.js", () => {
+    expect(code).toMatch(/import\s*\{[^}]*\bwarnIfTrustOverrideEnabled\b[^}]*\}\s*from\s*["']\.\/web-ui-trust\.js["']/);
+  });
+
+  test("calls warnIfTrustOverrideEnabled() as a real statement, after initAuthOrExit()", () => {
+    const authCallIndex = code.indexOf("initAuthOrExit()");
+    const warnCallMatch = code.match(/\bwarnIfTrustOverrideEnabled\s*\(\s*\)\s*;/);
+    expect(authCallIndex).toBeGreaterThan(-1);
+    expect(warnCallMatch).not.toBeNull();
+    const warnCallIndex = code.indexOf(warnCallMatch![0]);
+    // SEC-01: the API key must resolve/provision before /ui can hand it out —
+    // the startup warning is meaningless before auth is even set up.
+    expect(warnCallIndex).toBeGreaterThan(authCallIndex);
   });
 });

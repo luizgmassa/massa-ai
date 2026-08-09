@@ -129,31 +129,37 @@ export function __resetMigrationForTests(): void {
 let tempFileCounter = 0;
 
 /**
- * Persist the config atomically: write a uniquely-named temp file in the SAME
- * directory, then rename(2) it over the target.
+ * Write `content` to `targetPath` atomically: a uniquely-named temp file in the SAME
+ * directory (never `os.tmpdir()`, which may be a different volume — `rename(2)` is only
+ * atomic within a filesystem), then `rename(2)` over the target. Both the temp file
+ * (`mode: 0o600` at creation) and the final target (an explicit `chmodSync` after the
+ * rename) end up owner-only (APCR-08.1/08.5). `mode` on `writeFileSync` is masked by the
+ * process umask on *creation only* — it does nothing for a target that already exists at
+ * a more permissive mode, which is why the `chmodSync` after the rename is what actually
+ * repairs an existing 644 file on its next write (APCR-08.3).
  *
- * A bare `writeFileSync` truncates the live config.json before rewriting it,
- * so any concurrent reader that lands in that window reads a partial file, and
- * two concurrent writers can interleave into a corrupt one. That stopped being
- * hypothetical with SEC-01: the API auto-provisions a key into this file on
- * first start, so two processes starting at once both write it. rename(2) is
- * atomic within a filesystem — hence the temp file must be a sibling of the
- * target, never in os.tmpdir(), which may be a different volume.
+ * Shared by `saveConfig` (config.json) and `savePartialConfig`'s backup writer
+ * (config.json.bak.<ISO>) so both go through the identical atomic-plus-owner-only path —
+ * never `copyFileSync` followed by a separate `chmod`, which leaves the new file at the
+ * source's mode until the chmod lands and cannot revoke a descriptor a same-UID watcher
+ * already opened (APCR-08.2).
  */
-export function saveConfig(config: MassaAiConfig): void {
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+export function writeFileAtomically(targetPath: string, content: string): void {
+  const dir = path.dirname(targetPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 
   const unique = `${process.pid}.${++tempFileCounter}.${crypto.randomBytes(6).toString("hex")}`;
-  const tempFile = path.join(CONFIG_DIR, `.config.json.${unique}.tmp`);
+  const tempFile = path.join(dir, `.${path.basename(targetPath)}.${unique}.tmp`);
 
   try {
-    fs.writeFileSync(tempFile, JSON.stringify(config, null, 2));
-    fs.renameSync(tempFile, CONFIG_FILE);
+    fs.writeFileSync(tempFile, content, { mode: 0o600 });
+    fs.renameSync(tempFile, targetPath);
+    fs.chmodSync(targetPath, 0o600);
   } catch (error) {
     // Never leave the temp file behind — a failed save must not litter the
-    // config dir with partial copies of a file that holds the API key.
+    // config dir with partial copies of a file that may hold the API key.
     try {
       fs.unlinkSync(tempFile);
     } catch {
@@ -161,6 +167,15 @@ export function saveConfig(config: MassaAiConfig): void {
     }
     throw error;
   }
+}
+
+/**
+ * Persist the config atomically. See {@link writeFileAtomically} — this function's
+ * temp-file-plus-rename atomicity is load-bearing (SEC-01: two processes can
+ * auto-provision the API key concurrently) and is preserved as-is; only the mode is new.
+ */
+export function saveConfig(config: MassaAiConfig): void {
+  writeFileAtomically(CONFIG_FILE, JSON.stringify(config, null, 2));
 }
 
 export function initConfig(): void {

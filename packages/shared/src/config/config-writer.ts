@@ -1,11 +1,16 @@
 import fs from "fs";
-import { loadConfig, saveConfig, getConfigPath } from "./config-loader";
+import path from "path";
+import { loadConfig, saveConfig, getConfigPath, writeFileAtomically } from "./config-loader";
 import type { MassaAiConfig } from "./massa-ai-config";
 
 const MASK_SENTINEL = "***";
 const RESTART_SECTIONS = ["database", "embedding", "llm", "security"];
 const VALID_EMBEDDING_PROVIDERS = ["ollama", "mistral", "openai", "google", "cohere"];
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"];
+/** Keep the 10 most recent `config.json.bak.<ISO>` files; delete older ones (APCR-08.4). No
+ *  prior policy existed — 10 covers a normal editing session while bounding a directory
+ *  that holds plaintext secrets. */
+const BACKUP_RETENTION_LIMIT = 10;
 
 export type SavePartialConfigResult =
   | { success: true; config: MassaAiConfig; restartNeededSections: string[] }
@@ -289,6 +294,59 @@ function validatePartial(partial: Partial<MassaAiConfig>): string[] {
   return details;
 }
 
+/**
+ * Repair + prune the backup family this code creates (APCR-08.2-4). Tightens every
+ * existing `config.json.bak.<ISO>` file to `0600` (a file the OLD `copyFileSync` code
+ * created may still be at the source's mode) and deletes the oldest beyond the retention
+ * limit. Also tightens the legacy untimestamped `config.json.bak` if present — chmod'd on
+ * every save, but never deleted: it was not created by this scheme, and deleting an
+ * operator's file to satisfy a retention policy this code just invented is not a
+ * correctness fix (design D-3, TD-9).
+ */
+function repairAndPruneBackups(configPath: string): void {
+  const dir = path.dirname(configPath);
+  const base = path.basename(configPath);
+  const legacyBackup = `${configPath}.bak`;
+  const timestampedPrefix = `${base}.bak.`;
+
+  if (fs.existsSync(legacyBackup)) {
+    try {
+      fs.chmodSync(legacyBackup, 0o600);
+    } catch {
+      // best effort — a repair must not fail the save that triggered it
+    }
+  }
+
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return;
+  }
+
+  // Lexical sort on the ISO timestamp suffix is chronological by construction (TD-9).
+  const timestamped = entries.filter((name) => name.startsWith(timestampedPrefix)).sort();
+
+  for (const name of timestamped) {
+    try {
+      fs.chmodSync(path.join(dir, name), 0o600);
+    } catch {
+      // best effort
+    }
+  }
+
+  const excess = timestamped.length - BACKUP_RETENTION_LIMIT;
+  if (excess > 0) {
+    for (const name of timestamped.slice(0, excess)) {
+      try {
+        fs.unlinkSync(path.join(dir, name));
+      } catch {
+        // best effort
+      }
+    }
+  }
+}
+
 export function savePartialConfig(partial: Partial<MassaAiConfig>): SavePartialConfigResult {
   const current = loadConfig();
 
@@ -305,10 +363,13 @@ export function savePartialConfig(partial: Partial<MassaAiConfig>): SavePartialC
   if (fs.existsSync(configPath)) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const backupPath = `${configPath}.bak.${timestamp}`;
-    fs.copyFileSync(configPath, backupPath);
+    const currentContent = fs.readFileSync(configPath, "utf-8");
+    writeFileAtomically(backupPath, currentContent);
   }
 
   saveConfig(merged);
+
+  repairAndPruneBackups(configPath);
 
   return {
     success: true,
