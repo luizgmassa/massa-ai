@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Marketplace-route Claude installs now pick up new bundle versions.** `claude plugin
+  install` is an idempotent no-op on an already-installed plugin, so the CLI kept serving
+  its version-pinned cache snapshot forever (observed: 1.28.0 served while the bundle and
+  `install-state.json` both said 1.44.0). The installer now compares the served version
+  against the bundle after registration, runs `claude plugin update` only when served is
+  older (never downgrades), and records the version the CLI actually serves — or no
+  version at all when the registry entry is unreadable, so the next run retries instead
+  of trusting a stale claim.
+
 ## [1.44.0] - 2026-08-09
 
 ### Added
