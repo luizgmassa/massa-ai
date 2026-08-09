@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-08-09
+
 ### Added
 
 - **Per-agent, per-tool capability tier overrides.** `scripts/lib/model-profiles.ts` gains
