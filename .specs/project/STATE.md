@@ -39,9 +39,13 @@
   was fixed by follow-up commit `61434ca` (user's cap-removal decision reads
   "everywhere a workflow interviews you — no stragglers"); spec success
   criteria amended to name the site. No open residual from the sweep.
-- Next step: review → verification (independent verifier, author != verifier)
-  → PR from `spec/workflow-interaction-policies`; push/PR/merge remain the
-  user's decision.
+- Validation: **PASS** (independent verifier, 2026-08-09) — 16/16 WF ACs
+  evidenced, 8 gates re-run green, discrimination sensor 3/4 killed (M3
+  heading-only deletion survived the substring gate — low, documented in
+  validation.md as a follow-up sensor recommendation). Reviewer's 2 blocking
+  bookkeeping findings fixed in `e5c18736`.
+- Next step: PR from `spec/workflow-interaction-policies` (push+PR
+  authorized); merge remains the user's decision.
 
 ## Previous — Admin Portal UX Overhaul (**VALIDATED PASS 2026-08-09** — T1-T15 + 2 fix loops, 18 commits + validation close-out; push/PR authorized)
 
