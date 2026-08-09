@@ -1600,6 +1600,32 @@ function mergeFlatMapForDisplay(serverMap, overlayMap) {
   return merged;
 }
 
+/** Merge one overlay profile over its server-side counterpart, per host and per tier.
+ *  Mirrors `mergeProfile` in scripts/lib/model-profiles.ts: the overlay is a DELTA, so a
+ *  host or tier it does not mention is retained from the server's profile, and a profile
+ *  the server does not have passes through as a genuinely new one.
+ *
+ *  Whole-object replace here is the client twin of the server bug APCR-01 fixed: the saved
+ *  overlay for an operator who edited only one host is `{hosts: {opencode: {...}}}`, and
+ *  assigning that over the server's profile erases claude/codex/cursor from the display —
+ *  their cells render as "—" and become uneditable. */
+function mergeProfileForDisplay(baseProfile, overlayProfile) {
+  const { _delete: _unusedDelete, ...rest } = overlayProfile;
+  void _unusedDelete;
+  if (!baseProfile) return rest;
+  const mergedHosts = { ...baseProfile.hosts };
+  if (rest.hosts) {
+    for (const [host, tierMap] of Object.entries(rest.hosts)) {
+      const baseTierMap = mergedHosts[host];
+      mergedHosts[host] = baseTierMap ? { ...baseTierMap, ...tierMap } : tierMap;
+    }
+  }
+  return {
+    description: rest.description !== undefined ? rest.description : baseProfile.description,
+    hosts: mergedHosts,
+  };
+}
+
 /** Build the display registry = server registry merged with in-memory overlay.
  *  This makes add/duplicate/delete/restore visible immediately (before save),
  *  instead of requiring a save+reload cycle. The renderer reads from this. */
@@ -1610,13 +1636,13 @@ export function mergeRegistryForDisplay(serverData, overlay) {
   merged.tiers = (overlay.tiers && overlay.tiers.length > 0) ? overlay.tiers : (merged.tiers || ["light", "standard", "deep"]);
   merged.hostDefaults = mergeFlatMapForDisplay(merged.hostDefaults, overlay.hostDefaults);
   merged.workflowTiers = mergeFlatMapForDisplay(merged.workflowTiers, overlay.workflowTiers);
-  // Merge profiles: skip _delete tombstones, keep everything else from overlay
+  // Merge profiles as a delta: skip _delete tombstones, deep-merge the rest per host/tier.
   merged.profiles = merged.profiles || {};
   for (const [key, val] of Object.entries(overlay.profiles)) {
     if (val && val._delete === true) {
       delete merged.profiles[key];
-    } else {
-      merged.profiles[key] = val;
+    } else if (val) {
+      merged.profiles[key] = mergeProfileForDisplay(merged.profiles[key], val);
     }
   }
   // overlayOverrideCount (APCR-01.10) is server-computed from the saved overlay, not the

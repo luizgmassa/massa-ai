@@ -651,6 +651,117 @@ describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
     const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
     expect(mergeRegistryForDisplay(server, overlay).overlayOverrideCount).toBe(0);
   });
+
+  // ── Profiles merge as a DELTA, per host and per tier ──────────────────────
+  // Every case above uses `hosts: {}` on both sides, where whole-object replace and
+  // deep merge are indistinguishable. These use a real single-host delta — the shape an
+  // operator's saved overlay actually has after editing one host — which is what made the
+  // claude/codex cells render "—" and become uneditable.
+
+  it("retains hosts the overlay profile does not mention (single-host delta)", () => {
+    const server = {
+      registry: {
+        profiles: {
+          balanced: {
+            description: "Default.",
+            hosts: {
+              claude: { light: { model: "haiku", effort: "high" }, standard: { model: "sonnet", effort: "high" } },
+              codex: { light: { model: "gpt-5.4-mini", effort: "high" }, standard: { model: "gpt-5.6-terra", effort: "high" } },
+              opencode: { light: { model: "opencode-go/deepseek-v4-pro", effort: "max" }, standard: { model: "opencode-go/glm-5.2", effort: "max" } },
+            },
+          },
+        },
+        tiers: ["light", "standard"],
+        hostDefaults: {},
+        workflowTiers: {},
+      },
+      source: {},
+    };
+    const overlay = {
+      profiles: {
+        balanced: {
+          hosts: {
+            opencode: { light: { model: "ollama-cloud/deepseek-v4-pro", effort: "max" }, standard: { model: "ollama-cloud/glm-5.2", effort: "max" } },
+          },
+        },
+      },
+      hostDefaults: {},
+      workflowTiers: {},
+      tiers: ["light", "standard"],
+    };
+    const hosts = mergeRegistryForDisplay(server, overlay).registry.profiles.balanced.hosts;
+    // The edited host takes the overlay's values...
+    expect(hosts.opencode.standard.model).toBe("ollama-cloud/glm-5.2");
+    // ...and every unmentioned host survives, rather than rendering as an empty cell.
+    expect(hosts.claude.standard.model).toBe("sonnet");
+    expect(hosts.claude.light.model).toBe("haiku");
+    expect(hosts.codex.standard.model).toBe("gpt-5.6-terra");
+    expect(Object.keys(hosts).sort()).toEqual(["claude", "codex", "opencode"]);
+  });
+
+  it("retains tiers the overlay's host map does not mention (single-tier delta)", () => {
+    const server = {
+      registry: {
+        profiles: {
+          balanced: {
+            hosts: { claude: { light: { model: "haiku", effort: "high" }, standard: { model: "sonnet", effort: "high" }, deep: { model: "opus", effort: "high" } } },
+          },
+        },
+        tiers: ["light", "standard", "deep"],
+        hostDefaults: {},
+        workflowTiers: {},
+      },
+      source: {},
+    };
+    const overlay = {
+      profiles: { balanced: { hosts: { claude: { standard: { model: "sonnet-next", effort: "low" } } } } },
+      hostDefaults: {},
+      workflowTiers: {},
+      tiers: ["light", "standard", "deep"],
+    };
+    const claude = mergeRegistryForDisplay(server, overlay).registry.profiles.balanced.hosts.claude;
+    expect(claude.standard).toEqual({ model: "sonnet-next", effort: "low" });
+    expect(claude.light).toEqual({ model: "haiku", effort: "high" });
+    expect(claude.deep).toEqual({ model: "opus", effort: "high" });
+  });
+
+  it("retains the server description when the overlay profile omits it", () => {
+    const server = {
+      registry: { profiles: { balanced: { description: "Default.", hosts: { claude: { light: { model: "haiku", effort: "high" } } } } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
+      source: {},
+    };
+    const overlay = { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    expect(mergeRegistryForDisplay(server, overlay).registry.profiles.balanced.description).toBe("Default.");
+  });
+
+  it("passes an overlay-only profile through unchanged, minus its _delete flag", () => {
+    const server = { registry: { profiles: { balanced: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} }, source: {} };
+    const overlay = {
+      profiles: { newprof: { description: "new", hosts: { claude: { light: { model: "haiku", effort: "high" } } } } },
+      hostDefaults: {},
+      workflowTiers: {},
+      tiers: ["light"],
+    };
+    const newprof = mergeRegistryForDisplay(server, overlay).registry.profiles.newprof;
+    expect(newprof.hosts.claude.light.model).toBe("haiku");
+    expect(newprof.description).toBe("new");
+    expect("_delete" in newprof).toBe(false);
+  });
+
+  it("does not mutate the server data it was handed", () => {
+    const server = {
+      registry: { profiles: { balanced: { hosts: { claude: { light: { model: "haiku", effort: "high" } } } } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
+      source: {},
+    };
+    const overlay = {
+      profiles: { balanced: { hosts: { claude: { light: { model: "opus", effort: "low" } } } } },
+      hostDefaults: {},
+      workflowTiers: {},
+      tiers: ["light"],
+    };
+    mergeRegistryForDisplay(server, overlay);
+    expect(server.registry.profiles.balanced.hosts.claude.light.model).toBe("haiku");
+  });
 });
 
 describe("renderModelRegistry — overlay override count display (APCR-01.10)", () => {

@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The registry editor no longer blanks every host the overlay does not mention.**
+  The Web UI's display merge assigned each overlay profile over the server's profile
+  whole, so an operator whose saved overlay touched a single host — the normal shape of
+  a delta — saw every other host's cells render as `—` and become uneditable, and the
+  profile's description disappear. This was the client-side twin of the whole-object
+  replace fixed on the server in this same release; the display merge now merges per
+  profile, per host and per tier, mirroring `mergeProfile` in
+  `scripts/lib/model-profiles.ts`. The saved overlay file was never wrong and no
+  operator edit was lost — the values were present on disk and correct in the server's
+  effective registry throughout, and reappear on the next load.
 - **The project list route no longer reports success on a failure it never
   diagnosed.** A bare `catch {}` around `listProjects()` swallowed every error class
   and fell back to an empty `{success:true, projects:[]}` whenever the store's optional
