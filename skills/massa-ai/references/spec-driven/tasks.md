@@ -146,10 +146,9 @@ What MUST be done before this task can start?
 
 Group tasks into ordered phases. Each phase depends on the ones before it; tasks execute sequentially within a phase.
 
-**Size phases near the worker budget.** During Execute, phases are packed into task-budgeted batches (~7 tasks per sub-agent, whole phases — see `references/spec-driven/sub-agents.md`). Because a batch cut may only land on a phase boundary, a phase that is much larger than the budget forces an over-sized worker. Keep each phase from greatly exceeding the budget:
+**Size phases to the worker budget.** During Execute, phases are packed into task-budgeted batches (max 3 tasks per sub-agent, ideal 2, whole phases — see `references/spec-driven/sub-agents.md`). Because a batch cut may only land on a phase boundary, a phase over the budget forces an over-sized worker. Size each phase to **max 3 tasks, ideal 2**:
 
-- If a phase would hold **more than ~10 tasks (≈1.5× the budget)**, split it into cohesive sub-phases at a genuine dependency/cohesion seam — not at an arbitrary task index.
-- Only leave a phase over-sized when its tasks are one tight dependency chain that genuinely cannot be split. That is a legitimate (if fat) single-worker phase, not a smell.
+A phase that holds more than 3 tasks is wrongly sized — split it into cohesive sub-phases at a genuine dependency/cohesion seam, never at an arbitrary task index. There is no exception: even a phase whose tasks form one strict, seemingly unsplittable dependency sequence does not excuse it from the limit — split the sequence at its own internal cohesion seam instead.
 
 This keeps phase boundaries meaningful while letting the packing hit its target worker count.
 
@@ -354,12 +353,12 @@ Execution is strictly sequential — there is no intra-phase parallelism. A sing
 
 **How phase-based execution works:**
 
-At Execute, the agent counts total tasks and packs phases into **task-budgeted batches** (~7 tasks per worker, whole phases — the benchmarked sweet spot is ~20 tasks → ~3 workers). A **phase** is the semantic/dependency unit; a **batch** is one or more *consecutive whole phases* assigned to one worker. The cut only ever lands on a phase boundary — a phase is never split across workers. **The sub-agent offer fires whenever the feature has more than 3 tasks** — a 4–8-task feature still packs into a single batch and is offered as one batch worker; only a feature with 3 or fewer tasks executes inline with no offer. Batches run sequentially: each worker executes ALL its tasks in order, then reports a compact summary before the next batch starts. This right-sizes the worker count by workload instead of by phase count (one-per-phase is too fragmented; expensive and slow). See `references/spec-driven/sub-agents.md` for the full model — packing algorithm, offer-then-confirm, worker payload, compact summary contract, failure handling, and context sizing guidance.
+At Execute, the agent counts total tasks and packs phases into **task-budgeted batches** (max 3 tasks per worker, ideal 2, whole phases). A **phase** is the semantic/dependency unit; a **batch** is one or more *consecutive whole phases* assigned to one worker. The cut only ever lands on a phase boundary — a phase is never split across workers. **The sub-agent offer fires whenever the feature has more than 3 tasks** — under this budget, a triggered feature always packs into at least two workers, so the offer is never for a single batch; only a feature with 3 or fewer tasks executes inline with no offer. Batches run sequentially: each worker executes ALL its tasks in order, then reports a compact summary before the next batch starts. This right-sizes the worker count by workload instead of by phase count (one-per-phase is too fragmented; expensive and slow). See `references/spec-driven/sub-agents.md` for the full model — packing algorithm, offer-then-confirm, worker payload, compact summary contract, failure handling, and context sizing guidance.
 
 When the whole feature has 3 or fewer tasks, execution happens inline in the main window with no sub-agents spawned and no offer made.
 
 **The orchestrating agent's role during Execute:**
-1. Count total tasks — if more than 3, pack phases into ~7-task batches and offer batch sub-agents (even a single resulting batch is offered); wait for the user's choice
+1. Count total tasks — if more than 3, pack phases into max-3-task batches (ideal 2) and offer batch sub-agents; wait for the user's choice
 2. Dispatch the next batch (to a worker, or execute inline)
 3. Receive the compact batch summary
 4. Update tasks.md with results
