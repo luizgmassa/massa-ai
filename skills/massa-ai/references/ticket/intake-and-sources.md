@@ -16,7 +16,7 @@ Resolve inputs in this order:
 4. **Definition of Ready and Definition of Done**: ask whether the user wants to provide either source. Accept Jira or Confluence content through Atlassian MCP, explicitly supplied local files, or pasted text. Use built-in checklists when omitted.
 5. **Jira-required choices**: after metadata inspection, ask only for unresolved issue types, priorities, components, labels, ownership, versions, or custom fields that are required by Jira or material to the user's intent.
 
-Group related choices into at most three concise questions at a time. Reuse answers across the draft unless the user scopes a different value to a specific issue.
+Group related choices into concise questions asked together — as many as the open choices require, with no numeric cap. Reuse answers across the draft unless the user scopes a different value to a specific issue.
 
 ## Source Roles
 

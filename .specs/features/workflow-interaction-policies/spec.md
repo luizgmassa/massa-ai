@@ -222,9 +222,11 @@ parity suites, or the release chain.
 - A grep for `~7` / `7-task` / `7 tasks` / `4–8` / `20 tasks → 3` / `1.5×` / `10+ tasks` /
   `tight dependency chain` over `skills/` returns no packing-budget hits; the new budget
   (max 3, ideal 2) appears at the canonical site and its mirrors consistently.
-- A grep for `≤2 independent questions` and `at most three related questions` over
-  `skills/` returns nothing (four cap sites removed: discuss.md, discovery-and-sizing.md,
-  workflows/tdd.md, plus workflows/design.md's "Ask only when" rephrased).
+- A grep for `≤2 independent`, `at most three`, and sibling numeric caps (`at most 2`,
+  `3+ questions`) over `skills/` returns nothing question-related (cap sites removed:
+  discuss.md Tips + Guided algorithm body, discovery-and-sizing.md, workflows/tdd.md,
+  ticket/intake-and-sources.md — "no stragglers" per the user's cap-removal choice —
+  plus workflows/design.md's "Ask only when" rephrased).
 - `validate_tasks.ts` errors on a 4-task-phase fixture (observed red) and passes this
   feature's own tasks.md; golden + validator suites green after any deliberate
   re-recording.
