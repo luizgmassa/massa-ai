@@ -195,6 +195,15 @@ export function renderMetricsSection(result) {
   </section>`;
 }
 
+/** T14, APUX-10: "About this tab" help card — the Dashboard is read-only, so
+ *  this is a short orientation note rather than a field-by-field guide. */
+const DASHBOARD_HELP_CARD =
+  '<details class="help-card"><summary>About this tab</summary>' +
+  '<div class="help-card-body">' +
+  '<p>A read-only snapshot of the scheduler, hook queue, Synapse sessions, and system metrics. Nothing on this tab can be edited — reload the page to see the latest values.</p>' +
+  '</div>' +
+  '</details>';
+
 /**
  * Top-level dashboard renderer. Takes the fetched data object and returns
  * an HTML string with all sections. Pure function (no DOM, no fetch).
@@ -207,6 +216,7 @@ export function renderDashboard(data) {
     renderHookQueueSection(data.hookQueue || { error: "no data" }),
     renderSynapseSection(data.synapse || { error: "no data" }),
     renderMetricsSection(data.metrics || { error: "no data" }),
+    DASHBOARD_HELP_CARD,
     '</div>',
   ].join("\n");
 }

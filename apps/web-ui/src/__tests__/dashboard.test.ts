@@ -245,4 +245,15 @@ describe("renderDashboard", () => {
     const html = renderDashboard({});
     expect(html).toContain("unavailable");
   });
+
+  it("renders an 'About this tab' help card (T14, APUX-10)", () => {
+    const html = renderDashboard({
+      scheduler: { data: { running: true, jobs: [] }, error: null },
+      hookQueue: { data: { pendingCount: 0, maxPending: 1, saturated: false }, error: null },
+      synapse: { data: { data: { sessions: [] } }, error: null },
+      metrics: { data: { system: { uptime: 1 } }, error: null },
+    });
+    expect(html).toContain('<details class="help-card"><summary>About this tab</summary>');
+    expect(html).toContain("read-only snapshot");
+  });
 });

@@ -299,19 +299,21 @@ export function renderProjects(data, opts) {
     indexProgress +
     body +
     indexForm +
-    '<details class="registry-help"><summary>?</summary>' +
-    '<div class="registry-help-body">' +
+    '<details class="help-card"><summary>About this tab</summary>' +
+    '<div class="help-card-body">' +
+    '<h4>What Indexing Does</h4>' +
+    '<p>Indexing reads a project\'s source files and stores them as searchable vectors, keyword entries, and code symbols, so massa-ai\'s memory and search tools can find relevant code and context. Re-index after large changes to keep that view current.</p>' +
     '<h4>Index Project</h4>' +
     '<dl>' +
-    '<dt>projectPath</dt><dd>Absolute path to the project directory to index. Must be a git repository or a directory with source files.</dd>' +
-    '<dt>projectId</dt><dd>Unique identifier for the project. Defaults to the directory basename. Used to scope all indexed data (memories, search, symbols).</dd>' +
-    '<dt>forceReindex</dt><dd>When checked, re-indexes all files even if they have not changed since the last index. Use after changing embedding models or when the index is corrupted.</dd>' +
-    '<dt>warmCache</dt><dd>When checked, pre-warms the search cache after indexing. Speeds up the first search query but adds time to the indexing process.</dd>' +
+    '<dt>Project Path</dt><dd>Absolute path to the project directory to index. Must be a git repository or a directory with source files.</dd>' +
+    '<dt>Project ID (optional)</dt><dd>Unique identifier for the project. Defaults to the directory basename. Used to scope all indexed data (memories, search, symbols).</dd>' +
+    '<dt>Force Reindex</dt><dd>When checked, re-indexes all files even if they have not changed since the last index. Use after changing embedding models or when the index is corrupted.</dd>' +
+    '<dt>Warm Cache</dt><dd>When checked, pre-warms the search cache after indexing. Speeds up the first search query but adds time to the indexing process.</dd>' +
     '</dl>' +
-    '<h4>Project Table</h4>' +
-    '<p>The table lists all indexed projects with their document count. Use the reset button to remove all indexed data for a project (vectors, keywords, symbols). This is irreversible.</p>' +
+    '<h4>What Delete Removes</h4>' +
+    '<p>Delete removes a project\'s indexed vectors, keyword entries, symbols, and memories, irreversibly. The project\'s files on disk are untouched — only massa-ai\'s record of it disappears from this list.</p>' +
     '<h4>Embedding Dimension Note</h4>' +
-    '<p>If a project is missing from the list, the current embedding model dimension may not match the dimension used when the project was indexed. Check the Embedding section in Config for the correct dimensions value, or reindex the project.</p>' +
+    '<p>If a project is missing from the list, the current embedding model\'s dimension may not match the dimension used when the project was indexed. Check the Embedding section in Config for the correct dimensions value, or reindex the project.</p>' +
     '</div>' +
     '</details>' +
     "</section>"
@@ -665,7 +667,16 @@ export function renderCheckpoints(data) {
       })
       .join("") +
     "</tbody></table>";
-  return '<section class="view"><h2>Checkpoints</h2>' + body + createForm + "</section>";
+  const helpCard =
+    '<details class="help-card"><summary>About this tab</summary>' +
+    '<div class="help-card-body">' +
+    '<h4>What A Checkpoint Is</h4>' +
+    '<p>A checkpoint is a saved snapshot of an in-progress task — its status, current step, and progress percentage — so work can resume exactly where it left off, even across a session restart.</p>' +
+    '<h4>Create And Edit</h4>' +
+    '<p>Use the form below to create a checkpoint for a task you are tracking. Each row\'s <strong>edit</strong> button reopens that checkpoint\'s fields for updating status, progress, and step; <strong>delete</strong> removes it.</p>' +
+    '</div>' +
+    '</details>';
+  return '<section class="view"><h2>Checkpoints</h2>' + body + createForm + helpCard + "</section>";
 }
 
 // ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
@@ -960,7 +971,18 @@ export function renderConfig(data, opts) {
     );
   }).join("");
 
-  return '<section class="view"><h2>Config</h2>' + cards + "</section>";
+  const helpCard =
+    '<details class="help-card"><summary>About this tab</summary>' +
+    '<div class="help-card-body">' +
+    '<h4>How Config Saves</h4>' +
+    '<p>Each section below saves independently — editing a field and pressing that section\'s Save button writes only that section, leaving every other section untouched.</p>' +
+    '<h4>Sections That Require A Restart</h4>' +
+    '<p>A section badged as requiring one takes effect only after the massa-ai server process restarts; saving it does not change the behavior of the already-running process.</p>' +
+    '<p>Each section\'s own "Field guide" toggle explains its individual fields, defaults, and examples.</p>' +
+    '</div>' +
+    '</details>';
+
+  return '<section class="view"><h2>Config</h2>' + helpCard + cards + "</section>";
 }
 
 function setByPath(obj, dottedPath, value) {
@@ -1276,11 +1298,11 @@ export function renderModelRegistry(data, opts) {
   const tombstoned = source.tombstoned || [];
 
   if (profileNames.length === 0 && !overlayError && !payload._error) {
-    return '<section class="view"><h2>Model Catalog</h2><p class="empty">No profiles in registry.</p></section>';
+    return '<section class="view"><h2>Model Catalog</h2><p class="empty">No profiles in the catalog.</p></section>';
   }
 
   const registryError = payload._error
-    ? '<div class="error">Registry load error: ' + escapeHtml(typeof payload._error === "string" ? payload._error : JSON.stringify(payload._error)) + "</div>"
+    ? '<div class="error">Catalog load error: ' + escapeHtml(typeof payload._error === "string" ? payload._error : JSON.stringify(payload._error)) + "</div>"
     : "";
 
   const overlayBanner = overlayError
@@ -1467,22 +1489,32 @@ export function renderModelRegistry(data, opts) {
       "</div>"
     : "";
 
-  const helpSection = '<details class="registry-help"><summary>?</summary>' +
-    '<div class="registry-help-body">' +
-    '<h4>Button Guide</h4>' +
+  const helpSection = '<details class="help-card"><summary>About this tab</summary>' +
+    '<div class="help-card-body">' +
+    '<h4>What A Profile Is</h4>' +
+    '<p>A profile is a named bundle of model choices — one model and effort setting per tool (Claude, Codex, Cursor, OpenCode) and per capability tier. Switching a tool to a different profile changes which model every agent on that tool runs.</p>' +
+    '<h4>Capability Tiers</h4>' +
+    '<p><strong>Light</strong>, <strong>Standard</strong>, and <strong>Deep</strong> are the three capability tiers a profile assigns a model to, from fastest/cheapest to most capable. An agent runs whichever tier its charter — or your Per-Agent Tier Override below — names.</p>' +
+    '<h4>Managing Profiles</h4>' +
     '<dl>' +
-    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. The new profile starts with null model/effort cells for all tools and tiers.</dd>' +
+    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. The new profile starts with empty model/effort cells for every tool and tier.</dd>' +
     '<dt>Duplicate Profile</dt><dd>Copies an existing profile (you choose which) to a new name. Useful for creating a variant of an existing profile without re-entering all cells.</dd>' +
-    '<dt>Delete Profile</dt><dd>Removes a profile. If the profile exists in the builtin registry, it is marked removed (restorable via the Removed Profiles section). If it was added locally (not part of the built-in set), it is removed entirely.</dd>' +
-    '<dt>Save &amp; Apply</dt><dd>Persists all your unsaved changes (profile cells, default profiles per tool, per-workflow tier overrides, per-agent tier overrides, add/duplicate/delete) to <code>~/.config/massa-ai/model-profiles.json</code>, then regenerates and installs the agent files for every tool. Asks for confirmation before running. The builtin registry is never modified.</dd>' +
-    '<dt>Discard All Overrides</dt><dd>Deletes your saved changes, reverting to the builtin registry. Asks for confirmation. All profiles you added, cell overrides, default-profile changes, and workflow-tier overrides are lost. Removed profiles are restored.</dd>' +
+    '<dt>Delete Profile</dt><dd>Removes a profile. If it is one of the built-in profiles, it moves to the Removed Profiles list below (restorable). If you added it yourself, it is removed entirely.</dd>' +
     '</dl>' +
-    '<h4>Per-Workflow Tier Overrides</h4>' +
-    '<p>The Per-Workflow Tier Overrides section maps a workflow name to a tier, overriding the charter default for agents dispatched under that workflow. The builtin registry ships with no workflow tier overrides. Add one (e.g., <code>spec-driven &rarr; deep</code>) to pin a heavier model tier for a specific workflow.</p>' +
     '<h4>Default Profile per Tool</h4>' +
     '<dl>' +
-    '<dt>Default Profile per Tool</dt><dd>The registry\'s declared default profile per tool, used only the first time that tool is auto-installed (it has no recorded active profile yet). It is <strong>not</strong> the profile currently installed on this machine — a tool can be running any profile you switched it to, regardless of what Default Profile per Tool reads here. See the "Active Profile" tab to view each tool\'s actual active profile and to change it.</dd>' +
+    '<dt>Default Profile per Tool</dt><dd>The declared default profile per tool, used only the first time that tool is auto-installed (it has no recorded active profile yet). It is <strong>not</strong> the profile currently installed on this machine — a tool can be running any profile you switched it to, regardless of what Default Profile per Tool reads here. See the "Active Profile" tab to view each tool\'s actual active profile and to change it.</dd>' +
     '</dl>' +
+    '<h4>Per-Workflow Tier Overrides</h4>' +
+    '<p>Maps a workflow name to a tier, overriding the charter default for agents dispatched under that workflow. Add one (e.g., <code>spec-driven &rarr; deep</code>) to pin a heavier model tier for a specific workflow.</p>' +
+    '<h4>Per-Agent Tier Overrides</h4>' +
+    '<p>Maps one agent to a tier, per tool — the only way to run, for example, <code>builder</code> at Deep on OpenCode while it stays Standard everywhere else. Pick the <code>(default: ...)</code> option to remove the override and go back to inheriting the agent\'s charter tier.</p>' +
+    '<h4>Save &amp; Apply</h4>' +
+    '<p>Persists every unsaved change on this tab (profile cells, Default Profile per Tool, Per-Workflow Tier Overrides, Per-Agent Tier Overrides, add/duplicate/delete profile) to your local machine, then regenerates and installs the agent files for every tool. Asks for confirmation first. <strong>Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) afterward</strong> — an already-running session keeps using the model it started with until you do.</p>' +
+    '<h4>Discard All Overrides</h4>' +
+    '<p>Deletes your saved changes, reverting every tool to the built-in defaults. Asks for confirmation. All profiles you added, cell overrides, default-profile changes, and Per-Workflow/Per-Agent overrides are lost. Removed profiles are restored.</p>' +
+    '<h4>Removed Profiles</h4>' +
+    '<p>A deleted built-in profile is not gone forever — it moves to the Removed Profiles list below, where Restore brings it back.</p>' +
     '</div>' +
     '</details>';
 
@@ -2133,14 +2165,14 @@ export function handleIndexStatusEvent(ctx, payload) {
 }
 
 export async function handleRegistryClearOverlay(ctx) {
-  if (!confirm("Reset to built-in? This deletes the overlay file and reverts to the builtin registry.")) return;
+  if (!confirm("Discard all your overrides? This deletes your saved changes and reverts every tool to the built-in defaults.")) return;
   try {
     const res = await ctx.api.request("/api/v1/model-registry/overlay", { method: "DELETE" });
     if (res && res.success === false) {
       showBanner(ctx.root, "error", "Clear failed: " + (res.error || "unknown"));
       return;
     }
-    showBanner(ctx.root, "success", "Overlay cleared. Registry reverted to built-in.");
+    showBanner(ctx.root, "success", "Overrides discarded. Reverted to the built-in defaults.");
     ctx.state.registryLoaded = false;
     ctx.state.registryDirty = false;
     ctx.render();

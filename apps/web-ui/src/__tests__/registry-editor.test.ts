@@ -440,9 +440,11 @@ describe("renderModelRegistry — overlay error + empty state (REG-16, T9 nomenc
     expect(html).toContain("No profiles");
   });
 
-  it("shows registry error message when _error present (UIC-06)", () => {
+  it("shows a catalog error message when _error present (UIC-06)", () => {
+    // T14: "Registry load error" renamed "Catalog load error" — negative
+    // vocabulary sensor (P2-D AC1) bans user-visible "registry".
     const html = renderModelRegistry({ registry: { profiles: {} }, source: {}, _error: "Route not found" }, { writeMode: true });
-    expect(html).toContain("Registry load error");
+    expect(html).toContain("Catalog load error");
     expect(html).toContain("Route not found");
   });
 });
@@ -475,12 +477,14 @@ describe("renderModelRegistry — defaults writeMode", () => {
   });
 });
 
-describe("renderModelRegistry — help section (REG-01, T8)", () => {
+describe("renderModelRegistry — help section (REG-01, T8, T14)", () => {
   it("renders a collapsible details help section", () => {
+    // T14: bare "?" summary + "registry-help" class replaced by the shared
+    // `.help-card` titled collapsible ("About this tab"), design D-5/D-6.
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("<details");
-    expect(html).toContain('class="registry-help"');
-    expect(html).toContain("<summary>?</summary>");
+    expect(html).toContain('class="help-card"');
+    expect(html).toContain("<summary>About this tab</summary>");
   });
 
   it("explains every current action button (T8: Save & Apply replaces Save Overlay + Regenerate Artifacts; T9: Discard All Overrides)", () => {
@@ -498,15 +502,39 @@ describe("renderModelRegistry — help section (REG-01, T8)", () => {
   it("help section appears after action buttons", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     const actionIdx = html.indexOf('data-action="registry-clear-overlay"');
-    const helpIdx = html.indexOf('class="registry-help"');
+    const helpIdx = html.indexOf('class="help-card"');
     expect(actionIdx).toBeGreaterThan(-1);
     expect(helpIdx).toBeGreaterThan(actionIdx);
   });
 
   it("renders help section in read mode too (buttons absent, help present)", () => {
+    // T14: "Button Guide" heading replaced by "Managing Profiles" as part of
+    // the plain-English rewrite (design D-6, APUX-10).
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
     expect(html).toContain("<details");
-    expect(html).toContain("Button Guide");
+    expect(html).toContain("Managing Profiles");
+  });
+});
+
+describe("renderModelRegistry — help card content (T14, APUX-10)", () => {
+  it("explains what a profile is and the three capability tiers", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("What A Profile Is");
+    expect(html).toContain("Capability Tiers");
+    expect(html).toContain("<strong>Light</strong>");
+    expect(html).toContain("<strong>Standard</strong>");
+    expect(html).toContain("<strong>Deep</strong>");
+  });
+
+  it("explains the Save & Apply flow including the CLI-restart consequence", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) afterward");
+  });
+
+  it("explains Per-Agent Tier Overrides and Removed Profiles", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("<h4>Per-Agent Tier Overrides</h4>");
+    expect(html).toContain("<h4>Removed Profiles</h4>");
   });
 });
 

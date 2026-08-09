@@ -1059,6 +1059,36 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       expect(html).toContain("<details");
       expect(html).toContain("Embedding Dimension Note");
     });
+
+    it("renders an 'About this tab' help card explaining indexing + Delete (T14, APUX-10)", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain('<details class="help-card"><summary>About this tab</summary>');
+      expect(html).toContain("What Indexing Does");
+      expect(html).toContain("What Delete Removes");
+      expect(html).toContain("irreversibly");
+    });
+  });
+
+  describe("checkpoints help card (T14, APUX-10)", () => {
+    it("renders an 'About this tab' help card explaining what a checkpoint is", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [] } };
+      const html = renderCheckpoints(data);
+      expect(html).toContain('<details class="help-card"><summary>About this tab</summary>');
+      expect(html).toContain("What A Checkpoint Is");
+      expect(html).toContain("saved snapshot");
+    });
+  });
+
+  describe("config help card (T14, APUX-10)", () => {
+    it("renders an 'About this tab' help card explaining per-section save + restart badges", () => {
+      const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
+      expect(html).toContain('<details class="help-card"><summary>About this tab</summary>');
+      expect(html).toContain("How Config Saves");
+      expect(html).toContain("saves independently");
+    });
   });
 
   // ── T11 (APUX-09, design D-5): shared button system + form-grid structure ──
@@ -1352,12 +1382,21 @@ describe("Models tab nomenclature Scheme A (T9, APUX-07, P2-D AC1)", () => {
     expect(visible.toLowerCase()).not.toContain("host");
   });
 
+  // T14 (P2-D AC1): the sensor now covers all four banned words, "registry"
+  // included — the T14 help-card rewrite eliminated the remaining
+  // user-visible "registry" prose (help section, catalog-empty/error text).
+  it('contains no "registry" in user-visible text (code samples + attributes excepted)', () => {
+    const visible = extractVisibleText(bothTabsHtml);
+    expect(visible.toLowerCase()).not.toContain("registry");
+  });
+
   it("sensor sanity: the raw (unstripped) HTML DOES still carry these words in attributes/classes, proving the strip step is load-bearing", () => {
     // If this ever goes false, the fixture stopped exercising data-host/
-    // class="tombstoned"/class="overlay-badge" and the negative tests above
-    // would pass vacuously.
+    // class="tombstoned"/class="overlay-badge"/class="registry-*" and the
+    // negative tests above would pass vacuously.
     expect(bothTabsHtml).toContain('data-host="claude"');
     expect(bothTabsHtml).toContain('class="tombstoned"');
     expect(bothTabsHtml).toContain('class="badge overlay-badge"');
+    expect(bothTabsHtml).toContain('class="registry-override-count muted"');
   });
 });
