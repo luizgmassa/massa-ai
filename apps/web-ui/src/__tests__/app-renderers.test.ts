@@ -1400,3 +1400,86 @@ describe("Models tab nomenclature Scheme A (T9, APUX-07, P2-D AC1)", () => {
     expect(bothTabsHtml).toContain('class="registry-override-count muted"');
   });
 });
+
+// ── Fix-loop 2, gap 1 (T10, APUX-08, P2-E AC1) ──────────────────────────────
+// The Projects Delete confirm() text is correct but untested: no test
+// simulates a real click on project-reset, because the shared fake-DOM
+// harness (`makeFakeDom` above) attaches every wired handler to one generic
+// stable child whose `dataset` never carries a `project` key — the handler's
+// own `if (!project) return;` guard exits before `confirm()` would ever run,
+// so a click-simulation here would pass vacuously (dialogs.confirms would
+// stay empty) rather than exercise the real message. This sensor takes the
+// documented fallback instead: extract wireViewHandlers' own source span
+// (the same brace-depth-lexer idiom registry-editor.test.ts already uses for
+// its no-prompt/no-alert sensor) and assert the exact confirm() literal
+// lives inside it.
+
+const WIRE_VIEW_HANDLERS_SOURCE = fs.readFileSync(path.join(STATIC_DIR, "app.js"), "utf8");
+
+/** Extracts the full source text of a single top-level `function name() { ... }`
+ *  declaration using a small brace-depth lexer that ignores braces inside
+ *  string/template literals and comments, so it never mis-closes on a `{`/`}`
+ *  inside a rendered HTML string. Mirrors registry-editor.test.ts's
+ *  `extractFunctionSpans` (kept local here — that helper isn't exported). */
+function extractFunctionSpan(source: string, name: string): string | null {
+  const declRe = new RegExp("function\\s+" + name + "\\s*\\(");
+  const m = declRe.exec(source);
+  if (!m) return null;
+  let i = m.index + m[0].length;
+  let parenDepth = 1;
+  while (parenDepth > 0 && i < source.length) {
+    if (source[i] === "(") parenDepth++;
+    else if (source[i] === ")") parenDepth--;
+    i++;
+  }
+  while (i < source.length && source[i] !== "{") i++;
+  let braceDepth = 0;
+  let state: "normal" | "sq" | "dq" | "tpl" | "line" | "block" = "normal";
+  let j = i;
+  for (; j < source.length; j++) {
+    const c = source[j];
+    const prev = source[j - 1];
+    if (state === "normal") {
+      if (c === "'") state = "sq";
+      else if (c === '"') state = "dq";
+      else if (c === "`") state = "tpl";
+      else if (c === "/" && source[j + 1] === "/") state = "line";
+      else if (c === "/" && source[j + 1] === "*") state = "block";
+      else if (c === "{") braceDepth++;
+      else if (c === "}") {
+        braceDepth--;
+        if (braceDepth === 0) { j++; break; }
+      }
+    } else if (state === "sq") {
+      if (c === "'" && prev !== "\\") state = "normal";
+    } else if (state === "dq") {
+      if (c === '"' && prev !== "\\") state = "normal";
+    } else if (state === "tpl") {
+      if (c === "`" && prev !== "\\") state = "normal";
+    } else if (state === "line") {
+      if (c === "\n") state = "normal";
+    } else if (state === "block") {
+      if (c === "*" && source[j + 1] === "/") { state = "normal"; j++; }
+    }
+  }
+  return source.slice(m.index, j);
+}
+
+describe("Projects Delete confirm text — wireViewHandlers source-span sensor (T10, APUX-08, P2-E AC1)", () => {
+  const wireViewHandlersSpan = extractFunctionSpan(WIRE_VIEW_HANDLERS_SOURCE, "wireViewHandlers");
+
+  it("finds the wireViewHandlers function span (sensor sanity — a null/tiny span proves nothing)", () => {
+    expect(wireViewHandlersSpan).not.toBeNull();
+    expect((wireViewHandlersSpan as string).length).toBeGreaterThan(500);
+    // A second, independently-known confirm() from the same function proves
+    // the span genuinely captured the real body, not a truncated match.
+    expect(wireViewHandlersSpan).toContain('confirm("Delete checkpoint " + id + " (task: " + task + ")? This cannot be undone.")');
+  });
+
+  it("wires project-reset with the exact removal-consequence confirm text", () => {
+    expect(wireViewHandlersSpan).toContain('data-action="project-reset"');
+    expect(wireViewHandlersSpan).toContain(
+      'confirm("Delete project " + project + "? This removes its indexed vectors, symbols and memories permanently. This cannot be undone.")',
+    );
+  });
+});

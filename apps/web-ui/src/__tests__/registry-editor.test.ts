@@ -643,6 +643,72 @@ describe("renderModelRegistry — inline dropdown forms replace prompt() (T7, AP
   });
 });
 
+// ── Fix-loop 2, gap 2 (T11, APUX-09, P2-F AC4) ──────────────────────────────
+// `.button-row` groups every inline-form's action buttons instead of leaving
+// them visually piled, but no test asserted the literal class. It renders
+// only inside the Models catalog's four inline forms (Add Workflow Override,
+// Duplicate Profile, Delete Profile, Add Profile) — one assertion per emission
+// site in app.js, both branches (has options / empty-state notice) where each
+// form renders two different bodies.
+
+const EMPTY_PROFILES_REGISTRY = { registry: { profiles: {}, tiers: ["light"] }, source: {}, _error: "unrelated" };
+
+const ALL_WORKFLOW_STEMS_TAKEN: Record<string, string> = {};
+for (const stem of [
+  "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
+  "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
+  "discovery", "exploration", "feature", "furps-refinement", "general",
+  "implementation-audit", "implementation-fix", "judge-with-debate",
+  "long-session", "maestro", "maestro-audit", "maestro-fix",
+  "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
+  "refactor", "requirements-audit", "requirements-fix", "rfc",
+  "security-audit", "security-fix", "skill-architect", "spec-driven",
+  "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
+]) {
+  ALL_WORKFLOW_STEMS_TAKEN[stem] = "standard";
+}
+const REGISTRY_ALL_WORKFLOW_STEMS_TAKEN = {
+  ...SAMPLE_REGISTRY,
+  registry: { ...SAMPLE_REGISTRY.registry, workflowTiers: ALL_WORKFLOW_STEMS_TAKEN },
+};
+
+describe("Models catalog inline-form button-row grouping (T11, APUX-09, P2-F AC4)", () => {
+  it("add-workflow form (workflows available): Add/Cancel pair renders inside .button-row", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
+    expect(html).toContain('class="button-row"');
+  });
+
+  it("add-workflow form (every stem taken — empty-state notice): lone Cancel renders inside .button-row", () => {
+    const html = renderModelRegistry(REGISTRY_ALL_WORKFLOW_STEMS_TAKEN, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
+    expect(html).toContain('class="button-row"');
+  });
+
+  it("duplicate-profile form (profiles available): Duplicate/Cancel pair renders inside .button-row", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "duplicate-profile", error: null } });
+    expect(html).toContain('class="button-row"');
+  });
+
+  it("duplicate-profile form (no profiles — empty-state notice): lone Cancel renders inside .button-row", () => {
+    const html = renderModelRegistry(EMPTY_PROFILES_REGISTRY, { writeMode: true, registryForm: { kind: "duplicate-profile", error: null } });
+    expect(html).toContain('class="button-row"');
+  });
+
+  it("delete-profile form (profiles available): Delete/Cancel pair renders inside .button-row", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "delete-profile", error: null } });
+    expect(html).toContain('class="button-row"');
+  });
+
+  it("delete-profile form (no profiles — empty-state notice): lone Cancel renders inside .button-row", () => {
+    const html = renderModelRegistry(EMPTY_PROFILES_REGISTRY, { writeMode: true, registryForm: { kind: "delete-profile", error: null } });
+    expect(html).toContain('class="button-row"');
+  });
+
+  it("add-profile form: Add/Cancel pair renders inside .button-row", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-profile", error: null } });
+    expect(html).toContain('class="button-row"');
+  });
+});
+
 // ── Structural no-prompt sensor (T7, P2-D AC6, advisory finding #4) ─────────
 // Scans only the source SPANS of handleRegistry* functions and
 // renderModelRegistry/renderProfilesView for `prompt(`/`alert(` — never a
