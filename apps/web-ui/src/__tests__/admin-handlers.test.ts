@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import fs from "fs";
+import path from "path";
 
 // ── admin-handlers.test.ts ──────────────────────────────────────────────────
 // Tests the admin-portal-enhancement handlers: showBanner, config save/reveal,
@@ -18,46 +20,54 @@ const {
   handleProfilesTabSwitch,
   handleRegistryCellEdit,
   handleRegistryHostDefaultEdit,
+  handleRegistryAgentTierEdit,
   handleRegistryWorkflowTierEdit,
+  handleRegistryFormToggle,
+  handleRegistryFormCancel,
   handleRegistryWorkflowTierAdd,
   handleRegistryWorkflowTierRemove,
   handleRegistryAddProfile,
   handleRegistryDuplicateProfile,
   handleRegistryDeleteProfile,
   handleRegistryRestore,
-  handleRegistrySaveOverlay,
   handleRegistryClearOverlay,
-  handleRegistryRegenerate,
+  runRegenerateStream,
+  handleRegistrySaveAndApply,
   handleProjectIndexProgress,
   handleIndexStatusEvent,
   initRegistryOverlay,
   mergeRegistryForDisplay,
   renderProfilesView,
   renderModelRegistry,
+  joinModelId,
 } = { ...mod, ...UI } as {
-  showBanner: (root: MockRoot, type: string, message: string) => void;
+  showBanner: (root: MockRoot, type: string, message: string, opts?: { persist?: boolean }) => MockElement;
   handleConfigSave: (ctx: any, section: string) => Promise<void>;
   handleConfigReveal: (ctx: any, targetId: string, section?: string, field?: string) => Promise<void>;
   handleProfileSwitch: (ctx: any, profile: string, host: string) => Promise<void>;
   handleProfilesTabSwitch: (ctx: any, tab: string) => void;
-  handleRegistryCellEdit: (ctx: any, profile: string, host: string, tier: string, field: string, value: string) => void;
+  handleRegistryCellEdit: (ctx: any, profile: string, host: string, tier: string, field: string, value: string | null) => void;
   handleRegistryHostDefaultEdit: (ctx: any, host: string, value: string) => void;
+  handleRegistryAgentTierEdit: (ctx: any, agent: string, host: string, value: string) => void;
   handleRegistryWorkflowTierEdit: (ctx: any, workflow: string, value: string) => void;
-  handleRegistryWorkflowTierAdd: (ctx: any) => void;
+  handleRegistryFormToggle: (ctx: any, kind: string) => void;
+  handleRegistryFormCancel: (ctx: any) => void;
+  handleRegistryWorkflowTierAdd: (ctx: any, workflow?: string, tier?: string) => void;
   handleRegistryWorkflowTierRemove: (ctx: any, workflow: string) => void;
-  handleRegistryAddProfile: (ctx: any) => void;
-  handleRegistryDuplicateProfile: (ctx: any) => void;
-  handleRegistryDeleteProfile: (ctx: any) => void;
+  handleRegistryAddProfile: (ctx: any, name?: string, description?: string) => void;
+  handleRegistryDuplicateProfile: (ctx: any, sourceName?: string, newName?: string) => void;
+  handleRegistryDeleteProfile: (ctx: any, name?: string) => void;
   handleRegistryRestore: (ctx: any, profile: string) => void;
-  handleRegistrySaveOverlay: (ctx: any) => Promise<void>;
   handleRegistryClearOverlay: (ctx: any) => Promise<void>;
-  handleRegistryRegenerate: (ctx: any) => Promise<void>;
+  runRegenerateStream: (ctx: any) => Promise<{ ok: boolean; reason?: string }>;
+  handleRegistrySaveAndApply: (ctx: any) => Promise<void>;
   handleProjectIndexProgress: (ctx: any, jobId: string) => Promise<void>;
   handleIndexStatusEvent: (ctx: any, payload: any) => boolean;
   initRegistryOverlay: (ctx: any, registry: any, source?: any) => void;
   mergeRegistryForDisplay: (serverData: any, overlay: any) => any;
   renderProfilesView: (profilesData: any, registryData: any, opts?: any) => string;
   renderModelRegistry: (data: any, opts?: any) => string;
+  joinModelId: (provider: string | null | undefined, model: string | null | undefined) => string | null;
 };
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
@@ -79,6 +89,7 @@ interface MockElement {
   getAttribute?: (name: string) => string;
   children?: MockElement[];
   style?: Record<string, string>;
+  className?: string;
 }
 
 function makeInput(dataset: Record<string, string> = {}, type = "text", value = ""): MockElement {
@@ -189,6 +200,40 @@ describe("showBanner — success/error banners (DS-04)", () => {
     // only one banner at a time — the success should be replaced by error
     // After clear + insert, the newest is the error
     expect(root.children[0].textContent).toContain("second");
+  });
+
+  // ── T8 (P1-C AC2): persist option skips the 6 s auto-hide ─────────────────
+  it("adds a banner-persist class and skips the auto-hide setTimeout when persist:true", () => {
+    const origSetTimeout = (globalThis as any).setTimeout;
+    const setTimeoutSpy = mock(() => 0);
+    (globalThis as any).setTimeout = setTimeoutSpy;
+    const root = makeRoot();
+    const banner = showBanner(root, "success", "Regeneration complete.", { persist: true });
+    expect(banner.className).toContain("success");
+    expect(banner.className).toContain("banner-persist");
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+    (globalThis as any).setTimeout = origSetTimeout;
+  });
+
+  it("still auto-hides a success banner via setTimeout when persist is omitted (existing behavior)", () => {
+    const origSetTimeout = (globalThis as any).setTimeout;
+    const setTimeoutSpy = mock(() => 0);
+    (globalThis as any).setTimeout = setTimeoutSpy;
+    const root = makeRoot();
+    const banner = showBanner(root, "success", "Config saved.");
+    expect(banner.className).not.toContain("banner-persist");
+    expect(setTimeoutSpy).toHaveBeenCalled();
+    (globalThis as any).setTimeout = origSetTimeout;
+  });
+
+  it("never auto-hides an error banner regardless of persist", () => {
+    const origSetTimeout = (globalThis as any).setTimeout;
+    const setTimeoutSpy = mock(() => 0);
+    (globalThis as any).setTimeout = setTimeoutSpy;
+    const root = makeRoot();
+    showBanner(root, "error", "Save failed.");
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+    (globalThis as any).setTimeout = origSetTimeout;
   });
 });
 
@@ -376,12 +421,12 @@ const SAMPLE_REGISTRY_DATA = {
   source: { builtin: {}, overlay: null, tombstoned: [] },
 };
 
-describe("renderProfilesView — tab switcher (PROFTAB-01..03, DS-05)", () => {
-  it("renders both tabs (Switch Profile / Edit Registry)", () => {
+describe("renderProfilesView — tab switcher (PROFTAB-01..03, DS-05, T9 nomenclature)", () => {
+  it("renders both tabs (Active Profile / Model Catalog)", () => {
     const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "switch", writeMode: true });
     expect(html).toContain("tab-switcher");
-    expect(html).toContain("Switch Profile");
-    expect(html).toContain("Edit Registry");
+    expect(html).toContain("Active Profile");
+    expect(html).toContain("Model Catalog");
   });
 
   it("renders the switch profile sub-view when tab=switch (PROFTAB-02)", () => {
@@ -393,13 +438,13 @@ describe("renderProfilesView — tab switcher (PROFTAB-01..03, DS-05)", () => {
   it("renders the registry sub-view when tab=registry (PROFTAB-03)", () => {
     const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "registry", writeMode: true });
     expect(html).toContain("registry-grid");
-    expect(html).toContain("Model Registry");
+    expect(html).toContain("Model Catalog");
   });
 
   it("marks the active tab with .active class (DS-05)", () => {
     const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "registry", writeMode: true });
     // the registry tab button should carry the active class
-    const regTabIdx = html.indexOf("Edit Registry");
+    const regTabIdx = html.indexOf("Model Catalog");
     // class attribute precedes the text — search the button element backwards
     const buttonStart = html.lastIndexOf("<button", regTabIdx);
     expect(html.slice(buttonStart, regTabIdx)).toContain("active");
@@ -775,14 +820,14 @@ describe("renderModelRegistry — overlay override count display (APCR-01.10)", 
     source: { overlay: null, tombstoned: [] },
   };
 
-  it("renders a compact override-count line when the count is greater than 0", () => {
+  it("renders a compact override-count line when the count is greater than 0 (T9: Nomenclature Map sentence)", () => {
     const html = renderModelRegistry({ ...minimalRegistry, overlayOverrideCount: 3 }, { writeMode: false });
-    expect(html).toContain("Overlay is overriding 3 entries from the builtin registry.");
+    expect(html).toContain("You have 3 custom overrides of the built-in defaults.");
   });
 
   it("uses singular phrasing for a count of exactly 1", () => {
     const html = renderModelRegistry({ ...minimalRegistry, overlayOverrideCount: 1 }, { writeMode: false });
-    expect(html).toContain("Overlay is overriding 1 entry from the builtin registry.");
+    expect(html).toContain("You have 1 custom override of the built-in defaults.");
   });
 
   it("renders nothing extra when the count is 0 (no overlay, no noise)", () => {
@@ -796,7 +841,7 @@ describe("renderModelRegistry — overlay override count display (APCR-01.10)", 
   });
 });
 
-describe("renderModelRegistry — help guide explains Host Defaults vs. the actually-installed profile", () => {
+describe("renderModelRegistry — help guide explains Default Profile per Tool vs. the actually-installed profile (T9 nomenclature)", () => {
   const minimalRegistry = {
     registry: {
       profiles: { p: { description: "P", hosts: {} } },
@@ -807,11 +852,13 @@ describe("renderModelRegistry — help guide explains Host Defaults vs. the actu
     source: { overlay: null, tombstoned: [] },
   };
 
-  it("adds a Host Defaults dt/dd pair distinguishing it from the currently-installed profile", () => {
+  it("adds a Default Profile per Tool dt/dd pair distinguishing it from the currently-installed profile", () => {
     const html = renderModelRegistry(minimalRegistry, { writeMode: false });
-    expect(html).toContain("<dt>Host Defaults</dt>");
+    expect(html).toContain("<dt>Default Profile per Tool</dt>");
     expect(html.toLowerCase()).toContain("not</strong> the profile currently installed");
-    expect(html).toContain("Switch Profile");
+    expect(html).toContain("Active Profile");
+    expect(html).not.toContain("Host Defaults");
+    expect(html).not.toContain("Switch Profile");
   });
 });
 
@@ -841,6 +888,31 @@ describe("handleRegistryCellEdit — in-memory cell edit (REGWIRE-01)", () => {
     expect(ctx.state.registryOverlay.profiles["builtin-only"].description).toBeUndefined();
     expect(Object.prototype.hasOwnProperty.call(ctx.state.registryOverlay.profiles["builtin-only"], "description")).toBe(false);
   });
+
+  // ── Provider/Model split-join (T5, APUX-14, P1-B AC2-AC5) ──────────────────
+  // The DOM change listener (wireViewHandlers) reads both sibling Provider/Model
+  // inputs, joins via `joinModelId`, and routes through this same handler with
+  // field "model" — these tests exercise that join contract directly.
+
+  it("stores the joined provider/model string produced by joinModelId (T5)", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { opencode: { standard: { model: "old", effort: "medium" } } } } } }, registryDirty: false, registryLoaded: true } });
+    const joined = joinModelId("opencode-go", "glm-5.2");
+    handleRegistryCellEdit(ctx, "balanced", "opencode", "standard", "model", joined);
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.opencode.standard.model).toBe("opencode-go/glm-5.2");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("stores a bare model string when provider is blank", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "old", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "model", joinModelId("", "sonnet"));
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.model).toBe("sonnet");
+  });
+
+  it("stores null (inherit) when both provider and model are blank", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "old", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "model", joinModelId("", ""));
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.model).toBeNull();
+  });
 });
 
 describe("handleRegistryHostDefaultEdit — hostDefaults edit (REGWIRE-02)", () => {
@@ -849,6 +921,97 @@ describe("handleRegistryHostDefaultEdit — hostDefaults edit (REGWIRE-02)", () 
     handleRegistryHostDefaultEdit(ctx, "claude", "work");
     expect(ctx.state.registryOverlay.hostDefaults.claude).toBe("work");
     expect(ctx.state.registryDirty).toBe(true);
+  });
+});
+
+describe("handleRegistryAgentTierEdit — Per-Agent Tier Overrides edit (T6, APUX-04, P1-A AC8)", () => {
+  it("sets an override for a new agent + sets dirty", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "deep");
+    expect(ctx.state.registryOverlay.agentTiers.builder.opencode).toBe("deep");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("adds a second host override without disturbing the first", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: { builder: { opencode: "deep" } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "claude", "standard");
+    expect(ctx.state.registryOverlay.agentTiers.builder).toEqual({ opencode: "deep", claude: "standard" });
+  });
+
+  it("removes the override key when the value is '' (default picked)", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: { builder: { opencode: "deep", claude: "standard" } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "");
+    expect(ctx.state.registryOverlay.agentTiers.builder).toEqual({ claude: "standard" });
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("prunes the agent object entirely once its last host override is removed", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: { builder: { opencode: "deep" } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "");
+    expect(Object.prototype.hasOwnProperty.call(ctx.state.registryOverlay.agentTiers, "builder")).toBe(false);
+  });
+
+  it("is a no-op (still sets dirty) when clearing a host that was never overridden", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "");
+    expect(ctx.state.registryOverlay.agentTiers).toEqual({});
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("initializes registryOverlay.agentTiers on demand when the overlay has never been touched", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "deep");
+    expect(ctx.state.registryOverlay.agentTiers.builder.opencode).toBe("deep");
+  });
+});
+
+describe("renderModelRegistry — Per-Agent Tier Overrides display merge (T6, APUX-04)", () => {
+  it("shows an unsaved agentTier override before save (mergeRegistryForDisplay)", () => {
+    const server = {
+      registry: { profiles: { p: { hosts: {} } }, tiers: ["light", "standard", "deep"], hostDefaults: {}, workflowTiers: {}, agentTiers: {} },
+      source: {},
+      agents: [{ name: "builder", charterTier: "standard" }],
+    };
+    const overlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: { builder: { opencode: "deep" } }, tiers: ["light", "standard", "deep"] };
+    const display = mergeRegistryForDisplay(server, overlay);
+    expect(display.registry.agentTiers.builder.opencode).toBe("deep");
+    const html = renderModelRegistry(display, { writeMode: true });
+    expect(html).toContain('data-agent="builder" data-host="opencode"');
+    expect(html).toContain('value="deep" selected');
+  });
+
+  it("carries agents + agentsError through the display-merge rebuild branch", () => {
+    const server = {
+      registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {}, agentTiers: {} },
+      source: {},
+      agents: [{ name: "builder", charterTier: "standard" }],
+      agentsError: undefined,
+    };
+    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, agentTiers: {}, tiers: ["light"] };
+    const display = mergeRegistryForDisplay(server, overlay);
+    expect(display.agents).toEqual([{ name: "builder", charterTier: "standard" }]);
+  });
+
+  it("cross-boundary parity: mergeRegistryForDisplay reproduces the shared fixture's expected merged agentTiers", () => {
+    // Same fixture consumed by scripts/__tests__/model-profiles.test.ts through mergeOverlay
+    // (T1) — this proves the client's hand-copied twin (design D-4.3) is byte-identical.
+    const fixturePath = path.join(
+      import.meta.dir,
+      "fixtures",
+      "agent-tiers-parity.json",
+    );
+    const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8")) as {
+      builtinAgentTiers: Record<string, Record<string, string>>;
+      overlayAgentTiers: Record<string, Record<string, string | null> | null>;
+      expectedMergedAgentTiers: Record<string, Record<string, string>>;
+    };
+    const server = {
+      registry: { profiles: {}, tiers: ["light", "standard", "deep"], hostDefaults: {}, workflowTiers: {}, agentTiers: fixture.builtinAgentTiers },
+      source: {},
+    };
+    const overlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: fixture.overlayAgentTiers, tiers: ["light", "standard", "deep"] };
+    const display = mergeRegistryForDisplay(server, overlay);
+    expect(display.registry.agentTiers).toEqual(fixture.expectedMergedAgentTiers);
   });
 });
 
@@ -861,61 +1024,80 @@ describe("handleRegistryWorkflowTierEdit — workflowTiers edit (REGWIRE-02)", (
   });
 });
 
-describe("handleRegistryWorkflowTierAdd — add workflow tier (REG-03)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  const origAlert = (globalThis as any).alert;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
+// ── Inline form toggle/cancel (T7, APUX-12, D-4.4) ──────────────────────────
+// Replaces the prompt()-driven flows: a trigger click opens/closes
+// state.registryForm, and the submit path (wireViewHandlers, exercised via
+// registry-editor.test.ts render assertions) reads field values and calls the
+// same-named handler below with explicit args instead of prompt().
 
-  it("adds a new workflow tier to the overlay + sets dirty + re-renders", () => {
-    let calls = 0;
-    (globalThis as any).prompt = mock((_msg: string) => {
-      calls++;
-      if (calls === 1) return "spec-driven";
-      if (calls === 2) return "deep";
-      return null;
-    });
-    const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
-    });
-    handleRegistryWorkflowTierAdd(ctx);
-    expect(ctx.state.registryOverlay.workflowTiers["spec-driven"]).toBe("deep");
-    expect(ctx.state.registryDirty).toBe(true);
+describe("handleRegistryFormToggle / handleRegistryFormCancel — inline form open/close (T7)", () => {
+  it("opens a form of the given kind + re-renders", () => {
+    const render = mock(() => {});
+    const ctx = makeRegistryCtx({ render, state: { registryForm: null } });
+    handleRegistryFormToggle(ctx, "add-profile");
+    expect(ctx.state.registryForm).toEqual({ kind: "add-profile", error: null });
+    expect(render).toHaveBeenCalled();
   });
 
-  it("rejects duplicate workflow name", () => {
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "search");
+  it("closes the form when the same trigger is clicked again", () => {
+    const ctx = makeRegistryCtx({ state: { registryForm: { kind: "add-profile", error: null } } });
+    handleRegistryFormToggle(ctx, "add-profile");
+    expect(ctx.state.registryForm).toBeNull();
+  });
+
+  it("switches to a different form when a different trigger is clicked", () => {
+    const ctx = makeRegistryCtx({ state: { registryForm: { kind: "add-profile", error: null } } });
+    handleRegistryFormToggle(ctx, "delete-profile");
+    expect(ctx.state.registryForm).toEqual({ kind: "delete-profile", error: null });
+  });
+
+  it("handleRegistryFormCancel closes any open form + re-renders", () => {
+    const render = mock(() => {});
+    const ctx = makeRegistryCtx({ render, state: { registryForm: { kind: "add-workflow", error: "some error" } } });
+    handleRegistryFormCancel(ctx);
+    expect(ctx.state.registryForm).toBeNull();
+    expect(render).toHaveBeenCalled();
+  });
+});
+
+describe("handleRegistryWorkflowTierAdd — inline form submit (T7, REG-03, APUX-12)", () => {
+  it("adds a new workflow tier to the overlay + sets dirty + closes the form + re-renders", () => {
+    const render = mock(() => {});
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard" }, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+      render,
+      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
     });
-    handleRegistryWorkflowTierAdd(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryWorkflowTierAdd(ctx, "spec-driven", "deep");
+    expect(ctx.state.registryOverlay.workflowTiers["spec-driven"]).toBe("deep");
+    expect(ctx.state.registryDirty).toBe(true);
+    expect(ctx.state.registryForm).toBeNull();
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("rejects a duplicate workflow name with an inline form error, not alert()", () => {
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard" }, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
+    });
+    handleRegistryWorkflowTierAdd(ctx, "search", "deep");
+    expect(ctx.state.registryForm?.kind).toBe("add-workflow");
+    expect(ctx.state.registryForm?.error).toContain("search");
     expect(ctx.state.registryDirty).toBe(false);
   });
 
-  it("rejects invalid tier", () => {
-    (globalThis as any).alert = mock(() => {});
-    let calls = 0;
-    (globalThis as any).prompt = mock(() => {
-      calls++;
-      if (calls === 1) return "debug";
-      if (calls === 2) return "titanic";
-      return null;
-    });
+  it("rejects an invalid tier with an inline form error, not alert()", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
     });
-    handleRegistryWorkflowTierAdd(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryWorkflowTierAdd(ctx, "debug", "titanic");
+    expect(ctx.state.registryForm?.error).toContain("titanic");
     expect(ctx.state.registryOverlay.workflowTiers["debug"]).toBeUndefined();
   });
 
-  it("does nothing when prompt cancelled", () => {
-    (globalThis as any).prompt = mock(() => null);
+  it("does nothing when workflow is blank", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
     });
-    handleRegistryWorkflowTierAdd(ctx);
+    handleRegistryWorkflowTierAdd(ctx, "", "deep");
     expect(Object.keys(ctx.state.registryOverlay.workflowTiers)).toEqual([]);
     expect(ctx.state.registryDirty).toBe(false);
   });
@@ -944,146 +1126,114 @@ describe("handleRegistryWorkflowTierRemove — remove workflow tier (REG-03 / AP
   });
 });
 
-describe("handleRegistryAddProfile — add profile via prompt (REGWIRE-03)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  const origAlert = (globalThis as any).alert;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
-
+describe("handleRegistryAddProfile — inline form submit (T7, REGWIRE-03, APUX-12)", () => {
   it("adds a new profile with null model/effort for all host/tier combos", () => {
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("new profile name")) return "custom";
-      if (msg.toLowerCase().includes("description")) return "a custom profile";
-      return null;
-    });
     const ctx = makeRegistryCtx({
       state: {
         registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] },
-        registryDirty: false, registryLoaded: true,
+        registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null },
       },
     });
-    handleRegistryAddProfile(ctx);
+    handleRegistryAddProfile(ctx, "custom", "a custom profile");
     expect(ctx.state.registryOverlay.profiles.custom).toBeDefined();
     expect(ctx.state.registryOverlay.profiles.custom.description).toBe("a custom profile");
+    expect(ctx.state.registryOverlay.profiles.custom.hosts.claude.light).toEqual({ model: null, effort: null });
     expect(ctx.state.registryDirty).toBe(true);
+    expect(ctx.state.registryForm).toBeNull();
   });
 
-  it("defaults description to profile name when description prompt is empty", () => {
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("new profile name")) return "custom";
-      if (msg.toLowerCase().includes("description")) return "";
-      return null;
-    });
+  it("defaults description to profile name when description is blank", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } },
     });
-    handleRegistryAddProfile(ctx);
+    handleRegistryAddProfile(ctx, "custom", "");
     expect(ctx.state.registryOverlay.profiles.custom.description).toBe("custom");
   });
 
-  it("alerts when profile name already exists", () => {
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "balanced");
+  it("rejects an existing profile name with an inline form error, not alert()", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } },
     });
-    handleRegistryAddProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryAddProfile(ctx, "balanced", "");
+    expect(ctx.state.registryForm?.error).toContain("balanced");
+    expect(ctx.state.registryDirty).toBe(false);
   });
 
-  it("does nothing when prompt returns null/empty name", () => {
-    (globalThis as any).prompt = mock(() => null);
+  it("does nothing when name is blank", () => {
     const ctx = makeRegistryCtx({
       state: { registryOverlay: { profiles: {} }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"], registryDirty: false, registryLoaded: true },
     });
-    handleRegistryAddProfile(ctx);
+    handleRegistryAddProfile(ctx, "", "");
     expect(Object.keys(ctx.state.registryOverlay.profiles)).toHaveLength(0);
     expect(ctx.state.registryDirty).toBe(false);
   });
 });
 
-describe("handleRegistryDuplicateProfile — duplicate via prompt (REGWIRE-04)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; });
-
+describe("handleRegistryDuplicateProfile — inline form submit (T7, REGWIRE-04, APUX-12)", () => {
   it("copies selected profile grid to a new name", () => {
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("source")) return "balanced";
-      if (msg.toLowerCase().includes("new profile name")) return "work-copy";
-      return null;
-    });
     const ctx = makeRegistryCtx({
       state: {
         registryOverlay: { profiles: { balanced: { description: "b", hosts: { claude: { light: { model: "m", effort: "low" } } } } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] },
-        registryDirty: false, registryLoaded: true,
+        registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null },
       },
     });
-    handleRegistryDuplicateProfile(ctx);
+    handleRegistryDuplicateProfile(ctx, "balanced", "work-copy");
     expect(ctx.state.registryOverlay.profiles["work-copy"]).toBeDefined();
     expect(ctx.state.registryOverlay.profiles["work-copy"].hosts.claude.light.model).toBe("m");
     expect(ctx.state.registryDirty).toBe(true);
+    expect(ctx.state.registryForm).toBeNull();
   });
 
-  it("alerts when no profiles available to duplicate", () => {
-    const origAlert = (globalThis as any).alert;
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "x");
+  it("shows an inline error, not alert(), when the source profile is not found", () => {
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null } },
+    });
+    handleRegistryDuplicateProfile(ctx, "nonexistent", "copy");
+    expect(ctx.state.registryForm?.error).toContain("nonexistent");
+  });
+
+  it("shows an inline error, not alert(), when the new name already exists", () => {
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} }, work: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null } },
+    });
+    handleRegistryDuplicateProfile(ctx, "balanced", "work");
+    expect(ctx.state.registryForm?.error).toContain("work");
+  });
+
+  it("does nothing when source is blank", () => {
     const ctx = makeRegistryCtx({
       state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
     });
-    handleRegistryDuplicateProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
-    (globalThis as any).alert = origAlert;
-  });
-
-  it("alerts when source profile not found", () => {
-    const origAlert = (globalThis as any).alert;
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("source")) return "nonexistent";
-      return null;
-    });
-    const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
-    });
-    handleRegistryDuplicateProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
-    (globalThis as any).alert = origAlert;
+    handleRegistryDuplicateProfile(ctx, "", "copy");
+    expect(ctx.state.registryDirty).toBe(false);
   });
 });
 
-describe("handleRegistryDeleteProfile — delete + tombstone (REGWIRE-05)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  const origAlert = (globalThis as any).alert;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
-
+describe("handleRegistryDeleteProfile — inline form submit (T7, REGWIRE-05, APUX-12)", () => {
   it("sets _delete:true on existing profile", () => {
-    (globalThis as any).prompt = mock(() => "balanced");
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "delete-profile", error: null } },
     });
-    handleRegistryDeleteProfile(ctx);
+    handleRegistryDeleteProfile(ctx, "balanced");
     expect(ctx.state.registryOverlay.profiles.balanced._delete).toBe(true);
     expect(ctx.state.registryDirty).toBe(true);
+    expect(ctx.state.registryForm).toBeNull();
   });
 
-  it("alerts when profile not found", () => {
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "nonexistent");
+  it("shows an inline error, not alert(), when the profile is not found", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "delete-profile", error: null } },
     });
-    handleRegistryDeleteProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryDeleteProfile(ctx, "nonexistent");
+    expect(ctx.state.registryForm?.error).toContain("nonexistent");
   });
 
-  it("alerts when no profiles available to delete", () => {
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "x");
+  it("does nothing when name is blank", () => {
     const ctx = makeRegistryCtx({
       state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
     });
-    handleRegistryDeleteProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryDeleteProfile(ctx, "");
+    expect(ctx.state.registryDirty).toBe(false);
   });
 });
 
@@ -1093,10 +1243,6 @@ describe("handleRegistryDeleteProfile — delete + tombstone (REGWIRE-05)", () =
 // initRegistryOverlay (unlike every test above, which builds ctx.state.registryOverlay
 // by hand) so they can actually observe the regression Batch Worker 1 flagged.
 describe("Registry Duplicate/Delete pickers see every effective-registry profile with an empty overlay (APCR-11.5)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  const origAlert = (globalThis as any).alert;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
-
   /** Build a ctx whose registryOverlay was seeded via initRegistryOverlay (overlay-only,
    *  APCR-01.8) from a session with NO saved overlay, and whose registryServerData mirrors
    *  what render() caches (the same server payload initRegistryOverlay read from). */
@@ -1118,40 +1264,30 @@ describe("Registry Duplicate/Delete pickers see every effective-registry profile
 
   it("Duplicate offers the builtin profile even though the overlay is empty", () => {
     const ctx = makeUnEditedSessionCtx();
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("source")) return "balanced";
-      if (msg.toLowerCase().includes("new profile name")) return "balanced-copy";
-      return null;
-    });
-    handleRegistryDuplicateProfile(ctx);
+    handleRegistryDuplicateProfile(ctx, "balanced", "balanced-copy");
     expect(ctx.state.registryOverlay.profiles["balanced-copy"]).toBeDefined();
     expect(ctx.state.registryOverlay.profiles["balanced-copy"].hosts.claude.light.model).toBe("m-l");
     expect(ctx.state.registryDirty).toBe(true);
   });
 
-  it("Duplicate does NOT alert 'no profiles available' when the overlay is empty but the server has profiles", () => {
+  it("Duplicate does not report a missing source when the overlay is empty but the server has profiles", () => {
     const ctx = makeUnEditedSessionCtx();
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => null); // cancel after the "no profiles" check would fire
-    handleRegistryDuplicateProfile(ctx);
-    expect((globalThis as any).alert).not.toHaveBeenCalled();
+    handleRegistryDuplicateProfile(ctx, "balanced", "another-copy");
+    expect(ctx.state.registryForm).toBeNull();
   });
 
   it("Delete offers the builtin profile even though the overlay is empty, and tombstones it in the overlay", () => {
     const ctx = makeUnEditedSessionCtx();
-    (globalThis as any).prompt = mock(() => "balanced");
-    handleRegistryDeleteProfile(ctx);
+    handleRegistryDeleteProfile(ctx, "balanced");
     expect(ctx.state.registryOverlay.profiles.balanced).toBeDefined();
     expect(ctx.state.registryOverlay.profiles.balanced._delete).toBe(true);
     expect(ctx.state.registryDirty).toBe(true);
   });
 
-  it("Delete does NOT alert 'no profiles available' when the overlay is empty but the server has profiles", () => {
+  it("Delete does not report a missing profile when the overlay is empty but the server has profiles", () => {
     const ctx = makeUnEditedSessionCtx();
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => null);
-    handleRegistryDeleteProfile(ctx);
-    expect((globalThis as any).alert).not.toHaveBeenCalled();
+    handleRegistryDeleteProfile(ctx, "balanced");
+    expect(ctx.state.registryForm).toBeNull();
   });
 });
 
@@ -1165,72 +1301,7 @@ describe("handleRegistryRestore — remove tombstone (REGWIRE-06)", () => {
   });
 });
 
-// ── Registry save/clear overlay (REGWIRE-07..13) ─────────────────────────────
-
-describe("handleRegistrySaveOverlay — confirm + PUT + dirty reset (REGWIRE-07..10)", () => {
-  const origConfirm = (globalThis as any).confirm;
-  afterEach(() => { (globalThis as any).confirm = origConfirm; });
-
-  it("shows confirm naming the overlay file path (REGWIRE-07)", async () => {
-    (globalThis as any).confirm = mock(() => false);
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true } });
-    await handleRegistrySaveOverlay(ctx);
-    const msg = ((globalThis as any).confirm.mock.calls[0] as any[])[0] as string;
-    expect(msg.toLowerCase()).toContain("overlay");
-    expect(msg.toLowerCase()).toContain("validat");
-  });
-
-  it("PUTs the full in-memory overlay on confirm (REGWIRE-08)", async () => {
-    (globalThis as any).confirm = mock(() => true);
-    const request = mock(async () => ({ success: true, data: { registry: {}, source: { overlay: { profiles: { balanced: {} } } } } }));
-    const ctx = makeRegistryCtx({
-      api: { request },
-      state: { registryOverlay: { profiles: { balanced: { description: "x" } } }, registryDirty: true, registryLoaded: true },
-    });
-    await handleRegistrySaveOverlay(ctx);
-    expect(request).toHaveBeenCalled();
-    const call = request.mock.calls[0] as any[];
-    expect(call[0]).toBe("/api/v1/model-registry");
-    expect(call[1].method).toBe("PUT");
-    expect(call[1].body.profiles.balanced.description).toBe("x");
-  });
-
-  it("resets registryDirty + reloads overlay on success (REGWIRE-09)", async () => {
-    (globalThis as any).confirm = mock(() => true);
-    const request = mock(async () => ({ success: true, data: { registry: {}, source: { overlay: { profiles: { balanced: { description: "saved" } }, builtin: {}, tombstoned: [] } } } }));
-    const render = mock(() => {});
-    const ctx = makeRegistryCtx({
-      api: { request }, render,
-      state: { registryOverlay: { profiles: { balanced: { description: "x" } } }, registryDirty: true, registryLoaded: true },
-    });
-    await handleRegistrySaveOverlay(ctx);
-    expect(ctx.state.registryDirty).toBe(false);
-    expect(ctx.state.registryLoaded).toBe(false); // reset so render re-inits from new source
-    expect(render).toHaveBeenCalled();
-  });
-
-  it("shows error banner with all violations on 400 (REGWIRE-10)", async () => {
-    (globalThis as any).confirm = mock(() => true);
-    const request = mock(async () => ({ success: false, error: "validation failed", details: ["profiles.foo missing tier 'standard'", "hostDefaults.bar unknown profile"] }));
-    const ctx = makeRegistryCtx({
-      api: { request },
-      state: { registryOverlay: { profiles: { foo: {} } }, registryDirty: true, registryLoaded: true },
-    });
-    await handleRegistrySaveOverlay(ctx);
-    expect(ctx.root.children[0].textContent).toContain("missing tier 'standard'");
-    expect(ctx.root.children[0].textContent).toContain("hostDefaults.bar unknown profile");
-    // dirty stays true on error
-    expect(ctx.state.registryDirty).toBe(true);
-  });
-
-  it("cancel (confirm=false) sends no PUT", async () => {
-    (globalThis as any).confirm = mock(() => false);
-    const request = mock(async () => ({ success: true }));
-    const ctx = makeRegistryCtx({ api: { request }, state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true } });
-    await handleRegistrySaveOverlay(ctx);
-    expect(request).not.toHaveBeenCalled();
-  });
-});
+// ── Registry save/clear overlay (REGWIRE-11..13, T8) ─────────────────────────
 
 describe("handleRegistryClearOverlay — confirm + DELETE (REGWIRE-11, REGWIRE-12)", () => {
   const origConfirm = (globalThis as any).confirm;
@@ -1293,8 +1364,7 @@ function makeSseResponse(chunks: string[]): { ok: boolean; status: number; heade
   };
 }
 
-describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
-  const origConfirm = (globalThis as any).confirm;
+describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGEN-01..07, D-4.5)", () => {
   const origFetch = (globalThis as any).fetch;
   const origSetTimeout = (globalThis as any).setTimeout;
 
@@ -1302,46 +1372,33 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     (globalThis as any).setTimeout = (cb: () => void, _ms: number) => { cb(); return 0 as any; };
   });
   afterEach(() => {
-    (globalThis as any).confirm = origConfirm;
     (globalThis as any).fetch = origFetch;
     (globalThis as any).setTimeout = origSetTimeout;
   });
 
-  it("shows confirm before calling regenerate-and-install-stream (REGEN-01)", async () => {
-    (globalThis as any).confirm = mock(() => false);
+  it("calls no confirm() of its own — the single Save & Apply confirm covers this step", async () => {
+    const confirmSpy = mock(() => false);
+    (globalThis as any).confirm = confirmSpy;
+    (globalThis as any).fetch = mock(async () => makeSseResponse(['data: {"type":"done","exitCode":0}\n\n']));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
-    expect((globalThis as any).confirm).toHaveBeenCalled();
-    const msg = ((globalThis as any).confirm.mock.calls[0] as any[])[0] as string;
-    expect(msg.toLowerCase()).toContain("regenerate");
-    expect(msg.toLowerCase()).toContain("overwrite");
-  });
-
-  it("cancel (confirm=false) sends no fetch", async () => {
-    (globalThis as any).confirm = mock(() => false);
-    const fetchMock = mock(async () => makeSseResponse([]));
-    (globalThis as any).fetch = fetchMock;
-    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
-    expect(fetchMock).not.toHaveBeenCalled();
+    await runRegenerateStream(ctx);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
   it("sends auth headers from ctx.api.authHeaders (REGEN-SEC)", async () => {
-    (globalThis as any).confirm = mock(() => true);
     const fetchMock = mock(async () => makeSseResponse(['data: {"type":"done","exitCode":0}\n\n']));
     (globalThis as any).fetch = fetchMock;
     const ctx = makeRegistryCtx({
       api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "secret-key" }) },
       state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true },
     });
-    await handleRegistryRegenerate(ctx);
+    await runRegenerateStream(ctx);
     expect(fetchMock).toHaveBeenCalled();
     const fetchArg = (fetchMock.mock.calls[0] as any[])[1] as any;
     expect(fetchArg.headers["x-api-key"]).toBe("secret-key");
   });
 
-  it("fetches regenerate-and-install-stream on confirm + shows success banner on done exit 0 (REGEN-02, REGEN-05)", async () => {
-    (globalThis as any).confirm = mock(() => true);
+  it("fetches regenerate-and-install-stream + shows a persistent success banner with the restart sentence on done exit 0 (REGEN-02, REGEN-05, P1-C AC2)", async () => {
     const sseChunks = [
       'data: {"type":"line","stream":"stdout","text":"Generating claude agents..."}\n\n',
       'data: {"type":"line","stream":"stdout","text":"Done."}\n\n',
@@ -1351,16 +1408,19 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const render = mock(() => {});
     const ctx = makeRegistryCtx({ render, state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
+    expect(ok).toBe(true);
+    expect(reason).toBeUndefined();
     expect((globalThis as any).fetch).toHaveBeenCalled();
-    // success banner shows completion message + install info
+    // success banner shows completion message + install info + the restart sentence, persisting
     expect(ctx.root.children[0].textContent).toContain("complete");
     expect(ctx.root.children[0].textContent).toContain("Installed");
+    expect(ctx.root.children[0].textContent).toContain("Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) to pick up the changes.");
+    expect(ctx.root.children[0].className).toContain("banner-persist");
     expect(ctx.state.regenerating).toBe(false);
   });
 
-  it("does NOT render a success banner when exitCode is 0 but a host install failed (APCR-06.6)", async () => {
-    (globalThis as any).confirm = mock(() => true);
+  it("does NOT render a success banner when exitCode is 0 but a host install failed, and reports the per-host detail (APCR-06.6, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
       'data: {"type":"install","host":"codex","status":"failed","profile":"balanced","switched":"none","skipped":"none","unsupported":"none","failed":"codex (locked)"}\n\n',
@@ -1368,52 +1428,60 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
+    expect(ok).toBe(false);
+    expect(reason).toContain("codex");
+    expect(reason).toContain("codex (locked)");
     const banner = ctx.root.children[0];
-    expect(banner.className).not.toBe("success");
+    expect(banner.className).not.toContain("success");
     expect(banner.textContent).toContain("codex");
+    // the returned reason is exactly the text the standalone banner showed
+    expect(banner.textContent).toBe(reason);
   });
 
-  it("classifies an unsupported install as its own class, not folded into skipped (APCR-06.7)", async () => {
-    (globalThis as any).confirm = mock(() => true);
+  it("classifies an unsupported install as its own class, not folded into skipped, and reports it in reason (APCR-06.7, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"install","host":"cursor","status":"unsupported","profile":"balanced","switched":"none","skipped":"none","unsupported":"cursor (bundle has no variants)","failed":"none"}\n\n',
       'data: {"type":"done","exitCode":0}\n\n',
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
+    expect(ok).toBe(false);
     const banner = ctx.root.children[0];
-    expect(banner.className).not.toBe("success");
+    expect(banner.className).not.toContain("success");
     expect(banner.textContent.toLowerCase()).toContain("unsupported");
     expect(banner.textContent).not.toContain("Skipped: cursor");
+    expect(reason!.toLowerCase()).toContain("unsupported");
+    expect(reason).toBe(banner.textContent);
   });
 
-  it("shows failure banner on done with non-zero exit (REGEN-05)", async () => {
-    (globalThis as any).confirm = mock(() => true);
+  it("shows failure banner on done with non-zero exit and reports the exit-code reason (REGEN-05, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"line","stream":"stderr","text":"fatal error"}\n\n',
       'data: {"type":"done","exitCode":1}\n\n',
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
+    expect(ok).toBe(false);
     expect(ctx.root.children[0].textContent).toContain("failed");
+    expect(reason).toBe("Regeneration failed (exit 1).");
   });
 
-  it("shows failure banner on spawn failure (done with exitCode null + error) (REGEN-07)", async () => {
-    (globalThis as any).confirm = mock(() => true);
+  it("shows failure banner on spawn failure (done with exitCode null + error) and reports it in reason (REGEN-07, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"done","exitCode":null,"error":"spawn ENOENT"}\n\n',
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
+    expect(ok).toBe(false);
     expect(ctx.root.children[0].textContent).toContain("ENOENT");
+    expect(reason).toContain("ENOENT");
   });
 
-  it("disables Regenerate button while running (REGEN-06) via state.regenerating guard", async () => {
-    (globalThis as any).confirm = mock(() => true);
+  it("guards against concurrent runs via state.regenerating (REGEN-06)", async () => {
     let resolveStream: () => void;
     const pendingStream = new Promise<void>((r) => { resolveStream = r; });
     const slowStream = new ReadableStream({
@@ -1428,26 +1496,43 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     const slowResponse = { ok: true, status: 200, headers: new Map([["content-type", "text/event-stream"]]), body: slowStream };
     (globalThis as any).fetch = mock(async () => slowResponse);
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const regenPromise = handleRegistryRegenerate(ctx);
+    const regenPromise = runRegenerateStream(ctx);
     // While running, state.regenerating should be true
     expect(ctx.state.regenerating).toBe(true);
+    // A concurrent call while already running is a no-op (returns ok:false immediately).
+    expect(await runRegenerateStream(ctx)).toEqual({ ok: false, reason: undefined });
     resolveStream!();
     await regenPromise;
     expect(ctx.state.regenerating).toBe(false);
   });
 
-  it("shows error banner on fetch failure (network)", async () => {
-    (globalThis as any).confirm = mock(() => true);
+  it("shows error banner on fetch failure (network) and reports it in reason", async () => {
     (globalThis as any).fetch = mock(async () => { throw new Error("network down"); });
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
+    expect(ok).toBe(false);
     expect(ctx.root.children[0].textContent).toContain("network down");
+    expect(reason).toContain("network down");
     expect(ctx.state.regenerating).toBe(false);
+  });
+
+  it("SSE stream closes without a done frame: reports the stream-closed sentence in reason, not silently discarded (edge case, fix-loop 1)", async () => {
+    // No "done" frame at all — the reader's `done: true` ends the outer loop
+    // with gotDone still false. This is the spec's SSE-closed-without-done
+    // edge case; its detail must survive into the unified retry banner.
+    const sseChunks = [
+      'data: {"type":"line","stream":"stdout","text":"Generating claude agents..."}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    const { ok, reason } = await runRegenerateStream(ctx);
+    expect(ok).toBe(false);
+    expect(reason).toBe("Regeneration stream closed unexpectedly.");
+    expect(ctx.root.children[0].textContent).toBe("Regeneration stream closed unexpectedly.");
   });
 
   // ── T5/T6k: variant-sync SSE frame rendering ──────────────────────────────
   it("renders variant-sync frames: synced hosts are folded into the success banner (T5)", async () => {
-    (globalThis as any).confirm = mock(() => true);
     const sseChunks = [
       'data: {"type":"variant-sync","host":"claude","status":"synced","profiles":["balanced"],"files":3,"retained":[]}\n\n',
       'data: {"type":"variant-sync","host":"cursor","status":"skipped","profiles":[],"files":0,"retained":[],"reason":"all tiers inherit"}\n\n',
@@ -1456,15 +1541,15 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
+    const { ok } = await runRegenerateStream(ctx);
+    expect(ok).toBe(true);
     const banner = ctx.root.children[0];
-    expect(banner.className).toBe("success");
+    expect(banner.className).toContain("success");
     expect(banner.textContent).toContain("Synced");
     expect(banner.textContent).toContain("claude");
   });
 
-  it("does NOT render a success banner when a variant-sync frame reports failed (T5)", async () => {
-    (globalThis as any).confirm = mock(() => true);
+  it("does NOT render a success banner when a variant-sync frame reports failed, and reports it in reason (T5, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"variant-sync","host":"claude","status":"failed","profiles":[],"files":0,"retained":[],"error":"disk full"}\n\n',
       'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
@@ -1472,15 +1557,16 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
+    expect(ok).toBe(false);
     const banner = ctx.root.children[0];
-    expect(banner.className).not.toBe("success");
+    expect(banner.className).not.toContain("success");
     expect(banner.textContent).toContain("Variant sync failed");
     expect(banner.textContent).toContain("disk full");
+    expect(reason).toContain("disk full");
   });
 
   it("a skipped variant-sync frame (the routine no-checkout case) stays silent — no banner noise", async () => {
-    (globalThis as any).confirm = mock(() => true);
     const sseChunks = [
       'data: {"type":"variant-sync","host":"claude","status":"skipped","profiles":[],"files":0,"retained":[],"reason":"no source checkout — nothing to sync"}\n\n',
       'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
@@ -1488,10 +1574,191 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    await handleRegistryRegenerate(ctx);
+    const { ok } = await runRegenerateStream(ctx);
+    expect(ok).toBe(true);
     const banner = ctx.root.children[0];
-    expect(banner.className).toBe("success");
+    expect(banner.className).toContain("success");
     expect(banner.textContent).not.toContain("Synced");
+  });
+});
+
+// ── Unified Save & Apply (T8, APUX-13, D-4.5, P1-C AC1-AC5) ─────────────────
+// Save & Apply owns the ONE confirm covering both the PUT overlay step and the
+// (no-confirm) regenerate stream, and layers a generic safe-to-retry banner
+// over runRegenerateStream's own failure banner when the apply step fails
+// after a successful save.
+
+describe("handleRegistrySaveAndApply — unified save + apply (T8, APUX-13, P1-C AC1-AC5)", () => {
+  const origConfirm = (globalThis as any).confirm;
+  const origFetch = (globalThis as any).fetch;
+  const origSetTimeout = (globalThis as any).setTimeout;
+
+  beforeEach(() => {
+    (globalThis as any).setTimeout = (cb: () => void, _ms: number) => { cb(); return 0 as any; };
+  });
+  afterEach(() => {
+    (globalThis as any).confirm = origConfirm;
+    (globalThis as any).fetch = origFetch;
+    (globalThis as any).setTimeout = origSetTimeout;
+  });
+
+  it("shows a single confirm naming save + apply + the restart consequence (D-4.5)", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true } });
+    await handleRegistrySaveAndApply(ctx);
+    expect((globalThis as any).confirm).toHaveBeenCalledTimes(1);
+    const msg = ((globalThis as any).confirm.mock.calls[0] as any[])[0] as string;
+    expect(msg.toLowerCase()).toContain("save");
+    expect(msg.toLowerCase()).toContain("apply");
+    expect(msg.toLowerCase()).toContain("restart");
+  });
+
+  it("cancel (confirm=false) sends no PUT and starts no stream", async () => {
+    (globalThis as any).confirm = mock(() => false);
+    const request = mock(async () => ({ success: true }));
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeRegistryCtx({ api: { request }, state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true } });
+    await handleRegistrySaveAndApply(ctx);
+    expect(request).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("PUTs the overlay BEFORE starting the regenerate stream (order, P1-C AC1)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const calls: string[] = [];
+    const request = mock(async () => { calls.push("put"); return { success: true }; });
+    const fetchMock = mock(async () => { calls.push("fetch"); return makeSseResponse(['data: {"type":"done","exitCode":0}\n\n']); });
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeRegistryCtx({
+      api: { request, authHeaders: () => ({}) },
+      state: { registryOverlay: { profiles: { balanced: { description: "x" } } }, registryDirty: true, registryLoaded: true },
+    });
+    await handleRegistrySaveAndApply(ctx);
+    expect(calls).toEqual(["put", "fetch"]);
+    const call = request.mock.calls[0] as any[];
+    expect(call[0]).toBe("/api/v1/model-registry");
+    expect(call[1].method).toBe("PUT");
+    expect(call[1].body.profiles.balanced.description).toBe("x");
+  });
+
+  it("save failure shows the validation banner and does NOT start the stream (P1-C AC3)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: false, error: "validation failed", details: ["profiles.foo missing tier 'standard'"] }));
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeRegistryCtx({ api: { request }, state: { registryOverlay: { profiles: { foo: {} } }, registryDirty: true, registryLoaded: true } });
+    await handleRegistrySaveAndApply(ctx);
+    expect(ctx.root.children[0].textContent).toContain("missing tier 'standard'");
+    expect(fetchMock).not.toHaveBeenCalled();
+    // dirty stays true — the save never went through.
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("save network failure shows an error banner and does NOT start the stream", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => { throw new Error("network down"); });
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeRegistryCtx({ api: { request }, state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true } });
+    await handleRegistrySaveAndApply(ctx);
+    expect(ctx.root.children[0].textContent).toContain("network down");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("save success + apply success: clears dirty/loaded, shows a persistent banner with the restart sentence (P1-C AC2)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true }));
+    const fetchMock = mock(async () => makeSseResponse(['data: {"type":"done","exitCode":0}\n\n']));
+    (globalThis as any).fetch = fetchMock;
+    const render = mock(() => {});
+    const ctx = makeRegistryCtx({
+      api: { request, authHeaders: () => ({}) }, render,
+      state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true, regenerating: false },
+    });
+    await handleRegistrySaveAndApply(ctx);
+    expect(ctx.state.registryDirty).toBe(false);
+    expect(ctx.state.registryLoaded).toBe(false);
+    const banner = ctx.root.children[0];
+    expect(banner.className).toContain("success");
+    expect(banner.className).toContain("banner-persist");
+    expect(banner.textContent).toContain("Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) to pick up the changes.");
+  });
+
+  it("save success + apply failure: overrides runRegenerateStream's own banner with the safe-retry sentence PLUS the specific reason (P1-C AC4, fix-loop 1)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true }));
+    const fetchMock = mock(async () => makeSseResponse(['data: {"type":"done","exitCode":1}\n\n']));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeRegistryCtx({
+      api: { request, authHeaders: () => ({}) },
+      state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true, regenerating: false },
+    });
+    await handleRegistrySaveAndApply(ctx);
+    // The save itself still went through (P1-C AC4: PUT is idempotent, retry is safe).
+    expect(ctx.state.registryDirty).toBe(false);
+    const banner = ctx.root.children[0];
+    expect(banner.className).not.toContain("success");
+    // The leading retry-safety sentence stays literal, but the specific
+    // exit-code reason (that runRegenerateStream would have shown on its
+    // own) is folded in — not discarded (fix-loop 1).
+    expect(banner.textContent).toBe(
+      "Changes saved, but applying them failed — press Save & Apply again to retry. Details: Regeneration failed (exit 1).",
+    );
+  });
+
+  it("save success + apply failure via a per-host install failure: the final banner names the failing host (fix-loop 1, APCR-06.6)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true }));
+    const sseChunks = [
+      'data: {"type":"install","host":"codex","status":"failed","profile":"balanced","switched":"none","skipped":"none","unsupported":"none","failed":"codex (locked)"}\n\n',
+      'data: {"type":"done","exitCode":0}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({
+      api: { request, authHeaders: () => ({}) },
+      state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true, regenerating: false },
+    });
+    await handleRegistrySaveAndApply(ctx);
+    const banner = ctx.root.children[0];
+    expect(banner.className).not.toContain("success");
+    expect(banner.textContent).toContain("Changes saved, but applying them failed — press Save & Apply again to retry.");
+    expect(banner.textContent).toContain("codex");
+    expect(banner.textContent).toContain("codex (locked)");
+  });
+
+  it("save success + apply failure via an SSE stream closed without a done frame: the stream-closed detail survives into the final banner (spec edge case, fix-loop 1)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true }));
+    // No "done" frame — the spec's "SSE stream closes without a done frame" edge case.
+    const fetchMock = mock(async () => makeSseResponse(['data: {"type":"line","stream":"stdout","text":"..."}\n\n']));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeRegistryCtx({
+      api: { request, authHeaders: () => ({}) },
+      state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true, regenerating: false },
+    });
+    await handleRegistrySaveAndApply(ctx);
+    const banner = ctx.root.children[0];
+    expect(banner.className).not.toContain("success");
+    expect(banner.textContent).toBe(
+      "Changes saved, but applying them failed — press Save & Apply again to retry. Details: Regeneration stream closed unexpectedly.",
+    );
+  });
+
+  it("pressing Save & Apply again after an apply failure re-PUTs and can succeed (idempotent retry, P1-C AC4)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true }));
+    const fetchMock = mock(async () => makeSseResponse(['data: {"type":"done","exitCode":0}\n\n']));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeRegistryCtx({
+      api: { request, authHeaders: () => ({}) },
+      state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true, regenerating: false },
+    });
+    await handleRegistrySaveAndApply(ctx);
+    await handleRegistrySaveAndApply(ctx);
+    expect(request).toHaveBeenCalledTimes(2);
+    const banner = ctx.root.children[0];
+    expect(banner.className).toContain("success");
   });
 });
 

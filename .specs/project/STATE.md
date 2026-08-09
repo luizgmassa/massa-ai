@@ -1,6 +1,59 @@
 # massa-ai Spec State
 
-## Current — Admin Portal Correctness Repair (**VALIDATED PASS 2026-08-08** — T1-T11 + 1 fix loop, 19 commits; unpushed; push/PR = user decision)
+## Current — Admin Portal UX Overhaul (**VALIDATED PASS 2026-08-09** — T1-T15 + 2 fix loops, 18 commits + validation close-out; push/PR authorized)
+
+- Validation: **PASS**, 32/32 ACs evidenced (verifier corrected its own first-pass
+  36/39 denominator by re-deriving from spec.md: 8+5+5+6+2+6 = 32), 5/5 mutations
+  killed, 0 survivors (population in `validation.md`). Fix loop 1 (`f26ed6e3`):
+  reviewer-blocking — Save & Apply's generic retry banner destroyed the specific
+  apply-failure diagnostics (SSE-closed sentence, per-host detail); now appended as
+  "Details: …". Fix loop 2 (`58a79a39`): two test-only gaps — Delete-confirm-text
+  span sensor + 7 `button-row` assertions, both with observed red before green.
+  Final gates: web-ui 468/0, scripts registry+generator 124/0, tools-api registry
+  routes 23/0 (incl. unmocked PUT→GET round-trip), type-check 6/6, oxlint 0,
+  `generate:artifacts --check` no drift, scoped `validate_state` 0 errors (feature
+  absent from the 52-error legacy baseline).
+
+- projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-ux-overhaul` ·
+  workflow: spec-driven (Large) · branch `spec/admin-portal-ux-overhaul` from
+  `main` @ `b1831197` (v1.43.0), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-admin-portal-ux-overhaul`. Five batch
+  workers split the 15 tasks across 3 phases; this close-out is Batch Worker 5
+  (T13-T15).
+- Scope: APUX-01..14 — per-agent per-tool capability tier overrides
+  (`agentTiers` registry section, generator resolution + stale-agent warn,
+  `agents` array in the GET route, a Per-Agent Tier Overrides UI table),
+  Model Catalog grid restructure (Tool + Tier leading columns, Provider/Model
+  split fields with hints), a unified Save & Apply action replacing Save
+  Overlay + Regenerate Artifacts, plain-English Scheme A nomenclature across
+  the Models tab (no user-visible "overlay"/"tombstoned"/"registry"/"host"),
+  inline dropdown forms replacing `prompt()`/`alert()`, Projects Delete +
+  Files header, and a five-tab (Projects/Checkpoints/Dashboard/Config/Models)
+  styling + help-card pass.
+- Contract: `.specs/features/admin-portal-ux-overhaul/{spec,design,tasks}.md`
+  — `3 Phases = 15 Tasks`, 16 commits total (1 spec + 15 task).
+- Commits: `6770a092` spec+design+tasks → `dfac0271` T1 agentTiers schema →
+  `7c50b70d` T2 generator resolution → `cd3a2cbf` T3 agents array →
+  `9fc5117c` T4 Tool/Tier columns → `c93dfa9b` T5 Provider/Model split →
+  `9efe1599` T6 Per-Agent Tier Overrides table → `4591a493` T7 inline forms →
+  `0fcb7d4d` T8 unified Save & Apply → `10a6db1f` T9 Scheme A nomenclature →
+  `2857a7d3` T10 Projects Delete + Files → `59cb95db` T11 shared CSS pass →
+  `765cc689` T12 Config + Checkpoints polish → `04ef9045` T13 Dashboard stat
+  cards → `469ab106` T14 plain-English help cards → this commit T15 close-out.
+- Gates (measured 2026-08-09, this worktree): web-ui 456 pass / 0 fail,
+  `scripts/__tests__/{model-profiles,generate-subagent-artifacts}.test.ts`
+  124 pass / 0 fail, `apps/tools-api/src/routes/{model-registry,
+  model-registry-round-trip}.test.ts` 23 pass / 0 fail, type-check 6/6
+  successful (turbo), oxlint exit 0, `generate:artifacts --check` no drift,
+  `check_specs_delivered admin-portal-ux-overhaul` exit 0. Full
+  `test:scripts`/tools-api isolated-runner/core suites were not run here
+  (this worktree has no live PostgreSQL) — those are the verification agent's
+  gates.
+- Next: dispatch verification-agent (author ≠ verifier) to write
+  `.specs/features/admin-portal-ux-overhaul/validation.md`; if PASS, push/PR
+  is authorized (not taken unattended by this session).
+
+## Previous — Admin Portal Correctness Repair (**VALIDATED PASS 2026-08-08** — T1-T11 + 1 fix loop, 19 commits; unpushed; push/PR = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-correctness-repair` ·
   workflow: spec-driven (Large) · branch `fix/admin-portal-correctness-repair`

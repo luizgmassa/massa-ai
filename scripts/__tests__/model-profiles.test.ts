@@ -114,10 +114,13 @@ describe("model-profiles: the shipped registry", () => {
       string,
       unknown
     >;
-    // The whole point of design.md 2.1: no roles/agents map anywhere in this file.
+    // The whole point of design.md 2.1: no roles/agents map anywhere in this file. APUX-01
+    // (admin-portal-ux-overhaul design D-1) adds `agentTiers` as an explicit, opt-in
+    // OVERRIDE section — but the shipped builtin still names zero agents in it, so the
+    // "no agent list" principle for DEFAULTS holds: it ships empty, not undefined.
     expect(raw.roles).toBeUndefined();
     expect(raw.agents).toBeUndefined();
-    expect(raw.agentTiers).toBeUndefined();
+    expect(raw.agentTiers).toEqual({});
     const asText = JSON.stringify(raw.profiles) + JSON.stringify(raw.hostDefaults);
     // No specialist name should appear as a key in the model policy itself.
     for (const name of ["investigator", "planner", "builder", "navigator", "plan-critic"]) {
@@ -910,6 +913,217 @@ describe("model-profiles: normalization drops byte-identical overlay entries and
     expect(result.overlayError).toBeUndefined();
     expect(result.source.overlay?.hostDefaults?.opencode).toBe("cheap");
     expect(result.registry.hostDefaults.opencode).toBe("cheap"); // the overlay value wins
+  });
+});
+
+// ── APUX-01: `agentTiers` section — validate, merge, normalize, count (design D-1,
+// admin-portal-ux-overhaul, P1-A AC1-3). The registry lib knows nothing about which agents
+// exist (file header), so agent-name validity is deliberately not checked at this layer —
+// only host keys (via isHost) and tier values (via the declared tier list) are validated.
+describe("model-profiles: agentTiers — validation (APUX-01 AC1)", () => {
+  test("absent agentTiers key is injected as {} by validateRegistry — never left undefined", () => {
+    const b = baseRegistry();
+    expect("agentTiers" in b).toBe(false); // baseRegistry() deliberately omits it
+    const r = validateRegistry(b) as Registry;
+    expect(r.agentTiers).toEqual({});
+    expect(r.agentTiers).not.toBeUndefined();
+  });
+
+  test("the shipped registry ships an explicit agentTiers: {} and loadRegistry passes it through unchanged", () => {
+    const r = loadRegistry(REGISTRY_PATH);
+    expect(r.agentTiers).toEqual({});
+  });
+
+  test("accepts a well-formed agentTiers entry (agent -> host -> declared tier)", () => {
+    const b = baseRegistry();
+    b.agentTiers = { builder: { opencode: "deep", claude: "standard" } };
+    const r = validateRegistry(b) as Registry;
+    expect(r.agentTiers).toEqual({ builder: { opencode: "deep", claude: "standard" } });
+  });
+
+  test("rejects an unknown host key inside an agent entry", () => {
+    expectViolation(
+      (x) => (x.agentTiers = { builder: { emacs: "deep" } }),
+      'agentTiers.builder.emacs is not a known host (claude, codex, cursor, opencode)',
+    );
+  });
+
+  test("rejects a tier value outside the declared tier list", () => {
+    expectViolation(
+      (x) => (x.agentTiers = { builder: { opencode: "max" } }),
+      'agentTiers.builder.opencode must be one of light, standard, deep, got "max"',
+    );
+  });
+
+  test("rejects a non-object per-agent entry", () => {
+    expectViolation((x) => (x.agentTiers = { builder: "deep" }), "agentTiers.builder is not an object");
+  });
+
+  test("rejects a non-object agentTiers root", () => {
+    expectViolation((x) => (x.agentTiers = "nope"), "agentTiers must be an object");
+  });
+
+  test("does NOT validate agent-name existence — that is the generator's job (design D-2), not this lib's", () => {
+    const b = baseRegistry();
+    b.agentTiers = { "an-agent-name-nobody-charters": { claude: "light" } };
+    expect(() => validateRegistry(b)).not.toThrow();
+  });
+});
+
+describe("model-profiles: agentTiers — merge (mergeOverlay, APUX-01 AC2, P1-A AC2)", () => {
+  /** Fully synthetic, deep-merge delta semantics under the test's control — mirrors the
+   *  FG1 syntheticBuiltin() pattern above, extended with agentTiers. */
+  function syntheticBuiltinWithAgentTiers(): Registry {
+    return {
+      version: 1,
+      tiers: ["light", "standard", "deep"],
+      hostDefaults: { claude: "A", codex: "A", cursor: "A", opencode: "A" },
+      workflowTiers: {},
+      agentTiers: {
+        builder: { claude: "standard", opencode: "standard" },
+        navigator: { claude: "light" },
+      },
+      profiles: {
+        A: {
+          description: "Profile A",
+          hosts: {
+            claude: { light: { model: "a", effort: "low" } },
+          },
+        },
+      },
+    };
+  }
+
+  test("absent agent/host keys inherit; a mentioned host is overridden — kills whole-object-replace", () => {
+    const builtin = syntheticBuiltinWithAgentTiers();
+    const overlay: OverlayData = { agentTiers: { builder: { opencode: "deep" } } };
+    const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
+    expect(merged.agentTiers.builder).toEqual({ claude: "standard", opencode: "deep" });
+    // An agent the overlay never mentions is retained verbatim.
+    expect(merged.agentTiers.navigator).toEqual(builtin.agentTiers.navigator);
+  });
+
+  test("agent-level null tombstones the whole agent entry", () => {
+    const builtin = syntheticBuiltinWithAgentTiers();
+    const overlay: OverlayData = { agentTiers: { navigator: null } };
+    const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
+    expect("navigator" in merged.agentTiers).toBe(false);
+    // The untouched agent survives.
+    expect(merged.agentTiers.builder).toEqual(builtin.agentTiers.builder);
+  });
+
+  test("host-level null tombstones one host key without deleting the agent entry", () => {
+    const builtin = syntheticBuiltinWithAgentTiers();
+    const overlay: OverlayData = { agentTiers: { builder: { claude: null } } };
+    const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
+    expect(merged.agentTiers.builder).toEqual({ opencode: "standard" });
+  });
+
+  test("a genuinely new agent the builtin never named passes through wholesale", () => {
+    const builtin = syntheticBuiltinWithAgentTiers();
+    const overlay: OverlayData = { agentTiers: { planner: { cursor: "deep" } } };
+    const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
+    expect(merged.agentTiers.planner).toEqual({ cursor: "deep" });
+  });
+
+  test("shared cross-boundary parity fixture: mergeOverlay reproduces the fixture's expected merged agentTiers (Worker 2 asserts the identical fixture through the client's mergeRegistryForDisplay)", () => {
+    const fixturePath = path.join(
+      REPO_ROOT,
+      "apps",
+      "web-ui",
+      "src",
+      "__tests__",
+      "fixtures",
+      "agent-tiers-parity.json",
+    );
+    const fixture = JSON.parse(require("fs").readFileSync(fixturePath, "utf8")) as {
+      builtinAgentTiers: Record<string, Record<string, string>>;
+      overlayAgentTiers: Record<string, Record<string, string | null> | null>;
+      expectedMergedAgentTiers: Record<string, Record<string, string>>;
+    };
+    const builtin: Registry = {
+      ...syntheticBuiltinWithAgentTiers(),
+      agentTiers: fixture.builtinAgentTiers,
+    };
+    const overlay: OverlayData = { agentTiers: fixture.overlayAgentTiers };
+    const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
+    expect(merged.agentTiers).toEqual(fixture.expectedMergedAgentTiers);
+  });
+});
+
+describe("model-profiles: agentTiers — normalize + count (APUX-01 AC3, P1-A AC3)", () => {
+  function scratchOverlayPath(): string {
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-overlay-agenttiers-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    return path.join(tmpDir, "model-profiles.json");
+  }
+
+  function writeOverlay(overlayPath: string, data: unknown): void {
+    const fs = require("fs");
+    fs.mkdirSync(path.dirname(overlayPath), { recursive: true });
+    fs.writeFileSync(overlayPath, JSON.stringify(data, null, 2));
+  }
+
+  // The shipped builtin's agentTiers is {} by design (D-1: "no agent list" holds for
+  // defaults). That means every real-disk normalize case below routes through the "the
+  // builtin lacks this key" branch of normalizeFlatMap — the identical byte-for-byte
+  // dedup branch is exercised generically by the sibling hostDefaults/workflowTiers tests
+  // above (normalizeAgentTiers calls the very same normalizeFlatMap one level deeper, so
+  // that mechanism is not re-derived per section).
+
+  test("a genuinely new agent's overrides survive normalization intact and are counted", () => {
+    const overlayPath = scratchOverlayPath();
+    writeOverlay(overlayPath, { agentTiers: { builder: { opencode: "deep", claude: "standard" } } });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.overlayError).toBeUndefined();
+    expect(result.source.overlay?.agentTiers).toEqual({
+      builder: { opencode: "deep", claude: "standard" },
+    });
+    expect(result.overlayOverrideCount).toBe(2); // two host-level leaves
+    expect(result.registry.agentTiers.builder).toEqual({ opencode: "deep", claude: "standard" });
+  });
+
+  test("a no-op host-level tombstone (host never existed on the builtin's empty agentTiers) is dropped, count 0", () => {
+    const overlayPath = scratchOverlayPath();
+    writeOverlay(overlayPath, { agentTiers: { builder: { opencode: null } } });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.overlayError).toBeUndefined();
+    expect(result.source.overlay?.agentTiers ?? {}).toEqual({});
+    expect(result.overlayOverrideCount).toBe(0);
+    expect(result.registry.agentTiers.builder ?? {}).toEqual({});
+  });
+
+  test("a no-op whole-agent tombstone (agent never existed on the builtin) is dropped, count 0", () => {
+    const overlayPath = scratchOverlayPath();
+    writeOverlay(overlayPath, { agentTiers: { builder: null } });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.overlayError).toBeUndefined();
+    expect(result.source.overlay?.agentTiers ?? {}).toEqual({});
+    expect(result.overlayOverrideCount).toBe(0);
+    expect("builder" in result.registry.agentTiers).toBe(false);
+  });
+
+  test("a mixed overlay counts only the surviving leaves, and each agent's shape is exact", () => {
+    const overlayPath = scratchOverlayPath();
+    writeOverlay(overlayPath, {
+      agentTiers: {
+        builder: { opencode: "deep" }, // survives: 1 leaf
+        navigator: { emacs_is_not_a_host: null }, // no-op tombstone on an invalid host — the
+        // merge validates hosts elsewhere; here it is simply an absent-in-builtin key, so
+        // normalization drops it as a no-op, count 0 for this agent.
+        ghost: null, // no-op whole-agent tombstone — agent never existed, count 0
+      },
+    });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.overlayError).toBeUndefined();
+    expect(result.overlayOverrideCount).toBe(1);
+    expect(result.source.overlay?.agentTiers).toEqual({ builder: { opencode: "deep" } });
   });
 });
 

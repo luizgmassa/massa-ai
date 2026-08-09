@@ -477,10 +477,22 @@ pre code {
   font-size: 0.8rem;
 }
 
+/* T4 (APUX-06): horizontal-scroll wrapper for the registry grid — the Tool +
+ * Tier leading columns plus per-profile columns can exceed the viewport
+ * width at 7+ profiles. */
+.grid-scroll {
+  overflow-x: auto;
+}
+
 /* DS-03: Model Registry view */
 .registry-grid {
   width: 100%;
   border-collapse: collapse;
+}
+.registry-grid .tool-cell,
+.registry-grid .tier-cell {
+  font-weight: 600;
+  white-space: nowrap;
 }
 .registry-grid th,
 .registry-grid td {
@@ -531,6 +543,45 @@ pre code {
   cursor: pointer;
   font-size: 0.85rem;
 }
+/* T7 (APUX-12, D-4.4): inline dropdown forms replacing prompt() popups. */
+.registry-inline-form {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  margin: 0.4rem 0 0.75rem;
+  max-width: 28rem;
+}
+.registry-inline-form label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  margin-bottom: 0.4rem;
+}
+.registry-inline-form input,
+.registry-inline-form select {
+  display: block;
+  width: 100%;
+  margin-top: 0.2rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+}
+.form-error {
+  color: var(--error-fg);
+  font-size: 0.82rem;
+  margin: 0 0 0.5rem;
+}
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
 .registry-hostDefaults,
 .registry-workflowTiers {
   background: var(--bg-panel);
@@ -546,6 +597,24 @@ pre code {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
+}
+/* T6 (APUX-04): Per-Agent Tier Overrides table. */
+.registry-agentTiers {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+}
+.registry-agentTiers select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+.overridden {
+  background: var(--accent-tint);
 }
 .tombstoned {
   background: var(--bg-code);
@@ -680,6 +749,79 @@ pre code {
   color: var(--fg-muted);
 }
 
+/* ── Shared button system (T11, APUX-09, design D-5) ─────────────────────
+ * `.btn` is the base every rendered button should carry (padding, radius,
+ * border, cursor, transition); `.btn-primary`/`.btn-secondary`/`.btn-danger`
+ * are the color variants. The pre-existing action-button classes below keep
+ * their own names in markup (nothing renamed) — they are added to this
+ * shared selector list so they inherit the same sizing/transition base
+ * without their per-class color rules being touched. */
+.btn,
+.btn-edit,
+.btn-delete,
+.btn-approve,
+.btn-reject,
+.save-btn,
+.switch-btn,
+.reveal-btn {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.btn {
+  background: var(--bg-panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+.btn:hover {
+  background: var(--row-hover);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+}
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+[data-theme="dark"] .btn-primary:hover {
+  background: #3b82f6;
+}
+
+.btn-secondary {
+  background: var(--bg-panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover {
+  background: var(--row-hover);
+}
+
+.btn-danger {
+  background: var(--error-bg);
+  color: var(--error-fg);
+  border: 1px solid var(--error-fg);
+}
+.btn-danger:hover {
+  background: var(--error-fg);
+  color: #fff;
+}
+
+.btn:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled {
+  background: var(--border);
+  color: var(--fg-muted);
+  cursor: not-allowed;
+  border-color: var(--border);
+}
+
 /* ── Action buttons + form containers (UIC-01) ───────────────────────────
  * Consistent button + form styling across all tabs. Colors use existing
  * CSS variables; no hardcoded values. */
@@ -799,4 +941,147 @@ pre code {
 /* Inline checkbox+label combo (e.g., project index form) */
 .form-field label > input[type="checkbox"] {
   margin-right: 0.3rem;
+}
+
+/* ── Form grid (T11, APUX-09, design D-5) ────────────────────────────────
+ * Two-column labeled field layout for create/edit forms (Projects index
+ * form, Checkpoints create/edit form). Collapses to one column under
+ * 640px. Non-`.form-field` direct children (the form's <h3> and its submit
+ * button) span both columns instead of being squeezed into one. */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem 1.5rem;
+  max-width: 40rem;
+}
+.form-grid > h3,
+.form-grid > button,
+.form-grid > .button-row {
+  grid-column: 1 / -1;
+}
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Text/select/textarea inputs inside any form container stop spanning the
+ * full viewport width (P2-F AC1). */
+.create-form input[type="text"],
+.create-form input[type="number"],
+.create-form input[type="password"],
+.create-form select,
+.create-form textarea,
+.form-grid input[type="text"],
+.form-grid input[type="number"],
+.form-grid input[type="password"],
+.form-grid select,
+.form-grid textarea {
+  max-width: 28rem;
+}
+
+/* ── Help card (T11, APUX-09/APUX-10, design D-5) ────────────────────────
+ * Titled collapsible help section ("About this tab" / "Field guide"),
+ * replacing bare "?" summary toggles. */
+.help-card {
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  overflow: hidden;
+}
+.help-card > summary {
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--accent);
+  user-select: none;
+}
+.help-card[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+.help-card-body {
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.help-card-body h4 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--fg);
+}
+.help-card-body dl {
+  margin: 0;
+}
+.help-card-body dt {
+  font-weight: 600;
+  margin-top: 0.5rem;
+  color: var(--accent);
+}
+.help-card-body dd {
+  margin: 0.15rem 0 0 1rem;
+}
+.help-card-body p {
+  margin: 0.4rem 0;
+}
+
+/* ── Persistent banner (T11, APUX-09, P1-C AC2) ──────────────────────────
+ * Modifier on `.success`/`.error` for a banner that must not auto-hide
+ * (the Save & Apply completion banner) — a slightly stronger border marks
+ * it as an operator-dismissed banner rather than a timed toast. */
+.banner-persist {
+  border-width: 2px;
+}
+
+/* ── Dashboard stat cards (T13, APUX-11, design D-6) ─────────────────────
+ * Replaces raw inline `<strong>label:</strong> value` summaries with a
+ * responsive grid of labeled cards. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  padding: 0.6rem 0.85rem;
+}
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0.15rem;
+}
+
+/* Dashboard per-job / per-session tables, unstyled until now — same
+ * conventions as `.grid` (T13, APUX-11). */
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+}
+.dashboard-table th,
+.dashboard-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.dashboard-table th {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.dashboard-table tbody tr:hover {
+  background: var(--row-hover);
 }

@@ -8,6 +8,7 @@ const builtinRegistry = {
   tiers: ["light", "standard", "deep"],
   hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
   workflowTiers: {},
+  agentTiers: {},
   profiles: {
     balanced: {
       description: "builtin balanced",
@@ -72,6 +73,19 @@ mock.module("../../../../scripts/lib/model-profiles.ts", () => ({
   DEFAULT_REGISTRY_PATH: "/dev/null",
 }));
 
+// design D-3 (APUX-03): agents inventory — mirrors the profilesLib() mock above exactly,
+// including the non-literal require path pattern the route itself uses.
+const DEFAULT_MOCK_CHARTERS = [
+  { name: "builder", modelTier: "standard" },
+  { name: "investigator", modelTier: "deep" },
+];
+const loadAllCharters = mock((..._args: unknown[]): unknown => DEFAULT_MOCK_CHARTERS);
+const actualGeneratorLib = require("../../../../scripts/generate-subagent-artifacts.ts");
+mock.module("../../../../scripts/generate-subagent-artifacts.ts", () => ({
+  ...actualGeneratorLib,
+  loadAllCharters: (...args: unknown[]) => loadAllCharters(...args),
+}));
+
 const configDir = mock((..._args: unknown[]): string => "/tmp/massa-ai-test-overlay");
 mock.module("@massa-ai/shared/config", () => {
   const actual = require("@massa-ai/shared/config");
@@ -108,6 +122,7 @@ beforeEach(() => {
   mergeOverlay.mockClear();
   configDir.mockClear();
   getDeploymentRoot.mockClear();
+  loadAllCharters.mockClear();
 });
 
 async function get(path: string) {
@@ -185,6 +200,57 @@ describe("GET /api/v1/model-registry", () => {
   });
 });
 
+// ── design D-3 / APUX-03: agents inventory ───────────────────────────────────
+
+describe("GET /api/v1/model-registry — agents inventory (design D-3, APUX-03, P1-A AC6)", () => {
+  test("200 + agents array shaped {name, charterTier} derived from loadAllCharters()", async () => {
+    loadAllCharters.mockImplementationOnce(() => [
+      { name: "builder", modelTier: "standard" },
+      { name: "investigator", modelTier: "deep" },
+    ]);
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect(res.json.success).toBe(true);
+    expect(res.json.data.agents).toEqual([
+      { name: "builder", charterTier: "standard" },
+      { name: "investigator", charterTier: "deep" },
+    ]);
+    expect(res.json.data.agentsError).toBeUndefined();
+  });
+
+  test("a loadAllCharters() throw degrades to agents:[] + agentsError, GET stays 200 (best-effort)", async () => {
+    loadAllCharters.mockImplementationOnce(() => {
+      throw new Error("charter parse failure: skills/agents/ghost/SKILL.md missing description");
+    });
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect(res.json.success).toBe(true);
+    expect(res.json.data.agents).toEqual([]);
+    expect(res.json.data.agentsError).toContain("charter parse failure");
+  });
+
+  test("a rejected loadAllCharters() promise degrades the same way — the async path is caught too", async () => {
+    loadAllCharters.mockImplementationOnce(() => Promise.reject(new Error("ENOENT skills/agents")));
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect(res.json.data.agents).toEqual([]);
+    expect(res.json.data.agentsError).toContain("ENOENT");
+  });
+
+  test("the existing off-checkout 501 gate runs first — unaffected by the new agents field", async () => {
+    getDeploymentRoot.mockImplementationOnce(() => null);
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(501);
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toContain("model-registry is unavailable in this deployment");
+    // The 501 gate returns before loadAllCharters() is ever reached.
+    expect(loadAllCharters).not.toHaveBeenCalled();
+  });
+});
+
 describe("PUT /api/v1/model-registry", () => {
   test("200 with valid overlay → writes + returns updated effective registry", async () => {
     validateRegistry.mockImplementationOnce(() => builtinRegistry);
@@ -241,6 +307,18 @@ describe("PUT /api/v1/model-registry", () => {
     expect(res.json.details).toContain("hostDefaults.bar names unknown profile");
   });
 });
+
+// design D-3 / plan-critic blocking finding #1's unmocked PUT->GET round-trip sensor lives
+// in its own file, model-registry-round-trip.test.ts, sibling of this one. This file's
+// blanket mock.module("../../../../scripts/lib/model-profiles.ts", ...) rebinds not only
+// what this file imports but that real module's OWN internal cross-references too (a
+// captured-before-mock.module function reference still has ITS internal calls to sibling
+// exports — e.g. loadEffectiveRegistry calling mergeOverlay — rerouted through the mock, one
+// level deeper than the existing getDeploymentRoot precedent needs to reach); confirmed by
+// instrumenting mergeOverlay's own mock.calls/mock.results, whose second (internal) call
+// silently fell back to the base mocked implementation instead of the real merge. A genuine
+// end-to-end real run therefore needs a file that registers no mock.module for that
+// specifier at all.
 
 describe("DELETE /api/v1/model-registry/overlay", () => {
   test("200 + returns builtin registry after overlay deleted", async () => {

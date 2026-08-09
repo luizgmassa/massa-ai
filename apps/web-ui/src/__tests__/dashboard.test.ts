@@ -77,8 +77,26 @@ describe("renderSchedulerSection", () => {
     });
     expect(html).toContain("j1");
     expect(html).toContain("reindex");
-    expect(html).toContain("Running:");
-    expect(html).toContain("1000");
+    // T13: raw "<strong>Running:</strong>" line replaced by a `.stat-card`
+    // labeled "Running" (no colon); tickIntervalMs is now locale-formatted
+    // via toLocaleString("en-US"), so 1000 renders "1,000" not "1000".
+    expect(html).toContain('<div class="stat-label">Running</div>');
+    expect(html).toContain("1,000");
+  });
+
+  it("renders stat cards and code-wrapped job id (T13)", () => {
+    const html = renderSchedulerSection({
+      data: {
+        running: true,
+        tickIntervalMs: 1000,
+        jobs: [{ id: "j1", name: "reindex", jobKind: "index", enabled: true, nextRunAt: 0, lastRunAt: 100, due: true, currentlyRunning: false }],
+      },
+      error: null,
+    });
+    expect(html).toContain('class="stat-grid"');
+    expect(html).toContain('class="stat-card"');
+    expect(html).toContain("<code>j1</code>");
+    expect(html).toContain("Tick Interval");
   });
 
   it("escapes html in job fields", () => {
@@ -113,6 +131,12 @@ describe("renderHookQueueSection", () => {
     expect(html).toContain("(0%)");
     expect(html).toContain("Saturated");
   });
+
+  it("renders a stat-card grid (T13)", () => {
+    const html = renderHookQueueSection({ data: { pendingCount: 5, maxPending: 10, saturated: false }, error: null });
+    expect(html).toContain('class="stat-grid"');
+    expect(html).toContain('class="stat-card"');
+  });
 });
 
 describe("renderSynapseSection", () => {
@@ -140,6 +164,16 @@ describe("renderSynapseSection", () => {
     expect(html).toContain("Synapse Sessions (1)");
   });
 
+  it("wraps session id/agent id/workspace id in <code> (T13)", () => {
+    const html = renderSynapseSection({
+      data: { data: { sessions: [{ sessionId: "s1", agentId: "a1", workspaceId: "w", taskContext: "t", expiresAt: 123 }] } },
+      error: null,
+    });
+    expect(html).toContain("<code>s1</code>");
+    expect(html).toContain("<code>a1</code>");
+    expect(html).toContain("<code>w</code>");
+  });
+
   it("uses em-dash for missing session fields", () => {
     const html = renderSynapseSection({
       data: { data: { sessions: [{ sessionId: "s2", agentId: "a2" }] } },
@@ -163,10 +197,24 @@ describe("renderMetricsSection", () => {
       data: { system: { uptime: 99, databaseSize: "10MB", memory: { heapUsed: 1, heapTotal: 2, rss: 3 } } },
       error: null,
     });
-    expect(html).toContain("99");
+    expect(html).toContain("99s");
     expect(html).toContain("10MB");
-    expect(html).toContain("Heap:");
-    expect(html).toContain("RSS:");
+    // T13: raw "<strong>Heap:</strong>"/"<strong>RSS:</strong>" lines
+    // replaced by separate "Heap Used"/"Heap Total"/"RSS" stat cards.
+    expect(html).toContain("Heap Used");
+    expect(html).toContain("Heap Total");
+    expect(html).toContain('<div class="stat-label">RSS</div>');
+  });
+
+  it("renders formatted stat cards with large numbers (T13)", () => {
+    const html = renderMetricsSection({
+      data: { system: { uptime: 12345, databaseSize: "10MB", memory: { heapUsed: 123456, heapTotal: 2, rss: 3 } } },
+      error: null,
+    });
+    expect(html).toContain('class="stat-grid"');
+    expect(html).toContain('class="stat-card"');
+    expect(html).toContain("12,345s");
+    expect(html).toContain("123,456");
   });
 
   it("uses em-dash for missing system fields", () => {
@@ -196,5 +244,16 @@ describe("renderDashboard", () => {
   it("defaults missing sections to unavailable", () => {
     const html = renderDashboard({});
     expect(html).toContain("unavailable");
+  });
+
+  it("renders an 'About this tab' help card (T14, APUX-10)", () => {
+    const html = renderDashboard({
+      scheduler: { data: { running: true, jobs: [] }, error: null },
+      hookQueue: { data: { pendingCount: 0, maxPending: 1, saturated: false }, error: null },
+      synapse: { data: { data: { sessions: [] } }, error: null },
+      metrics: { data: { system: { uptime: 1 } }, error: null },
+    });
+    expect(html).toContain('<details class="help-card"><summary>About this tab</summary>');
+    expect(html).toContain("read-only snapshot");
   });
 });

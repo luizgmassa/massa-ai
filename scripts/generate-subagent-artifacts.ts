@@ -427,6 +427,15 @@ export interface EmitOptions {
   readonly profileFlag?: string | null;
   /** Injected for tests; defaults to process.env. */
   readonly env?: Record<string, string | undefined>;
+  /**
+   * Dedup set for `warnStaleAgentTiers` (design D-2, plan-critic blocking finding #2). A
+   * real run's `main()` calls both `emitAll` and `emitVariants` against the same registry,
+   * so a per-entry warn would print twice without a Set shared across both calls. Defaults
+   * to a fresh, call-local `Set` when omitted — safe for a single isolated call, but a
+   * caller invoking more than one emit function against the same registry in one run MUST
+   * create the `Set` once and pass it to every call.
+   */
+  readonly warnedStaleAgents?: Set<string>;
 }
 
 type EmitFn = (c: Charter, m: Resolved) => string;
@@ -479,9 +488,12 @@ async function emitHostProfile(
   await fs.mkdir(dir, { recursive: true });
   const emit = EMIT_BY_HOST[host];
   for (const c of charters) {
-    // Resolution is (charter tier) x host x profile. A tier the profile does not
-    // define, or a profile that does not support this host, throws by design.
-    const resolved = resolveTier(registry, host, profile, c.modelTier);
+    // Resolution is (charter tier OR its per-agent/per-host override) x host x profile.
+    // `registry.agentTiers[agent][host]` (design D-1/D-2) is opt-in user-overlay data that
+    // wins over the charter's own `metadata.model_tier` when present; a tier the profile
+    // does not define, or a profile that does not support this host, still throws by design.
+    const tierOverride = registry.agentTiers[c.name]?.[host];
+    const resolved = resolveTier(registry, host, profile, tierOverride ?? c.modelTier);
     const ext = capabilitiesFor(host).artifactExtension;
     const fileName = `massa-ai-${c.name}.${ext}`;
     const filePath = path.join(dir, fileName);
@@ -504,6 +516,7 @@ export async function emitAll(
 ): Promise<Record<Host, string>> {
   const charters = await loadAllCharters();
   const registry = opts.registry ?? loadRegistry();
+  warnStaleAgentTiers(registry, charters, opts.warnedStaleAgents ?? new Set());
   const profiles = profilesPerHost(registry, opts, hosts);
   for (const host of hosts) {
     await emitHostProfile(host, profiles[host], targetDirs[host], charters, registry);
@@ -514,6 +527,36 @@ export async function emitAll(
 export interface EmitVariantsOptions {
   /** Pre-loaded registry; loaded from disk when omitted. */
   readonly registry?: Registry;
+  /** See `EmitOptions.warnedStaleAgents` — the same dedup Set, threaded here so a real run
+   *  (`main()`, calling both `emitAll` and `emitVariants`) warns each stale name once. */
+  readonly warnedStaleAgents?: Set<string>;
+}
+
+/**
+ * `agentTiers` is opt-in USER-OVERLAY data (design D-1) that names agents by bare string —
+ * this lib deliberately does not check agent-name existence at the registry-validation layer
+ * (`scripts/lib/model-profiles.ts` knows nothing about which agents exist, see its file
+ * header). This generator DOES know the charter set, so it is the layer that warns: a
+ * deleted-charter agent name left behind in the overlay must not brick regeneration, but it
+ * must not be silent either (spec assumption row).
+ *
+ * `warned` is caller-supplied and threaded through `EmitOptions`/`EmitVariantsOptions` so a
+ * real run — `main()` calls both `emitAll` and `emitVariants` against the same registry —
+ * prints each stale name exactly once total, not once per caller (plan-critic blocking
+ * finding #2). An empty `agentTiers` (the shipped default) iterates zero entries, so
+ * `--check`'s normal-path output never gains a warn line it did not have before.
+ */
+export function warnStaleAgentTiers(
+  registry: Registry,
+  charters: readonly Charter[],
+  warned: Set<string>
+): void {
+  const charterNames = new Set(charters.map((c) => c.name));
+  for (const agentName of Object.keys(registry.agentTiers)) {
+    if (charterNames.has(agentName) || warned.has(agentName)) continue;
+    warned.add(agentName);
+    console.warn(`[massa-ai] agentTiers names unknown agent "${agentName}" — ignored`);
+  }
 }
 
 /**
@@ -535,6 +578,7 @@ export async function emitVariants(
 ): Promise<Record<Host, string[]>> {
   const charters = await loadAllCharters();
   const registry = opts.registry ?? loadRegistry();
+  warnStaleAgentTiers(registry, charters, opts.warnedStaleAgents ?? new Set());
   const out = {} as Record<Host, string[]>;
   for (const host of hosts) {
     const profiles = profilesSupporting(registry, host);
@@ -635,7 +679,11 @@ export async function runCheck(opts: EmitOptions = {}): Promise<number> {
       cursor: path.join(tmp, "cursor"),
       opencode: path.join(tmp, "opencode"),
     };
-    await emitAll(tmpDirs, opts);
+    // Shared across this function's own emitAll + emitVariants calls (design D-2) so a
+    // stale agentTiers name — were the --check builtin ever to carry one — warns once, not
+    // twice, mirroring main()'s own threading below.
+    const warnedStaleAgents = new Set<string>();
+    await emitAll(tmpDirs, { ...opts, warnedStaleAgents });
     let drift = false;
     for (const host of HOSTS) {
       const diffs = await diffHost(tmpDirs[host], HOST_DIRS[host], host);
@@ -664,7 +712,7 @@ export async function runCheck(opts: EmitOptions = {}): Promise<number> {
       cursor: path.join(tmp, "variants", "cursor-plugin"),
       opencode: path.join(tmp, "variants", "opencode-plugin"),
     };
-    const supportedByHost = await emitVariants(tmpPluginDirs, { registry });
+    const supportedByHost = await emitVariants(tmpPluginDirs, { registry, warnedStaleAgents });
     for (const host of HOSTS) {
       for (const profile of supportedByHost[host]) {
         const genDir = variantDir(host, profile, tmpPluginDirs);
@@ -721,7 +769,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   if (effective.overlayError) {
     console.warn(`Warning: overlay error — ${effective.overlayError} (using builtin)`);
   }
-  const runtimeOpts: EmitOptions = { ...opts, registry };
+  // Created once and threaded through BOTH calls below (design D-2, plan-critic blocking
+  // finding #2) — a real run reaches emitAll then emitVariants against this same registry,
+  // so a shared Set is what keeps a stale agentTiers name warning exactly once.
+  const warnedStaleAgents = new Set<string>();
+  const runtimeOpts: EmitOptions = { ...opts, registry, warnedStaleAgents };
   const profiles = await emitAll(HOST_DIRS, runtimeOpts);
   const hostCount = Object.keys(HOST_DIRS).length;
   const total = SPECIALIST_NAMES.length * hostCount;
@@ -737,7 +789,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   // Variant trees (design.md Component 1, MPS-01): every profile a host supports,
   // pre-rendered under agent-profiles/<profile>/ — independent of --profile/env,
   // which only picks the ACTIVE profile above.
-  const variantProfiles = await emitVariants(PLUGIN_ROOT_DIRS, { registry });
+  const variantProfiles = await emitVariants(PLUGIN_ROOT_DIRS, { registry, warnedStaleAgents });
   let variantTotal = 0;
   for (const [host, ps] of Object.entries(variantProfiles)) {
     variantTotal += ps.length * SPECIALIST_NAMES.length;

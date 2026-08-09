@@ -14,6 +14,8 @@ const {
   renderProposals,
   renderConfig,
   renderProfiles,
+  renderProfilesView,
+  renderModelRegistry,
   initTheme,
   toggleTheme,
   createApiClient,
@@ -704,6 +706,14 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(profilesIdx).toBeGreaterThan(configIdx);
   });
 
+  it("index.html nav uses the plain-English 'Models' label for the #/profiles route (T9, APUX-07)", () => {
+    const navMatch = INDEX_HTML.match(/<nav class="nav">([\s\S]*?)<\/nav>/);
+    expect(navMatch).not.toBeNull();
+    const nav = navMatch![1];
+    expect(nav).toContain('<a href="#/profiles">Models</a>');
+    expect(nav).not.toContain(">Profiles<");
+  });
+
   it("index.html footer text is 'Admin portal · served by the massa-ai Tools API'", () => {
     expect(INDEX_HTML).toContain("Admin portal");
     expect(INDEX_HTML).toContain("served by the massa-ai Tools API");
@@ -735,13 +745,16 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(html).toContain("active");
   });
 
-  it("renderProfiles shows installed with marketplace message when no variant profiles (UIC-05)", () => {
+  it("renderProfiles shows installed with marketplace message when no variant profiles (UIC-05, T9: Save & Apply / Model Catalog nomenclature)", () => {
     const html = renderProfiles({ hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.41.0", availableProfiles: [] }] }, { writeMode: false });
     expect(html).toContain("claude");
     expect(html).not.toContain("Not installed");
     expect(html).toContain("marketplace");
     expect(html).toContain("MASSA_AI_MODEL_PROFILE");
-    expect(html).toContain("Regenerate Artifacts");
+    expect(html).toContain("Save &amp; Apply");
+    expect(html).toContain("Model Catalog");
+    expect(html).not.toContain("Regenerate Artifacts");
+    expect(html).not.toContain("Edit Registry");
   });
 
   it("renderProfiles shows Not installed when installed is false", () => {
@@ -999,20 +1012,33 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       expect(html).toContain('data-create="warmCache"');
     });
 
-    it("renders reset button on project rows when write mode on", () => {
+    it("renders a Delete button on project rows when write mode on (APUX-08)", () => {
       enableWrite();
       const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
       const html = renderProjects(data);
       expect(html).toContain('data-action="project-reset"');
       expect(html).toContain('data-project="p1"');
+      expect(html).toContain('class="btn-delete" data-action="project-reset" data-project="p1">Delete</button>');
     });
 
-    it("hides index form + reset button when write mode off", () => {
+    it("hides index form + delete button when write mode off", () => {
       disableWrite();
       const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
       const html = renderProjects(data);
       expect(html).not.toContain('data-action="project-reset"');
       expect(html).not.toContain('data-create="projectPath"');
+    });
+
+    it("renders Title Case column headers with a Files header (APUX-08, P2-E AC2)", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain("<th>Project</th>");
+      expect(html).toContain("<th>Files</th>");
+      expect(html).toContain("<th>Actions</th>");
+      expect(html).not.toContain("<th>project</th>");
+      expect(html).not.toContain("<th>docs</th>");
+      expect(html).not.toContain("<th>actions</th>");
     });
 
     it("renders field helper section with Index Project guide", () => {
@@ -1033,5 +1059,427 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       expect(html).toContain("<details");
       expect(html).toContain("Embedding Dimension Note");
     });
+
+    it("renders an 'About this tab' help card explaining indexing + Delete (T14, APUX-10)", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain('<details class="help-card"><summary>About this tab</summary>');
+      expect(html).toContain("What Indexing Does");
+      expect(html).toContain("What Delete Removes");
+      expect(html).toContain("irreversibly");
+    });
+  });
+
+  describe("checkpoints help card (T14, APUX-10)", () => {
+    it("renders an 'About this tab' help card explaining what a checkpoint is", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [] } };
+      const html = renderCheckpoints(data);
+      expect(html).toContain('<details class="help-card"><summary>About this tab</summary>');
+      expect(html).toContain("What A Checkpoint Is");
+      expect(html).toContain("saved snapshot");
+    });
+  });
+
+  describe("config help card (T14, APUX-10)", () => {
+    it("renders an 'About this tab' help card explaining per-section save + restart badges", () => {
+      const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
+      expect(html).toContain('<details class="help-card"><summary>About this tab</summary>');
+      expect(html).toContain("How Config Saves");
+      expect(html).toContain("saves independently");
+    });
+  });
+
+  // ── T11 (APUX-09, design D-5): shared button system + form-grid structure ──
+  // Every <button> rendered by the five polished tabs must carry a class (no
+  // bare `<button ...>` with no styling hook), and the Projects/Checkpoints
+  // create forms must be laid out in `.form-grid`.
+  describe("five-tab button class scan (T11, APUX-09, design D-5)", () => {
+    /** Returns every `<button ...>` opening tag found in `html`. */
+    function extractButtonTags(html: string): string[] {
+      return html.match(/<button\b[^>]*>/g) || [];
+    }
+
+    it("every <button> in the write-mode Projects view carries a class", () => {
+      enableWrite();
+      const html = renderProjects({ projects: [{ projectId: "p1", documentCount: 10 }] });
+      const buttons = extractButtonTags(html);
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const tag of buttons) expect(tag).toContain("class=");
+    });
+
+    it("every <button> in the write-mode Checkpoints view carries a class", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      const buttons = extractButtonTags(html);
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const tag of buttons) expect(tag).toContain("class=");
+    });
+
+    it("every <button> in the write-mode Config view carries a class", () => {
+      const html = renderConfig({ config: { database: { url: "postgresql://x" } }, restartNeededSections: [] }, { writeMode: true });
+      const buttons = extractButtonTags(html);
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const tag of buttons) expect(tag).toContain("class=");
+    });
+
+    it("every <button> in the write-mode Models (Model Catalog) view carries a class, including inline-form and empty-state buttons", () => {
+      const registryData = {
+        registry: {
+          version: 1,
+          tiers: ["light", "standard", "deep"],
+          hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
+          workflowTiers: { search: "standard" },
+          agentTiers: { builder: { opencode: "deep" } },
+          profiles: {
+            balanced: {
+              description: "Balanced profile",
+              hosts: {
+                claude: { light: { model: "claude-sonnet", effort: "low" }, standard: { model: "claude-sonnet", effort: "medium" }, deep: { model: "claude-opus", effort: "high" } },
+                opencode: { light: { model: "qwen-mini", effort: "low" }, standard: { model: "opencode-go/glm-5.2", effort: "medium" }, deep: { model: "qwen-max", effort: "high" } },
+              },
+            },
+          },
+        },
+        source: { builtin: {}, overlay: {}, tombstoned: ["old-profile"] },
+        agents: [{ name: "builder", charterTier: "standard" }],
+      };
+      const scanFormState = (registryForm: { kind: string; error: string | null } | null) => {
+        const html = renderModelRegistry(registryData, { writeMode: true, registryForm });
+        const buttons = extractButtonTags(html);
+        expect(buttons.length).toBeGreaterThan(0);
+        for (const tag of buttons) expect(tag).toContain("class=");
+      };
+      scanFormState(null);
+      scanFormState({ kind: "add-workflow", error: null });
+      scanFormState({ kind: "add-profile", error: null });
+      scanFormState({ kind: "duplicate-profile", error: null });
+      scanFormState({ kind: "delete-profile", error: null });
+
+      // Empty-state inline-form branches (no workflows left / no profiles to
+      // duplicate or delete) render a bare-looking form with only a Cancel
+      // button — exercise those too.
+      const noProfiles = { ...registryData, registry: { ...registryData.registry, profiles: {} } };
+      for (const kind of ["duplicate-profile", "delete-profile"]) {
+        const html = renderModelRegistry(noProfiles, { writeMode: true, registryForm: { kind, error: null } });
+        const buttons = extractButtonTags(html);
+        for (const tag of buttons) expect(tag).toContain("class=");
+      }
+      // Mirrors app.js's WORKFLOW_STEMS exactly — every stem must already have
+      // an override for the add-workflow form to hit its empty-state branch.
+      const ALL_WORKFLOW_STEMS = [
+        "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
+        "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
+        "discovery", "exploration", "feature", "furps-refinement", "general",
+        "implementation-audit", "implementation-fix", "judge-with-debate",
+        "long-session", "maestro", "maestro-audit", "maestro-fix",
+        "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
+        "refactor", "requirements-audit", "requirements-fix", "rfc",
+        "security-audit", "security-fix", "skill-architect", "spec-driven",
+        "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
+      ];
+      const noWorkflowRoom = {
+        ...registryData,
+        registry: {
+          ...registryData.registry,
+          workflowTiers: Object.fromEntries(ALL_WORKFLOW_STEMS.map((s) => [s, "light"])),
+        },
+      };
+      const htmlFull = renderModelRegistry(noWorkflowRoom, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
+      expect(extractButtonTags(htmlFull).length).toBeGreaterThan(0);
+      for (const tag of extractButtonTags(htmlFull)) expect(tag).toContain("class=");
+    });
+
+    it(".form-grid is present on the Projects index form and Checkpoints create form", () => {
+      enableWrite();
+      const projectsHtml = renderProjects({ projects: [{ projectId: "p1" }] });
+      expect(projectsHtml).toContain('class="create-form form-grid"');
+      const checkpointsHtml = renderCheckpoints({ success: true, data: { checkpoints: [] } });
+      expect(checkpointsHtml).toContain('class="create-form form-grid"');
+    });
+  });
+
+  // ── T12 (APUX-09, design D-6): Checkpoints + Projects Title Case labels ────
+  describe("Checkpoints + Projects Title Case labels (T12, APUX-09)", () => {
+    it("Checkpoints create form labels are Title Case", () => {
+      enableWrite();
+      const html = renderCheckpoints({ success: true, data: { checkpoints: [] } });
+      expect(html).toContain("<label>Task ID</label>");
+      expect(html).toContain("<label>Description</label>");
+      expect(html).toContain("<label>Status</label>");
+      expect(html).toContain("<label>Progress Percent</label>");
+      expect(html).toContain("<label>Current Step</label>");
+      expect(html).toContain("<label>Total Steps</label>");
+      expect(html).toContain("<label>Completed Steps</label>");
+      expect(html).toContain("<label>Checkpoint Type</label>");
+      // Old camelCase labels are gone (data-create attributes stay camelCase —
+      // those are field names, not labels, and are asserted unchanged above).
+      expect(html).not.toContain("<label>taskId</label>");
+      expect(html).not.toContain("<label>progressPercent</label>");
+      expect(html).not.toContain("<label>currentStep</label>");
+      expect(html).not.toContain("<label>totalSteps</label>");
+      expect(html).not.toContain("<label>completedSteps</label>");
+      expect(html).not.toContain("<label>checkpointType</label>");
+    });
+
+    it("Checkpoints table headers are Title Case", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      expect(html).toContain("<th>Task</th>");
+      expect(html).toContain("<th>Type</th>");
+      expect(html).toContain("<th>Status</th>");
+      expect(html).toContain("<th>Description</th>");
+      expect(html).toContain("<th>Actions</th>");
+      expect(html).not.toContain("<th>task</th>");
+      expect(html).not.toContain("<th>type</th>");
+      expect(html).not.toContain("<th>status</th>");
+      expect(html).not.toContain("<th>description</th>");
+      expect(html).not.toContain("<th>actions</th>");
+    });
+
+    it("Projects index form labels are Title Case", () => {
+      enableWrite();
+      const html = renderProjects({ projects: [{ projectId: "p1" }] });
+      expect(html).toContain("<label>Project Path</label>");
+      expect(html).toContain("<label>Project ID (optional)</label>");
+      expect(html).toContain("/> Force Reindex</label>");
+      expect(html).toContain("/> Warm Cache</label>");
+      expect(html).not.toContain("<label>projectPath</label>");
+      expect(html).not.toContain("<label>projectId (optional)</label>");
+    });
+  });
+});
+
+// ── T9 (APUX-07, P2-D AC1): Nomenclature Scheme A negative-vocabulary sensor ─
+// The Models tab's user-visible text must never say "overlay", "tombstoned",
+// or "host" — <code> samples and HTML attributes (both stripped below) are
+// exempt. Exercises renderProfilesView with BOTH tabs (Active Profile +
+// Model Catalog), the real page assembly, not renderModelRegistry alone.
+
+/** Strips <code>...</code> content and every HTML tag (attributes included,
+ *  since a tag can't survive without its attributes) so only genuinely
+ *  user-visible text remains for the negative-vocabulary match. */
+function extractVisibleText(html: string): string {
+  return html.replace(/<code[^>]*>[\s\S]*?<\/code>/g, " ").replace(/<[^>]*>/g, " ");
+}
+
+const NOMENCLATURE_SAMPLE_REGISTRY = {
+  registry: {
+    version: 1,
+    tiers: ["light", "standard", "deep"],
+    hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
+    workflowTiers: { search: "standard" },
+    agentTiers: { builder: { opencode: "deep" } },
+    profiles: {
+      balanced: {
+        description: "Balanced profile",
+        hosts: {
+          claude: { light: { model: "claude-sonnet", effort: "low" }, standard: { model: "claude-sonnet", effort: "medium" }, deep: { model: "claude-opus", effort: "high" } },
+          codex: { light: { model: "gpt-4o-mini", effort: "minimal" }, standard: { model: "gpt-4o", effort: "medium" }, deep: { model: "o1", effort: "high" } },
+          cursor: { light: { model: null, effort: null }, standard: { model: "claude-sonnet", effort: null }, deep: { model: "claude-opus", effort: null } },
+          opencode: { light: { model: "qwen-mini", effort: "low" }, standard: { model: "opencode-go/glm-5.2", effort: "medium" }, deep: { model: "qwen-max", effort: "high" } },
+        },
+      },
+      work: {
+        description: "Work profile",
+        hosts: { claude: { light: { model: "claude-haiku", effort: "low" } } },
+      },
+    },
+  },
+  source: {
+    builtin: {},
+    overlay: { profiles: { work: { description: "Custom work profile", hosts: {} } }, hostDefaults: { codex: "work" } },
+    tombstoned: ["old-profile"],
+  },
+  overlayOverrideCount: 2,
+  agents: [
+    { name: "builder", charterTier: "standard" },
+    { name: "reviewer", charterTier: "light" },
+  ],
+};
+
+const NOMENCLATURE_SAMPLE_PROFILES = {
+  hosts: [
+    { host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced", "work"] },
+    { host: "cursor", installed: false, skipped: true, skipReason: "skipped", activeProfile: null, bundleVersion: null, availableProfiles: [] },
+  ],
+};
+
+describe("Models tab nomenclature Scheme A (T9, APUX-07, P2-D AC1)", () => {
+  const switchTabHtml = renderProfilesView(NOMENCLATURE_SAMPLE_PROFILES, NOMENCLATURE_SAMPLE_REGISTRY, { profilesTab: "switch", writeMode: true, unsaved: true, registryForm: null });
+  const catalogTabHtml = renderProfilesView(NOMENCLATURE_SAMPLE_PROFILES, NOMENCLATURE_SAMPLE_REGISTRY, { profilesTab: "registry", writeMode: true, unsaved: true, registryForm: null });
+  const bothTabsHtml = switchTabHtml + catalogTabHtml;
+
+  it('uses "Active Profile" and "Model Catalog" sub-tab labels (Nomenclature Map)', () => {
+    expect(bothTabsHtml).toContain(">Active Profile<");
+    expect(bothTabsHtml).toContain(">Model Catalog<");
+    expect(bothTabsHtml).not.toContain(">Switch Profile<");
+    expect(bothTabsHtml).not.toContain(">Edit Registry<");
+  });
+
+  it('the Model Catalog H2 reads "Model Catalog", not "Model Registry" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain("<h2>Model Catalog</h2>");
+    expect(catalogTabHtml).not.toContain("Model Registry");
+  });
+
+  it('"Default Profile per Tool" replaces "Host Defaults" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain("Default Profile per Tool");
+    expect(catalogTabHtml).not.toContain("Host Defaults");
+  });
+
+  it('"Per-Workflow Tier Overrides" replaces "Workflow Tiers" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain("Per-Workflow Tier Overrides");
+    expect(catalogTabHtml).not.toContain("<h3>Workflow Tiers</h3>");
+    expect(catalogTabHtml).not.toContain("<h4>Workflow Tiers</h4>");
+  });
+
+  it('the "override" badge and override-count sentence replace "overlay" wording (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain(">override<");
+    expect(catalogTabHtml).toContain("You have 2 custom overrides of the built-in defaults.");
+    expect(catalogTabHtml).not.toContain(">overlay<");
+    expect(catalogTabHtml).not.toContain("Overlay is overriding");
+  });
+
+  it('"Discard All Overrides" replaces "Reset to Built-in (clear overlay)" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain(">Discard All Overrides<");
+    expect(catalogTabHtml).not.toContain("Reset to Built-in");
+  });
+
+  it('"Removed Profiles (restorable)" replaces "Deleted (restorable)" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain("Removed Profiles (restorable)");
+    expect(catalogTabHtml).not.toContain("Deleted (restorable)");
+  });
+
+  it('the "Save & Apply" button is present (already Scheme A wording)', () => {
+    expect(catalogTabHtml).toContain("Save &amp; Apply");
+  });
+
+  it('renderModelRegistry alone matches the same Scheme A labels', () => {
+    const html = renderModelRegistry(NOMENCLATURE_SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("<h2>Model Catalog</h2>");
+    expect(html).toContain("Default Profile per Tool");
+    expect(html).toContain("Per-Workflow Tier Overrides");
+    expect(html).toContain("Discard All Overrides");
+    expect(html).toContain("Removed Profiles (restorable)");
+  });
+
+  // ── Negative sensor (P2-D AC1) ──────────────────────────────────────────
+  it('contains no "overlay" in user-visible text (code samples + attributes excepted)', () => {
+    const visible = extractVisibleText(bothTabsHtml);
+    expect(visible.toLowerCase()).not.toContain("overlay");
+  });
+
+  it('contains no "tombstoned" in user-visible text (code samples + attributes excepted)', () => {
+    const visible = extractVisibleText(bothTabsHtml);
+    expect(visible.toLowerCase()).not.toContain("tombstoned");
+  });
+
+  it('contains no "host" in user-visible text (code samples + attributes excepted)', () => {
+    const visible = extractVisibleText(bothTabsHtml);
+    expect(visible.toLowerCase()).not.toContain("host");
+  });
+
+  // T14 (P2-D AC1): the sensor now covers all four banned words, "registry"
+  // included — the T14 help-card rewrite eliminated the remaining
+  // user-visible "registry" prose (help section, catalog-empty/error text).
+  it('contains no "registry" in user-visible text (code samples + attributes excepted)', () => {
+    const visible = extractVisibleText(bothTabsHtml);
+    expect(visible.toLowerCase()).not.toContain("registry");
+  });
+
+  it("sensor sanity: the raw (unstripped) HTML DOES still carry these words in attributes/classes, proving the strip step is load-bearing", () => {
+    // If this ever goes false, the fixture stopped exercising data-host/
+    // class="tombstoned"/class="overlay-badge"/class="registry-*" and the
+    // negative tests above would pass vacuously.
+    expect(bothTabsHtml).toContain('data-host="claude"');
+    expect(bothTabsHtml).toContain('class="tombstoned"');
+    expect(bothTabsHtml).toContain('class="badge overlay-badge"');
+    expect(bothTabsHtml).toContain('class="registry-override-count muted"');
+  });
+});
+
+// ── Fix-loop 2, gap 1 (T10, APUX-08, P2-E AC1) ──────────────────────────────
+// The Projects Delete confirm() text is correct but untested: no test
+// simulates a real click on project-reset, because the shared fake-DOM
+// harness (`makeFakeDom` above) attaches every wired handler to one generic
+// stable child whose `dataset` never carries a `project` key — the handler's
+// own `if (!project) return;` guard exits before `confirm()` would ever run,
+// so a click-simulation here would pass vacuously (dialogs.confirms would
+// stay empty) rather than exercise the real message. This sensor takes the
+// documented fallback instead: extract wireViewHandlers' own source span
+// (the same brace-depth-lexer idiom registry-editor.test.ts already uses for
+// its no-prompt/no-alert sensor) and assert the exact confirm() literal
+// lives inside it.
+
+const WIRE_VIEW_HANDLERS_SOURCE = fs.readFileSync(path.join(STATIC_DIR, "app.js"), "utf8");
+
+/** Extracts the full source text of a single top-level `function name() { ... }`
+ *  declaration using a small brace-depth lexer that ignores braces inside
+ *  string/template literals and comments, so it never mis-closes on a `{`/`}`
+ *  inside a rendered HTML string. Mirrors registry-editor.test.ts's
+ *  `extractFunctionSpans` (kept local here — that helper isn't exported). */
+function extractFunctionSpan(source: string, name: string): string | null {
+  const declRe = new RegExp("function\\s+" + name + "\\s*\\(");
+  const m = declRe.exec(source);
+  if (!m) return null;
+  let i = m.index + m[0].length;
+  let parenDepth = 1;
+  while (parenDepth > 0 && i < source.length) {
+    if (source[i] === "(") parenDepth++;
+    else if (source[i] === ")") parenDepth--;
+    i++;
+  }
+  while (i < source.length && source[i] !== "{") i++;
+  let braceDepth = 0;
+  let state: "normal" | "sq" | "dq" | "tpl" | "line" | "block" = "normal";
+  let j = i;
+  for (; j < source.length; j++) {
+    const c = source[j];
+    const prev = source[j - 1];
+    if (state === "normal") {
+      if (c === "'") state = "sq";
+      else if (c === '"') state = "dq";
+      else if (c === "`") state = "tpl";
+      else if (c === "/" && source[j + 1] === "/") state = "line";
+      else if (c === "/" && source[j + 1] === "*") state = "block";
+      else if (c === "{") braceDepth++;
+      else if (c === "}") {
+        braceDepth--;
+        if (braceDepth === 0) { j++; break; }
+      }
+    } else if (state === "sq") {
+      if (c === "'" && prev !== "\\") state = "normal";
+    } else if (state === "dq") {
+      if (c === '"' && prev !== "\\") state = "normal";
+    } else if (state === "tpl") {
+      if (c === "`" && prev !== "\\") state = "normal";
+    } else if (state === "line") {
+      if (c === "\n") state = "normal";
+    } else if (state === "block") {
+      if (c === "*" && source[j + 1] === "/") { state = "normal"; j++; }
+    }
+  }
+  return source.slice(m.index, j);
+}
+
+describe("Projects Delete confirm text — wireViewHandlers source-span sensor (T10, APUX-08, P2-E AC1)", () => {
+  const wireViewHandlersSpan = extractFunctionSpan(WIRE_VIEW_HANDLERS_SOURCE, "wireViewHandlers");
+
+  it("finds the wireViewHandlers function span (sensor sanity — a null/tiny span proves nothing)", () => {
+    expect(wireViewHandlersSpan).not.toBeNull();
+    expect((wireViewHandlersSpan as string).length).toBeGreaterThan(500);
+    // A second, independently-known confirm() from the same function proves
+    // the span genuinely captured the real body, not a truncated match.
+    expect(wireViewHandlersSpan).toContain('confirm("Delete checkpoint " + id + " (task: " + task + ")? This cannot be undone.")');
+  });
+
+  it("wires project-reset with the exact removal-consequence confirm text", () => {
+    expect(wireViewHandlersSpan).toContain('data-action="project-reset"');
+    expect(wireViewHandlersSpan).toContain(
+      'confirm("Delete project " + project + "? This removes its indexed vectors, symbols and memories permanently. This cannot be undone.")',
+    );
   });
 });

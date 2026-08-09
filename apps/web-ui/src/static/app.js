@@ -253,13 +253,13 @@ export function renderProjects(data, opts) {
     : "";
 
   const indexForm = writeMode
-    ? '<div class="create-form">' +
+    ? '<div class="create-form form-grid">' +
       "<h3>Index Project</h3>" +
-      '<div class="form-field"><label>projectPath</label><input type="text" data-create="projectPath" data-form="project-index" /></div>' +
-      '<div class="form-field"><label>projectId (optional)</label><input type="text" data-create="projectId" data-form="project-index" /></div>' +
-      '<div class="form-field"><label><input type="checkbox" data-create="forceReindex" data-form="project-index" /> forceReindex</label></div>' +
-      '<div class="form-field"><label><input type="checkbox" data-create="warmCache" data-form="project-index" /> warmCache</label></div>' +
-      '<button type="button" data-action="project-index">Index</button>' +
+      '<div class="form-field"><label>Project Path</label><input type="text" data-create="projectPath" data-form="project-index" /></div>' +
+      '<div class="form-field"><label>Project ID (optional)</label><input type="text" data-create="projectId" data-form="project-index" /></div>' +
+      '<div class="form-field"><label><input type="checkbox" data-create="forceReindex" data-form="project-index" /> Force Reindex</label></div>' +
+      '<div class="form-field"><label><input type="checkbox" data-create="warmCache" data-form="project-index" /> Warm Cache</label></div>' +
+      '<button type="button" class="btn btn-primary" data-action="project-index">Index</button>' +
       "</div>"
     : "";
 
@@ -267,16 +267,16 @@ export function renderProjects(data, opts) {
     return '<section class="view"><h2>Projects</h2>' + indexProgress + '<p class="empty">No indexed projects.</p></section>';
   }
 
-  const actionCol = writeMode ? "<th>actions</th>" : "";
+  const actionCol = writeMode ? "<th>Actions</th>" : "";
   const body =
-    '<table class="grid"><thead><tr><th>project</th><th>docs</th>' + actionCol + '</tr></thead><tbody>' +
+    '<table class="grid"><thead><tr><th>Project</th><th>Files</th>' + actionCol + '</tr></thead><tbody>' +
     projects
       .map((p) => {
         const id = escapeHtml(p.projectId || p.id || "");
         const count = p.documentCount ?? p.docCount ?? "";
         const actions = writeMode
           ? '<td class="actions-cell">' +
-            '<button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">reset</button>' +
+            '<button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">Delete</button>' +
             "</td>"
           : "";
         return (
@@ -299,19 +299,21 @@ export function renderProjects(data, opts) {
     indexProgress +
     body +
     indexForm +
-    '<details class="registry-help"><summary>?</summary>' +
-    '<div class="registry-help-body">' +
+    '<details class="help-card"><summary>About this tab</summary>' +
+    '<div class="help-card-body">' +
+    '<h4>What Indexing Does</h4>' +
+    '<p>Indexing reads a project\'s source files and stores them as searchable vectors, keyword entries, and code symbols, so massa-ai\'s memory and search tools can find relevant code and context. Re-index after large changes to keep that view current.</p>' +
     '<h4>Index Project</h4>' +
     '<dl>' +
-    '<dt>projectPath</dt><dd>Absolute path to the project directory to index. Must be a git repository or a directory with source files.</dd>' +
-    '<dt>projectId</dt><dd>Unique identifier for the project. Defaults to the directory basename. Used to scope all indexed data (memories, search, symbols).</dd>' +
-    '<dt>forceReindex</dt><dd>When checked, re-indexes all files even if they have not changed since the last index. Use after changing embedding models or when the index is corrupted.</dd>' +
-    '<dt>warmCache</dt><dd>When checked, pre-warms the search cache after indexing. Speeds up the first search query but adds time to the indexing process.</dd>' +
+    '<dt>Project Path</dt><dd>Absolute path to the project directory to index. Must be a git repository or a directory with source files.</dd>' +
+    '<dt>Project ID (optional)</dt><dd>Unique identifier for the project. Defaults to the directory basename. Used to scope all indexed data (memories, search, symbols).</dd>' +
+    '<dt>Force Reindex</dt><dd>When checked, re-indexes all files even if they have not changed since the last index. Use after changing embedding models or when the index is corrupted.</dd>' +
+    '<dt>Warm Cache</dt><dd>When checked, pre-warms the search cache after indexing. Speeds up the first search query but adds time to the indexing process.</dd>' +
     '</dl>' +
-    '<h4>Project Table</h4>' +
-    '<p>The table lists all indexed projects with their document count. Use the reset button to remove all indexed data for a project (vectors, keywords, symbols). This is irreversible.</p>' +
+    '<h4>What Delete Removes</h4>' +
+    '<p>Delete removes a project\'s indexed vectors, keyword entries, symbols, and memories, irreversibly. The project\'s files on disk are untouched — only massa-ai\'s record of it disappears from this list.</p>' +
     '<h4>Embedding Dimension Note</h4>' +
-    '<p>If a project is missing from the list, the current embedding model dimension may not match the dimension used when the project was indexed. Check the Embedding section in Config for the correct dimensions value, or reindex the project.</p>' +
+    '<p>If a project is missing from the list, the current embedding model\'s dimension may not match the dimension used when the project was indexed. Check the Embedding section in Config for the correct dimensions value, or reindex the project.</p>' +
     '</div>' +
     '</details>' +
     "</section>"
@@ -616,26 +618,26 @@ export function renderCheckpoints(data) {
   }
 
   const createForm = writeMode
-    ? '<div class="create-form">' +
+    ? '<div class="create-form form-grid">' +
       "<h3>Create Checkpoint</h3>" +
-      '<div class="form-field"><label>taskId</label><input type="text" data-create="taskId" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>description</label><input type="text" data-create="description" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>status</label><select data-create="status" data-form="checkpoint-create"><option>pending</option><option>in_progress</option><option>completed</option><option>failed</option><option>paused</option></select></div>' +
-      '<div class="form-field"><label>progressPercent</label><input type="number" min="0" max="100" data-create="progressPercent" data-form="checkpoint-create" value="0" /></div>' +
-      '<div class="form-field"><label>currentStep</label><input type="text" data-create="currentStep" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>totalSteps</label><input type="number" data-create="totalSteps" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>completedSteps</label><input type="number" data-create="completedSteps" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>checkpointType</label><select data-create="checkpointType" data-form="checkpoint-create"><option>manual</option><option>milestone</option></select></div>' +
-      '<button type="button" data-action="checkpoint-create">Create</button>' +
+      '<div class="form-field"><label>Task ID</label><input type="text" data-create="taskId" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Description</label><input type="text" data-create="description" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Status</label><select data-create="status" data-form="checkpoint-create"><option>pending</option><option>in_progress</option><option>completed</option><option>failed</option><option>paused</option></select></div>' +
+      '<div class="form-field"><label>Progress Percent</label><input type="number" min="0" max="100" data-create="progressPercent" data-form="checkpoint-create" value="0" /></div>' +
+      '<div class="form-field"><label>Current Step</label><input type="text" data-create="currentStep" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Total Steps</label><input type="number" data-create="totalSteps" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Completed Steps</label><input type="number" data-create="completedSteps" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Checkpoint Type</label><select data-create="checkpointType" data-form="checkpoint-create"><option>manual</option><option>milestone</option></select></div>' +
+      '<button type="button" class="btn btn-primary" data-action="checkpoint-create">Create</button>' +
       "</div>"
     : "";
 
   if (rows.length === 0 && !writeMode) {
     return '<section class="view"><h2>Checkpoints</h2><p class="empty">No checkpoints.</p></section>';
   }
-  const actionCol = writeMode ? "<th>actions</th>" : "";
+  const actionCol = writeMode ? "<th>Actions</th>" : "";
   const body =
-    '<table class="grid"><thead><tr><th>task</th><th>type</th><th>status</th><th>description</th>' + actionCol + '</tr></thead><tbody>' +
+    '<table class="grid"><thead><tr><th>Task</th><th>Type</th><th>Status</th><th>Description</th>' + actionCol + '</tr></thead><tbody>' +
     rows
       .map((c) => {
         const id = escapeHtml(c.id || c.checkpointId || "");
@@ -665,7 +667,16 @@ export function renderCheckpoints(data) {
       })
       .join("") +
     "</tbody></table>";
-  return '<section class="view"><h2>Checkpoints</h2>' + body + createForm + "</section>";
+  const helpCard =
+    '<details class="help-card"><summary>About this tab</summary>' +
+    '<div class="help-card-body">' +
+    '<h4>What A Checkpoint Is</h4>' +
+    '<p>A checkpoint is a saved snapshot of an in-progress task — its status, current step, and progress percentage — so work can resume exactly where it left off, even across a session restart.</p>' +
+    '<h4>Create And Edit</h4>' +
+    '<p>Use the form below to create a checkpoint for a task you are tracking. Each row\'s <strong>edit</strong> button reopens that checkpoint\'s fields for updating status, progress, and step; <strong>delete</strong> removes it.</p>' +
+    '</div>' +
+    '</details>';
+  return '<section class="view"><h2>Checkpoints</h2>' + body + createForm + helpCard + "</section>";
 }
 
 // ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
@@ -684,17 +695,17 @@ const CONFIG_SECTIONS = [
   {
     key: "database",
     label: "Database",
-    fields: [{ name: "url", type: "text", label: "Database URL", sensitive: true, guide: "PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/db). Changing this requires a server restart." }],
+    fields: [{ name: "url", type: "text", label: "Database URL", sensitive: true, guide: "PostgreSQL connection string (e.g., `postgresql://user:pass@host:5432/db`). Changing this requires a server restart." }],
   },
   {
     key: "embedding",
     label: "Embedding",
     fields: [
       { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "mistral", "openai", "google", "cohere"], guide: "Which embedding provider to use. Ollama runs locally; others are cloud APIs." },
-      { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., qwen3-embedding:4b for Ollama)." },
-      { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically http://localhost:11434." },
+      { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., `qwen3-embedding:4b` for Ollama)." },
+      { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically `http://localhost:11434`." },
       { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama. Changing this requires a restart." },
-      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 4096 for qwen3-embedding:4b)." },
+      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 4096 for `qwen3-embedding:4b`)." },
     ],
   },
   {
@@ -718,7 +729,7 @@ const CONFIG_SECTIONS = [
     fields: [
       { name: "maxMatchWork", type: "number", label: "Max Match Work", guide: "Maximum glob match operations before bailing. Default: 100000." },
       { name: "maxIgnorePatterns", type: "number", label: "Max Ignore Patterns", guide: "Maximum ignore patterns allowed. Default: 1024." },
-      { name: "rules", type: "string[]", label: "Rules (JSON)", guide: "Capture rules as JSON array of {pattern, disposition: Keep|Drop|MetadataOnly}. When absent, the built-in DEFAULT_POLICY applies." },
+      { name: "rules", type: "string[]", label: "Rules (JSON)", guide: "Capture rules as JSON array of {pattern, disposition: Keep|Drop|MetadataOnly}. When absent, the built-in `DEFAULT_POLICY` applies." },
     ],
   },
   {
@@ -763,9 +774,9 @@ const CONFIG_SECTIONS = [
     label: "LLM",
     fields: [
       { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables LLM-powered features (consolidation, query understanding, compression)." },
-      { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., http://localhost:11434/v1 for Ollama OpenAI-compatible endpoint)." },
+      { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., `http://localhost:11434/v1` for Ollama OpenAI-compatible endpoint)." },
       { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for the LLM provider. Not needed for local Ollama. Changing this requires a restart." },
-      { name: "model", type: "text", label: "Model", guide: "Primary LLM model name (e.g., qwen2.5:7b-instruct)." },
+      { name: "model", type: "text", label: "Model", guide: "Primary LLM model name (e.g., `qwen2.5:7b-instruct`)." },
       { name: "codeModel", type: "text", label: "Code Model", guide: "Model used for code-related tasks. When empty, falls back to the primary model." },
       { name: "temperature", type: "number", label: "Temperature", guide: "Sampling temperature (0 = deterministic, 1 = creative). Typically 0.2 for tasks." },
       { name: "maxOutputTokens", type: "number", label: "Max Output Tokens", guide: "Maximum tokens the LLM can generate in a single response." },
@@ -849,12 +860,26 @@ const CONFIG_SECTIONS = [
     key: "security",
     label: "Security",
     fields: [
-      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key required on every request except /health, /swagger, and /ui. Auto-provisioned on first start. Changing this requires a restart." },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key required on every request except `/health`, `/swagger`, and `/ui`. Auto-provisioned on first start. Changing this requires a restart." },
       { name: "corsOrigins", type: "string[]", label: "CORS Origins", guide: "Comma-separated list of allowed CORS origins. Empty means no CORS." },
       { name: "allowedExtensions", type: "string[]", label: "Allowed Extensions", guide: "Comma-separated list of file extensions allowed for indexing." },
     ],
   },
 ];
+
+/**
+ * Renders a Field guide `dd` value (T12, APUX-09/APUX-11, design D-6): escapes
+ * the whole string first, then turns any `` `backtick` `` span into `<code>`.
+ * The guide strings themselves carry the backtick markers around their
+ * machine tokens (env-style URLs, model ids, paths, identifiers) — chosen
+ * over a token-matching regex because it is small and fully deterministic:
+ * every wrapped span is one this function's own caller opted into, not a
+ * pattern guess that could over- or under-match prose.
+ */
+function renderGuideText(s) {
+  const escaped = escapeHtml(s);
+  return escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
+}
 
 function getConfigFieldValue(config, sectionKey, fieldName) {
   if (sectionKey === "dataDir") return config[sectionKey] || "";
@@ -926,10 +951,10 @@ export function renderConfig(data, opts) {
       return renderConfigField(section.key, field, value);
     }).join("");
     const saveBtn = writeMode
-      ? '<button type="button" class="save-btn" data-action="config-save" data-section="' + section.key + '">Save</button>'
+      ? '<button type="button" class="save-btn btn-primary" data-action="config-save" data-section="' + section.key + '">Save</button>'
       : "";
     const guideEntries = section.fields.filter((f) => f.guide).map((f) => {
-      return "<dt>" + escapeHtml(f.label) + "</dt><dd>" + escapeHtml(f.guide) + "</dd>";
+      return "<dt>" + escapeHtml(f.label) + "</dt><dd>" + renderGuideText(f.guide) + "</dd>";
     }).join("");
     const fieldGuide = guideEntries
       ? '<details class="config-field-guide"><summary>Field guide</summary>' +
@@ -946,7 +971,18 @@ export function renderConfig(data, opts) {
     );
   }).join("");
 
-  return '<section class="view"><h2>Config</h2>' + cards + "</section>";
+  const helpCard =
+    '<details class="help-card"><summary>About this tab</summary>' +
+    '<div class="help-card-body">' +
+    '<h4>How Config Saves</h4>' +
+    '<p>Each section below saves independently — editing a field and pressing that section\'s Save button writes only that section, leaving every other section untouched.</p>' +
+    '<h4>Sections That Require A Restart</h4>' +
+    '<p>A section badged as requiring one takes effect only after the massa-ai server process restarts; saving it does not change the behavior of the already-running process.</p>' +
+    '<p>Each section\'s own "Field guide" toggle explains its individual fields, defaults, and examples.</p>' +
+    '</div>' +
+    '</details>';
+
+  return '<section class="view"><h2>Config</h2>' + helpCard + cards + "</section>";
 }
 
 function setByPath(obj, dottedPath, value) {
@@ -1028,7 +1064,7 @@ export function renderProfiles(data, opts) {
       return (
         '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
         "<h3>" + escapeHtml(hostName) + "</h3>" +
-        '<p class="muted">Installed via marketplace (no per-profile variant directories). To switch profiles, set <code>MASSA_AI_MODEL_PROFILE</code> and run Regenerate Artifacts in Edit Registry.</p>' +
+        '<p class="muted">Installed via marketplace (no per-profile variant directories). To switch profiles, set <code>MASSA_AI_MODEL_PROFILE</code> and use Save &amp; Apply on the Model Catalog tab.</p>' +
         "</div>"
       );
     }
@@ -1076,6 +1112,56 @@ const UI_HOST_EFFORT_ENUM = {
 
 const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"];
 
+/** Display labels for the Tool column (design D-4.1). Not a simple capitalize —
+ *  "opencode" -> "OpenCode" needs its own casing. `data-*` attributes keep the
+ *  raw lowercase host id; only this label is user-facing. */
+const REGISTRY_HOST_LABELS = { claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" };
+
+/** Capitalizes the first letter of a raw tier id ("light" -> "Light") for the
+ *  Tier column and per-agent tier dropdown labels (design D-4.1, D-4.3). */
+function capitalizeLabel(s) {
+  if (!s) return "";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Hints (placeholder + title) for the Provider/Model split fields (design D-4.2, APUX-05).
+const REGISTRY_PROVIDER_HINT = "e.g. opencode-go, zai-coding-plan, local — leave blank for Claude/Codex";
+const REGISTRY_MODEL_HINT = "e.g. sonnet · gpt-5.6-terra · glm-5.2";
+
+/**
+ * Splits a stored registry model string into its Provider + Model display parts
+ * (design D-4.2, APUX-14). Splits on the FIRST "/" only, so a multi-segment
+ * OpenCode id like "a/b/c" keeps its remainder intact as the Model part.
+ * `null`/`""`/`undefined` (the "inherit" sentinel) render as two empty fields.
+ *
+ *   splitModelId("a/b/c") -> { provider: "a", model: "b/c" }
+ *   splitModelId("m")     -> { provider: "", model: "m" }
+ *   splitModelId(null)    -> { provider: "", model: "" }
+ */
+export function splitModelId(model) {
+  if (!model) return { provider: "", model: "" };
+  const idx = model.indexOf("/");
+  if (idx === -1) return { provider: "", model };
+  return { provider: model.slice(0, idx), model: model.slice(idx + 1) };
+}
+
+/**
+ * Joins Provider + Model back into the single string the overlay stores
+ * (design D-4.2, APUX-14, P1-B AC5). Both blank -> `null` (never `""` or the
+ * string `"null"`), so a cleared cell round-trips to the "inherit" sentinel.
+ *
+ *   joinModelId("a", "b/c") -> "a/b/c"
+ *   joinModelId("", "m")    -> "m"
+ *   joinModelId("", "")     -> null
+ */
+export function joinModelId(provider, model) {
+  const p = (provider || "").trim();
+  const m = (model || "").trim();
+  if (!p && !m) return null;
+  if (!p) return m;
+  return p + "/" + m;
+}
+
 /** Frontend copy of the live workflow inventory (basenames from
  *  skills/massa-ai/workflows/ - all .md files). Kept in sync manually; the
  *  frontend cannot import from scripts/lib. Used by the Workflow Tiers picker. */
@@ -1091,6 +1177,102 @@ const WORKFLOW_STEMS = [
   "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
 ];
 
+// ── Registry inline forms (design D-4.4, APUX-12, P2-D AC2-AC6) ────────────
+// Replaces the old prompt()/alert() flows for Add Workflow Override, Duplicate
+// Profile, Delete Profile and Add Profile. state.registryForm tracks which
+// form (if any) is open: null | { kind, error }. The renderer emits the open
+// form's markup under its trigger button row; wireViewHandlers reads the
+// rendered field values on submit and dispatches to the same-named handler.
+
+/** Renders the inline `.form-error` line when the current form carries a
+ *  validation error (duplicate name, unknown workflow, etc.) — replaces
+ *  `alert()` for these flows. */
+function renderRegistryFormError(formState) {
+  return formState && formState.error
+    ? '<p class="form-error">' + escapeHtml(formState.error) + "</p>"
+    : "";
+}
+
+function renderAddWorkflowForm(formState, existingWorkflows, tiers) {
+  const available = WORKFLOW_STEMS.filter((s) => !existingWorkflows.includes(s));
+  if (available.length === 0) {
+    return (
+      '<div class="registry-inline-form">' +
+      '<p class="muted">Every known workflow already has a tier override. Remove one first to add another.</p>' +
+      '<div class="button-row"><button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button></div>' +
+      "</div>"
+    );
+  }
+  const workflowOptions = available.map((s) => '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + "</option>").join("");
+  const tierOptions = tiers.map((t) => '<option value="' + escapeHtml(t) + '">' + escapeHtml(capitalizeLabel(t)) + "</option>").join("");
+  return (
+    '<div class="registry-inline-form form-field">' +
+    renderRegistryFormError(formState) +
+    '<label>Workflow<select data-action="registry-form-workflow" title="Pick a workflow that does not yet have a tier override">' + workflowOptions + "</select></label>" +
+    '<label>Tier<select data-action="registry-form-tier" title="The tier to pin this workflow to">' + tierOptions + "</select></label>" +
+    '<div class="button-row">' +
+    '<button type="button" class="btn btn-primary" data-action="registry-form-submit">Add</button>' +
+    '<button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button>' +
+    "</div></div>"
+  );
+}
+
+function renderDuplicateProfileForm(formState, profileNames) {
+  if (profileNames.length === 0) {
+    return (
+      '<div class="registry-inline-form">' +
+      '<p class="muted">No profiles available to duplicate. Add a profile first.</p>' +
+      '<div class="button-row"><button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button></div>' +
+      "</div>"
+    );
+  }
+  const profileOptions = profileNames.map((p) => '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + "</option>").join("");
+  return (
+    '<div class="registry-inline-form form-field">' +
+    renderRegistryFormError(formState) +
+    '<label>Source Profile<select data-action="registry-form-source" title="The profile to copy">' + profileOptions + "</select></label>" +
+    '<label>New Name<input type="text" data-action="registry-form-new-name" placeholder="e.g. work-variant" title="A new, unused profile name" /></label>' +
+    '<div class="button-row">' +
+    '<button type="button" class="btn btn-primary" data-action="registry-form-submit">Duplicate</button>' +
+    '<button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button>' +
+    "</div></div>"
+  );
+}
+
+function renderDeleteProfileForm(formState, profileNames) {
+  if (profileNames.length === 0) {
+    return (
+      '<div class="registry-inline-form">' +
+      '<p class="muted">No profiles available to delete.</p>' +
+      '<div class="button-row"><button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button></div>' +
+      "</div>"
+    );
+  }
+  const profileOptions = profileNames.map((p) => '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + "</option>").join("");
+  return (
+    '<div class="registry-inline-form form-field">' +
+    renderRegistryFormError(formState) +
+    '<label>Profile<select data-action="registry-form-profile" title="The profile to delete">' + profileOptions + "</select></label>" +
+    '<div class="button-row">' +
+    '<button type="button" class="btn btn-danger" data-action="registry-form-submit">Delete</button>' +
+    '<button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button>' +
+    "</div></div>"
+  );
+}
+
+function renderAddProfileForm(formState) {
+  return (
+    '<div class="registry-inline-form form-field">' +
+    renderRegistryFormError(formState) +
+    '<label>Name<input type="text" data-action="registry-form-name" placeholder="e.g. work-variant" title="A new, unused profile name" /></label>' +
+    '<label>Description<input type="text" data-action="registry-form-description" placeholder="optional — defaults to the name" title="Optional profile description" /></label>' +
+    '<div class="button-row">' +
+    '<button type="button" class="btn btn-primary" data-action="registry-form-submit">Add</button>' +
+    '<button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button>' +
+    "</div></div>"
+  );
+}
+
 /**
  * Model-registry editor renderer. Renders a grid (rows = {host, tier} pairs,
  * columns = profiles, cells = {model, effort}). Marks overlay-sourced cells.
@@ -1105,6 +1287,7 @@ export function renderModelRegistry(data, opts) {
   const overlayError = payload.overlayError;
   const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
   const unsaved = opts && opts.unsaved ? ' <span class="badge" style="background:rgba(245,158,11,0.15);color:#92400e;">unsaved changes</span>' : "";
+  const registryFormState = (opts && opts.registryForm) || null;
 
   const profiles = registry.profiles || {};
   const profileNames = Object.keys(profiles);
@@ -1115,15 +1298,15 @@ export function renderModelRegistry(data, opts) {
   const tombstoned = source.tombstoned || [];
 
   if (profileNames.length === 0 && !overlayError && !payload._error) {
-    return '<section class="view"><h2>Model Registry</h2><p class="empty">No profiles in registry.</p></section>';
+    return '<section class="view"><h2>Model Catalog</h2><p class="empty">No profiles in the catalog.</p></section>';
   }
 
   const registryError = payload._error
-    ? '<div class="error">Registry load error: ' + escapeHtml(typeof payload._error === "string" ? payload._error : JSON.stringify(payload._error)) + "</div>"
+    ? '<div class="error">Catalog load error: ' + escapeHtml(typeof payload._error === "string" ? payload._error : JSON.stringify(payload._error)) + "</div>"
     : "";
 
   const overlayBanner = overlayError
-    ? '<div class="error">Overlay error: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
+    ? '<div class="error">Saved changes could not be loaded: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
     : "";
 
   // APCR-01.10: the only available mitigation for the AC9 known limitation (a stale
@@ -1132,8 +1315,8 @@ export function renderModelRegistry(data, opts) {
   // override, so an operator with no overlay sees no noise.
   const overlayOverrideCount = typeof payload.overlayOverrideCount === "number" ? payload.overlayOverrideCount : 0;
   const overlayOverrideLine = overlayOverrideCount > 0
-    ? '<p class="registry-override-count muted">Overlay is overriding ' + overlayOverrideCount +
-      " entr" + (overlayOverrideCount === 1 ? "y" : "ies") + " from the builtin registry.</p>"
+    ? '<p class="registry-override-count muted">You have ' + overlayOverrideCount +
+      " custom override" + (overlayOverrideCount === 1 ? "" : "s") + " of the built-in defaults.</p>"
     : "";
 
   // Build rows = {host, tier} pairs
@@ -1147,7 +1330,7 @@ export function renderModelRegistry(data, opts) {
   // Grid header: profile names as columns
   const headerCells = profileNames.map((p) => {
     const isOverlay = Object.prototype.hasOwnProperty.call(overlayProfiles, p);
-    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">overlay</span>' : "";
+    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">override</span>' : "";
     return "<th>" + escapeHtml(p) + overlayMark + "</th>";
   }).join("");
 
@@ -1177,16 +1360,29 @@ export function renderModelRegistry(data, opts) {
       } else {
         effortInput = '<span class="muted">n/a</span>';
       }
+      // Provider input above Model input above Effort (design D-4.2, APUX-14):
+      // the overlay still stores one joined model string per cell — split only
+      // for display, joined back on change by the wireViewHandlers listener.
+      const modelIdParts = splitModelId(model);
+      const providerModelAttrs = ' data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '"';
       const modelInput = writeMode
-        ? '<input type="text" data-action="registry-model" data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(row.host) + '" data-tier="' + escapeHtml(row.tier) + '" value="' + escapeHtml(model) + '" />'
+        ? '<input type="text" class="registry-provider-input" data-action="registry-provider"' + providerModelAttrs + ' value="' + escapeHtml(modelIdParts.provider) + '" placeholder="' + escapeHtml(REGISTRY_PROVIDER_HINT) + '" title="' + escapeHtml(REGISTRY_PROVIDER_HINT) + '" />' +
+          '<input type="text" class="registry-model-input" data-action="registry-model"' + providerModelAttrs + ' value="' + escapeHtml(modelIdParts.model) + '" placeholder="' + escapeHtml(REGISTRY_MODEL_HINT) + '" title="' + escapeHtml(REGISTRY_MODEL_HINT) + '" />'
         : '<span>' + escapeHtml(model || "—") + "</span>";
       return '<td class="registry-cell' + overlayClass + '">' + modelInput + effortInput + "</td>";
     }).join("");
-    return "<tr><th>" + escapeHtml(row.host) + " / " + escapeHtml(row.tier) + "</th>" + cells + "</tr>";
+    // First tier row of each host carries the Tool cell (rowspan across every
+    // tier row for that host); subsequent rows omit it (design D-4.1).
+    const isFirstTierRowForHost = row.tier === tiers[0];
+    const toolCell = isFirstTierRowForHost
+      ? '<th class="tool-cell" rowspan="' + tiers.length + '">' + escapeHtml(REGISTRY_HOST_LABELS[row.host] || capitalizeLabel(row.host)) + "</th>"
+      : "";
+    const tierCell = '<th class="tier-cell">' + escapeHtml(capitalizeLabel(row.tier)) + "</th>";
+    return "<tr>" + toolCell + tierCell + cells + "</tr>";
   }).join("");
 
   const grid =
-    '<table class="registry-grid"><thead><tr><th>host / tier</th>' + headerCells + "</tr></thead><tbody>" + bodyRows + "</tbody></table>";
+    '<div class="grid-scroll"><table class="registry-grid"><thead><tr><th>Tool</th><th>Tier</th>' + headerCells + "</tr></thead><tbody>" + bodyRows + "</tbody></table></div>";
 
   // hostDefaults editor
   const hostDefaultsRows = REGISTRY_HOSTS.map((host) => {
@@ -1219,23 +1415,67 @@ export function renderModelRegistry(data, opts) {
   }).join("");
 
   const addWorkflowTierBtn = writeMode
-    ? '<div class="registry-actions"><button type="button" data-action="registry-workflowTier-add">Add Workflow Tier</button></div>'
+    ? '<div class="registry-actions"><button type="button" class="btn btn-secondary" data-action="registry-workflowTier-add">Add Workflow Tier</button></div>' +
+      (registryFormState && registryFormState.kind === "add-workflow" ? renderAddWorkflowForm(registryFormState, workflowTierNames, tiers) : "")
     : "";
+
+  // Per-Agent Tier Overrides table (design D-4.3, APUX-04, P1-A AC7-AC8). Data
+  // is payload.agents (from GET, charter-derived) + the DISPLAY registry's
+  // agentTiers (already merged with unsaved in-memory overlay edits by
+  // mergeRegistryForDisplay, so an unsaved pick renders before save).
+  const agents = payload.agents || [];
+  const agentsError = payload.agentsError;
+  const agentTiersDisplay = registry.agentTiers || {};
+  let agentTierSection;
+  if (agentsError) {
+    agentTierSection =
+      '<div class="registry-agentTiers"><h3>Per-Agent Tier Overrides</h3>' +
+      '<p class="muted">Agent list unavailable: ' + escapeHtml(agentsError) + "</p></div>";
+  } else if (agents.length === 0) {
+    agentTierSection =
+      '<div class="registry-agentTiers"><h3>Per-Agent Tier Overrides</h3>' +
+      '<p class="muted">No agents found.</p></div>';
+  } else {
+    const agentHeaderCells = REGISTRY_HOSTS.map((h) => "<th>" + escapeHtml(REGISTRY_HOST_LABELS[h]) + "</th>").join("");
+    const agentBodyRows = agents.map((agent) => {
+      const perHost = agentTiersDisplay[agent.name] || {};
+      const cells = REGISTRY_HOSTS.map((host) => {
+        const effective = perHost[host] || "";
+        const overriddenClass = effective ? ' class="overridden"' : "";
+        const options =
+          '<option value="">(default: ' + escapeHtml(agent.charterTier) + ")</option>" +
+          tiers.map((t) => {
+            const sel = t === effective ? " selected" : "";
+            return '<option value="' + escapeHtml(t) + '"' + sel + ">" + escapeHtml(capitalizeLabel(t)) + "</option>";
+          }).join("");
+        return (
+          "<td" + overriddenClass + '><select data-action="registry-agentTier" data-agent="' + escapeHtml(agent.name) + '" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + options + "</select></td>"
+        );
+      }).join("");
+      return "<tr><th>" + escapeHtml(agent.name) + "</th>" + cells + "</tr>";
+    }).join("");
+    agentTierSection =
+      '<div class="registry-agentTiers"><h3>Per-Agent Tier Overrides</h3>' +
+      '<div class="grid-scroll"><table class="registry-grid"><thead><tr><th>Agent</th>' + agentHeaderCells + "</tr></thead><tbody>" + agentBodyRows + "</tbody></table></div></div>";
+  }
 
   // Profile management: add / duplicate / delete / restore
   const profileActions = writeMode
     ? '<div class="registry-actions">' +
-      '<button type="button" data-action="registry-add-profile">Add Profile</button>' +
-      '<button type="button" data-action="registry-duplicate-profile">Duplicate Profile</button>' +
-      '<button type="button" data-action="registry-delete-profile">Delete Profile</button>' +
-      "</div>"
+      '<button type="button" class="btn btn-secondary" data-action="registry-add-profile">Add Profile</button>' +
+      '<button type="button" class="btn btn-secondary" data-action="registry-duplicate-profile">Duplicate Profile</button>' +
+      '<button type="button" class="btn btn-secondary" data-action="registry-delete-profile">Delete Profile</button>' +
+      "</div>" +
+      (registryFormState && registryFormState.kind === "add-profile" ? renderAddProfileForm(registryFormState) : "") +
+      (registryFormState && registryFormState.kind === "duplicate-profile" ? renderDuplicateProfileForm(registryFormState, profileNames) : "") +
+      (registryFormState && registryFormState.kind === "delete-profile" ? renderDeleteProfileForm(registryFormState, profileNames) : "")
     : "";
 
   const tombstonedList = tombstoned.length
-    ? '<div class="tombstoned"><h4>Deleted (restorable)</h4>' +
+    ? '<div class="tombstoned"><h4>Removed Profiles (restorable)</h4>' +
       tombstoned.map((p) => {
         const restoreBtn = writeMode
-          ? ' <button type="button" data-action="registry-restore" data-profile="' + escapeHtml(p) + '">Restore</button>'
+          ? ' <button type="button" class="btn btn-secondary" data-action="registry-restore" data-profile="' + escapeHtml(p) + '">Restore</button>'
           : "";
         return '<div class="tombstoned-item" data-tombstoned="' + escapeHtml(p) + '">' + escapeHtml(p) + restoreBtn + "</div>";
       }).join("") +
@@ -1244,40 +1484,49 @@ export function renderModelRegistry(data, opts) {
 
   const actionButtons = writeMode
     ? '<div class="registry-action-buttons">' +
-      '<button type="button" data-action="registry-save-overlay">Save Overlay</button>' +
-      '<button type="button" data-action="registry-regenerate">Regenerate Artifacts</button>' +
-      '<button type="button" data-action="registry-clear-overlay">Reset to Built-in (clear overlay)</button>' +
+      '<button type="button" class="btn btn-primary" data-action="registry-save-apply">Save &amp; Apply</button>' +
+      '<button type="button" class="btn btn-danger" data-action="registry-clear-overlay">Discard All Overrides</button>' +
       "</div>"
     : "";
 
-  const helpSection = '<details class="registry-help"><summary>?</summary>' +
-    '<div class="registry-help-body">' +
-    '<h4>Button Guide</h4>' +
+  const helpSection = '<details class="help-card"><summary>About this tab</summary>' +
+    '<div class="help-card-body">' +
+    '<h4>What A Profile Is</h4>' +
+    '<p>A profile is a named bundle of model choices — one model and effort setting per tool (Claude, Codex, Cursor, OpenCode) and per capability tier. Switching a tool to a different profile changes which model every agent on that tool runs.</p>' +
+    '<h4>Capability Tiers</h4>' +
+    '<p><strong>Light</strong>, <strong>Standard</strong>, and <strong>Deep</strong> are the three capability tiers a profile assigns a model to, from fastest/cheapest to most capable. An agent runs whichever tier its charter — or your Per-Agent Tier Override below — names.</p>' +
+    '<h4>Managing Profiles</h4>' +
     '<dl>' +
-    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. Prompts for a profile name and optional description. The new profile starts with null model/effort cells for all hosts and tiers.</dd>' +
-    '<dt>Duplicate Profile</dt><dd>Copies an existing profile (you choose which) to a new name. Prompts for the source profile and the new name. Useful for creating a variant of an existing profile without re-entering all cells.</dd>' +
-    '<dt>Delete Profile</dt><dd>Removes a profile from the overlay. Prompts for the profile name. If the profile exists in the builtin registry, it is tombstoned (restorable via the Deleted section). If it is overlay-only, it is removed entirely.</dd>' +
-    '<dt>Save Overlay</dt><dd>Persists all unsaved overlay changes (profile cells, host defaults, workflow tiers, add/duplicate/delete) to <code>~/.config/massa-ai/model-profiles.json</code>. Asks for confirmation before writing. The builtin registry is never modified.</dd>' +
-    '<dt>Regenerate Artifacts</dt><dd>Re-runs <code>generate-subagent-artifacts.ts</code> to rebuild all host agent files from the current effective registry. Streams progress via SSE. Use after changing model/effort assignments so the installed agents reflect the new values.</dd>' +
-    '<dt>Reset to Built-in (clear overlay)</dt><dd>Deletes the user overlay file, reverting to the builtin registry. Asks for confirmation. All overlay-only profiles, cell overrides, host default changes, and workflow tiers are lost. Tombstoned profiles are restored.</dd>' +
+    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. The new profile starts with empty model/effort cells for every tool and tier.</dd>' +
+    '<dt>Duplicate Profile</dt><dd>Copies an existing profile (you choose which) to a new name. Useful for creating a variant of an existing profile without re-entering all cells.</dd>' +
+    '<dt>Delete Profile</dt><dd>Removes a profile. If it is one of the built-in profiles, it moves to the Removed Profiles list below (restorable). If you added it yourself, it is removed entirely.</dd>' +
     '</dl>' +
-    '<h4>Workflow Tiers</h4>' +
-    '<p>The Workflow Tiers section maps a workflow name to a tier, overriding the charter default for agents dispatched under that workflow. The builtin registry ships with no workflow tier overrides. Add one (e.g., <code>spec-driven &rarr; deep</code>) to pin a heavier model tier for a specific workflow.</p>' +
-    '<h4>Host Defaults</h4>' +
+    '<h4>Default Profile per Tool</h4>' +
     '<dl>' +
-    '<dt>Host Defaults</dt><dd>The registry\'s declared default profile per host, used only the first time that host is auto-installed (it has no recorded active profile yet). It is <strong>not</strong> the profile currently installed on this machine — a host can be running any profile you switched it to, regardless of what Host Defaults reads here. See the "Switch Profile" tab to view each host\'s actual active profile and to change it.</dd>' +
+    '<dt>Default Profile per Tool</dt><dd>The declared default profile per tool, used only the first time that tool is auto-installed (it has no recorded active profile yet). It is <strong>not</strong> the profile currently installed on this machine — a tool can be running any profile you switched it to, regardless of what Default Profile per Tool reads here. See the "Active Profile" tab to view each tool\'s actual active profile and to change it.</dd>' +
     '</dl>' +
+    '<h4>Per-Workflow Tier Overrides</h4>' +
+    '<p>Maps a workflow name to a tier, overriding the charter default for agents dispatched under that workflow. Add one (e.g., <code>spec-driven &rarr; deep</code>) to pin a heavier model tier for a specific workflow.</p>' +
+    '<h4>Per-Agent Tier Overrides</h4>' +
+    '<p>Maps one agent to a tier, per tool — the only way to run, for example, <code>builder</code> at Deep on OpenCode while it stays Standard everywhere else. Pick the <code>(default: ...)</code> option to remove the override and go back to inheriting the agent\'s charter tier.</p>' +
+    '<h4>Save &amp; Apply</h4>' +
+    '<p>Persists every unsaved change on this tab (profile cells, Default Profile per Tool, Per-Workflow Tier Overrides, Per-Agent Tier Overrides, add/duplicate/delete profile) to your local machine, then regenerates and installs the agent files for every tool. Asks for confirmation first. <strong>Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) afterward</strong> — an already-running session keeps using the model it started with until you do.</p>' +
+    '<h4>Discard All Overrides</h4>' +
+    '<p>Deletes your saved changes, reverting every tool to the built-in defaults. Asks for confirmation. All profiles you added, cell overrides, default-profile changes, and Per-Workflow/Per-Agent overrides are lost. Removed profiles are restored.</p>' +
+    '<h4>Removed Profiles</h4>' +
+    '<p>A deleted built-in profile is not gone forever — it moves to the Removed Profiles list below, where Restore brings it back.</p>' +
     '</div>' +
     '</details>';
 
   return (
-    '<section class="view"><h2>Model Registry</h2>' + unsaved +
+    '<section class="view"><h2>Model Catalog</h2>' + unsaved +
     registryError +
     overlayBanner +
     overlayOverrideLine +
     grid +
-    '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
-    '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + addWorkflowTierBtn + "</div>" +
+    '<div class="registry-hostDefaults"><h3>Default Profile per Tool</h3>' + hostDefaultsRows + "</div>" +
+    '<div class="registry-workflowTiers"><h3>Per-Workflow Tier Overrides</h3>' + workflowTiersRows + addWorkflowTierBtn + "</div>" +
+    agentTierSection +
     profileActions +
     tombstonedList +
     actionButtons +
@@ -1414,12 +1663,16 @@ function createApiClient(opts) {
 
 const BANNER_AUTOHIDE_MS = 6000;
 
-export function showBanner(root, type, message) {
+/** @param {object} [opts] - `{ persist: true }` (T8, P1-C AC2) skips the 6 s
+ *  auto-hide for a success banner — used for the Save & Apply completion
+ *  banner, which must stay visible until the operator dismisses/navigates. */
+export function showBanner(root, type, message, opts) {
+  const persist = !!(opts && opts.persist);
   // Clear existing banner(s) — only one at a time.
   const existing = root.querySelectorAll ? root.querySelectorAll(".success, .error") : [];
   existing.forEach((b) => { if (b.remove) b.remove(); });
   const div = {
-    className: type === "success" ? "success" : "error",
+    className: (type === "success" ? "success" : "error") + (persist ? " banner-persist" : ""),
     textContent: message,
     style: {},
     remove: () => {},
@@ -1432,7 +1685,7 @@ export function showBanner(root, type, message) {
   } catch {
     // best effort
   }
-  if (type === "success" && typeof setTimeout !== "undefined") {
+  if (type === "success" && !persist && typeof setTimeout !== "undefined") {
     setTimeout(() => { if (div.remove) div.remove(); }, BANNER_AUTOHIDE_MS);
   }
   return div;
@@ -1512,13 +1765,13 @@ export function renderProfilesView(profilesData, registryData, opts) {
 
   const switcher =
     '<div class="tab-switcher">' +
-    '<button type="button" class="tab' + (tab === "switch" ? " active" : "") + '" data-action="profiles-tab" data-tab="switch">Switch Profile</button>' +
-    '<button type="button" class="tab' + (tab === "registry" ? " active" : "") + '" data-action="profiles-tab" data-tab="registry">Edit Registry</button>' +
+    '<button type="button" class="tab' + (tab === "switch" ? " active" : "") + '" data-action="profiles-tab" data-tab="switch">Active Profile</button>' +
+    '<button type="button" class="tab' + (tab === "registry" ? " active" : "") + '" data-action="profiles-tab" data-tab="registry">Model Catalog</button>' +
     "</div>";
 
   let body;
   if (tab === "registry") {
-    body = renderModelRegistry(registryData, { writeMode, unsaved: opts.unsaved });
+    body = renderModelRegistry(registryData, { writeMode, unsaved: opts.unsaved, registryForm: opts.registryForm });
   } else {
     body = renderProfiles(profilesData, { writeMode });
   }
@@ -1585,6 +1838,7 @@ export function initRegistryOverlay(ctx, registry, source) {
     profiles: seed.profiles || {},
     hostDefaults: seed.hostDefaults || {},
     workflowTiers: seed.workflowTiers || {},
+    agentTiers: seed.agentTiers || {},
     tiers: seed.tiers || reg.tiers || ["light", "standard", "deep"],
   };
   ctx.state.registryDirty = false;
@@ -1602,6 +1856,27 @@ function mergeFlatMapForDisplay(serverMap, overlayMap) {
     else merged[key] = value;
   }
   return merged;
+}
+
+/** Per-agent, per-host merge of `agentTiers` (design D-1, D-4.3) — client twin of
+ *  `mergeAgentTiers` in scripts/lib/model-profiles.ts (cross-boundary parity fixture
+ *  `apps/web-ui/src/__tests__/fixtures/agent-tiers-parity.json` keeps the two provably
+ *  identical). `overlay[agent] === null` deletes the whole agent entry; otherwise the
+ *  agent's host map is merged against the base via `mergeFlatMapForDisplay` itself, so a
+ *  host-level `null` tombstones just that key and an absent host key inherits. */
+function mergeAgentTiersForDisplay(base, overlay) {
+  const result = {};
+  for (const [agent, hostMap] of Object.entries(base || {})) {
+    result[agent] = { ...hostMap };
+  }
+  for (const [agent, value] of Object.entries(overlay || {})) {
+    if (value === null) {
+      delete result[agent];
+      continue;
+    }
+    result[agent] = mergeFlatMapForDisplay((base && base[agent]) || {}, value);
+  }
+  return result;
 }
 
 /** Merge one overlay profile over its server-side counterpart, per host and per tier.
@@ -1640,6 +1915,7 @@ export function mergeRegistryForDisplay(serverData, overlay) {
   merged.tiers = (overlay.tiers && overlay.tiers.length > 0) ? overlay.tiers : (merged.tiers || ["light", "standard", "deep"]);
   merged.hostDefaults = mergeFlatMapForDisplay(merged.hostDefaults, overlay.hostDefaults);
   merged.workflowTiers = mergeFlatMapForDisplay(merged.workflowTiers, overlay.workflowTiers);
+  merged.agentTiers = mergeAgentTiersForDisplay(merged.agentTiers, overlay.agentTiers);
   // Merge profiles as a delta: skip _delete tombstones, deep-merge the rest per host/tier.
   merged.profiles = merged.profiles || {};
   for (const [key, val] of Object.entries(overlay.profiles)) {
@@ -1651,11 +1927,16 @@ export function mergeRegistryForDisplay(serverData, overlay) {
   }
   // overlayOverrideCount (APCR-01.10) is server-computed from the saved overlay, not the
   // in-memory display merge — carry it through unchanged so the count stays visible while
-  // add/duplicate/delete/edit are shown pre-save.
+  // add/duplicate/delete/edit are shown pre-save. `agents`/`agentsError` (T6, design D-4.3)
+  // are likewise server-computed (charter-derived) and must survive this rebuild branch, or
+  // the Per-Agent Tier Overrides table loses its row source the instant any other field is
+  // edited in the same session.
   return {
     registry: merged,
     source: (serverData && serverData.source) || {},
     overlayOverrideCount: (serverData && serverData.overlayOverrideCount) || 0,
+    agents: (serverData && serverData.agents) || [],
+    agentsError: serverData && serverData.agentsError,
   };
 }
 
@@ -1682,6 +1963,28 @@ export function handleRegistryHostDefaultEdit(ctx, host, value) {
   ctx.state.registryDirty = true;
 }
 
+/** Per-Agent Tier Overrides cell edit (design D-4.3, APUX-04, P1-A AC8). `value === ""`
+ *  (the "(default: ...)" option) removes the override key entirely rather than writing a
+ *  `null` tombstone — the spec's assumption row (P1-A) notes the builtin `agentTiers` ships
+ *  `{}`, so there is nothing to tombstone; an absent key already inherits the charter tier.
+ *  An emptied agent object is pruned so a fully-reset agent leaves no residue in the saved
+ *  overlay. */
+export function handleRegistryAgentTierEdit(ctx, agent, host, value) {
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: {}, tiers: ["light", "standard", "deep"] };
+  if (!ctx.state.registryOverlay.agentTiers) ctx.state.registryOverlay.agentTiers = {};
+  if (value === "") {
+    const agentEntry = ctx.state.registryOverlay.agentTiers[agent];
+    if (agentEntry) {
+      delete agentEntry[host];
+      if (Object.keys(agentEntry).length === 0) delete ctx.state.registryOverlay.agentTiers[agent];
+    }
+  } else {
+    if (!ctx.state.registryOverlay.agentTiers[agent]) ctx.state.registryOverlay.agentTiers[agent] = {};
+    ctx.state.registryOverlay.agentTiers[agent][host] = value;
+  }
+  ctx.state.registryDirty = true;
+}
+
 export function handleRegistryWorkflowTierEdit(ctx, workflow, value) {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, workflowTiers: {} };
   if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
@@ -1689,31 +1992,47 @@ export function handleRegistryWorkflowTierEdit(ctx, workflow, value) {
   ctx.state.registryDirty = true;
 }
 
-export function handleRegistryWorkflowTierAdd(ctx) {
-  const existing = (ctx.state.registryOverlay && ctx.state.registryOverlay.workflowTiers) || {};
-  const available = WORKFLOW_STEMS.filter((s) => !Object.prototype.hasOwnProperty.call(existing, s));
-  if (available.length === 0) {
-    alert("All known workflow stems already have a tier. Remove one first or enter a custom name.");
-    return;
+/** Opens/closes an inline registry form (design D-4.4). Clicking a trigger
+ *  button whose form is already open closes it; clicking a different
+ *  trigger switches forms. Replaces the old direct prompt()-driven handlers
+ *  as the click target for Add Workflow Override / Add Profile / Duplicate
+ *  Profile / Delete Profile. */
+export function handleRegistryFormToggle(ctx, kind) {
+  if (ctx.state.registryForm && ctx.state.registryForm.kind === kind) {
+    ctx.state.registryForm = null;
+  } else {
+    ctx.state.registryForm = { kind, error: null };
   }
-  const name = prompt("Workflow name (pick from the list or type a custom name):\n\nAvailable: " + available.join(", "));
-  if (!name || !name.trim()) return;
-  const wf = name.trim();
+  ctx.render();
+}
+
+/** Closes the currently open inline registry form without applying it. */
+export function handleRegistryFormCancel(ctx) {
+  ctx.state.registryForm = null;
+  ctx.render();
+}
+
+export function handleRegistryWorkflowTierAdd(ctx, workflow, tier) {
+  const existing = (ctx.state.registryOverlay && ctx.state.registryOverlay.workflowTiers) || {};
+  if (!workflow || !workflow.trim()) return;
+  const wf = workflow.trim();
   if (Object.prototype.hasOwnProperty.call(existing, wf)) {
-    alert('Workflow "' + wf + '" already has a tier. Edit it instead.');
+    ctx.state.registryForm = { kind: "add-workflow", error: 'Workflow "' + wf + '" already has a tier. Edit it instead.' };
+    ctx.render();
     return;
   }
   const tiers = (ctx.state.registryOverlay && ctx.state.registryOverlay.tiers) || ["light", "standard", "deep"];
-  const tier = prompt("Tier (one of: " + tiers.join(", ") + "):");
-  if (!tier || !tier.trim()) return;
-  if (!tiers.includes(tier.trim())) {
-    alert('Tier "' + tier.trim() + '" is not one of ' + tiers.join(", ") + ".");
+  const trimmedTier = (tier || "").trim();
+  if (!trimmedTier || !tiers.includes(trimmedTier)) {
+    ctx.state.registryForm = { kind: "add-workflow", error: 'Tier "' + trimmedTier + '" is not one of ' + tiers.join(", ") + "." };
+    ctx.render();
     return;
   }
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, workflowTiers: {} };
   if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
-  ctx.state.registryOverlay.workflowTiers[wf] = tier.trim();
+  ctx.state.registryOverlay.workflowTiers[wf] = trimmedTier;
   ctx.state.registryDirty = true;
+  ctx.state.registryForm = null;
   ctx.render();
 }
 
@@ -1728,15 +2047,15 @@ export function handleRegistryWorkflowTierRemove(ctx, workflow) {
   ctx.render();
 }
 
-export function handleRegistryAddProfile(ctx) {
-  const name = prompt("New profile name:");
+export function handleRegistryAddProfile(ctx, name, description) {
   if (!name || !name.trim()) return;
   const trimmed = name.trim();
   if (ctx.state.registryOverlay && ctx.state.registryOverlay.profiles && ctx.state.registryOverlay.profiles[trimmed]) {
-    alert('Profile "' + trimmed + '" already exists.');
+    ctx.state.registryForm = { kind: "add-profile", error: 'Profile "' + trimmed + '" already exists.' };
+    ctx.render();
     return;
   }
-  const description = prompt("Description (optional — defaults to profile name):") || trimmed;
+  const desc = (description && description.trim()) || trimmed;
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   const tiers = ctx.state.registryOverlay.tiers || ["light", "standard", "deep"];
   const hosts = {};
@@ -1744,8 +2063,9 @@ export function handleRegistryAddProfile(ctx) {
     hosts[h] = {};
     for (const t of tiers) hosts[h][t] = { model: null, effort: null };
   }
-  ctx.state.registryOverlay.profiles[trimmed] = { description, hosts };
+  ctx.state.registryOverlay.profiles[trimmed] = { description: desc, hosts };
   ctx.state.registryDirty = true;
+  ctx.state.registryForm = null;
   ctx.render();
 }
 
@@ -1756,51 +2076,43 @@ export function handleRegistryAddProfile(ctx) {
 // made both pickers report "no profiles available" even though every builtin profile is
 // selectable (APCR-11.5). mergeRegistryForDisplay already drops `_delete`-tombstoned
 // profiles from its result, so no separate filter is needed here.
-export function handleRegistryDuplicateProfile(ctx) {
+export function handleRegistryDuplicateProfile(ctx, sourceName, newName) {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
   const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
   const available = (display && display.registry && display.registry.profiles) || {};
-  const keys = Object.keys(available);
-  if (keys.length === 0) {
-    alert("No profiles available to duplicate. Add a profile first.");
-    return;
-  }
-  const sourceName = prompt("Source profile to duplicate:\n\nAvailable: " + keys.join(", "));
   if (!sourceName || !sourceName.trim()) return;
   const src = sourceName.trim();
   if (!available[src]) {
-    alert('Profile "' + src + '" not found. Available: ' + keys.join(", "));
+    ctx.state.registryForm = { kind: "duplicate-profile", error: 'Profile "' + src + '" not found.' };
+    ctx.render();
     return;
   }
-  const newName = prompt("New profile name (copy of " + src + "):");
   if (!newName || !newName.trim()) return;
-  if (Object.prototype.hasOwnProperty.call(available, newName.trim())) {
-    alert('Profile "' + newName.trim() + '" already exists.');
+  const trimmedNew = newName.trim();
+  if (Object.prototype.hasOwnProperty.call(available, trimmedNew)) {
+    ctx.state.registryForm = { kind: "duplicate-profile", error: 'Profile "' + trimmedNew + '" already exists.' };
+    ctx.render();
     return;
   }
   const copy = JSON.parse(JSON.stringify(available[src]));
   delete copy._delete;
-  ctx.state.registryOverlay.profiles[newName.trim()] = copy;
+  ctx.state.registryOverlay.profiles[trimmedNew] = copy;
   ctx.state.registryDirty = true;
+  ctx.state.registryForm = null;
   ctx.render();
 }
 
-export function handleRegistryDeleteProfile(ctx) {
+export function handleRegistryDeleteProfile(ctx, name) {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
   const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
   const available = (display && display.registry && display.registry.profiles) || {};
-  const keys = Object.keys(available);
-  if (keys.length === 0) {
-    alert("No profiles available to delete.");
-    return;
-  }
-  const name = prompt("Profile name to delete:\n\nAvailable: " + keys.join(", "));
   if (!name || !name.trim()) return;
   const trimmed = name.trim();
   if (!available[trimmed]) {
-    alert('Profile "' + trimmed + '" not found. Available: ' + keys.join(", "));
+    ctx.state.registryForm = { kind: "delete-profile", error: 'Profile "' + trimmed + '" not found.' };
+    ctx.render();
     return;
   }
   // The tombstone must land on the OVERLAY (the thing that gets saved), not the computed
@@ -1813,6 +2125,7 @@ export function handleRegistryDeleteProfile(ctx) {
     ctx.state.registryOverlay.profiles[trimmed]._delete = true;
   }
   ctx.state.registryDirty = true;
+  ctx.state.registryForm = null;
   ctx.render();
 }
 
@@ -1823,25 +2136,6 @@ export function handleRegistryRestore(ctx, profile) {
   delete p._delete;
   ctx.state.registryDirty = true;
   ctx.render();
-}
-
-export async function handleRegistrySaveOverlay(ctx) {
-  if (!confirm("Save registry overlay? Validates and writes to ~/.config/massa-ai/model-profiles.json.")) return;
-  try {
-    const res = await ctx.api.request("/api/v1/model-registry", { method: "PUT", body: ctx.state.registryOverlay });
-    if (res && res.success === false) {
-      const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
-      showBanner(ctx.root, "error", "Save failed: " + details);
-      return;
-    }
-    showBanner(ctx.root, "success", "Registry overlay saved.");
-    // Reset loaded guard so next render re-inits from the new source.overlay.
-    ctx.state.registryLoaded = false;
-    ctx.state.registryDirty = false;
-    ctx.render();
-  } catch (e) {
-    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
-  }
 }
 
 export async function handleProjectIndexProgress(ctx, jobId) {
@@ -1871,14 +2165,14 @@ export function handleIndexStatusEvent(ctx, payload) {
 }
 
 export async function handleRegistryClearOverlay(ctx) {
-  if (!confirm("Reset to built-in? This deletes the overlay file and reverts to the builtin registry.")) return;
+  if (!confirm("Discard all your overrides? This deletes your saved changes and reverts every tool to the built-in defaults.")) return;
   try {
     const res = await ctx.api.request("/api/v1/model-registry/overlay", { method: "DELETE" });
     if (res && res.success === false) {
       showBanner(ctx.root, "error", "Clear failed: " + (res.error || "unknown"));
       return;
     }
-    showBanner(ctx.root, "success", "Overlay cleared. Registry reverted to built-in.");
+    showBanner(ctx.root, "success", "Overrides discarded. Reverted to the built-in defaults.");
     ctx.state.registryLoaded = false;
     ctx.state.registryDirty = false;
     ctx.render();
@@ -1887,13 +2181,29 @@ export async function handleRegistryClearOverlay(ctx) {
   }
 }
 
-// ── Registry regenerate streaming handler (Component 4) ──────────────────────
+// ── Registry regenerate streaming handler (design D-4.5, T8, fix-loop 1) ────
+// runRegenerateStream is the SSE fetch + APCR-06 classification logic, called
+// ONLY from handleRegistrySaveAndApply below (the standalone "Regenerate
+// Artifacts" button + its own confirm() no longer exist — T8, APUX-13). It
+// carries no confirm() of its own; the single Save & Apply confirm covers
+// both the save and the apply step. Returns `{ ok, reason }`: `ok` is true
+// only for a full, unqualified success (every host installed, no
+// variant-sync failures); on any other outcome `reason` is the exact
+// diagnostic text this function would otherwise have shown on its own —
+// stream-closed sentence, exit-code line, per-host failed/unsupported
+// detail, or the spawn/network error — so the caller can fold the specific
+// reason into its own banner instead of discarding it (fix-loop 1: the
+// unified Save & Apply flow overwrites this function's own banner with a
+// generic retry message, and that message must not lose the diagnostic).
 
-export async function handleRegistryRegenerate(ctx) {
-  if (ctx.state.regenerating) return;
-  if (!confirm("Regenerate subagent artifacts? This overwrites installed variant dirs.")) return;
+const RESTART_SENTENCE = "Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) to pick up the changes.";
+
+export async function runRegenerateStream(ctx) {
+  if (ctx.state.regenerating) return { ok: false, reason: undefined };
   ctx.state.regenerating = true;
   ctx.render();
+  let ok = false;
+  let reason;
 
   try {
     const headers = (ctx.api && ctx.api.authHeaders) ? ctx.api.authHeaders() : {};
@@ -1948,15 +2258,19 @@ export async function handleRegistryRegenerate(ctx) {
           // install failed or was unsupported — that is not a success.
           var hadInstallProblems = installResults.failed.length > 0 || installResults.unsupported.length > 0 || variantSyncResults.failed.length > 0;
           if (event.exitCode === 0 && !hadInstallProblems) {
+            ok = true;
             var parts = ["Regeneration complete."];
             if (variantSyncResults.synced.length > 0) parts.push("Synced: " + variantSyncResults.synced.join(", "));
             if (installResults.switched.length > 0) parts.push("Installed: " + installResults.switched.join(", "));
             if (installResults.skipped.length > 0) parts.push("Skipped: " + installResults.skipped.join(", "));
-            showBanner(ctx.root, "success", parts.join(" "));
+            parts.push(RESTART_SENTENCE);
+            showBanner(ctx.root, "success", parts.join(" "), { persist: true });
           } else if (event.exitCode === null) {
-            showBanner(ctx.root, "error", "Regeneration failed: " + (event.error || "spawn error"));
+            reason = "Regeneration failed: " + (event.error || "spawn error");
+            showBanner(ctx.root, "error", reason);
           } else if (event.exitCode !== 0) {
-            showBanner(ctx.root, "error", "Regeneration failed (exit " + event.exitCode + ").");
+            reason = "Regeneration failed (exit " + event.exitCode + ").";
+            showBanner(ctx.root, "error", reason);
           } else {
             var errParts = ["Regeneration complete, but not every host installed."];
             if (variantSyncResults.failed.length > 0) errParts.push("Variant sync failed: " + variantSyncResults.failed.join("; "));
@@ -1964,20 +2278,60 @@ export async function handleRegistryRegenerate(ctx) {
             if (installResults.skipped.length > 0) errParts.push("Skipped: " + installResults.skipped.join(", "));
             if (installResults.unsupported.length > 0) errParts.push("Unsupported: " + installResults.unsupported.join("; "));
             if (installResults.failed.length > 0) errParts.push("Failed: " + installResults.failed.join("; "));
-            showBanner(ctx.root, "error", errParts.join(" "));
+            reason = errParts.join(" ");
+            showBanner(ctx.root, "error", reason);
           }
           break;
         }
       }
     }
     if (!gotDone) {
-      showBanner(ctx.root, "error", "Regeneration stream closed unexpectedly.");
+      ok = false;
+      reason = "Regeneration stream closed unexpectedly.";
+      showBanner(ctx.root, "error", reason);
     }
   } catch (e) {
-    showBanner(ctx.root, "error", "Regeneration failed: " + String((e && e.message) || e));
+    ok = false;
+    reason = "Regeneration failed: " + String((e && e.message) || e);
+    showBanner(ctx.root, "error", reason);
   } finally {
     ctx.state.regenerating = false;
     ctx.render();
+  }
+  return { ok, reason };
+}
+
+/** Unified Save & Apply (design D-4.5, APUX-13, P1-C AC1-AC5). One confirm
+ *  covering both steps: PUT the in-memory overlay, and — only on a successful
+ *  save — run the existing regenerate-and-install stream (no second confirm).
+ *  Replaces the separate "Save Overlay" + "Regenerate Artifacts" buttons. */
+export async function handleRegistrySaveAndApply(ctx) {
+  if (!confirm("Save changes and apply them to your installed agents? This overwrites installed variant directories, and you will need to restart your CLI sessions afterward.")) return;
+  try {
+    const res = await ctx.api.request("/api/v1/model-registry", { method: "PUT", body: ctx.state.registryOverlay });
+    if (res && res.success === false) {
+      const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
+      showBanner(ctx.root, "error", "Save failed: " + details);
+      return;
+    }
+  } catch (e) {
+    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
+    return;
+  }
+  // Reset the loaded/dirty guards so the next render re-inits from the newly
+  // saved source.overlay (mirrors the old Save Overlay success path).
+  ctx.state.registryDirty = false;
+  ctx.state.registryLoaded = false;
+  const { ok: applied, reason } = await runRegenerateStream(ctx);
+  if (!applied) {
+    // Overrides runRegenerateStream's own (more detailed) failure banner —
+    // showBanner clears the prior banner, so this is what the operator sees
+    // last. The leading sentence stays literal (P1-C AC4's safe-to-retry
+    // contract); the specific reason (stream-closed, per-host failure,
+    // exit-code line, spawn error) is folded in rather than discarded
+    // (fix-loop 1).
+    const detail = reason ? " Details: " + reason : "";
+    showBanner(ctx.root, "error", "Changes saved, but applying them failed — press Save & Apply again to retry." + detail);
   }
 }
 
@@ -2000,6 +2354,7 @@ function startApp(opts) {
     registryOverlay: null,
     registryDirty: false,
     registryLoaded: false,
+    registryForm: null,
     regenerating: false,
     indexJobId: null,
     indexJobStatus: null,
@@ -2133,7 +2488,7 @@ function startApp(opts) {
         root.innerHTML = renderProfilesView(
           (profilesRes && profilesRes.data) || { hosts: [] },
           displayData,
-          { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled(), unsaved: state.registryDirty },
+          { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled(), unsaved: state.registryDirty, registryForm: state.registryForm },
         );
       } else if (state.view === "model-registry") {
         const data = await api.request("/api/v1/model-registry");
@@ -2142,7 +2497,7 @@ function startApp(opts) {
         initRegistryOverlay(ctxObj, regData.registry, regData.source);
         state.registryServerData = regData;
         const displayData = mergeRegistryForDisplay(regData, state.registryOverlay);
-        root.innerHTML = renderModelRegistry(displayData, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty });
+        root.innerHTML = renderModelRegistry(displayData, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty, registryForm: state.registryForm });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
@@ -2285,7 +2640,7 @@ function startApp(opts) {
       btn.addEventListener("click", () => {
         const project = btn.dataset.project;
         if (!project) return;
-        if (confirm("Reset project " + project + "? This deletes vectors/symbols/memories. This cannot be undone.")) {
+        if (confirm("Delete project " + project + "? This removes its indexed vectors, symbols and memories permanently. This cannot be undone.")) {
           handleProjectReset(project);
         }
       });
@@ -2323,9 +2678,24 @@ function startApp(opts) {
       });
     });
     // admin-portal-enhancements: registry in-memory CRUD + save/clear
-    root.querySelectorAll('[data-action="registry-model"], [data-action="registry-effort"]').forEach((el) => {
+    root.querySelectorAll('[data-action="registry-effort"]').forEach((el) => {
       el.addEventListener("change", () => {
-        handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, el.dataset.action === "registry-model" ? "model" : "effort", el.value);
+        handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, "effort", el.value);
+      });
+    });
+    // Provider + Model split fields (design D-4.2, APUX-14): either input's
+    // change reads BOTH sibling fields from their shared .registry-cell and
+    // joins them into the one string the overlay stores. `closest` is guarded
+    // (absent/no-match in the test fake DOM) rather than assumed present.
+    root.querySelectorAll('[data-action="registry-provider"], [data-action="registry-model"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        const cell = typeof el.closest === "function" ? el.closest(".registry-cell") : null;
+        const sibling = cell && cell.querySelectorAll
+          ? cell.querySelectorAll('[data-action="' + (el.dataset.action === "registry-provider" ? "registry-model" : "registry-provider") + '"]')[0]
+          : null;
+        const providerVal = el.dataset.action === "registry-provider" ? el.value : (sibling ? sibling.value : "");
+        const modelVal = el.dataset.action === "registry-model" ? el.value : (sibling ? sibling.value : "");
+        handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, "model", joinModelId(providerVal, modelVal));
       });
     });
     root.querySelectorAll('[data-action="registry-hostDefault"]').forEach((el) => {
@@ -2333,13 +2703,20 @@ function startApp(opts) {
         handleRegistryHostDefaultEdit(ctx, el.dataset.host, el.value);
       });
     });
+    root.querySelectorAll('[data-action="registry-agentTier"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        handleRegistryAgentTierEdit(ctx, el.dataset.agent, el.dataset.host, el.value);
+      });
+    });
     root.querySelectorAll('[data-action="registry-workflowTier"]').forEach((el) => {
       el.addEventListener("change", () => {
         handleRegistryWorkflowTierEdit(ctx, el.dataset.workflow, el.value);
       });
     });
+    // T7 (APUX-12, D-4.4): trigger buttons toggle the corresponding inline
+    // form instead of invoking the prompt()-driven handler directly.
     root.querySelector('[data-action="registry-workflowTier-add"]')?.addEventListener("click", () => {
-      handleRegistryWorkflowTierAdd(ctx);
+      handleRegistryFormToggle(ctx, "add-workflow");
     });
     root.querySelectorAll('[data-action="registry-workflowTier-remove"]').forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -2347,13 +2724,35 @@ function startApp(opts) {
       });
     });
     root.querySelector('[data-action="registry-add-profile"]')?.addEventListener("click", () => {
-      handleRegistryAddProfile(ctx);
+      handleRegistryFormToggle(ctx, "add-profile");
     });
     root.querySelector('[data-action="registry-duplicate-profile"]')?.addEventListener("click", () => {
-      handleRegistryDuplicateProfile(ctx);
+      handleRegistryFormToggle(ctx, "duplicate-profile");
     });
     root.querySelector('[data-action="registry-delete-profile"]')?.addEventListener("click", () => {
-      handleRegistryDeleteProfile(ctx);
+      handleRegistryFormToggle(ctx, "delete-profile");
+    });
+    root.querySelector('[data-action="registry-form-cancel"]')?.addEventListener("click", () => {
+      handleRegistryFormCancel(ctx);
+    });
+    root.querySelector('[data-action="registry-form-submit"]')?.addEventListener("click", () => {
+      const kind = ctx.state.registryForm && ctx.state.registryForm.kind;
+      if (kind === "add-workflow") {
+        const workflow = root.querySelector('[data-action="registry-form-workflow"]')?.value;
+        const tier = root.querySelector('[data-action="registry-form-tier"]')?.value;
+        handleRegistryWorkflowTierAdd(ctx, workflow, tier);
+      } else if (kind === "duplicate-profile") {
+        const source = root.querySelector('[data-action="registry-form-source"]')?.value;
+        const newName = root.querySelector('[data-action="registry-form-new-name"]')?.value;
+        handleRegistryDuplicateProfile(ctx, source, newName);
+      } else if (kind === "delete-profile") {
+        const profile = root.querySelector('[data-action="registry-form-profile"]')?.value;
+        handleRegistryDeleteProfile(ctx, profile);
+      } else if (kind === "add-profile") {
+        const name = root.querySelector('[data-action="registry-form-name"]')?.value;
+        const description = root.querySelector('[data-action="registry-form-description"]')?.value;
+        handleRegistryAddProfile(ctx, name, description);
+      }
     });
     root.querySelectorAll('[data-action="registry-restore"]').forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -2362,14 +2761,11 @@ function startApp(opts) {
         handleRegistryRestore(ctx, profile);
       });
     });
-    root.querySelector('[data-action="registry-save-overlay"]')?.addEventListener("click", () => {
-      handleRegistrySaveOverlay(ctx);
+    root.querySelector('[data-action="registry-save-apply"]')?.addEventListener("click", () => {
+      handleRegistrySaveAndApply(ctx);
     });
     root.querySelector('[data-action="registry-clear-overlay"]')?.addEventListener("click", () => {
       handleRegistryClearOverlay(ctx);
-    });
-    root.querySelector('[data-action="registry-regenerate"]')?.addEventListener("click", () => {
-      handleRegistryRegenerate(ctx);
     });
   }
 
@@ -2662,6 +3058,8 @@ const MASSA_AI_UI = {
   buildConfigSectionBody,
   renderProfiles,
   renderModelRegistry,
+  splitModelId,
+  joinModelId,
   initTheme,
   toggleTheme,
   isWriteModeEnabled,
@@ -2678,16 +3076,19 @@ const MASSA_AI_UI = {
   mergeRegistryForDisplay,
   handleRegistryCellEdit,
   handleRegistryHostDefaultEdit,
+  handleRegistryAgentTierEdit,
   handleRegistryWorkflowTierEdit,
+  handleRegistryFormToggle,
+  handleRegistryFormCancel,
   handleRegistryWorkflowTierAdd,
   handleRegistryWorkflowTierRemove,
   handleRegistryAddProfile,
   handleRegistryDuplicateProfile,
   handleRegistryDeleteProfile,
   handleRegistryRestore,
-  handleRegistrySaveOverlay,
   handleRegistryClearOverlay,
-  handleRegistryRegenerate,
+  runRegenerateStream,
+  handleRegistrySaveAndApply,
   handleProjectIndexProgress,
   handleIndexStatusEvent,
   MEMORY_TYPES,

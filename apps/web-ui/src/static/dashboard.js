@@ -59,7 +59,30 @@ function fmtTime(ts) {
 }
 
 function fmtBool(b) {
-  return b ? "yes" : "no";
+  return b ? "Yes" : "No";
+}
+
+/**
+ * Format a number for display (T13, APUX-11): locale thousands separators
+ * via toLocaleString("en-US") (fixed locale keeps tests deterministic), an
+ * optional unit suffix, and an em-dash for missing/non-numeric values so a
+ * raw `undefined`/`NaN` never reaches the DOM.
+ */
+function fmtNum(n, suffix = "") {
+  if (n === null || n === undefined || n === "") return "—";
+  const num = Number(n);
+  if (Number.isNaN(num)) return escapeHtml(String(n));
+  return `${num.toLocaleString("en-US")}${suffix}`;
+}
+
+/** Render a single labeled stat card (D-6 `.stat-card` grid). `value` is
+ * pre-built HTML (caller is responsible for escaping/wrapping in `<code>`). */
+function statCard(label, value) {
+  return `<div class="stat-card"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${value}</div></div>`;
+}
+
+function statGrid(cards) {
+  return `<div class="stat-grid">${cards.join("")}</div>`;
 }
 
 export function renderSchedulerSection(result) {
@@ -75,7 +98,7 @@ export function renderSchedulerSection(result) {
   }
   const jobs = (d.jobs || []).map((j) => {
     return `<tr>
-      <td>${escapeHtml(j.id)}</td>
+      <td><code>${escapeHtml(j.id)}</code></td>
       <td>${escapeHtml(j.name)}</td>
       <td>${escapeHtml(j.jobKind)}</td>
       <td>${fmtBool(j.enabled)}</td>
@@ -85,11 +108,15 @@ export function renderSchedulerSection(result) {
       <td>${fmtBool(j.currentlyRunning)}</td>
     </tr>`;
   }).join("");
+  const cards = statGrid([
+    statCard("Running", fmtBool(d.running)),
+    statCard("Tick Interval", fmtNum(d.tickIntervalMs, " ms")),
+  ]);
   return `<section class="dashboard-section">
     <h2>Scheduler</h2>
-    <p><strong>Running:</strong> ${fmtBool(d.running)} · <strong>Tick interval:</strong> ${escapeHtml(d.tickIntervalMs)} ms</p>
+    ${cards}
     <table class="dashboard-table">
-      <thead><tr><th>ID</th><th>Name</th><th>Kind</th><th>Enabled</th><th>Next run</th><th>Last run</th><th>Due</th><th>Running</th></tr></thead>
+      <thead><tr><th>ID</th><th>Name</th><th>Kind</th><th>Enabled</th><th>Next Run</th><th>Last Run</th><th>Due</th><th>Running</th></tr></thead>
       <tbody>${jobs}</tbody>
     </table>
   </section>`;
@@ -104,9 +131,13 @@ export function renderHookQueueSection(result) {
     return '<section class="dashboard-section"><h2>Hook Queue</h2><p class="muted">unavailable</p></section>';
   }
   const pct = d.maxPending > 0 ? Math.round((d.pendingCount / d.maxPending) * 100) : 0;
+  const cards = statGrid([
+    statCard("Pending", `${fmtNum(d.pendingCount)} / ${fmtNum(d.maxPending)} (${pct}%)`),
+    statCard("Saturated", fmtBool(d.saturated)),
+  ]);
   return `<section class="dashboard-section">
     <h2>Hook Queue</h2>
-    <p><strong>Pending:</strong> ${escapeHtml(d.pendingCount)} / ${escapeHtml(d.maxPending)} (${pct}%) · <strong>Saturated:</strong> ${fmtBool(d.saturated)}</p>
+    ${cards}
   </section>`;
 }
 
@@ -123,10 +154,11 @@ export function renderSynapseSection(result) {
     return '<section class="dashboard-section"><h2>Synapse Sessions</h2><p class="muted">No active sessions</p></section>';
   }
   const rows = sessions.map((s) => {
+    const workspace = s.workspaceId ? `<code>${escapeHtml(s.workspaceId)}</code>` : "—";
     return `<tr>
-      <td>${escapeHtml(s.sessionId)}</td>
-      <td>${escapeHtml(s.agentId)}</td>
-      <td>${escapeHtml(s.workspaceId || "—")}</td>
+      <td><code>${escapeHtml(s.sessionId)}</code></td>
+      <td><code>${escapeHtml(s.agentId)}</code></td>
+      <td>${workspace}</td>
       <td>${escapeHtml(s.taskContext || "—")}</td>
       <td>${fmtTime(s.expiresAt)}</td>
     </tr>`;
@@ -150,12 +182,27 @@ export function renderMetricsSection(result) {
   }
   const sys = d.system || {};
   const mem = sys.memory || {};
+  const cards = statGrid([
+    statCard("Uptime", fmtNum(sys.uptime, "s")),
+    statCard("DB Size", escapeHtml(sys.databaseSize || "—")),
+    statCard("Heap Used", fmtNum(mem.heapUsed)),
+    statCard("Heap Total", fmtNum(mem.heapTotal)),
+    statCard("RSS", fmtNum(mem.rss)),
+  ]);
   return `<section class="dashboard-section">
     <h2>System Metrics</h2>
-    <p><strong>Uptime:</strong> ${escapeHtml(sys.uptime || "—")}s · <strong>DB size:</strong> ${escapeHtml(sys.databaseSize || "—")}</p>
-    <p><strong>Heap:</strong> ${escapeHtml(mem.heapUsed || "—")} / ${escapeHtml(mem.heapTotal || "—")} · <strong>RSS:</strong> ${escapeHtml(mem.rss || "—")}</p>
+    ${cards}
   </section>`;
 }
+
+/** T14, APUX-10: "About this tab" help card — the Dashboard is read-only, so
+ *  this is a short orientation note rather than a field-by-field guide. */
+const DASHBOARD_HELP_CARD =
+  '<details class="help-card"><summary>About this tab</summary>' +
+  '<div class="help-card-body">' +
+  '<p>A read-only snapshot of the scheduler, hook queue, Synapse sessions, and system metrics. Nothing on this tab can be edited — reload the page to see the latest values.</p>' +
+  '</div>' +
+  '</details>';
 
 /**
  * Top-level dashboard renderer. Takes the fetched data object and returns
@@ -169,6 +216,7 @@ export function renderDashboard(data) {
     renderHookQueueSection(data.hookQueue || { error: "no data" }),
     renderSynapseSection(data.synapse || { error: "no data" }),
     renderMetricsSection(data.metrics || { error: "no data" }),
+    DASHBOARD_HELP_CARD,
     '</div>',
   ].join("\n");
 }

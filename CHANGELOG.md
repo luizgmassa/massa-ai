@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Per-agent, per-tool capability tier overrides.** `scripts/lib/model-profiles.ts` gains
+  an optional `agentTiers` section (`{ [agentName]: { [host]: tier } }`) with validation,
+  deep merge (absent key inherits, `null` tombstones), and normalization against the
+  builtin; `generate-subagent-artifacts.ts` resolves each agent's tier as
+  `agentTiers[agent][host] ?? charter.metadata.model_tier`, with a single warn line for a
+  stale agent name and no warning when `agentTiers` is empty. `GET /api/v1/model-registry`
+  now returns an `agents: [{name, charterTier}]` array (degrading with the existing 501
+  path off-checkout), and the Model Catalog tab renders a "Per-Agent Tier Overrides" table
+  — one row per agent, one column per tool — so e.g. `builder` can run Deep on OpenCode
+  while staying Standard everywhere else.
+- **Provider/Model split fields in the Model Catalog grid.** Each cell now shows separate
+  Provider and Model text inputs (split from the stored `provider/model` string on the
+  first `/`, joined back on save), each with a placeholder/title hint; every other
+  editable string field in the Model Catalog carries a hint too.
+- **Inline dropdown forms replace `prompt()`/`alert()` popups** for Add Workflow Override,
+  Duplicate Profile, Delete Profile, and Add Profile — each shows a dropdown of the known
+  options (workflow stems, profile names) instead of asking the operator to type an exact
+  string, with inline validation errors instead of `alert()`.
+- **"About this tab" help cards** on all five admin portal tabs (Projects, Checkpoints,
+  Dashboard, Config, Models), rewritten in plain English, plus a Dashboard `.stat-card`
+  grid with Title Case labels, locale-formatted numbers, and machine tokens (job/session
+  ids) in `<code>`.
+
+### Changed
+
+- **Unified "Save & Apply"** replaces the Model Catalog's separate "Save Overlay" and
+  "Regenerate Artifacts" buttons with one confirm-gated action: it PUTs the overlay and,
+  only on success, runs the existing regenerate-and-install stream, ending with a
+  non-auto-hiding banner that names the CLI-restart consequence. A save failure stops
+  before regeneration; a save-ok-but-apply-failed outcome is reported as safe to retry.
+- **Model Catalog nomenclature rewritten to plain English** (Scheme A): the "Profiles" nav
+  tab is now "Models", sub-tabs are "Active Profile" / "Model Catalog", "Host Defaults" is
+  "Default Profile per Tool", "Workflow Tiers" is "Per-Workflow Tier Overrides", the
+  overlay badge/count sentence reads "override" / "You have N custom overrides of the
+  built-in defaults.", and "Deleted (restorable)" reads "Removed Profiles (restorable)".
+  User-visible Models-tab text no longer contains "overlay", "tombstoned", "registry", or
+  "host" (code identifiers and `<code>` samples excepted).
+- **Model Catalog grid restructured** with leading Tool and Tier columns (was a merged
+  "host / tier" header), each tool's rows sharing one rowspan Tool cell.
+- **Projects tab**: the row action is now a "Delete" button whose confirm text states that
+  the project's indexed vectors, symbols, and memories are removed irreversibly (was an
+  unlabeled reset action); the "docs" column header is now "Files"; index-form labels are
+  Title Case ("Project Path", "Project ID (optional)", "Force Reindex", "Warm Cache").
+- **Five-tab styling pass** (Projects, Checkpoints, Dashboard, Config, Models): every
+  rendered button carries a styling class, create/edit forms use a `.form-grid`
+  two-column layout with a max-width so fields stop spanning the full viewport, action
+  buttons cluster in spaced `.button-row` groups, and machine tokens (env vars, paths,
+  model ids, JSON keys) render in `<code>`.
+
 ## [1.43.0] - 2026-08-09
 
 ### Changed

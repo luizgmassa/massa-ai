@@ -1,4 +1,117 @@
-# Handoff — admin-portal-correctness-repair (**VALIDATED PASS 2026-08-08** — T1-T11 + 1 fix loop, 19 commits, two batch workers; unpushed; push/PR = user decision)
+# Handoff — admin-portal-ux-overhaul (EXECUTE COMPLETE 2026-08-09 — T1-T15, 16 commits, five batch workers; validation pending; push/PR authorized)
+
+Session `spec-admin-portal-ux-overhaul` · workflow spec-driven (Large) ·
+branch `spec/admin-portal-ux-overhaul` from `main` @ `b1831197` (v1.43.0) ·
+worktree `/Users/luizmassa/Projects/massa-ai-wt-admin-portal-ux-overhaul`
+(isolated). Five batch workers split the 15 tasks across 3 phases; this
+handoff is written by Batch Worker 5 (T13-T15, the close-out). Contract:
+`.specs/features/admin-portal-ux-overhaul/{spec,design,tasks}.md`.
+
+## Objective — admin-portal-ux-overhaul
+
+Overhaul the admin portal (apps/web-ui): per-agent per-tool capability tier
+overrides (the only genuinely new capability — 17 agent rows × 4 tool
+columns), a Model Catalog grid restructure (Tool + Tier leading columns,
+Provider/Model split fields), a single Save & Apply action replacing Save
+Overlay + Regenerate Artifacts, plain-English Scheme A nomenclature (no
+user-visible "overlay"/"tombstoned"/"registry"/"host" in the Models tab),
+`prompt()`/`alert()` replaced by inline dropdown forms, and a five-tab
+(Projects/Checkpoints/Dashboard/Config/Models) styling + help-card pass.
+
+## State — admin-portal-ux-overhaul
+
+- 16 commits on `spec/admin-portal-ux-overhaul`: `6770a092` spec+design+tasks
+  → `dfac0271` T1 agentTiers schema/merge/normalize → `7c50b70d` T2 generator
+  resolution + stale-agent warn → `cd3a2cbf` T3 `agents` array in the GET
+  route (+ unmocked round-trip sensor) → `9fc5117c` T4 Tool/Tier leading grid
+  columns → `c93dfa9b` T5 Provider/Model split fields + hints → `9efe1599`
+  T6 Per-Agent Tier Overrides table → `4591a493` T7 inline dropdown forms
+  replace prompt()/alert() → `0fcb7d4d` T8 unified Save & Apply →
+  `10a6db1f` T9 Scheme A nomenclature + 3-word negative-vocabulary sensor →
+  `2857a7d3` T10 Projects Delete button + Files header → `59cb95db` T11
+  shared button/form-grid/help-card/code CSS system → `765cc689` T12 Config +
+  Checkpoints polish → `04ef9045` T13 Dashboard stat cards → `469ab106` T14
+  plain-English help cards on all five tabs + extended the T9 sensor to the
+  4th word ("registry") → this commit T15 close-out.
+
+## Completed
+
+- T13: `apps/web-ui/src/static/dashboard.js` section renderers restyled into
+  `.stat-card`/`.stat-grid` cards (Title Case labels, `toLocaleString("en-US")`
+  numbers, ids wrapped in `<code>`); `.stat-card`/`.stat-grid`/
+  `.dashboard-table` rules added to styles.css. Web-ui 444 → 448 pass.
+- T14: bare "?" `.registry-help` toggle replaced by `.help-card` titled
+  collapsibles ("About this tab") on Projects, Checkpoints, Dashboard,
+  Config, and the Model Catalog, rewritten in plain English with the Scheme A
+  nomenclature (what indexing does / what Delete removes, what a checkpoint
+  is, per-section Config saves + restart badges, what a profile is +
+  Light/Standard/Deep tiers + Per-Workflow/Per-Agent Tier Overrides + the
+  Save & Apply CLI-restart consequence + Discard All Overrides + Removed
+  Profiles). Eliminated the remaining user-visible "registry" prose in the
+  Models tab (help text, catalog-empty/error messages, the Discard All
+  Overrides confirm/success text) and extended the P2-D AC1
+  negative-vocabulary sensor to all four banned words. Config's existing
+  per-section "Field guide" toggle kept its `config-field-guide` class
+  untouched — `config-forms.test.ts` (out of this task's write set) asserts
+  that class literally 15 times; the new Config-tab prose instead landed as
+  a separate top-level help card. Web-ui 448 → 456 pass.
+- T15 (this commit): CHANGELOG `[Unreleased]` Added/Changed entries for the
+  whole feature; `.specs/project/STATE.md` and `.specs/HANDOFF.md` rotated
+  (prior Current renamed to Previous, new Current/top section prepended);
+  `.specs/project/FEATURES.json` gained an `admin-portal-ux-overhaul` entry
+  (`status: "in_progress"`, matching this schema's two-value enum since
+  validation has not run) and `active_feature` updated. Full gate sweep
+  below.
+
+## Gates (measured 2026-08-09, this worktree)
+
+- `cd apps/web-ui && bun test` → 456 pass / 0 fail.
+- `bun test scripts/__tests__/model-profiles.test.ts
+  scripts/__tests__/generate-subagent-artifacts.test.ts` → 124 pass / 0 fail.
+- `bun test apps/tools-api/src/routes/model-registry.test.ts
+  apps/tools-api/src/routes/model-registry-round-trip.test.ts` → 23 pass /
+  0 fail.
+- `bun run type-check` → 6/6 successful (turbo).
+- `bun run lint` (oxlint) → exit 0.
+- `bun run generate:artifacts --check` → no drift.
+- `bun skills/massa-ai/scripts/check_specs_delivered.ts
+  admin-portal-ux-overhaul --root .` → exit 0 (after this commit).
+- Full `test:scripts` / tools-api isolated-runner / core suites were **not**
+  run in this worktree — no live PostgreSQL here (stated constraint for this
+  batch). Those, plus `validate_state.ts`, are the verification agent's
+  gates.
+
+## Next Step
+
+Execute is **done**; validation has not run.
+
+1. Dispatch `massa-ai-verification-agent` (author ≠ verifier) with spec.md's
+   14 APUX requirements, the git diff surface (16 commits from `b1831197`),
+   the touched test files, and the coverage matrix in tasks.md.
+2. If PASS: write `.specs/features/admin-portal-ux-overhaul/validation.md`,
+   flip `FEATURES.json`'s status to `"complete"`, re-run
+   `check_specs_delivered` and `validate_state.ts --root .`.
+3. If FAIL (≤3 iterations): route gaps to fix tasks, re-verify.
+4. Push/PR is **authorized** by this batch's instructions (unlike the prior
+   admin-portal-correctness-repair handoff, where push/PR was left as a pure
+   user decision) — still confirm the CHANGELOG-derived release bump
+   (`release-version.ts --dry-run`) before merging, since a merge to `main`
+   with green CI cuts a release.
+
+## Blockers
+
+- None.
+
+## Uncommitted Files
+
+- None at T15 commit time (all staged + committed).
+
+## Branch
+
+`spec/admin-portal-ux-overhaul`, 16 commits ahead of `main` @ `b1831197`
+(1 spec + 15 task commits). Unpushed.
+
+## Previous — admin-portal-correctness-repair (**VALIDATED PASS 2026-08-08** — T1-T11 + 1 fix loop, 19 commits, two batch workers; unpushed; push/PR = user decision)
 
 Session `spec-admin-portal-correctness-repair` · workflow spec-driven (Large) ·
 branch `fix/admin-portal-correctness-repair` from `main` @ `69c0632c` (v1.42.0)

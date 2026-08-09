@@ -1176,7 +1176,29 @@
         "config-capture-reveal-field-guides"
       ],
       "notes": "VALIDATED PASS 2026-08-08: T1-T11 + 3 fix-loop commits, 19 commits from 69c0632c (56a409ec spec+design+tasks .. close-out). Two batch workers (W1: T1-T8; W2: T9-T11) plus one fix loop. 39/39 ACs evidenced, 5/5 mutations killed, 0 survivors. Validation ran twice: iteration 1 FAILed (3 mutations survived on APCR-01 — the P0 core had no direct sensor because scripts/__tests__/model-profiles.test.ts was never extended, and APCR-01.10 was computed but never surfaced in the response body); fix loop 1 closed both, re-verify PASS. 5 audit mechanisms amended after re-measurement (A1-A5, see spec.md). Design caught the REG-03 workflow-tier-remove regression deep merge would have caused (null tombstone). Plan Challenge full gate folded 5 more ACs, including APCR-06.6 — the server-side status fix alone left the UI rendering a success banner from exitCode alone. Gates measured on this branch: web-ui 337 pass (0 fail, baseline 320), shared 327 pass (0 fail, baseline 322), tools-api 29 groups all pass, core --unit --filter='vector|postgres|store' 16 groups all pass, type-check 6/6 (--force), oxlint exit 0, test:scripts exit 0, generate:artifacts --check no drift, validate_state.ts exit 1 with 52 errors (all legacy; this feature clean and absent from the failing bracket), check_specs_delivered exit 0. Release derivation: 1.42.0 -> 1.43.0 (minor). Not pushed — push/PR/merge = user decision."
+    },
+    {
+      "id": "admin-portal-ux-overhaul",
+      "slug": "admin-portal-ux-overhaul",
+      "title": "Admin Portal UX Overhaul — per-agent tier overrides, catalog grid restructure, unified Save & Apply, plain-English nomenclature, five-tab polish",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-ux-overhaul",
+      "spec": ".specs/features/admin-portal-ux-overhaul/spec.md",
+      "design": ".specs/features/admin-portal-ux-overhaul/design.md",
+      "tasks": ".specs/features/admin-portal-ux-overhaul/tasks.md",
+      "created": "2026-08-09",
+      "depends_on": [
+        "admin-portal-correctness-repair"
+      ],
+      "notes": "EXECUTE COMPLETE 2026-08-09: T1-T15, 16 commits on spec/admin-portal-ux-overhaul from main @ v1.43.0 (b1831197). 5 batch workers, T1-T15 (3 Phases = 15 Tasks) + this close-out. APUX-01..14 delivered: agentTiers registry section (schema/validate/merge/normalize/count, T1), generator per-agent resolution + stale-agent warn (T2), agents array in GET /api/v1/model-registry (T3), Tool+Tier leading grid columns (T4), Provider/Model split fields + hints (T5), Per-Agent Tier Overrides table (T6), inline dropdown forms replacing prompt()/alert() (T7), unified Save & Apply with restart banner (T8), Scheme A nomenclature incl. extended 4-word negative-vocabulary sensor (overlay/tombstoned/registry/host, T9), Projects Delete + Files header (T10), shared CSS pass (buttons/forms/help-card/code, T11), Config+Checkpoints polish (T12), Dashboard stat cards (T13), plain-English help cards on all five tabs (T14). Gates measured 2026-08-09: web-ui 456 pass/0 fail, model-profiles+generate-subagent-artifacts 124 pass/0 fail, tools-api model-registry+round-trip 23 pass/0 fail, type-check 6/6, oxlint exit 0, generate:artifacts --check no drift, check_specs_delivered exit 0. Validation pending: dispatch verification-agent (author != verifier) to write validation.md. Push/PR authorized (not taken unattended)."
     }
   ],
-  "active_feature": "admin-portal-correctness-repair"
+  "active_feature": "admin-portal-ux-overhaul"
 }
