@@ -255,10 +255,10 @@ export function renderProjects(data, opts) {
   const indexForm = writeMode
     ? '<div class="create-form form-grid">' +
       "<h3>Index Project</h3>" +
-      '<div class="form-field"><label>projectPath</label><input type="text" data-create="projectPath" data-form="project-index" /></div>' +
-      '<div class="form-field"><label>projectId (optional)</label><input type="text" data-create="projectId" data-form="project-index" /></div>' +
-      '<div class="form-field"><label><input type="checkbox" data-create="forceReindex" data-form="project-index" /> forceReindex</label></div>' +
-      '<div class="form-field"><label><input type="checkbox" data-create="warmCache" data-form="project-index" /> warmCache</label></div>' +
+      '<div class="form-field"><label>Project Path</label><input type="text" data-create="projectPath" data-form="project-index" /></div>' +
+      '<div class="form-field"><label>Project ID (optional)</label><input type="text" data-create="projectId" data-form="project-index" /></div>' +
+      '<div class="form-field"><label><input type="checkbox" data-create="forceReindex" data-form="project-index" /> Force Reindex</label></div>' +
+      '<div class="form-field"><label><input type="checkbox" data-create="warmCache" data-form="project-index" /> Warm Cache</label></div>' +
       '<button type="button" class="btn btn-primary" data-action="project-index">Index</button>' +
       "</div>"
     : "";
@@ -618,14 +618,14 @@ export function renderCheckpoints(data) {
   const createForm = writeMode
     ? '<div class="create-form form-grid">' +
       "<h3>Create Checkpoint</h3>" +
-      '<div class="form-field"><label>taskId</label><input type="text" data-create="taskId" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>description</label><input type="text" data-create="description" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>status</label><select data-create="status" data-form="checkpoint-create"><option>pending</option><option>in_progress</option><option>completed</option><option>failed</option><option>paused</option></select></div>' +
-      '<div class="form-field"><label>progressPercent</label><input type="number" min="0" max="100" data-create="progressPercent" data-form="checkpoint-create" value="0" /></div>' +
-      '<div class="form-field"><label>currentStep</label><input type="text" data-create="currentStep" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>totalSteps</label><input type="number" data-create="totalSteps" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>completedSteps</label><input type="number" data-create="completedSteps" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>checkpointType</label><select data-create="checkpointType" data-form="checkpoint-create"><option>manual</option><option>milestone</option></select></div>' +
+      '<div class="form-field"><label>Task ID</label><input type="text" data-create="taskId" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Description</label><input type="text" data-create="description" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Status</label><select data-create="status" data-form="checkpoint-create"><option>pending</option><option>in_progress</option><option>completed</option><option>failed</option><option>paused</option></select></div>' +
+      '<div class="form-field"><label>Progress Percent</label><input type="number" min="0" max="100" data-create="progressPercent" data-form="checkpoint-create" value="0" /></div>' +
+      '<div class="form-field"><label>Current Step</label><input type="text" data-create="currentStep" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Total Steps</label><input type="number" data-create="totalSteps" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Completed Steps</label><input type="number" data-create="completedSteps" data-form="checkpoint-create" /></div>' +
+      '<div class="form-field"><label>Checkpoint Type</label><select data-create="checkpointType" data-form="checkpoint-create"><option>manual</option><option>milestone</option></select></div>' +
       '<button type="button" class="btn btn-primary" data-action="checkpoint-create">Create</button>' +
       "</div>"
     : "";
@@ -633,9 +633,9 @@ export function renderCheckpoints(data) {
   if (rows.length === 0 && !writeMode) {
     return '<section class="view"><h2>Checkpoints</h2><p class="empty">No checkpoints.</p></section>';
   }
-  const actionCol = writeMode ? "<th>actions</th>" : "";
+  const actionCol = writeMode ? "<th>Actions</th>" : "";
   const body =
-    '<table class="grid"><thead><tr><th>task</th><th>type</th><th>status</th><th>description</th>' + actionCol + '</tr></thead><tbody>' +
+    '<table class="grid"><thead><tr><th>Task</th><th>Type</th><th>Status</th><th>Description</th>' + actionCol + '</tr></thead><tbody>' +
     rows
       .map((c) => {
         const id = escapeHtml(c.id || c.checkpointId || "");
@@ -684,17 +684,17 @@ const CONFIG_SECTIONS = [
   {
     key: "database",
     label: "Database",
-    fields: [{ name: "url", type: "text", label: "Database URL", sensitive: true, guide: "PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/db). Changing this requires a server restart." }],
+    fields: [{ name: "url", type: "text", label: "Database URL", sensitive: true, guide: "PostgreSQL connection string (e.g., `postgresql://user:pass@host:5432/db`). Changing this requires a server restart." }],
   },
   {
     key: "embedding",
     label: "Embedding",
     fields: [
       { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "mistral", "openai", "google", "cohere"], guide: "Which embedding provider to use. Ollama runs locally; others are cloud APIs." },
-      { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., qwen3-embedding:4b for Ollama)." },
-      { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically http://localhost:11434." },
+      { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., `qwen3-embedding:4b` for Ollama)." },
+      { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically `http://localhost:11434`." },
       { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama. Changing this requires a restart." },
-      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 4096 for qwen3-embedding:4b)." },
+      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 4096 for `qwen3-embedding:4b`)." },
     ],
   },
   {
@@ -718,7 +718,7 @@ const CONFIG_SECTIONS = [
     fields: [
       { name: "maxMatchWork", type: "number", label: "Max Match Work", guide: "Maximum glob match operations before bailing. Default: 100000." },
       { name: "maxIgnorePatterns", type: "number", label: "Max Ignore Patterns", guide: "Maximum ignore patterns allowed. Default: 1024." },
-      { name: "rules", type: "string[]", label: "Rules (JSON)", guide: "Capture rules as JSON array of {pattern, disposition: Keep|Drop|MetadataOnly}. When absent, the built-in DEFAULT_POLICY applies." },
+      { name: "rules", type: "string[]", label: "Rules (JSON)", guide: "Capture rules as JSON array of {pattern, disposition: Keep|Drop|MetadataOnly}. When absent, the built-in `DEFAULT_POLICY` applies." },
     ],
   },
   {
@@ -763,9 +763,9 @@ const CONFIG_SECTIONS = [
     label: "LLM",
     fields: [
       { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables LLM-powered features (consolidation, query understanding, compression)." },
-      { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., http://localhost:11434/v1 for Ollama OpenAI-compatible endpoint)." },
+      { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., `http://localhost:11434/v1` for Ollama OpenAI-compatible endpoint)." },
       { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for the LLM provider. Not needed for local Ollama. Changing this requires a restart." },
-      { name: "model", type: "text", label: "Model", guide: "Primary LLM model name (e.g., qwen2.5:7b-instruct)." },
+      { name: "model", type: "text", label: "Model", guide: "Primary LLM model name (e.g., `qwen2.5:7b-instruct`)." },
       { name: "codeModel", type: "text", label: "Code Model", guide: "Model used for code-related tasks. When empty, falls back to the primary model." },
       { name: "temperature", type: "number", label: "Temperature", guide: "Sampling temperature (0 = deterministic, 1 = creative). Typically 0.2 for tasks." },
       { name: "maxOutputTokens", type: "number", label: "Max Output Tokens", guide: "Maximum tokens the LLM can generate in a single response." },
@@ -849,12 +849,26 @@ const CONFIG_SECTIONS = [
     key: "security",
     label: "Security",
     fields: [
-      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key required on every request except /health, /swagger, and /ui. Auto-provisioned on first start. Changing this requires a restart." },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key required on every request except `/health`, `/swagger`, and `/ui`. Auto-provisioned on first start. Changing this requires a restart." },
       { name: "corsOrigins", type: "string[]", label: "CORS Origins", guide: "Comma-separated list of allowed CORS origins. Empty means no CORS." },
       { name: "allowedExtensions", type: "string[]", label: "Allowed Extensions", guide: "Comma-separated list of file extensions allowed for indexing." },
     ],
   },
 ];
+
+/**
+ * Renders a Field guide `dd` value (T12, APUX-09/APUX-11, design D-6): escapes
+ * the whole string first, then turns any `` `backtick` `` span into `<code>`.
+ * The guide strings themselves carry the backtick markers around their
+ * machine tokens (env-style URLs, model ids, paths, identifiers) — chosen
+ * over a token-matching regex because it is small and fully deterministic:
+ * every wrapped span is one this function's own caller opted into, not a
+ * pattern guess that could over- or under-match prose.
+ */
+function renderGuideText(s) {
+  const escaped = escapeHtml(s);
+  return escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
+}
 
 function getConfigFieldValue(config, sectionKey, fieldName) {
   if (sectionKey === "dataDir") return config[sectionKey] || "";
@@ -926,10 +940,10 @@ export function renderConfig(data, opts) {
       return renderConfigField(section.key, field, value);
     }).join("");
     const saveBtn = writeMode
-      ? '<button type="button" class="save-btn" data-action="config-save" data-section="' + section.key + '">Save</button>'
+      ? '<button type="button" class="save-btn btn-primary" data-action="config-save" data-section="' + section.key + '">Save</button>'
       : "";
     const guideEntries = section.fields.filter((f) => f.guide).map((f) => {
-      return "<dt>" + escapeHtml(f.label) + "</dt><dd>" + escapeHtml(f.guide) + "</dd>";
+      return "<dt>" + escapeHtml(f.label) + "</dt><dd>" + renderGuideText(f.guide) + "</dd>";
     }).join("");
     const fieldGuide = guideEntries
       ? '<details class="config-field-guide"><summary>Field guide</summary>' +

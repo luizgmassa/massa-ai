@@ -1170,6 +1170,57 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       expect(checkpointsHtml).toContain('class="create-form form-grid"');
     });
   });
+
+  // ── T12 (APUX-09, design D-6): Checkpoints + Projects Title Case labels ────
+  describe("Checkpoints + Projects Title Case labels (T12, APUX-09)", () => {
+    it("Checkpoints create form labels are Title Case", () => {
+      enableWrite();
+      const html = renderCheckpoints({ success: true, data: { checkpoints: [] } });
+      expect(html).toContain("<label>Task ID</label>");
+      expect(html).toContain("<label>Description</label>");
+      expect(html).toContain("<label>Status</label>");
+      expect(html).toContain("<label>Progress Percent</label>");
+      expect(html).toContain("<label>Current Step</label>");
+      expect(html).toContain("<label>Total Steps</label>");
+      expect(html).toContain("<label>Completed Steps</label>");
+      expect(html).toContain("<label>Checkpoint Type</label>");
+      // Old camelCase labels are gone (data-create attributes stay camelCase —
+      // those are field names, not labels, and are asserted unchanged above).
+      expect(html).not.toContain("<label>taskId</label>");
+      expect(html).not.toContain("<label>progressPercent</label>");
+      expect(html).not.toContain("<label>currentStep</label>");
+      expect(html).not.toContain("<label>totalSteps</label>");
+      expect(html).not.toContain("<label>completedSteps</label>");
+      expect(html).not.toContain("<label>checkpointType</label>");
+    });
+
+    it("Checkpoints table headers are Title Case", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      expect(html).toContain("<th>Task</th>");
+      expect(html).toContain("<th>Type</th>");
+      expect(html).toContain("<th>Status</th>");
+      expect(html).toContain("<th>Description</th>");
+      expect(html).toContain("<th>Actions</th>");
+      expect(html).not.toContain("<th>task</th>");
+      expect(html).not.toContain("<th>type</th>");
+      expect(html).not.toContain("<th>status</th>");
+      expect(html).not.toContain("<th>description</th>");
+      expect(html).not.toContain("<th>actions</th>");
+    });
+
+    it("Projects index form labels are Title Case", () => {
+      enableWrite();
+      const html = renderProjects({ projects: [{ projectId: "p1" }] });
+      expect(html).toContain("<label>Project Path</label>");
+      expect(html).toContain("<label>Project ID (optional)</label>");
+      expect(html).toContain("/> Force Reindex</label>");
+      expect(html).toContain("/> Warm Cache</label>");
+      expect(html).not.toContain("<label>projectPath</label>");
+      expect(html).not.toContain("<label>projectId (optional)</label>");
+    });
+  });
 });
 
 // ── T9 (APUX-07, P2-D AC1): Nomenclature Scheme A negative-vocabulary sensor ─

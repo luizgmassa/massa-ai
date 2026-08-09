@@ -325,3 +325,45 @@ describe("renderConfig — per-section field guides (CFG-03)", () => {
     expect(html).toContain("When checked");
   });
 });
+
+// ── T12 (APUX-09, design D-6): Save button variant + guide-text <code> tokens ─
+
+describe("renderConfig — per-section Save button is .btn-primary (T12, APUX-09)", () => {
+  it("renders the Save button with both save-btn and btn-primary classes", () => {
+    const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
+    expect(html).toContain('class="save-btn btn-primary"');
+  });
+});
+
+describe("renderConfig — field guide machine tokens render in <code> (T12, APUX-09/11)", () => {
+  const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
+
+  it("wraps the database URL example in <code>", () => {
+    expect(html).toContain("<code>postgresql://user:pass@host:5432/db</code>");
+  });
+
+  it("wraps the embedding model + base URL examples in <code>", () => {
+    expect(html).toContain("<code>qwen3-embedding:4b</code>");
+    expect(html).toContain("<code>http://localhost:11434</code>");
+  });
+
+  it("wraps the LLM base URL + model examples in <code>", () => {
+    expect(html).toContain("<code>http://localhost:11434/v1</code>");
+    expect(html).toContain("<code>qwen2.5:7b-instruct</code>");
+  });
+
+  it("wraps the capturePolicy DEFAULT_POLICY identifier in <code>", () => {
+    expect(html).toContain("<code>DEFAULT_POLICY</code>");
+  });
+
+  it("wraps the security public-path list in <code>", () => {
+    expect(html).toContain("<code>/health</code>");
+    expect(html).toContain("<code>/swagger</code>");
+    expect(html).toContain("<code>/ui</code>");
+  });
+
+  it("does not turn the surrounding prose into <code>", () => {
+    expect(html).toContain("PostgreSQL connection string (e.g.,");
+    expect(html).toContain("Changing this requires a server restart.");
+  });
+});
