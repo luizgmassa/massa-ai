@@ -267,16 +267,16 @@ export function renderProjects(data, opts) {
     return '<section class="view"><h2>Projects</h2>' + indexProgress + '<p class="empty">No indexed projects.</p></section>';
   }
 
-  const actionCol = writeMode ? "<th>actions</th>" : "";
+  const actionCol = writeMode ? "<th>Actions</th>" : "";
   const body =
-    '<table class="grid"><thead><tr><th>project</th><th>docs</th>' + actionCol + '</tr></thead><tbody>' +
+    '<table class="grid"><thead><tr><th>Project</th><th>Files</th>' + actionCol + '</tr></thead><tbody>' +
     projects
       .map((p) => {
         const id = escapeHtml(p.projectId || p.id || "");
         const count = p.documentCount ?? p.docCount ?? "";
         const actions = writeMode
           ? '<td class="actions-cell">' +
-            '<button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">reset</button>' +
+            '<button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">Delete</button>' +
             "</td>"
           : "";
         return (
@@ -2578,7 +2578,7 @@ function startApp(opts) {
       btn.addEventListener("click", () => {
         const project = btn.dataset.project;
         if (!project) return;
-        if (confirm("Reset project " + project + "? This deletes vectors/symbols/memories. This cannot be undone.")) {
+        if (confirm("Delete project " + project + "? This removes its indexed vectors, symbols and memories permanently. This cannot be undone.")) {
           handleProjectReset(project);
         }
       });

@@ -1012,20 +1012,33 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       expect(html).toContain('data-create="warmCache"');
     });
 
-    it("renders reset button on project rows when write mode on", () => {
+    it("renders a Delete button on project rows when write mode on (APUX-08)", () => {
       enableWrite();
       const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
       const html = renderProjects(data);
       expect(html).toContain('data-action="project-reset"');
       expect(html).toContain('data-project="p1"');
+      expect(html).toContain('class="btn-delete" data-action="project-reset" data-project="p1">Delete</button>');
     });
 
-    it("hides index form + reset button when write mode off", () => {
+    it("hides index form + delete button when write mode off", () => {
       disableWrite();
       const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
       const html = renderProjects(data);
       expect(html).not.toContain('data-action="project-reset"');
       expect(html).not.toContain('data-create="projectPath"');
+    });
+
+    it("renders Title Case column headers with a Files header (APUX-08, P2-E AC2)", () => {
+      enableWrite();
+      const data = { projects: [{ projectId: "p1", documentCount: 10 }] };
+      const html = renderProjects(data);
+      expect(html).toContain("<th>Project</th>");
+      expect(html).toContain("<th>Files</th>");
+      expect(html).toContain("<th>Actions</th>");
+      expect(html).not.toContain("<th>project</th>");
+      expect(html).not.toContain("<th>docs</th>");
+      expect(html).not.toContain("<th>actions</th>");
     });
 
     it("renders field helper section with Index Project guide", () => {
