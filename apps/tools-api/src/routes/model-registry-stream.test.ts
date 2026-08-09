@@ -446,6 +446,23 @@ describe("POST /api/v1/model-registry/regenerate-and-install-stream — auto-ins
   });
 });
 
+// ── APCR-09: both routes share one handler — identical frame sequences ──────
+
+describe("POST /regenerate-and-install-stream vs /regenerate-stream — one shared handler (APCR-09)", () => {
+  test("both routes emit an identical frame sequence for the same fixture", async () => {
+    const fixture = { stdoutLines: ["Generating claude agents..."], stderrLines: ["a warning"], exitCode: 0 };
+
+    spawnMock.mockImplementationOnce(() => makeFakeChild(fixture));
+    const first = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+
+    spawnMock.mockImplementationOnce(() => makeFakeChild(fixture));
+    const second = await postStream("/api/v1/model-registry/regenerate-stream");
+
+    expect(first.status).toBe(second.status);
+    expect(parseSseEvents(first.text)).toEqual(parseSseEvents(second.text));
+  });
+});
+
 // ── APCR-07: the SSE terminal frame carries the 501 reason, no spawn attempt ─
 
 describe("SSE streams — terminal done frame carries the deployment-unavailable reason (APCR-07.5)", () => {

@@ -98,9 +98,15 @@ function installActiveProfiles(controller: ReadableStreamDefaultController<Uint8
   }
 }
 
-export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-registry" }).post(
-  "/regenerate-and-install-stream",
-  () => {
+/**
+ * Factory for the SSE regenerate-stream handler (APCR-09). Both
+ * `/regenerate-and-install-stream` and its deprecated `/regenerate-stream`
+ * alias had byte-equivalent handler bodies; this is the one implementation
+ * behind both routes. Each call returns a fresh closure so the two routes
+ * never share `child`/`closedRef` state, matching the pre-refactor shape.
+ */
+function createRegenerateStreamHandler(): () => Response {
+  return () => {
     let child: ReturnType<typeof spawn> | null = null;
     const closedRef = { closed: false };
 
@@ -202,127 +208,24 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
         "X-Accel-Buffering": "no",
       },
     });
-  },
-  {
+  };
+}
+
+export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-registry" })
+  .post("/regenerate-and-install-stream", createRegenerateStreamHandler(), {
     detail: {
       tags: ["model-registry"],
       summary: "Regenerate subagent artifacts + auto-install to active dirs (streaming SSE)",
       description:
         "Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn (non-blocking). Pipes stdout/stderr line-by-line as SSE. After the generator succeeds (exit 0), calls switchProfile for every detected host to reinstall the active profile's agents from the freshly generated variant dirs. Emits `install` events per host, then a terminal `done` event with the exit code.",
     },
-  },
-)
-// Deprecated alias — same behavior, kept for backward compat with older UI.
-.post(
-  "/regenerate-stream",
-  () => {
-    let child: ReturnType<typeof spawn> | null = null;
-    const closedRef = { closed: false };
-
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        const root = getDeploymentRoot();
-        if (!root) {
-          controller.enqueue(sseFrame({
-            type: "done",
-            exitCode: null,
-            error: deploymentUnavailableMessage("scripts/generate-subagent-artifacts.ts"),
-          }));
-          controller.close();
-          closedRef.closed = true;
-          return;
-        }
-        const generateScript = path.join(root, "scripts", "generate-subagent-artifacts.ts");
-        try {
-          child = spawn("bun", [generateScript], {
-            env: { ...process.env },
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-        } catch (e) {
-          controller.enqueue(sseFrame({
-            type: "done",
-            exitCode: null,
-            error: `spawn failed: ${(e as Error).message}`,
-          }));
-          controller.close();
-          closedRef.closed = true;
-          return;
-        }
-
-        const emitLine = (streamName: "stdout" | "stderr", chunk: Buffer) => {
-          if (closedRef.closed) return;
-          const text = chunk.toString();
-          const lines = text.split("\n");
-          for (const line of lines) {
-            if (line.length === 0) continue;
-            try {
-              controller.enqueue(sseFrame({ type: "line", stream: streamName, text: line }));
-            } catch {
-              closedRef.closed = true;
-              return;
-            }
-          }
-        };
-
-        child.stdout?.on("data", (chunk: Buffer) => emitLine("stdout", chunk));
-        child.stderr?.on("data", (chunk: Buffer) => emitLine("stderr", chunk));
-
-        child.on("error", (e: Error) => {
-          if (closedRef.closed) return;
-          closedRef.closed = true;
-          try {
-            controller.enqueue(sseFrame({ type: "done", exitCode: null, error: `spawn error: ${e.message}` }));
-            controller.close();
-          } catch {
-            // already closed
-          }
-        });
-
-        child.on("close", (code: number | null) => {
-          if (closedRef.closed) return;
-          if (code === 0) {
-            try {
-              controller.enqueue(sseFrame({ type: "line", stream: "stdout", text: "Installing regenerated agents to active directories..." }));
-            } catch {
-              closedRef.closed = true;
-              return;
-            }
-            installActiveProfiles(controller, closedRef);
-          }
-          closedRef.closed = true;
-          try {
-            controller.enqueue(sseFrame({ type: "done", exitCode: code }));
-            controller.close();
-          } catch {
-            // already closed
-          }
-        });
-      },
-      cancel() {
-        closedRef.closed = true;
-        try {
-          child?.kill();
-        } catch {
-          // best effort
-        }
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "X-Accel-Buffering": "no",
-      },
-    });
-  },
-  {
+  })
+  // Deprecated alias — same behavior, kept for backward compat with older UI.
+  .post("/regenerate-stream", createRegenerateStreamHandler(), {
     detail: {
       tags: ["model-registry"],
       summary: "Regenerate subagent artifacts + auto-install (streaming SSE, deprecated alias)",
       description:
         "Alias for POST /regenerate-and-install-stream. Kept for backward compat with older UI versions.",
     },
-  },
-);
+  });
