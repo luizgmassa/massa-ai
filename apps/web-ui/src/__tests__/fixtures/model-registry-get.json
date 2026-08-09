@@ -11,6 +11,9 @@
         "opencode": "balanced"
       },
       "workflowTiers": {},
+      "agentTiers": {
+        "builder": { "opencode": "deep" }
+      },
       "profiles": {
         "balanced": {
           "description": "balanced profile",
@@ -50,6 +53,7 @@
           "opencode": "balanced"
         },
         "workflowTiers": {},
+        "agentTiers": {},
         "profiles": {
           "balanced": {
             "description": "balanced profile",
@@ -57,8 +61,13 @@
           }
         }
       },
-      "overlay": null,
+      "overlay": { "agentTiers": { "builder": { "opencode": "deep" } } },
       "tombstoned": []
-    }
+    },
+    "overlayOverrideCount": 1,
+    "agents": [
+      { "name": "builder", "charterTier": "standard" },
+      { "name": "investigator", "charterTier": "deep" }
+    ]
   }
 }

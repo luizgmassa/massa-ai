@@ -51,6 +51,46 @@ export function getRegistryHostDefaults(): Record<string, string> | undefined {
   }
 }
 
+// Same lazy dynamic-require pattern as profilesLib() above, for the same reasons: the
+// generator lives outside tools-api's rootDir, is not copied into the production Docker
+// image, and the non-literal require path keeps the bundler from trying to resolve it at
+// build time. Reuses the generator's own real charter parser (loadAllCharters) rather than
+// a second frontmatter parser that could drift from it (design D-3).
+let _generatorLib: Record<string, unknown> | null = null;
+function generatorLib(): Record<string, unknown> {
+  if (!_generatorLib) {
+    const root = getDeploymentRoot();
+    if (!root) {
+      throw new Error(deploymentUnavailableMessage("scripts/generate-subagent-artifacts.ts"));
+    }
+    const libPath = path.join(root, "scripts", "generate-subagent-artifacts.ts");
+    _generatorLib = (typeof require === "function" ? require : (globalThis as any).require)(libPath);
+  }
+  return _generatorLib!;
+}
+
+/**
+ * Best-effort `agents` inventory for the Model Catalog's Per-Agent Tier Overrides table
+ * (design D-3, APUX-03). Any throw — missing checkout, a charter parse failure — degrades to
+ * an empty list plus `agentsError` rather than failing the GET; the caller has already run
+ * the shared 501 off-checkout gate before this is reached, so this is a second, narrower
+ * failure surface on top of that one.
+ */
+async function loadAgentsInventory(): Promise<{
+  agents: Array<{ name: string; charterTier: string }>;
+  agentsError?: string;
+}> {
+  try {
+    const gen = generatorLib();
+    const charters = (await (
+      gen.loadAllCharters as () => Promise<Array<{ name: string; modelTier: string }>>
+    )()) as Array<{ name: string; modelTier: string }>;
+    return { agents: charters.map((c) => ({ name: c.name, charterTier: c.modelTier })) };
+  } catch (e) {
+    return { agents: [], agentsError: (e as Error).message };
+  }
+}
+
 const REGISTRY_DETAIL = {
   tags: ["model-registry"],
 };
@@ -60,7 +100,7 @@ const OVERLAY_PATH = path.join(configDir("massa-ai"), "model-profiles.json");
 export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry" })
   .get(
     "/",
-    ({ set }) => {
+    async ({ set }) => {
       const root = getDeploymentRoot();
       if (!root) {
         set.status = 501;
@@ -68,6 +108,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
       }
       const lib = profilesLib();
       const result = (lib.loadEffectiveRegistry as (opts?: { overlayPath?: string }) => any)({ overlayPath: OVERLAY_PATH });
+      const { agents, agentsError } = await loadAgentsInventory();
       set.status = 200;
       return {
         success: true as const,
@@ -76,6 +117,8 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
           source: result.source,
           overlayOverrideCount: result.overlayOverrideCount ?? 0,
           ...(result.overlayError ? { overlayError: result.overlayError } : {}),
+          agents,
+          ...(agentsError ? { agentsError } : {}),
         },
       };
     },
@@ -84,7 +127,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         ...REGISTRY_DETAIL,
         summary: "Get effective registry (builtin + overlay) with source attribution",
         description:
-          "Returns the merged registry (builtin + overlay), source attribution (builtin, overlay, tombstoned), overlayOverrideCount (APCR-01.10 — count of overlay entries surviving normalization, so an operator can see how much of the registry their overlay is overriding), and overlayError if the overlay is corrupted (200 status, never fails).",
+          "Returns the merged registry (builtin + overlay), source attribution (builtin, overlay, tombstoned), overlayOverrideCount (APCR-01.10 — count of overlay entries surviving normalization, so an operator can see how much of the registry their overlay is overriding), overlayError if the overlay is corrupted, and agents (design D-3, APUX-03 — {name, charterTier} for every charter under skills/agents/, best-effort with agentsError on failure) (200 status, never fails).",
       },
     },
   )
