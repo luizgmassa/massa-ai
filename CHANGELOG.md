@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-08-09
+
 ### Changed
 
 - **The model-registry overlay is now interpreted as a real delta, deep-merged against
