@@ -14,6 +14,8 @@ const {
   renderProposals,
   renderConfig,
   renderProfiles,
+  renderProfilesView,
+  renderModelRegistry,
   initTheme,
   toggleTheme,
   createApiClient,
@@ -704,6 +706,14 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(profilesIdx).toBeGreaterThan(configIdx);
   });
 
+  it("index.html nav uses the plain-English 'Models' label for the #/profiles route (T9, APUX-07)", () => {
+    const navMatch = INDEX_HTML.match(/<nav class="nav">([\s\S]*?)<\/nav>/);
+    expect(navMatch).not.toBeNull();
+    const nav = navMatch![1];
+    expect(nav).toContain('<a href="#/profiles">Models</a>');
+    expect(nav).not.toContain(">Profiles<");
+  });
+
   it("index.html footer text is 'Admin portal · served by the massa-ai Tools API'", () => {
     expect(INDEX_HTML).toContain("Admin portal");
     expect(INDEX_HTML).toContain("served by the massa-ai Tools API");
@@ -735,13 +745,16 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(html).toContain("active");
   });
 
-  it("renderProfiles shows installed with marketplace message when no variant profiles (UIC-05)", () => {
+  it("renderProfiles shows installed with marketplace message when no variant profiles (UIC-05, T9: Save & Apply / Model Catalog nomenclature)", () => {
     const html = renderProfiles({ hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.41.0", availableProfiles: [] }] }, { writeMode: false });
     expect(html).toContain("claude");
     expect(html).not.toContain("Not installed");
     expect(html).toContain("marketplace");
     expect(html).toContain("MASSA_AI_MODEL_PROFILE");
-    expect(html).toContain("Regenerate Artifacts");
+    expect(html).toContain("Save &amp; Apply");
+    expect(html).toContain("Model Catalog");
+    expect(html).not.toContain("Regenerate Artifacts");
+    expect(html).not.toContain("Edit Registry");
   });
 
   it("renderProfiles shows Not installed when installed is false", () => {
@@ -1033,5 +1046,144 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       expect(html).toContain("<details");
       expect(html).toContain("Embedding Dimension Note");
     });
+  });
+});
+
+// ── T9 (APUX-07, P2-D AC1): Nomenclature Scheme A negative-vocabulary sensor ─
+// The Models tab's user-visible text must never say "overlay", "tombstoned",
+// or "host" — <code> samples and HTML attributes (both stripped below) are
+// exempt. Exercises renderProfilesView with BOTH tabs (Active Profile +
+// Model Catalog), the real page assembly, not renderModelRegistry alone.
+
+/** Strips <code>...</code> content and every HTML tag (attributes included,
+ *  since a tag can't survive without its attributes) so only genuinely
+ *  user-visible text remains for the negative-vocabulary match. */
+function extractVisibleText(html: string): string {
+  return html.replace(/<code[^>]*>[\s\S]*?<\/code>/g, " ").replace(/<[^>]*>/g, " ");
+}
+
+const NOMENCLATURE_SAMPLE_REGISTRY = {
+  registry: {
+    version: 1,
+    tiers: ["light", "standard", "deep"],
+    hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
+    workflowTiers: { search: "standard" },
+    agentTiers: { builder: { opencode: "deep" } },
+    profiles: {
+      balanced: {
+        description: "Balanced profile",
+        hosts: {
+          claude: { light: { model: "claude-sonnet", effort: "low" }, standard: { model: "claude-sonnet", effort: "medium" }, deep: { model: "claude-opus", effort: "high" } },
+          codex: { light: { model: "gpt-4o-mini", effort: "minimal" }, standard: { model: "gpt-4o", effort: "medium" }, deep: { model: "o1", effort: "high" } },
+          cursor: { light: { model: null, effort: null }, standard: { model: "claude-sonnet", effort: null }, deep: { model: "claude-opus", effort: null } },
+          opencode: { light: { model: "qwen-mini", effort: "low" }, standard: { model: "opencode-go/glm-5.2", effort: "medium" }, deep: { model: "qwen-max", effort: "high" } },
+        },
+      },
+      work: {
+        description: "Work profile",
+        hosts: { claude: { light: { model: "claude-haiku", effort: "low" } } },
+      },
+    },
+  },
+  source: {
+    builtin: {},
+    overlay: { profiles: { work: { description: "Custom work profile", hosts: {} } }, hostDefaults: { codex: "work" } },
+    tombstoned: ["old-profile"],
+  },
+  overlayOverrideCount: 2,
+  agents: [
+    { name: "builder", charterTier: "standard" },
+    { name: "reviewer", charterTier: "light" },
+  ],
+};
+
+const NOMENCLATURE_SAMPLE_PROFILES = {
+  hosts: [
+    { host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced", "work"] },
+    { host: "cursor", installed: false, skipped: true, skipReason: "skipped", activeProfile: null, bundleVersion: null, availableProfiles: [] },
+  ],
+};
+
+describe("Models tab nomenclature Scheme A (T9, APUX-07, P2-D AC1)", () => {
+  const switchTabHtml = renderProfilesView(NOMENCLATURE_SAMPLE_PROFILES, NOMENCLATURE_SAMPLE_REGISTRY, { profilesTab: "switch", writeMode: true, unsaved: true, registryForm: null });
+  const catalogTabHtml = renderProfilesView(NOMENCLATURE_SAMPLE_PROFILES, NOMENCLATURE_SAMPLE_REGISTRY, { profilesTab: "registry", writeMode: true, unsaved: true, registryForm: null });
+  const bothTabsHtml = switchTabHtml + catalogTabHtml;
+
+  it('uses "Active Profile" and "Model Catalog" sub-tab labels (Nomenclature Map)', () => {
+    expect(bothTabsHtml).toContain(">Active Profile<");
+    expect(bothTabsHtml).toContain(">Model Catalog<");
+    expect(bothTabsHtml).not.toContain(">Switch Profile<");
+    expect(bothTabsHtml).not.toContain(">Edit Registry<");
+  });
+
+  it('the Model Catalog H2 reads "Model Catalog", not "Model Registry" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain("<h2>Model Catalog</h2>");
+    expect(catalogTabHtml).not.toContain("Model Registry");
+  });
+
+  it('"Default Profile per Tool" replaces "Host Defaults" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain("Default Profile per Tool");
+    expect(catalogTabHtml).not.toContain("Host Defaults");
+  });
+
+  it('"Per-Workflow Tier Overrides" replaces "Workflow Tiers" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain("Per-Workflow Tier Overrides");
+    expect(catalogTabHtml).not.toContain("<h3>Workflow Tiers</h3>");
+    expect(catalogTabHtml).not.toContain("<h4>Workflow Tiers</h4>");
+  });
+
+  it('the "override" badge and override-count sentence replace "overlay" wording (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain(">override<");
+    expect(catalogTabHtml).toContain("You have 2 custom overrides of the built-in defaults.");
+    expect(catalogTabHtml).not.toContain(">overlay<");
+    expect(catalogTabHtml).not.toContain("Overlay is overriding");
+  });
+
+  it('"Discard All Overrides" replaces "Reset to Built-in (clear overlay)" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain(">Discard All Overrides<");
+    expect(catalogTabHtml).not.toContain("Reset to Built-in");
+  });
+
+  it('"Removed Profiles (restorable)" replaces "Deleted (restorable)" (Nomenclature Map)', () => {
+    expect(catalogTabHtml).toContain("Removed Profiles (restorable)");
+    expect(catalogTabHtml).not.toContain("Deleted (restorable)");
+  });
+
+  it('the "Save & Apply" button is present (already Scheme A wording)', () => {
+    expect(catalogTabHtml).toContain("Save &amp; Apply");
+  });
+
+  it('renderModelRegistry alone matches the same Scheme A labels', () => {
+    const html = renderModelRegistry(NOMENCLATURE_SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("<h2>Model Catalog</h2>");
+    expect(html).toContain("Default Profile per Tool");
+    expect(html).toContain("Per-Workflow Tier Overrides");
+    expect(html).toContain("Discard All Overrides");
+    expect(html).toContain("Removed Profiles (restorable)");
+  });
+
+  // ── Negative sensor (P2-D AC1) ──────────────────────────────────────────
+  it('contains no "overlay" in user-visible text (code samples + attributes excepted)', () => {
+    const visible = extractVisibleText(bothTabsHtml);
+    expect(visible.toLowerCase()).not.toContain("overlay");
+  });
+
+  it('contains no "tombstoned" in user-visible text (code samples + attributes excepted)', () => {
+    const visible = extractVisibleText(bothTabsHtml);
+    expect(visible.toLowerCase()).not.toContain("tombstoned");
+  });
+
+  it('contains no "host" in user-visible text (code samples + attributes excepted)', () => {
+    const visible = extractVisibleText(bothTabsHtml);
+    expect(visible.toLowerCase()).not.toContain("host");
+  });
+
+  it("sensor sanity: the raw (unstripped) HTML DOES still carry these words in attributes/classes, proving the strip step is load-bearing", () => {
+    // If this ever goes false, the fixture stopped exercising data-host/
+    // class="tombstoned"/class="overlay-badge" and the negative tests above
+    // would pass vacuously.
+    expect(bothTabsHtml).toContain('data-host="claude"');
+    expect(bothTabsHtml).toContain('class="tombstoned"');
+    expect(bothTabsHtml).toContain('class="badge overlay-badge"');
   });
 });

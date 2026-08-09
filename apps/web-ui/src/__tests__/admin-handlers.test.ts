@@ -421,12 +421,12 @@ const SAMPLE_REGISTRY_DATA = {
   source: { builtin: {}, overlay: null, tombstoned: [] },
 };
 
-describe("renderProfilesView — tab switcher (PROFTAB-01..03, DS-05)", () => {
-  it("renders both tabs (Switch Profile / Edit Registry)", () => {
+describe("renderProfilesView — tab switcher (PROFTAB-01..03, DS-05, T9 nomenclature)", () => {
+  it("renders both tabs (Active Profile / Model Catalog)", () => {
     const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "switch", writeMode: true });
     expect(html).toContain("tab-switcher");
-    expect(html).toContain("Switch Profile");
-    expect(html).toContain("Edit Registry");
+    expect(html).toContain("Active Profile");
+    expect(html).toContain("Model Catalog");
   });
 
   it("renders the switch profile sub-view when tab=switch (PROFTAB-02)", () => {
@@ -438,13 +438,13 @@ describe("renderProfilesView — tab switcher (PROFTAB-01..03, DS-05)", () => {
   it("renders the registry sub-view when tab=registry (PROFTAB-03)", () => {
     const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "registry", writeMode: true });
     expect(html).toContain("registry-grid");
-    expect(html).toContain("Model Registry");
+    expect(html).toContain("Model Catalog");
   });
 
   it("marks the active tab with .active class (DS-05)", () => {
     const html = renderProfilesView(SAMPLE_PROFILES_DATA, SAMPLE_REGISTRY_DATA, { profilesTab: "registry", writeMode: true });
     // the registry tab button should carry the active class
-    const regTabIdx = html.indexOf("Edit Registry");
+    const regTabIdx = html.indexOf("Model Catalog");
     // class attribute precedes the text — search the button element backwards
     const buttonStart = html.lastIndexOf("<button", regTabIdx);
     expect(html.slice(buttonStart, regTabIdx)).toContain("active");
@@ -820,14 +820,14 @@ describe("renderModelRegistry — overlay override count display (APCR-01.10)", 
     source: { overlay: null, tombstoned: [] },
   };
 
-  it("renders a compact override-count line when the count is greater than 0", () => {
+  it("renders a compact override-count line when the count is greater than 0 (T9: Nomenclature Map sentence)", () => {
     const html = renderModelRegistry({ ...minimalRegistry, overlayOverrideCount: 3 }, { writeMode: false });
-    expect(html).toContain("Overlay is overriding 3 entries from the builtin registry.");
+    expect(html).toContain("You have 3 custom overrides of the built-in defaults.");
   });
 
   it("uses singular phrasing for a count of exactly 1", () => {
     const html = renderModelRegistry({ ...minimalRegistry, overlayOverrideCount: 1 }, { writeMode: false });
-    expect(html).toContain("Overlay is overriding 1 entry from the builtin registry.");
+    expect(html).toContain("You have 1 custom override of the built-in defaults.");
   });
 
   it("renders nothing extra when the count is 0 (no overlay, no noise)", () => {
@@ -841,7 +841,7 @@ describe("renderModelRegistry — overlay override count display (APCR-01.10)", 
   });
 });
 
-describe("renderModelRegistry — help guide explains Host Defaults vs. the actually-installed profile", () => {
+describe("renderModelRegistry — help guide explains Default Profile per Tool vs. the actually-installed profile (T9 nomenclature)", () => {
   const minimalRegistry = {
     registry: {
       profiles: { p: { description: "P", hosts: {} } },
@@ -852,11 +852,13 @@ describe("renderModelRegistry — help guide explains Host Defaults vs. the actu
     source: { overlay: null, tombstoned: [] },
   };
 
-  it("adds a Host Defaults dt/dd pair distinguishing it from the currently-installed profile", () => {
+  it("adds a Default Profile per Tool dt/dd pair distinguishing it from the currently-installed profile", () => {
     const html = renderModelRegistry(minimalRegistry, { writeMode: false });
-    expect(html).toContain("<dt>Host Defaults</dt>");
+    expect(html).toContain("<dt>Default Profile per Tool</dt>");
     expect(html.toLowerCase()).toContain("not</strong> the profile currently installed");
-    expect(html).toContain("Switch Profile");
+    expect(html).toContain("Active Profile");
+    expect(html).not.toContain("Host Defaults");
+    expect(html).not.toContain("Switch Profile");
   });
 });
 

@@ -1028,7 +1028,7 @@ export function renderProfiles(data, opts) {
       return (
         '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
         "<h3>" + escapeHtml(hostName) + "</h3>" +
-        '<p class="muted">Installed via marketplace (no per-profile variant directories). To switch profiles, set <code>MASSA_AI_MODEL_PROFILE</code> and run Regenerate Artifacts in Edit Registry.</p>' +
+        '<p class="muted">Installed via marketplace (no per-profile variant directories). To switch profiles, set <code>MASSA_AI_MODEL_PROFILE</code> and use Save &amp; Apply on the Model Catalog tab.</p>' +
         "</div>"
       );
     }
@@ -1262,7 +1262,7 @@ export function renderModelRegistry(data, opts) {
   const tombstoned = source.tombstoned || [];
 
   if (profileNames.length === 0 && !overlayError && !payload._error) {
-    return '<section class="view"><h2>Model Registry</h2><p class="empty">No profiles in registry.</p></section>';
+    return '<section class="view"><h2>Model Catalog</h2><p class="empty">No profiles in registry.</p></section>';
   }
 
   const registryError = payload._error
@@ -1270,7 +1270,7 @@ export function renderModelRegistry(data, opts) {
     : "";
 
   const overlayBanner = overlayError
-    ? '<div class="error">Overlay error: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
+    ? '<div class="error">Saved changes could not be loaded: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
     : "";
 
   // APCR-01.10: the only available mitigation for the AC9 known limitation (a stale
@@ -1279,8 +1279,8 @@ export function renderModelRegistry(data, opts) {
   // override, so an operator with no overlay sees no noise.
   const overlayOverrideCount = typeof payload.overlayOverrideCount === "number" ? payload.overlayOverrideCount : 0;
   const overlayOverrideLine = overlayOverrideCount > 0
-    ? '<p class="registry-override-count muted">Overlay is overriding ' + overlayOverrideCount +
-      " entr" + (overlayOverrideCount === 1 ? "y" : "ies") + " from the builtin registry.</p>"
+    ? '<p class="registry-override-count muted">You have ' + overlayOverrideCount +
+      " custom override" + (overlayOverrideCount === 1 ? "" : "s") + " of the built-in defaults.</p>"
     : "";
 
   // Build rows = {host, tier} pairs
@@ -1294,7 +1294,7 @@ export function renderModelRegistry(data, opts) {
   // Grid header: profile names as columns
   const headerCells = profileNames.map((p) => {
     const isOverlay = Object.prototype.hasOwnProperty.call(overlayProfiles, p);
-    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">overlay</span>' : "";
+    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">override</span>' : "";
     return "<th>" + escapeHtml(p) + overlayMark + "</th>";
   }).join("");
 
@@ -1436,7 +1436,7 @@ export function renderModelRegistry(data, opts) {
     : "";
 
   const tombstonedList = tombstoned.length
-    ? '<div class="tombstoned"><h4>Deleted (restorable)</h4>' +
+    ? '<div class="tombstoned"><h4>Removed Profiles (restorable)</h4>' +
       tombstoned.map((p) => {
         const restoreBtn = writeMode
           ? ' <button type="button" data-action="registry-restore" data-profile="' + escapeHtml(p) + '">Restore</button>'
@@ -1449,7 +1449,7 @@ export function renderModelRegistry(data, opts) {
   const actionButtons = writeMode
     ? '<div class="registry-action-buttons">' +
       '<button type="button" data-action="registry-save-apply">Save &amp; Apply</button>' +
-      '<button type="button" data-action="registry-clear-overlay">Reset to Built-in (clear overlay)</button>' +
+      '<button type="button" data-action="registry-clear-overlay">Discard All Overrides</button>' +
       "</div>"
     : "";
 
@@ -1457,29 +1457,29 @@ export function renderModelRegistry(data, opts) {
     '<div class="registry-help-body">' +
     '<h4>Button Guide</h4>' +
     '<dl>' +
-    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. The new profile starts with null model/effort cells for all hosts and tiers.</dd>' +
+    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. The new profile starts with null model/effort cells for all tools and tiers.</dd>' +
     '<dt>Duplicate Profile</dt><dd>Copies an existing profile (you choose which) to a new name. Useful for creating a variant of an existing profile without re-entering all cells.</dd>' +
-    '<dt>Delete Profile</dt><dd>Removes a profile from the overlay. If the profile exists in the builtin registry, it is tombstoned (restorable via the Deleted section). If it is overlay-only, it is removed entirely.</dd>' +
-    '<dt>Save &amp; Apply</dt><dd>Persists all unsaved overlay changes (profile cells, host defaults, workflow tiers, per-agent tier overrides, add/duplicate/delete) to <code>~/.config/massa-ai/model-profiles.json</code>, then regenerates and installs the agent files for every host. Asks for confirmation before running. The builtin registry is never modified.</dd>' +
-    '<dt>Reset to Built-in (clear overlay)</dt><dd>Deletes the user overlay file, reverting to the builtin registry. Asks for confirmation. All overlay-only profiles, cell overrides, host default changes, and workflow tiers are lost. Tombstoned profiles are restored.</dd>' +
+    '<dt>Delete Profile</dt><dd>Removes a profile. If the profile exists in the builtin registry, it is marked removed (restorable via the Removed Profiles section). If it was added locally (not part of the built-in set), it is removed entirely.</dd>' +
+    '<dt>Save &amp; Apply</dt><dd>Persists all your unsaved changes (profile cells, default profiles per tool, per-workflow tier overrides, per-agent tier overrides, add/duplicate/delete) to <code>~/.config/massa-ai/model-profiles.json</code>, then regenerates and installs the agent files for every tool. Asks for confirmation before running. The builtin registry is never modified.</dd>' +
+    '<dt>Discard All Overrides</dt><dd>Deletes your saved changes, reverting to the builtin registry. Asks for confirmation. All profiles you added, cell overrides, default-profile changes, and workflow-tier overrides are lost. Removed profiles are restored.</dd>' +
     '</dl>' +
-    '<h4>Workflow Tiers</h4>' +
-    '<p>The Workflow Tiers section maps a workflow name to a tier, overriding the charter default for agents dispatched under that workflow. The builtin registry ships with no workflow tier overrides. Add one (e.g., <code>spec-driven &rarr; deep</code>) to pin a heavier model tier for a specific workflow.</p>' +
-    '<h4>Host Defaults</h4>' +
+    '<h4>Per-Workflow Tier Overrides</h4>' +
+    '<p>The Per-Workflow Tier Overrides section maps a workflow name to a tier, overriding the charter default for agents dispatched under that workflow. The builtin registry ships with no workflow tier overrides. Add one (e.g., <code>spec-driven &rarr; deep</code>) to pin a heavier model tier for a specific workflow.</p>' +
+    '<h4>Default Profile per Tool</h4>' +
     '<dl>' +
-    '<dt>Host Defaults</dt><dd>The registry\'s declared default profile per host, used only the first time that host is auto-installed (it has no recorded active profile yet). It is <strong>not</strong> the profile currently installed on this machine — a host can be running any profile you switched it to, regardless of what Host Defaults reads here. See the "Switch Profile" tab to view each host\'s actual active profile and to change it.</dd>' +
+    '<dt>Default Profile per Tool</dt><dd>The registry\'s declared default profile per tool, used only the first time that tool is auto-installed (it has no recorded active profile yet). It is <strong>not</strong> the profile currently installed on this machine — a tool can be running any profile you switched it to, regardless of what Default Profile per Tool reads here. See the "Active Profile" tab to view each tool\'s actual active profile and to change it.</dd>' +
     '</dl>' +
     '</div>' +
     '</details>';
 
   return (
-    '<section class="view"><h2>Model Registry</h2>' + unsaved +
+    '<section class="view"><h2>Model Catalog</h2>' + unsaved +
     registryError +
     overlayBanner +
     overlayOverrideLine +
     grid +
-    '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
-    '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + addWorkflowTierBtn + "</div>" +
+    '<div class="registry-hostDefaults"><h3>Default Profile per Tool</h3>' + hostDefaultsRows + "</div>" +
+    '<div class="registry-workflowTiers"><h3>Per-Workflow Tier Overrides</h3>' + workflowTiersRows + addWorkflowTierBtn + "</div>" +
     agentTierSection +
     profileActions +
     tombstonedList +
@@ -1719,8 +1719,8 @@ export function renderProfilesView(profilesData, registryData, opts) {
 
   const switcher =
     '<div class="tab-switcher">' +
-    '<button type="button" class="tab' + (tab === "switch" ? " active" : "") + '" data-action="profiles-tab" data-tab="switch">Switch Profile</button>' +
-    '<button type="button" class="tab' + (tab === "registry" ? " active" : "") + '" data-action="profiles-tab" data-tab="registry">Edit Registry</button>' +
+    '<button type="button" class="tab' + (tab === "switch" ? " active" : "") + '" data-action="profiles-tab" data-tab="switch">Active Profile</button>' +
+    '<button type="button" class="tab' + (tab === "registry" ? " active" : "") + '" data-action="profiles-tab" data-tab="registry">Model Catalog</button>' +
     "</div>";
 
   let body;

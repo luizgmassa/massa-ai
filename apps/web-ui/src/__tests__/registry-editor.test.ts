@@ -261,9 +261,10 @@ describe("renderModelRegistry — profile management (REG-04..07)", () => {
     expect(html).not.toContain('data-action="registry-delete-profile"');
   });
 
-  it("renders tombstoned profiles in a restorable list (REG-06, REG-07)", () => {
+  it("renders tombstoned profiles in a restorable list (REG-06, REG-07, T9: Removed Profiles nomenclature)", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("Deleted (restorable)");
+    expect(html).toContain("Removed Profiles (restorable)");
+    expect(html).not.toContain("Deleted (restorable)");
     expect(html).toContain("old-profile");
     expect(html).toContain('data-action="registry-restore"');
     expect(html).toContain('data-profile="old-profile"');
@@ -275,18 +276,20 @@ describe("renderModelRegistry — profile management (REG-04..07)", () => {
   });
 });
 
-describe("renderModelRegistry — hostDefaults + workflowTiers (REG-08, REG-09)", () => {
-  it("renders hostDefaults editor with per-host selects", () => {
+describe("renderModelRegistry — hostDefaults + workflowTiers (REG-08, REG-09, T9 nomenclature)", () => {
+  it("renders hostDefaults editor with per-host selects, labeled Default Profile per Tool", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("Host Defaults");
+    expect(html).toContain("Default Profile per Tool");
+    expect(html).not.toContain("Host Defaults");
     expect(html).toContain('data-action="registry-hostDefault"');
     expect(html).toContain('data-host="claude"');
     expect(html).toContain('data-host="codex"');
   });
 
-  it("renders workflowTiers editor with per-workflow selects", () => {
+  it("renders workflowTiers editor with per-workflow selects, labeled Per-Workflow Tier Overrides", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("Workflow Tiers");
+    expect(html).toContain("Per-Workflow Tier Overrides");
+    expect(html).not.toContain("<h3>Workflow Tiers</h3>");
     expect(html).toContain('data-action="registry-workflowTier"');
     expect(html).toContain('data-workflow="search"');
     expect(html).toContain('data-workflow="index"');
@@ -320,9 +323,9 @@ describe("renderModelRegistry — hostDefaults + workflowTiers (REG-08, REG-09)"
 });
 
 describe("renderModelRegistry — Per-Agent Tier Overrides table (T6, APUX-04, P1-A AC7-AC8)", () => {
-  it("renders the section heading after Workflow Tiers", () => {
+  it("renders the section heading after Per-Workflow Tier Overrides (T9 nomenclature)", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const workflowIdx = html.indexOf("<h3>Workflow Tiers</h3>");
+    const workflowIdx = html.indexOf("<h3>Per-Workflow Tier Overrides</h3>");
     const agentIdx = html.indexOf("<h3>Per-Agent Tier Overrides</h3>");
     expect(workflowIdx).toBeGreaterThan(-1);
     expect(agentIdx).toBeGreaterThan(workflowIdx);
@@ -398,10 +401,11 @@ describe("renderModelRegistry — action buttons (T8, APUX-13, REG-14, REG-15, P
     expect(html).not.toContain('data-action="registry-regenerate"');
   });
 
-  it("renders clear-overlay button when write mode on (REG-14, REG-15)", () => {
+  it("renders clear-overlay button when write mode on, labeled Discard All Overrides (REG-14, REG-15, T9 nomenclature)", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain('data-action="registry-clear-overlay"');
-    expect(html).toContain("Reset to Built-in");
+    expect(html).toContain("Discard All Overrides");
+    expect(html).not.toContain("Reset to Built-in");
   });
 
   it("hides all action buttons when write mode off", () => {
@@ -413,14 +417,15 @@ describe("renderModelRegistry — action buttons (T8, APUX-13, REG-14, REG-15, P
   });
 });
 
-describe("renderModelRegistry — overlay error + empty state (REG-16)", () => {
-  it("shows overlay error banner when overlayError present", () => {
+describe("renderModelRegistry — overlay error + empty state (REG-16, T9 nomenclature)", () => {
+  it("shows a load-error banner when overlayError present, without saying 'overlay'", () => {
     const html = renderModelRegistry({
       registry: SAMPLE_REGISTRY.registry,
       source: { overlay: null, tombstoned: [] },
       overlayError: "corrupted JSON",
     }, { writeMode: true });
-    expect(html).toContain("Overlay error");
+    expect(html).toContain("Saved changes could not be loaded");
+    expect(html).not.toContain("Overlay error");
     expect(html).toContain("corrupted JSON");
     expect(html).toContain("showing builtin");
   });
@@ -478,15 +483,16 @@ describe("renderModelRegistry — help section (REG-01, T8)", () => {
     expect(html).toContain("<summary>?</summary>");
   });
 
-  it("explains every current action button (T8: Save & Apply replaces Save Overlay + Regenerate Artifacts)", () => {
+  it("explains every current action button (T8: Save & Apply replaces Save Overlay + Regenerate Artifacts; T9: Discard All Overrides)", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("Add Profile");
     expect(html).toContain("Duplicate Profile");
     expect(html).toContain("Delete Profile");
     expect(html).toContain("Save &amp; Apply");
-    expect(html).toContain("Reset to Built-in");
+    expect(html).toContain("Discard All Overrides");
     expect(html).not.toContain("Save Overlay");
     expect(html).not.toContain("Regenerate Artifacts");
+    expect(html).not.toContain("Reset to Built-in");
   });
 
   it("help section appears after action buttons", () => {
@@ -700,5 +706,60 @@ describe("no-prompt/no-alert structural sensor — Models tab (T7, P2-D AC6)", (
     // Proves the sensor is scoped to specific function spans, not a whole-file
     // scan that would trivially also "pass" a repo with no prompt() anywhere.
     expect(APP_JS_SOURCE).toContain('prompt("Edit memory content:", "")');
+  });
+});
+
+// ── T9 (APUX-07, P2-D AC1): Nomenclature Map, row-by-row on renderModelRegistry ─
+
+describe("renderModelRegistry — Nomenclature Scheme A per-row assertions (T9, APUX-07)", () => {
+  const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: null });
+
+  it('H2 "Model Registry" -> "Model Catalog"', () => {
+    expect(html).toContain("<h2>Model Catalog</h2>");
+    expect(html).not.toContain("Model Registry");
+  });
+
+  it('"Host Defaults" -> "Default Profile per Tool"', () => {
+    expect(html).toContain("<h3>Default Profile per Tool</h3>");
+    expect(html).not.toContain("Host Defaults");
+  });
+
+  it('"Workflow Tiers" -> "Per-Workflow Tier Overrides"', () => {
+    expect(html).toContain("<h3>Per-Workflow Tier Overrides</h3>");
+    expect(html).not.toContain("<h3>Workflow Tiers</h3>");
+  });
+
+  it('"Per-Agent Tier Overrides" section is present (new section row)', () => {
+    expect(html).toContain("<h3>Per-Agent Tier Overrides</h3>");
+  });
+
+  it('"overlay" badge / count sentence -> "override" badge / new sentence', () => {
+    expect(html).toContain(">override<");
+    expect(html).not.toContain(">overlay<");
+  });
+
+  it('"Save Overlay" + "Regenerate Artifacts" -> single "Save & Apply"', () => {
+    expect(html).toContain("Save &amp; Apply");
+    expect(html).not.toContain("Save Overlay");
+    expect(html).not.toContain("Regenerate Artifacts");
+  });
+
+  it('"Reset to Built-in (clear overlay)" -> "Discard All Overrides"', () => {
+    expect(html).toContain("Discard All Overrides");
+    expect(html).not.toContain("Reset to Built-in");
+  });
+
+  it('"Deleted (restorable)" -> "Removed Profiles (restorable)"', () => {
+    expect(html).toContain("Removed Profiles (restorable)");
+    expect(html).not.toContain("Deleted (restorable)");
+  });
+
+  it("data-action values, state keys and registry JSON keys keep their internal names (only user-visible text changed)", () => {
+    expect(html).toContain('data-action="registry-hostDefault"');
+    expect(html).toContain('data-action="registry-workflowTier"');
+    expect(html).toContain('data-action="registry-clear-overlay"');
+    expect(html).toContain('data-action="registry-save-apply"');
+    expect(html).toContain('class="registry-hostDefaults"');
+    expect(html).toContain('class="registry-workflowTiers"');
   });
 });
