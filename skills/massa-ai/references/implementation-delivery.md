@@ -20,6 +20,7 @@ human chose to merge it".
 | --- | --- | --- | --- |
 | 0 | Preflight | `git rev-parse --is-inside-work-tree`; `command -v gh`; `gh auth status` | Record which capabilities are absent and select the degraded path below |
 | 1 | Isolate | `git fetch origin <base> && git worktree add -b <type>/<slug> <path> origin/<base>` | Branch name taken → suffix `-2`. Worktree path taken → reuse it only if its branch matches |
+| 1.5 | Summarize | present the pre-implementation change summary (see Stage 1.5) | Summary presented with the delivery-authorization ask; work does not start before it |
 | 2 | Implement | one task → gate → `git commit` | Gate red → fix before committing. Never commit through a failing gate |
 | 3 | Push | `git push -u origin <type>/<slug>` | Rejected non-fast-forward → `git fetch` + rebase, never force-push a shared branch |
 | 3.5 | Deliver specs | `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` | Non-zero → commit the missing `.specs/` updates (a `docs(specs):`-type commit is normal), push, re-run. Defensive fallback — should not fire when the close-out task already committed `.specs/` before the first push |
@@ -73,6 +74,36 @@ Each Task inside the phase is then one atomic commit on that branch, prefixed
 with its own sub-task key — the commit contract is owned by
 `workflows/commit.md`; do not restate it here. Non-phased work keeps the
 `<type>/<slug>` branch shape unchanged.
+
+### Stage 1.5 — summarize before you touch the tree
+
+Before the first implementation mutation, present one compact summary of the
+changes about to be made. Source it from the approved spec/design/tasks
+artifacts when they exist; otherwise from the plan or the conversation's
+logical work items. A single-item summary is valid — this stage applies to
+Quick mode too, not only spec-driven work.
+
+Format: one list, separated by tasks — `- T01`-style items with `--`
+sub-items, each a medium-length phrase, clear, direct, and objective. For
+example:
+
+```md
+- T01
+-- Button will be renamed to XXX
+-- Field YYY will be dropped
+-- Business rule ZZZ will be changed to WWW
+
+- T02
+-- New feature AAA will be implemented
+-- Backend behavior BBB will be implemented
+-- Frontend behavior CCC will be tied to that backend behavior BBB
+```
+
+**Anchor:** the summary is presented together with the feature's
+delivery-authorization ask (Stage 3, obtained before implementation begins) —
+it is not a new standalone gate and never adds a second prompt. Workflows
+with their own pre-implementation pause (e.g. spec-driven's sub-agent offer)
+attach the summary to that pause rather than inventing a separate one.
 
 ### Stage 2 — one commit per task
 
