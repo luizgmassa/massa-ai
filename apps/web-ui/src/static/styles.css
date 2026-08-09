@@ -543,6 +543,45 @@ pre code {
   cursor: pointer;
   font-size: 0.85rem;
 }
+/* T7 (APUX-12, D-4.4): inline dropdown forms replacing prompt() popups. */
+.registry-inline-form {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  margin: 0.4rem 0 0.75rem;
+  max-width: 28rem;
+}
+.registry-inline-form label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  margin-bottom: 0.4rem;
+}
+.registry-inline-form input,
+.registry-inline-form select {
+  display: block;
+  width: 100%;
+  margin-top: 0.2rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+}
+.form-error {
+  color: var(--error-fg);
+  font-size: 0.82rem;
+  margin: 0 0 0.5rem;
+}
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
 .registry-hostDefaults,
 .registry-workflowTiers {
   background: var(--bg-panel);

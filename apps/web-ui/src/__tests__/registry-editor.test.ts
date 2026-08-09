@@ -1,9 +1,11 @@
 import { describe, it, expect } from "bun:test";
+import fs from "fs";
+import path from "path";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
 const { renderModelRegistry, splitModelId, joinModelId } = { ...mod, ...UI } as {
-  renderModelRegistry: (data: unknown, opts?: { writeMode?: boolean }) => string;
+  renderModelRegistry: (data: unknown, opts?: { writeMode?: boolean; registryForm?: { kind: string; error: string | null } | null }) => string;
   splitModelId: (model: string | null | undefined) => { provider: string; model: string };
   joinModelId: (provider: string | null | undefined, model: string | null | undefined) => string | null;
 };
@@ -501,5 +503,204 @@ describe("renderModelRegistry — help section (REG-01)", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
     expect(html).toContain("<details");
     expect(html).toContain("Button Guide");
+  });
+});
+
+describe("renderModelRegistry — inline dropdown forms replace prompt() (T7, APUX-12, D-4.4, P2-D AC2-AC6)", () => {
+  it("renders no inline form when registryForm is absent", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).not.toContain('class="registry-inline-form');
+  });
+
+  it("add-workflow: renders a workflow + tier select excluding already-overridden workflows", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
+    expect(html).toContain('data-action="registry-form-workflow"');
+    expect(html).toContain('data-action="registry-form-tier"');
+    // search/index/audit already have overrides in SAMPLE_REGISTRY.workflowTiers.
+    const formStart = html.indexOf('data-action="registry-form-workflow"');
+    const formEnd = html.indexOf("</select>", formStart);
+    const workflowOptions = html.slice(formStart, formEnd);
+    expect(workflowOptions).not.toContain('value="search"');
+    expect(workflowOptions).not.toContain('value="index"');
+    expect(workflowOptions).not.toContain('value="audit"');
+    expect(workflowOptions).toContain('value="debug"');
+    expect(html).toContain('data-action="registry-form-submit">Add</button>');
+    expect(html).toContain('data-action="registry-form-cancel">Cancel</button>');
+  });
+
+  it("add-workflow: renders a muted notice instead of the form when every stem is taken", () => {
+    const allTaken: Record<string, string> = {};
+    for (const stem of [
+      "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
+      "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
+      "discovery", "exploration", "feature", "furps-refinement", "general",
+      "implementation-audit", "implementation-fix", "judge-with-debate",
+      "long-session", "maestro", "maestro-audit", "maestro-fix",
+      "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
+      "refactor", "requirements-audit", "requirements-fix", "rfc",
+      "security-audit", "security-fix", "skill-architect", "spec-driven",
+      "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
+    ]) {
+      allTaken[stem] = "standard";
+    }
+    const registryAllTaken = {
+      ...SAMPLE_REGISTRY,
+      registry: { ...SAMPLE_REGISTRY.registry, workflowTiers: allTaken },
+    };
+    const html = renderModelRegistry(registryAllTaken, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
+    expect(html).not.toContain('data-action="registry-form-workflow"');
+    expect(html).toContain("already has a tier override");
+    expect(html).toContain('data-action="registry-form-cancel"');
+  });
+
+  it("add-workflow: renders the inline .form-error instead of alert() when the form carries an error", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-workflow", error: 'Workflow "search" already has a tier. Edit it instead.' } });
+    expect(html).toContain('class="form-error"');
+    expect(html).toContain("already has a tier");
+  });
+
+  it("duplicate-profile: renders a source-profile select from the display registry + a new-name input", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "duplicate-profile", error: null } });
+    expect(html).toContain('data-action="registry-form-source"');
+    expect(html).toContain('value="balanced"');
+    expect(html).toContain('value="work"');
+    expect(html).toContain('data-action="registry-form-new-name"');
+    expect(html).toContain('data-action="registry-form-submit">Duplicate</button>');
+  });
+
+  it("duplicate-profile: renders a muted notice when there are no profiles to duplicate", () => {
+    // profileNames.length === 0 alone hits the page's own top-level "No profiles in
+    // registry" empty state before reaching profileActions at all; carrying an
+    // unrelated _error keeps the rest of the page (and this notice) reachable.
+    const empty = { registry: { profiles: {}, tiers: ["light"] }, source: {}, _error: "unrelated" };
+    const html = renderModelRegistry(empty, { writeMode: true, registryForm: { kind: "duplicate-profile", error: null } });
+    expect(html).not.toContain('data-action="registry-form-source"');
+    expect(html).toContain("No profiles available to duplicate");
+  });
+
+  it("delete-profile: renders a profile select from the display registry", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "delete-profile", error: null } });
+    expect(html).toContain('data-action="registry-form-profile"');
+    expect(html).toContain('value="balanced"');
+    expect(html).toContain('value="work"');
+    expect(html).toContain('data-action="registry-form-submit">Delete</button>');
+  });
+
+  it("add-profile: renders name + description inputs, both hinted", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-profile", error: null } });
+    expect(html).toContain('data-action="registry-form-name"');
+    expect(html).toContain('data-action="registry-form-description"');
+    const nameStart = html.indexOf('data-action="registry-form-name"');
+    const nameEnd = html.indexOf("/>", nameStart);
+    expect(html.slice(nameStart, nameEnd)).toContain("placeholder=");
+    expect(html.slice(nameStart, nameEnd)).toContain("title=");
+    expect(html).toContain('data-action="registry-form-submit">Add</button>');
+  });
+
+  it("renders only the form matching the open kind, not the others", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-profile", error: null } });
+    expect(html).toContain('data-action="registry-form-name"');
+    expect(html).not.toContain('data-action="registry-form-source"');
+    expect(html).not.toContain('data-action="registry-form-profile"');
+    expect(html).not.toContain('data-action="registry-form-workflow"');
+  });
+
+  it("renders no inline form in read mode even when registryForm is set", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false, registryForm: { kind: "add-profile", error: null } });
+    expect(html).not.toContain('class="registry-inline-form');
+  });
+});
+
+// ── Structural no-prompt sensor (T7, P2-D AC6, advisory finding #4) ─────────
+// Scans only the source SPANS of handleRegistry* functions and
+// renderModelRegistry/renderProfilesView for `prompt(`/`alert(` — never a
+// whole-file scan, so the (out-of-scope) Memory tab prompt() at a different
+// function is never a false positive here.
+
+const APP_JS_SOURCE = fs.readFileSync(path.join(import.meta.dir, "..", "static", "app.js"), "utf8");
+
+/** Extracts the full source text of every top-level `function name(...)  { ... }`
+ *  declaration (optionally `export`/`async`) whose name matches `namePattern`,
+ *  using a small brace-depth lexer that ignores braces inside string/template
+ *  literals and comments so it never mis-closes on `"{" `/`"}"` inside a
+ *  rendered HTML string. */
+function extractFunctionSpans(source: string, namePattern: RegExp): { name: string; span: string }[] {
+  const spans: { name: string; span: string }[] = [];
+  const declRe = /(export\s+)?(async\s+)?function\s+(\w+)\s*\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = declRe.exec(source))) {
+    const name = m[3];
+    if (!namePattern.test(name)) continue;
+    // Walk past the parameter list (balance parens) to find the body's opening brace.
+    let i = declRe.lastIndex;
+    let parenDepth = 1;
+    while (parenDepth > 0 && i < source.length) {
+      if (source[i] === "(") parenDepth++;
+      else if (source[i] === ")") parenDepth--;
+      i++;
+    }
+    while (i < source.length && source[i] !== "{") i++;
+    let braceDepth = 0;
+    let state: "normal" | "sq" | "dq" | "tpl" | "line" | "block" = "normal";
+    let j = i;
+    for (; j < source.length; j++) {
+      const c = source[j];
+      const prev = source[j - 1];
+      if (state === "normal") {
+        if (c === "'") state = "sq";
+        else if (c === '"') state = "dq";
+        else if (c === "`") state = "tpl";
+        else if (c === "/" && source[j + 1] === "/") state = "line";
+        else if (c === "/" && source[j + 1] === "*") state = "block";
+        else if (c === "{") braceDepth++;
+        else if (c === "}") {
+          braceDepth--;
+          if (braceDepth === 0) { j++; break; }
+        }
+      } else if (state === "sq") {
+        if (c === "'" && prev !== "\\") state = "normal";
+      } else if (state === "dq") {
+        if (c === '"' && prev !== "\\") state = "normal";
+      } else if (state === "tpl") {
+        if (c === "`" && prev !== "\\") state = "normal";
+      } else if (state === "line") {
+        if (c === "\n") state = "normal";
+      } else if (state === "block") {
+        if (c === "*" && source[j + 1] === "/") { state = "normal"; j++; }
+      }
+    }
+    spans.push({ name, span: source.slice(m.index, j) });
+  }
+  return spans;
+}
+
+describe("no-prompt/no-alert structural sensor — Models tab (T7, P2-D AC6)", () => {
+  const targetSpans = extractFunctionSpans(APP_JS_SOURCE, /^(handleRegistry\w+|renderModelRegistry|renderProfilesView)$/);
+
+  it("finds at least the known Models-tab handler + renderer functions (sensor sanity — a 0-span result proves nothing)", () => {
+    const names = targetSpans.map((s) => s.name);
+    expect(names).toContain("renderModelRegistry");
+    expect(names).toContain("renderProfilesView");
+    expect(names).toContain("handleRegistryAddProfile");
+    expect(names).toContain("handleRegistryDuplicateProfile");
+    expect(names).toContain("handleRegistryDeleteProfile");
+    expect(names).toContain("handleRegistryWorkflowTierAdd");
+    expect(targetSpans.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("contains zero prompt( calls across every handleRegistry*/renderModelRegistry/renderProfilesView span", () => {
+    const offenders = targetSpans.filter((s) => s.span.includes("prompt("));
+    expect(offenders.map((o) => o.name)).toEqual([]);
+  });
+
+  it("contains zero alert( calls across every handleRegistry*/renderModelRegistry/renderProfilesView span", () => {
+    const offenders = targetSpans.filter((s) => s.span.includes("alert("));
+    expect(offenders.map((o) => o.name)).toEqual([]);
+  });
+
+  it("the Memory tab's unrelated prompt() (out of scope for this sensor) still exists in the file", () => {
+    // Proves the sensor is scoped to specific function spans, not a whole-file
+    // scan that would trivially also "pass" a repo with no prompt() anywhere.
+    expect(APP_JS_SOURCE).toContain('prompt("Edit memory content:", "")');
   });
 });

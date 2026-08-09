@@ -1141,6 +1141,102 @@ const WORKFLOW_STEMS = [
   "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
 ];
 
+// ── Registry inline forms (design D-4.4, APUX-12, P2-D AC2-AC6) ────────────
+// Replaces the old prompt()/alert() flows for Add Workflow Override, Duplicate
+// Profile, Delete Profile and Add Profile. state.registryForm tracks which
+// form (if any) is open: null | { kind, error }. The renderer emits the open
+// form's markup under its trigger button row; wireViewHandlers reads the
+// rendered field values on submit and dispatches to the same-named handler.
+
+/** Renders the inline `.form-error` line when the current form carries a
+ *  validation error (duplicate name, unknown workflow, etc.) — replaces
+ *  `alert()` for these flows. */
+function renderRegistryFormError(formState) {
+  return formState && formState.error
+    ? '<p class="form-error">' + escapeHtml(formState.error) + "</p>"
+    : "";
+}
+
+function renderAddWorkflowForm(formState, existingWorkflows, tiers) {
+  const available = WORKFLOW_STEMS.filter((s) => !existingWorkflows.includes(s));
+  if (available.length === 0) {
+    return (
+      '<div class="registry-inline-form">' +
+      '<p class="muted">Every known workflow already has a tier override. Remove one first to add another.</p>' +
+      '<div class="button-row"><button type="button" data-action="registry-form-cancel">Cancel</button></div>' +
+      "</div>"
+    );
+  }
+  const workflowOptions = available.map((s) => '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + "</option>").join("");
+  const tierOptions = tiers.map((t) => '<option value="' + escapeHtml(t) + '">' + escapeHtml(capitalizeLabel(t)) + "</option>").join("");
+  return (
+    '<div class="registry-inline-form form-field">' +
+    renderRegistryFormError(formState) +
+    '<label>Workflow<select data-action="registry-form-workflow" title="Pick a workflow that does not yet have a tier override">' + workflowOptions + "</select></label>" +
+    '<label>Tier<select data-action="registry-form-tier" title="The tier to pin this workflow to">' + tierOptions + "</select></label>" +
+    '<div class="button-row">' +
+    '<button type="button" data-action="registry-form-submit">Add</button>' +
+    '<button type="button" data-action="registry-form-cancel">Cancel</button>' +
+    "</div></div>"
+  );
+}
+
+function renderDuplicateProfileForm(formState, profileNames) {
+  if (profileNames.length === 0) {
+    return (
+      '<div class="registry-inline-form">' +
+      '<p class="muted">No profiles available to duplicate. Add a profile first.</p>' +
+      '<div class="button-row"><button type="button" data-action="registry-form-cancel">Cancel</button></div>' +
+      "</div>"
+    );
+  }
+  const profileOptions = profileNames.map((p) => '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + "</option>").join("");
+  return (
+    '<div class="registry-inline-form form-field">' +
+    renderRegistryFormError(formState) +
+    '<label>Source Profile<select data-action="registry-form-source" title="The profile to copy">' + profileOptions + "</select></label>" +
+    '<label>New Name<input type="text" data-action="registry-form-new-name" placeholder="e.g. work-variant" title="A new, unused profile name" /></label>' +
+    '<div class="button-row">' +
+    '<button type="button" data-action="registry-form-submit">Duplicate</button>' +
+    '<button type="button" data-action="registry-form-cancel">Cancel</button>' +
+    "</div></div>"
+  );
+}
+
+function renderDeleteProfileForm(formState, profileNames) {
+  if (profileNames.length === 0) {
+    return (
+      '<div class="registry-inline-form">' +
+      '<p class="muted">No profiles available to delete.</p>' +
+      '<div class="button-row"><button type="button" data-action="registry-form-cancel">Cancel</button></div>' +
+      "</div>"
+    );
+  }
+  const profileOptions = profileNames.map((p) => '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + "</option>").join("");
+  return (
+    '<div class="registry-inline-form form-field">' +
+    renderRegistryFormError(formState) +
+    '<label>Profile<select data-action="registry-form-profile" title="The profile to delete">' + profileOptions + "</select></label>" +
+    '<div class="button-row">' +
+    '<button type="button" data-action="registry-form-submit">Delete</button>' +
+    '<button type="button" data-action="registry-form-cancel">Cancel</button>' +
+    "</div></div>"
+  );
+}
+
+function renderAddProfileForm(formState) {
+  return (
+    '<div class="registry-inline-form form-field">' +
+    renderRegistryFormError(formState) +
+    '<label>Name<input type="text" data-action="registry-form-name" placeholder="e.g. work-variant" title="A new, unused profile name" /></label>' +
+    '<label>Description<input type="text" data-action="registry-form-description" placeholder="optional — defaults to the name" title="Optional profile description" /></label>' +
+    '<div class="button-row">' +
+    '<button type="button" data-action="registry-form-submit">Add</button>' +
+    '<button type="button" data-action="registry-form-cancel">Cancel</button>' +
+    "</div></div>"
+  );
+}
+
 /**
  * Model-registry editor renderer. Renders a grid (rows = {host, tier} pairs,
  * columns = profiles, cells = {model, effort}). Marks overlay-sourced cells.
@@ -1155,6 +1251,7 @@ export function renderModelRegistry(data, opts) {
   const overlayError = payload.overlayError;
   const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
   const unsaved = opts && opts.unsaved ? ' <span class="badge" style="background:rgba(245,158,11,0.15);color:#92400e;">unsaved changes</span>' : "";
+  const registryFormState = (opts && opts.registryForm) || null;
 
   const profiles = registry.profiles || {};
   const profileNames = Object.keys(profiles);
@@ -1282,7 +1379,8 @@ export function renderModelRegistry(data, opts) {
   }).join("");
 
   const addWorkflowTierBtn = writeMode
-    ? '<div class="registry-actions"><button type="button" data-action="registry-workflowTier-add">Add Workflow Tier</button></div>'
+    ? '<div class="registry-actions"><button type="button" data-action="registry-workflowTier-add">Add Workflow Tier</button></div>' +
+      (registryFormState && registryFormState.kind === "add-workflow" ? renderAddWorkflowForm(registryFormState, workflowTierNames, tiers) : "")
     : "";
 
   // Per-Agent Tier Overrides table (design D-4.3, APUX-04, P1-A AC7-AC8). Data
@@ -1331,7 +1429,10 @@ export function renderModelRegistry(data, opts) {
       '<button type="button" data-action="registry-add-profile">Add Profile</button>' +
       '<button type="button" data-action="registry-duplicate-profile">Duplicate Profile</button>' +
       '<button type="button" data-action="registry-delete-profile">Delete Profile</button>' +
-      "</div>"
+      "</div>" +
+      (registryFormState && registryFormState.kind === "add-profile" ? renderAddProfileForm(registryFormState) : "") +
+      (registryFormState && registryFormState.kind === "duplicate-profile" ? renderDuplicateProfileForm(registryFormState, profileNames) : "") +
+      (registryFormState && registryFormState.kind === "delete-profile" ? renderDeleteProfileForm(registryFormState, profileNames) : "")
     : "";
 
   const tombstonedList = tombstoned.length
@@ -1622,7 +1723,7 @@ export function renderProfilesView(profilesData, registryData, opts) {
 
   let body;
   if (tab === "registry") {
-    body = renderModelRegistry(registryData, { writeMode, unsaved: opts.unsaved });
+    body = renderModelRegistry(registryData, { writeMode, unsaved: opts.unsaved, registryForm: opts.registryForm });
   } else {
     body = renderProfiles(profilesData, { writeMode });
   }
@@ -1843,31 +1944,47 @@ export function handleRegistryWorkflowTierEdit(ctx, workflow, value) {
   ctx.state.registryDirty = true;
 }
 
-export function handleRegistryWorkflowTierAdd(ctx) {
-  const existing = (ctx.state.registryOverlay && ctx.state.registryOverlay.workflowTiers) || {};
-  const available = WORKFLOW_STEMS.filter((s) => !Object.prototype.hasOwnProperty.call(existing, s));
-  if (available.length === 0) {
-    alert("All known workflow stems already have a tier. Remove one first or enter a custom name.");
-    return;
+/** Opens/closes an inline registry form (design D-4.4). Clicking a trigger
+ *  button whose form is already open closes it; clicking a different
+ *  trigger switches forms. Replaces the old direct prompt()-driven handlers
+ *  as the click target for Add Workflow Override / Add Profile / Duplicate
+ *  Profile / Delete Profile. */
+export function handleRegistryFormToggle(ctx, kind) {
+  if (ctx.state.registryForm && ctx.state.registryForm.kind === kind) {
+    ctx.state.registryForm = null;
+  } else {
+    ctx.state.registryForm = { kind, error: null };
   }
-  const name = prompt("Workflow name (pick from the list or type a custom name):\n\nAvailable: " + available.join(", "));
-  if (!name || !name.trim()) return;
-  const wf = name.trim();
+  ctx.render();
+}
+
+/** Closes the currently open inline registry form without applying it. */
+export function handleRegistryFormCancel(ctx) {
+  ctx.state.registryForm = null;
+  ctx.render();
+}
+
+export function handleRegistryWorkflowTierAdd(ctx, workflow, tier) {
+  const existing = (ctx.state.registryOverlay && ctx.state.registryOverlay.workflowTiers) || {};
+  if (!workflow || !workflow.trim()) return;
+  const wf = workflow.trim();
   if (Object.prototype.hasOwnProperty.call(existing, wf)) {
-    alert('Workflow "' + wf + '" already has a tier. Edit it instead.');
+    ctx.state.registryForm = { kind: "add-workflow", error: 'Workflow "' + wf + '" already has a tier. Edit it instead.' };
+    ctx.render();
     return;
   }
   const tiers = (ctx.state.registryOverlay && ctx.state.registryOverlay.tiers) || ["light", "standard", "deep"];
-  const tier = prompt("Tier (one of: " + tiers.join(", ") + "):");
-  if (!tier || !tier.trim()) return;
-  if (!tiers.includes(tier.trim())) {
-    alert('Tier "' + tier.trim() + '" is not one of ' + tiers.join(", ") + ".");
+  const trimmedTier = (tier || "").trim();
+  if (!trimmedTier || !tiers.includes(trimmedTier)) {
+    ctx.state.registryForm = { kind: "add-workflow", error: 'Tier "' + trimmedTier + '" is not one of ' + tiers.join(", ") + "." };
+    ctx.render();
     return;
   }
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, workflowTiers: {} };
   if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
-  ctx.state.registryOverlay.workflowTiers[wf] = tier.trim();
+  ctx.state.registryOverlay.workflowTiers[wf] = trimmedTier;
   ctx.state.registryDirty = true;
+  ctx.state.registryForm = null;
   ctx.render();
 }
 
@@ -1882,15 +1999,15 @@ export function handleRegistryWorkflowTierRemove(ctx, workflow) {
   ctx.render();
 }
 
-export function handleRegistryAddProfile(ctx) {
-  const name = prompt("New profile name:");
+export function handleRegistryAddProfile(ctx, name, description) {
   if (!name || !name.trim()) return;
   const trimmed = name.trim();
   if (ctx.state.registryOverlay && ctx.state.registryOverlay.profiles && ctx.state.registryOverlay.profiles[trimmed]) {
-    alert('Profile "' + trimmed + '" already exists.');
+    ctx.state.registryForm = { kind: "add-profile", error: 'Profile "' + trimmed + '" already exists.' };
+    ctx.render();
     return;
   }
-  const description = prompt("Description (optional — defaults to profile name):") || trimmed;
+  const desc = (description && description.trim()) || trimmed;
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   const tiers = ctx.state.registryOverlay.tiers || ["light", "standard", "deep"];
   const hosts = {};
@@ -1898,8 +2015,9 @@ export function handleRegistryAddProfile(ctx) {
     hosts[h] = {};
     for (const t of tiers) hosts[h][t] = { model: null, effort: null };
   }
-  ctx.state.registryOverlay.profiles[trimmed] = { description, hosts };
+  ctx.state.registryOverlay.profiles[trimmed] = { description: desc, hosts };
   ctx.state.registryDirty = true;
+  ctx.state.registryForm = null;
   ctx.render();
 }
 
@@ -1910,51 +2028,43 @@ export function handleRegistryAddProfile(ctx) {
 // made both pickers report "no profiles available" even though every builtin profile is
 // selectable (APCR-11.5). mergeRegistryForDisplay already drops `_delete`-tombstoned
 // profiles from its result, so no separate filter is needed here.
-export function handleRegistryDuplicateProfile(ctx) {
+export function handleRegistryDuplicateProfile(ctx, sourceName, newName) {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
   const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
   const available = (display && display.registry && display.registry.profiles) || {};
-  const keys = Object.keys(available);
-  if (keys.length === 0) {
-    alert("No profiles available to duplicate. Add a profile first.");
-    return;
-  }
-  const sourceName = prompt("Source profile to duplicate:\n\nAvailable: " + keys.join(", "));
   if (!sourceName || !sourceName.trim()) return;
   const src = sourceName.trim();
   if (!available[src]) {
-    alert('Profile "' + src + '" not found. Available: ' + keys.join(", "));
+    ctx.state.registryForm = { kind: "duplicate-profile", error: 'Profile "' + src + '" not found.' };
+    ctx.render();
     return;
   }
-  const newName = prompt("New profile name (copy of " + src + "):");
   if (!newName || !newName.trim()) return;
-  if (Object.prototype.hasOwnProperty.call(available, newName.trim())) {
-    alert('Profile "' + newName.trim() + '" already exists.');
+  const trimmedNew = newName.trim();
+  if (Object.prototype.hasOwnProperty.call(available, trimmedNew)) {
+    ctx.state.registryForm = { kind: "duplicate-profile", error: 'Profile "' + trimmedNew + '" already exists.' };
+    ctx.render();
     return;
   }
   const copy = JSON.parse(JSON.stringify(available[src]));
   delete copy._delete;
-  ctx.state.registryOverlay.profiles[newName.trim()] = copy;
+  ctx.state.registryOverlay.profiles[trimmedNew] = copy;
   ctx.state.registryDirty = true;
+  ctx.state.registryForm = null;
   ctx.render();
 }
 
-export function handleRegistryDeleteProfile(ctx) {
+export function handleRegistryDeleteProfile(ctx, name) {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
   const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
   const available = (display && display.registry && display.registry.profiles) || {};
-  const keys = Object.keys(available);
-  if (keys.length === 0) {
-    alert("No profiles available to delete.");
-    return;
-  }
-  const name = prompt("Profile name to delete:\n\nAvailable: " + keys.join(", "));
   if (!name || !name.trim()) return;
   const trimmed = name.trim();
   if (!available[trimmed]) {
-    alert('Profile "' + trimmed + '" not found. Available: ' + keys.join(", "));
+    ctx.state.registryForm = { kind: "delete-profile", error: 'Profile "' + trimmed + '" not found.' };
+    ctx.render();
     return;
   }
   // The tombstone must land on the OVERLAY (the thing that gets saved), not the computed
@@ -1967,6 +2077,7 @@ export function handleRegistryDeleteProfile(ctx) {
     ctx.state.registryOverlay.profiles[trimmed]._delete = true;
   }
   ctx.state.registryDirty = true;
+  ctx.state.registryForm = null;
   ctx.render();
 }
 
@@ -2154,6 +2265,7 @@ function startApp(opts) {
     registryOverlay: null,
     registryDirty: false,
     registryLoaded: false,
+    registryForm: null,
     regenerating: false,
     indexJobId: null,
     indexJobStatus: null,
@@ -2287,7 +2399,7 @@ function startApp(opts) {
         root.innerHTML = renderProfilesView(
           (profilesRes && profilesRes.data) || { hosts: [] },
           displayData,
-          { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled(), unsaved: state.registryDirty },
+          { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled(), unsaved: state.registryDirty, registryForm: state.registryForm },
         );
       } else if (state.view === "model-registry") {
         const data = await api.request("/api/v1/model-registry");
@@ -2296,7 +2408,7 @@ function startApp(opts) {
         initRegistryOverlay(ctxObj, regData.registry, regData.source);
         state.registryServerData = regData;
         const displayData = mergeRegistryForDisplay(regData, state.registryOverlay);
-        root.innerHTML = renderModelRegistry(displayData, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty });
+        root.innerHTML = renderModelRegistry(displayData, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty, registryForm: state.registryForm });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
@@ -2512,8 +2624,10 @@ function startApp(opts) {
         handleRegistryWorkflowTierEdit(ctx, el.dataset.workflow, el.value);
       });
     });
+    // T7 (APUX-12, D-4.4): trigger buttons toggle the corresponding inline
+    // form instead of invoking the prompt()-driven handler directly.
     root.querySelector('[data-action="registry-workflowTier-add"]')?.addEventListener("click", () => {
-      handleRegistryWorkflowTierAdd(ctx);
+      handleRegistryFormToggle(ctx, "add-workflow");
     });
     root.querySelectorAll('[data-action="registry-workflowTier-remove"]').forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -2521,13 +2635,35 @@ function startApp(opts) {
       });
     });
     root.querySelector('[data-action="registry-add-profile"]')?.addEventListener("click", () => {
-      handleRegistryAddProfile(ctx);
+      handleRegistryFormToggle(ctx, "add-profile");
     });
     root.querySelector('[data-action="registry-duplicate-profile"]')?.addEventListener("click", () => {
-      handleRegistryDuplicateProfile(ctx);
+      handleRegistryFormToggle(ctx, "duplicate-profile");
     });
     root.querySelector('[data-action="registry-delete-profile"]')?.addEventListener("click", () => {
-      handleRegistryDeleteProfile(ctx);
+      handleRegistryFormToggle(ctx, "delete-profile");
+    });
+    root.querySelector('[data-action="registry-form-cancel"]')?.addEventListener("click", () => {
+      handleRegistryFormCancel(ctx);
+    });
+    root.querySelector('[data-action="registry-form-submit"]')?.addEventListener("click", () => {
+      const kind = ctx.state.registryForm && ctx.state.registryForm.kind;
+      if (kind === "add-workflow") {
+        const workflow = root.querySelector('[data-action="registry-form-workflow"]')?.value;
+        const tier = root.querySelector('[data-action="registry-form-tier"]')?.value;
+        handleRegistryWorkflowTierAdd(ctx, workflow, tier);
+      } else if (kind === "duplicate-profile") {
+        const source = root.querySelector('[data-action="registry-form-source"]')?.value;
+        const newName = root.querySelector('[data-action="registry-form-new-name"]')?.value;
+        handleRegistryDuplicateProfile(ctx, source, newName);
+      } else if (kind === "delete-profile") {
+        const profile = root.querySelector('[data-action="registry-form-profile"]')?.value;
+        handleRegistryDeleteProfile(ctx, profile);
+      } else if (kind === "add-profile") {
+        const name = root.querySelector('[data-action="registry-form-name"]')?.value;
+        const description = root.querySelector('[data-action="registry-form-description"]')?.value;
+        handleRegistryAddProfile(ctx, name, description);
+      }
     });
     root.querySelectorAll('[data-action="registry-restore"]').forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -2856,6 +2992,8 @@ const MASSA_AI_UI = {
   handleRegistryHostDefaultEdit,
   handleRegistryAgentTierEdit,
   handleRegistryWorkflowTierEdit,
+  handleRegistryFormToggle,
+  handleRegistryFormCancel,
   handleRegistryWorkflowTierAdd,
   handleRegistryWorkflowTierRemove,
   handleRegistryAddProfile,

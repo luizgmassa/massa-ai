@@ -22,6 +22,8 @@ const {
   handleRegistryHostDefaultEdit,
   handleRegistryAgentTierEdit,
   handleRegistryWorkflowTierEdit,
+  handleRegistryFormToggle,
+  handleRegistryFormCancel,
   handleRegistryWorkflowTierAdd,
   handleRegistryWorkflowTierRemove,
   handleRegistryAddProfile,
@@ -48,11 +50,13 @@ const {
   handleRegistryHostDefaultEdit: (ctx: any, host: string, value: string) => void;
   handleRegistryAgentTierEdit: (ctx: any, agent: string, host: string, value: string) => void;
   handleRegistryWorkflowTierEdit: (ctx: any, workflow: string, value: string) => void;
-  handleRegistryWorkflowTierAdd: (ctx: any) => void;
+  handleRegistryFormToggle: (ctx: any, kind: string) => void;
+  handleRegistryFormCancel: (ctx: any) => void;
+  handleRegistryWorkflowTierAdd: (ctx: any, workflow?: string, tier?: string) => void;
   handleRegistryWorkflowTierRemove: (ctx: any, workflow: string) => void;
-  handleRegistryAddProfile: (ctx: any) => void;
-  handleRegistryDuplicateProfile: (ctx: any) => void;
-  handleRegistryDeleteProfile: (ctx: any) => void;
+  handleRegistryAddProfile: (ctx: any, name?: string, description?: string) => void;
+  handleRegistryDuplicateProfile: (ctx: any, sourceName?: string, newName?: string) => void;
+  handleRegistryDeleteProfile: (ctx: any, name?: string) => void;
   handleRegistryRestore: (ctx: any, profile: string) => void;
   handleRegistrySaveOverlay: (ctx: any) => Promise<void>;
   handleRegistryClearOverlay: (ctx: any) => Promise<void>;
@@ -983,61 +987,80 @@ describe("handleRegistryWorkflowTierEdit — workflowTiers edit (REGWIRE-02)", (
   });
 });
 
-describe("handleRegistryWorkflowTierAdd — add workflow tier (REG-03)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  const origAlert = (globalThis as any).alert;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
+// ── Inline form toggle/cancel (T7, APUX-12, D-4.4) ──────────────────────────
+// Replaces the prompt()-driven flows: a trigger click opens/closes
+// state.registryForm, and the submit path (wireViewHandlers, exercised via
+// registry-editor.test.ts render assertions) reads field values and calls the
+// same-named handler below with explicit args instead of prompt().
 
-  it("adds a new workflow tier to the overlay + sets dirty + re-renders", () => {
-    let calls = 0;
-    (globalThis as any).prompt = mock((_msg: string) => {
-      calls++;
-      if (calls === 1) return "spec-driven";
-      if (calls === 2) return "deep";
-      return null;
-    });
-    const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
-    });
-    handleRegistryWorkflowTierAdd(ctx);
-    expect(ctx.state.registryOverlay.workflowTiers["spec-driven"]).toBe("deep");
-    expect(ctx.state.registryDirty).toBe(true);
+describe("handleRegistryFormToggle / handleRegistryFormCancel — inline form open/close (T7)", () => {
+  it("opens a form of the given kind + re-renders", () => {
+    const render = mock(() => {});
+    const ctx = makeRegistryCtx({ render, state: { registryForm: null } });
+    handleRegistryFormToggle(ctx, "add-profile");
+    expect(ctx.state.registryForm).toEqual({ kind: "add-profile", error: null });
+    expect(render).toHaveBeenCalled();
   });
 
-  it("rejects duplicate workflow name", () => {
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "search");
+  it("closes the form when the same trigger is clicked again", () => {
+    const ctx = makeRegistryCtx({ state: { registryForm: { kind: "add-profile", error: null } } });
+    handleRegistryFormToggle(ctx, "add-profile");
+    expect(ctx.state.registryForm).toBeNull();
+  });
+
+  it("switches to a different form when a different trigger is clicked", () => {
+    const ctx = makeRegistryCtx({ state: { registryForm: { kind: "add-profile", error: null } } });
+    handleRegistryFormToggle(ctx, "delete-profile");
+    expect(ctx.state.registryForm).toEqual({ kind: "delete-profile", error: null });
+  });
+
+  it("handleRegistryFormCancel closes any open form + re-renders", () => {
+    const render = mock(() => {});
+    const ctx = makeRegistryCtx({ render, state: { registryForm: { kind: "add-workflow", error: "some error" } } });
+    handleRegistryFormCancel(ctx);
+    expect(ctx.state.registryForm).toBeNull();
+    expect(render).toHaveBeenCalled();
+  });
+});
+
+describe("handleRegistryWorkflowTierAdd — inline form submit (T7, REG-03, APUX-12)", () => {
+  it("adds a new workflow tier to the overlay + sets dirty + closes the form + re-renders", () => {
+    const render = mock(() => {});
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard" }, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+      render,
+      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
     });
-    handleRegistryWorkflowTierAdd(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryWorkflowTierAdd(ctx, "spec-driven", "deep");
+    expect(ctx.state.registryOverlay.workflowTiers["spec-driven"]).toBe("deep");
+    expect(ctx.state.registryDirty).toBe(true);
+    expect(ctx.state.registryForm).toBeNull();
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("rejects a duplicate workflow name with an inline form error, not alert()", () => {
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard" }, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
+    });
+    handleRegistryWorkflowTierAdd(ctx, "search", "deep");
+    expect(ctx.state.registryForm?.kind).toBe("add-workflow");
+    expect(ctx.state.registryForm?.error).toContain("search");
     expect(ctx.state.registryDirty).toBe(false);
   });
 
-  it("rejects invalid tier", () => {
-    (globalThis as any).alert = mock(() => {});
-    let calls = 0;
-    (globalThis as any).prompt = mock(() => {
-      calls++;
-      if (calls === 1) return "debug";
-      if (calls === 2) return "titanic";
-      return null;
-    });
+  it("rejects an invalid tier with an inline form error, not alert()", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
     });
-    handleRegistryWorkflowTierAdd(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryWorkflowTierAdd(ctx, "debug", "titanic");
+    expect(ctx.state.registryForm?.error).toContain("titanic");
     expect(ctx.state.registryOverlay.workflowTiers["debug"]).toBeUndefined();
   });
 
-  it("does nothing when prompt cancelled", () => {
-    (globalThis as any).prompt = mock(() => null);
+  it("does nothing when workflow is blank", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
     });
-    handleRegistryWorkflowTierAdd(ctx);
+    handleRegistryWorkflowTierAdd(ctx, "", "deep");
     expect(Object.keys(ctx.state.registryOverlay.workflowTiers)).toEqual([]);
     expect(ctx.state.registryDirty).toBe(false);
   });
@@ -1066,146 +1089,114 @@ describe("handleRegistryWorkflowTierRemove — remove workflow tier (REG-03 / AP
   });
 });
 
-describe("handleRegistryAddProfile — add profile via prompt (REGWIRE-03)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  const origAlert = (globalThis as any).alert;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
-
+describe("handleRegistryAddProfile — inline form submit (T7, REGWIRE-03, APUX-12)", () => {
   it("adds a new profile with null model/effort for all host/tier combos", () => {
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("new profile name")) return "custom";
-      if (msg.toLowerCase().includes("description")) return "a custom profile";
-      return null;
-    });
     const ctx = makeRegistryCtx({
       state: {
         registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] },
-        registryDirty: false, registryLoaded: true,
+        registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null },
       },
     });
-    handleRegistryAddProfile(ctx);
+    handleRegistryAddProfile(ctx, "custom", "a custom profile");
     expect(ctx.state.registryOverlay.profiles.custom).toBeDefined();
     expect(ctx.state.registryOverlay.profiles.custom.description).toBe("a custom profile");
+    expect(ctx.state.registryOverlay.profiles.custom.hosts.claude.light).toEqual({ model: null, effort: null });
     expect(ctx.state.registryDirty).toBe(true);
+    expect(ctx.state.registryForm).toBeNull();
   });
 
-  it("defaults description to profile name when description prompt is empty", () => {
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("new profile name")) return "custom";
-      if (msg.toLowerCase().includes("description")) return "";
-      return null;
-    });
+  it("defaults description to profile name when description is blank", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } },
     });
-    handleRegistryAddProfile(ctx);
+    handleRegistryAddProfile(ctx, "custom", "");
     expect(ctx.state.registryOverlay.profiles.custom.description).toBe("custom");
   });
 
-  it("alerts when profile name already exists", () => {
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "balanced");
+  it("rejects an existing profile name with an inline form error, not alert()", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } },
     });
-    handleRegistryAddProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryAddProfile(ctx, "balanced", "");
+    expect(ctx.state.registryForm?.error).toContain("balanced");
+    expect(ctx.state.registryDirty).toBe(false);
   });
 
-  it("does nothing when prompt returns null/empty name", () => {
-    (globalThis as any).prompt = mock(() => null);
+  it("does nothing when name is blank", () => {
     const ctx = makeRegistryCtx({
       state: { registryOverlay: { profiles: {} }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"], registryDirty: false, registryLoaded: true },
     });
-    handleRegistryAddProfile(ctx);
+    handleRegistryAddProfile(ctx, "", "");
     expect(Object.keys(ctx.state.registryOverlay.profiles)).toHaveLength(0);
     expect(ctx.state.registryDirty).toBe(false);
   });
 });
 
-describe("handleRegistryDuplicateProfile — duplicate via prompt (REGWIRE-04)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; });
-
+describe("handleRegistryDuplicateProfile — inline form submit (T7, REGWIRE-04, APUX-12)", () => {
   it("copies selected profile grid to a new name", () => {
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("source")) return "balanced";
-      if (msg.toLowerCase().includes("new profile name")) return "work-copy";
-      return null;
-    });
     const ctx = makeRegistryCtx({
       state: {
         registryOverlay: { profiles: { balanced: { description: "b", hosts: { claude: { light: { model: "m", effort: "low" } } } } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] },
-        registryDirty: false, registryLoaded: true,
+        registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null },
       },
     });
-    handleRegistryDuplicateProfile(ctx);
+    handleRegistryDuplicateProfile(ctx, "balanced", "work-copy");
     expect(ctx.state.registryOverlay.profiles["work-copy"]).toBeDefined();
     expect(ctx.state.registryOverlay.profiles["work-copy"].hosts.claude.light.model).toBe("m");
     expect(ctx.state.registryDirty).toBe(true);
+    expect(ctx.state.registryForm).toBeNull();
   });
 
-  it("alerts when no profiles available to duplicate", () => {
-    const origAlert = (globalThis as any).alert;
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "x");
+  it("shows an inline error, not alert(), when the source profile is not found", () => {
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null } },
+    });
+    handleRegistryDuplicateProfile(ctx, "nonexistent", "copy");
+    expect(ctx.state.registryForm?.error).toContain("nonexistent");
+  });
+
+  it("shows an inline error, not alert(), when the new name already exists", () => {
+    const ctx = makeRegistryCtx({
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} }, work: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null } },
+    });
+    handleRegistryDuplicateProfile(ctx, "balanced", "work");
+    expect(ctx.state.registryForm?.error).toContain("work");
+  });
+
+  it("does nothing when source is blank", () => {
     const ctx = makeRegistryCtx({
       state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
     });
-    handleRegistryDuplicateProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
-    (globalThis as any).alert = origAlert;
-  });
-
-  it("alerts when source profile not found", () => {
-    const origAlert = (globalThis as any).alert;
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("source")) return "nonexistent";
-      return null;
-    });
-    const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
-    });
-    handleRegistryDuplicateProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
-    (globalThis as any).alert = origAlert;
+    handleRegistryDuplicateProfile(ctx, "", "copy");
+    expect(ctx.state.registryDirty).toBe(false);
   });
 });
 
-describe("handleRegistryDeleteProfile — delete + tombstone (REGWIRE-05)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  const origAlert = (globalThis as any).alert;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
-
+describe("handleRegistryDeleteProfile — inline form submit (T7, REGWIRE-05, APUX-12)", () => {
   it("sets _delete:true on existing profile", () => {
-    (globalThis as any).prompt = mock(() => "balanced");
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "delete-profile", error: null } },
     });
-    handleRegistryDeleteProfile(ctx);
+    handleRegistryDeleteProfile(ctx, "balanced");
     expect(ctx.state.registryOverlay.profiles.balanced._delete).toBe(true);
     expect(ctx.state.registryDirty).toBe(true);
+    expect(ctx.state.registryForm).toBeNull();
   });
 
-  it("alerts when profile not found", () => {
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "nonexistent");
+  it("shows an inline error, not alert(), when the profile is not found", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "delete-profile", error: null } },
     });
-    handleRegistryDeleteProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryDeleteProfile(ctx, "nonexistent");
+    expect(ctx.state.registryForm?.error).toContain("nonexistent");
   });
 
-  it("alerts when no profiles available to delete", () => {
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => "x");
+  it("does nothing when name is blank", () => {
     const ctx = makeRegistryCtx({
       state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
     });
-    handleRegistryDeleteProfile(ctx);
-    expect((globalThis as any).alert).toHaveBeenCalled();
+    handleRegistryDeleteProfile(ctx, "");
+    expect(ctx.state.registryDirty).toBe(false);
   });
 });
 
@@ -1215,10 +1206,6 @@ describe("handleRegistryDeleteProfile — delete + tombstone (REGWIRE-05)", () =
 // initRegistryOverlay (unlike every test above, which builds ctx.state.registryOverlay
 // by hand) so they can actually observe the regression Batch Worker 1 flagged.
 describe("Registry Duplicate/Delete pickers see every effective-registry profile with an empty overlay (APCR-11.5)", () => {
-  const origPrompt = (globalThis as any).prompt;
-  const origAlert = (globalThis as any).alert;
-  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
-
   /** Build a ctx whose registryOverlay was seeded via initRegistryOverlay (overlay-only,
    *  APCR-01.8) from a session with NO saved overlay, and whose registryServerData mirrors
    *  what render() caches (the same server payload initRegistryOverlay read from). */
@@ -1240,40 +1227,30 @@ describe("Registry Duplicate/Delete pickers see every effective-registry profile
 
   it("Duplicate offers the builtin profile even though the overlay is empty", () => {
     const ctx = makeUnEditedSessionCtx();
-    (globalThis as any).prompt = mock((msg: string) => {
-      if (msg.toLowerCase().includes("source")) return "balanced";
-      if (msg.toLowerCase().includes("new profile name")) return "balanced-copy";
-      return null;
-    });
-    handleRegistryDuplicateProfile(ctx);
+    handleRegistryDuplicateProfile(ctx, "balanced", "balanced-copy");
     expect(ctx.state.registryOverlay.profiles["balanced-copy"]).toBeDefined();
     expect(ctx.state.registryOverlay.profiles["balanced-copy"].hosts.claude.light.model).toBe("m-l");
     expect(ctx.state.registryDirty).toBe(true);
   });
 
-  it("Duplicate does NOT alert 'no profiles available' when the overlay is empty but the server has profiles", () => {
+  it("Duplicate does not report a missing source when the overlay is empty but the server has profiles", () => {
     const ctx = makeUnEditedSessionCtx();
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => null); // cancel after the "no profiles" check would fire
-    handleRegistryDuplicateProfile(ctx);
-    expect((globalThis as any).alert).not.toHaveBeenCalled();
+    handleRegistryDuplicateProfile(ctx, "balanced", "another-copy");
+    expect(ctx.state.registryForm).toBeNull();
   });
 
   it("Delete offers the builtin profile even though the overlay is empty, and tombstones it in the overlay", () => {
     const ctx = makeUnEditedSessionCtx();
-    (globalThis as any).prompt = mock(() => "balanced");
-    handleRegistryDeleteProfile(ctx);
+    handleRegistryDeleteProfile(ctx, "balanced");
     expect(ctx.state.registryOverlay.profiles.balanced).toBeDefined();
     expect(ctx.state.registryOverlay.profiles.balanced._delete).toBe(true);
     expect(ctx.state.registryDirty).toBe(true);
   });
 
-  it("Delete does NOT alert 'no profiles available' when the overlay is empty but the server has profiles", () => {
+  it("Delete does not report a missing profile when the overlay is empty but the server has profiles", () => {
     const ctx = makeUnEditedSessionCtx();
-    (globalThis as any).alert = mock(() => {});
-    (globalThis as any).prompt = mock(() => null);
-    handleRegistryDeleteProfile(ctx);
-    expect((globalThis as any).alert).not.toHaveBeenCalled();
+    handleRegistryDeleteProfile(ctx, "balanced");
+    expect(ctx.state.registryForm).toBeNull();
   });
 });
 
