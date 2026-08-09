@@ -1,4 +1,4 @@
-# Handoff — admin-portal-correctness-repair (EXECUTE COMPLETE 2026-08-08 — T1-T11, 15 commits, two batch workers; validation pending; push/PR = user decision)
+# Handoff — admin-portal-correctness-repair (**VALIDATED PASS 2026-08-08** — T1-T11 + 1 fix loop, 19 commits, two batch workers; unpushed; push/PR = user decision)
 
 Session `spec-admin-portal-correctness-repair` · workflow spec-driven (Large) ·
 branch `fix/admin-portal-correctness-repair` from `main` @ `69c0632c` (v1.42.0)
@@ -67,30 +67,59 @@ CHANGELOG entry and the APCR-11.5/11.6 amendment T11 covers.
   the coverage-matrix note that every prior test built `registryOverlay` by
   hand and couldn't see this regression).
 
+## Validation — PASS
+
+39/39 ACs evidenced, 5/5 mutations killed, 0 survivors. Report:
+`.specs/features/admin-portal-correctness-repair/validation.md`.
+
+Validation ran **twice**. Iteration 1 returned FAIL: three mutations survived on
+APCR-01 — the P0 finding this whole feature exists to close — because
+`scripts/__tests__/model-profiles.test.ts` was never extended, so the new
+`mergeFlatMap` / `mergeProfile` / `normalizeFlatMap` had no direct sensor and
+the pre-existing fixtures specified every key, making partial-retention
+indistinguishable from whole-replace. APCR-01.10's `overlayOverrideCount` was
+also computed but never returned by the route — a code gap, not a test gap.
+Fix loop 1 (`6192212a` sensors, `019f8da8` APCR-01.10, `fdc55203` gate-command
+docs) closed both; the re-verify killed all three prior survivors plus two fresh
+mutations against the new code.
+
+One methodology note worth carrying forward: a scratch `git worktree add` has no
+`node_modules`, so `model-profiles.test.ts` reports 53p/1f there and 54p/0f in a
+provisioned tree. The failing case shells out to the generator. Mutation verdicts
+read in an unprovisioned scratch are unreliable for any test that shells out.
+
 ## Next Step
 
-1. Dispatch `massa-ai-verification-agent` (author != verifier) with spec.md
-   ACs + the branch diff (`69c0632c..HEAD`, 15 commits) + test files +
-   validate.md checklist to write
-   `.specs/features/admin-portal-correctness-repair/validation.md`.
-2. If PASS: `validate_state.ts admin-portal-correctness-repair --root .`
-   exit 0, then flip `FEATURES.json` status from `in_progress` to
-   `complete`.
-3. If FAIL (<=3 iterations): route gaps to fix tasks, re-verify.
-4. Push/PR = user decision (not taken unattended).
+Execute and validation are **done**. Delivery is the user's decision and was not
+taken unattended.
+
+1. `git push -u origin fix/admin-portal-correctness-repair` — **not run.**
+2. PR against `main`. The CHANGELOG merge gate is satisfied; `release-version.ts
+   --dry-run` derives **1.42.0 → 1.43.0 (minor)**. Merging to `main` with green
+   CI cuts a release, so approving that merge is approving a publish to
+   npmjs.org and GitHub Packages, not just a merge.
+3. Reviewer context: the diff touches `skills/massa-ai/scripts/validate_state.ts`
+   (a managed harness surface) and `packages/shared/src/config/config-loader.ts`
+   (a `0600` change that can break a `config.json` bind-mount read by another
+   UID after the next save).
+4. `/Users/luizmassa/Projects/massa-ai` (the `debug/registry-editor-fixes`
+   checkout) still holds the 4 originally-uncommitted files. They were copied
+   here byte-identical and are commit `b8eb8ace` on this branch. Nothing was
+   deleted there; cleaning it up is the user's call.
 
 ## Blockers
 
-- None. Independent verification is the only remaining gate.
+- None.
 
 ## Uncommitted Files
 
-- None at T11 commit time (all staged + committed).
+- None.
 
 ## Branch
 
-`fix/admin-portal-correctness-repair`, 15 commits ahead of `main` @
-`69c0632c` (spec/design/tasks + T1-T11, 1 oxlint fixup, 1 spec amendment).
+`fix/admin-portal-correctness-repair`, 19 commits ahead of `main` @ `69c0632c`
+(spec/design/tasks, the carried admin-portal work, T1-T11, 1 oxlint fixup,
+1 spec amendment, 3 fix-loop commits, this close-out). Unpushed.
 
 ## Previous — admin-portal-enhancements (EXECUTE COMPLETE 2026-08-08 — T1-T9, 9 commits; validation pending; push/PR = user decision)
 

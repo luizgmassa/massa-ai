@@ -1154,7 +1154,7 @@
       "id": "admin-portal-correctness-repair",
       "slug": "admin-portal-correctness-repair",
       "title": "Admin Portal Correctness Repair — 8 correctness defects, 2 security issues, 1 dedupe, 5 state drifts from v1.41.0+v1.42.0",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P0",
       "phases": {
         "specify": true,
@@ -1166,6 +1166,7 @@
       "spec": ".specs/features/admin-portal-correctness-repair/spec.md",
       "design": ".specs/features/admin-portal-correctness-repair/design.md",
       "tasks": ".specs/features/admin-portal-correctness-repair/tasks.md",
+      "validation": ".specs/features/admin-portal-correctness-repair/validation.md",
       "created": "2026-08-08",
       "depends_on": [
         "admin-portal",
@@ -1174,7 +1175,7 @@
         "registry-help-dropdown-workflow-tiers",
         "config-capture-reveal-field-guides"
       ],
-      "notes": "EXECUTE COMPLETE 2026-08-08: T1-T11, 15 commits (56a409ec spec+design+tasks .. this close-out), two batch workers (Worker 1: spec/design/tasks + T1-T8; Worker 2: T9-T11). Status stays in_progress (not complete) rather than reusing the retired execute-complete value (APCR-10.3) - validation.md does not exist yet; an independent verification-agent dispatch is the next step. Gates measured 2026-08-08 on this branch: web-ui 331 pass (0 fail), tools-api 29 groups all pass, shared 327 pass (0 fail), type-check 6/6 (--force), oxlint exit 0, test:scripts 1703 pass (0 fail), generate:artifacts --check no drift, validate_state.ts exit 1 with 53 errors (52 legacy + this feature's own pending-validation entry; the 5 admin-portal-era features clean), check_specs_delivered exit 0. Push/PR = user decision."
+      "notes": "VALIDATED PASS 2026-08-08: T1-T11 + 3 fix-loop commits, 19 commits from 69c0632c (56a409ec spec+design+tasks .. close-out). Two batch workers (W1: T1-T8; W2: T9-T11) plus one fix loop. 39/39 ACs evidenced, 5/5 mutations killed, 0 survivors. Validation ran twice: iteration 1 FAILed (3 mutations survived on APCR-01 — the P0 core had no direct sensor because scripts/__tests__/model-profiles.test.ts was never extended, and APCR-01.10 was computed but never surfaced in the response body); fix loop 1 closed both, re-verify PASS. 5 audit mechanisms amended after re-measurement (A1-A5, see spec.md). Design caught the REG-03 workflow-tier-remove regression deep merge would have caused (null tombstone). Plan Challenge full gate folded 5 more ACs, including APCR-06.6 — the server-side status fix alone left the UI rendering a success banner from exitCode alone. Gates measured on this branch: web-ui 337 pass (0 fail, baseline 320), shared 327 pass (0 fail, baseline 322), tools-api 29 groups all pass, core --unit --filter='vector|postgres|store' 16 groups all pass, type-check 6/6 (--force), oxlint exit 0, test:scripts exit 0, generate:artifacts --check no drift, validate_state.ts exit 1 with 52 errors (all legacy; this feature clean and absent from the failing bracket), check_specs_delivered exit 0. Release derivation: 1.42.0 -> 1.43.0 (minor). Not pushed — push/PR/merge = user decision."
     }
   ],
   "active_feature": "admin-portal-correctness-repair"
