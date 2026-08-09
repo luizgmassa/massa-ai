@@ -131,12 +131,18 @@ let tempFileCounter = 0;
 /**
  * Write `content` to `targetPath` atomically: a uniquely-named temp file in the SAME
  * directory (never `os.tmpdir()`, which may be a different volume — `rename(2)` is only
- * atomic within a filesystem), then `rename(2)` over the target. Both the temp file
- * (`mode: 0o600` at creation) and the final target (an explicit `chmodSync` after the
- * rename) end up owner-only (APCR-08.1/08.5). `mode` on `writeFileSync` is masked by the
- * process umask on *creation only* — it does nothing for a target that already exists at
- * a more permissive mode, which is why the `chmodSync` after the rename is what actually
- * repairs an existing 644 file on its next write (APCR-08.3).
+ * atomic within a filesystem), then `rename(2)` over the target. The temp file is made
+ * owner-only BEFORE the rename (APCR-08.1/08.5): `mode` on `writeFileSync` applies at
+ * creation and is masked by the process umask, so the explicit `chmodSync` on the temp is
+ * what actually guarantees 0600.
+ *
+ * The chmod is on the temp file and not on `targetPath` after the rename, for two reasons.
+ * `rename(2)` replaces the target's directory entry with the temp file's inode, so the
+ * result already carries the temp's mode — an existing 644 file is still repaired on its
+ * next write (APCR-08.3), by the rename rather than by a second chmod. And chmodding
+ * `targetPath` touched a path this function had not itself created, which under a test
+ * that stubs `writeFileSync`/`renameSync` but not `chmodSync` escaped the virtual
+ * filesystem and re-moded the developer's real `~/.config/massa-ai/config.json`.
  *
  * Shared by `saveConfig` (config.json) and `savePartialConfig`'s backup writer
  * (config.json.bak.<ISO>) so both go through the identical atomic-plus-owner-only path —
@@ -155,8 +161,8 @@ export function writeFileAtomically(targetPath: string, content: string): void {
 
   try {
     fs.writeFileSync(tempFile, content, { mode: 0o600 });
+    fs.chmodSync(tempFile, 0o600);
     fs.renameSync(tempFile, targetPath);
-    fs.chmodSync(targetPath, 0o600);
   } catch (error) {
     // Never leave the temp file behind — a failed save must not litter the
     // config dir with partial copies of a file that may hold the API key.

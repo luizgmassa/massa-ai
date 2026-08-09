@@ -33,15 +33,19 @@ let readSpy: ReturnType<typeof spyOn>;
 let writeSpy: ReturnType<typeof spyOn>;
 let mkdirSpy: ReturnType<typeof spyOn>;
 let renameSpy: ReturnType<typeof spyOn>;
+let chmodSpy: ReturnType<typeof spyOn>;
 
 // In-memory virtual file store keyed by absolute path.
 let vfs: Map<string, string> = new Map();
 // Set of paths that "exist" (files + dirs).
 let existing: Set<string> = new Set();
+// Mode last applied to each path by chmodSync, so a test can assert on it.
+let modes: Map<string, number> = new Map();
 
 function resetVfs() {
   vfs = new Map();
   existing = new Set();
+  modes = new Map();
 }
 
 beforeEach(() => {
@@ -61,6 +65,15 @@ beforeEach(() => {
     existing.add(String(p));
     return String(p);
   });
+  // Stubbed for containment as much as for assertion. An unstubbed chmodSync escapes this
+  // virtual filesystem and runs against the developer's REAL $HOME: that is how a green
+  // local run of this suite silently re-moded ~/.config/massa-ai/config.json to 0600 while
+  // CI, which has no such file, failed the same cases with ENOENT.
+  chmodSpy = spyOn(fs, "chmodSync").mockImplementation((p: any, mode: any) => {
+    const key = String(p);
+    if (!existing.has(key)) { const e = new Error(`ENOENT: ${key}`); (e as any).code = "ENOENT"; throw e; }
+    modes.set(key, Number(mode));
+  });
   renameSpy = spyOn(fs, "renameSync").mockImplementation((from: any, to: any) => {
     const fromKey = String(from);
     const toKey = String(to);
@@ -76,6 +89,11 @@ beforeEach(() => {
         existing.delete(k);
         existing.add(moved);
         vfs.delete(k);
+        // rename(2) replaces the target's directory entry with the source inode, so the
+        // renamed file carries the SOURCE's mode — including over an existing 0644 target.
+        const carried = modes.get(k);
+        modes.delete(k);
+        if (carried !== undefined) modes.set(moved, carried);
       }
     }
   });
@@ -93,6 +111,7 @@ afterEach(() => {
   writeSpy.mockRestore();
   mkdirSpy.mockRestore();
   renameSpy.mockRestore();
+  chmodSpy.mockRestore();
 });
 
 describe("config-loader path helpers", () => {
@@ -219,6 +238,23 @@ describe("saveConfig atomicity (SEC-01 concurrent provisioning)", () => {
     saveConfig(defaultMassaAiConfig);
     const [first, second] = writeSpy.mock.calls.map((c) => String(c[0]));
     expect(first).not.toBe(second);
+  });
+
+  test("chmods only the temp file, before the rename, leaving the target owner-only (APCR-08.1/08.5)", () => {
+    saveConfig(defaultMassaAiConfig);
+
+    const tmpPath = String(writeSpy.mock.calls[0]![0]);
+    const chmodded = chmodSpy.mock.calls.map((c) => [String(c[0]), Number(c[1])]);
+
+    // Exactly one chmod, on the temp file this call created — never on CONFIG_PATH, a
+    // path saveConfig did not create. Chmodding the target is what let an unstubbed
+    // chmodSync reach the developer's real config.json on an otherwise green run.
+    expect(chmodded).toEqual([[tmpPath, 0o600]]);
+    expect(chmodded.map(([p]) => p)).not.toContain(CONFIG_PATH);
+
+    // ...and the mode still lands on the target, because rename(2) carries the temp's
+    // inode over. A 0644 file already at the target is repaired by that rename.
+    expect(modes.get(CONFIG_PATH)).toBe(0o600);
   });
 
   test("a failed rename removes the temp file and rethrows", () => {
