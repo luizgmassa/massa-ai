@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 import { configDir } from "@massa-ai/shared/config";
+import { getDeploymentRoot, deploymentUnavailableMessage } from "./model-registry-deployment.js";
 
 // scripts/lib is outside tools-api's rootDir and is not copied into the
 // production Docker image (only apps/ + packages/ are). We use a dynamic
@@ -10,11 +11,17 @@ import { configDir } from "@massa-ai/shared/config";
 // external and leaves it for runtime resolution. In the deployed image the
 // route is not exercised (admin-portal is a local-operator surface); locally
 // and in tests the path resolves to the dev checkout. Lazy: resolved on first
-// call, so mock.module() in tests can intercept before this runs.
+// call, so mock.module() in tests can intercept before this runs. Every
+// caller checks getDeploymentRoot() first and returns 501 before reaching
+// this, so the throw below is a defensive backstop, not the primary path.
 let _profilesLib: Record<string, unknown> | null = null;
 function profilesLib(): Record<string, unknown> {
   if (!_profilesLib) {
-    const libPath = ["..", "..", "..", "..", "scripts", "lib", "model-profiles.ts"].join("/");
+    const root = getDeploymentRoot();
+    if (!root) {
+      throw new Error(deploymentUnavailableMessage("scripts/lib/model-profiles.ts"));
+    }
+    const libPath = path.join(root, "scripts", "lib", "model-profiles.ts");
     _profilesLib = (typeof require === "function" ? require : (globalThis as any).require)(libPath);
   }
   return _profilesLib!;
@@ -25,15 +32,16 @@ const REGISTRY_DETAIL = {
 };
 
 const OVERLAY_PATH = path.join(configDir("massa-ai"), "model-profiles.json");
-const GENERATE_SCRIPT = path.resolve(
-  import.meta.dirname,
-  "../../../../scripts/generate-subagent-artifacts.ts",
-);
 
 export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry" })
   .get(
     "/",
     ({ set }) => {
+      const root = getDeploymentRoot();
+      if (!root) {
+        set.status = 501;
+        return { success: false as const, error: deploymentUnavailableMessage("scripts/lib/model-profiles.ts") };
+      }
       const lib = profilesLib();
       const result = (lib.loadEffectiveRegistry as (opts?: { overlayPath?: string }) => any)({ overlayPath: OVERLAY_PATH });
       set.status = 200;
@@ -58,6 +66,11 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
   .put(
     "/",
     ({ body, set }) => {
+      const root = getDeploymentRoot();
+      if (!root) {
+        set.status = 501;
+        return { success: false as const, error: deploymentUnavailableMessage("scripts/lib/model-profiles.ts") };
+      }
       const lib = profilesLib();
       const overlay = body as Record<string, unknown>;
 
@@ -114,8 +127,14 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
   .post(
     "/regenerate",
     ({ set }) => {
+      const root = getDeploymentRoot();
+      if (!root) {
+        set.status = 501;
+        return { success: false as const, error: deploymentUnavailableMessage("scripts/generate-subagent-artifacts.ts") };
+      }
+      const generateScript = path.join(root, "scripts", "generate-subagent-artifacts.ts");
       try {
-        const child = spawnSync("bun", [GENERATE_SCRIPT], {
+        const child = spawnSync("bun", [generateScript], {
           env: { ...process.env },
           stdio: ["pipe", "pipe", "pipe"],
         }) as unknown as { exitCode: number | null; stderr?: { toString(): string } };
@@ -153,6 +172,11 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
   .delete(
     "/overlay",
     ({ set }) => {
+      const root = getDeploymentRoot();
+      if (!root) {
+        set.status = 501;
+        return { success: false as const, error: deploymentUnavailableMessage("scripts/lib/model-profiles.ts") };
+      }
       const lib = profilesLib();
       try {
         if (fs.existsSync(OVERLAY_PATH)) {

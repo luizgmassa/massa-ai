@@ -53,6 +53,20 @@ mock.module("@massa-ai/shared/config", () => {
   return { ...actual, configDir: (...args: unknown[]) => configDir(...args) };
 });
 
+// Real resolution by default (this test file runs from a real checkout). The
+// real value is captured BEFORE mock.module registers — mock.module rebinds
+// the namespace of anything already imported, so calling back into the
+// module's own getDeploymentRoot() lazily from inside the mock would recurse.
+// mockImplementationOnce(() => null) per-test simulates an unresolvable
+// deployment (APCR-07).
+const actualDeployment = require("./model-registry-deployment.ts");
+const realDeploymentRoot: string | null = actualDeployment.getDeploymentRoot();
+const getDeploymentRoot = mock((..._args: unknown[]): string | null => realDeploymentRoot);
+mock.module("./model-registry-deployment.ts", () => ({
+  ...actualDeployment,
+  getDeploymentRoot: (...args: unknown[]) => getDeploymentRoot(...args),
+}));
+
 // ── Mock @massa-ai/shared listProfiles + switchProfile for the auto-install step ──
 const listProfilesMock = mock((..._args: unknown[]): unknown => ({
   hosts: [
@@ -144,6 +158,7 @@ beforeEach(() => {
   spawnMock.mockClear();
   spawnSyncMock.mockClear();
   configDir.mockClear();
+  getDeploymentRoot.mockClear();
 });
 
 async function postStream(path: string): Promise<{ status: number; text: string; contentType: string }> {
@@ -428,6 +443,35 @@ describe("POST /api/v1/model-registry/regenerate-and-install-stream — auto-ins
     const events = parseSseEvents(res.text);
     const installEvents = events.filter((e) => e.type === "install");
     expect(installEvents.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── APCR-07: the SSE terminal frame carries the 501 reason, no spawn attempt ─
+
+describe("SSE streams — terminal done frame carries the deployment-unavailable reason (APCR-07.5)", () => {
+  test("regenerate-and-install-stream: no deployment root -> done frame with exitCode null + the shared message, never spawns", async () => {
+    getDeploymentRoot.mockImplementationOnce(() => null);
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    expect(events.length).toBe(1);
+    const done = events[0];
+    expect(done.type).toBe("done");
+    expect(done.exitCode).toBeNull();
+    expect(done.error as string).toContain("model-registry is unavailable in this deployment");
+    expect(done.error as string).toContain("massa-ai source checkout");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  test("regenerate-stream (deprecated alias): same 501 reason in the terminal frame", async () => {
+    getDeploymentRoot.mockImplementationOnce(() => null);
+    const res = await postStream("/api/v1/model-registry/regenerate-stream");
+    const events = parseSseEvents(res.text);
+    const done = events.find((e) => e.type === "done");
+    expect(done).toBeDefined();
+    expect(done!.exitCode).toBeNull();
+    expect(done!.error as string).toContain("model-registry is unavailable in this deployment");
+    expect(spawnMock).not.toHaveBeenCalled();
   });
 });
 

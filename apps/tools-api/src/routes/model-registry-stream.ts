@@ -32,11 +32,8 @@ import {
   type HostSwitchStatus,
   type SwitchReport,
 } from "@massa-ai/shared";
+import { getDeploymentRoot, deploymentUnavailableMessage } from "./model-registry-deployment.js";
 
-const GENERATE_SCRIPT = path.resolve(
-  import.meta.dirname,
-  "../../../../scripts/generate-subagent-artifacts.ts",
-);
 // configDir import is needed so mock.module can intercept @massa-ai/shared/config
 // in tests (the route shares the mock surface with model-registry.ts).
 void configDir;
@@ -109,8 +106,20 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
+        const root = getDeploymentRoot();
+        if (!root) {
+          controller.enqueue(sseFrame({
+            type: "done",
+            exitCode: null,
+            error: deploymentUnavailableMessage("scripts/generate-subagent-artifacts.ts"),
+          }));
+          controller.close();
+          closedRef.closed = true;
+          return;
+        }
+        const generateScript = path.join(root, "scripts", "generate-subagent-artifacts.ts");
         try {
-          child = spawn("bun", [GENERATE_SCRIPT], {
+          child = spawn("bun", [generateScript], {
             env: { ...process.env },
             stdio: ["pipe", "pipe", "pipe"],
           });
@@ -212,8 +221,20 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
+        const root = getDeploymentRoot();
+        if (!root) {
+          controller.enqueue(sseFrame({
+            type: "done",
+            exitCode: null,
+            error: deploymentUnavailableMessage("scripts/generate-subagent-artifacts.ts"),
+          }));
+          controller.close();
+          closedRef.closed = true;
+          return;
+        }
+        const generateScript = path.join(root, "scripts", "generate-subagent-artifacts.ts");
         try {
-          child = spawn("bun", [GENERATE_SCRIPT], {
+          child = spawn("bun", [generateScript], {
             env: { ...process.env },
             stdio: ["pipe", "pipe", "pipe"],
           });

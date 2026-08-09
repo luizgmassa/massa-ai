@@ -81,6 +81,22 @@ mock.module("@massa-ai/shared/config", () => {
   };
 });
 
+// Real resolution by default (this test file runs from a real checkout, so the
+// bounded upward walk finds the repo root exactly as production does). The
+// real value is captured BEFORE mock.module registers — mock.module rebinds
+// the namespace of anything already imported, so calling back into
+// actualDeployment.getDeploymentRoot() lazily from inside the mock would
+// recurse into the mock itself.
+// mockImplementationOnce(() => null) per-test simulates an unresolvable
+// deployment (APCR-07).
+const actualDeployment = require("./model-registry-deployment.ts");
+const realDeploymentRoot: string | null = actualDeployment.getDeploymentRoot();
+const getDeploymentRoot = mock((..._args: unknown[]): string | null => realDeploymentRoot);
+mock.module("./model-registry-deployment.ts", () => ({
+  ...actualDeployment,
+  getDeploymentRoot: (...args: unknown[]) => getDeploymentRoot(...args),
+}));
+
 import { modelRegistryRoutes } from "./model-registry.js";
 
 const app = new Elysia().use(modelRegistryRoutes);
@@ -91,6 +107,7 @@ beforeEach(() => {
   validateRegistry.mockClear();
   mergeOverlay.mockClear();
   configDir.mockClear();
+  getDeploymentRoot.mockClear();
 });
 
 async function get(path: string) {
@@ -249,6 +266,63 @@ describe("POST /api/v1/model-registry/regenerate", () => {
     expect(res.status).toBe(500);
     expect(res.json.success).toBe(false);
     expect(res.json.error).toContain("regeneration error");
+  });
+});
+
+// ── APCR-07: 501, not a stack trace, when this deployment has no checkout ──
+
+describe("model-registry routes — 501 when the deployment root cannot be resolved (APCR-07)", () => {
+  test("GET / returns 501 with the shared message and never throws", async () => {
+    getDeploymentRoot.mockImplementationOnce(() => null);
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(501);
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toContain("model-registry is unavailable in this deployment");
+    expect(res.json.error).toContain("massa-ai source checkout");
+  });
+
+  test("PUT / returns 501 with the shared message", async () => {
+    getDeploymentRoot.mockImplementationOnce(() => null);
+    const res = await put("/api/v1/model-registry", { profiles: {} });
+    expect(res.status).toBe(501);
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toContain("model-registry is unavailable in this deployment");
+  });
+
+  test("DELETE /overlay returns 501 with the shared message", async () => {
+    getDeploymentRoot.mockImplementationOnce(() => null);
+    const res = await del("/api/v1/model-registry/overlay");
+    expect(res.status).toBe(501);
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toContain("model-registry is unavailable in this deployment");
+  });
+
+  test("POST /regenerate returns 501 naming the generator script, not a spawn failure", async () => {
+    spawnSyncMock.mockClear();
+    getDeploymentRoot.mockImplementationOnce(() => null);
+    const res = await post("/api/v1/model-registry/regenerate");
+    expect(res.status).toBe(501);
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toContain("model-registry is unavailable in this deployment");
+    expect(res.json.error).toContain("generate-subagent-artifacts.ts");
+    // The spawnSync path was never reached.
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+  });
+
+  test("the 501 message shape is identical across every affected route", async () => {
+    getDeploymentRoot.mockImplementation(() => null);
+    const [getRes, delRes, postRes] = await Promise.all([
+      get("/api/v1/model-registry"),
+      del("/api/v1/model-registry/overlay"),
+      post("/api/v1/model-registry/regenerate"),
+    ]);
+    getDeploymentRoot.mockImplementation(() => realDeploymentRoot);
+    expect(getRes.status).toBe(501);
+    expect(delRes.status).toBe(501);
+    expect(postRes.status).toBe(501);
+    expect(getRes.json.error).toContain("model-registry is unavailable in this deployment");
+    expect(delRes.json.error).toContain("model-registry is unavailable in this deployment");
+    expect(postRes.json.error).toContain("model-registry is unavailable in this deployment");
   });
 });
 
