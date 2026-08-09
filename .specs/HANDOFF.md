@@ -1,4 +1,131 @@
-# Handoff — admin-portal-ux-overhaul (EXECUTE COMPLETE 2026-08-09 — T1-T15, 16 commits, five batch workers; validation pending; push/PR authorized)
+# Handoff — workflow-interaction-policies (EXECUTE COMPLETE 2026-08-09 — T1-T9, 10 commits, four batch workers; validation pending; push/PR = user decision)
+
+Session `spec-workflow-interaction-policies` · workflow spec-driven · branch
+`spec/workflow-interaction-policies` from `main` · worktree
+`/Users/luizmassa/Projects/massa-ai-wt-workflow-interaction-policies` (isolated).
+Four batch workers split the 9 tasks across 4 phases (`4 Phases = 9 Tasks`,
+phases sized to the new rule: max 3 tasks each); this handoff is written by
+Batch Worker 4 (T7, T9, T8, the close-out). Contract:
+`.specs/features/workflow-interaction-policies/{spec,design,tasks}.md`.
+
+## Objective — workflow-interaction-policies
+
+Implement the operator's spec-driven/TDD/design workflow-interaction-policy
+directives: cap spec-driven batch workers at max 3 tasks/worker (ideal 2),
+size phases to the same budget with an ERROR-level `validate_tasks.ts` gate,
+remove every numeric per-turn question cap in spec-driven/TDD/design in favor
+of an ask-first-for-important-decisions stance, and add a pre-implementation
+change-summary stage (Stage 1.5 — Summarize) to `implementation-delivery.md`.
+
+## State — workflow-interaction-policies
+
+- 10 commits on `spec/workflow-interaction-policies`: `af1b24d7`
+  spec+design+tasks → `99aed979` T1 sub-agents.md packing budget max 3/ideal 2
+  → `79752fdd` T2 tasks.md phase-granularity rule + packing mirrors →
+  `f0caf90b` T3 execute.md budget mirrors + over-sized-phase valve + summary
+  hook → `68137985` T4 workflows/spec-driven.md mirrors + summary mention +
+  version 1.4.0 → `987207fc` T5 implementation-delivery.md Stage 1.5 —
+  Summarize (+ six-workflow pause audit) → `fed3d175` T6 discuss.md/specify.md
+  question policy → `ecc2096b` T6 follow-up (sibling numeric caps in discuss
+  Guided algorithm) → `c9400ae9` T7 tdd + workflows/design.md question policy
+  → `0bcd2063` T9 validate_tasks.ts per-phase max-3 error + sensors → this
+  commit T8 close-out (CHANGELOG, artifact regeneration, parity gates,
+  `.specs` rotation).
+
+## Completed
+
+- T7: tdd's Clarification Policy and `workflows/tdd.md` step 4 replaced the
+  `at most three` cap with cap-free ask-first-when-in-doubt guidance
+  (`metadata.version` 1.1.0 → 1.2.0); `workflows/design.md` step 4 rewrote its
+  narrow `Ask only when` list to ask whenever any important decision remains
+  ambiguous after source inspection (`metadata.version` 1.3.0 → 1.4.0).
+- T9: `validate_tasks.ts` gained `countTasksPerPhase()`, scoped to the Task
+  Breakdown section, reporting `Phase N has K tasks (max 3 per phase, ideal
+  2)` as an ERROR for any phase exceeding 3 tasks (D14). Observed-red 4-task
+  fixture confirmed by stashing the script change and re-running (exit 1 →
+  0); green 3-task and phase-less fixtures added. `pyts-golden/
+  validate_tasks.json` inspected: every fixture holds phases of at most 2
+  tasks, so no golden entry fires the new check — none re-recorded. The
+  pre-existing "dogfood" test was repointed off the historical
+  `tlc-330-harness-update` fixture (predates the rule, now legitimately trips
+  it with 6/9/4-task phases) onto this feature's own live tasks.md.
+- T8 (this commit): CHANGELOG `[Unreleased]` → `### Changed` entry for the
+  whole feature (batch-worker cap + validator enforcement, question-cap
+  removal, Stage 1.5); `bun run generate:artifacts` + `--check` both exit 0
+  when isolated from this machine's local `~/.config/massa-ai/model-
+  profiles.json` overlay (`XDG_CONFIG_HOME=$(mktemp -d)` — the overlay
+  legitimately diverges plain-generate output from `--check`'s builtin-only
+  comparison, REG-13/REG-18, unrelated to this feature); subagent-parity,
+  skill-artifact-parity, skills-harness-integrity suites all green;
+  `.specs/project/STATE.md` and `.specs/HANDOFF.md` rotated (prior
+  Current/top section renamed to Previous, new section prepended);
+  `.specs/project/FEATURES.json` gained a `workflow-interaction-policies`
+  entry (`status: "in_progress"`) and `active_feature` updated.
+
+## Gates (measured 2026-08-09, this worktree)
+
+- `bun test scripts/__tests__/spec-driven-validators.test.ts` → 66 pass / 0
+  fail.
+- `bun test scripts/__tests__/pyts-golden.test.ts` → 46 pass / 0 fail.
+- `bun run lint` (oxlint) → exit 0.
+- `XDG_CONFIG_HOME=$(mktemp -d) bun run generate:artifacts` → exit 0.
+- `XDG_CONFIG_HOME=$(mktemp -d) bun run generate:artifacts --check` → no
+  drift (plain `--check` on this machine reports drift in
+  `opencode/agent-profiles/local_models` — a local model-profiles.json
+  overlay effect per REG-13/REG-18, not a defect in this feature).
+- `bun test scripts/__tests__/subagent-parity.test.ts` → 65 pass / 0 fail.
+- `bun test scripts/__tests__/skill-artifact-parity.test.ts` → 23 pass / 0
+  fail.
+- `bun test scripts/__tests__/skills-harness-integrity.test.ts` → 32 pass /
+  0 fail.
+- Repo-wide literal sweep over `skills/` (T8 gate) found 3 residual hits:
+  two `sweet spot` hits in `references/pr-task-fix.md` and
+  `references/tdd/document-contract.md` are an unrelated PR-line-count
+  sizing convention (matches spec.md's Out of Scope "Re-benchmarking worker
+  sizes" / "Broader single-sourcing of spec-driven packing prose" rows, and
+  the tasks.md coverage matrix's own "(packing contexts)" qualifier on this
+  literal); one genuine `at most three` cap survives in
+  `skills/massa-ai/references/ticket/intake-and-sources.md:19`, outside
+  every task's assigned `Where` field (T6 = discuss.md/specify.md, T7 =
+  tdd/design.md) — reported as a finding, not fixed, since T8's own write
+  scope is limited to CHANGELOG.md + `.specs` project files.
+- `bun skills/massa-ai/scripts/validate_state.ts --root .` → does not exist
+  in this checkout; skipped per instruction.
+- `bun skills/massa-ai/scripts/check_specs_delivered.ts
+  workflow-interaction-policies --root .` → see Next Step (run after this
+  commit lands, since the artifacts it checks must be committed first).
+
+## Next Step
+
+Execute is **done** (T1-T9 + T8 close-out); validation has not run.
+
+1. Dispatch an independent verifier (author ≠ verifier) with spec.md's WF-01
+   through WF-16 requirements, the git diff surface (10 commits from
+   `af1b24d7`), the touched files, and the coverage matrix in tasks.md.
+   Include the `ticket/intake-and-sources.md` finding above as an explicit
+   open question for the verifier/user to disposition (fix now vs. accept as
+   documented residual).
+2. If PASS: write
+   `.specs/features/workflow-interaction-policies/validation.md`, flip
+   `FEATURES.json`'s status to `"complete"`, re-run `check_specs_delivered`
+   and `validate_state.ts --root .` (if present).
+3. If FAIL: route gaps to fix tasks, re-verify.
+4. Push/PR/merge remain the user's decision.
+
+## Blockers
+
+- None blocking this close-out. See the `ticket/intake-and-sources.md`
+  residual finding above for the one open, out-of-scope item.
+
+## Uncommitted Files
+
+- None at T8 commit time (all staged + committed).
+
+## Branch
+
+`spec/workflow-interaction-policies`, 10 commits ahead of `main`. Unpushed.
+
+## Previous — admin-portal-ux-overhaul (EXECUTE COMPLETE 2026-08-09 — T1-T15, 16 commits, five batch workers; validation pending; push/PR authorized)
 
 Session `spec-admin-portal-ux-overhaul` · workflow spec-driven (Large) ·
 branch `spec/admin-portal-ux-overhaul` from `main` @ `b1831197` (v1.43.0) ·

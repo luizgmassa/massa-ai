@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Spec-driven batch workers are capped at max 3 tasks/worker (ideal 2), enforced from
+  Tasks time.** Phases size to the same budget and a `>3-task feature always ≥2 workers`;
+  `validate_tasks.ts` now reports an ERROR for any Task Breakdown phase holding more than 3
+  tasks (`Phase N has K tasks (max 3 per phase, ideal 2)`), so an oversized phase fails
+  validation before tasks are presented for approval instead of surfacing only at Execute
+  time.
+- **Numeric question caps removed across spec-driven, TDD, and design workflows**, replaced
+  with an ask-first-for-important-decisions stance: group related questions naturally per
+  turn with no fixed count, and ask rather than assume whenever an important or ambiguous
+  decision remains after source inspection. Trivial, safe details may still be assumed and
+  recorded without asking.
+- **New pre-implementation change-summary stage (Stage 1.5 — Summarize)** in
+  `implementation-delivery.md`, sitting between Isolate and Implement: a task-separated
+  change summary is presented alongside the existing Stage 3 delivery-authorization ask, so
+  no per-workflow anchor is required and no new standalone gate is introduced.
+
 ## [1.44.0] - 2026-08-09
 
 ### Added
