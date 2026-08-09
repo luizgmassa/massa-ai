@@ -241,6 +241,8 @@ intended bump. Commit `.specs/` state for this feature before the first push.
 | APCR-11 | 2 | `[Unreleased]` non-empty with mapped headings | T11 |
 | APCR-11 | 3 | regenerate `fetch` sends `x-api-key` | T11 |
 | APCR-11 | 4 | display merge does not blank the flat maps | T1, T11 |
+| APCR-11 | 5 | Duplicate/Delete pickers list effective-registry profiles with an empty overlay | T11 |
+| APCR-11 | 6 | first cell edit of a builtin-only profile does not stamp its key as the description | T11 |
 
 ## Gate Check Commands
 

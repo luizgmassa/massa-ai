@@ -409,6 +409,26 @@ The 4 pre-existing modified files are part of this feature and carry these behav
 2. The `[Unreleased]` section of `CHANGELOG.md` SHALL carry entries for this feature under headings that map to the intended version bump per `CONTRIBUTING.md`. <!-- ubiquitous -->
 3. WHEN the regenerate handler issues its `fetch` THEN it SHALL send the API key. <!-- event-driven -->
 4. WHERE the in-memory overlay carries empty objects for `hostDefaults`, `workflowTiers`, or `tiers`, the display merge SHALL NOT blank them — a live coupling to APCR-01.8's revert. <!-- state-driven -->
+5. WHEN an operator opens the registry editor without having edited anything this session THEN the Duplicate and Delete pickers SHALL offer every profile in the **effective** registry, not only those present in the saved overlay. <!-- event-driven — see below -->
+6. WHEN the operator edits a cell of a profile that exists only in the builtin THEN the resulting overlay entry SHALL NOT overwrite that profile's builtin `description` with its own key name. <!-- event-driven — see below -->
+
+**AC5/AC6 — the second coupling APCR-01.8's revert exposes.** The Duplicate and Delete
+handlers (`app.js:1699-1712` and the Delete twin) build their "Available: …" list from
+`ctx.state.registryOverlay.profiles`. That object was a full copy of the effective registry
+under the carried work's seed; after APCR-01.8 reverts the seed to overlay-only it is `{}`
+for an operator who has not edited anything, so both handlers take their empty-list branch
+and report "No profiles available to duplicate. Add a profile first." Separately,
+`handleRegistryCellEdit`'s create-on-demand path writes
+`{ description: profile, hosts: {} }`, so the first edit to a builtin-only profile stamps
+the profile's key as its description, and `mergeProfile` inherits the builtin description
+only when the overlay's is `undefined`. Both handlers must read the **display** registry
+(server registry merged with the in-memory overlay) rather than the raw overlay, and the
+create-on-demand path must leave `description` absent rather than defaulting it.
+
+This was surfaced by Batch Worker 1 as a `SPEC_DEVIATION` on T1 and confirmed against
+`app.js:1702-1707` before being scheduled here rather than silently absorbed into T1.
+It is not a regression against v1.42.0 — overlay-only seeding is the **original** behavior;
+the pickers are new, and were written against the seed T1 removes.
 
 ---
 
