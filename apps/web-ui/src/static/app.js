@@ -1581,7 +1581,7 @@ export function initRegistryOverlay(ctx, registry, source) {
  *  blank the server's map, APCR-11.4). A `null` overlay value tombstones the
  *  key (design D-1). */
 function mergeFlatMapForDisplay(serverMap, overlayMap) {
-  const merged = { ...(serverMap || {}) };
+  const merged = { ...serverMap };
   for (const [key, value] of Object.entries(overlayMap || {})) {
     if (value === null) delete merged[key];
     else merged[key] = value;
