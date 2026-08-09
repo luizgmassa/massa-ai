@@ -45,6 +45,8 @@ import { profileRoutes } from "./routes/profiles.js";
 import { configRoutes } from "./routes/config.js";
 import { modelRegistryRoutes } from "./routes/model-registry.js";
 import { modelRegistryStreamRoutes } from "./routes/model-registry-stream.js";
+import { restartRoutes } from "./routes/restart.js";
+import { setServerStopper, setJobsStopper, gracefulShutdown } from "./lifecycle.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@massa-ai/core";
@@ -150,6 +152,7 @@ const app = new Elysia({ adapter: node() })
   .use(configRoutes)
   .use(modelRegistryRoutes)
   .use(modelRegistryStreamRoutes)
+  .use(restartRoutes)
   .get("/health", () => buildHealthResponse(getParserReadiness()));
 
 // SEC-01: resolve (and if necessary provision) the API key BEFORE the port
@@ -163,7 +166,13 @@ warnIfTrustOverrideEnabled();
 await listenAfterParserValidation({
   validate: validateAllGrammars,
   listen: () => {
-    app.listen(PORT);
+    // Restart/shutdown drain path (lifecycle.ts). The stopper must come from
+    // the listen callback's server handle: `app.stop()` dispatches to the
+    // web-standard adapter's stop under `adapter: node()` and throws
+    // "Elysia isn't running" (measured; restart-e2e.test.ts guards this).
+    app.listen(PORT, (server) => {
+      setServerStopper(() => void (server as unknown as { stop: () => unknown }).stop());
+    });
   },
   onValidationFailure: (error) => {
     console.error(
@@ -241,17 +250,16 @@ try {
   console.error(`[scheduler] init error:`, err instanceof Error ? err.message : err);
 }
 
-// Graceful shutdown
+// Graceful shutdown — same drain implementation the restart route uses
+// (lifecycle.ts): stop listener, stop jobs, disconnect Prisma, exit.
+setJobsStopper(() => {
+  clearInterval(jobReaperTimer);
+  try { scheduler.stop(); } catch {}
+});
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-  process.on(signal, async () => {
+  process.on(signal, () => {
     console.log(`${signal} received, shutting down gracefully...`);
-    clearInterval(jobReaperTimer);
-    try { scheduler.stop(); } catch {}
-    try {
-      const { disconnectPrisma } = await import('@massa-ai/core/services');
-      await disconnectPrisma();
-    } catch {}
-    process.exit(0);
+    void gracefulShutdown();
   });
 }
 

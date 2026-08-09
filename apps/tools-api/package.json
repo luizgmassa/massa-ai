@@ -12,7 +12,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "bun --watch src/index.ts",
+    "dev": "MASSA_AI_DEV_WATCH=1 bun --watch src/index.ts",
     "dev:insecure": "NODE_TLS_REJECT_UNAUTHORIZED=0 bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "start:insecure": "NODE_TLS_REJECT_UNAUTHORIZED=0 bun src/index.ts",

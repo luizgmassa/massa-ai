@@ -26,7 +26,8 @@ only `export type App`, not the instance.
   mandatory, NOT in `PUBLIC_PATHS`). Response first —
   `{ restarting: true, mode: "supervised" | "respawn" }` — then graceful
   drain (stop accepting, stop job reaper + scheduler, `disconnectPrisma()`,
-  mirroring the SIGTERM path `index.ts:252-263`), then mode action.
+  mirroring the SIGTERM path `index.ts:244-256` — critic re-measured; an
+  earlier 252-263 citation was wrong), then mode action.
 - **APR-02 (mode selection):** `supervised` when `MASSA_AI_SUPERVISED=1` or
   `/.dockerenv` exists → drain + `process.exit(0)` (Docker Compose
   `restart: unless-stopped` respawns). Otherwise `respawn` → spawn detached
@@ -86,6 +87,31 @@ only `export type App`, not the instance.
   risk/benefit for an admin button).
 - Env-only knobs (`MASSA_AI_API_PORT`, `MASSA_AI_EMBEDDED`) in the proposal
   banner — they have no config.json section to diff.
+
+## Plan-challenge revisions (critic verdict: revise → applied 2026-08-09)
+
+- **R1 (flush race):** no blind 50 ms timer. The drain triggers off the
+  response lifecycle (`onAfterResponse`/response-close event), so the body is
+  flushed before the listener stops by construction. Plus a **real-process
+  e2e test**: spawn tools-api as a child on a scratch port (pattern:
+  `web-ui-static-dir.test.ts:102`), POST restart in respawn mode with seams
+  redirected to a marker file via env, assert the client receives the full
+  JSON body.
+- **R2 (silent batch truncation):** tools-api's isolated runner classifies
+  only `mock.module(` — a test leaking a real `process.exit`/`Bun.spawn`
+  would silently truncate the shared batch with a clean exit. Add a guard
+  test that greps tools-api test sources for `process.exit(`/`Bun.spawn(`
+  outside the lifecycle seam module and fails naming the file.
+- **R3 (AC-7 strengthened):** parity-suite-green is green-by-omission
+  (`embedded-mode-parity.test.ts` forward-enumerates `TOOL_DEFINITIONS`
+  only). AC-7's sensor is now an explicit negative assertion: no tool
+  definition maps to `/api/v1/system/restart`.
+- **R4 (badge vs banner semantics, accepted + clarified):** the existing GET
+  badge is presence-based and reads as a static "changing this requires
+  restart" field marker; the new banner is the actionable diff-based
+  proposal. UI copy must keep the badge informational ("requires restart to
+  apply changes") so the two cannot contradict; no badge logic change
+  shipped.
 
 ## Acceptance criteria
 

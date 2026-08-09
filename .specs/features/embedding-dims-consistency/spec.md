@@ -46,6 +46,24 @@ Line numbers below re-verified against the worktree before each edit
   it kills the "sweep missed a surface" defect class, not just these
   instances.
 - **EDC-07:** CHANGELOG `### Fixed` bullets.
+- **EDC-08 (critic finding, 2026-08-09):** `apps/tools-api/setup-ollama-wsl.sh`
+  (≈:93-94) writes `.env` with `qwen3-embedding:4b` + `4096` — same live
+  mismatch class as EDC-02. Fix to 2560 and include in EDC-06's scan set.
+
+## Plan-challenge revisions (critic verdict: revise → applied 2026-08-09)
+
+- EDC-06 must use **per-dialect extractors** (`ENV KEY=VALUE` for Dockerfile,
+  line-anchored non-commented `KEY=VALUE` for install.sh/.env.example/
+  setup-ollama-wsl.sh, `${VAR:-default}` for docker-compose.yml) and assert
+  **exactly one active pair extracted per surface** (not 0, not >1) as a
+  self-check — kills both the parse-0-subjects trap and the
+  commented-alternatives (.env.example:165-168) false-match trap.
+- AC-2's population print runs the full-repo `OLLAMA_EMBEDDING` grep
+  (26 files at spec time), not just the named surfaces.
+- New AC-6: mcp-client test asserts `use ollama` (no --dimensions flag)
+  writes `dimensions: 2560` — runtime sensor, not just the file literal
+  (config-cli.test.ts has no assertion on the old 768, so nothing else
+  senses this).
 
 ## Invariants
 
