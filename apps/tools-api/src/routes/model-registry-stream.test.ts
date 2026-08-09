@@ -67,7 +67,12 @@ mock.module("./model-registry-deployment.ts", () => ({
   getDeploymentRoot: (...args: unknown[]) => getDeploymentRoot(...args),
 }));
 
-// ── Mock @massa-ai/shared listProfiles + switchProfile for the auto-install step ──
+// ── Mock @massa-ai/shared listProfiles + switchProfile + syncGeneratedVariants
+// for the auto-install step ── syncGeneratedVariants MUST be mocked: the real
+// implementation would run against the real getDeploymentRoot() (this repo's
+// own checkout, per the mock above) as sourceRoot and os.homedir() (the real
+// developer machine) as the default targetHome — exactly the HARD RULE
+// hazard the task brief calls out. Never let the real one run in this file.
 const listProfilesMock = mock((..._args: unknown[]): unknown => ({
   hosts: [
     { host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] },
@@ -80,12 +85,17 @@ const switchProfileMock = mock((..._args: unknown[]): unknown => ({
   hosts: [{ host: "claude", status: "switched" }, { host: "opencode", status: "switched" }],
   restartRequired: true,
 }));
+const syncGeneratedVariantsMock = mock((..._args: unknown[]): unknown => [
+  { host: "claude", status: "synced", profiles: ["balanced"], retained: [], files: 3 },
+  { host: "opencode", status: "skipped", profiles: [], retained: [], files: 0, reason: "no generated variants for this host" },
+]);
 mock.module("@massa-ai/shared", () => {
   const actual = require("@massa-ai/shared");
   return {
     ...actual,
     listProfiles: (...args: unknown[]) => listProfilesMock(...args),
     switchProfile: (...args: unknown[]) => switchProfileMock(...args),
+    syncGeneratedVariants: (...args: unknown[]) => syncGeneratedVariantsMock(...args),
   };
 });
 
@@ -159,6 +169,7 @@ beforeEach(() => {
   spawnSyncMock.mockClear();
   configDir.mockClear();
   getDeploymentRoot.mockClear();
+  syncGeneratedVariantsMock.mockClear();
 });
 
 async function postStream(path: string): Promise<{ status: number; text: string; contentType: string }> {
@@ -443,6 +454,68 @@ describe("POST /api/v1/model-registry/regenerate-and-install-stream — auto-ins
     const events = parseSseEvents(res.text);
     const installEvents = events.filter((e) => e.type === "install");
     expect(installEvents.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── T3: the bridge step (syncGeneratedVariants) runs before the install loop ──
+
+describe("POST /api/v1/model-registry/regenerate-and-install-stream — variant-sync bridge (T3)", () => {
+  beforeEach(() => {
+    listProfilesMock.mockClear();
+    switchProfileMock.mockClear();
+    syncGeneratedVariantsMock.mockClear();
+  });
+
+  test("emits one variant-sync SSE frame per host, before the install frames", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const syncEvents = events.filter((e) => e.type === "variant-sync");
+    const firstInstallIdx = events.findIndex((e) => e.type === "install");
+
+    expect(syncEvents.length).toBe(2); // claude + opencode, per the mock fixture
+    expect(syncEvents.some((e) => e.host === "claude" && e.status === "synced" && e.files === 3)).toBe(true);
+    expect(syncEvents.some((e) => e.host === "opencode" && e.status === "skipped" && e.reason)).toBe(true);
+    // Every variant-sync frame precedes every install frame.
+    const lastSyncIdx = events.map((e, i) => (e.type === "variant-sync" ? i : -1)).filter((i) => i >= 0).pop()!;
+    expect(lastSyncIdx).toBeLessThan(firstInstallIdx);
+  });
+
+  test("calls syncGeneratedVariants with sourceRoot from getDeploymentRoot()", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+
+    expect(syncGeneratedVariantsMock).toHaveBeenCalledTimes(1);
+    const arg = (syncGeneratedVariantsMock.mock.calls[0] as any[])[0] as { sourceRoot: string | null };
+    expect(arg.sourceRoot).toBe(realDeploymentRoot);
+  });
+
+  test("hostDefaults reaches listProfiles via getRegistryHostDefaults()", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+
+    expect(listProfilesMock).toHaveBeenCalledTimes(1);
+    const arg = (listProfilesMock.mock.calls[0] as any[])[0] as { hostDefaults?: Record<string, string> };
+    // builtinRegistry (this file's fixture) declares hostDefaults for every host.
+    expect(arg.hostDefaults).toMatchObject({ claude: "balanced", opencode: "balanced" });
+  });
+
+  test("a variant-sync failure does not block the install loop", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    syncGeneratedVariantsMock.mockImplementationOnce(() => [
+      { host: "claude", status: "failed", profiles: [], retained: [], files: 0, error: "disk full" },
+    ]);
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const syncEvent = events.find((e) => e.type === "variant-sync");
+    const installEvents = events.filter((e) => e.type === "install");
+    const done = events.find((e) => e.type === "done");
+
+    expect(syncEvent).toMatchObject({ host: "claude", status: "failed", error: "disk full" });
+    expect(installEvents.length).toBeGreaterThanOrEqual(1); // install loop still ran
+    expect(done!.exitCode).toBe(0);
   });
 });
 

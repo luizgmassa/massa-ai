@@ -1,11 +1,16 @@
 /**
  * `massa-ai-config profile list|show|set` (T13 / TASK-013).
  *
- * Mocks `@massa-ai/shared`'s `listProfiles`/`switchProfile` — the real
- * engine defaults `targetHome` to `os.homedir()`, and the CLI's argument
- * surface has no way to inject a fixture root, so a real call from a test
- * would risk mutating whatever host plugins happen to be installed on the
- * machine running the suite. Invalid-host / missing-name validation (which
+ * Mocks `@massa-ai/shared`'s `listProfiles`/`switchProfile`/
+ * `syncGeneratedVariants` — the real engine defaults `targetHome` to
+ * `os.homedir()`, and the CLI's argument surface has no way to inject a
+ * fixture root, so a real call from a test would risk mutating whatever
+ * host plugins happen to be installed on the machine running the suite.
+ * `syncGeneratedVariants` is now also called from `profile set` (T4) with
+ * a `sourceRoot` resolved from this real checkout's own position — leaving
+ * it unmocked would risk writing into this developer machine's real
+ * `~/.claude`, `~/.codex`, `~/.config/opencode` variant trees on every
+ * `profile set` test below. Invalid-host / missing-name validation (which
  * never reaches the engine) is covered safely, without mocking, in
  * `scripts/__tests__/profile-cli-parity.test.ts`.
  */
@@ -19,6 +24,7 @@ const switchProfile = mock((..._args: unknown[]): unknown => ({
   hosts: [],
   restartRequired: false,
 }));
+const syncGeneratedVariants = mock((..._args: unknown[]): unknown => []);
 
 // Pre-resolved BEFORE registering the mock — see embedded-profiles.test.ts's
 // comment for why a `require()` inside the factory recurses and silently
@@ -28,6 +34,7 @@ mock.module("@massa-ai/shared", () => ({
   ...actualShared,
   listProfiles: (...args: unknown[]) => listProfiles(...args),
   switchProfile: (...args: unknown[]) => switchProfile(...args),
+  syncGeneratedVariants: (...args: unknown[]) => syncGeneratedVariants(...args),
 }));
 
 const { runCli } = await import("../config-cli.js");
@@ -48,6 +55,7 @@ function captureConsole(fn: () => Promise<number>): Promise<{ code: number; out:
 beforeEach(() => {
   listProfiles.mockClear();
   switchProfile.mockClear();
+  syncGeneratedVariants.mockClear();
 });
 
 describe("profile list / profile show", () => {
@@ -116,6 +124,19 @@ describe("profile set", () => {
     switchProfile.mockImplementationOnce(() => ({ profile: "work", dryRun: false, hosts: [], restartRequired: false }));
     await captureConsole(() => runCli(["profile", "set", "work", "--host", "codex"]));
     expect((switchProfile.mock.calls.at(-1) as any[] | undefined)?.[0]).toMatchObject({ host: "codex" });
+  });
+
+  test("T4: syncGeneratedVariants runs before switchProfile, and a synced host prints one line", async () => {
+    syncGeneratedVariants.mockImplementationOnce(() => [
+      { host: "claude", status: "synced", profiles: ["balanced"], retained: [], files: 4 },
+      { host: "cursor", status: "skipped", profiles: [], retained: [], files: 0, reason: "all tiers inherit" },
+    ]);
+    switchProfile.mockImplementationOnce(() => ({ profile: "work", dryRun: false, hosts: [], restartRequired: false }));
+    const r = await captureConsole(() => runCli(["profile", "set", "work"]));
+    expect(r.code).toBe(0);
+    expect(syncGeneratedVariants).toHaveBeenCalledTimes(1);
+    expect(r.out).toContain("synced claude: 4 file(s) across 1 profile(s)");
+    expect(r.out).not.toContain("cursor"); // skipped hosts stay silent
   });
 
   test("a partial failure (mixed report) exits 1", async () => {

@@ -62,11 +62,31 @@ function resolveCommon(opts: CommonOpts): { targetHome: string; stateFilePath: s
 
 export interface ListProfilesOptions extends CommonOpts {
   hosts?: readonly Host[];
+  /** Per-host declared default profile (registry `hostDefaults`, rank 3 of
+   *  profile resolution — `scripts/lib/model-profiles.ts:356`). Used only
+   *  when a host has no recorded `modelProfile` in install-state: that
+   *  value drives what `installActiveProfiles` *writes* on the next
+   *  regenerate (not merely what the UI shows), so a caller that can reach
+   *  the registry should pass this rather than accept the last-resort
+   *  literal below. Omit when the registry is unreachable (e.g. the two
+   *  published config-CLIs, which cannot depend on `scripts/lib`) — the
+   *  literal is the correct degrade, not a bug to work around. */
+  hostDefaults?: Readonly<Record<string, string>>;
 }
 
-/** Enumerates installed variant dirs per detected host + reads recorded
+/**
+ * Enumerates installed variant dirs per detected host + reads recorded
  * state. Never touches the registry — every profile name comes from
- * on-disk directories (MPS-02 offline requirement). */
+ * on-disk directories (MPS-02 offline requirement); `opts.hostDefaults` is
+ * the one exception, an optional caller-supplied map read only as the
+ * fallback for a host with no recorded `modelProfile`.
+ *
+ * ACCEPTED RISK (plan-critic F3, not fixed here): a host with no recorded
+ * `modelProfile` is still auto-installed on the next regenerate — this
+ * change only makes that auto-install target the registry's declared
+ * default instead of a hardcoded literal. Refusing to auto-install an
+ * unswitched host at all would be a separate, unrequested behaviour change.
+ */
 export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
   const { targetHome, stateFilePath } = resolveCommon(opts);
   const state = readInstallState(stateFilePath);
@@ -93,7 +113,7 @@ export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
       installed,
       skipped: false,
       skipReason: null,
-      activeProfile: platform?.modelProfile?.profile ?? "balanced",
+      activeProfile: platform?.modelProfile?.profile ?? opts.hostDefaults?.[host] ?? "balanced",
       bundleVersion: platform?.plugin?.version ?? null,
       availableProfiles,
     };

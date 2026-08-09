@@ -796,6 +796,25 @@ describe("renderModelRegistry — overlay override count display (APCR-01.10)", 
   });
 });
 
+describe("renderModelRegistry — help guide explains Host Defaults vs. the actually-installed profile", () => {
+  const minimalRegistry = {
+    registry: {
+      profiles: { p: { description: "P", hosts: {} } },
+      tiers: ["light"],
+      hostDefaults: {},
+      workflowTiers: {},
+    },
+    source: { overlay: null, tombstoned: [] },
+  };
+
+  it("adds a Host Defaults dt/dd pair distinguishing it from the currently-installed profile", () => {
+    const html = renderModelRegistry(minimalRegistry, { writeMode: false });
+    expect(html).toContain("<dt>Host Defaults</dt>");
+    expect(html.toLowerCase()).toContain("not</strong> the profile currently installed");
+    expect(html).toContain("Switch Profile");
+  });
+});
+
 describe("handleRegistryCellEdit — in-memory cell edit (REGWIRE-01)", () => {
   it("updates model field in overlay + sets dirty", () => {
     const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "m-l", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
@@ -1424,6 +1443,55 @@ describe("handleRegistryRegenerate — streaming SSE (REGEN-01..06)", () => {
     await handleRegistryRegenerate(ctx);
     expect(ctx.root.children[0].textContent).toContain("network down");
     expect(ctx.state.regenerating).toBe(false);
+  });
+
+  // ── T5/T6k: variant-sync SSE frame rendering ──────────────────────────────
+  it("renders variant-sync frames: synced hosts are folded into the success banner (T5)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const sseChunks = [
+      'data: {"type":"variant-sync","host":"claude","status":"synced","profiles":["balanced"],"files":3,"retained":[]}\n\n',
+      'data: {"type":"variant-sync","host":"cursor","status":"skipped","profiles":[],"files":0,"retained":[],"reason":"all tiers inherit"}\n\n',
+      'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
+      'data: {"type":"done","exitCode":0}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    const banner = ctx.root.children[0];
+    expect(banner.className).toBe("success");
+    expect(banner.textContent).toContain("Synced");
+    expect(banner.textContent).toContain("claude");
+  });
+
+  it("does NOT render a success banner when a variant-sync frame reports failed (T5)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const sseChunks = [
+      'data: {"type":"variant-sync","host":"claude","status":"failed","profiles":[],"files":0,"retained":[],"error":"disk full"}\n\n',
+      'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
+      'data: {"type":"done","exitCode":0}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    const banner = ctx.root.children[0];
+    expect(banner.className).not.toBe("success");
+    expect(banner.textContent).toContain("Variant sync failed");
+    expect(banner.textContent).toContain("disk full");
+  });
+
+  it("a skipped variant-sync frame (the routine no-checkout case) stays silent — no banner noise", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const sseChunks = [
+      'data: {"type":"variant-sync","host":"claude","status":"skipped","profiles":[],"files":0,"retained":[],"reason":"no source checkout — nothing to sync"}\n\n',
+      'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
+      'data: {"type":"done","exitCode":0}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    await handleRegistryRegenerate(ctx);
+    const banner = ctx.root.children[0];
+    expect(banner.className).toBe("success");
+    expect(banner.textContent).not.toContain("Synced");
   });
 });
 

@@ -19,8 +19,8 @@
  * would run and emit a wrong/empty artifact set — worse than a diagnosable 501.
  */
 
-import fs from "fs";
 import path from "path";
+import { findRepoRootWithMarker } from "@massa-ai/shared";
 
 const MARKER = path.join("scripts", "generate-subagent-artifacts.ts");
 /** A superset of every measured working position (4 up in a dev checkout, 3
@@ -31,16 +31,12 @@ let cachedRoot: string | null | undefined;
 
 /** Pure, parameterized search — exported so the bounded-walk contract (finds a marker N
  *  levels up, resolves to `null` rather than throwing once the filesystem root is reached)
- *  is directly testable without depending on this module's own on-disk position. */
+ *  is directly testable without depending on this module's own on-disk position. Delegates
+ *  to `@massa-ai/shared`'s `findRepoRootWithMarker` (factored out so `variant-sync.ts` and
+ *  the published config-CLIs share the same walk); this function's own signature, MARKER,
+ *  MAX_LEVELS, memoization and 501-message shaping are all unchanged. */
 export function findDeploymentRoot(startDir: string): string | null {
-  let dir = startDir;
-  for (let i = 0; i <= MAX_LEVELS; i++) {
-    if (fs.existsSync(path.join(dir, MARKER))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break; // reached the filesystem root
-    dir = parent;
-  }
-  return null;
+  return findRepoRootWithMarker(startDir, MARKER, MAX_LEVELS);
 }
 
 /** Resolves and memoizes the repo root housing `scripts/generate-subagent-artifacts.ts`,

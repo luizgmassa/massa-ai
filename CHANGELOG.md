@@ -73,6 +73,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolved outside a source checkout (the Docker image, the published npm package).
   The path resolver is now a bounded upward search for a repo marker instead of two
   fixed `../../../../` climbs that only worked from one position in the source tree.
+- **"Regenerate Artifacts" now actually changes what a subsequent profile switch
+  installs.** Nothing previously copied the freshly regenerated
+  `apps/<host>-plugin/agent-profiles/<profile>/` bundles into a host's installed
+  variant root — regenerate would regenerate, then reinstall from whatever stale tree
+  was already there (measured: an operator's regenerated `opencode` `balanced` profile
+  carried a v1.42 overlay while the installed variant tree it switched from still
+  carried v1.41.0). Both the tools-api regenerate-stream route and `POST
+  /api/v1/profiles/switch` now bridge the generated tree into the installed variant
+  root first, reported as a new `variant-sync` SSE event per host on the Web UI's
+  Regenerate flow; both published config-CLIs (`massa-ai-config profile set`) do the
+  same from a source checkout. This bridge is a no-op without a source checkout, so a
+  published npm/marketplace install sees no behaviour change. An installed profile
+  directory the source no longer emits is never deleted. `listProfiles` also now
+  prefers the registry's declared per-host default profile (when reachable) over a
+  hardcoded `"balanced"` literal for a host with no recorded active profile, so a first
+  auto-install targets the registry's real default instead of always `balanced`; the
+  Web UI's registry help text now explains that "Host Defaults" is that build-time
+  default, not the currently-installed profile.
 - **The registry editor's Duplicate and Delete profile pickers no longer report "no
   profiles available" for an operator who hasn't edited anything this session.** Both
   now read the effective (server + in-memory-overlay) registry instead of only the raw

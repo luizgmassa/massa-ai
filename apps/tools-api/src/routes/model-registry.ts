@@ -27,6 +27,30 @@ function profilesLib(): Record<string, unknown> {
   return _profilesLib!;
 }
 
+/**
+ * Best-effort per-host default profile map from the effective registry
+ * (`registry.hostDefaults`, rank 3 of profile resolution —
+ * `scripts/lib/model-profiles.ts:356`), reusing the same lazy `profilesLib()`
+ * dynamic-require pattern above. Returns `undefined` — never throws — when
+ * the checkout or the lib is unavailable, so every caller falls through to
+ * `listProfiles`'s own last-resort `"balanced"` literal (T2) instead of
+ * failing the request. Exported for `model-registry-stream.ts` and
+ * `profiles.ts`, which need `hostDefaults` for `listProfiles()` but must not
+ * duplicate the dynamic-require plumbing.
+ */
+export function getRegistryHostDefaults(): Record<string, string> | undefined {
+  try {
+    const root = getDeploymentRoot();
+    if (!root) return undefined;
+    const lib = profilesLib();
+    const result = (lib.loadEffectiveRegistry as (opts?: { overlayPath?: string }) => any)({ overlayPath: OVERLAY_PATH });
+    const hostDefaults = result?.registry?.hostDefaults;
+    return hostDefaults && typeof hostDefaults === "object" ? (hostDefaults as Record<string, string>) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const REGISTRY_DETAIL = {
   tags: ["model-registry"],
 };

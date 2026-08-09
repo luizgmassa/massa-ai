@@ -98,3 +98,5 @@ export {
   type HostSwitchResult,
   type SwitchReport,
 } from "./profile-switch/report.js";
+export { syncGeneratedVariants, type VariantSyncHostResult, type VariantSyncOptions } from "./profile-switch/variant-sync.js";
+export { findRepoRootWithMarker } from "./profile-switch/repo-root.js";

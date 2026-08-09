@@ -6,11 +6,17 @@
  *
  * Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn
  * (non-blocking), pipes stdout/stderr line-by-line to an SSE stream. After
- * the generator succeeds (exit 0), automatically calls `switchProfile` for
- * every detected host to reinstall the active profile's agents from the
- * freshly generated variant dirs. Emits install events as SSE
- * `data: {"type":"install","host":"...","status":"switched|skipped|failed",...}`
- * frames, then a terminal `done` event with the exit code.
+ * the generator succeeds (exit 0), automatically bridges the freshly
+ * generated `apps/<host>-plugin/agent-profiles/` trees into each host's
+ * installed variant root (`syncGeneratedVariants`, see `variant-sync.ts`'s
+ * module docblock for why this bridge exists — without it "Regenerate
+ * Artifacts" regenerates and then reinstalls from a stale tree) and then
+ * calls `switchProfile` for every detected host to reinstall the active
+ * profile's agents from those freshly-synced variant dirs. Emits one
+ * `variant-sync` SSE frame per host from the bridge step, then one `install`
+ * SSE frame per host from the switch step
+ * (`data: {"type":"install","host":"...","status":"switched|skipped|failed",...}`),
+ * then a terminal `done` event with the exit code.
  *
  * Streaming pattern follows events.ts exactly: return
  * `new Response(new ReadableStream({ start, cancel }), { headers })`. Do NOT
@@ -28,11 +34,13 @@ import {
   listProfiles,
   switchProfile,
   reportSucceeded,
+  syncGeneratedVariants,
   type Host,
   type HostSwitchStatus,
   type SwitchReport,
 } from "@massa-ai/shared";
 import { getDeploymentRoot, deploymentUnavailableMessage } from "./model-registry-deployment.js";
+import { getRegistryHostDefaults } from "./model-registry.js";
 
 // configDir import is needed so mock.module can intercept @massa-ai/shared/config
 // in tests (the route shares the mock surface with model-registry.ts).
@@ -62,10 +70,28 @@ function deriveInstallStatus(report: SwitchReport): HostSwitchStatus {
 }
 
 /** Install the active profile's agents for every detected host after
- *  regeneration. Emits one `install` SSE event per host, then returns. */
+ *  regeneration. First bridges the freshly regenerated variant trees into
+ *  each host's installed variant root (one `variant-sync` SSE event per
+ *  host — see the module docblock), then emits one `install` SSE event per
+ *  host, then returns. */
 function installActiveProfiles(controller: ReadableStreamDefaultController<Uint8Array>, closedRef: { closed: boolean }): void {
   try {
-    const inventory = listProfiles();
+    const syncResults = syncGeneratedVariants({ sourceRoot: getDeploymentRoot() });
+    for (const r of syncResults) {
+      if (closedRef.closed) return;
+      controller.enqueue(sseFrame({
+        type: "variant-sync",
+        host: r.host,
+        status: r.status,
+        profiles: r.profiles,
+        files: r.files,
+        retained: r.retained,
+        ...(r.reason ? { reason: r.reason } : {}),
+        ...(r.error ? { error: r.error } : {}),
+      }));
+    }
+
+    const inventory = listProfiles({ hostDefaults: getRegistryHostDefaults() });
     for (const hostEntry of inventory.hosts) {
       if (closedRef.closed) return;
       const host = hostEntry.host as Host;
@@ -217,7 +243,7 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
       tags: ["model-registry"],
       summary: "Regenerate subagent artifacts + auto-install to active dirs (streaming SSE)",
       description:
-        "Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn (non-blocking). Pipes stdout/stderr line-by-line as SSE. After the generator succeeds (exit 0), calls switchProfile for every detected host to reinstall the active profile's agents from the freshly generated variant dirs. Emits `install` events per host, then a terminal `done` event with the exit code.",
+        "Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn (non-blocking). Pipes stdout/stderr line-by-line as SSE. After the generator succeeds (exit 0), bridges the freshly generated agent-profiles trees into each host's installed variant root (`variant-sync` events per host), then calls switchProfile for every detected host to reinstall the active profile's agents from those synced variant dirs. Emits `install` events per host, then a terminal `done` event with the exit code.",
     },
   })
   // Deprecated alias — same behavior, kept for backward compat with older UI.

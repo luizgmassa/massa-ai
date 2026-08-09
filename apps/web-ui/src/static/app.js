@@ -1263,6 +1263,10 @@ export function renderModelRegistry(data, opts) {
     '</dl>' +
     '<h4>Workflow Tiers</h4>' +
     '<p>The Workflow Tiers section maps a workflow name to a tier, overriding the charter default for agents dispatched under that workflow. The builtin registry ships with no workflow tier overrides. Add one (e.g., <code>spec-driven &rarr; deep</code>) to pin a heavier model tier for a specific workflow.</p>' +
+    '<h4>Host Defaults</h4>' +
+    '<dl>' +
+    '<dt>Host Defaults</dt><dd>The registry\'s declared default profile per host, used only the first time that host is auto-installed (it has no recorded active profile yet). It is <strong>not</strong> the profile currently installed on this machine — a host can be running any profile you switched it to, regardless of what Host Defaults reads here. See the "Switch Profile" tab to view each host\'s actual active profile and to change it.</dd>' +
+    '</dl>' +
     '</div>' +
     '</details>';
 
@@ -1902,6 +1906,7 @@ export async function handleRegistryRegenerate(ctx) {
     let buffer = "";
     let gotDone = false;
     const installResults = { switched: [], skipped: [], unsupported: [], failed: [] };
+    const variantSyncResults = { synced: [], failed: [] };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1928,13 +1933,23 @@ export async function handleRegistryRegenerate(ctx) {
           else if (event.status === "skipped") installResults.skipped.push(event.host);
           else if (event.status === "unsupported") installResults.unsupported.push(event.unsupported || event.host);
           else if (event.status === "failed") installResults.failed.push(event.host + ": " + (event.error || event.failed || "unknown"));
+        } else if (event.type === "variant-sync") {
+          // Bridge-step frames (T3), emitted before the "install" frames —
+          // one per host, copying the freshly regenerated agent-profiles
+          // trees into that host's installed variant root. "skipped" is the
+          // routine case (no source checkout, Cursor, or no variant tree
+          // installed yet) and stays silent, matching how a "skipped"
+          // install host needs no banner line on its own.
+          if (event.status === "synced") variantSyncResults.synced.push(event.host);
+          else if (event.status === "failed") variantSyncResults.failed.push(event.host + ": " + (event.error || "unknown"));
         } else if (event.type === "done") {
           gotDone = true;
           // APCR-06.6: the generator can exit 0 while at least one host's
           // install failed or was unsupported — that is not a success.
-          var hadInstallProblems = installResults.failed.length > 0 || installResults.unsupported.length > 0;
+          var hadInstallProblems = installResults.failed.length > 0 || installResults.unsupported.length > 0 || variantSyncResults.failed.length > 0;
           if (event.exitCode === 0 && !hadInstallProblems) {
             var parts = ["Regeneration complete."];
+            if (variantSyncResults.synced.length > 0) parts.push("Synced: " + variantSyncResults.synced.join(", "));
             if (installResults.switched.length > 0) parts.push("Installed: " + installResults.switched.join(", "));
             if (installResults.skipped.length > 0) parts.push("Skipped: " + installResults.skipped.join(", "));
             showBanner(ctx.root, "success", parts.join(" "));
@@ -1944,6 +1959,7 @@ export async function handleRegistryRegenerate(ctx) {
             showBanner(ctx.root, "error", "Regeneration failed (exit " + event.exitCode + ").");
           } else {
             var errParts = ["Regeneration complete, but not every host installed."];
+            if (variantSyncResults.failed.length > 0) errParts.push("Variant sync failed: " + variantSyncResults.failed.join("; "));
             if (installResults.switched.length > 0) errParts.push("Installed: " + installResults.switched.join(", "));
             if (installResults.skipped.length > 0) errParts.push("Skipped: " + installResults.skipped.join(", "));
             if (installResults.unsupported.length > 0) errParts.push("Unsupported: " + installResults.unsupported.join("; "));
