@@ -11,7 +11,7 @@ Use for the required Execute phase. Implement ONE task at a time: surgical chang
 - `.specs/features/<slug>/tasks.md` when Tasks was included, otherwise the inline atomic step list from `workflows/spec-driven.md`.
 - Current `.specs/project/STATE.md`.
 - `references/spec-driven/coding-principles.md`.
-- `references/spec-driven/sub-agents.md` when a formal task plan has more than 3 tasks (the batch offer trigger — packing still uses ~7-task batches), or final validation needs the standalone verifier fallback.
+- `references/spec-driven/sub-agents.md` when a formal task plan has more than 3 tasks (the batch offer trigger — packing uses max-3-task batches, ideal 2), or final validation needs the standalone verifier fallback.
 
 Artifact-store evidence: active artifact key, version, and checksum after write (see `references/spec-driven/artifact-store.md`).
 
@@ -31,15 +31,15 @@ Do not proceed without stating these explicitly.
 
 ## Process
 
-**Batch worker context:** When this task is executed as part of a phase-batch sub-agent, the worker receives the task definitions for every phase in its batch, coding principles, the generated Test Coverage Matrix and Gate Check Commands from tasks.md, and relevant spec/design context. A batch is one or more consecutive whole phases packed to ~7 tasks. The worker executes ALL tasks in its assigned batch in order — finishing every task in one phase before starting the next phase in the batch — and each task follows every step below (implement → gate → atomic commit) before moving to the next. After all tasks in the batch are complete, the worker reports a compact summary (tasks done, commit hashes, test counts, deviations/blockers) to the orchestrator. See [sub-agents.md](sub-agents.md) for the full model.
+**Batch worker context:** When this task is executed as part of a phase-batch sub-agent, the worker receives the task definitions for every phase in its batch, coding principles, the generated Test Coverage Matrix and Gate Check Commands from tasks.md, and relevant spec/design context. A batch is one or more consecutive whole phases packed to max 3 tasks (ideal 2). The worker executes ALL tasks in its assigned batch in order — finishing every task in one phase before starting the next phase in the batch — and each task follows every step below (implement → gate → atomic commit) before moving to the next. After all tasks in the batch are complete, the worker reports a compact summary (tasks done, commit hashes, test counts, deviations/blockers) to the orchestrator. See [sub-agents.md](sub-agents.md) for the full model.
 
 ### Before implementing: assess sub-agent delegation (MANDATORY — before the first task)
 
-Before implementing anything, if a formal `.specs/features/<slug>/tasks.md` with an Execution Plan exists, **count its total tasks**. If the feature has **more than 3 tasks**, you MUST present the sub-agent offer to the user and wait for their choice before starting Execute — do not silently proceed inline. Packing itself still uses task-budgeted batches (~7 tasks per worker, whole phases — see [sub-agents.md](sub-agents.md)); a 4–8-task feature packs into a single batch and is still offered as one batch worker. If the feature has 3 or fewer tasks, or the user declines the offer, execute inline. Skip this check only when you are already a batch worker executing a delegated batch (the orchestrator already made the delegation decision).
+Before implementing anything, if a formal `.specs/features/<slug>/tasks.md` with an Execution Plan exists, **count its total tasks**. If the feature has **more than 3 tasks**, you MUST present the sub-agent offer to the user and wait for their choice before starting Execute — do not silently proceed inline. Packing itself still uses task-budgeted batches (max 3 tasks per worker, ideal 2, whole phases — see [sub-agents.md](sub-agents.md)); a triggered feature always packs into at least two workers and the offer is always presented. If any phase in `tasks.md` holds more than 3 tasks, that is a wrongly-sized Tasks artifact — stop and split the phase during Tasks (safety valve) before packing; never assign an over-budget worker. The offer message MUST begin with the pre-implementation change summary required by `references/implementation-delivery.md` Stage 1.5 — one list separated by tasks, derived from the approved spec/design/tasks artifacts — so the user sees what will change before choosing. If the feature has 3 or fewer tasks, or the user declines the offer, execute inline — the Stage 1.5 change summary is still presented before the first mutation, attached to the feature's delivery-authorization ask. Skip this check only when you are already a batch worker executing a delegated batch (the orchestrator already made the delegation decision).
 
 ### 0. List Atomic Steps (MANDATORY when Tasks phase was skipped)
 
-If there is no `tasks.md` for this feature, you MUST list atomic steps before writing any code. This is non-negotiable — it prevents the agent from losing focus and doing too many things at once.
+If there is no `tasks.md` for this feature, you MUST list atomic steps before writing any code. This is non-negotiable — it prevents the agent from losing focus and doing too many things at once. The listed steps double as the Stage 1.5 change summary (`references/implementation-delivery.md`): present them before the first mutation, attached to the delivery-authorization ask.
 
 ```
 ## Execution Plan

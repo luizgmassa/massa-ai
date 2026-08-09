@@ -213,7 +213,13 @@ ${taskBreakdown}
 
 describe("validate_tasks.py (T2, SYNC-01 AC2)", () => {
   test("live fixture: this feature's own tasks.md exits 0 (dogfood)", () => {
-    const r = runPy(VALIDATE_TASKS, ["tlc-330-harness-update", "--root", "."]);
+    // Repointed from the historical `tlc-330-harness-update` fixture (T9,
+    // WF-16/D14): its checked-in tasks.md predates the max-3-tasks-per-phase
+    // rule and now legitimately trips the new per-phase error (6/9/4-task
+    // phases) - the validator working as designed, not a regression. Point
+    // the dogfood assertion at a live tasks.md this task's own gate already
+    // guarantees stays <=3 tasks per phase.
+    const r = runPy(VALIDATE_TASKS, ["workflow-interaction-policies", "--root", "."]);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("0 error(s)");
   });
@@ -358,6 +364,126 @@ T1 → T2
     const r = runPy(VALIDATE_TASKS, ["--root", root]);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("diagram arrows not parsed confidently");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T9: validate_tasks.ts per-phase task-count enforcement (WF-16, D14)
+// ---------------------------------------------------------------------------
+
+describe("validate_tasks.ts phase-size enforcement (T9, WF-16)", () => {
+  test("a phase with 4 tasks in Task Breakdown exits 1, names the phase and count", () => {
+    const root = makeTempRoot("validate-tasks-phase-oversized");
+    const executionPlan = `### Phase 1: Foundation
+
+\`\`\`
+T1 → T2 → T3 → T4
+\`\`\`
+`;
+    const taskBreakdown = `### Phase 1: Foundation
+
+### T1: Create thing
+**Where**: \`src/thing.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+
+### T2: Extend thing
+**Where**: \`src/thing.ts\`
+**Depends on**: T1
+**Tests**: unit
+**Gate**: quick
+
+### T3: Extend thing more
+**Where**: \`src/thing.ts\`
+**Depends on**: T2
+**Tests**: unit
+**Gate**: quick
+
+### T4: Extend thing even more
+**Where**: \`src/thing.ts\`
+**Depends on**: T3
+**Tests**: unit
+**Gate**: quick
+`;
+    writeFeatureFile(root, "task-feature", "tasks.md", minimalTasksMd(taskBreakdown, executionPlan));
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("Phase 1 has 4 tasks (max 3 per phase, ideal 2)");
+  });
+
+  test("phases holding at most 3 tasks each pass (green)", () => {
+    const root = makeTempRoot("validate-tasks-phase-ok");
+    const executionPlan = `### Phase 1: Foundation
+
+\`\`\`
+T1 → T2 → T3
+\`\`\`
+`;
+    const taskBreakdown = `### Phase 1: Foundation
+
+### T1: Create thing
+**Where**: \`src/thing.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+
+### T2: Extend thing
+**Where**: \`src/thing.ts\`
+**Depends on**: T1
+**Tests**: unit
+**Gate**: quick
+
+### T3: Extend thing more
+**Where**: \`src/thing.ts\`
+**Depends on**: T2
+**Tests**: unit
+**Gate**: quick
+`;
+    writeFeatureFile(root, "task-feature", "tasks.md", minimalTasksMd(taskBreakdown, executionPlan));
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).not.toContain("max 3 per phase");
+  });
+
+  test("tasks before any phase heading in Task Breakdown are not counted against a phase", () => {
+    const root = makeTempRoot("validate-tasks-phase-less");
+    const executionPlan = `### Foundation
+
+\`\`\`
+T1 → T2 → T3 → T4
+\`\`\`
+`;
+    // No "### Phase N" heading inside Task Breakdown at all - unchanged
+    // behavior for phase-less breakdowns, even with 4 tasks.
+    const taskBreakdown = `### T1: Create thing
+**Where**: \`src/thing.ts\`
+**Depends on**: None
+**Tests**: unit
+**Gate**: quick
+
+### T2: Extend thing
+**Where**: \`src/thing.ts\`
+**Depends on**: T1
+**Tests**: unit
+**Gate**: quick
+
+### T3: Extend thing more
+**Where**: \`src/thing.ts\`
+**Depends on**: T2
+**Tests**: unit
+**Gate**: quick
+
+### T4: Extend thing even more
+**Where**: \`src/thing.ts\`
+**Depends on**: T3
+**Tests**: unit
+**Gate**: quick
+`;
+    writeFeatureFile(root, "task-feature", "tasks.md", minimalTasksMd(taskBreakdown, executionPlan));
+    const r = runPy(VALIDATE_TASKS, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).not.toContain("max 3 per phase");
   });
 });
 
