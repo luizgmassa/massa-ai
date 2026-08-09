@@ -145,6 +145,7 @@ describe("GET /api/v1/model-registry", () => {
         overlay: { profiles: { balanced: { description: "overlay" } } },
         tombstoned: [],
       },
+      overlayOverrideCount: 3,
     }));
 
     const res = await get("/api/v1/model-registry");
@@ -152,6 +153,21 @@ describe("GET /api/v1/model-registry", () => {
     expect(res.json.success).toBe(true);
     expect(res.json.data.registry.version).toBe(1);
     expect(res.json.data.source.overlay).not.toBeNull();
+    // APCR-01.10: the count of overlay entries surviving normalization is surfaced to the
+    // operator through the read path, not just computed internally.
+    expect(res.json.data.overlayOverrideCount).toBe(3);
+  });
+
+  test("200 with no overlay reports overlayOverrideCount:0 (APCR-01.10)", async () => {
+    loadEffectiveRegistry.mockImplementationOnce(() => ({
+      registry: builtinRegistry,
+      source: { builtin: builtinRegistry, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
+    }));
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect(res.json.data.overlayOverrideCount).toBe(0);
   });
 
   test("200 on overlay corruption with overlayError surfaced", async () => {
@@ -175,6 +191,7 @@ describe("PUT /api/v1/model-registry", () => {
     loadEffectiveRegistry.mockImplementationOnce(() => ({
       registry: builtinRegistry,
       source: { builtin: builtinRegistry, overlay: { profiles: {} }, tombstoned: [] },
+      overlayOverrideCount: 1,
     }));
 
     const res = await put("/api/v1/model-registry", {
@@ -185,6 +202,9 @@ describe("PUT /api/v1/model-registry", () => {
     expect(res.status).toBe(200);
     expect(res.json.success).toBe(true);
     expect(res.json.data.registry).toBeDefined();
+    // APCR-01.10: the write path's response also reports the post-save override count, not
+    // just the read path — the operator sees it immediately after Save Overlay.
+    expect(res.json.data.overlayOverrideCount).toBe(1);
   });
 
   test("uses the shared library merge, not a hand-copied twin (APCR-01.7)", async () => {

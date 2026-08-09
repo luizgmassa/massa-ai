@@ -33,6 +33,7 @@ const {
   initRegistryOverlay,
   mergeRegistryForDisplay,
   renderProfilesView,
+  renderModelRegistry,
 } = { ...mod, ...UI } as {
   showBanner: (root: MockRoot, type: string, message: string) => void;
   handleConfigSave: (ctx: any, section: string) => Promise<void>;
@@ -56,6 +57,7 @@ const {
   initRegistryOverlay: (ctx: any, registry: any, source?: any) => void;
   mergeRegistryForDisplay: (serverData: any, overlay: any) => any;
   renderProfilesView: (profilesData: any, registryData: any, opts?: any) => string;
+  renderModelRegistry: (data: any, opts?: any) => string;
 };
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
@@ -630,6 +632,56 @@ describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
     const overlay = { profiles: {}, hostDefaults: {}, workflowTiers: { search: null }, tiers: ["light"] };
     const result = mergeRegistryForDisplay(server, overlay);
     expect(result.registry.workflowTiers.search).toBeUndefined();
+  });
+
+  it("carries overlayOverrideCount through the display merge (APCR-01.10)", () => {
+    // The count is server-computed from the saved overlay, not the in-memory display merge —
+    // it must survive both the "overlay has no profiles, return serverData as-is" branch and
+    // the "build a fresh {registry, source}" branch that previously dropped it.
+    const server = { registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} }, source: {}, overlayOverrideCount: 5 };
+    const noProfilesOverlay = { profiles: {} };
+    expect(mergeRegistryForDisplay(server, noProfilesOverlay).overlayOverrideCount).toBe(5);
+
+    const withProfilesOverlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    expect(mergeRegistryForDisplay(server, withProfilesOverlay).overlayOverrideCount).toBe(5);
+  });
+
+  it("defaults overlayOverrideCount to 0 when the server data omits it", () => {
+    const server = { registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} }, source: {} };
+    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    expect(mergeRegistryForDisplay(server, overlay).overlayOverrideCount).toBe(0);
+  });
+});
+
+describe("renderModelRegistry — overlay override count display (APCR-01.10)", () => {
+  const minimalRegistry = {
+    registry: {
+      profiles: { p: { description: "P", hosts: {} } },
+      tiers: ["light"],
+      hostDefaults: {},
+      workflowTiers: {},
+    },
+    source: { overlay: null, tombstoned: [] },
+  };
+
+  it("renders a compact override-count line when the count is greater than 0", () => {
+    const html = renderModelRegistry({ ...minimalRegistry, overlayOverrideCount: 3 }, { writeMode: false });
+    expect(html).toContain("Overlay is overriding 3 entries from the builtin registry.");
+  });
+
+  it("uses singular phrasing for a count of exactly 1", () => {
+    const html = renderModelRegistry({ ...minimalRegistry, overlayOverrideCount: 1 }, { writeMode: false });
+    expect(html).toContain("Overlay is overriding 1 entry from the builtin registry.");
+  });
+
+  it("renders nothing extra when the count is 0 (no overlay, no noise)", () => {
+    const html = renderModelRegistry({ ...minimalRegistry, overlayOverrideCount: 0 }, { writeMode: false });
+    expect(html).not.toContain("registry-override-count");
+  });
+
+  it("renders nothing extra when overlayOverrideCount is absent", () => {
+    const html = renderModelRegistry(minimalRegistry, { writeMode: false });
+    expect(html).not.toContain("registry-override-count");
   });
 });
 

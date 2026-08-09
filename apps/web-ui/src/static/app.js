@@ -1126,6 +1126,16 @@ export function renderModelRegistry(data, opts) {
     ? '<div class="error">Overlay error: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
     : "";
 
+  // APCR-01.10: the only available mitigation for the AC9 known limitation (a stale
+  // full-copy overlay entry stays frozen on an old builtin value) is making the override
+  // count visible. A compact, honest line — nothing rendered when there is nothing to
+  // override, so an operator with no overlay sees no noise.
+  const overlayOverrideCount = typeof payload.overlayOverrideCount === "number" ? payload.overlayOverrideCount : 0;
+  const overlayOverrideLine = overlayOverrideCount > 0
+    ? '<p class="registry-override-count muted">Overlay is overriding ' + overlayOverrideCount +
+      " entr" + (overlayOverrideCount === 1 ? "y" : "ies") + " from the builtin registry.</p>"
+    : "";
+
   // Build rows = {host, tier} pairs
   const rows = [];
   for (const host of REGISTRY_HOSTS) {
@@ -1260,6 +1270,7 @@ export function renderModelRegistry(data, opts) {
     '<section class="view"><h2>Model Registry</h2>' + unsaved +
     registryError +
     overlayBanner +
+    overlayOverrideLine +
     grid +
     '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
     '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + addWorkflowTierBtn + "</div>" +
@@ -1608,7 +1619,14 @@ export function mergeRegistryForDisplay(serverData, overlay) {
       merged.profiles[key] = val;
     }
   }
-  return { registry: merged, source: (serverData && serverData.source) || {} };
+  // overlayOverrideCount (APCR-01.10) is server-computed from the saved overlay, not the
+  // in-memory display merge — carry it through unchanged so the count stays visible while
+  // add/duplicate/delete/edit are shown pre-save.
+  return {
+    registry: merged,
+    source: (serverData && serverData.source) || {},
+    overlayOverrideCount: (serverData && serverData.overlayOverrideCount) || 0,
+  };
 }
 
 export function handleRegistryCellEdit(ctx, profile, host, tier, field, value) {

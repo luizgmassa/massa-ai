@@ -50,6 +50,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         data: {
           registry: result.registry,
           source: result.source,
+          overlayOverrideCount: result.overlayOverrideCount ?? 0,
           ...(result.overlayError ? { overlayError: result.overlayError } : {}),
         },
       };
@@ -59,7 +60,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         ...REGISTRY_DETAIL,
         summary: "Get effective registry (builtin + overlay) with source attribution",
         description:
-          "Returns the merged registry (builtin + overlay), source attribution (builtin, overlay, tombstoned), and overlayError if the overlay is corrupted (200 status, never fails).",
+          "Returns the merged registry (builtin + overlay), source attribution (builtin, overlay, tombstoned), overlayOverrideCount (APCR-01.10 — count of overlay entries surviving normalization, so an operator can see how much of the registry their overlay is overriding), and overlayError if the overlay is corrupted (200 status, never fails).",
       },
     },
   )
@@ -111,6 +112,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         data: {
           registry: result.registry,
           source: result.source,
+          overlayOverrideCount: result.overlayOverrideCount ?? 0,
         },
       };
     },
@@ -120,7 +122,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         ...REGISTRY_DETAIL,
         summary: "Write overlay (full-replace, validated, atomic)",
         description:
-          "Accepts the full overlay object. Validates the merged result (builtin + overlay) via validateRegistry(). On success, writes atomically to ~/.config/massa-ai/model-profiles.json and returns the updated effective registry. On failure, returns 400 with all violations.",
+          "Accepts the full overlay object. Validates the merged result (builtin + overlay) via validateRegistry(). On success, writes atomically to ~/.config/massa-ai/model-profiles.json and returns the updated effective registry, including overlayOverrideCount (APCR-01.10). On failure, returns 400 with all violations.",
       },
     },
   )
