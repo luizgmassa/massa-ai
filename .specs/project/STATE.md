@@ -1,6 +1,18 @@
 # massa-ai Spec State
 
-## Current — Admin Portal UX Overhaul (EXECUTE COMPLETE 2026-08-09 — T1-T15, 16 commits; validation pending; push/PR authorized)
+## Current — Admin Portal UX Overhaul (**VALIDATED PASS 2026-08-09** — T1-T15 + 2 fix loops, 18 commits + validation close-out; push/PR authorized)
+
+- Validation: **PASS**, 32/32 ACs evidenced (verifier corrected its own first-pass
+  36/39 denominator by re-deriving from spec.md: 8+5+5+6+2+6 = 32), 5/5 mutations
+  killed, 0 survivors (population in `validation.md`). Fix loop 1 (`f26ed6e3`):
+  reviewer-blocking — Save & Apply's generic retry banner destroyed the specific
+  apply-failure diagnostics (SSE-closed sentence, per-host detail); now appended as
+  "Details: …". Fix loop 2 (`58a79a39`): two test-only gaps — Delete-confirm-text
+  span sensor + 7 `button-row` assertions, both with observed red before green.
+  Final gates: web-ui 468/0, scripts registry+generator 124/0, tools-api registry
+  routes 23/0 (incl. unmocked PUT→GET round-trip), type-check 6/6, oxlint 0,
+  `generate:artifacts --check` no drift, scoped `validate_state` 0 errors (feature
+  absent from the 52-error legacy baseline).
 
 - projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-ux-overhaul` ·
   workflow: spec-driven (Large) · branch `spec/admin-portal-ux-overhaul` from

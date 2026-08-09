@@ -1181,7 +1181,7 @@
       "id": "admin-portal-ux-overhaul",
       "slug": "admin-portal-ux-overhaul",
       "title": "Admin Portal UX Overhaul — per-agent tier overrides, catalog grid restructure, unified Save & Apply, plain-English nomenclature, five-tab polish",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
