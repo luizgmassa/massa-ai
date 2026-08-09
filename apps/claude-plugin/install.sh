@@ -44,6 +44,11 @@ source "$REPO_ROOT/scripts/lib/installer-shared.sh"
 SCOPE="user"
 UNINSTALL=0
 DRY_RUN=0
+# Served-plugin version on the marketplace route, filled by
+# refresh_marketplace_cache and read by record_plugin_version. Declared at
+# top level so routes that never refresh (file route, uninstall) cannot trip
+# `set -u` (CMR R3).
+PLUGIN_SERVED_VERSION=""
 # The marketplace root to register. install-harness.sh resolves this once for
 # the whole run (--plugin-source local|copy|auto); a direct invocation of this
 # script defaults to the checkout it lives in.
@@ -426,7 +431,6 @@ record_plugin_version() {
   fi
 
   local version installed_at route
-  version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$SCRIPT_DIR/package.json" | head -n 1)"
   installed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   # installRoute (T8, design F1): installer-owned, engine-read-only. The
   # marketplace route (register_claude_plugin succeeded) serves agents in
@@ -434,6 +438,17 @@ record_plugin_version() {
   # Written on EVERY install path — an absent field is what makes the switch
   # engine refuse loud rather than guess (hosts.ts detectRoute).
   if [[ "$PLUGIN_ROUTE" -eq 1 ]]; then route="marketplace"; else route="file"; fi
+  # Version claim (CMR-02/03): the file route records the bundle version — it
+  # IS what was just copied. The marketplace route records what the CLI
+  # actually serves (refresh_marketplace_cache), which the version-pinned
+  # cache can hold BEHIND the bundle; recording the bundle version there is
+  # the lie that froze this host's harness gate at a stale cache. Empty
+  # served version → record no version at all (next run retries).
+  if [[ "$PLUGIN_ROUTE" -eq 1 ]]; then
+    version="$PLUGIN_SERVED_VERSION"
+  else
+    version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$SCRIPT_DIR/package.json" | head -n 1)"
+  fi
 
   # Tolerant of a corrupt/missing state file (rewrites a minimal valid one —
   # AC-8). A record-write failure warns but never fails the install: the next
@@ -458,7 +473,13 @@ const rec =
   data.platforms[host] && typeof data.platforms[host] === "object" && !Array.isArray(data.platforms[host])
     ? data.platforms[host]
     : { root, skillsOwner: "plugin", skills: [] };
-rec.plugin = { version, installedAt };
+// An empty version means the served version was unreadable (CMR-03): keep
+// any prior plugin record untouched and claim nothing new — an absent/stale
+// record is what makes the next harness run retry. installRoute is still
+// written below on every path.
+if (version) {
+  rec.plugin = { version, installedAt };
+}
 // installRoute is installer-owned (like plugin above); modelProfile is NEVER
 // written here — the switch engine (packages/shared/src/profile-switch/) is
 // its sole writer, and this installer only ever reads it (see
@@ -546,6 +567,77 @@ unregister_claude_plugin() {
   claude plugin marketplace remove "$PLUGIN_MARKETPLACE" </dev/null >/dev/null 2>&1 || true
 }
 
+# ── Marketplace cache refresh (CMR-01..05) ──────────────────────────────────
+# `claude plugin install` is an idempotent no-op on an already-installed
+# plugin, and the CLI serves a version-pinned cache snapshot — so an upgraded
+# bundle never reaches an already-registered host by itself (observed: cache
+# pinned at 1.28.0 while the checkout walked to 1.44.0). `claude plugin
+# update` re-materializes the cache from a directory-source marketplace
+# (verified against the real CLI, spec R1), so run it exactly when the served
+# version is OLDER than the bundle — never on equal (no-op) or newer (that
+# would downgrade; mirrors the harness "never downgrades" policy).
+
+# Prints the version Claude actually serves for $PLUGIN_ID, or "" when it
+# cannot be determined. Tolerant like recorded_profile: a missing/corrupt
+# registry, a legacy non-array entry shape, or an absent entry all mean
+# "unknown", never a failure. Claude-specific registry format — deliberately
+# NOT in installer-shared.sh (Codex's registry differs; don't generalize one
+# host's file shape).
+claude_served_plugin_version() {
+  local runner="$1"
+  "$runner" - "$PLUGIN_REGISTRY" "$PLUGIN_ID" <<'NODE'
+const fs = require("fs");
+const [, , file, id] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const entries = data && data.plugins ? data.plugins[id] : null;
+  if (!Array.isArray(entries) || entries.length === 0) process.exit(0);
+  const rec = entries.find((e) => e && e.scope === "user") ?? entries[0];
+  if (rec && typeof rec.version === "string") process.stdout.write(rec.version);
+} catch { /* unknown */ }
+NODE
+}
+
+# Fills PLUGIN_SERVED_VERSION. Every failure path degrades with a loud
+# warning and never aborts the install (I1) — an empty result makes
+# record_plugin_version skip the version claim, so the next harness run
+# retries instead of trusting a lie.
+refresh_marketplace_cache() {
+  local runner=""
+  if command -v node &>/dev/null; then runner="node"
+  elif command -v bun &>/dev/null; then runner="bun"
+  else
+    echo "  ⚠ node or bun required to verify the served plugin version — skipping cache refresh" >&2
+    return 0
+  fi
+
+  local served bundle
+  served="$(claude_served_plugin_version "$runner")"
+  bundle="$(installer_bundle_version "$SCRIPT_DIR/package.json")"
+  if [[ -z "$served" ]]; then
+    echo "  ⚠ could not read the served plugin version from $PLUGIN_REGISTRY — not recording a version claim" >&2
+    return 0
+  fi
+
+  if [[ "$(installer_compare_versions "$runner" "$served" "$bundle")" == "-1" ]]; then
+    if installer_host_cli_supports claude plugin update; then
+      if claude plugin update "$PLUGIN_ID" </dev/null >/dev/null 2>&1; then
+        vecho "  + refreshed marketplace cache: ${served} → ${bundle}"
+      else
+        echo "  ⚠ 'claude plugin update ${PLUGIN_ID}' failed — Claude keeps serving ${served}; re-run the installer or run the update manually" >&2
+      fi
+    else
+      echo "  ⚠ this claude CLI has no 'plugin update' — Claude keeps serving ${served}; update the CLI or reinstall the plugin" >&2
+    fi
+    # Re-read: record what the CLI serves NOW, whether or not the update
+    # succeeded (CMR-02 truthful record; a stale record keeps the harness
+    # version gate re-triggering until an update lands — self-healing).
+    served="$(claude_served_plugin_version "$runner")"
+  fi
+
+  PLUGIN_SERVED_VERSION="$served"
+}
+
 # Strip artifacts a previous file-route install left behind. Called on the
 # plugin route, where the bundle supplies all three itself. Without this an
 # upgrading user keeps their old loose commands and merged hooks *and* gains
@@ -615,6 +707,7 @@ vecho "Installing massa-ai Claude Code plugin to: $TARGET"
 PLUGIN_ROUTE=0
 if register_claude_plugin; then
   PLUGIN_ROUTE=1
+  refresh_marketplace_cache
 fi
 
 command_count=0
