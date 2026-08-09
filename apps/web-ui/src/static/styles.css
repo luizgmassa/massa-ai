@@ -477,10 +477,22 @@ pre code {
   font-size: 0.8rem;
 }
 
+/* T4 (APUX-06): horizontal-scroll wrapper for the registry grid — the Tool +
+ * Tier leading columns plus per-profile columns can exceed the viewport
+ * width at 7+ profiles. */
+.grid-scroll {
+  overflow-x: auto;
+}
+
 /* DS-03: Model Registry view */
 .registry-grid {
   width: 100%;
   border-collapse: collapse;
+}
+.registry-grid .tool-cell,
+.registry-grid .tier-cell {
+  font-weight: 600;
+  white-space: nowrap;
 }
 .registry-grid th,
 .registry-grid td {

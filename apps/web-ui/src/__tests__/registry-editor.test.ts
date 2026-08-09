@@ -48,12 +48,13 @@ describe("renderModelRegistry — grid render (REG-01)", () => {
     expect(html).toContain("work");
   });
 
-  it("renders host/tier pairs as rows", () => {
-    expect(html).toContain("claude / light");
-    expect(html).toContain("claude / standard");
-    expect(html).toContain("codex / deep");
-    expect(html).toContain("cursor / light");
-    expect(html).toContain("opencode / standard");
+  it("renders Tool + Tier leading columns instead of the merged host/tier header (T4, APUX-06)", () => {
+    expect(html).toContain("Claude");
+    expect(html).toContain("Light");
+    expect(html).toContain("Standard");
+    expect(html).toContain("Deep");
+    expect(html).not.toContain("claude / light");
+    expect(html).not.toContain("codex / deep");
   });
 
   it("renders model + effort cells", () => {
@@ -66,6 +67,44 @@ describe("renderModelRegistry — grid render (REG-01)", () => {
     expect(html).toContain('<table class="registry-grid">');
     expect(html).toContain("<thead>");
     expect(html).toContain("<tbody>");
+  });
+});
+
+describe("renderModelRegistry — Tool + Tier leading columns (T4, APUX-06, P1-B AC1)", () => {
+  it("renders Tool and Tier header cells before the profile columns", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const theadEnd = html.indexOf("</thead>");
+    const thead = html.slice(0, theadEnd);
+    expect(thead).toContain("<th>Tool</th>");
+    expect(thead).toContain("<th>Tier</th>");
+  });
+
+  it("gives the Tool cell a rowspan equal to tiers.length", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const tierCount = SAMPLE_REGISTRY.registry.tiers.length;
+    expect(html).toContain('<th class="tool-cell" rowspan="' + tierCount + '">');
+  });
+
+  it("renders exactly one tool cell per host (first tier row only)", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const toolCellMatches = html.match(/class="tool-cell"/g) || [];
+    expect(toolCellMatches.length).toBe(4); // one per REGISTRY_HOSTS entry
+  });
+
+  it("capitalizes tool and tier labels while data-* attributes keep raw lowercase ids", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('<th class="tool-cell" rowspan="3">Claude</th>');
+    expect(html).toContain('<th class="tool-cell" rowspan="3">OpenCode</th>');
+    expect(html).toContain('<th class="tier-cell">Light</th>');
+    expect(html).toContain('<th class="tier-cell">Standard</th>');
+    expect(html).toContain('<th class="tier-cell">Deep</th>');
+    expect(html).toContain('data-host="claude"');
+    expect(html).toContain('data-tier="light"');
+  });
+
+  it("wraps the grid in a .grid-scroll horizontal-scroll container", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('<div class="grid-scroll"><table class="registry-grid">');
   });
 });
 

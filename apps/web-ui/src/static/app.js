@@ -1076,6 +1076,18 @@ const UI_HOST_EFFORT_ENUM = {
 
 const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"];
 
+/** Display labels for the Tool column (design D-4.1). Not a simple capitalize —
+ *  "opencode" -> "OpenCode" needs its own casing. `data-*` attributes keep the
+ *  raw lowercase host id; only this label is user-facing. */
+const REGISTRY_HOST_LABELS = { claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" };
+
+/** Capitalizes the first letter of a raw tier id ("light" -> "Light") for the
+ *  Tier column and per-agent tier dropdown labels (design D-4.1, D-4.3). */
+function capitalizeLabel(s) {
+  if (!s) return "";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /** Frontend copy of the live workflow inventory (basenames from
  *  skills/massa-ai/workflows/ - all .md files). Kept in sync manually; the
  *  frontend cannot import from scripts/lib. Used by the Workflow Tiers picker. */
@@ -1182,11 +1194,18 @@ export function renderModelRegistry(data, opts) {
         : '<span>' + escapeHtml(model || "—") + "</span>";
       return '<td class="registry-cell' + overlayClass + '">' + modelInput + effortInput + "</td>";
     }).join("");
-    return "<tr><th>" + escapeHtml(row.host) + " / " + escapeHtml(row.tier) + "</th>" + cells + "</tr>";
+    // First tier row of each host carries the Tool cell (rowspan across every
+    // tier row for that host); subsequent rows omit it (design D-4.1).
+    const isFirstTierRowForHost = row.tier === tiers[0];
+    const toolCell = isFirstTierRowForHost
+      ? '<th class="tool-cell" rowspan="' + tiers.length + '">' + escapeHtml(REGISTRY_HOST_LABELS[row.host] || capitalizeLabel(row.host)) + "</th>"
+      : "";
+    const tierCell = '<th class="tier-cell">' + escapeHtml(capitalizeLabel(row.tier)) + "</th>";
+    return "<tr>" + toolCell + tierCell + cells + "</tr>";
   }).join("");
 
   const grid =
-    '<table class="registry-grid"><thead><tr><th>host / tier</th>' + headerCells + "</tr></thead><tbody>" + bodyRows + "</tbody></table>";
+    '<div class="grid-scroll"><table class="registry-grid"><thead><tr><th>Tool</th><th>Tier</th>' + headerCells + "</tr></thead><tbody>" + bodyRows + "</tbody></table></div>";
 
   // hostDefaults editor
   const hostDefaultsRows = REGISTRY_HOSTS.map((host) => {
