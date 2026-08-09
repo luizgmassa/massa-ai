@@ -12,10 +12,13 @@ import {
   listProfiles,
   switchProfile,
   reportSucceeded,
+  syncGeneratedVariants,
+  findRepoRootWithMarker,
   isHost,
   type Host,
   type ProfileInventory,
   type SwitchReport,
+  type VariantSyncHostResult,
 } from "@massa-ai/shared";
 import { promises as fs } from "fs";
 import path from "path";
@@ -23,6 +26,28 @@ import os from "os";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// This CLI is a PUBLISHED app (npm) and, unlike apps/tools-api's routes,
+// cannot depend on scripts/lib/model-profiles.ts at all — that tree ships
+// only in a source checkout, not in the published package. `profile list`/
+// `show` below therefore keep listProfiles()'s own last-resort "balanced"
+// literal fallback rather than passing registry.hostDefaults (T2); the
+// generic findRepoRootWithMarker walk below is fine to use for
+// `syncGeneratedVariants`'s sourceRoot because it depends on nothing outside
+// this package.
+const GENERATOR_MARKER = "scripts/generate-subagent-artifacts.ts";
+const GENERATOR_MARKER_MAX_LEVELS = 6;
+
+/** One line per host that actually synced (skipped/failed hosts stay
+ *  silent — skipped is the routine, published-install-adjacent no-op case,
+ *  and a failed sync is not fatal to the switch that follows). */
+function formatVariantSync(results: VariantSyncHostResult[]): void {
+  for (const r of results) {
+    if (r.status === "synced") {
+      console.log(`  synced ${r.host}: ${r.files} file(s) across ${r.profiles.length} profile(s)`);
+    }
+  }
+}
 
 function help() {
   console.log(`
@@ -311,6 +336,9 @@ export async function runCli(argv: string[]): Promise<number> {
 
     if (subcommand === "list" || subcommand === "show") {
       try {
+        // No hostDefaults passed here (see the module-level comment) — this
+        // published CLI cannot reach the registry, so an unrecorded host's
+        // activeProfile falls back to listProfiles()'s own "balanced" literal.
         formatProfileInventory(listProfiles());
       } catch (e) {
         console.error(`Error: ${(e as Error).message}`);
@@ -331,6 +359,13 @@ export async function runCli(argv: string[]): Promise<number> {
         return 1;
       }
       try {
+        // Bridge apps/<host>-plugin/agent-profiles/ into the installed
+        // variant root before switching, from a dev checkout only (T4) — a
+        // null sourceRoot (published install, no scripts/ marker findable)
+        // makes syncGeneratedVariants a silent no-op, so nothing prints.
+        const sourceRoot = findRepoRootWithMarker(__dirname, GENERATOR_MARKER, GENERATOR_MARKER_MAX_LEVELS);
+        formatVariantSync(syncGeneratedVariants({ sourceRoot }));
+
         const report = switchProfile({
           profile: name,
           host: hostOpt as Host | undefined,

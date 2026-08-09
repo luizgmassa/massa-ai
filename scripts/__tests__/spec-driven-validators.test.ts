@@ -604,6 +604,42 @@ describe("validate_state.py (T4, SYNC-01 AC4)", () => {
     expect(r.stdout).toContain("feature-b");
     expect(r.stdout).not.toContain("verdict is FAIL across [feature-a");
   });
+
+  // -------------------------------------------------------------------------
+  // D4 / APCR-10.5-6: the summary line prints the failing feature set, not
+  // the scanned population - a large scanned population with a small failing
+  // set used to read as total collapse (`${n} error(s) across [${checked}]`,
+  // `checked` was every scanned feature, not the ones that actually failed).
+  // -------------------------------------------------------------------------
+
+  test("cross-check mode: the bracket lists only the failing features, strictly fewer than the scanned population (D4/APCR-10.5)", () => {
+    const root = makeTempRoot("validate-state-failing-set");
+    // feature-a passes; feature-b and feature-c fail (FAIL verdict, missing
+    // validation.md respectively) - 3 scanned, 2 failing.
+    writeFeatureFile(root, "feature-a", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "feature-a", "validation.md", PASS_VALIDATION_MD);
+    writeFeatureFile(root, "feature-b", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "feature-b", "validation.md", FAIL_VALIDATION_MD);
+    writeFeatureFile(root, "feature-c", "tasks.md", DONE_TASKS_MD);
+    const r = runPy(VALIDATE_STATE, ["--root", root]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toContain("2 error(s) across [feature-b, feature-c]");
+    // feature-a passed - it must not appear in the bracket, even though it
+    // was part of the scanned population.
+    expect(r.stdout).not.toContain("across [feature-a");
+    expect(r.stdout).not.toContain("feature-a]");
+  });
+
+  test("zero errors prints no bracket at all (D4/APCR-10.6)", () => {
+    const root = makeTempRoot("validate-state-zero-errors-no-bracket");
+    writeFeatureFile(root, "feature-a", "tasks.md", DONE_TASKS_MD);
+    writeFeatureFile(root, "feature-a", "validation.md", PASS_VALIDATION_MD);
+    const r = runPy(VALIDATE_STATE, ["--root", root]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("validate_state: 0 error(s)");
+    expect(r.stdout).not.toContain("across [");
+    expect(r.stdout).not.toContain("[]");
+  });
 });
 
 // ---------------------------------------------------------------------------

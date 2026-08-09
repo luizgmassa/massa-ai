@@ -1,6 +1,69 @@
 # massa-ai Spec State
 
-## Current — Registry Help, Opencode Dropdown, Workflow Tiers (**VALIDATED PASS 2026-08-08** — T7-T10, 4 commits; push/PR = user decision)
+## Current — Admin Portal Correctness Repair (**VALIDATED PASS 2026-08-08** — T1-T11 + 1 fix loop, 19 commits; unpushed; push/PR = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-correctness-repair` ·
+  workflow: spec-driven (Large) · branch `fix/admin-portal-correctness-repair`
+  from `main` @ `69c0632c` (v1.42.0), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-admin-portal-correctness-repair`
+  (isolated). Two batch workers split the 11 tasks: Batch Worker 1 delivered
+  spec/design/tasks + T1-T8 (Phases 1-2); Batch Worker 2 delivered T9-T11
+  (Phase 3).
+- Scope: repair 8 correctness defects (F1-F8), 2 security issues (S1-S2), 1
+  quality issue (Q1, duplicate SSE handler), and 4 spec/state drifts (D1-D4)
+  found by a 66-commit audit spanning releases v1.41.0-v1.42.0. Phase 1 (P0):
+  overlay deep-merge with `null` tombstones (APCR-01), project-list loud
+  failure (APCR-02), one connection pool per vector store (APCR-03),
+  schema-qualified table enumeration (APCR-04), mask sentinel never persisted
+  (APCR-05), install status derived from the switch report (APCR-06). Phase 2
+  (P1): model-registry routes 501-degrade off-checkout (APCR-07), secret
+  files owner-only and bounded (APCR-08). Phase 3 (P2): one SSE handler
+  behind two routes (APCR-09), `.specs/` state truth restored (APCR-10), the
+  carried admin-portal work closed out with a CHANGELOG entry and the
+  APCR-11.5/11.6 amendment (APCR-11).
+- Contract: `.specs/features/admin-portal-correctness-repair/{spec,design,tasks}.md`
+  — `3 Phases = 11 Tasks`, two batch workers, 15 commits total (1 spec +
+  11 task + 1 oxlint fixup + 1 spec amendment + 1 this close-out).
+- Commits: `56a409ec` spec+design+tasks → `b8eb8ace` carried work (T0, the
+  pre-existing regenerate-and-install route) → `b096d8e4` T1 overlay delta →
+  `b052ebbc` T2 project-list rethrow → `fe5ad0c2` T3 one pool →
+  `d713ba4d` T4 schema-qualified enumeration → `407a7a1e` T5 mask sentinel →
+  `1a7f7e5e` T6 install status → `1bac10ac` oxlint fixup →
+  `235c8cb2` T7 501-degrade → `139c8d14` T8 secret file modes →
+  `095e004f` spec amendment (APCR-11.5/11.6 scheduled) → `f6a11d1e` T9 SSE
+  handler factory → `ea463c3a` T10 state truth → this commit T11 close-out.
+- Fix loop 1 (after validation iteration 1 returned FAIL): `6192212a` sensors
+  for the APCR-01 merge/normalize functions → `019f8da8` APCR-01.10
+  `overlayOverrideCount` surfaced in both response bodies and the UI →
+  `fdc55203` corrected gate commands that named a `--filter` flag the
+  `apps/tools-api` runner does not expose.
+- Validation: **PASS**, 39/39 ACs evidenced, 5/5 mutations killed, 0
+  survivors. Iteration 1 FAILed because `scripts/__tests__/model-profiles.test.ts`
+  was never extended — the P0 merge/normalize functions had no direct sensor,
+  and the pre-existing fixtures specified every key, so partial-retention was
+  indistinguishable from whole-replace. Three mutations survived. APCR-01.10
+  was also computed but never returned by the route (a code gap, not a test
+  gap). Both closed; the re-verify killed all three prior survivors plus two
+  fresh mutations against the new code.
+- Gates (measured 2026-08-08 on this branch, independently by the orchestrator
+  and again by the verifier): web-ui 337 pass / 0 fail (baseline 320), shared
+  327 pass / 0 fail (baseline 322), tools-api 29 groups all pass, core
+  `--unit --filter='vector|postgres|store'` 16 groups all pass, type-check 6/6
+  (`--force`; turbo caches this one), oxlint exit 0, `bun run test:scripts`
+  exit 0, `generate:artifacts --check` no drift, `check_specs_delivered` exit
+  0, `validate_state.ts --root .` exit 1 with **52** errors — the pre-existing
+  legacy baseline, with this feature absent from the failing bracket.
+  `release-version.ts --dry-run` derives 1.42.0 → **1.43.0** (minor).
+- Measurement note worth reusing: a scratch `git worktree add` has no
+  `node_modules`, so `model-profiles.test.ts` reads 53p/1f there and 54p/0f in
+  a provisioned tree — the failing case shells out to the generator. A
+  mutation verdict read in an unprovisioned scratch is unreliable for any test
+  that shells out.
+- Next: push/PR/merge = user decision, not taken unattended. A merge to `main`
+  with green CI cuts the 1.43.0 release and publishes to npmjs.org and GitHub
+  Packages.
+
+## Previous — Registry Help, Opencode Dropdown, Workflow Tiers (**VALIDATED PASS 2026-08-08** — T7-T10, 4 commits; push/PR = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-ui-fixes` ·
   workflow: spec-driven (Medium) · branch `spec/admin-portal-ui-fixes` from
@@ -38,8 +101,10 @@
   6 Tasks, inline execution (sub-agents unavailable). Design skipped (CSS + render
   function fixes only).
 - Commits: `4a087b8` spec+tasks, `5493f3c` all 6 tasks (CSS + render fixes + tests).
-- Gates: web-ui 282 pass (4 new, 0 fail), type-check 6/6, lint 0. tools-api 25
-  fails pre-existing on base (not from this feature).
+- Gates: web-ui 282 pass (4 new, 0 fail), type-check 6/6, lint 0. tools-api:
+  re-measured 2026-08-08 (D3, `admin-portal-correctness-repair` T10) — 0
+  fails, 29 groups all pass; the prior "25 fails pre-existing on base" claim
+  did not reproduce.
 - Next: dispatch verification-agent (author ≠ verifier) → write validation.md →
   validate_state.ts exit 0 → push/PR = user decision.
 

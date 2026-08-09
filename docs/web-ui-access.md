@@ -71,6 +71,32 @@ the page can read the key: a browser extension, a screen share, a saved copy, a
 `view-source`. This is the accepted cost of having no login surface. Rotate by
 editing `security.apiKey` in `~/.config/massa-ai/config.json` and restarting.
 
+### `/config/reveal` escalates the exposure (S2, APCR-08)
+
+With `MASSA_AI_WEB_UI_TRUST_LOCAL=true` (the Docker default — see above),
+`GET /api/v1/config/reveal` hands **plaintext** `database.url` and every
+configured API key (`security.apiKey`, `llm.apiKey`, `embedding.apiKey`) to
+any caller that can reach the port. Before this route existed the same
+exposure only ever leaked masked values (`"***"`); this route is the
+plaintext path.
+
+`/config/reveal` carries **no protection beyond** the already-accepted `/ui`
+key-injection chain described above. It is not in `PUBLIC_PATHS`, so it is
+authenticated like every other route — but the key that authenticates it is
+the exact key `/ui` already handed the caller. "Authenticated" here should
+not be read as "mitigated": anyone who could read the key out of the page
+source could always call this route with it.
+
+### Rotating a key does not purge old backups
+
+Every save through the Config tab writes a timestamped backup
+(`config.json.bak.<ISO>`) before overwriting `config.json`, capped at the 10
+most recent. Rotating `security.apiKey`, `llm.apiKey`, `embedding.apiKey`, or
+`database.url` does **not** purge the backups that predate the rotation — up
+to 10 files can retain the previous secret, at mode `0600`, until they age out
+of the cap on a later save. "Bounded in number" caps disk growth; it does not
+bound how long a rotated secret stays readable on disk.
+
 ## Turning the dashboard off
 
 `WEB_UI_ENABLED=false` makes `/ui` return 404 entirely. Nothing is served and no

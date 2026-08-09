@@ -87,9 +87,9 @@ describe("GET /api/v1/project/list", () => {
     expect(res.json.data.total).toBe(2);
   });
 
-  test("falls back to listAllProjectsAcrossDimensions when listProjects throws", async () => {
+  test("falls back to listAllProjectsAcrossDimensions when listProjects throws a dimension-mismatch error (APCR-02.1)", async () => {
     vectorProjects.mockImplementationOnce(async () => {
-      throw new Error("store down");
+      throw new Error("Embedding dimension mismatch: got 384, expected 1536");
     });
     vectorAllProjects.mockImplementationOnce(async () => [{ projectId: "fallback-p", documentCount: 5 }]);
     const res = await req("GET", "/api/v1/project/list");
@@ -98,9 +98,9 @@ describe("GET /api/v1/project/list", () => {
     expect(res.json.data.projects[0].projectId).toBe("fallback-p");
   });
 
-  test("returns failure envelope when both listProjects and fallback throw", async () => {
+  test("returns failure envelope when both listProjects (dimension mismatch) and the fallback throw", async () => {
     vectorProjects.mockImplementationOnce(async () => {
-      throw new Error("store down");
+      throw new Error("Embedding dimension mismatch: got 384, expected 1536");
     });
     vectorAllProjects.mockImplementationOnce(async () => {
       throw new Error("db unreachable");
@@ -108,6 +108,18 @@ describe("GET /api/v1/project/list", () => {
     const res = await req("GET", "/api/v1/project/list");
     expect(res.json.success).toBe(false);
     expect(res.json.error).toBe("db unreachable");
+  });
+
+  test("a non-dimension error rethrows: success:false carrying its message, fallback never called (APCR-02.2/.3)", async () => {
+    vectorAllProjects.mockClear();
+    vectorProjects.mockImplementationOnce(async () => {
+      throw new Error("store down");
+    });
+    const res = await req("GET", "/api/v1/project/list");
+    expect(res.status).toBe(200);
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toBe("store down");
+    expect(vectorAllProjects).not.toHaveBeenCalled();
   });
 });
 

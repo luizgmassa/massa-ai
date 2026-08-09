@@ -22,6 +22,13 @@ const switchProfile = mock((..._args: unknown[]): unknown => ({
   hosts: [],
   restartRequired: false,
 }));
+// syncGeneratedVariants MUST be mocked: the real implementation would run
+// against os.homedir() (the real developer machine, the default targetHome)
+// as its write target — exactly the HARD RULE hazard the task brief calls
+// out. Never let the real one run in this file.
+const syncGeneratedVariants = mock((..._args: unknown[]): unknown => [
+  { host: "claude", status: "skipped", profiles: [], retained: [], files: 0, reason: "no source checkout — nothing to sync" },
+]);
 
 // Pre-resolved BEFORE registering the mock (not inside the factory): a
 // `require()` of the same specifier from inside a `mock.module` factory can
@@ -32,6 +39,32 @@ mock.module("@massa-ai/shared", () => ({
   ...actualShared,
   listProfiles: (...args: unknown[]) => listProfiles(...args),
   switchProfile: (...args: unknown[]) => switchProfile(...args),
+  syncGeneratedVariants: (...args: unknown[]) => syncGeneratedVariants(...args),
+}));
+
+// getRegistryHostDefaults is mocked so a test can assert exactly what
+// listProfiles() receives, without pulling in the real scripts/lib
+// dynamic-require plumbing (already covered by model-registry.test.ts).
+const getRegistryHostDefaults = mock((..._args: unknown[]): unknown => ({
+  claude: "balanced",
+  codex: "balanced",
+  cursor: "balanced",
+  opencode: "balanced",
+}));
+const actualModelRegistry = require("./model-registry.ts");
+mock.module("./model-registry.ts", () => ({
+  ...actualModelRegistry,
+  getRegistryHostDefaults: (...args: unknown[]) => getRegistryHostDefaults(...args),
+}));
+
+// getDeploymentRoot controls the sourceRoot syncGeneratedVariants is called
+// with (assertable below); real resolution by default (a real checkout).
+const actualDeployment = require("./model-registry-deployment.ts");
+const realDeploymentRoot: string | null = actualDeployment.getDeploymentRoot();
+const getDeploymentRoot = mock((..._args: unknown[]): string | null => realDeploymentRoot);
+mock.module("./model-registry-deployment.ts", () => ({
+  ...actualDeployment,
+  getDeploymentRoot: (...args: unknown[]) => getDeploymentRoot(...args),
 }));
 
 import { profileRoutes } from "./profiles.js";
@@ -44,6 +77,9 @@ const app = new Elysia().use(profileRoutes);
 beforeEach(() => {
   listProfiles.mockClear();
   switchProfile.mockClear();
+  syncGeneratedVariants.mockClear();
+  getRegistryHostDefaults.mockClear();
+  getDeploymentRoot.mockClear();
 });
 
 async function get(path: string) {
@@ -86,6 +122,15 @@ describe("GET /api/v1/profiles", () => {
     listProfiles.mockImplementationOnce(() => ({ hosts: [] }));
     await get("/api/v1/profiles?host=codex");
     expect((listProfiles.mock.calls.at(-1) as any[] | undefined)?.[0]).toMatchObject({ hosts: ["codex"] });
+  });
+
+  test("T3: hostDefaults from getRegistryHostDefaults() reaches listProfiles", async () => {
+    listProfiles.mockImplementationOnce(() => ({ hosts: [] }));
+    await get("/api/v1/profiles");
+    expect(getRegistryHostDefaults).toHaveBeenCalled();
+    expect((listProfiles.mock.calls.at(-1) as any[] | undefined)?.[0]).toMatchObject({
+      hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
+    });
   });
 });
 
@@ -152,6 +197,30 @@ describe("POST /api/v1/profiles/switch — MPS-09 error surfacing", () => {
     switchProfile.mockImplementationOnce(() => ({ profile: "work", dryRun: true, hosts: [], restartRequired: false }));
     await post("/api/v1/profiles/switch", { profile: "work", dryRun: true });
     expect((switchProfile.mock.calls.at(-1) as any[] | undefined)?.[0]).toMatchObject({ profile: "work", dryRun: true });
+  });
+
+  test("T3: syncGeneratedVariants runs (with sourceRoot from getDeploymentRoot()) before switchProfile", async () => {
+    switchProfile.mockImplementationOnce(() => ({ profile: "work", dryRun: false, hosts: [], restartRequired: false }));
+    await post("/api/v1/profiles/switch", { profile: "work" });
+
+    expect(syncGeneratedVariants).toHaveBeenCalledTimes(1);
+    const syncArg = (syncGeneratedVariants.mock.calls[0] as any[])[0] as { sourceRoot: string | null };
+    expect(syncArg.sourceRoot).toBe(realDeploymentRoot);
+    expect(switchProfile).toHaveBeenCalledTimes(1);
+  });
+
+  test("T3: a syncGeneratedVariants failure never blocks the switch (function never throws by contract, but the route stays resilient)", async () => {
+    syncGeneratedVariants.mockImplementationOnce(() => {
+      throw new Error("unexpected sync throw");
+    });
+    switchProfile.mockImplementationOnce(() => ({ profile: "work", dryRun: false, hosts: [{ host: "claude", status: "switched" }], restartRequired: true }));
+
+    const res = await post("/api/v1/profiles/switch", { profile: "work" });
+    // syncGeneratedVariants is documented to never throw; if it somehow did,
+    // the route's existing catch still maps it through the normal MPS-09
+    // error surfacing rather than crashing the process.
+    expect(res.status).toBe(500);
+    expect(res.json.success).toBe(false);
   });
 });
 

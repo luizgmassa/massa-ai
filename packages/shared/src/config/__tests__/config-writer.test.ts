@@ -369,6 +369,141 @@ describe("config-writer: masked sentinel preserves existing value", () => {
   });
 });
 
+describe("config-writer: masked sentinel against an empty stored value (APCR-05, F7)", () => {
+  test("security.apiKey = '***' against an absent stored key does not persist the literal sentinel", () => {
+    // defaultMassaAiConfig.security carries no apiKey at all.
+    const { exitCode: seedExit } = runWriter(
+      "seed-empty-security",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const { exitCode, stdout } = runWriter(
+      "sentinel-empty-security",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({
+        security: { apiKey: "***", corsOrigins: [] },
+      });
+      if (result.success) {
+        console.log(JSON.stringify({ success: true, apiKey: result.config.security?.apiKey }));
+      } else {
+        console.log(JSON.stringify({ success: false, details: result.details }));
+      }
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.success).toBe(true);
+    expect(out.apiKey).not.toBe("***");
+  });
+
+  test("llm.apiKey = '***' against an empty stored key does not persist the literal sentinel", () => {
+    const { exitCode: seedExit } = runWriter(
+      "seed-empty-llm",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig({ ...defaultMassaAiConfig, llm: { ...defaultMassaAiConfig.llm, apiKey: "" } });
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const { exitCode, stdout } = runWriter(
+      "sentinel-empty-llm",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+
+      const result = savePartialConfig({
+        llm: { ...defaultMassaAiConfig.llm, apiKey: "***" },
+      });
+      if (result.success) {
+        console.log(JSON.stringify({ success: true, apiKey: result.config.llm?.apiKey }));
+      } else {
+        console.log(JSON.stringify({ success: false, details: result.details }));
+      }
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.success).toBe(true);
+    expect(out.apiKey).not.toBe("***");
+  });
+
+  test("embedding.apiKey = '***' against an absent stored key does not persist the literal sentinel", () => {
+    // defaultMassaAiConfig.embedding carries no apiKey at all.
+    const { exitCode: seedExit } = runWriter(
+      "seed-empty-embedding",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const { exitCode, stdout } = runWriter(
+      "sentinel-empty-embedding",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+
+      const result = savePartialConfig({
+        embedding: { ...defaultMassaAiConfig.embedding, apiKey: "***" },
+      });
+      if (result.success) {
+        console.log(JSON.stringify({ success: true, apiKey: result.config.embedding?.apiKey }));
+      } else {
+        console.log(JSON.stringify({ success: false, details: result.details }));
+      }
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.success).toBe(true);
+    expect(out.apiKey).not.toBe("***");
+  });
+
+  test("database.url = '***' against the empty default url does not persist the literal sentinel", () => {
+    // defaultMassaAiConfig.database.url defaults to "" — the exact shape the audit
+    // named: a save with security.apiKey = "***" against a current value of "" is the
+    // Independent Test's fixture.
+    const { exitCode: seedExit } = runWriter(
+      "seed-empty-database",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const { exitCode, stdout } = runWriter(
+      "sentinel-empty-database",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({
+        database: { url: "***" },
+      });
+      if (result.success) {
+        console.log(JSON.stringify({ success: true, url: result.config.database?.url }));
+      } else {
+        console.log(JSON.stringify({ success: false, details: result.details }));
+      }
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.success).toBe(true);
+    expect(out.url).not.toBe("***");
+  });
+});
+
 describe("config-writer: import-time safety", () => {
   test("module never reads or writes at import time", () => {
     const { exitCode, stdout, stderr } = runWriter(
@@ -431,5 +566,148 @@ describe("config-writer: savePartialConfig returns restartNeededSections", () =>
     expect(out.restart).toContain("embedding");
     expect(out.restart).toContain("llm");
     expect(out.restart).toContain("security");
+  });
+});
+
+// ── APCR-08: secret files are owner-only, backups bounded ────────────────
+
+/** POSIX file mode bits, ignoring the file-type bits `fs.Stats.mode` also carries. */
+function modeOf(p: string): number {
+  return fs.statSync(p).mode & 0o777;
+}
+
+describe("config-writer: secret file modes (APCR-08.1, 08.5)", () => {
+  test("config.json is 0600 after a save", () => {
+    const { exitCode, stdout } = runWriter(
+      "mode-config",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({ logging: { level: "debug", enableMetrics: true } });
+      console.log(JSON.stringify({ success: result.success }));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout).success).toBe(true);
+    expect(modeOf(home.configPath)).toBe(0o600);
+  });
+
+  test("every backup created by a save is 0600", () => {
+    const { exitCode: seedExit } = runWriter(
+      "mode-backup-seed",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const { exitCode } = runWriter(
+      "mode-backup-save",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      savePartialConfig({ logging: { level: "warn", enableMetrics: false } });
+      `,
+    );
+    expect(exitCode).toBe(0);
+
+    const entries = fs.readdirSync(home.configDir);
+    const backups = entries.filter((e) => e.startsWith("config.json.bak."));
+    expect(backups.length).toBeGreaterThan(0);
+    for (const b of backups) {
+      expect(modeOf(path.join(home.configDir, b))).toBe(0o600);
+    }
+  });
+});
+
+describe("config-writer: existing over-permissive files are repaired on the next save (APCR-08.3)", () => {
+  test("a pre-existing 644 config.json is tightened to 0600 by the next save", () => {
+    const { exitCode: seedExit } = runWriter(
+      "repair-config-seed",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    fs.chmodSync(home.configPath, 0o644);
+    expect(modeOf(home.configPath)).toBe(0o644);
+
+    const { exitCode } = runWriter(
+      "repair-config-save",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      savePartialConfig({ logging: { level: "info", enableMetrics: true } });
+      `,
+    );
+    expect(exitCode).toBe(0);
+    expect(modeOf(home.configPath)).toBe(0o600);
+  });
+
+  test("a planted 644 legacy config.json.bak is tightened to 0600 and survives (never deleted)", () => {
+    const { exitCode: seedExit } = runWriter(
+      "repair-legacy-seed",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const legacyBackupPath = `${home.configPath}.bak`;
+    fs.copyFileSync(home.configPath, legacyBackupPath);
+    fs.chmodSync(legacyBackupPath, 0o644);
+    expect(modeOf(legacyBackupPath)).toBe(0o644);
+
+    const { exitCode } = runWriter(
+      "repair-legacy-save",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      savePartialConfig({ logging: { level: "debug", enableMetrics: false } });
+      `,
+    );
+    expect(exitCode).toBe(0);
+    expect(fs.existsSync(legacyBackupPath)).toBe(true);
+    expect(modeOf(legacyBackupPath)).toBe(0o600);
+  });
+});
+
+describe("config-writer: backup retention caps at 10, the legacy .bak is exempt (APCR-08.4)", () => {
+  test("an 11th save leaves exactly 10 timestamped backups; the legacy .bak (if present) survives untouched by the cap", () => {
+    const { exitCode: seedExit } = runWriter(
+      "retention-seed",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const legacyBackupPath = `${home.configPath}.bak`;
+    fs.writeFileSync(legacyBackupPath, "{}");
+
+    // 11 separate subprocess saves — each a real process invocation, so the
+    // ISO-millisecond backup filenames cannot collide the way 11 saves in a
+    // tight in-process loop could.
+    for (let i = 0; i < 11; i++) {
+      const { exitCode } = runWriter(
+        `retention-save-${i}`,
+        `
+        import { savePartialConfig } from ${JSON.stringify(WRITER)};
+        const result = savePartialConfig({ logging: { level: "info", enableMetrics: ${i % 2 === 0} } });
+        if (!result.success) { console.error(JSON.stringify(result.details)); process.exit(1); }
+        `,
+      );
+      expect(exitCode).toBe(0);
+    }
+
+    const entries = fs.readdirSync(home.configDir);
+    const timestamped = entries.filter((e) => e.startsWith("config.json.bak."));
+    expect(timestamped.length).toBe(10);
+    expect(fs.existsSync(legacyBackupPath)).toBe(true);
   });
 });

@@ -53,6 +53,52 @@ mock.module("@massa-ai/shared/config", () => {
   return { ...actual, configDir: (...args: unknown[]) => configDir(...args) };
 });
 
+// Real resolution by default (this test file runs from a real checkout). The
+// real value is captured BEFORE mock.module registers — mock.module rebinds
+// the namespace of anything already imported, so calling back into the
+// module's own getDeploymentRoot() lazily from inside the mock would recurse.
+// mockImplementationOnce(() => null) per-test simulates an unresolvable
+// deployment (APCR-07).
+const actualDeployment = require("./model-registry-deployment.ts");
+const realDeploymentRoot: string | null = actualDeployment.getDeploymentRoot();
+const getDeploymentRoot = mock((..._args: unknown[]): string | null => realDeploymentRoot);
+mock.module("./model-registry-deployment.ts", () => ({
+  ...actualDeployment,
+  getDeploymentRoot: (...args: unknown[]) => getDeploymentRoot(...args),
+}));
+
+// ── Mock @massa-ai/shared listProfiles + switchProfile + syncGeneratedVariants
+// for the auto-install step ── syncGeneratedVariants MUST be mocked: the real
+// implementation would run against the real getDeploymentRoot() (this repo's
+// own checkout, per the mock above) as sourceRoot and os.homedir() (the real
+// developer machine) as the default targetHome — exactly the HARD RULE
+// hazard the task brief calls out. Never let the real one run in this file.
+const listProfilesMock = mock((..._args: unknown[]): unknown => ({
+  hosts: [
+    { host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] },
+    { host: "opencode", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] },
+  ],
+}));
+const switchProfileMock = mock((..._args: unknown[]): unknown => ({
+  profile: "balanced",
+  dryRun: false,
+  hosts: [{ host: "claude", status: "switched" }, { host: "opencode", status: "switched" }],
+  restartRequired: true,
+}));
+const syncGeneratedVariantsMock = mock((..._args: unknown[]): unknown => [
+  { host: "claude", status: "synced", profiles: ["balanced"], retained: [], files: 3 },
+  { host: "opencode", status: "skipped", profiles: [], retained: [], files: 0, reason: "no generated variants for this host" },
+]);
+mock.module("@massa-ai/shared", () => {
+  const actual = require("@massa-ai/shared");
+  return {
+    ...actual,
+    listProfiles: (...args: unknown[]) => listProfilesMock(...args),
+    switchProfile: (...args: unknown[]) => switchProfileMock(...args),
+    syncGeneratedVariants: (...args: unknown[]) => syncGeneratedVariantsMock(...args),
+  };
+});
+
 // ── Mock child_process: capture spawnSync (blocking route, REGEN-08) + spawn (stream) ──
 const child_process = require("child_process");
 const spawnSyncMock = mock((..._args: unknown[]): any => ({ exitCode: 0, stdout: "", stderr: "" }));
@@ -122,6 +168,8 @@ beforeEach(() => {
   spawnMock.mockClear();
   spawnSyncMock.mockClear();
   configDir.mockClear();
+  getDeploymentRoot.mockClear();
+  syncGeneratedVariantsMock.mockClear();
 });
 
 async function postStream(path: string): Promise<{ status: number; text: string; contentType: string }> {
@@ -230,7 +278,7 @@ describe("POST /api/v1/model-registry/regenerate-stream — SSE line emission (R
     expect(killed).toBe(true);
   });
 
-  test("emits no line events for empty stdout/stderr but still emits done exit 0", async () => {
+  test("emits done exit 0 with install line when stdout/stderr empty", async () => {
     spawnMock.mockImplementationOnce(() => makeFakeChild({
       stdoutLines: [],
       stderrLines: [],
@@ -240,11 +288,280 @@ describe("POST /api/v1/model-registry/regenerate-stream — SSE line emission (R
     const res = await postStream("/api/v1/model-registry/regenerate-stream");
     expect(res.status).toBe(200);
     const events = parseSseEvents(res.text);
-    const lineEvents = events.filter((e) => e.type === "line");
     const doneEvents = events.filter((e) => e.type === "done");
-    expect(lineEvents.length).toBe(0);
     expect(doneEvents.length).toBe(1);
     expect(doneEvents[0].exitCode).toBe(0);
+  });
+});
+
+describe("POST /api/v1/model-registry/regenerate-and-install-stream — auto-install after regenerate", () => {
+  beforeEach(() => {
+    listProfilesMock.mockClear();
+    switchProfileMock.mockClear();
+  });
+
+  test("emits install events + calls switchProfile after successful regeneration", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: ["Generating..."],
+      exitCode: 0,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const installEvents = events.filter((e) => e.type === "install");
+    const doneEvents = events.filter((e) => e.type === "done");
+
+    expect(installEvents.length).toBeGreaterThanOrEqual(1);
+    expect(installEvents.some((e) => e.status === "switched")).toBe(true);
+    expect(listProfilesMock).toHaveBeenCalled();
+    expect(switchProfileMock).toHaveBeenCalled();
+    expect(doneEvents.length).toBe(1);
+    expect(doneEvents[0].exitCode).toBe(0);
+  });
+
+  test("does NOT install when generator fails (non-zero exit)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: [],
+      exitCode: 1,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const installEvents = events.filter((e) => e.type === "install");
+    const done = events.find((e) => e.type === "done");
+
+    expect(installEvents.length).toBe(0);
+    expect(listProfilesMock).not.toHaveBeenCalled();
+    expect(done!.exitCode).toBe(1);
+  });
+
+  test("install phase handles switchProfile errors gracefully", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: [],
+      exitCode: 0,
+    }));
+    switchProfileMock.mockImplementation(() => {
+      throw new Error("install failure");
+    });
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const installEvents = events.filter((e) => e.type === "install");
+    const done = events.find((e) => e.type === "done");
+
+    expect(installEvents.some((e) => e.status === "failed")).toBe(true);
+    expect(done!.exitCode).toBe(0);
+  });
+
+  test("an all-failed report emits status:\"failed\", not \"switched\" (APCR-06.2)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    listProfilesMock.mockImplementationOnce(() => ({
+      hosts: [{ host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }],
+    }));
+    switchProfileMock.mockImplementationOnce(() => ({
+      profile: "balanced",
+      dryRun: false,
+      hosts: [{ host: "claude", status: "failed", reason: "route refused" }],
+      restartRequired: false,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const install = events.find((e) => e.type === "install");
+    expect(install).toBeDefined();
+    expect(install!.status).toBe("failed");
+  });
+
+  test("an all-skipped report emits status:\"skipped\" (APCR-06.3)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    listProfilesMock.mockImplementationOnce(() => ({
+      hosts: [{ host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }],
+    }));
+    switchProfileMock.mockImplementationOnce(() => ({
+      profile: "balanced",
+      dryRun: false,
+      hosts: [{ host: "claude", status: "skipped", reason: "already current" }],
+      restartRequired: false,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const install = events.find((e) => e.type === "install");
+    expect(install).toBeDefined();
+    expect(install!.status).toBe("skipped");
+  });
+
+  test("an all-unsupported report emits status:\"unsupported\" and it appears in the detail strings, never folded into \"skipped\" (APCR-06.7)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    listProfilesMock.mockImplementationOnce(() => ({
+      hosts: [{ host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }],
+    }));
+    switchProfileMock.mockImplementationOnce(() => ({
+      profile: "balanced",
+      dryRun: false,
+      hosts: [{ host: "claude", status: "unsupported", reason: "bundle has no variants — upgrade plugin" }],
+      restartRequired: false,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const install = events.find((e) => e.type === "install");
+    expect(install).toBeDefined();
+    expect(install!.status).toBe("unsupported");
+    expect(install!.unsupported as string).toContain("claude");
+    expect(install!.skipped).toBe("none");
+  });
+
+  test("a mixed report emits switched and retains every status bucket's detail string (APCR-06.1/.4)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    listProfilesMock.mockImplementationOnce(() => ({
+      hosts: [{ host: "claude", installed: true, activeProfile: "balanced", bundleVersion: "1.0.0", availableProfiles: ["balanced"] }],
+    }));
+    switchProfileMock.mockImplementationOnce(() => ({
+      profile: "balanced",
+      dryRun: false,
+      hosts: [
+        { host: "claude", status: "switched" },
+        { host: "codex", status: "skipped", reason: "already current" },
+        { host: "cursor", status: "unsupported", reason: "bundle has no variants" },
+        { host: "opencode", status: "failed", reason: "locked" },
+      ],
+      restartRequired: true,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const install = events.find((e) => e.type === "install");
+    expect(install).toBeDefined();
+    expect(install!.status).toBe("switched");
+    expect(install!.switched as string).toContain("claude");
+    expect(install!.skipped as string).toContain("codex");
+    expect(install!.unsupported as string).toContain("cursor");
+    expect(install!.failed as string).toContain("opencode");
+  });
+
+  test("deprecated /regenerate-stream alias also auto-installs", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({
+      stdoutLines: [],
+      exitCode: 0,
+    }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    const installEvents = events.filter((e) => e.type === "install");
+    expect(installEvents.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── T3: the bridge step (syncGeneratedVariants) runs before the install loop ──
+
+describe("POST /api/v1/model-registry/regenerate-and-install-stream — variant-sync bridge (T3)", () => {
+  beforeEach(() => {
+    listProfilesMock.mockClear();
+    switchProfileMock.mockClear();
+    syncGeneratedVariantsMock.mockClear();
+  });
+
+  test("emits one variant-sync SSE frame per host, before the install frames", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const syncEvents = events.filter((e) => e.type === "variant-sync");
+    const firstInstallIdx = events.findIndex((e) => e.type === "install");
+
+    expect(syncEvents.length).toBe(2); // claude + opencode, per the mock fixture
+    expect(syncEvents.some((e) => e.host === "claude" && e.status === "synced" && e.files === 3)).toBe(true);
+    expect(syncEvents.some((e) => e.host === "opencode" && e.status === "skipped" && e.reason)).toBe(true);
+    // Every variant-sync frame precedes every install frame.
+    const lastSyncIdx = events.map((e, i) => (e.type === "variant-sync" ? i : -1)).filter((i) => i >= 0).pop()!;
+    expect(lastSyncIdx).toBeLessThan(firstInstallIdx);
+  });
+
+  test("calls syncGeneratedVariants with sourceRoot from getDeploymentRoot()", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+
+    expect(syncGeneratedVariantsMock).toHaveBeenCalledTimes(1);
+    const arg = (syncGeneratedVariantsMock.mock.calls[0] as any[])[0] as { sourceRoot: string | null };
+    expect(arg.sourceRoot).toBe(realDeploymentRoot);
+  });
+
+  test("hostDefaults reaches listProfiles via getRegistryHostDefaults()", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+
+    expect(listProfilesMock).toHaveBeenCalledTimes(1);
+    const arg = (listProfilesMock.mock.calls[0] as any[])[0] as { hostDefaults?: Record<string, string> };
+    // builtinRegistry (this file's fixture) declares hostDefaults for every host.
+    expect(arg.hostDefaults).toMatchObject({ claude: "balanced", opencode: "balanced" });
+  });
+
+  test("a variant-sync failure does not block the install loop", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
+    syncGeneratedVariantsMock.mockImplementationOnce(() => [
+      { host: "claude", status: "failed", profiles: [], retained: [], files: 0, error: "disk full" },
+    ]);
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const syncEvent = events.find((e) => e.type === "variant-sync");
+    const installEvents = events.filter((e) => e.type === "install");
+    const done = events.find((e) => e.type === "done");
+
+    expect(syncEvent).toMatchObject({ host: "claude", status: "failed", error: "disk full" });
+    expect(installEvents.length).toBeGreaterThanOrEqual(1); // install loop still ran
+    expect(done!.exitCode).toBe(0);
+  });
+});
+
+// ── APCR-09: both routes share one handler — identical frame sequences ──────
+
+describe("POST /regenerate-and-install-stream vs /regenerate-stream — one shared handler (APCR-09)", () => {
+  test("both routes emit an identical frame sequence for the same fixture", async () => {
+    const fixture = { stdoutLines: ["Generating claude agents..."], stderrLines: ["a warning"], exitCode: 0 };
+
+    spawnMock.mockImplementationOnce(() => makeFakeChild(fixture));
+    const first = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+
+    spawnMock.mockImplementationOnce(() => makeFakeChild(fixture));
+    const second = await postStream("/api/v1/model-registry/regenerate-stream");
+
+    expect(first.status).toBe(second.status);
+    expect(parseSseEvents(first.text)).toEqual(parseSseEvents(second.text));
+  });
+});
+
+// ── APCR-07: the SSE terminal frame carries the 501 reason, no spawn attempt ─
+
+describe("SSE streams — terminal done frame carries the deployment-unavailable reason (APCR-07.5)", () => {
+  test("regenerate-and-install-stream: no deployment root -> done frame with exitCode null + the shared message, never spawns", async () => {
+    getDeploymentRoot.mockImplementationOnce(() => null);
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    expect(res.status).toBe(200);
+    const events = parseSseEvents(res.text);
+    expect(events.length).toBe(1);
+    const done = events[0];
+    expect(done.type).toBe("done");
+    expect(done.exitCode).toBeNull();
+    expect(done.error as string).toContain("model-registry is unavailable in this deployment");
+    expect(done.error as string).toContain("massa-ai source checkout");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  test("regenerate-stream (deprecated alias): same 501 reason in the terminal frame", async () => {
+    getDeploymentRoot.mockImplementationOnce(() => null);
+    const res = await postStream("/api/v1/model-registry/regenerate-stream");
+    const events = parseSseEvents(res.text);
+    const done = events.find((e) => e.type === "done");
+    expect(done).toBeDefined();
+    expect(done!.exitCode).toBeNull();
+    expect(done!.error as string).toContain("model-registry is unavailable in this deployment");
+    expect(spawnMock).not.toHaveBeenCalled();
   });
 });
 

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 import { configDir } from "@massa-ai/shared/config";
+import { getDeploymentRoot, deploymentUnavailableMessage } from "./model-registry-deployment.js";
 
 // scripts/lib is outside tools-api's rootDir and is not copied into the
 // production Docker image (only apps/ + packages/ are). We use a dynamic
@@ -10,14 +11,44 @@ import { configDir } from "@massa-ai/shared/config";
 // external and leaves it for runtime resolution. In the deployed image the
 // route is not exercised (admin-portal is a local-operator surface); locally
 // and in tests the path resolves to the dev checkout. Lazy: resolved on first
-// call, so mock.module() in tests can intercept before this runs.
+// call, so mock.module() in tests can intercept before this runs. Every
+// caller checks getDeploymentRoot() first and returns 501 before reaching
+// this, so the throw below is a defensive backstop, not the primary path.
 let _profilesLib: Record<string, unknown> | null = null;
 function profilesLib(): Record<string, unknown> {
   if (!_profilesLib) {
-    const libPath = ["..", "..", "..", "..", "scripts", "lib", "model-profiles.ts"].join("/");
+    const root = getDeploymentRoot();
+    if (!root) {
+      throw new Error(deploymentUnavailableMessage("scripts/lib/model-profiles.ts"));
+    }
+    const libPath = path.join(root, "scripts", "lib", "model-profiles.ts");
     _profilesLib = (typeof require === "function" ? require : (globalThis as any).require)(libPath);
   }
   return _profilesLib!;
+}
+
+/**
+ * Best-effort per-host default profile map from the effective registry
+ * (`registry.hostDefaults`, rank 3 of profile resolution —
+ * `scripts/lib/model-profiles.ts:356`), reusing the same lazy `profilesLib()`
+ * dynamic-require pattern above. Returns `undefined` — never throws — when
+ * the checkout or the lib is unavailable, so every caller falls through to
+ * `listProfiles`'s own last-resort `"balanced"` literal (T2) instead of
+ * failing the request. Exported for `model-registry-stream.ts` and
+ * `profiles.ts`, which need `hostDefaults` for `listProfiles()` but must not
+ * duplicate the dynamic-require plumbing.
+ */
+export function getRegistryHostDefaults(): Record<string, string> | undefined {
+  try {
+    const root = getDeploymentRoot();
+    if (!root) return undefined;
+    const lib = profilesLib();
+    const result = (lib.loadEffectiveRegistry as (opts?: { overlayPath?: string }) => any)({ overlayPath: OVERLAY_PATH });
+    const hostDefaults = result?.registry?.hostDefaults;
+    return hostDefaults && typeof hostDefaults === "object" ? (hostDefaults as Record<string, string>) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const REGISTRY_DETAIL = {
@@ -25,15 +56,16 @@ const REGISTRY_DETAIL = {
 };
 
 const OVERLAY_PATH = path.join(configDir("massa-ai"), "model-profiles.json");
-const GENERATE_SCRIPT = path.resolve(
-  import.meta.dirname,
-  "../../../../scripts/generate-subagent-artifacts.ts",
-);
 
 export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry" })
   .get(
     "/",
     ({ set }) => {
+      const root = getDeploymentRoot();
+      if (!root) {
+        set.status = 501;
+        return { success: false as const, error: deploymentUnavailableMessage("scripts/lib/model-profiles.ts") };
+      }
       const lib = profilesLib();
       const result = (lib.loadEffectiveRegistry as (opts?: { overlayPath?: string }) => any)({ overlayPath: OVERLAY_PATH });
       set.status = 200;
@@ -42,6 +74,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         data: {
           registry: result.registry,
           source: result.source,
+          overlayOverrideCount: result.overlayOverrideCount ?? 0,
           ...(result.overlayError ? { overlayError: result.overlayError } : {}),
         },
       };
@@ -51,18 +84,26 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         ...REGISTRY_DETAIL,
         summary: "Get effective registry (builtin + overlay) with source attribution",
         description:
-          "Returns the merged registry (builtin + overlay), source attribution (builtin, overlay, tombstoned), and overlayError if the overlay is corrupted (200 status, never fails).",
+          "Returns the merged registry (builtin + overlay), source attribution (builtin, overlay, tombstoned), overlayOverrideCount (APCR-01.10 — count of overlay entries surviving normalization, so an operator can see how much of the registry their overlay is overriding), and overlayError if the overlay is corrupted (200 status, never fails).",
       },
     },
   )
   .put(
     "/",
     ({ body, set }) => {
+      const root = getDeploymentRoot();
+      if (!root) {
+        set.status = 501;
+        return { success: false as const, error: deploymentUnavailableMessage("scripts/lib/model-profiles.ts") };
+      }
       const lib = profilesLib();
       const overlay = body as Record<string, unknown>;
 
       const builtin = (lib.loadRegistry as (file?: string) => any)(lib.DEFAULT_REGISTRY_PATH as string);
-      const merged = mergeOverlayForValidation(builtin, overlay);
+      const merged = (lib.mergeOverlay as (b: unknown, o: unknown) => Record<string, unknown>)(
+        builtin,
+        overlay,
+      );
 
       try {
         (lib.validateRegistry as (raw: unknown) => void)(merged);
@@ -95,6 +136,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         data: {
           registry: result.registry,
           source: result.source,
+          overlayOverrideCount: result.overlayOverrideCount ?? 0,
         },
       };
     },
@@ -104,15 +146,21 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         ...REGISTRY_DETAIL,
         summary: "Write overlay (full-replace, validated, atomic)",
         description:
-          "Accepts the full overlay object. Validates the merged result (builtin + overlay) via validateRegistry(). On success, writes atomically to ~/.config/massa-ai/model-profiles.json and returns the updated effective registry. On failure, returns 400 with all violations.",
+          "Accepts the full overlay object. Validates the merged result (builtin + overlay) via validateRegistry(). On success, writes atomically to ~/.config/massa-ai/model-profiles.json and returns the updated effective registry, including overlayOverrideCount (APCR-01.10). On failure, returns 400 with all violations.",
       },
     },
   )
   .post(
     "/regenerate",
     ({ set }) => {
+      const root = getDeploymentRoot();
+      if (!root) {
+        set.status = 501;
+        return { success: false as const, error: deploymentUnavailableMessage("scripts/generate-subagent-artifacts.ts") };
+      }
+      const generateScript = path.join(root, "scripts", "generate-subagent-artifacts.ts");
       try {
-        const child = spawnSync("bun", [GENERATE_SCRIPT], {
+        const child = spawnSync("bun", [generateScript], {
           env: { ...process.env },
           stdio: ["pipe", "pipe", "pipe"],
         }) as unknown as { exitCode: number | null; stderr?: { toString(): string } };
@@ -150,6 +198,11 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
   .delete(
     "/overlay",
     ({ set }) => {
+      const root = getDeploymentRoot();
+      if (!root) {
+        set.status = 501;
+        return { success: false as const, error: deploymentUnavailableMessage("scripts/lib/model-profiles.ts") };
+      }
       const lib = profilesLib();
       try {
         if (fs.existsSync(OVERLAY_PATH)) {
@@ -181,37 +234,6 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
       },
     },
   );
-
-function mergeOverlayForValidation(builtin: unknown, overlay: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = JSON.parse(JSON.stringify(builtin));
-
-  if (overlay.tiers && Array.isArray(overlay.tiers)) {
-    result.tiers = [...(overlay.tiers as unknown[])];
-  }
-  if (overlay.hostDefaults) {
-    result.hostDefaults = { ...overlay.hostDefaults };
-  }
-  if (overlay.workflowTiers) {
-    result.workflowTiers = { ...overlay.workflowTiers };
-  }
-  if (overlay.profiles) {
-    const profiles = result.profiles as Record<string, unknown>;
-    for (const [key, val] of Object.entries(overlay.profiles)) {
-      if (val && typeof val === "object" && !Array.isArray(val)) {
-        if ((val as { _delete?: true })._delete === true) {
-          delete profiles[key];
-          continue;
-        }
-        const { _delete: _unused, ...profileData } = val as Record<string, unknown>;
-        void _unused;
-        profiles[key] = profileData;
-      }
-    }
-    result.profiles = profiles;
-  }
-
-  return result;
-}
 
 function writeOverlayAtomically(overlayPath: string, data: unknown): void {
   const dir = path.dirname(overlayPath);

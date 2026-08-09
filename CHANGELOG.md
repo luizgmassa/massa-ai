@@ -7,6 +7,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The model-registry overlay is now interpreted as a real delta, deep-merged against
+  the builtin, instead of a whole-object replace.** An overlay key that is absent now
+  means "inherit the builtin's value"; a `null` value on `hostDefaults`/`workflowTiers`
+  is the explicit nested-deletion tombstone (profile-level deletion still uses
+  `{_delete: true}`, unchanged). Practical effect: an operator who has previously saved
+  a registry overlay will now receive future builtin model/tier/host additions instead
+  of being silently frozen on the registry that existed when they last saved. A
+  read-path normalization step also collapses a full-copy overlay (written by the
+  v1.41/v1.42 registry editor) back down to a real delta the first time it is read,
+  without losing any operator edit that actually differs from the builtin. The route
+  and the CLI library now share one merge implementation
+  (`scripts/lib/model-profiles.ts`'s `mergeOverlay`) instead of two hand-copied twins
+  that had already drifted once.
+- One SSE handler factory now backs both `POST /regenerate-and-install-stream` and the
+  deprecated `POST /regenerate-stream` alias, replacing ~90 lines of byte-identical
+  duplication; the alias keeps its own Swagger summary and behaves identically.
+
+### Fixed
+
+- **The registry editor no longer blanks every host the overlay does not mention.**
+  The Web UI's display merge assigned each overlay profile over the server's profile
+  whole, so an operator whose saved overlay touched a single host — the normal shape of
+  a delta — saw every other host's cells render as `—` and become uneditable, and the
+  profile's description disappear. This was the client-side twin of the whole-object
+  replace fixed on the server in this same release; the display merge now merges per
+  profile, per host and per tier, mirroring `mergeProfile` in
+  `scripts/lib/model-profiles.ts`. The saved overlay file was never wrong and no
+  operator edit was lost — the values were present on disk and correct in the server's
+  effective registry throughout, and reappear on the next load.
+- **The project list route no longer reports success on a failure it never
+  diagnosed.** A bare `catch {}` around `listProjects()` swallowed every error class
+  and fell back to an empty `{success:true, projects:[]}` whenever the store's optional
+  cross-dimension method was absent. Only the true embedding-dimension-mismatch case
+  now falls back; every other error rethrows and the route returns
+  `{success:false}` naming the cause.
+- **`PostgresVectorStore` no longer leaks a connection pool.** `getPool()` and
+  `ensureInitialized()` now share one pool-construction path, so a `getPool()` call
+  followed by `ensureInitialized()` can no longer orphan a first `Pool` behind a
+  second one that `close()` never reaches.
+- **Cross-dimension project enumeration is now schema-qualified.** The `pg_tables`
+  scan filters on `schemaname = current_schema()` and the generated `UNION ALL` SQL
+  references each table by a quoted, schema-qualified identifier, so a same-named
+  `vector_documents_*d` table in another PostgreSQL schema can no longer be
+  double-counted or silently read instead of the intended table.
+- **The Config tab's masking sentinel (`"***"`) can no longer be persisted as a real
+  secret.** Saving with a sensitive field still showing `"***"` (e.g. after revealing
+  and hiding it, or when the field was never set) previously wrote the literal string
+  `"***"` into `config.json` as `security.apiKey`, `llm.apiKey`, `embedding.apiKey`, or
+  `database.url` whenever the previously stored value was empty. The sentinel is now
+  dropped or restored regardless of the stored value's truthiness, for all four
+  fields.
+- **The regenerate-and-install SSE stream now derives its install status from the
+  switch report's actual host outcomes**, instead of emitting `status:"switched"`
+  whenever `switchProfile` merely returned. A report where every host failed now
+  emits `status:"failed"`; `unsupported` hosts are their own status class instead of
+  being folded into `skipped`. The Web UI banner now classifies a run by that status
+  rather than by `exitCode === 0` alone, so a generator run that exits 0 while every
+  host install failed no longer renders a success banner.
+- **The model-registry routes (`GET/PUT/DELETE /api/v1/model-registry*` and both
+  regenerate SSE streams) now return a diagnosable `501` instead of a stack trace or
+  `MODULE_NOT_FOUND`** when the generator script and its supporting library can't be
+  resolved outside a source checkout (the Docker image, the published npm package).
+  The path resolver is now a bounded upward search for a repo marker instead of two
+  fixed `../../../../` climbs that only worked from one position in the source tree.
+- **"Regenerate Artifacts" now actually changes what a subsequent profile switch
+  installs.** Nothing previously copied the freshly regenerated
+  `apps/<host>-plugin/agent-profiles/<profile>/` bundles into a host's installed
+  variant root — regenerate would regenerate, then reinstall from whatever stale tree
+  was already there (measured: an operator's regenerated `opencode` `balanced` profile
+  carried a v1.42 overlay while the installed variant tree it switched from still
+  carried v1.41.0). Both the tools-api regenerate-stream route and `POST
+  /api/v1/profiles/switch` now bridge the generated tree into the installed variant
+  root first, reported as a new `variant-sync` SSE event per host on the Web UI's
+  Regenerate flow; both published config-CLIs (`massa-ai-config profile set`) do the
+  same from a source checkout. This bridge is a no-op without a source checkout, so a
+  published npm/marketplace install sees no behaviour change. An installed profile
+  directory the source no longer emits is never deleted. `listProfiles` also now
+  prefers the registry's declared per-host default profile (when reachable) over a
+  hardcoded `"balanced"` literal for a host with no recorded active profile, so a first
+  auto-install targets the registry's real default instead of always `balanced`; the
+  Web UI's registry help text now explains that "Host Defaults" is that build-time
+  default, not the currently-installed profile.
+- **The registry editor's Duplicate and Delete profile pickers no longer report "no
+  profiles available" for an operator who hasn't edited anything this session.** Both
+  now read the effective (server + in-memory-overlay) registry instead of only the raw
+  overlay, which is legitimately empty until the operator makes an edit.
+- Editing a single cell of a profile that exists only in the builtin registry no
+  longer overwrites that profile's real description with its own profile key on the
+  first edit.
+- `handleRegistryRegenerate`'s `fetch` now sends the `x-api-key` header — it was
+  previously reaching the mandatory-auth model-registry API (AD-011) with no key at
+  all.
+
+### Security
+
+- **`config.json` and its backup files are now written at mode `0600` (owner-only),
+  and an existing more-permissive file is tightened on the next save.** Backups go
+  through the same temp-file-plus-rename path as the primary write instead of
+  `copyFileSync` + a separate `chmod`, closing a window where a same-UID process could
+  read a plaintext secret before the mode landed. Backup retention is capped at the
+  10 most recent `config.json.bak.<ISO>` files; the legacy untimestamped
+  `config.json.bak` is tightened but never deleted. **Operator-visible behavior
+  change**: a `config.json` read from a bind-mount by another UID loses that access
+  after the next save from this process. `docs/web-ui-access.md` now documents the
+  `/config/reveal` plaintext exposure under `MASSA_AI_WEB_UI_TRUST_LOCAL=true`, that
+  backups are not purged on key rotation (up to 10 files retain a rotated secret until
+  they age out), and that `/config/reveal` carries no protection beyond the
+  already-accepted `/ui` key-injection chain.
+
 ## [1.42.0] - 2026-08-08
 
 ### Added

@@ -104,9 +104,13 @@ export class PostgresVectorStore extends BaseVectorStore {
 
   // ── Initialization ─────────────────────────────────────────────────────────
 
-  async ensureInitialized(): Promise<Pool> {
-    if (this.pool && this.initialized) return this.pool;
-
+  /**
+   * Construct a new `Pool`. The only place that calls `new Pool(...)` — both
+   * `ensureInitialized()` and `getPool()` route through this, and both reuse
+   * `this.pool` when one already exists rather than constructing a second one
+   * that orphans the first (APCR-03.1/03.2 — F3).
+   */
+  private async createPool(): Promise<Pool> {
     const pg = await import('pg');
     const PgPool = (pg.default as any)?.Pool ?? (pg as any).Pool;
 
@@ -117,7 +121,18 @@ export class PostgresVectorStore extends BaseVectorStore {
       connectionTimeoutMillis: 5000,
     };
 
-    const pool = new PgPool(poolConfig) as Pool;
+    return new PgPool(poolConfig) as Pool;
+  }
+
+  async ensureInitialized(): Promise<Pool> {
+    if (this.pool && this.initialized) return this.pool;
+
+    // Reuse a pool `getPool()` (or a prior failed `ensureInitialized()` call)
+    // already constructed, instead of unconditionally building a second one —
+    // that second pool is never `.end()`ed by `close()`, and every dimension
+    // setup below still needs to run even when the pool already exists, so
+    // `getPool()` cannot be allowed to satisfy this method's own gate.
+    const pool = this.pool ?? (await this.createPool());
     this.pool = pool;
 
     const client = await pool.connect();
@@ -722,15 +737,7 @@ export class PostgresVectorStore extends BaseVectorStore {
    */
   private async getPool(): Promise<Pool> {
     if (this.pool) return this.pool;
-    const pg = await import('pg');
-    const PgPool = (pg.default as any)?.Pool ?? (pg as any).Pool;
-    const poolConfig: PoolConfig = {
-      connectionString: this.config.connectionString,
-      max: this.config.poolSize,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    };
-    this.pool = new PgPool(poolConfig) as Pool;
+    this.pool = await this.createPool();
     return this.pool;
   }
 
@@ -742,18 +749,24 @@ export class PostgresVectorStore extends BaseVectorStore {
   async listAllProjectsAcrossDimensions(): Promise<ProjectInfo[]> {
     const pool = await this.getPool();
 
+    // schemaname = current_schema() (APCR-04.1): without it, an identically-named table in
+    // another schema is UNION ALL'd in and double-counted.
     const { rows: tables } = await pool.query(`
-      SELECT tablename FROM pg_tables
-      WHERE tablename = 'vector_documents'
-         OR tablename ~ '^vector_documents_[0-9]+d$'
+      SELECT schemaname, tablename FROM pg_tables
+      WHERE schemaname = current_schema()
+        AND (tablename = 'vector_documents' OR tablename ~ '^vector_documents_[0-9]+d$')
       ORDER BY tablename
     `);
 
     if (tables.length === 0) return [];
 
-    const unionParts = tables.map((t: any) =>
-      `SELECT project_id, COUNT(*)::int AS doc_count, MAX(updated_at) AS last_updated, SUM(LENGTH(content))::bigint AS total_size FROM ${t.tablename} WHERE id NOT LIKE '_metadata:%' GROUP BY project_id`
-    ).join(' UNION ALL ');
+    // Quoted, schema-qualified identifiers (APCR-04.2): an unqualified name resolves via
+    // search_path at execution time, which can read a different table than the one just
+    // enumerated.
+    const unionParts = tables.map((t: any) => {
+      const qualified = `"${t.schemaname}"."${t.tablename}"`;
+      return `SELECT project_id, COUNT(*)::int AS doc_count, MAX(updated_at) AS last_updated, SUM(LENGTH(content))::bigint AS total_size FROM ${qualified} WHERE id NOT LIKE '_metadata:%' GROUP BY project_id`;
+    }).join(' UNION ALL ');
 
     const { rows } = await pool.query(`
       SELECT project_id,

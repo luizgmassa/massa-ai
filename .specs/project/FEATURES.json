@@ -1113,7 +1113,7 @@
       "id": "admin-portal-enhancements",
       "slug": "admin-portal-enhancements",
       "title": "Admin Portal Enhancements — handlers, styling, confirm, progress UX, registry sub-tab",
-      "status": "execute-complete",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
@@ -1126,7 +1126,7 @@
       "design": ".specs/features/admin-portal-enhancements/design.md",
       "tasks": ".specs/features/admin-portal-enhancements/tasks.md",
       "created": "2026-08-08",
-      "notes": "EXECUTE COMPLETE 2026-08-08: T1-T9, 9 task commits on spec/admin-portal-enhancements (2 planning + 9 task). Inline execution (sub-agents unavailable). 51 ACs across 3 phases = 9 tasks. Plan Challenge full gate 7 findings all folded (F1-F7). Per-task gates green: model-registry-stream 7, web-ui 220->278, type-check 6/6, test:plugins 135/0. New backend route POST /api/v1/model-registry/regenerate-stream (SSE). Frontend: showBanner, config save/reveal confirm, profiles tab switcher, registry in-memory overlay CRUD + save/clear, regenerate streaming, index progress + poll fallback, CSS design system. Validation pending (verification-agent dispatch). Push/PR = user decision."
+      "notes": "VALIDATED PASS 2026-08-08: T1-T9, 9 task commits on spec/admin-portal-enhancements (2 planning + 9 task). Inline execution (sub-agents unavailable). 51 ACs across 3 phases = 9 tasks. Plan Challenge full gate 7 findings all folded (F1-F7). Per-task gates green: model-registry-stream 7, web-ui 220->278, type-check 6/6, test:plugins 135/0. New backend route POST /api/v1/model-registry/regenerate-stream (SSE). Frontend: showBanner, config save/reveal confirm, profiles tab switcher, registry in-memory overlay CRUD + save/clear, regenerate streaming, index progress + poll fallback, CSS design system. Standalone fresh-eyes validation PASS: 51/51 ACs matched, 5/5 discrimination mutations killed (1 fix applied for PRG-02 gap, re-verified). Push/PR = user decision."
     },
     {
       "id": "config-capture-reveal-field-guides",
@@ -1149,7 +1149,34 @@
         "admin-portal-ui-fixes"
       ],
       "notes": "VALIDATED PASS 2026-08-08: T11-T14 (3 ACs CFG-01..03). 3/3 ACs, 3/3 mutations killed. web-ui 307 pass, tools-api config 14 pass, type-check 6/6, lint 0. New GET /api/v1/config/reveal endpoint. Push/PR = user decision."
+    },
+    {
+      "id": "admin-portal-correctness-repair",
+      "slug": "admin-portal-correctness-repair",
+      "title": "Admin Portal Correctness Repair — 8 correctness defects, 2 security issues, 1 dedupe, 5 state drifts from v1.41.0+v1.42.0",
+      "status": "complete",
+      "priority": "P0",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "fix/admin-portal-correctness-repair",
+      "spec": ".specs/features/admin-portal-correctness-repair/spec.md",
+      "design": ".specs/features/admin-portal-correctness-repair/design.md",
+      "tasks": ".specs/features/admin-portal-correctness-repair/tasks.md",
+      "validation": ".specs/features/admin-portal-correctness-repair/validation.md",
+      "created": "2026-08-08",
+      "depends_on": [
+        "admin-portal",
+        "admin-portal-enhancements",
+        "admin-portal-ui-fixes",
+        "registry-help-dropdown-workflow-tiers",
+        "config-capture-reveal-field-guides"
+      ],
+      "notes": "VALIDATED PASS 2026-08-08: T1-T11 + 3 fix-loop commits, 19 commits from 69c0632c (56a409ec spec+design+tasks .. close-out). Two batch workers (W1: T1-T8; W2: T9-T11) plus one fix loop. 39/39 ACs evidenced, 5/5 mutations killed, 0 survivors. Validation ran twice: iteration 1 FAILed (3 mutations survived on APCR-01 — the P0 core had no direct sensor because scripts/__tests__/model-profiles.test.ts was never extended, and APCR-01.10 was computed but never surfaced in the response body); fix loop 1 closed both, re-verify PASS. 5 audit mechanisms amended after re-measurement (A1-A5, see spec.md). Design caught the REG-03 workflow-tier-remove regression deep merge would have caused (null tombstone). Plan Challenge full gate folded 5 more ACs, including APCR-06.6 — the server-side status fix alone left the UI rendering a success banner from exitCode alone. Gates measured on this branch: web-ui 337 pass (0 fail, baseline 320), shared 327 pass (0 fail, baseline 322), tools-api 29 groups all pass, core --unit --filter='vector|postgres|store' 16 groups all pass, type-check 6/6 (--force), oxlint exit 0, test:scripts exit 0, generate:artifacts --check no drift, validate_state.ts exit 1 with 52 errors (all legacy; this feature clean and absent from the failing bracket), check_specs_delivered exit 0. Release derivation: 1.42.0 -> 1.43.0 (minor). Not pushed — push/PR/merge = user decision."
     }
   ],
-  "active_feature": "config-capture-reveal-field-guides"
+  "active_feature": "admin-portal-correctness-repair"
 }

@@ -22,12 +22,14 @@ import {
   hostsSupportedBy,
   loadRegistry,
   loadEffectiveRegistry,
+  mergeOverlay,
   profileFlagFrom,
   resolveTier,
   selectProfile,
   validateRegistry,
   workflowTier,
   type Host,
+  type OverlayData,
   type Registry,
 } from "../lib/model-profiles.ts";
 
@@ -687,6 +689,227 @@ describe("model-profiles: loadEffectiveRegistry", () => {
     if (!result.overlayError) {
       expect(result.registry.hostDefaults.claude).toBe(newClaudeDefault);
     }
+  });
+});
+
+// ── APCR-01 fix-loop iteration 1 (FG1): mergeOverlay is a deep-merge delta, not a
+// whole-object replace. These sensors target the three functions a mutation self-check
+// found survived the whole reachable suite: mergeFlatMap (`model-profiles.ts:582-595`),
+// mergeProfile (`model-profiles.ts:600-620`) and normalizeFlatMap (`model-profiles.ts:663-
+// 678`). Everything above this block (`describe("model-profiles: loadEffectiveRegistry"`)
+// predates this feature and still describes the old whole-object-replace contract — its
+// fixtures set every key, so they cannot distinguish partial-key retention from whole
+// replace. These tests deliberately leave keys unmentioned.
+describe("model-profiles: mergeOverlay is a deep-merge delta, not a whole-object replace (APCR-01.1/.2/.3, FG1)", () => {
+  /** Fully synthetic — not the real `skills/model-profiles.json` — so every key's presence
+   *  or absence is under the test's control. `mergeOverlay` is a pure function of its two
+   *  arguments, so no disk I/O or real builtin is needed here. */
+  function syntheticBuiltin(): Registry {
+    return {
+      version: 1,
+      tiers: ["light", "standard", "deep"],
+      hostDefaults: { claude: "A", codex: "A", cursor: "A", opencode: "A" },
+      workflowTiers: { "spec-driven": "deep", general: "light" },
+      profiles: {
+        A: {
+          description: "Profile A",
+          hosts: {
+            claude: {
+              light: { model: "a-claude-light", effort: "low" },
+              standard: { model: "a-claude-standard", effort: "medium" },
+              deep: { model: "a-claude-deep", effort: "high" },
+            },
+            codex: {
+              light: { model: "a-codex-light", effort: "low" },
+              standard: { model: "a-codex-standard", effort: "medium" },
+              deep: { model: "a-codex-deep", effort: "high" },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  test("spec's Independent Test for APCR-01: a builtin addition the overlay never mentions survives the merge, and profile A's untouched tiers are unchanged", () => {
+    const builtin = syntheticBuiltin();
+    // Overlay written before the builtin gained profile B — touches only one leaf of A.
+    const overlay: OverlayData = {
+      profiles: {
+        A: {
+          hosts: {
+            claude: { light: { model: "overlay-claude-light", effort: "max" } },
+          },
+        },
+      },
+    };
+    // Simulate a later builtin bump: a new profile B the overlay predates and never mentions.
+    const bumpedBuiltin: Registry = {
+      ...builtin,
+      profiles: {
+        ...builtin.profiles,
+        B: {
+          description: "Profile B — added by a builtin bump after the overlay was written",
+          hosts: {
+            claude: { light: { model: "b-claude-light", effort: "low" } },
+          },
+        },
+      },
+    };
+
+    const merged = mergeOverlay(bumpedBuiltin, overlay) as unknown as Registry;
+
+    // The regression this whole feature exists to prevent: the addition reaches the operator.
+    expect(merged.profiles.B).toEqual(bumpedBuiltin.profiles.B);
+
+    // Only the touched leaf changed; A's other tiers/hosts are retained verbatim.
+    expect(merged.profiles.A.hosts.claude.light).toEqual({
+      model: "overlay-claude-light",
+      effort: "max",
+    });
+    expect(merged.profiles.A.hosts.claude.standard).toEqual(
+      bumpedBuiltin.profiles.A.hosts.claude.standard,
+    );
+    expect(merged.profiles.A.hosts.claude.deep).toEqual(
+      bumpedBuiltin.profiles.A.hosts.claude.deep,
+    );
+    expect(merged.profiles.A.hosts.codex).toEqual(bumpedBuiltin.profiles.A.hosts.codex);
+  });
+
+  test("mergeOverlay retains builtin hostDefaults/workflowTiers keys the overlay does not mention (kills the whole-object-replace mutation on mergeFlatMap)", () => {
+    const builtin = syntheticBuiltin();
+    const overlay: OverlayData = {
+      hostDefaults: { claude: "A" }, // mentions only claude
+      workflowTiers: { "spec-driven": "light" }, // mentions only spec-driven
+    };
+
+    const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
+
+    expect(merged.hostDefaults.claude).toBe("A");
+    expect(merged.hostDefaults.codex).toBe(builtin.hostDefaults.codex);
+    expect(merged.hostDefaults.cursor).toBe(builtin.hostDefaults.cursor);
+    expect(merged.hostDefaults.opencode).toBe(builtin.hostDefaults.opencode);
+
+    expect(merged.workflowTiers["spec-driven"]).toBe("light");
+    expect(merged.workflowTiers.general).toBe(builtin.workflowTiers.general);
+  });
+
+  test("mergeOverlay: null tombstones a single hostDefaults/workflowTiers key without dropping its siblings (design D-1)", () => {
+    const builtin = syntheticBuiltin();
+    const overlay: OverlayData = {
+      hostDefaults: { claude: null },
+      workflowTiers: { "spec-driven": null },
+    };
+
+    const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
+
+    expect("claude" in merged.hostDefaults).toBe(false);
+    expect(merged.hostDefaults.codex).toBe(builtin.hostDefaults.codex);
+    expect(merged.hostDefaults.cursor).toBe(builtin.hostDefaults.cursor);
+
+    expect("spec-driven" in merged.workflowTiers).toBe(false);
+    expect(merged.workflowTiers.general).toBe(builtin.workflowTiers.general);
+  });
+
+  test("mergeOverlay retains a profile's untouched tiers and hosts when the overlay edits only one tier of one host (kills the whole-host-replace mutation on mergeProfile)", () => {
+    const builtin = syntheticBuiltin();
+    const overlay: OverlayData = {
+      profiles: {
+        A: {
+          hosts: {
+            claude: { standard: { model: "overlay-model", effort: "xhigh" } },
+          },
+        },
+      },
+    };
+
+    const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
+
+    expect(merged.profiles.A.hosts.claude.standard).toEqual({
+      model: "overlay-model",
+      effort: "xhigh",
+    });
+    expect(merged.profiles.A.hosts.claude.light).toEqual(builtin.profiles.A.hosts.claude.light);
+    expect(merged.profiles.A.hosts.claude.deep).toEqual(builtin.profiles.A.hosts.claude.deep);
+    expect(merged.profiles.A.hosts.codex).toEqual(builtin.profiles.A.hosts.codex);
+  });
+});
+
+// ── APCR-01 fix-loop iteration 1 (FG1): read-path normalization (`normalizeFlatMap`,
+// `model-profiles.ts:663-678`) against the real builtin registry, since normalization is
+// reached only through `loadEffectiveRegistry` and always diffs against
+// `DEFAULT_REGISTRY_PATH`. Also covers APCR-01.10 (surviving-entry count) and pins
+// APCR-01.9 (the documented known limitation).
+describe("model-profiles: normalization drops byte-identical overlay entries and keeps genuine edits (APCR-01.4/.5/.9/.10, FG1)", () => {
+  function scratchOverlayPath(): string {
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-overlay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    return path.join(tmpDir, "model-profiles.json");
+  }
+
+  function writeOverlay(overlayPath: string, data: unknown): void {
+    const fs = require("fs");
+    fs.mkdirSync(path.dirname(overlayPath), { recursive: true });
+    fs.writeFileSync(overlayPath, JSON.stringify(data, null, 2));
+  }
+
+  test("normalization drops a hostDefaults entry byte-identical to the builtin and keeps one that genuinely differs (kills the inverted-comparison mutation on normalizeFlatMap)", () => {
+    const overlayPath = scratchOverlayPath();
+    const builtin = loadRegistry(REGISTRY_PATH);
+    // Fixture assumption this test depends on — both keys must exist on the real registry
+    // and "cheap" must support both claude and codex, or the merge fails validation.
+    expect(builtin.hostDefaults.claude).toBe("balanced");
+    expect("cheap" in builtin.profiles).toBe(true);
+
+    writeOverlay(overlayPath, {
+      hostDefaults: {
+        claude: "balanced", // byte-identical to the builtin — normalization must drop it
+        codex: "cheap", // genuinely differs from the builtin's "balanced" — must survive
+      },
+    });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.overlayError).toBeUndefined();
+
+    const normalizedHostDefaults = result.source.overlay?.hostDefaults ?? {};
+    expect("claude" in normalizedHostDefaults).toBe(false);
+    expect(normalizedHostDefaults.codex).toBe("cheap");
+
+    // APCR-01.10: only the surviving entry counts toward the reported override count.
+    expect(result.overlayOverrideCount).toBe(1);
+
+    // The served registry reflects the surviving override and the collapsed identical entry.
+    expect(result.registry.hostDefaults.codex).toBe("cheap");
+    expect(result.registry.hostDefaults.claude).toBe("balanced");
+  });
+
+  test("APCR-01.9 known-limitation pin: an overlay entry that differs from the current builtin — as if copied from an older builtin whose value has since changed — is not dropped, and the overlay value wins", () => {
+    // Design D-1 / spec.md's "Limitation behind AC9": `OverlayData` carries no provenance,
+    // so normalization cannot tell "the operator typed this deliberately" apart from "this
+    // was copied verbatim from a past builtin whose value has since moved on" — both read
+    // identically here, an overlay value that differs from the *current* builtin. Deep merge
+    // (APCR-01.1-3) already fixes builtin *additions*; this pins the one case design.md
+    // documents as NOT closable without a provenance field: a stale full-copy overlay entry
+    // whose builtin value later changes stays frozen on the old value. This is asserted as
+    // accepted, expected behavior — a future change to normalization (e.g. adding
+    // provenance) must change this test explicitly, not silently change behavior under it.
+    const overlayPath = scratchOverlayPath();
+    const builtin = loadRegistry(REGISTRY_PATH);
+    expect(builtin.hostDefaults.opencode).toBe("balanced");
+
+    writeOverlay(overlayPath, {
+      hostDefaults: {
+        // Stands in for "balanced" as it existed in an older builtin, before the current
+        // builtin's value moved on.
+        opencode: "cheap",
+      },
+    });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.overlayError).toBeUndefined();
+    expect(result.source.overlay?.hostDefaults?.opencode).toBe("cheap");
+    expect(result.registry.hostDefaults.opencode).toBe("cheap"); // the overlay value wins
   });
 });
 

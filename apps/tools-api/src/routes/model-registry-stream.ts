@@ -1,12 +1,22 @@
 /**
  * SSE streaming regenerate route (Component 4 — REGEN-01..08).
  *
- *   POST /api/v1/model-registry/regenerate-stream
+ *   POST /api/v1/model-registry/regenerate-and-install-stream
+ *   POST /api/v1/model-registry/regenerate-stream   (deprecated alias, same behavior)
  *
  * Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn
- * (non-blocking), pipes stdout/stderr line-by-line to an SSE stream, and emits
- * a terminal `done` event with the exit code. The existing blocking
- * `/regenerate` route (spawnSync) is unchanged for API compatibility.
+ * (non-blocking), pipes stdout/stderr line-by-line to an SSE stream. After
+ * the generator succeeds (exit 0), automatically bridges the freshly
+ * generated `apps/<host>-plugin/agent-profiles/` trees into each host's
+ * installed variant root (`syncGeneratedVariants`, see `variant-sync.ts`'s
+ * module docblock for why this bridge exists — without it "Regenerate
+ * Artifacts" regenerates and then reinstalls from a stale tree) and then
+ * calls `switchProfile` for every detected host to reinstall the active
+ * profile's agents from those freshly-synced variant dirs. Emits one
+ * `variant-sync` SSE frame per host from the bridge step, then one `install`
+ * SSE frame per host from the switch step
+ * (`data: {"type":"install","host":"...","status":"switched|skipped|failed",...}`),
+ * then a terminal `done` event with the exit code.
  *
  * Streaming pattern follows events.ts exactly: return
  * `new Response(new ReadableStream({ start, cancel }), { headers })`. Do NOT
@@ -20,11 +30,18 @@ import { Elysia } from "elysia";
 import path from "path";
 import { spawn } from "child_process";
 import { configDir } from "@massa-ai/shared/config";
+import {
+  listProfiles,
+  switchProfile,
+  reportSucceeded,
+  syncGeneratedVariants,
+  type Host,
+  type HostSwitchStatus,
+  type SwitchReport,
+} from "@massa-ai/shared";
+import { getDeploymentRoot, deploymentUnavailableMessage } from "./model-registry-deployment.js";
+import { getRegistryHostDefaults } from "./model-registry.js";
 
-const GENERATE_SCRIPT = path.resolve(
-  import.meta.dirname,
-  "../../../../scripts/generate-subagent-artifacts.ts",
-);
 // configDir import is needed so mock.module can intercept @massa-ai/shared/config
 // in tests (the route shares the mock surface with model-registry.ts).
 void configDir;
@@ -35,16 +52,106 @@ function sseFrame(data: Record<string, unknown>): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-registry" }).post(
-  "/regenerate-stream",
-  () => {
+/**
+ * Derive the emitted install status from the switch report's actual host
+ * outcomes (APCR-06), instead of the report merely *returning* — a report in
+ * which every host failed used to still emit `status:"switched"`. Reuses
+ * `reportSucceeded` for the switched/skipped success boundary rather than
+ * re-deriving it (design D-4): switched if any host switched, else failed if
+ * any host failed, else unsupported if any host is unsupported, else skipped.
+ */
+function deriveInstallStatus(report: SwitchReport): HostSwitchStatus {
+  if (report.hosts.some((h) => h.status === "switched")) return "switched";
+  // No host switched. `reportSucceeded` is true here exactly when every remaining host is
+  // "skipped" (it would be false if any were "failed" or "unsupported") — reused rather than
+  // hand-rolling the same every-host check.
+  if (reportSucceeded(report)) return "skipped";
+  return report.hosts.some((h) => h.status === "failed") ? "failed" : "unsupported";
+}
+
+/** Install the active profile's agents for every detected host after
+ *  regeneration. First bridges the freshly regenerated variant trees into
+ *  each host's installed variant root (one `variant-sync` SSE event per
+ *  host — see the module docblock), then emits one `install` SSE event per
+ *  host, then returns. */
+function installActiveProfiles(controller: ReadableStreamDefaultController<Uint8Array>, closedRef: { closed: boolean }): void {
+  try {
+    const syncResults = syncGeneratedVariants({ sourceRoot: getDeploymentRoot() });
+    for (const r of syncResults) {
+      if (closedRef.closed) return;
+      controller.enqueue(sseFrame({
+        type: "variant-sync",
+        host: r.host,
+        status: r.status,
+        profiles: r.profiles,
+        files: r.files,
+        retained: r.retained,
+        ...(r.reason ? { reason: r.reason } : {}),
+        ...(r.error ? { error: r.error } : {}),
+      }));
+    }
+
+    const inventory = listProfiles({ hostDefaults: getRegistryHostDefaults() });
+    for (const hostEntry of inventory.hosts) {
+      if (closedRef.closed) return;
+      const host = hostEntry.host as Host;
+      if (!hostEntry.installed || !hostEntry.activeProfile) {
+        if (!closedRef.closed) {
+          controller.enqueue(sseFrame({ type: "install", host, status: "skipped", reason: "not installed or no active profile" }));
+        }
+        continue;
+      }
+      try {
+        const report = switchProfile({ profile: hostEntry.activeProfile, host });
+        const status = deriveInstallStatus(report);
+        const switched = (report.hosts || []).filter((h: any) => h.status === "switched").map((h: any) => h.host).join(", ") || "none";
+        const skipped = (report.hosts || []).filter((h: any) => h.status === "skipped").map((h: any) => `${h.host} (${h.reason || "unknown"})`).join(", ") || "none";
+        const unsupported = (report.hosts || []).filter((h: any) => h.status === "unsupported").map((h: any) => `${h.host} (${h.reason || "unknown"})`).join(", ") || "none";
+        const failed = (report.hosts || []).filter((h: any) => h.status === "failed").map((h: any) => `${h.host} (${h.reason || "unknown"})`).join(", ") || "none";
+        if (!closedRef.closed) {
+          controller.enqueue(sseFrame({ type: "install", host, status, profile: hostEntry.activeProfile, switched, skipped, unsupported, failed }));
+        }
+      } catch (e) {
+        if (!closedRef.closed) {
+          controller.enqueue(sseFrame({ type: "install", host, status: "failed", error: (e as Error).message }));
+        }
+      }
+    }
+  } catch (e) {
+    if (!closedRef.closed) {
+      controller.enqueue(sseFrame({ type: "install", status: "error", error: `install phase failed: ${(e as Error).message}` }));
+    }
+  }
+}
+
+/**
+ * Factory for the SSE regenerate-stream handler (APCR-09). Both
+ * `/regenerate-and-install-stream` and its deprecated `/regenerate-stream`
+ * alias had byte-equivalent handler bodies; this is the one implementation
+ * behind both routes. Each call returns a fresh closure so the two routes
+ * never share `child`/`closedRef` state, matching the pre-refactor shape.
+ */
+function createRegenerateStreamHandler(): () => Response {
+  return () => {
     let child: ReturnType<typeof spawn> | null = null;
-    let closed = false;
+    const closedRef = { closed: false };
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
+        const root = getDeploymentRoot();
+        if (!root) {
+          controller.enqueue(sseFrame({
+            type: "done",
+            exitCode: null,
+            error: deploymentUnavailableMessage("scripts/generate-subagent-artifacts.ts"),
+          }));
+          controller.close();
+          closedRef.closed = true;
+          return;
+        }
+        const generateScript = path.join(root, "scripts", "generate-subagent-artifacts.ts");
         try {
-          child = spawn("bun", [GENERATE_SCRIPT], {
+          child = spawn("bun", [generateScript], {
             env: { ...process.env },
             stdio: ["pipe", "pipe", "pipe"],
           });
@@ -55,12 +162,12 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
             error: `spawn failed: ${(e as Error).message}`,
           }));
           controller.close();
-          closed = true;
+          closedRef.closed = true;
           return;
         }
 
         const emitLine = (streamName: "stdout" | "stderr", chunk: Buffer) => {
-          if (closed) return;
+          if (closedRef.closed) return;
           const text = chunk.toString();
           const lines = text.split("\n");
           for (const line of lines) {
@@ -68,7 +175,7 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
             try {
               controller.enqueue(sseFrame({ type: "line", stream: streamName, text: line }));
             } catch {
-              closed = true;
+              closedRef.closed = true;
               return;
             }
           }
@@ -78,8 +185,8 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
         child.stderr?.on("data", (chunk: Buffer) => emitLine("stderr", chunk));
 
         child.on("error", (e: Error) => {
-          if (closed) return;
-          closed = true;
+          if (closedRef.closed) return;
+          closedRef.closed = true;
           try {
             controller.enqueue(sseFrame({ type: "done", exitCode: null, error: `spawn error: ${e.message}` }));
             controller.close();
@@ -89,8 +196,18 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
         });
 
         child.on("close", (code: number | null) => {
-          if (closed) return;
-          closed = true;
+          if (closedRef.closed) return;
+          // After successful generation, auto-install agents to active dirs.
+          if (code === 0) {
+            try {
+              controller.enqueue(sseFrame({ type: "line", stream: "stdout", text: "Installing regenerated agents to active directories..." }));
+            } catch {
+              closedRef.closed = true;
+              return;
+            }
+            installActiveProfiles(controller, closedRef);
+          }
+          closedRef.closed = true;
           try {
             controller.enqueue(sseFrame({ type: "done", exitCode: code }));
             controller.close();
@@ -100,7 +217,7 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
         });
       },
       cancel() {
-        closed = true;
+        closedRef.closed = true;
         try {
           child?.kill();
         } catch {
@@ -117,13 +234,24 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
         "X-Accel-Buffering": "no",
       },
     });
-  },
-  {
+  };
+}
+
+export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-registry" })
+  .post("/regenerate-and-install-stream", createRegenerateStreamHandler(), {
     detail: {
       tags: ["model-registry"],
-      summary: "Regenerate subagent artifacts (streaming SSE)",
+      summary: "Regenerate subagent artifacts + auto-install to active dirs (streaming SSE)",
       description:
-        "Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn (non-blocking). Pipes stdout/stderr line-by-line as SSE `data: {\"type\":\"line\",\"stream\":\"stdout|stderr\",\"text\":\"...\"}` events, then a terminal `data: {\"type\":\"done\",\"exitCode\":<n>}` event. On spawn failure emits `done` with `exitCode:null` + `error`. The existing blocking POST /regenerate route stays for API compatibility.",
+        "Spawns `bun scripts/generate-subagent-artifacts.ts` with child_process.spawn (non-blocking). Pipes stdout/stderr line-by-line as SSE. After the generator succeeds (exit 0), bridges the freshly generated agent-profiles trees into each host's installed variant root (`variant-sync` events per host), then calls switchProfile for every detected host to reinstall the active profile's agents from those synced variant dirs. Emits `install` events per host, then a terminal `done` event with the exit code.",
     },
-  },
-);
+  })
+  // Deprecated alias — same behavior, kept for backward compat with older UI.
+  .post("/regenerate-stream", createRegenerateStreamHandler(), {
+    detail: {
+      tags: ["model-registry"],
+      summary: "Regenerate subagent artifacts + auto-install (streaming SSE, deprecated alias)",
+      description:
+        "Alias for POST /regenerate-and-install-stream. Kept for backward compat with older UI versions.",
+    },
+  });

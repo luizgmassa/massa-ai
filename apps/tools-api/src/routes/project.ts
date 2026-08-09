@@ -27,6 +27,13 @@ import path from "path";
 import { getGlobalDataDir } from "@massa-ai/shared";
 import { deriveActor } from "../middleware/auth.js";
 
+/** APCR-02: the only fallback-worthy failure — everything else must surface as a real
+ *  error rather than a silent empty project list (F2). */
+function isDimensionMismatchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /dimension mismatch/i.test(message);
+}
+
 let indexProjectTool: IndexProjectTool | null = null;
 let indexStatusTool: GetIndexStatusTool | null = null;
 let projectIdentityService: ProjectIdentityService | null = null;
@@ -128,10 +135,11 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
         let projects;
         try {
           projects = await vectorStore.listProjects();
-        } catch {
-          // Embedding dimension mismatch or model unavailable — fall back to
-          // listing projects across ALL dimension tables.
-          projects = await (vectorStore as any).listAllProjectsAcrossDimensions?.() ?? [];
+        } catch (error) {
+          if (!isDimensionMismatchError(error)) throw error;
+          // Embedding dimension mismatch — fall back to listing projects
+          // across ALL dimension tables.
+          projects = await vectorStore.listAllProjectsAcrossDimensions();
         }
         return {
           success: true,
