@@ -196,7 +196,7 @@ Discuss is done when every gray area is either resolved with the user, recorded 
 ## Tips
 
 - **Pace is a user choice; Guided is the default** — Quick for speed, Guided for balance, Detailed for Socratic depth; honor mid-discussion switches
-- **Guided ≠ interrogation and ≠ form dump** — Assume-first when safe, ≤2 independent questions per turn, one-at-a-time only when answers depend on each other
+- **Guided ≠ interrogation and ≠ form dump** — no numeric cap on questions; ask as many as the open decisions require. Group independent questions naturally per turn, one-at-a-time only when answers depend on each other. Ask-first for important or uncertain decisions; only genuinely trivial, safe details may be assumed, and every assumption is recorded
 - **Look it up, don't ask** — Resolve anything discoverable from the code yourself; ask only genuine product decisions
 - **Decisions, not vision** — "Card-based layout with subtle shadows" is a decision. "Should feel modern" is not.
 - **Scope is sacred** — Deferred Ideas captures scope creep without losing ideas
