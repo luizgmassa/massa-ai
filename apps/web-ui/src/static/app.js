@@ -1448,8 +1448,7 @@ export function renderModelRegistry(data, opts) {
 
   const actionButtons = writeMode
     ? '<div class="registry-action-buttons">' +
-      '<button type="button" data-action="registry-save-overlay">Save Overlay</button>' +
-      '<button type="button" data-action="registry-regenerate">Regenerate Artifacts</button>' +
+      '<button type="button" data-action="registry-save-apply">Save &amp; Apply</button>' +
       '<button type="button" data-action="registry-clear-overlay">Reset to Built-in (clear overlay)</button>' +
       "</div>"
     : "";
@@ -1458,11 +1457,10 @@ export function renderModelRegistry(data, opts) {
     '<div class="registry-help-body">' +
     '<h4>Button Guide</h4>' +
     '<dl>' +
-    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. Prompts for a profile name and optional description. The new profile starts with null model/effort cells for all hosts and tiers.</dd>' +
-    '<dt>Duplicate Profile</dt><dd>Copies an existing profile (you choose which) to a new name. Prompts for the source profile and the new name. Useful for creating a variant of an existing profile without re-entering all cells.</dd>' +
-    '<dt>Delete Profile</dt><dd>Removes a profile from the overlay. Prompts for the profile name. If the profile exists in the builtin registry, it is tombstoned (restorable via the Deleted section). If it is overlay-only, it is removed entirely.</dd>' +
-    '<dt>Save Overlay</dt><dd>Persists all unsaved overlay changes (profile cells, host defaults, workflow tiers, add/duplicate/delete) to <code>~/.config/massa-ai/model-profiles.json</code>. Asks for confirmation before writing. The builtin registry is never modified.</dd>' +
-    '<dt>Regenerate Artifacts</dt><dd>Re-runs <code>generate-subagent-artifacts.ts</code> to rebuild all host agent files from the current effective registry. Streams progress via SSE. Use after changing model/effort assignments so the installed agents reflect the new values.</dd>' +
+    '<dt>Add Profile</dt><dd>Creates a new profile with a name you choose. The new profile starts with null model/effort cells for all hosts and tiers.</dd>' +
+    '<dt>Duplicate Profile</dt><dd>Copies an existing profile (you choose which) to a new name. Useful for creating a variant of an existing profile without re-entering all cells.</dd>' +
+    '<dt>Delete Profile</dt><dd>Removes a profile from the overlay. If the profile exists in the builtin registry, it is tombstoned (restorable via the Deleted section). If it is overlay-only, it is removed entirely.</dd>' +
+    '<dt>Save &amp; Apply</dt><dd>Persists all unsaved overlay changes (profile cells, host defaults, workflow tiers, per-agent tier overrides, add/duplicate/delete) to <code>~/.config/massa-ai/model-profiles.json</code>, then regenerates and installs the agent files for every host. Asks for confirmation before running. The builtin registry is never modified.</dd>' +
     '<dt>Reset to Built-in (clear overlay)</dt><dd>Deletes the user overlay file, reverting to the builtin registry. Asks for confirmation. All overlay-only profiles, cell overrides, host default changes, and workflow tiers are lost. Tombstoned profiles are restored.</dd>' +
     '</dl>' +
     '<h4>Workflow Tiers</h4>' +
@@ -1619,12 +1617,16 @@ function createApiClient(opts) {
 
 const BANNER_AUTOHIDE_MS = 6000;
 
-export function showBanner(root, type, message) {
+/** @param {object} [opts] - `{ persist: true }` (T8, P1-C AC2) skips the 6 s
+ *  auto-hide for a success banner — used for the Save & Apply completion
+ *  banner, which must stay visible until the operator dismisses/navigates. */
+export function showBanner(root, type, message, opts) {
+  const persist = !!(opts && opts.persist);
   // Clear existing banner(s) — only one at a time.
   const existing = root.querySelectorAll ? root.querySelectorAll(".success, .error") : [];
   existing.forEach((b) => { if (b.remove) b.remove(); });
   const div = {
-    className: type === "success" ? "success" : "error",
+    className: (type === "success" ? "success" : "error") + (persist ? " banner-persist" : ""),
     textContent: message,
     style: {},
     remove: () => {},
@@ -1637,7 +1639,7 @@ export function showBanner(root, type, message) {
   } catch {
     // best effort
   }
-  if (type === "success" && typeof setTimeout !== "undefined") {
+  if (type === "success" && !persist && typeof setTimeout !== "undefined") {
     setTimeout(() => { if (div.remove) div.remove(); }, BANNER_AUTOHIDE_MS);
   }
   return div;
@@ -2090,25 +2092,6 @@ export function handleRegistryRestore(ctx, profile) {
   ctx.render();
 }
 
-export async function handleRegistrySaveOverlay(ctx) {
-  if (!confirm("Save registry overlay? Validates and writes to ~/.config/massa-ai/model-profiles.json.")) return;
-  try {
-    const res = await ctx.api.request("/api/v1/model-registry", { method: "PUT", body: ctx.state.registryOverlay });
-    if (res && res.success === false) {
-      const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
-      showBanner(ctx.root, "error", "Save failed: " + details);
-      return;
-    }
-    showBanner(ctx.root, "success", "Registry overlay saved.");
-    // Reset loaded guard so next render re-inits from the new source.overlay.
-    ctx.state.registryLoaded = false;
-    ctx.state.registryDirty = false;
-    ctx.render();
-  } catch (e) {
-    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
-  }
-}
-
 export async function handleProjectIndexProgress(ctx, jobId) {
   ctx.state.indexJobId = jobId;
   ctx.state.indexJobStatus = "pending";
@@ -2152,13 +2135,22 @@ export async function handleRegistryClearOverlay(ctx) {
   }
 }
 
-// ── Registry regenerate streaming handler (Component 4) ──────────────────────
+// ── Registry regenerate streaming handler (design D-4.5, T8) ────────────────
+// runRegenerateStream is the SSE fetch + APCR-06 classification logic, called
+// ONLY from handleRegistrySaveAndApply below (the standalone "Regenerate
+// Artifacts" button + its own confirm() no longer exist — T8, APUX-13). It
+// carries no confirm() of its own; the single Save & Apply confirm covers
+// both the save and the apply step. Returns `true` when the run finished as a
+// full, unqualified success (every host installed, no variant-sync failures),
+// so the caller can decide whether to layer its own retry banner on failure.
 
-export async function handleRegistryRegenerate(ctx) {
-  if (ctx.state.regenerating) return;
-  if (!confirm("Regenerate subagent artifacts? This overwrites installed variant dirs.")) return;
+const RESTART_SENTENCE = "Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) to pick up the changes.";
+
+export async function runRegenerateStream(ctx) {
+  if (ctx.state.regenerating) return false;
   ctx.state.regenerating = true;
   ctx.render();
+  let ok = false;
 
   try {
     const headers = (ctx.api && ctx.api.authHeaders) ? ctx.api.authHeaders() : {};
@@ -2213,11 +2205,13 @@ export async function handleRegistryRegenerate(ctx) {
           // install failed or was unsupported — that is not a success.
           var hadInstallProblems = installResults.failed.length > 0 || installResults.unsupported.length > 0 || variantSyncResults.failed.length > 0;
           if (event.exitCode === 0 && !hadInstallProblems) {
+            ok = true;
             var parts = ["Regeneration complete."];
             if (variantSyncResults.synced.length > 0) parts.push("Synced: " + variantSyncResults.synced.join(", "));
             if (installResults.switched.length > 0) parts.push("Installed: " + installResults.switched.join(", "));
             if (installResults.skipped.length > 0) parts.push("Skipped: " + installResults.skipped.join(", "));
-            showBanner(ctx.root, "success", parts.join(" "));
+            parts.push(RESTART_SENTENCE);
+            showBanner(ctx.root, "success", parts.join(" "), { persist: true });
           } else if (event.exitCode === null) {
             showBanner(ctx.root, "error", "Regeneration failed: " + (event.error || "spawn error"));
           } else if (event.exitCode !== 0) {
@@ -2236,13 +2230,46 @@ export async function handleRegistryRegenerate(ctx) {
       }
     }
     if (!gotDone) {
+      ok = false;
       showBanner(ctx.root, "error", "Regeneration stream closed unexpectedly.");
     }
   } catch (e) {
+    ok = false;
     showBanner(ctx.root, "error", "Regeneration failed: " + String((e && e.message) || e));
   } finally {
     ctx.state.regenerating = false;
     ctx.render();
+  }
+  return ok;
+}
+
+/** Unified Save & Apply (design D-4.5, APUX-13, P1-C AC1-AC5). One confirm
+ *  covering both steps: PUT the in-memory overlay, and — only on a successful
+ *  save — run the existing regenerate-and-install stream (no second confirm).
+ *  Replaces the separate "Save Overlay" + "Regenerate Artifacts" buttons. */
+export async function handleRegistrySaveAndApply(ctx) {
+  if (!confirm("Save changes and apply them to your installed agents? This overwrites installed variant directories, and you will need to restart your CLI sessions afterward.")) return;
+  try {
+    const res = await ctx.api.request("/api/v1/model-registry", { method: "PUT", body: ctx.state.registryOverlay });
+    if (res && res.success === false) {
+      const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
+      showBanner(ctx.root, "error", "Save failed: " + details);
+      return;
+    }
+  } catch (e) {
+    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
+    return;
+  }
+  // Reset the loaded/dirty guards so the next render re-inits from the newly
+  // saved source.overlay (mirrors the old Save Overlay success path).
+  ctx.state.registryDirty = false;
+  ctx.state.registryLoaded = false;
+  const applied = await runRegenerateStream(ctx);
+  if (!applied) {
+    // Overrides runRegenerateStream's own (more detailed) failure banner —
+    // showBanner clears the prior banner, so this generic, safe-to-retry
+    // message is what the operator sees last (P1-C AC4).
+    showBanner(ctx.root, "error", "Changes saved, but applying them failed — press Save & Apply again to retry.");
   }
 }
 
@@ -2672,14 +2699,11 @@ function startApp(opts) {
         handleRegistryRestore(ctx, profile);
       });
     });
-    root.querySelector('[data-action="registry-save-overlay"]')?.addEventListener("click", () => {
-      handleRegistrySaveOverlay(ctx);
+    root.querySelector('[data-action="registry-save-apply"]')?.addEventListener("click", () => {
+      handleRegistrySaveAndApply(ctx);
     });
     root.querySelector('[data-action="registry-clear-overlay"]')?.addEventListener("click", () => {
       handleRegistryClearOverlay(ctx);
-    });
-    root.querySelector('[data-action="registry-regenerate"]')?.addEventListener("click", () => {
-      handleRegistryRegenerate(ctx);
     });
   }
 
@@ -3000,9 +3024,9 @@ const MASSA_AI_UI = {
   handleRegistryDuplicateProfile,
   handleRegistryDeleteProfile,
   handleRegistryRestore,
-  handleRegistrySaveOverlay,
   handleRegistryClearOverlay,
-  handleRegistryRegenerate,
+  runRegenerateStream,
+  handleRegistrySaveAndApply,
   handleProjectIndexProgress,
   handleIndexStatusEvent,
   MEMORY_TYPES,

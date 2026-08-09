@@ -389,17 +389,13 @@ describe("renderModelRegistry — Per-Agent Tier Overrides table (T6, APUX-04, P
   });
 });
 
-describe("renderModelRegistry — action buttons (REG-10, REG-13, REG-14, REG-15)", () => {
-  it("renders Save Overlay button when write mode on (REG-10)", () => {
+describe("renderModelRegistry — action buttons (T8, APUX-13, REG-14, REG-15, P1-C AC5)", () => {
+  it("renders exactly one Save & Apply button when write mode on, and no separate Save Overlay/Regenerate buttons (P1-C AC5)", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-save-overlay"');
-    expect(html).toContain("Save Overlay");
-  });
-
-  it("renders Regenerate Artifacts button when write mode on (REG-13)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-regenerate"');
-    expect(html).toContain("Regenerate Artifacts");
+    expect(html).toContain('data-action="registry-save-apply"');
+    expect(html).toContain("Save &amp; Apply");
+    expect(html).not.toContain('data-action="registry-save-overlay"');
+    expect(html).not.toContain('data-action="registry-regenerate"');
   });
 
   it("renders clear-overlay button when write mode on (REG-14, REG-15)", () => {
@@ -410,6 +406,7 @@ describe("renderModelRegistry — action buttons (REG-10, REG-13, REG-14, REG-15
 
   it("hides all action buttons when write mode off", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(html).not.toContain('data-action="registry-save-apply"');
     expect(html).not.toContain('data-action="registry-save-overlay"');
     expect(html).not.toContain('data-action="registry-regenerate"');
     expect(html).not.toContain('data-action="registry-clear-overlay"');
@@ -469,11 +466,11 @@ describe("renderModelRegistry — defaults writeMode", () => {
     delete (globalThis as any).document;
     delete (globalThis as any).localStorage;
     const html = renderModelRegistry(SAMPLE_REGISTRY);
-    expect(html).not.toContain('data-action="registry-save-overlay"');
+    expect(html).not.toContain('data-action="registry-save-apply"');
   });
 });
 
-describe("renderModelRegistry — help section (REG-01)", () => {
+describe("renderModelRegistry — help section (REG-01, T8)", () => {
   it("renders a collapsible details help section", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("<details");
@@ -481,14 +478,15 @@ describe("renderModelRegistry — help section (REG-01)", () => {
     expect(html).toContain("<summary>?</summary>");
   });
 
-  it("explains all six action buttons", () => {
+  it("explains every current action button (T8: Save & Apply replaces Save Overlay + Regenerate Artifacts)", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("Add Profile");
     expect(html).toContain("Duplicate Profile");
     expect(html).toContain("Delete Profile");
-    expect(html).toContain("Save Overlay");
-    expect(html).toContain("Regenerate Artifacts");
+    expect(html).toContain("Save &amp; Apply");
     expect(html).toContain("Reset to Built-in");
+    expect(html).not.toContain("Save Overlay");
+    expect(html).not.toContain("Regenerate Artifacts");
   });
 
   it("help section appears after action buttons", () => {
