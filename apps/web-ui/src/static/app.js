@@ -2181,22 +2181,29 @@ export async function handleRegistryClearOverlay(ctx) {
   }
 }
 
-// ── Registry regenerate streaming handler (design D-4.5, T8) ────────────────
+// ── Registry regenerate streaming handler (design D-4.5, T8, fix-loop 1) ────
 // runRegenerateStream is the SSE fetch + APCR-06 classification logic, called
 // ONLY from handleRegistrySaveAndApply below (the standalone "Regenerate
 // Artifacts" button + its own confirm() no longer exist — T8, APUX-13). It
 // carries no confirm() of its own; the single Save & Apply confirm covers
-// both the save and the apply step. Returns `true` when the run finished as a
-// full, unqualified success (every host installed, no variant-sync failures),
-// so the caller can decide whether to layer its own retry banner on failure.
+// both the save and the apply step. Returns `{ ok, reason }`: `ok` is true
+// only for a full, unqualified success (every host installed, no
+// variant-sync failures); on any other outcome `reason` is the exact
+// diagnostic text this function would otherwise have shown on its own —
+// stream-closed sentence, exit-code line, per-host failed/unsupported
+// detail, or the spawn/network error — so the caller can fold the specific
+// reason into its own banner instead of discarding it (fix-loop 1: the
+// unified Save & Apply flow overwrites this function's own banner with a
+// generic retry message, and that message must not lose the diagnostic).
 
 const RESTART_SENTENCE = "Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) to pick up the changes.";
 
 export async function runRegenerateStream(ctx) {
-  if (ctx.state.regenerating) return false;
+  if (ctx.state.regenerating) return { ok: false, reason: undefined };
   ctx.state.regenerating = true;
   ctx.render();
   let ok = false;
+  let reason;
 
   try {
     const headers = (ctx.api && ctx.api.authHeaders) ? ctx.api.authHeaders() : {};
@@ -2259,9 +2266,11 @@ export async function runRegenerateStream(ctx) {
             parts.push(RESTART_SENTENCE);
             showBanner(ctx.root, "success", parts.join(" "), { persist: true });
           } else if (event.exitCode === null) {
-            showBanner(ctx.root, "error", "Regeneration failed: " + (event.error || "spawn error"));
+            reason = "Regeneration failed: " + (event.error || "spawn error");
+            showBanner(ctx.root, "error", reason);
           } else if (event.exitCode !== 0) {
-            showBanner(ctx.root, "error", "Regeneration failed (exit " + event.exitCode + ").");
+            reason = "Regeneration failed (exit " + event.exitCode + ").";
+            showBanner(ctx.root, "error", reason);
           } else {
             var errParts = ["Regeneration complete, but not every host installed."];
             if (variantSyncResults.failed.length > 0) errParts.push("Variant sync failed: " + variantSyncResults.failed.join("; "));
@@ -2269,7 +2278,8 @@ export async function runRegenerateStream(ctx) {
             if (installResults.skipped.length > 0) errParts.push("Skipped: " + installResults.skipped.join(", "));
             if (installResults.unsupported.length > 0) errParts.push("Unsupported: " + installResults.unsupported.join("; "));
             if (installResults.failed.length > 0) errParts.push("Failed: " + installResults.failed.join("; "));
-            showBanner(ctx.root, "error", errParts.join(" "));
+            reason = errParts.join(" ");
+            showBanner(ctx.root, "error", reason);
           }
           break;
         }
@@ -2277,16 +2287,18 @@ export async function runRegenerateStream(ctx) {
     }
     if (!gotDone) {
       ok = false;
-      showBanner(ctx.root, "error", "Regeneration stream closed unexpectedly.");
+      reason = "Regeneration stream closed unexpectedly.";
+      showBanner(ctx.root, "error", reason);
     }
   } catch (e) {
     ok = false;
-    showBanner(ctx.root, "error", "Regeneration failed: " + String((e && e.message) || e));
+    reason = "Regeneration failed: " + String((e && e.message) || e);
+    showBanner(ctx.root, "error", reason);
   } finally {
     ctx.state.regenerating = false;
     ctx.render();
   }
-  return ok;
+  return { ok, reason };
 }
 
 /** Unified Save & Apply (design D-4.5, APUX-13, P1-C AC1-AC5). One confirm
@@ -2310,12 +2322,16 @@ export async function handleRegistrySaveAndApply(ctx) {
   // saved source.overlay (mirrors the old Save Overlay success path).
   ctx.state.registryDirty = false;
   ctx.state.registryLoaded = false;
-  const applied = await runRegenerateStream(ctx);
+  const { ok: applied, reason } = await runRegenerateStream(ctx);
   if (!applied) {
     // Overrides runRegenerateStream's own (more detailed) failure banner —
-    // showBanner clears the prior banner, so this generic, safe-to-retry
-    // message is what the operator sees last (P1-C AC4).
-    showBanner(ctx.root, "error", "Changes saved, but applying them failed — press Save & Apply again to retry.");
+    // showBanner clears the prior banner, so this is what the operator sees
+    // last. The leading sentence stays literal (P1-C AC4's safe-to-retry
+    // contract); the specific reason (stream-closed, per-host failure,
+    // exit-code line, spawn error) is folded in rather than discarded
+    // (fix-loop 1).
+    const detail = reason ? " Details: " + reason : "";
+    showBanner(ctx.root, "error", "Changes saved, but applying them failed — press Save & Apply again to retry." + detail);
   }
 }
 

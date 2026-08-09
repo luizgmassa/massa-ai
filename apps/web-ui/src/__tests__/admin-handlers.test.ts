@@ -59,7 +59,7 @@ const {
   handleRegistryDeleteProfile: (ctx: any, name?: string) => void;
   handleRegistryRestore: (ctx: any, profile: string) => void;
   handleRegistryClearOverlay: (ctx: any) => Promise<void>;
-  runRegenerateStream: (ctx: any) => Promise<boolean>;
+  runRegenerateStream: (ctx: any) => Promise<{ ok: boolean; reason?: string }>;
   handleRegistrySaveAndApply: (ctx: any) => Promise<void>;
   handleProjectIndexProgress: (ctx: any, jobId: string) => Promise<void>;
   handleIndexStatusEvent: (ctx: any, payload: any) => boolean;
@@ -1408,8 +1408,9 @@ describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGE
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const render = mock(() => {});
     const ctx = makeRegistryCtx({ render, state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const ok = await runRegenerateStream(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
     expect(ok).toBe(true);
+    expect(reason).toBeUndefined();
     expect((globalThis as any).fetch).toHaveBeenCalled();
     // success banner shows completion message + install info + the restart sentence, persisting
     expect(ctx.root.children[0].textContent).toContain("complete");
@@ -1419,7 +1420,7 @@ describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGE
     expect(ctx.state.regenerating).toBe(false);
   });
 
-  it("does NOT render a success banner when exitCode is 0 but a host install failed (APCR-06.6)", async () => {
+  it("does NOT render a success banner when exitCode is 0 but a host install failed, and reports the per-host detail (APCR-06.6, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
       'data: {"type":"install","host":"codex","status":"failed","profile":"balanced","switched":"none","skipped":"none","unsupported":"none","failed":"codex (locked)"}\n\n',
@@ -1427,49 +1428,57 @@ describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGE
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const ok = await runRegenerateStream(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
     expect(ok).toBe(false);
+    expect(reason).toContain("codex");
+    expect(reason).toContain("codex (locked)");
     const banner = ctx.root.children[0];
     expect(banner.className).not.toContain("success");
     expect(banner.textContent).toContain("codex");
+    // the returned reason is exactly the text the standalone banner showed
+    expect(banner.textContent).toBe(reason);
   });
 
-  it("classifies an unsupported install as its own class, not folded into skipped (APCR-06.7)", async () => {
+  it("classifies an unsupported install as its own class, not folded into skipped, and reports it in reason (APCR-06.7, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"install","host":"cursor","status":"unsupported","profile":"balanced","switched":"none","skipped":"none","unsupported":"cursor (bundle has no variants)","failed":"none"}\n\n',
       'data: {"type":"done","exitCode":0}\n\n',
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const ok = await runRegenerateStream(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
     expect(ok).toBe(false);
     const banner = ctx.root.children[0];
     expect(banner.className).not.toContain("success");
     expect(banner.textContent.toLowerCase()).toContain("unsupported");
     expect(banner.textContent).not.toContain("Skipped: cursor");
+    expect(reason!.toLowerCase()).toContain("unsupported");
+    expect(reason).toBe(banner.textContent);
   });
 
-  it("shows failure banner on done with non-zero exit (REGEN-05)", async () => {
+  it("shows failure banner on done with non-zero exit and reports the exit-code reason (REGEN-05, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"line","stream":"stderr","text":"fatal error"}\n\n',
       'data: {"type":"done","exitCode":1}\n\n',
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const ok = await runRegenerateStream(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
     expect(ok).toBe(false);
     expect(ctx.root.children[0].textContent).toContain("failed");
+    expect(reason).toBe("Regeneration failed (exit 1).");
   });
 
-  it("shows failure banner on spawn failure (done with exitCode null + error) (REGEN-07)", async () => {
+  it("shows failure banner on spawn failure (done with exitCode null + error) and reports it in reason (REGEN-07, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"done","exitCode":null,"error":"spawn ENOENT"}\n\n',
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const ok = await runRegenerateStream(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
     expect(ok).toBe(false);
     expect(ctx.root.children[0].textContent).toContain("ENOENT");
+    expect(reason).toContain("ENOENT");
   });
 
   it("guards against concurrent runs via state.regenerating (REGEN-06)", async () => {
@@ -1490,20 +1499,36 @@ describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGE
     const regenPromise = runRegenerateStream(ctx);
     // While running, state.regenerating should be true
     expect(ctx.state.regenerating).toBe(true);
-    // A concurrent call while already running is a no-op (returns false immediately).
-    expect(await runRegenerateStream(ctx)).toBe(false);
+    // A concurrent call while already running is a no-op (returns ok:false immediately).
+    expect(await runRegenerateStream(ctx)).toEqual({ ok: false, reason: undefined });
     resolveStream!();
     await regenPromise;
     expect(ctx.state.regenerating).toBe(false);
   });
 
-  it("shows error banner on fetch failure (network)", async () => {
+  it("shows error banner on fetch failure (network) and reports it in reason", async () => {
     (globalThis as any).fetch = mock(async () => { throw new Error("network down"); });
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const ok = await runRegenerateStream(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
     expect(ok).toBe(false);
     expect(ctx.root.children[0].textContent).toContain("network down");
+    expect(reason).toContain("network down");
     expect(ctx.state.regenerating).toBe(false);
+  });
+
+  it("SSE stream closes without a done frame: reports the stream-closed sentence in reason, not silently discarded (edge case, fix-loop 1)", async () => {
+    // No "done" frame at all — the reader's `done: true` ends the outer loop
+    // with gotDone still false. This is the spec's SSE-closed-without-done
+    // edge case; its detail must survive into the unified retry banner.
+    const sseChunks = [
+      'data: {"type":"line","stream":"stdout","text":"Generating claude agents..."}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
+    const { ok, reason } = await runRegenerateStream(ctx);
+    expect(ok).toBe(false);
+    expect(reason).toBe("Regeneration stream closed unexpectedly.");
+    expect(ctx.root.children[0].textContent).toBe("Regeneration stream closed unexpectedly.");
   });
 
   // ── T5/T6k: variant-sync SSE frame rendering ──────────────────────────────
@@ -1516,7 +1541,7 @@ describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGE
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const ok = await runRegenerateStream(ctx);
+    const { ok } = await runRegenerateStream(ctx);
     expect(ok).toBe(true);
     const banner = ctx.root.children[0];
     expect(banner.className).toContain("success");
@@ -1524,7 +1549,7 @@ describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGE
     expect(banner.textContent).toContain("claude");
   });
 
-  it("does NOT render a success banner when a variant-sync frame reports failed (T5)", async () => {
+  it("does NOT render a success banner when a variant-sync frame reports failed, and reports it in reason (T5, fix-loop 1)", async () => {
     const sseChunks = [
       'data: {"type":"variant-sync","host":"claude","status":"failed","profiles":[],"files":0,"retained":[],"error":"disk full"}\n\n',
       'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
@@ -1532,12 +1557,13 @@ describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGE
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const ok = await runRegenerateStream(ctx);
+    const { ok, reason } = await runRegenerateStream(ctx);
     expect(ok).toBe(false);
     const banner = ctx.root.children[0];
     expect(banner.className).not.toContain("success");
     expect(banner.textContent).toContain("Variant sync failed");
     expect(banner.textContent).toContain("disk full");
+    expect(reason).toContain("disk full");
   });
 
   it("a skipped variant-sync frame (the routine no-checkout case) stays silent — no banner noise", async () => {
@@ -1548,7 +1574,7 @@ describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGE
     ];
     (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
     const ctx = makeRegistryCtx({ state: { regenerating: false, registryOverlay: { profiles: {} }, registryLoaded: true } });
-    const ok = await runRegenerateStream(ctx);
+    const { ok } = await runRegenerateStream(ctx);
     expect(ok).toBe(true);
     const banner = ctx.root.children[0];
     expect(banner.className).toContain("success");
@@ -1659,7 +1685,7 @@ describe("handleRegistrySaveAndApply — unified save + apply (T8, APUX-13, P1-C
     expect(banner.textContent).toContain("Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) to pick up the changes.");
   });
 
-  it("save success + apply failure: overrides runRegenerateStream's own banner with the safe-retry sentence (P1-C AC4)", async () => {
+  it("save success + apply failure: overrides runRegenerateStream's own banner with the safe-retry sentence PLUS the specific reason (P1-C AC4, fix-loop 1)", async () => {
     (globalThis as any).confirm = mock(() => true);
     const request = mock(async () => ({ success: true }));
     const fetchMock = mock(async () => makeSseResponse(['data: {"type":"done","exitCode":1}\n\n']));
@@ -1673,7 +1699,50 @@ describe("handleRegistrySaveAndApply — unified save + apply (T8, APUX-13, P1-C
     expect(ctx.state.registryDirty).toBe(false);
     const banner = ctx.root.children[0];
     expect(banner.className).not.toContain("success");
-    expect(banner.textContent).toBe("Changes saved, but applying them failed — press Save & Apply again to retry.");
+    // The leading retry-safety sentence stays literal, but the specific
+    // exit-code reason (that runRegenerateStream would have shown on its
+    // own) is folded in — not discarded (fix-loop 1).
+    expect(banner.textContent).toBe(
+      "Changes saved, but applying them failed — press Save & Apply again to retry. Details: Regeneration failed (exit 1).",
+    );
+  });
+
+  it("save success + apply failure via a per-host install failure: the final banner names the failing host (fix-loop 1, APCR-06.6)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true }));
+    const sseChunks = [
+      'data: {"type":"install","host":"codex","status":"failed","profile":"balanced","switched":"none","skipped":"none","unsupported":"none","failed":"codex (locked)"}\n\n',
+      'data: {"type":"done","exitCode":0}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const ctx = makeRegistryCtx({
+      api: { request, authHeaders: () => ({}) },
+      state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true, regenerating: false },
+    });
+    await handleRegistrySaveAndApply(ctx);
+    const banner = ctx.root.children[0];
+    expect(banner.className).not.toContain("success");
+    expect(banner.textContent).toContain("Changes saved, but applying them failed — press Save & Apply again to retry.");
+    expect(banner.textContent).toContain("codex");
+    expect(banner.textContent).toContain("codex (locked)");
+  });
+
+  it("save success + apply failure via an SSE stream closed without a done frame: the stream-closed detail survives into the final banner (spec edge case, fix-loop 1)", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true }));
+    // No "done" frame — the spec's "SSE stream closes without a done frame" edge case.
+    const fetchMock = mock(async () => makeSseResponse(['data: {"type":"line","stream":"stdout","text":"..."}\n\n']));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeRegistryCtx({
+      api: { request, authHeaders: () => ({}) },
+      state: { registryOverlay: { profiles: {} }, registryDirty: true, registryLoaded: true, regenerating: false },
+    });
+    await handleRegistrySaveAndApply(ctx);
+    const banner = ctx.root.children[0];
+    expect(banner.className).not.toContain("success");
+    expect(banner.textContent).toBe(
+      "Changes saved, but applying them failed — press Save & Apply again to retry. Details: Regeneration stream closed unexpectedly.",
+    );
   });
 
   it("pressing Save & Apply again after an apply failure re-PUTs and can succeed (idempotent retry, P1-C AC4)", async () => {
