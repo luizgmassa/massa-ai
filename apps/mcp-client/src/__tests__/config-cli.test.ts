@@ -113,6 +113,18 @@ describe("config-cli runCli", () => {
     expect(r.out).toContain("nomic");
   });
 
+  test("use ollama defaults write the 4b/2560 pair (EDC-03)", async () => {
+    // The written pair must match the default model's real output width —
+    // 768 here shipped a config that refuseOnDimensionMismatch rejects at
+    // first embed.
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() => runCli(["use", "ollama"]));
+    expect(r.code).toBe(0);
+    const show = await captureConsole(() => runCli(["show"]));
+    expect(show.out).toContain("qwen3-embedding:4b");
+    expect(show.out).toContain("2560");
+  });
+
   test("use mistral without api-key → exit 1", async () => {
     await captureConsole(() => runCli(["init"]));
     const r = await captureConsole(() => runCli(["use", "mistral"]));

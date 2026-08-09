@@ -705,7 +705,7 @@ const CONFIG_SECTIONS = [
       { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., `qwen3-embedding:4b` for Ollama)." },
       { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically `http://localhost:11434`." },
       { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama. Changing this requires a restart." },
-      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 4096 for `qwen3-embedding:4b`)." },
+      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 2560 for `qwen3-embedding:4b`)." },
     ],
   },
   {

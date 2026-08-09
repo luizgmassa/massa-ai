@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Embedding model/dimension pairs aligned to the 4b/2560 default on every surface.**
+  The v1.33.0 default swap missed four surfaces, three of them shipping internally
+  inconsistent pairs that `refuseOnDimensionMismatch` turns into a hard fail at first
+  embed: the Docker image (`qwen3-embedding:8b`/4096), `install.sh` and
+  `setup-ollama-wsl.sh` (4b model beside 4096 dims), and `massa-ai-config use ollama`
+  (4b beside 768). All now write `qwen3-embedding:4b`/2560, the Web UI dimensions guide
+  and docs examples say 2560, and a new parity test extracts every surface's pair with
+  per-dialect anchors — failing by name on any future sweep-missed surface.
 - **Marketplace-route Claude installs now pick up new bundle versions.** `claude plugin
   install` is an idempotent no-op on an already-installed plugin, so the CLI kept serving
   its version-pinned cache snapshot forever (observed: 1.28.0 served while the bundle and
