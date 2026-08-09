@@ -122,6 +122,78 @@ describe("config-writer: restartNeededSections", () => {
   });
 });
 
+describe("config-writer: changedRestartSections (APR-05)", () => {
+  test("identical re-save reports no changed sections; a real change reports its section", () => {
+    const { exitCode, stdout, stderr } = runWriter(
+      "diff-sections",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+
+      // loadConfig() materializes full defaults, so the meaningful diff is
+      // against the EFFECTIVE config: saving default-equal values is not a
+      // change; only a real value edit is.
+      const embedding = { provider: "ollama", model: "qwen3-embedding:4b", baseURL: "http://localhost:11434", dimensions: 1024 };
+      const first = savePartialConfig({ embedding });               // 2560 (default) → 1024
+      const resave = savePartialConfig({ embedding: { ...embedding } });
+      const changed = savePartialConfig({ embedding: { ...embedding, dimensions: 2560 } });
+      console.log(JSON.stringify({
+        first: first.success && first.changedRestartSections,
+        resave: resave.success && resave.changedRestartSections,
+        changed: changed.success && changed.changedRestartSections,
+      }));
+      `,
+    );
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.first).toEqual(["embedding"]);   // default → non-default IS a change
+    expect(out.resave).toEqual([]);             // byte-identical re-save: no restart proposal
+    expect(out.changed).toEqual(["embedding"]);
+  });
+
+  test("a masked-sentinel echo is not a change (unmask runs before the diff)", () => {
+    const { exitCode, stdout, stderr } = runWriter(
+      "diff-masked-echo",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+
+      // validatePartial requires the full llm field set — extend the default.
+      const llm = { ...defaultMassaAiConfig.llm, apiKey: "real-secret" };
+      savePartialConfig({ llm });
+      // The UI round-trips the masked value verbatim — must diff as unchanged.
+      const echo = savePartialConfig({ llm: { ...llm, apiKey: "***" } });
+      const real = savePartialConfig({ llm: { ...llm, apiKey: "rotated" } });
+      console.log(JSON.stringify({
+        echo: echo.success && echo.changedRestartSections,
+        real: real.success && real.changedRestartSections,
+      }));
+      `,
+    );
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.echo).toEqual([]);
+    expect(out.real).toEqual(["llm"]);
+  });
+
+  test("key order alone is not a change (structural compare, not serialized)", () => {
+    const { exitCode, stdout, stderr } = runWriter(
+      "diff-key-order",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+
+      savePartialConfig({ database: { url: "postgres://h/db" } });
+      const reordered = savePartialConfig({ database: JSON.parse('{"url":"postgres://h/db"}') });
+      console.log(JSON.stringify({ reordered: reordered.success && reordered.changedRestartSections }));
+      `,
+    );
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout).reordered).toEqual([]);
+  });
+});
+
 describe("config-writer: savePartialConfig validation", () => {
   test("rejects bad embedding provider enum", () => {
     const { exitCode, stdout } = runWriter(

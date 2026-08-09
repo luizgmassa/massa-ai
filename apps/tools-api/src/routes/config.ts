@@ -99,7 +99,13 @@ export const configRoutes = new Elysia({ prefix: "/api/v1/config" })
       set.status = 200;
       return {
         success: true as const,
-        data: { config: masked, restartNeededSections: result.restartNeededSections },
+        data: {
+          config: masked,
+          restartNeededSections: result.restartNeededSections,
+          // Diff-based (APR-05): only sections whose stored value actually
+          // changed in this save — drives the UI's restart proposal banner.
+          changedRestartSections: result.changedRestartSections,
+        },
       };
     },
     {
