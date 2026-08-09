@@ -88,9 +88,9 @@ Shared rules for every pace:
 
 1. Classify upcoming decisions as **independent** vs **dependent**.
 2. Low-stakes / safe-to-default → state the assumption and invite correction (no blocking question).
-3. Independent product decisions → ask **at most 2** in the same turn, each with options + recommended default.
+3. Independent product decisions → ask them together in the same turn — as many as the open decision set requires, each with options + recommended default.
 4. Dependent decisions → ask **exactly one**, wait, then continue (the earlier answer should prune later questions).
-5. Never dump 3+ questions in one turn. Never ask what the code already answers.
+5. Never dump unrelated questions as one bulk form. Never ask what the code already answers.
 6. Stop the area as soon as enough is decided.
 
 **Detailed:** Walk selected gray areas as a strict decision tree — one concrete question per turn, dependency order, wait for each answer before the next. Use when the user wants maximum control or the feature is highly ambiguous.
