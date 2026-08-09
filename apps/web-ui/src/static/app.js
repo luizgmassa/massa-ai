@@ -1285,6 +1285,46 @@ export function renderModelRegistry(data, opts) {
     ? '<div class="registry-actions"><button type="button" data-action="registry-workflowTier-add">Add Workflow Tier</button></div>'
     : "";
 
+  // Per-Agent Tier Overrides table (design D-4.3, APUX-04, P1-A AC7-AC8). Data
+  // is payload.agents (from GET, charter-derived) + the DISPLAY registry's
+  // agentTiers (already merged with unsaved in-memory overlay edits by
+  // mergeRegistryForDisplay, so an unsaved pick renders before save).
+  const agents = payload.agents || [];
+  const agentsError = payload.agentsError;
+  const agentTiersDisplay = registry.agentTiers || {};
+  let agentTierSection;
+  if (agentsError) {
+    agentTierSection =
+      '<div class="registry-agentTiers"><h3>Per-Agent Tier Overrides</h3>' +
+      '<p class="muted">Agent list unavailable: ' + escapeHtml(agentsError) + "</p></div>";
+  } else if (agents.length === 0) {
+    agentTierSection =
+      '<div class="registry-agentTiers"><h3>Per-Agent Tier Overrides</h3>' +
+      '<p class="muted">No agents found.</p></div>';
+  } else {
+    const agentHeaderCells = REGISTRY_HOSTS.map((h) => "<th>" + escapeHtml(REGISTRY_HOST_LABELS[h]) + "</th>").join("");
+    const agentBodyRows = agents.map((agent) => {
+      const perHost = agentTiersDisplay[agent.name] || {};
+      const cells = REGISTRY_HOSTS.map((host) => {
+        const effective = perHost[host] || "";
+        const overriddenClass = effective ? ' class="overridden"' : "";
+        const options =
+          '<option value="">(default: ' + escapeHtml(agent.charterTier) + ")</option>" +
+          tiers.map((t) => {
+            const sel = t === effective ? " selected" : "";
+            return '<option value="' + escapeHtml(t) + '"' + sel + ">" + escapeHtml(capitalizeLabel(t)) + "</option>";
+          }).join("");
+        return (
+          "<td" + overriddenClass + '><select data-action="registry-agentTier" data-agent="' + escapeHtml(agent.name) + '" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + options + "</select></td>"
+        );
+      }).join("");
+      return "<tr><th>" + escapeHtml(agent.name) + "</th>" + cells + "</tr>";
+    }).join("");
+    agentTierSection =
+      '<div class="registry-agentTiers"><h3>Per-Agent Tier Overrides</h3>' +
+      '<div class="grid-scroll"><table class="registry-grid"><thead><tr><th>Agent</th>' + agentHeaderCells + "</tr></thead><tbody>" + agentBodyRows + "</tbody></table></div></div>";
+  }
+
   // Profile management: add / duplicate / delete / restore
   const profileActions = writeMode
     ? '<div class="registry-actions">' +
@@ -1341,6 +1381,7 @@ export function renderModelRegistry(data, opts) {
     grid +
     '<div class="registry-hostDefaults"><h3>Host Defaults</h3>' + hostDefaultsRows + "</div>" +
     '<div class="registry-workflowTiers"><h3>Workflow Tiers</h3>' + workflowTiersRows + addWorkflowTierBtn + "</div>" +
+    agentTierSection +
     profileActions +
     tombstonedList +
     actionButtons +
@@ -1648,6 +1689,7 @@ export function initRegistryOverlay(ctx, registry, source) {
     profiles: seed.profiles || {},
     hostDefaults: seed.hostDefaults || {},
     workflowTiers: seed.workflowTiers || {},
+    agentTiers: seed.agentTiers || {},
     tiers: seed.tiers || reg.tiers || ["light", "standard", "deep"],
   };
   ctx.state.registryDirty = false;
@@ -1665,6 +1707,27 @@ function mergeFlatMapForDisplay(serverMap, overlayMap) {
     else merged[key] = value;
   }
   return merged;
+}
+
+/** Per-agent, per-host merge of `agentTiers` (design D-1, D-4.3) — client twin of
+ *  `mergeAgentTiers` in scripts/lib/model-profiles.ts (cross-boundary parity fixture
+ *  `apps/web-ui/src/__tests__/fixtures/agent-tiers-parity.json` keeps the two provably
+ *  identical). `overlay[agent] === null` deletes the whole agent entry; otherwise the
+ *  agent's host map is merged against the base via `mergeFlatMapForDisplay` itself, so a
+ *  host-level `null` tombstones just that key and an absent host key inherits. */
+function mergeAgentTiersForDisplay(base, overlay) {
+  const result = {};
+  for (const [agent, hostMap] of Object.entries(base || {})) {
+    result[agent] = { ...hostMap };
+  }
+  for (const [agent, value] of Object.entries(overlay || {})) {
+    if (value === null) {
+      delete result[agent];
+      continue;
+    }
+    result[agent] = mergeFlatMapForDisplay((base && base[agent]) || {}, value);
+  }
+  return result;
 }
 
 /** Merge one overlay profile over its server-side counterpart, per host and per tier.
@@ -1703,6 +1766,7 @@ export function mergeRegistryForDisplay(serverData, overlay) {
   merged.tiers = (overlay.tiers && overlay.tiers.length > 0) ? overlay.tiers : (merged.tiers || ["light", "standard", "deep"]);
   merged.hostDefaults = mergeFlatMapForDisplay(merged.hostDefaults, overlay.hostDefaults);
   merged.workflowTiers = mergeFlatMapForDisplay(merged.workflowTiers, overlay.workflowTiers);
+  merged.agentTiers = mergeAgentTiersForDisplay(merged.agentTiers, overlay.agentTiers);
   // Merge profiles as a delta: skip _delete tombstones, deep-merge the rest per host/tier.
   merged.profiles = merged.profiles || {};
   for (const [key, val] of Object.entries(overlay.profiles)) {
@@ -1714,11 +1778,16 @@ export function mergeRegistryForDisplay(serverData, overlay) {
   }
   // overlayOverrideCount (APCR-01.10) is server-computed from the saved overlay, not the
   // in-memory display merge — carry it through unchanged so the count stays visible while
-  // add/duplicate/delete/edit are shown pre-save.
+  // add/duplicate/delete/edit are shown pre-save. `agents`/`agentsError` (T6, design D-4.3)
+  // are likewise server-computed (charter-derived) and must survive this rebuild branch, or
+  // the Per-Agent Tier Overrides table loses its row source the instant any other field is
+  // edited in the same session.
   return {
     registry: merged,
     source: (serverData && serverData.source) || {},
     overlayOverrideCount: (serverData && serverData.overlayOverrideCount) || 0,
+    agents: (serverData && serverData.agents) || [],
+    agentsError: serverData && serverData.agentsError,
   };
 }
 
@@ -1742,6 +1811,28 @@ export function handleRegistryHostDefaultEdit(ctx, host, value) {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {} };
   if (!ctx.state.registryOverlay.hostDefaults) ctx.state.registryOverlay.hostDefaults = {};
   ctx.state.registryOverlay.hostDefaults[host] = value;
+  ctx.state.registryDirty = true;
+}
+
+/** Per-Agent Tier Overrides cell edit (design D-4.3, APUX-04, P1-A AC8). `value === ""`
+ *  (the "(default: ...)" option) removes the override key entirely rather than writing a
+ *  `null` tombstone — the spec's assumption row (P1-A) notes the builtin `agentTiers` ships
+ *  `{}`, so there is nothing to tombstone; an absent key already inherits the charter tier.
+ *  An emptied agent object is pruned so a fully-reset agent leaves no residue in the saved
+ *  overlay. */
+export function handleRegistryAgentTierEdit(ctx, agent, host, value) {
+  if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: {}, tiers: ["light", "standard", "deep"] };
+  if (!ctx.state.registryOverlay.agentTiers) ctx.state.registryOverlay.agentTiers = {};
+  if (value === "") {
+    const agentEntry = ctx.state.registryOverlay.agentTiers[agent];
+    if (agentEntry) {
+      delete agentEntry[host];
+      if (Object.keys(agentEntry).length === 0) delete ctx.state.registryOverlay.agentTiers[agent];
+    }
+  } else {
+    if (!ctx.state.registryOverlay.agentTiers[agent]) ctx.state.registryOverlay.agentTiers[agent] = {};
+    ctx.state.registryOverlay.agentTiers[agent][host] = value;
+  }
   ctx.state.registryDirty = true;
 }
 
@@ -2411,6 +2502,11 @@ function startApp(opts) {
         handleRegistryHostDefaultEdit(ctx, el.dataset.host, el.value);
       });
     });
+    root.querySelectorAll('[data-action="registry-agentTier"]').forEach((el) => {
+      el.addEventListener("change", () => {
+        handleRegistryAgentTierEdit(ctx, el.dataset.agent, el.dataset.host, el.value);
+      });
+    });
     root.querySelectorAll('[data-action="registry-workflowTier"]').forEach((el) => {
       el.addEventListener("change", () => {
         handleRegistryWorkflowTierEdit(ctx, el.dataset.workflow, el.value);
@@ -2758,6 +2854,7 @@ const MASSA_AI_UI = {
   mergeRegistryForDisplay,
   handleRegistryCellEdit,
   handleRegistryHostDefaultEdit,
+  handleRegistryAgentTierEdit,
   handleRegistryWorkflowTierEdit,
   handleRegistryWorkflowTierAdd,
   handleRegistryWorkflowTierRemove,

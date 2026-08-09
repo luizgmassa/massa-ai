@@ -559,6 +559,24 @@ pre code {
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
 }
+/* T6 (APUX-04): Per-Agent Tier Overrides table. */
+.registry-agentTiers {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+}
+.registry-agentTiers select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+.overridden {
+  background: var(--accent-tint);
+}
 .tombstoned {
   background: var(--bg-code);
   border: 1px solid var(--border);

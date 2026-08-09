@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import fs from "fs";
+import path from "path";
 
 // ── admin-handlers.test.ts ──────────────────────────────────────────────────
 // Tests the admin-portal-enhancement handlers: showBanner, config save/reveal,
@@ -18,6 +20,7 @@ const {
   handleProfilesTabSwitch,
   handleRegistryCellEdit,
   handleRegistryHostDefaultEdit,
+  handleRegistryAgentTierEdit,
   handleRegistryWorkflowTierEdit,
   handleRegistryWorkflowTierAdd,
   handleRegistryWorkflowTierRemove,
@@ -41,8 +44,9 @@ const {
   handleConfigReveal: (ctx: any, targetId: string, section?: string, field?: string) => Promise<void>;
   handleProfileSwitch: (ctx: any, profile: string, host: string) => Promise<void>;
   handleProfilesTabSwitch: (ctx: any, tab: string) => void;
-  handleRegistryCellEdit: (ctx: any, profile: string, host: string, tier: string, field: string, value: string) => void;
+  handleRegistryCellEdit: (ctx: any, profile: string, host: string, tier: string, field: string, value: string | null) => void;
   handleRegistryHostDefaultEdit: (ctx: any, host: string, value: string) => void;
+  handleRegistryAgentTierEdit: (ctx: any, agent: string, host: string, value: string) => void;
   handleRegistryWorkflowTierEdit: (ctx: any, workflow: string, value: string) => void;
   handleRegistryWorkflowTierAdd: (ctx: any) => void;
   handleRegistryWorkflowTierRemove: (ctx: any, workflow: string) => void;
@@ -876,6 +880,97 @@ describe("handleRegistryHostDefaultEdit — hostDefaults edit (REGWIRE-02)", () 
     handleRegistryHostDefaultEdit(ctx, "claude", "work");
     expect(ctx.state.registryOverlay.hostDefaults.claude).toBe("work");
     expect(ctx.state.registryDirty).toBe(true);
+  });
+});
+
+describe("handleRegistryAgentTierEdit — Per-Agent Tier Overrides edit (T6, APUX-04, P1-A AC8)", () => {
+  it("sets an override for a new agent + sets dirty", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "deep");
+    expect(ctx.state.registryOverlay.agentTiers.builder.opencode).toBe("deep");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("adds a second host override without disturbing the first", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: { builder: { opencode: "deep" } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "claude", "standard");
+    expect(ctx.state.registryOverlay.agentTiers.builder).toEqual({ opencode: "deep", claude: "standard" });
+  });
+
+  it("removes the override key when the value is '' (default picked)", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: { builder: { opencode: "deep", claude: "standard" } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "");
+    expect(ctx.state.registryOverlay.agentTiers.builder).toEqual({ claude: "standard" });
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("prunes the agent object entirely once its last host override is removed", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: { builder: { opencode: "deep" } } }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "");
+    expect(Object.prototype.hasOwnProperty.call(ctx.state.registryOverlay.agentTiers, "builder")).toBe(false);
+  });
+
+  it("is a no-op (still sets dirty) when clearing a host that was never overridden", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "");
+    expect(ctx.state.registryOverlay.agentTiers).toEqual({});
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("initializes registryOverlay.agentTiers on demand when the overlay has never been touched", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "deep");
+    expect(ctx.state.registryOverlay.agentTiers.builder.opencode).toBe("deep");
+  });
+});
+
+describe("renderModelRegistry — Per-Agent Tier Overrides display merge (T6, APUX-04)", () => {
+  it("shows an unsaved agentTier override before save (mergeRegistryForDisplay)", () => {
+    const server = {
+      registry: { profiles: { p: { hosts: {} } }, tiers: ["light", "standard", "deep"], hostDefaults: {}, workflowTiers: {}, agentTiers: {} },
+      source: {},
+      agents: [{ name: "builder", charterTier: "standard" }],
+    };
+    const overlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: { builder: { opencode: "deep" } }, tiers: ["light", "standard", "deep"] };
+    const display = mergeRegistryForDisplay(server, overlay);
+    expect(display.registry.agentTiers.builder.opencode).toBe("deep");
+    const html = renderModelRegistry(display, { writeMode: true });
+    expect(html).toContain('data-agent="builder" data-host="opencode"');
+    expect(html).toContain('value="deep" selected');
+  });
+
+  it("carries agents + agentsError through the display-merge rebuild branch", () => {
+    const server = {
+      registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {}, agentTiers: {} },
+      source: {},
+      agents: [{ name: "builder", charterTier: "standard" }],
+      agentsError: undefined,
+    };
+    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, agentTiers: {}, tiers: ["light"] };
+    const display = mergeRegistryForDisplay(server, overlay);
+    expect(display.agents).toEqual([{ name: "builder", charterTier: "standard" }]);
+  });
+
+  it("cross-boundary parity: mergeRegistryForDisplay reproduces the shared fixture's expected merged agentTiers", () => {
+    // Same fixture consumed by scripts/__tests__/model-profiles.test.ts through mergeOverlay
+    // (T1) — this proves the client's hand-copied twin (design D-4.3) is byte-identical.
+    const fixturePath = path.join(
+      import.meta.dir,
+      "fixtures",
+      "agent-tiers-parity.json",
+    );
+    const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8")) as {
+      builtinAgentTiers: Record<string, Record<string, string>>;
+      overlayAgentTiers: Record<string, Record<string, string | null> | null>;
+      expectedMergedAgentTiers: Record<string, Record<string, string>>;
+    };
+    const server = {
+      registry: { profiles: {}, tiers: ["light", "standard", "deep"], hostDefaults: {}, workflowTiers: {}, agentTiers: fixture.builtinAgentTiers },
+      source: {},
+    };
+    const overlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: fixture.overlayAgentTiers, tiers: ["light", "standard", "deep"] };
+    const display = mergeRegistryForDisplay(server, overlay);
+    expect(display.registry.agentTiers).toEqual(fixture.expectedMergedAgentTiers);
   });
 });
 

@@ -14,6 +14,7 @@ const SAMPLE_REGISTRY = {
     tiers: ["light", "standard", "deep"],
     hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
     workflowTiers: { search: "standard", index: "light", audit: "deep" },
+    agentTiers: { builder: { opencode: "deep" } },
     profiles: {
       balanced: {
         description: "Balanced profile",
@@ -40,6 +41,10 @@ const SAMPLE_REGISTRY = {
     },
     tombstoned: ["old-profile"],
   },
+  agents: [
+    { name: "builder", charterTier: "standard" },
+    { name: "reviewer", charterTier: "light" },
+  ],
 };
 
 describe("renderModelRegistry — grid render (REG-01)", () => {
@@ -309,6 +314,76 @@ describe("renderModelRegistry — hostDefaults + workflowTiers (REG-08, REG-09)"
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
     expect(html).not.toContain('data-action="registry-workflowTier-add"');
     expect(html).not.toContain('data-action="registry-workflowTier-remove"');
+  });
+});
+
+describe("renderModelRegistry — Per-Agent Tier Overrides table (T6, APUX-04, P1-A AC7-AC8)", () => {
+  it("renders the section heading after Workflow Tiers", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const workflowIdx = html.indexOf("<h3>Workflow Tiers</h3>");
+    const agentIdx = html.indexOf("<h3>Per-Agent Tier Overrides</h3>");
+    expect(workflowIdx).toBeGreaterThan(-1);
+    expect(agentIdx).toBeGreaterThan(workflowIdx);
+  });
+
+  it("renders one row per agent with one dropdown per tool", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('data-agent="builder"');
+    expect(html).toContain('data-agent="reviewer"');
+    const builderSelects = (html.match(/data-agent="builder"/g) || []).length;
+    expect(builderSelects).toBe(4); // one select per REGISTRY_HOSTS entry
+  });
+
+  it("labels the default option with the raw charterTier and declared tiers with capitalized labels + raw values", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("(default: standard)"); // builder's charterTier, unmodified
+    expect(html).toContain("(default: light)"); // reviewer's charterTier, unmodified
+    expect(html).toContain('<option value="light">Light</option>');
+    expect(html).toContain('<option value="standard">Standard</option>');
+    expect(html).toContain('<option value="deep">Deep</option>');
+  });
+
+  it("selects the effective override and marks the cell overridden (builder/opencode -> deep)", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const selectStart = html.indexOf('data-agent="builder" data-host="opencode"');
+    expect(selectStart).toBeGreaterThan(-1);
+    const cellStart = html.lastIndexOf("<td", selectStart);
+    const cellEnd = html.indexOf("</td>", selectStart);
+    const cellHtml = html.slice(cellStart, cellEnd);
+    expect(cellHtml).toContain('class="overridden"');
+    expect(cellHtml).toContain('value="deep" selected');
+  });
+
+  it("leaves a non-overridden cell unmarked with no option selected", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const selectStart = html.indexOf('data-agent="reviewer" data-host="claude"');
+    const cellStart = html.lastIndexOf("<td", selectStart);
+    const cellEnd = html.indexOf("</td>", selectStart);
+    const cellHtml = html.slice(cellStart, cellEnd);
+    expect(cellHtml).not.toContain('class="overridden"');
+    expect(cellHtml).not.toContain("selected");
+  });
+
+  it("disables the dropdowns in read mode", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    const selectStart = html.indexOf('data-action="registry-agentTier"');
+    expect(selectStart).toBeGreaterThan(-1);
+    const selectEnd = html.indexOf(">", selectStart);
+    expect(html.slice(selectStart, selectEnd)).toContain("disabled");
+  });
+
+  it("shows a muted notice instead of the table when agents is empty", () => {
+    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, agents: [] }, { writeMode: true });
+    expect(html).toContain("Per-Agent Tier Overrides");
+    expect(html).toContain("No agents found.");
+    expect(html).not.toContain('data-action="registry-agentTier"');
+  });
+
+  it("shows a muted notice naming the error when agentsError is present", () => {
+    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, agentsError: "checkout absent" }, { writeMode: true });
+    expect(html).toContain("Agent list unavailable");
+    expect(html).toContain("checkout absent");
+    expect(html).not.toContain('data-action="registry-agentTier"');
   });
 });
 
