@@ -1113,7 +1113,7 @@
       "id": "admin-portal-enhancements",
       "slug": "admin-portal-enhancements",
       "title": "Admin Portal Enhancements — handlers, styling, confirm, progress UX, registry sub-tab",
-      "status": "execute-complete",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
@@ -1126,7 +1126,7 @@
       "design": ".specs/features/admin-portal-enhancements/design.md",
       "tasks": ".specs/features/admin-portal-enhancements/tasks.md",
       "created": "2026-08-08",
-      "notes": "EXECUTE COMPLETE 2026-08-08: T1-T9, 9 task commits on spec/admin-portal-enhancements (2 planning + 9 task). Inline execution (sub-agents unavailable). 51 ACs across 3 phases = 9 tasks. Plan Challenge full gate 7 findings all folded (F1-F7). Per-task gates green: model-registry-stream 7, web-ui 220->278, type-check 6/6, test:plugins 135/0. New backend route POST /api/v1/model-registry/regenerate-stream (SSE). Frontend: showBanner, config save/reveal confirm, profiles tab switcher, registry in-memory overlay CRUD + save/clear, regenerate streaming, index progress + poll fallback, CSS design system. Validation pending (verification-agent dispatch). Push/PR = user decision."
+      "notes": "VALIDATED PASS 2026-08-08: T1-T9, 9 task commits on spec/admin-portal-enhancements (2 planning + 9 task). Inline execution (sub-agents unavailable). 51 ACs across 3 phases = 9 tasks. Plan Challenge full gate 7 findings all folded (F1-F7). Per-task gates green: model-registry-stream 7, web-ui 220->278, type-check 6/6, test:plugins 135/0. New backend route POST /api/v1/model-registry/regenerate-stream (SSE). Frontend: showBanner, config save/reveal confirm, profiles tab switcher, registry in-memory overlay CRUD + save/clear, regenerate streaming, index progress + poll fallback, CSS design system. Standalone fresh-eyes validation PASS: 51/51 ACs matched, 5/5 discrimination mutations killed (1 fix applied for PRG-02 gap, re-verified). Push/PR = user decision."
     },
     {
       "id": "config-capture-reveal-field-guides",

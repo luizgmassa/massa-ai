@@ -38,8 +38,10 @@
   6 Tasks, inline execution (sub-agents unavailable). Design skipped (CSS + render
   function fixes only).
 - Commits: `4a087b8` spec+tasks, `5493f3c` all 6 tasks (CSS + render fixes + tests).
-- Gates: web-ui 282 pass (4 new, 0 fail), type-check 6/6, lint 0. tools-api 25
-  fails pre-existing on base (not from this feature).
+- Gates: web-ui 282 pass (4 new, 0 fail), type-check 6/6, lint 0. tools-api:
+  re-measured 2026-08-08 (D3, `admin-portal-correctness-repair` T10) — 0
+  fails, 29 groups all pass; the prior "25 fails pre-existing on base" claim
+  did not reproduce.
 - Next: dispatch verification-agent (author ≠ verifier) → write validation.md →
   validate_state.ts exit 0 → push/PR = user decision.
 

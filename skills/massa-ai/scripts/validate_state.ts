@@ -260,14 +260,20 @@ function main(argv: string[]): number {
 
   const targets = resolveTargets(root, args.feature);
   const allErrors: string[] = [];
+  // D4 / APCR-10.5-6: the scanned population (`targets`) can be much larger
+  // than the set that actually failed - printing `targets` here read as total
+  // collapse. Track only the features that produced at least one error.
+  const failing: string[] = [];
   for (const [fdir, name] of targets) {
-    allErrors.push(...checkFeature(fdir, name));
+    const errors = checkFeature(fdir, name);
+    allErrors.push(...errors);
+    if (errors.length) failing.push(name);
   }
 
   for (const e of allErrors) console.log(`  ERROR ${e}`);
   const n = allErrors.length;
-  const checked = targets.map(([, name]) => name).join(", ") || "(none)";
-  console.log(`\nvalidate_state: ${n} error(s) across [${checked}]`);
+  const bracket = n ? ` across [${failing.join(", ")}]` : "";
+  console.log(`\nvalidate_state: ${n} error(s)${bracket}`);
   return n ? 1 : 0;
 }
 
