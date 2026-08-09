@@ -336,6 +336,40 @@ function parseDiagramOrder(lines: string[]): { positions: Map<string, number>; p
   return { positions, parsed: foundAnyArrow };
 }
 
+const MAX_TASKS_PER_PHASE = 3;
+
+/**
+ * Count tasks (TASK_RE headings) per phase (PHASE_HEADING_RE), scoped to the
+ * Task Breakdown section only - mirrors parsePhaseMembership's
+ * inTaskBreakdown gating so a phase heading appearing earlier in the
+ * Execution Plan diagram never seeds a count, and a task header encountered
+ * before any Phase heading inside Task Breakdown is not counted against a
+ * phase (unchanged behavior for phase-less breakdowns).
+ */
+function countTasksPerPhase(lines: string[]): Map<number, number> {
+  const counts = new Map<number, number>();
+  let inTaskBreakdown = false;
+  let currentPhase: number | null = null;
+  for (const ln of lines) {
+    const stripped = ln.trim();
+    if (TASK_BREAKDOWN_RE.test(stripped)) {
+      inTaskBreakdown = true;
+      continue;
+    }
+    if (!inTaskBreakdown) continue;
+    const pm = PHASE_HEADING_RE.exec(stripped);
+    if (pm) {
+      currentPhase = parseInt(pm[1]!, 10);
+      continue;
+    }
+    if (currentPhase === null) continue;
+    if (TASK_RE.test(stripped)) {
+      counts.set(currentPhase, (counts.get(currentPhase) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 function check(tasksPath: string): { errors: string[]; warnings: string[] } {
   const text = readFileSync(tasksPath, "utf-8");
   const lines = splitLines(text);
@@ -370,6 +404,15 @@ function check(tasksPath: string): { errors: string[]; warnings: string[] } {
       warnings.push(
         `${tid}: \`Where\` names multiple files ${pyListRepr(uniqueSorted)} - granularity smell, consider splitting`,
       );
+    }
+  }
+
+  // Per-phase task-count budget (WF-16, D14): a phase holding more than 3
+  // tasks is wrongly sized, not merely a smell - see D14 in design.md.
+  const phaseCounts = countTasksPerPhase(lines);
+  for (const [phase, count] of phaseCounts) {
+    if (count > MAX_TASKS_PER_PHASE) {
+      errors.push(`Phase ${phase} has ${count} tasks (max 3 per phase, ideal 2)`);
     }
   }
 
