@@ -1033,3 +1033,55 @@ pre code {
 .banner-persist {
   border-width: 2px;
 }
+
+/* ── Dashboard stat cards (T13, APUX-11, design D-6) ─────────────────────
+ * Replaces raw inline `<strong>label:</strong> value` summaries with a
+ * responsive grid of labeled cards. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  padding: 0.6rem 0.85rem;
+}
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0.15rem;
+}
+
+/* Dashboard per-job / per-session tables, unstyled until now — same
+ * conventions as `.grid` (T13, APUX-11). */
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+}
+.dashboard-table th,
+.dashboard-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.dashboard-table th {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.dashboard-table tbody tr:hover {
+  background: var(--row-hover);
+}
