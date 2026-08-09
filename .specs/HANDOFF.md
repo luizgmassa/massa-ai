@@ -1,10 +1,10 @@
-# Handoff — admin-portal-correctness-repair (EXECUTE IN PROGRESS 2026-08-08 — Batch Worker 2, T9 done, T10 this commit, T11 next; push/PR = user decision)
+# Handoff — admin-portal-correctness-repair (EXECUTE COMPLETE 2026-08-08 — T1-T11, 15 commits, two batch workers; validation pending; push/PR = user decision)
 
 Session `spec-admin-portal-correctness-repair` · workflow spec-driven (Large) ·
 branch `fix/admin-portal-correctness-repair` from `main` @ `69c0632c` (v1.42.0)
 · worktree `/Users/luizmassa/Projects/massa-ai-wt-admin-portal-correctness-repair`
 (isolated). Two batch workers split the 11 tasks: Batch Worker 1 delivered the
-spec/design/tasks plus T1-T8 (Phases 1-2); Batch Worker 2 covers T9-T11
+spec/design/tasks plus T1-T8 (Phases 1-2); Batch Worker 2 delivered T9-T11
 (Phase 3), this handoff. Contract:
 `.specs/features/admin-portal-correctness-repair/{spec,design,tasks}.md`.
 
@@ -28,8 +28,9 @@ CHANGELOG entry and the APCR-11.5/11.6 amendment T11 covers.
   `.specs/features/admin-portal-correctness-repair/tasks.md` for the full
   execution plan, dependency graph, and gate-check commands.
 - Batch Worker 2 (this handoff): T9 `f6a11d1e` (SSE handler factory) → T10
-  (this commit, state-truth corrections) → T11 next (CHANGELOG,
-  APCR-11.5/11.6, close-out).
+  `ea463c3a` (state-truth corrections) → T11 this commit (CHANGELOG,
+  APCR-11.5/11.6, close-out). All 11 tasks landed, 15 commits total on the
+  branch.
 
 ## Completed
 
@@ -40,42 +41,56 @@ CHANGELOG entry and the APCR-11.5/11.6 amendment T11 covers.
   identical-frame-sequence test. Gate:
   `bun test src/routes/model-registry-stream.test.ts` 21/0,
   `npx oxlint --quiet` exit 0, `bun run type-check --force` 6/6.
-- T10: `.specs/HANDOFF.md` rotated (this edit — prior Active block renamed
-  to Previous, then this block prepended); `FEATURES.json`'s
-  `admin-portal-enhancements` normalized `"execute-complete"` →
-  `"complete"` with corrected notes; `STATE.md`'s "tools-api 25 fails
-  pre-existing on base" corrected to the measured 0 fails / 29 groups,
-  dated 2026-08-08; `validate_state.ts:270` now prints the **failing**
-  feature set instead of the scanned population, with no bracket printed at
-  zero errors; the 4 `apps/*-plugin/skills/massa-ai/scripts/validate_state.ts`
-  copies regenerated via `bun run generate:artifacts`.
+- T10: `.specs/HANDOFF.md` rotated (prior Active block renamed to Previous,
+  then that block prepended); `FEATURES.json`'s `admin-portal-enhancements`
+  normalized `"execute-complete"` → `"complete"` with corrected notes;
+  `STATE.md`'s "tools-api 25 fails pre-existing on base" corrected to the
+  measured 0 fails / 29 groups, dated 2026-08-08; `validate_state.ts:270`
+  now prints the **failing** feature set instead of the scanned population,
+  with no bracket printed at zero errors; the 4
+  `apps/*-plugin/skills/massa-ai/scripts/validate_state.ts` copies
+  regenerated via `bun run generate:artifacts`.
+- T11: APCR-11.5 — `handleRegistryDuplicateProfile`/`handleRegistryDeleteProfile`
+  now read the display registry (`mergeRegistryForDisplay(state.registryServerData,
+  state.registryOverlay)`, cached at render time) instead of the raw overlay,
+  so both pickers list every effective-registry profile even when the
+  overlay-only seed (APCR-01.8) is empty. APCR-11.6 —
+  `handleRegistryCellEdit`'s create-on-demand path now writes `{hosts: {}}`
+  without a `description` key, so `mergeProfile()` still inherits the
+  builtin's real description on the first edit. APCR-11.3 — confirmed
+  `handleRegistryRegenerate`'s `fetch` already sent `x-api-key` (existing
+  test `REGEN-SEC`); no code gap. `CHANGELOG.md` `[Unreleased]` gained
+  Changed/Fixed/Security entries covering all 11 tasks, including the two
+  operator-visible behavior changes (`config.json`/backups now `0600`; the
+  overlay is now a deep-merged delta). 5 new web-ui tests
+  (1 CellEdit + 4 Duplicate/Delete going through `initRegistryOverlay`, per
+  the coverage-matrix note that every prior test built `registryOverlay` by
+  hand and couldn't see this regression).
 
 ## Next Step
 
-1. T11: confirm every APCR-11 carried behavior has an AC or a passing test —
-   notably APCR-11.5/11.6, the Duplicate/Delete-picker and
-   create-on-demand-description regressions APCR-01.8's revert exposed; add
-   the `x-api-key` assertion for `handleRegistryRegenerate`'s `fetch`; write
-   `[Unreleased]` CHANGELOG entries under the headings
-   `CONTRIBUTING.md` maps to the intended bump; commit `.specs/` close-out
-   for this feature.
-2. `bun skills/massa-ai/scripts/check_specs_delivered.ts
-   admin-portal-correctness-repair --root .` must exit 0 before hand-off.
-3. Push/PR = user decision (not taken unattended).
+1. Dispatch `massa-ai-verification-agent` (author != verifier) with spec.md
+   ACs + the branch diff (`69c0632c..HEAD`, 15 commits) + test files +
+   validate.md checklist to write
+   `.specs/features/admin-portal-correctness-repair/validation.md`.
+2. If PASS: `validate_state.ts admin-portal-correctness-repair --root .`
+   exit 0, then flip `FEATURES.json` status from `in_progress` to
+   `complete`.
+3. If FAIL (<=3 iterations): route gaps to fix tasks, re-verify.
+4. Push/PR = user decision (not taken unattended).
 
 ## Blockers
 
-- None.
+- None. Independent verification is the only remaining gate.
 
 ## Uncommitted Files
 
-- None at T10 commit time (all staged + committed).
+- None at T11 commit time (all staged + committed).
 
 ## Branch
 
-`fix/admin-portal-correctness-repair`, 13 commits ahead of `main` @
-`69c0632c` before this T10 commit (spec/design/tasks + T1-T9); T10 adds one
-more.
+`fix/admin-portal-correctness-repair`, 15 commits ahead of `main` @
+`69c0632c` (spec/design/tasks + T1-T11, 1 oxlint fixup, 1 spec amendment).
 
 ## Previous — admin-portal-enhancements (EXECUTE COMPLETE 2026-08-08 — T1-T9, 9 commits; validation pending; push/PR = user decision)
 

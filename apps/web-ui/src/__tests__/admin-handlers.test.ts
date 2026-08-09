@@ -647,6 +647,18 @@ describe("handleRegistryCellEdit — in-memory cell edit (REGWIRE-01)", () => {
     expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.effort).toBe("high");
     expect(ctx.state.registryDirty).toBe(true);
   });
+
+  it("create-on-demand path leaves description absent, not stamped with the profile key (APCR-11.6)", () => {
+    // A profile the overlay has never touched (e.g. builtin-only) - the first cell edit
+    // must NOT write `description: profile`. The server's mergeProfile() only inherits the
+    // builtin description when the overlay's own is `undefined`; a stamped key permanently
+    // overwrites the real description on the next save.
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true } });
+    handleRegistryCellEdit(ctx, "builtin-only", "claude", "light", "model", "new-model");
+    expect(ctx.state.registryOverlay.profiles["builtin-only"].hosts.claude.light.model).toBe("new-model");
+    expect(ctx.state.registryOverlay.profiles["builtin-only"].description).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(ctx.state.registryOverlay.profiles["builtin-only"], "description")).toBe(false);
+  });
 });
 
 describe("handleRegistryHostDefaultEdit — hostDefaults edit (REGWIRE-02)", () => {
@@ -890,6 +902,74 @@ describe("handleRegistryDeleteProfile — delete + tombstone (REGWIRE-05)", () =
     });
     handleRegistryDeleteProfile(ctx);
     expect((globalThis as any).alert).toHaveBeenCalled();
+  });
+});
+
+// ── APCR-11.5: Duplicate/Delete pickers must read the DISPLAY registry (server +
+// overlay), not the raw overlay - a session with no edits yet has an empty overlay
+// after APCR-01.8's revert to an overlay-only seed. These tests go THROUGH
+// initRegistryOverlay (unlike every test above, which builds ctx.state.registryOverlay
+// by hand) so they can actually observe the regression Batch Worker 1 flagged.
+describe("Registry Duplicate/Delete pickers see every effective-registry profile with an empty overlay (APCR-11.5)", () => {
+  const origPrompt = (globalThis as any).prompt;
+  const origAlert = (globalThis as any).alert;
+  afterEach(() => { (globalThis as any).prompt = origPrompt; (globalThis as any).alert = origAlert; });
+
+  /** Build a ctx whose registryOverlay was seeded via initRegistryOverlay (overlay-only,
+   *  APCR-01.8) from a session with NO saved overlay, and whose registryServerData mirrors
+   *  what render() caches (the same server payload initRegistryOverlay read from). */
+  function makeUnEditedSessionCtx() {
+    const ctx = makeRegistryCtx();
+    const registry = {
+      version: 1, tiers: ["light", "standard", "deep"],
+      hostDefaults: {}, workflowTiers: {},
+      profiles: {
+        balanced: { description: "builtin balanced", hosts: { claude: { light: { model: "m-l", effort: "low" } } } },
+      },
+    };
+    initRegistryOverlay(ctx, registry, { overlay: null, tombstoned: [], builtin: {} });
+    // No edits this session - the raw overlay is empty, exactly APCR-01.8's revert.
+    expect(ctx.state.registryOverlay.profiles).toEqual({});
+    ctx.state.registryServerData = { registry, source: { overlay: null, tombstoned: [], builtin: {} } };
+    return ctx;
+  }
+
+  it("Duplicate offers the builtin profile even though the overlay is empty", () => {
+    const ctx = makeUnEditedSessionCtx();
+    (globalThis as any).prompt = mock((msg: string) => {
+      if (msg.toLowerCase().includes("source")) return "balanced";
+      if (msg.toLowerCase().includes("new profile name")) return "balanced-copy";
+      return null;
+    });
+    handleRegistryDuplicateProfile(ctx);
+    expect(ctx.state.registryOverlay.profiles["balanced-copy"]).toBeDefined();
+    expect(ctx.state.registryOverlay.profiles["balanced-copy"].hosts.claude.light.model).toBe("m-l");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("Duplicate does NOT alert 'no profiles available' when the overlay is empty but the server has profiles", () => {
+    const ctx = makeUnEditedSessionCtx();
+    (globalThis as any).alert = mock(() => {});
+    (globalThis as any).prompt = mock(() => null); // cancel after the "no profiles" check would fire
+    handleRegistryDuplicateProfile(ctx);
+    expect((globalThis as any).alert).not.toHaveBeenCalled();
+  });
+
+  it("Delete offers the builtin profile even though the overlay is empty, and tombstones it in the overlay", () => {
+    const ctx = makeUnEditedSessionCtx();
+    (globalThis as any).prompt = mock(() => "balanced");
+    handleRegistryDeleteProfile(ctx);
+    expect(ctx.state.registryOverlay.profiles.balanced).toBeDefined();
+    expect(ctx.state.registryOverlay.profiles.balanced._delete).toBe(true);
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("Delete does NOT alert 'no profiles available' when the overlay is empty but the server has profiles", () => {
+    const ctx = makeUnEditedSessionCtx();
+    (globalThis as any).alert = mock(() => {});
+    (globalThis as any).prompt = mock(() => null);
+    handleRegistryDeleteProfile(ctx);
+    expect((globalThis as any).alert).not.toHaveBeenCalled();
   });
 });
 

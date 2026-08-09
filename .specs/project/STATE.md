@@ -1,6 +1,50 @@
 # massa-ai Spec State
 
-## Current — Registry Help, Opencode Dropdown, Workflow Tiers (**VALIDATED PASS 2026-08-08** — T7-T10, 4 commits; push/PR = user decision)
+## Current — Admin Portal Correctness Repair (**EXECUTE COMPLETE 2026-08-08** — T1-T11, 15 commits; validation pending; push/PR = user decision)
+
+- projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-correctness-repair` ·
+  workflow: spec-driven (Large) · branch `fix/admin-portal-correctness-repair`
+  from `main` @ `69c0632c` (v1.42.0), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-admin-portal-correctness-repair`
+  (isolated). Two batch workers split the 11 tasks: Batch Worker 1 delivered
+  spec/design/tasks + T1-T8 (Phases 1-2); Batch Worker 2 delivered T9-T11
+  (Phase 3).
+- Scope: repair 8 correctness defects (F1-F8), 2 security issues (S1-S2), 1
+  quality issue (Q1, duplicate SSE handler), and 4 spec/state drifts (D1-D4)
+  found by a 66-commit audit spanning releases v1.41.0-v1.42.0. Phase 1 (P0):
+  overlay deep-merge with `null` tombstones (APCR-01), project-list loud
+  failure (APCR-02), one connection pool per vector store (APCR-03),
+  schema-qualified table enumeration (APCR-04), mask sentinel never persisted
+  (APCR-05), install status derived from the switch report (APCR-06). Phase 2
+  (P1): model-registry routes 501-degrade off-checkout (APCR-07), secret
+  files owner-only and bounded (APCR-08). Phase 3 (P2): one SSE handler
+  behind two routes (APCR-09), `.specs/` state truth restored (APCR-10), the
+  carried admin-portal work closed out with a CHANGELOG entry and the
+  APCR-11.5/11.6 amendment (APCR-11).
+- Contract: `.specs/features/admin-portal-correctness-repair/{spec,design,tasks}.md`
+  — `3 Phases = 11 Tasks`, two batch workers, 15 commits total (1 spec +
+  11 task + 1 oxlint fixup + 1 spec amendment + 1 this close-out).
+- Commits: `56a409ec` spec+design+tasks → `b8eb8ace` carried work (T0, the
+  pre-existing regenerate-and-install route) → `b096d8e4` T1 overlay delta →
+  `b052ebbc` T2 project-list rethrow → `fe5ad0c2` T3 one pool →
+  `d713ba4d` T4 schema-qualified enumeration → `407a7a1e` T5 mask sentinel →
+  `1a7f7e5e` T6 install status → `1bac10ac` oxlint fixup →
+  `235c8cb2` T7 501-degrade → `139c8d14` T8 secret file modes →
+  `095e004f` spec amendment (APCR-11.5/11.6 scheduled) → `f6a11d1e` T9 SSE
+  handler factory → `ea463c3a` T10 state truth → this commit T11 close-out.
+- Gates (measured 2026-08-08 on this branch): web-ui 331 pass (5 new, 0
+  fail), tools-api 29 groups all pass, shared 327 pass (0 fail), type-check
+  6/6 (--force), oxlint exit 0, `bun run test:scripts` 1703 pass / 0 fail,
+  `generate:artifacts --check` no drift, `validate_state.ts --root .` exit
+  1 with 53 errors (52 legacy + this feature's own pending-validation entry,
+  expected until an independent verifier writes validation.md — the 5
+  admin-portal-era features stay clean).
+- Next: dispatch verification-agent (author != verifier) to write
+  `.specs/features/admin-portal-correctness-repair/validation.md`, then
+  `validate_state.ts admin-portal-correctness-repair --root .` exit 0. Push/PR
+  = user decision (not taken unattended).
+
+## Previous — Registry Help, Opencode Dropdown, Workflow Tiers (**VALIDATED PASS 2026-08-08** — T7-T10, 4 commits; push/PR = user decision)
 
 - projectId: `massa-ai` · workflowSessionId: `spec-admin-portal-ui-fixes` ·
   workflow: spec-driven (Medium) · branch `spec/admin-portal-ui-fixes` from

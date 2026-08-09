@@ -1614,7 +1614,12 @@ export function mergeRegistryForDisplay(serverData, overlay) {
 export function handleRegistryCellEdit(ctx, profile, host, tier, field, value) {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
-  if (!ctx.state.registryOverlay.profiles[profile]) ctx.state.registryOverlay.profiles[profile] = { description: profile, hosts: {} };
+  // Create-on-demand for the first edit of a profile the overlay has never touched. Leave
+  // `description` absent rather than defaulting it to the profile key: the server's
+  // mergeProfile() only inherits the builtin's description when the overlay's own is
+  // `undefined` (APCR-11.6) - stamping the key here would overwrite a builtin profile's real
+  // description with its own name on the very first cell edit.
+  if (!ctx.state.registryOverlay.profiles[profile]) ctx.state.registryOverlay.profiles[profile] = { hosts: {} };
   if (!ctx.state.registryOverlay.profiles[profile].hosts) ctx.state.registryOverlay.profiles[profile].hosts = {};
   if (!ctx.state.registryOverlay.profiles[profile].hosts[host]) ctx.state.registryOverlay.profiles[profile].hosts[host] = {};
   if (!ctx.state.registryOverlay.profiles[profile].hosts[host][tier]) ctx.state.registryOverlay.profiles[profile].hosts[host][tier] = { model: null, effort: null };
@@ -1696,11 +1701,19 @@ export function handleRegistryAddProfile(ctx) {
   ctx.render();
 }
 
+// Both Duplicate and Delete build their "Available: ..." list from the DISPLAY registry
+// (server registry merged with the in-memory overlay via mergeRegistryForDisplay), not the
+// raw overlay. The overlay-only seed (APCR-01.8) leaves ctx.state.registryOverlay.profiles
+// empty for an operator who has not edited anything this session, so reading the raw overlay
+// made both pickers report "no profiles available" even though every builtin profile is
+// selectable (APCR-11.5). mergeRegistryForDisplay already drops `_delete`-tombstoned
+// profiles from its result, so no separate filter is needed here.
 export function handleRegistryDuplicateProfile(ctx) {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
-  const existing = ctx.state.registryOverlay.profiles;
-  const keys = Object.keys(existing).filter((k) => !existing[k] || !existing[k]._delete);
+  const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
+  const available = (display && display.registry && display.registry.profiles) || {};
+  const keys = Object.keys(available);
   if (keys.length === 0) {
     alert("No profiles available to duplicate. Add a profile first.");
     return;
@@ -1708,17 +1721,17 @@ export function handleRegistryDuplicateProfile(ctx) {
   const sourceName = prompt("Source profile to duplicate:\n\nAvailable: " + keys.join(", "));
   if (!sourceName || !sourceName.trim()) return;
   const src = sourceName.trim();
-  if (!existing[src]) {
+  if (!available[src]) {
     alert('Profile "' + src + '" not found. Available: ' + keys.join(", "));
     return;
   }
   const newName = prompt("New profile name (copy of " + src + "):");
   if (!newName || !newName.trim()) return;
-  if (existing[newName.trim()]) {
+  if (Object.prototype.hasOwnProperty.call(available, newName.trim())) {
     alert('Profile "' + newName.trim() + '" already exists.');
     return;
   }
-  const copy = JSON.parse(JSON.stringify(existing[src]));
+  const copy = JSON.parse(JSON.stringify(available[src]));
   delete copy._delete;
   ctx.state.registryOverlay.profiles[newName.trim()] = copy;
   ctx.state.registryDirty = true;
@@ -1728,19 +1741,29 @@ export function handleRegistryDuplicateProfile(ctx) {
 export function handleRegistryDeleteProfile(ctx) {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
-  const existing = ctx.state.registryOverlay.profiles;
-  const keys = Object.keys(existing).filter((k) => !existing[k] || !existing[k]._delete);
+  const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
+  const available = (display && display.registry && display.registry.profiles) || {};
+  const keys = Object.keys(available);
   if (keys.length === 0) {
     alert("No profiles available to delete.");
     return;
   }
   const name = prompt("Profile name to delete:\n\nAvailable: " + keys.join(", "));
   if (!name || !name.trim()) return;
-  if (!existing[name.trim()]) {
-    alert('Profile "' + name.trim() + '" not found. Available: ' + keys.join(", "));
+  const trimmed = name.trim();
+  if (!available[trimmed]) {
+    alert('Profile "' + trimmed + '" not found. Available: ' + keys.join(", "));
     return;
   }
-  existing[name.trim()]._delete = true;
+  // The tombstone must land on the OVERLAY (the thing that gets saved), not the computed
+  // display copy - create a minimal overlay entry when deleting a profile the overlay has
+  // never touched (e.g. a builtin-only profile). `_delete: true` alone is a valid tombstone
+  // (scripts/lib/model-profiles.ts mergeOverlay only checks that flag).
+  if (!ctx.state.registryOverlay.profiles[trimmed]) {
+    ctx.state.registryOverlay.profiles[trimmed] = { _delete: true };
+  } else {
+    ctx.state.registryOverlay.profiles[trimmed]._delete = true;
+  }
   ctx.state.registryDirty = true;
   ctx.render();
 }
@@ -2042,6 +2065,10 @@ function startApp(opts) {
         const registryData = (registryRes && registryRes.success !== false && registryRes.data) || { registry: {}, source: {}, _error: registryRes && registryRes.error };
         const ctxObj = { api, root, state, render, doc };
         initRegistryOverlay(ctxObj, registryData.registry, registryData.source);
+        // Cached so handleRegistryDuplicateProfile/handleRegistryDeleteProfile (Component 3,
+        // triggered from wireViewHandlers' own `ctx`, not ctxObj) can read the same display
+        // registry this render used, instead of only the raw overlay (APCR-11.5).
+        state.registryServerData = registryData;
         const displayData = mergeRegistryForDisplay(registryData, state.registryOverlay);
         root.innerHTML = renderProfilesView(
           (profilesRes && profilesRes.data) || { hosts: [] },
@@ -2053,6 +2080,7 @@ function startApp(opts) {
         const ctxObj = { api, root, state, render, doc };
         const regData = (data && data.data) || { registry: {}, source: {} };
         initRegistryOverlay(ctxObj, regData.registry, regData.source);
+        state.registryServerData = regData;
         const displayData = mergeRegistryForDisplay(regData, state.registryOverlay);
         root.innerHTML = renderModelRegistry(displayData, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty });
       }
