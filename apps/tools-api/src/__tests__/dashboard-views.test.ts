@@ -41,7 +41,8 @@ describe("dashboard views (T28)", () => {
     expect(html).toContain("Scheduler");
     expect(html).toContain("Memory Consolidation");
     expect(html).toContain("memory-consolidation");
-    expect(html).toContain("yes");
+    // APUX-11 (admin-portal-ux-overhaul T13): boolean cells render Title Case.
+    expect(html).toContain("Yes");
   });
 
   test("scheduler section shows 'scheduler disabled' when no jobs + not running", () => {
@@ -71,9 +72,9 @@ describe("dashboard views (T28)", () => {
       error: null,
     });
     expect(html).toContain("Pending");
-    expect(html).toContain("5");
-    expect(html).toContain("256");
-    expect(html).toContain("no");
+    // APUX-11 (T13): counts render as one stat-card value, booleans Title Case.
+    expect(html).toContain("5 / 256");
+    expect(html).toContain('<div class="stat-card"><div class="stat-label">Saturated</div><div class="stat-value">No</div></div>');
   });
 
   test("hook queue section shows 'unavailable' on error", () => {
@@ -127,7 +128,8 @@ describe("dashboard views (T28)", () => {
       },
       error: null,
     });
-    expect(html).toContain("3600");
+    // APUX-11 (T13): numbers render via toLocaleString("en-US") in stat cards.
+    expect(html).toContain("3,600s");
     expect(html).toContain("1.2 GB");
     expect(html).toContain("50MB");
   });
