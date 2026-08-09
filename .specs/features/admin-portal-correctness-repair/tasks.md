@@ -55,7 +55,7 @@ Revert `initRegistryOverlay` to seed from `source.overlay` only, fix
 **Depends on**: none
 **Where**: `scripts/lib/model-profiles.ts` (+ `apps/tools-api/src/routes/model-registry.ts`, `apps/web-ui/src/static/app.js`)
 **Tests**: `scripts/__tests__/model-profiles*.test.ts` — builtin-bump-reaches-overlay-user regression (APCR-01.3), partial `hostDefaults`/`workflowTiers` retention, `null` tombstone deletes, normalization collapses a full-copy overlay and preserves a genuine edit, the AC9 limitation pinned (overlay copied from builtin v1, read against v2 whose value changed, still returns v1 — asserted as known behavior so a future change is visible), the AC10 surviving-entry count, `_delete` unchanged; `apps/tools-api/src/routes/model-registry.test.ts` — route uses the shared merge; `apps/web-ui/src/__tests__/admin-handlers.test.ts` — overlay-only seed, display merge does not blank the flat maps, remove writes `null`
-**Gate**: `bun test scripts/__tests__/ -t 'model-profiles'` && `cd apps/tools-api && bun scripts/run-tests-isolated.ts --filter='model-registry'` && `bun test apps/web-ui/src/__tests__/` && `bun run type-check`
+**Gate**: `bun test scripts/__tests__/ -t 'model-profiles'` && `bun test apps/tools-api/src/routes/model-registry.test.ts` && `bun test apps/web-ui/src/__tests__/` && `bun run type-check`
 
 ### T2: Project list rethrows every error it cannot diagnose
 
@@ -67,7 +67,7 @@ cast and the `?.() ?? []` silent-empty default both disappear.
 **Depends on**: none
 **Where**: `apps/tools-api/src/routes/project.ts`
 **Tests**: `apps/tools-api/src/routes/project.test.ts` — a non-dimension error returns `success:false` carrying its message and never calls the fallback; the existing dimension-mismatch fallback case at line 90 still passes unchanged
-**Gate**: `cd apps/tools-api && bun scripts/run-tests-isolated.ts --filter='project'` && `bun run type-check`
+**Gate**: `bun test apps/tools-api/src/routes/project.test.ts` && `bun run type-check`
 
 ### T3: One connection pool per store instance
 
@@ -118,7 +118,7 @@ inside the message — that branch is part of this task, not a follow-up.
 **Depends on**: none
 **Where**: `apps/tools-api/src/routes/model-registry-stream.ts` (+ `apps/web-ui/src/static/app.js`)
 **Tests**: `apps/tools-api/src/routes/model-registry-stream.test.ts` — an all-failed report emits `status:"failed"`; an all-skipped report emits `status:"skipped"`; an all-unsupported report emits `status:"unsupported"` and appears in the detail strings; a mixed report emits `switched` and retains every bucket; `apps/web-ui/src/__tests__/admin-handlers.test.ts` — a failed install event does not land in the success list, and the terminal banner for an exit-0-with-failed-installs stream is **not** `success` (APCR-06.6)
-**Gate**: `cd apps/tools-api && bun scripts/run-tests-isolated.ts --filter='model-registry'` && `bun test apps/web-ui/src/__tests__/` && `bun run type-check`
+**Gate**: `bun test apps/tools-api/src/routes/model-registry-stream.test.ts` && `bun test apps/web-ui/src/__tests__/` && `bun run type-check`
 
 ## Phase 2 — Deployment + security (P1)
 
@@ -133,7 +133,7 @@ frame's `error`, instead of `MODULE_NOT_FOUND` or a spawn failure.
 **Depends on**: none
 **Where**: `apps/tools-api/src/routes/model-registry.ts` (+ `apps/tools-api/src/routes/model-registry-stream.ts`)
 **Tests**: `apps/tools-api/src/routes/model-registry.test.ts` and `model-registry-stream.test.ts` — resolver finds the script from the source-tree position and from a simulated `dist` position; an unresolvable root yields 501 with the shared message and throws nothing; the SSE terminal frame carries the same reason
-**Gate**: `cd apps/tools-api && bun scripts/run-tests-isolated.ts --filter='model-registry'` && `bun run build` && `bun run type-check`
+**Gate**: `bun test apps/tools-api/src/routes/model-registry.test.ts` && `bun test apps/tools-api/src/routes/model-registry-stream.test.ts` && `bun run build` && `bun run type-check`
 
 ### T8: Secret files are owner-only, backups bounded, exposure documented
 
@@ -165,7 +165,7 @@ Behavior-preserving; the deprecated alias stays registered.
 **Depends on**: T6
 **Where**: `apps/tools-api/src/routes/model-registry-stream.ts`
 **Tests**: `apps/tools-api/src/routes/model-registry-stream.test.ts` — the existing suite passes unchanged; both routes produce identical frame sequences for the same fixture
-**Gate**: `cd apps/tools-api && bun scripts/run-tests-isolated.ts --filter='model-registry'` && `npx oxlint --quiet` && `bun run type-check`
+**Gate**: `bun test apps/tools-api/src/routes/model-registry-stream.test.ts` && `npx oxlint --quiet` && `bun run type-check`
 
 ### T10: State files describe the repository
 
