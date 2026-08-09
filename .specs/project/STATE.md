@@ -34,16 +34,16 @@
   presented alongside the existing Stage 3 delivery-authorization ask defined in
   the same shared reference, so no per-workflow anchor is required and no new
   standalone gate is introduced.
-- Known finding (not fixed in this feature — outside every task's assigned
-  write scope): `skills/massa-ai/references/ticket/intake-and-sources.md:19`
-  still carries an `at most three` numeric question cap that the repo-wide T8
-  sweep surfaced; T6/T7's `Where` fields never named this file. Left for a
-  follow-up task/PR review rather than an unscoped edit.
+- Straggler closed post-close-out: the `at most three` cap the T8 sweep
+  surfaced in `skills/massa-ai/references/ticket/intake-and-sources.md:19`
+  was fixed by follow-up commit `61434ca` (user's cap-removal decision reads
+  "everywhere a workflow interviews you — no stragglers"); spec success
+  criteria amended to name the site. No open residual from the sweep.
 - Next step: review → verification (independent verifier, author != verifier)
   → PR from `spec/workflow-interaction-policies`; push/PR/merge remain the
   user's decision.
 
-## Current — Admin Portal UX Overhaul (**VALIDATED PASS 2026-08-09** — T1-T15 + 2 fix loops, 18 commits + validation close-out; push/PR authorized)
+## Previous — Admin Portal UX Overhaul (**VALIDATED PASS 2026-08-09** — T1-T15 + 2 fix loops, 18 commits + validation close-out; push/PR authorized)
 
 - Validation: **PASS**, 32/32 ACs evidenced (verifier corrected its own first-pass
   36/39 denominator by re-deriving from spec.md: 8+5+5+6+2+6 = 32), 5/5 mutations

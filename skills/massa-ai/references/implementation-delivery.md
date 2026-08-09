@@ -20,7 +20,7 @@ human chose to merge it".
 | --- | --- | --- | --- |
 | 0 | Preflight | `git rev-parse --is-inside-work-tree`; `command -v gh`; `gh auth status` | Record which capabilities are absent and select the degraded path below |
 | 1 | Isolate | `git fetch origin <base> && git worktree add -b <type>/<slug> <path> origin/<base>` | Branch name taken → suffix `-2`. Worktree path taken → reuse it only if its branch matches |
-| 1.5 | Summarize | present the pre-implementation change summary (see Stage 1.5) | Summary presented with the delivery-authorization ask; work does not start before it |
+| 1.5 | Summarize | present the pre-implementation change summary (see Stage 1.5) | Summary skipped → stop and present it before the first mutation; a mutation made without it is a protocol violation to report, not to hide |
 | 2 | Implement | one task → gate → `git commit` | Gate red → fix before committing. Never commit through a failing gate |
 | 3 | Push | `git push -u origin <type>/<slug>` | Rejected non-fast-forward → `git fetch` + rebase, never force-push a shared branch |
 | 3.5 | Deliver specs | `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` | Non-zero → commit the missing `.specs/` updates (a `docs(specs):`-type commit is normal), push, re-run. Defensive fallback — should not fire when the close-out task already committed `.specs/` before the first push |

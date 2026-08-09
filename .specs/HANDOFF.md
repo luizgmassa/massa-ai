@@ -84,11 +84,10 @@ change-summary stage (Stage 1.5 — Summarize) to `implementation-delivery.md`.
   sizing convention (matches spec.md's Out of Scope "Re-benchmarking worker
   sizes" / "Broader single-sourcing of spec-driven packing prose" rows, and
   the tasks.md coverage matrix's own "(packing contexts)" qualifier on this
-  literal); one genuine `at most three` cap survives in
-  `skills/massa-ai/references/ticket/intake-and-sources.md:19`, outside
-  every task's assigned `Where` field (T6 = discuss.md/specify.md, T7 =
-  tdd/design.md) — reported as a finding, not fixed, since T8's own write
-  scope is limited to CHANGELOG.md + `.specs` project files.
+  literal); the one genuine `at most three` cap the sweep surfaced
+  (`skills/massa-ai/references/ticket/intake-and-sources.md:19`) was closed
+  by follow-up commit `61434ca` immediately after close-out; the sweep now
+  returns no question-cap hits anywhere under `skills/`.
 - `bun skills/massa-ai/scripts/validate_state.ts --root .` → does not exist
   in this checkout; skipped per instruction.
 - `bun skills/massa-ai/scripts/check_specs_delivered.ts
@@ -102,9 +101,9 @@ Execute is **done** (T1-T9 + T8 close-out); validation has not run.
 1. Dispatch an independent verifier (author ≠ verifier) with spec.md's WF-01
    through WF-16 requirements, the git diff surface (10 commits from
    `af1b24d7`), the touched files, and the coverage matrix in tasks.md.
-   Include the `ticket/intake-and-sources.md` finding above as an explicit
-   open question for the verifier/user to disposition (fix now vs. accept as
-   documented residual).
+   The `ticket/intake-and-sources.md` straggler is already closed
+   (`61434ca`) — the verifier confirms the fix rather than dispositioning an
+   open question.
 2. If PASS: write
    `.specs/features/workflow-interaction-policies/validation.md`, flip
    `FEATURES.json`'s status to `"complete"`, re-run `check_specs_delivered`
@@ -114,8 +113,8 @@ Execute is **done** (T1-T9 + T8 close-out); validation has not run.
 
 ## Blockers
 
-- None blocking this close-out. See the `ticket/intake-and-sources.md`
-  residual finding above for the one open, out-of-scope item.
+- None blocking this close-out. The `ticket/intake-and-sources.md`
+  straggler was closed by `61434ca`; no open residual remains.
 
 ## Uncommitted Files
 
