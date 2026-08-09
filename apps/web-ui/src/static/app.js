@@ -253,13 +253,13 @@ export function renderProjects(data, opts) {
     : "";
 
   const indexForm = writeMode
-    ? '<div class="create-form">' +
+    ? '<div class="create-form form-grid">' +
       "<h3>Index Project</h3>" +
       '<div class="form-field"><label>projectPath</label><input type="text" data-create="projectPath" data-form="project-index" /></div>' +
       '<div class="form-field"><label>projectId (optional)</label><input type="text" data-create="projectId" data-form="project-index" /></div>' +
       '<div class="form-field"><label><input type="checkbox" data-create="forceReindex" data-form="project-index" /> forceReindex</label></div>' +
       '<div class="form-field"><label><input type="checkbox" data-create="warmCache" data-form="project-index" /> warmCache</label></div>' +
-      '<button type="button" data-action="project-index">Index</button>' +
+      '<button type="button" class="btn btn-primary" data-action="project-index">Index</button>' +
       "</div>"
     : "";
 
@@ -616,7 +616,7 @@ export function renderCheckpoints(data) {
   }
 
   const createForm = writeMode
-    ? '<div class="create-form">' +
+    ? '<div class="create-form form-grid">' +
       "<h3>Create Checkpoint</h3>" +
       '<div class="form-field"><label>taskId</label><input type="text" data-create="taskId" data-form="checkpoint-create" /></div>' +
       '<div class="form-field"><label>description</label><input type="text" data-create="description" data-form="checkpoint-create" /></div>' +
@@ -626,7 +626,7 @@ export function renderCheckpoints(data) {
       '<div class="form-field"><label>totalSteps</label><input type="number" data-create="totalSteps" data-form="checkpoint-create" /></div>' +
       '<div class="form-field"><label>completedSteps</label><input type="number" data-create="completedSteps" data-form="checkpoint-create" /></div>' +
       '<div class="form-field"><label>checkpointType</label><select data-create="checkpointType" data-form="checkpoint-create"><option>manual</option><option>milestone</option></select></div>' +
-      '<button type="button" data-action="checkpoint-create">Create</button>' +
+      '<button type="button" class="btn btn-primary" data-action="checkpoint-create">Create</button>' +
       "</div>"
     : "";
 
@@ -1163,7 +1163,7 @@ function renderAddWorkflowForm(formState, existingWorkflows, tiers) {
     return (
       '<div class="registry-inline-form">' +
       '<p class="muted">Every known workflow already has a tier override. Remove one first to add another.</p>' +
-      '<div class="button-row"><button type="button" data-action="registry-form-cancel">Cancel</button></div>' +
+      '<div class="button-row"><button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button></div>' +
       "</div>"
     );
   }
@@ -1175,8 +1175,8 @@ function renderAddWorkflowForm(formState, existingWorkflows, tiers) {
     '<label>Workflow<select data-action="registry-form-workflow" title="Pick a workflow that does not yet have a tier override">' + workflowOptions + "</select></label>" +
     '<label>Tier<select data-action="registry-form-tier" title="The tier to pin this workflow to">' + tierOptions + "</select></label>" +
     '<div class="button-row">' +
-    '<button type="button" data-action="registry-form-submit">Add</button>' +
-    '<button type="button" data-action="registry-form-cancel">Cancel</button>' +
+    '<button type="button" class="btn btn-primary" data-action="registry-form-submit">Add</button>' +
+    '<button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button>' +
     "</div></div>"
   );
 }
@@ -1186,7 +1186,7 @@ function renderDuplicateProfileForm(formState, profileNames) {
     return (
       '<div class="registry-inline-form">' +
       '<p class="muted">No profiles available to duplicate. Add a profile first.</p>' +
-      '<div class="button-row"><button type="button" data-action="registry-form-cancel">Cancel</button></div>' +
+      '<div class="button-row"><button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button></div>' +
       "</div>"
     );
   }
@@ -1197,8 +1197,8 @@ function renderDuplicateProfileForm(formState, profileNames) {
     '<label>Source Profile<select data-action="registry-form-source" title="The profile to copy">' + profileOptions + "</select></label>" +
     '<label>New Name<input type="text" data-action="registry-form-new-name" placeholder="e.g. work-variant" title="A new, unused profile name" /></label>' +
     '<div class="button-row">' +
-    '<button type="button" data-action="registry-form-submit">Duplicate</button>' +
-    '<button type="button" data-action="registry-form-cancel">Cancel</button>' +
+    '<button type="button" class="btn btn-primary" data-action="registry-form-submit">Duplicate</button>' +
+    '<button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button>' +
     "</div></div>"
   );
 }
@@ -1208,7 +1208,7 @@ function renderDeleteProfileForm(formState, profileNames) {
     return (
       '<div class="registry-inline-form">' +
       '<p class="muted">No profiles available to delete.</p>' +
-      '<div class="button-row"><button type="button" data-action="registry-form-cancel">Cancel</button></div>' +
+      '<div class="button-row"><button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button></div>' +
       "</div>"
     );
   }
@@ -1218,8 +1218,8 @@ function renderDeleteProfileForm(formState, profileNames) {
     renderRegistryFormError(formState) +
     '<label>Profile<select data-action="registry-form-profile" title="The profile to delete">' + profileOptions + "</select></label>" +
     '<div class="button-row">' +
-    '<button type="button" data-action="registry-form-submit">Delete</button>' +
-    '<button type="button" data-action="registry-form-cancel">Cancel</button>' +
+    '<button type="button" class="btn btn-danger" data-action="registry-form-submit">Delete</button>' +
+    '<button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button>' +
     "</div></div>"
   );
 }
@@ -1231,8 +1231,8 @@ function renderAddProfileForm(formState) {
     '<label>Name<input type="text" data-action="registry-form-name" placeholder="e.g. work-variant" title="A new, unused profile name" /></label>' +
     '<label>Description<input type="text" data-action="registry-form-description" placeholder="optional — defaults to the name" title="Optional profile description" /></label>' +
     '<div class="button-row">' +
-    '<button type="button" data-action="registry-form-submit">Add</button>' +
-    '<button type="button" data-action="registry-form-cancel">Cancel</button>' +
+    '<button type="button" class="btn btn-primary" data-action="registry-form-submit">Add</button>' +
+    '<button type="button" class="btn btn-secondary" data-action="registry-form-cancel">Cancel</button>' +
     "</div></div>"
   );
 }
@@ -1379,7 +1379,7 @@ export function renderModelRegistry(data, opts) {
   }).join("");
 
   const addWorkflowTierBtn = writeMode
-    ? '<div class="registry-actions"><button type="button" data-action="registry-workflowTier-add">Add Workflow Tier</button></div>' +
+    ? '<div class="registry-actions"><button type="button" class="btn btn-secondary" data-action="registry-workflowTier-add">Add Workflow Tier</button></div>' +
       (registryFormState && registryFormState.kind === "add-workflow" ? renderAddWorkflowForm(registryFormState, workflowTierNames, tiers) : "")
     : "";
 
@@ -1426,9 +1426,9 @@ export function renderModelRegistry(data, opts) {
   // Profile management: add / duplicate / delete / restore
   const profileActions = writeMode
     ? '<div class="registry-actions">' +
-      '<button type="button" data-action="registry-add-profile">Add Profile</button>' +
-      '<button type="button" data-action="registry-duplicate-profile">Duplicate Profile</button>' +
-      '<button type="button" data-action="registry-delete-profile">Delete Profile</button>' +
+      '<button type="button" class="btn btn-secondary" data-action="registry-add-profile">Add Profile</button>' +
+      '<button type="button" class="btn btn-secondary" data-action="registry-duplicate-profile">Duplicate Profile</button>' +
+      '<button type="button" class="btn btn-secondary" data-action="registry-delete-profile">Delete Profile</button>' +
       "</div>" +
       (registryFormState && registryFormState.kind === "add-profile" ? renderAddProfileForm(registryFormState) : "") +
       (registryFormState && registryFormState.kind === "duplicate-profile" ? renderDuplicateProfileForm(registryFormState, profileNames) : "") +
@@ -1439,7 +1439,7 @@ export function renderModelRegistry(data, opts) {
     ? '<div class="tombstoned"><h4>Removed Profiles (restorable)</h4>' +
       tombstoned.map((p) => {
         const restoreBtn = writeMode
-          ? ' <button type="button" data-action="registry-restore" data-profile="' + escapeHtml(p) + '">Restore</button>'
+          ? ' <button type="button" class="btn btn-secondary" data-action="registry-restore" data-profile="' + escapeHtml(p) + '">Restore</button>'
           : "";
         return '<div class="tombstoned-item" data-tombstoned="' + escapeHtml(p) + '">' + escapeHtml(p) + restoreBtn + "</div>";
       }).join("") +
@@ -1448,8 +1448,8 @@ export function renderModelRegistry(data, opts) {
 
   const actionButtons = writeMode
     ? '<div class="registry-action-buttons">' +
-      '<button type="button" data-action="registry-save-apply">Save &amp; Apply</button>' +
-      '<button type="button" data-action="registry-clear-overlay">Discard All Overrides</button>' +
+      '<button type="button" class="btn btn-primary" data-action="registry-save-apply">Save &amp; Apply</button>' +
+      '<button type="button" class="btn btn-danger" data-action="registry-clear-overlay">Discard All Overrides</button>' +
       "</div>"
     : "";
 

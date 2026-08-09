@@ -1060,6 +1060,116 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       expect(html).toContain("Embedding Dimension Note");
     });
   });
+
+  // ── T11 (APUX-09, design D-5): shared button system + form-grid structure ──
+  // Every <button> rendered by the five polished tabs must carry a class (no
+  // bare `<button ...>` with no styling hook), and the Projects/Checkpoints
+  // create forms must be laid out in `.form-grid`.
+  describe("five-tab button class scan (T11, APUX-09, design D-5)", () => {
+    /** Returns every `<button ...>` opening tag found in `html`. */
+    function extractButtonTags(html: string): string[] {
+      return html.match(/<button\b[^>]*>/g) || [];
+    }
+
+    it("every <button> in the write-mode Projects view carries a class", () => {
+      enableWrite();
+      const html = renderProjects({ projects: [{ projectId: "p1", documentCount: 10 }] });
+      const buttons = extractButtonTags(html);
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const tag of buttons) expect(tag).toContain("class=");
+    });
+
+    it("every <button> in the write-mode Checkpoints view carries a class", () => {
+      enableWrite();
+      const data = { success: true, data: { checkpoints: [{ id: "c1", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };
+      const html = renderCheckpoints(data);
+      const buttons = extractButtonTags(html);
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const tag of buttons) expect(tag).toContain("class=");
+    });
+
+    it("every <button> in the write-mode Config view carries a class", () => {
+      const html = renderConfig({ config: { database: { url: "postgresql://x" } }, restartNeededSections: [] }, { writeMode: true });
+      const buttons = extractButtonTags(html);
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const tag of buttons) expect(tag).toContain("class=");
+    });
+
+    it("every <button> in the write-mode Models (Model Catalog) view carries a class, including inline-form and empty-state buttons", () => {
+      const registryData = {
+        registry: {
+          version: 1,
+          tiers: ["light", "standard", "deep"],
+          hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
+          workflowTiers: { search: "standard" },
+          agentTiers: { builder: { opencode: "deep" } },
+          profiles: {
+            balanced: {
+              description: "Balanced profile",
+              hosts: {
+                claude: { light: { model: "claude-sonnet", effort: "low" }, standard: { model: "claude-sonnet", effort: "medium" }, deep: { model: "claude-opus", effort: "high" } },
+                opencode: { light: { model: "qwen-mini", effort: "low" }, standard: { model: "opencode-go/glm-5.2", effort: "medium" }, deep: { model: "qwen-max", effort: "high" } },
+              },
+            },
+          },
+        },
+        source: { builtin: {}, overlay: {}, tombstoned: ["old-profile"] },
+        agents: [{ name: "builder", charterTier: "standard" }],
+      };
+      const scanFormState = (registryForm: { kind: string; error: string | null } | null) => {
+        const html = renderModelRegistry(registryData, { writeMode: true, registryForm });
+        const buttons = extractButtonTags(html);
+        expect(buttons.length).toBeGreaterThan(0);
+        for (const tag of buttons) expect(tag).toContain("class=");
+      };
+      scanFormState(null);
+      scanFormState({ kind: "add-workflow", error: null });
+      scanFormState({ kind: "add-profile", error: null });
+      scanFormState({ kind: "duplicate-profile", error: null });
+      scanFormState({ kind: "delete-profile", error: null });
+
+      // Empty-state inline-form branches (no workflows left / no profiles to
+      // duplicate or delete) render a bare-looking form with only a Cancel
+      // button — exercise those too.
+      const noProfiles = { ...registryData, registry: { ...registryData.registry, profiles: {} } };
+      for (const kind of ["duplicate-profile", "delete-profile"]) {
+        const html = renderModelRegistry(noProfiles, { writeMode: true, registryForm: { kind, error: null } });
+        const buttons = extractButtonTags(html);
+        for (const tag of buttons) expect(tag).toContain("class=");
+      }
+      // Mirrors app.js's WORKFLOW_STEMS exactly — every stem must already have
+      // an override for the add-workflow form to hit its empty-state branch.
+      const ALL_WORKFLOW_STEMS = [
+        "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
+        "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
+        "discovery", "exploration", "feature", "furps-refinement", "general",
+        "implementation-audit", "implementation-fix", "judge-with-debate",
+        "long-session", "maestro", "maestro-audit", "maestro-fix",
+        "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
+        "refactor", "requirements-audit", "requirements-fix", "rfc",
+        "security-audit", "security-fix", "skill-architect", "spec-driven",
+        "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
+      ];
+      const noWorkflowRoom = {
+        ...registryData,
+        registry: {
+          ...registryData.registry,
+          workflowTiers: Object.fromEntries(ALL_WORKFLOW_STEMS.map((s) => [s, "light"])),
+        },
+      };
+      const htmlFull = renderModelRegistry(noWorkflowRoom, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
+      expect(extractButtonTags(htmlFull).length).toBeGreaterThan(0);
+      for (const tag of extractButtonTags(htmlFull)) expect(tag).toContain("class=");
+    });
+
+    it(".form-grid is present on the Projects index form and Checkpoints create form", () => {
+      enableWrite();
+      const projectsHtml = renderProjects({ projects: [{ projectId: "p1" }] });
+      expect(projectsHtml).toContain('class="create-form form-grid"');
+      const checkpointsHtml = renderCheckpoints({ success: true, data: { checkpoints: [] } });
+      expect(checkpointsHtml).toContain('class="create-form form-grid"');
+    });
+  });
 });
 
 // ── T9 (APUX-07, P2-D AC1): Nomenclature Scheme A negative-vocabulary sensor ─
