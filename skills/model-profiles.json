@@ -32,6 +32,8 @@
 
   "workflowTiers": {},
 
+  "agentTiers": {},
+
   "profiles": {
     "balanced": {
       "description": "Default. Mixed-capability spread per host. Reproduces the pins shipped before the registry existed, with the three cross-host tier disagreements normalized.",

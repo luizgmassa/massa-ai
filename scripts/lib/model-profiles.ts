@@ -49,6 +49,10 @@ export interface Registry {
   readonly tiers: readonly string[];
   readonly hostDefaults: { readonly [host: string]: string };
   readonly workflowTiers: { readonly [name: string]: string };
+  /** Per-agent per-host tier overrides (design D-1). Opt-in user-overlay data, same standing
+   *  as `workflowTiers` — this lib knows nothing about which agents exist (see file header),
+   *  so agent-name validity is deliberately not checked here (the generator warns instead). */
+  readonly agentTiers: { readonly [agent: string]: { readonly [host: string]: string } };
   readonly profiles: { readonly [name: string]: Profile };
 }
 
@@ -277,6 +281,36 @@ export function validateRegistry(raw: unknown): Registry {
     }
   }
 
+  // agentTiers — optional section (design D-1), sibling of workflowTiers. Absent is treated
+  // as `{}` rather than left `undefined`: several downstream call sites (merge, normalize,
+  // count, the generator's diff) need an iterable, never a branch on presence. Agent-name
+  // validity is NOT checked here — this lib knows nothing about which agents exist (file
+  // header); the generator warns on a stale name instead (design D-2).
+  const agentTiersRaw = raw.agentTiers;
+  if (agentTiersRaw === undefined) {
+    (raw as Record<string, unknown>).agentTiers = {};
+  } else if (!isPlainObject(agentTiersRaw)) {
+    v.push("agentTiers must be an object (may be omitted)");
+  } else {
+    for (const [aName, aRaw] of Object.entries(agentTiersRaw)) {
+      if (!isPlainObject(aRaw)) {
+        v.push(`agentTiers.${aName} is not an object`);
+        continue;
+      }
+      for (const [hName, tRaw] of Object.entries(aRaw)) {
+        if (!isHost(hName)) {
+          v.push(`agentTiers.${aName}.${hName} is not a known host (${HOSTS.join(", ")})`);
+          continue;
+        }
+        if (typeof tRaw !== "string" || !tierList.includes(tRaw)) {
+          v.push(
+            `agentTiers.${aName}.${hName} must be one of ${tierList.join(", ")}, got ${JSON.stringify(tRaw)}`,
+          );
+        }
+      }
+    }
+  }
+
   if (v.length > 0) throw new RegistryValidationError(v);
   return raw as unknown as Registry;
 }
@@ -436,6 +470,10 @@ export interface OverlayData {
   readonly profiles?: Record<string, OverlayProfile>;
   readonly hostDefaults?: Record<string, string | null>;
   readonly workflowTiers?: Record<string, string | null>;
+  /** Two-level delta (design D-1): `agentTiers[agent] === null` tombstones the whole agent
+   *  entry; `agentTiers[agent][host] === null` tombstones one host key; an absent key at
+   *  either level inherits. */
+  readonly agentTiers?: Record<string, Record<string, string | null> | null>;
   readonly tiers?: string[];
 }
 
@@ -560,6 +598,10 @@ export function mergeOverlay(builtin: Registry, overlay: OverlayData): Record<st
     result.workflowTiers = mergeFlatMap(builtin.workflowTiers, overlay.workflowTiers);
   }
 
+  if (overlay.agentTiers) {
+    result.agentTiers = mergeAgentTiers(builtin.agentTiers, overlay.agentTiers);
+  }
+
   if (overlay.profiles) {
     const profiles = result.profiles as Record<string, unknown>;
     for (const [key, val] of Object.entries(overlay.profiles)) {
@@ -590,6 +632,28 @@ function mergeFlatMap(
     } else {
       result[key] = value;
     }
+  }
+  return result;
+}
+
+/** Per-agent, per-host merge of `agentTiers` (design D-1) — mirrors `mergeFlatMap` one level
+ *  deeper. `overlay[agent] === null` deletes the whole agent entry; otherwise the agent's
+ *  host map is merged against the builtin's via `mergeFlatMap` itself, so a host-level
+ *  `null` tombstones just that key and an absent host key inherits. */
+function mergeAgentTiers(
+  builtin: { readonly [agent: string]: { readonly [host: string]: string } },
+  overlay: Record<string, Record<string, string | null> | null>,
+): Record<string, Record<string, string>> {
+  const result: Record<string, Record<string, string>> = {};
+  for (const [agent, hostMap] of Object.entries(builtin)) {
+    result[agent] = { ...hostMap };
+  }
+  for (const [agent, value] of Object.entries(overlay)) {
+    if (value === null) {
+      delete result[agent];
+      continue;
+    }
+    result[agent] = mergeFlatMap(builtin[agent] ?? {}, value);
   }
   return result;
 }
@@ -643,6 +707,11 @@ function normalizeOverlay(builtin: Registry, overlay: OverlayData): OverlayData 
     if (Object.keys(normalized).length > 0) result.workflowTiers = normalized;
   }
 
+  if (overlay.agentTiers) {
+    const normalized = normalizeAgentTiers(builtin.agentTiers, overlay.agentTiers);
+    if (Object.keys(normalized).length > 0) result.agentTiers = normalized;
+  }
+
   if (overlay.profiles) {
     const normalized: Record<string, OverlayProfile> = {};
     for (const [key, val] of Object.entries(overlay.profiles)) {
@@ -673,6 +742,27 @@ function normalizeFlatMap(
     if (!(key in builtin) || JSON.stringify(value) !== JSON.stringify(builtin[key])) {
       result[key] = value;
     }
+  }
+  return result;
+}
+
+/** Per-agent normalization of `agentTiers` (design D-1) — mirrors `normalizeFlatMap` one
+ *  level deeper. A whole-agent `null` tombstone survives only if the builtin actually has
+ *  that agent (otherwise it is a no-op and dropped); the per-host map reuses
+ *  `normalizeFlatMap` directly against the agent's builtin host map (or `{}` for a genuinely
+ *  new agent), so byte-identical leaves and no-op host tombstones drop the same way. */
+function normalizeAgentTiers(
+  builtin: { readonly [agent: string]: { readonly [host: string]: string } },
+  overlay: Record<string, Record<string, string | null> | null>,
+): Record<string, Record<string, string | null> | null> {
+  const result: Record<string, Record<string, string | null> | null> = {};
+  for (const [agent, value] of Object.entries(overlay)) {
+    if (value === null) {
+      if (agent in builtin) result[agent] = null; // tombstone for a real agent — kept
+      continue; // tombstone for an agent the builtin lacks — dropped, it is a no-op
+    }
+    const normalizedHosts = normalizeFlatMap(builtin[agent] ?? {}, value);
+    if (Object.keys(normalizedHosts).length > 0) result[agent] = normalizedHosts;
   }
   return result;
 }
@@ -719,6 +809,13 @@ function countOverlayEntries(overlay: OverlayData): number {
   let n = 0;
   if (overlay.hostDefaults) n += Object.keys(overlay.hostDefaults).length;
   if (overlay.workflowTiers) n += Object.keys(overlay.workflowTiers).length;
+  if (overlay.agentTiers) {
+    for (const value of Object.values(overlay.agentTiers)) {
+      // A surviving whole-agent tombstone counts as one override (removing that agent's
+      // overrides entirely); otherwise count each surviving host-level leaf (design D-1).
+      n += value === null ? 1 : Object.keys(value).length;
+    }
+  }
   if (overlay.tiers) n += 1;
   if (overlay.profiles) {
     for (const val of Object.values(overlay.profiles)) {
