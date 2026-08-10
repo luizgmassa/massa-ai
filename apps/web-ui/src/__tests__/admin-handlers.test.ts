@@ -16,6 +16,13 @@ const {
   showBanner,
   handleConfigSave,
   handleConfigReveal,
+  handleMemoryDeleteProjectOpen,
+  handleMemoryDeleteProjectCancel,
+  handleMemoryDeleteProject,
+  stopLogsLiveStream,
+  runLogsLiveStream,
+  handleLogsLiveToggle,
+  handleLogsExport,
   handleProfileSwitch,
   handleProfilesTabSwitch,
   handleRegistryCellEdit,
@@ -44,6 +51,13 @@ const {
   showBanner: (root: MockRoot, type: string, message: string, opts?: { persist?: boolean }) => MockElement;
   handleConfigSave: (ctx: any, section: string) => Promise<void>;
   handleConfigReveal: (ctx: any, targetId: string, section?: string, field?: string) => Promise<void>;
+  handleMemoryDeleteProjectOpen: (ctx: any) => void;
+  handleMemoryDeleteProjectCancel: (ctx: any) => void;
+  handleMemoryDeleteProject: (ctx: any) => Promise<void>;
+  stopLogsLiveStream: (ctx: any) => void;
+  runLogsLiveStream: (ctx: any) => Promise<void>;
+  handleLogsLiveToggle: (ctx: any) => void;
+  handleLogsExport: (ctx: any) => Promise<void>;
   handleProfileSwitch: (ctx: any, profile: string, host: string) => Promise<void>;
   handleProfilesTabSwitch: (ctx: any, tab: string) => void;
   handleRegistryCellEdit: (ctx: any, profile: string, host: string, tier: string, field: string, value: string | null) => void;
@@ -138,6 +152,10 @@ function makeRoot(children: MockElement[] = []): MockRoot {
         if (sel.startsWith("[data-target=")) {
           const val = sel.match(/data-target="([^"]+)"/)?.[1] || "";
           return c.dataset["target"] === val;
+        }
+        if (sel.startsWith("[data-bulk=")) {
+          const val = sel.match(/data-bulk="([^"]+)"/)?.[1] || "";
+          return c.dataset["bulk"] === val;
         }
         return false;
       });
@@ -402,6 +420,134 @@ describe("handleConfigReveal — toggle input type + fetch real value (CFG-06, C
     await handleConfigReveal(ctx, "config-database-url", "database", "url");
     expect(input.type).toBe("password");
     expect(input.value).toBe("postgres://real");
+  });
+});
+
+// ── Memory bulk delete (MBD-03..06, T2) ───────────────────────────────────────
+
+function makeConfirmIdInput(value: string): MockElement {
+  return makeInput({ bulk: "confirm-id" }, "text", value);
+}
+
+describe("handleMemoryDeleteProjectOpen / handleMemoryDeleteProjectCancel — form open/close (MBD-04)", () => {
+  it("open sets state.memoryBulkForm and re-renders", () => {
+    const render = mock(() => {});
+    const ctx = makeCtx({ state: { project: "proj-a" }, render });
+    handleMemoryDeleteProjectOpen(ctx);
+    expect(ctx.state.memoryBulkForm).toEqual({ error: null });
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("cancel clears state.memoryBulkForm and re-renders, issuing no request", () => {
+    const request = mock(async () => ({ success: true }));
+    const render = mock(() => {});
+    const ctx = makeCtx({ state: { project: "proj-a", memoryBulkForm: { error: null } }, api: { request }, render });
+    handleMemoryDeleteProjectCancel(ctx);
+    expect(ctx.state.memoryBulkForm).toBeNull();
+    expect(render).toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleMemoryDeleteProject — typed-match guard, request body, results (MBD-03..06)", () => {
+  it("POSTs the exact request body on an exact typed match", async () => {
+    const request = mock(async () => ({ success: true, data: { projectId: "proj-a", memoriesDeleted: 7 } }));
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("proj-a")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(request).toHaveBeenCalledTimes(1);
+    const call = request.mock.calls[0] as any[];
+    expect(call[0]).toBe("/api/v1/project/reset");
+    expect(call[1]).toEqual({
+      method: "POST",
+      body: { projectId: "proj-a", clearVectors: false, clearSymbols: false, clearMemories: true },
+    });
+  });
+
+  it("displays memoriesDeleted and re-renders on success, closing the form", async () => {
+    const request = mock(async () => ({ success: true, data: { projectId: "proj-a", memoriesDeleted: 7 } }));
+    const render = mock(() => {});
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("proj-a")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+      render,
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(ctx.root.children[0].textContent).toContain("7");
+    expect(ctx.state.memoryBulkForm).toBeNull();
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("a mismatched typed value renders the exact error and issues ZERO api.request calls (MBD-05 discriminating case)", async () => {
+    const request = mock(async () => ({ success: true }));
+    const render = mock(() => {});
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("wrong-id")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+      render,
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(request).not.toHaveBeenCalled();
+    expect(ctx.state.memoryBulkForm).toEqual({ error: "Project id does not match." });
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("bails with no request and no render when the confirm-id input is absent", async () => {
+    const request = mock(async () => ({ success: true }));
+    const render = mock(() => {});
+    const ctx = makeCtx({
+      rootChildren: [],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+      render,
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(request).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("success:false renders the returned errors and claims no deletion", async () => {
+    const request = mock(async () => ({ success: false, data: {}, errors: ["memories: db unavailable"] }));
+    const render = mock(() => {});
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("proj-a")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+      render,
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(ctx.root.children[0].textContent).toContain("db unavailable");
+    expect(ctx.root.children[0].textContent).not.toMatch(/deleted \d/i);
+    expect(ctx.state.memoryBulkForm).toEqual({ error: "memories: db unavailable" });
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("re-entrancy guard: a second call while in flight issues no second request", async () => {
+    let resolveFirst: (() => void) | undefined;
+    const request = mock(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = () => resolve({ success: true, data: { memoriesDeleted: 1 } });
+        }),
+    );
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("proj-a")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+    });
+    const firstCall = handleMemoryDeleteProject(ctx);
+    // The in-flight flag is set synchronously before the first await yields.
+    expect(ctx.state.memoryBulkDeleteInFlight).toBe(true);
+    await handleMemoryDeleteProject(ctx);
+    expect(request).toHaveBeenCalledTimes(1);
+    resolveFirst?.();
+    await firstCall;
+    expect(ctx.state.memoryBulkDeleteInFlight).toBe(false);
   });
 });
 
@@ -1885,5 +2031,259 @@ describe("renderProjects — index progress line (PRG-01, DS-07)", () => {
     const { renderProjects } = { ...mod, ...UI } as { renderProjects: (data: any, opts?: any) => string };
     const html = renderProjects({ projects: [{ projectId: "p1" }] });
     expect(html).not.toContain("index-progress");
+  });
+});
+
+// ── Logs tab: live tail + export (T15, LOG-14, LOG-15, design § 3f) ─────────
+// EventSource is not usable here (it cannot set request headers and every
+// non-public route requires x-api-key — AD-011), so the live tail mirrors
+// runRegenerateStream's own fetch + ReadableStream + hand-parsed `data:`
+// frame pattern above. `runLogsLiveStream` is the load-bearing safety gate:
+// it is a no-op whenever `ctx.state.logsLive` is false, which is what keeps
+// the fake-DOM startApp harness's synthetic dispatch (every wired
+// data-action/change handler fired against a generic child whose `checked`
+// reads as falsy) from ever opening a real, never-resolving fetch.
+
+function makeLiveToggle(checked: boolean): MockElement {
+  const el = makeInput({ action: "logs-live-toggle" }, "checkbox", "");
+  (el as any).checked = checked;
+  return el;
+}
+
+describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)", () => {
+  const origFetch = (globalThis as any).fetch;
+  afterEach(() => {
+    (globalThis as any).fetch = origFetch;
+  });
+
+  it("is a no-op when ctx.state.logsLive is false — the harness's synthetic click cannot open a stream", async () => {
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({ state: { logsLive: false } });
+    await runLogsLiveStream(ctx);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("appends streamed entries to state.logsEntries without re-issuing the range query (LOG-14)", async () => {
+    const sseChunks = [
+      'data: {"seq":1,"ts":"2026-08-09T00:00:00.000Z","level":"info","message":"first"}\n\n',
+      ': heartbeat\n\n',
+      'data: {"seq":2,"ts":"2026-08-09T00:00:01.000Z","level":"warn","message":"second"}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const request = mock(async () => ({ success: true, data: { entries: [], total: 0 } }));
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request, authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    await runLogsLiveStream(ctx);
+    expect(ctx.state.logsEntries.map((e: any) => e.message)).toEqual(["first", "second"]);
+    // no range query (GET /api/v1/logs) was reissued to render these
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("sends the x-api-key auth header on the stream fetch", async () => {
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "secret-key" }) },
+    });
+    await runLogsLiveStream(ctx);
+    expect(fetchMock).toHaveBeenCalled();
+    const fetchArg = (fetchMock.mock.calls[0] as any[])[1] as any;
+    expect(fetchArg.headers["x-api-key"]).toBe("secret-key");
+  });
+
+  it("a stream failure turns Live off, banners the error, and keeps already-rendered rows intact (LOG-15)", async () => {
+    (globalThis as any).fetch = mock(async () => {
+      throw new Error("network down");
+    });
+    const render = mock(() => {});
+    const priorEntries = [{ seq: 0, ts: "t", level: "info", message: "already here" }];
+    const ctx = makeCtx({ state: { logsLive: true, logsEntries: priorEntries }, render });
+    await runLogsLiveStream(ctx);
+    expect(ctx.state.logsLive).toBe(false);
+    expect(ctx.root.children[0].textContent).toContain("Live log stream failed");
+    expect(ctx.root.children[0].textContent).toContain("network down");
+    // the accumulator (and, by extension, whatever it already fed into the
+    // DOM) is untouched — LOG-15's "without discarding already-rendered
+    // entries"
+    expect(ctx.state.logsEntries).toBe(priorEntries);
+    expect(ctx.state.logsEntries.length).toBe(1);
+    // no full re-render happened; already-rendered rows were never replaced
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("does not banner an error when the fetch rejection is our own teardown abort, not a genuine failure", async () => {
+    class FakeAbortController {
+      signal: { aborted: boolean };
+      constructor() {
+        this.signal = { aborted: false };
+      }
+      abort() {
+        this.signal.aborted = true;
+      }
+    }
+    const origAC = (globalThis as any).AbortController;
+    (globalThis as any).AbortController = FakeAbortController;
+    (globalThis as any).fetch = mock(async (_url: string, init: any) => {
+      // Simulate a real aborted-fetch rejection landing after teardown
+      // already flipped the signal (the same sequence a browser produces
+      // when stopLogsLiveStream()'s abort() races the in-flight fetch).
+      init.signal.aborted = true;
+      const err = new Error("The operation was aborted.");
+      (err as any).name = "AbortError";
+      throw err;
+    });
+    try {
+      const ctx = makeCtx({ state: { logsLive: true } });
+      await runLogsLiveStream(ctx);
+      expect(ctx.root.children.length).toBe(0);
+    } finally {
+      (globalThis as any).AbortController = origAC;
+    }
+  });
+});
+
+describe("stopLogsLiveStream — teardown on toggle-off / navigate-away (T15, LOG-14/15)", () => {
+  it("aborts the stored controller and clears state.logsStreamAbort", () => {
+    const abort = mock(() => {});
+    const ctx = makeCtx({ state: { logsStreamAbort: { abort } } });
+    stopLogsLiveStream(ctx);
+    expect(abort).toHaveBeenCalledTimes(1);
+    expect(ctx.state.logsStreamAbort).toBeNull();
+  });
+
+  it("is a safe no-op when no stream is in flight", () => {
+    const ctx = makeCtx({ state: { logsStreamAbort: null } });
+    expect(() => stopLogsLiveStream(ctx)).not.toThrow();
+    expect(ctx.state.logsStreamAbort).toBeNull();
+  });
+});
+
+describe("handleLogsLiveToggle — reads the checkbox's real DOM state, never a dataset/event value (T15, LOG-14)", () => {
+  const origFetch = (globalThis as any).fetch;
+  afterEach(() => {
+    (globalThis as any).fetch = origFetch;
+  });
+
+  it("checking Live sets state.logsLive and opens the stream", async () => {
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({ state: {}, rootChildren: [makeLiveToggle(true)] });
+    handleLogsLiveToggle(ctx);
+    expect(ctx.state.logsLive).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("unchecking Live sets state.logsLive false and aborts any in-flight stream, without ever calling fetch", () => {
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const abort = mock(() => {});
+    const ctx = makeCtx({ state: { logsStreamAbort: { abort } }, rootChildren: [makeLiveToggle(false)] });
+    handleLogsLiveToggle(ctx);
+    expect(ctx.state.logsLive).toBe(false);
+    expect(abort).toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a missing toggle element (the harness's generic-child scenario) reads as unchecked, never a stale true", () => {
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({ state: {}, rootChildren: [] });
+    handleLogsLiveToggle(ctx);
+    expect(ctx.state.logsLive).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleLogsExport — fetch with auth header + object-URL download (T15, design § 3f Export)", () => {
+  const origFetch = (globalThis as any).fetch;
+  afterEach(() => {
+    (globalThis as any).fetch = origFetch;
+  });
+
+  function makeExportDoc() {
+    const created: any[] = [];
+    const doc = {
+      createElement: (tag: string) => {
+        const el: any = { tag, click: mock(() => {}) };
+        created.push(el);
+        return el;
+      },
+      body: { appendChild: mock(() => {}), removeChild: mock(() => {}) },
+    };
+    return { doc, created };
+  }
+
+  function makeExportResponse(filename: string, text: string) {
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: (h: string) => (h === "content-disposition" ? 'attachment; filename="' + filename + '"' : null) },
+      blob: async () => new Blob([text], { type: "application/x-ndjson" }),
+    };
+  }
+
+  it("sends the x-api-key header and format=jsonl on the export fetch", async () => {
+    const fetchMock = mock(async () => makeExportResponse("massa-ai-logs-a_b.jsonl", "line1\nline2\n"));
+    (globalThis as any).fetch = fetchMock;
+    const { doc } = makeExportDoc();
+    const ctx = makeCtx({
+      state: { logsFrom: "", logsTo: "", logsLevel: "", logsQuery: "" },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "secret-key" }) },
+      doc,
+    });
+    await handleLogsExport(ctx);
+    expect(fetchMock).toHaveBeenCalled();
+    const [url, init] = fetchMock.mock.calls[0] as any[];
+    expect(String(url)).toContain("/api/v1/logs/export");
+    expect(String(url)).toContain("format=jsonl");
+    expect(init.headers["x-api-key"]).toBe("secret-key");
+  });
+
+  it("triggers a download via an object-URL anchor named from Content-Disposition", async () => {
+    const fetchMock = mock(async () => makeExportResponse("massa-ai-logs-a_b.jsonl", "line1\n"));
+    (globalThis as any).fetch = fetchMock;
+    const { doc, created } = makeExportDoc();
+    const ctx = makeCtx({ state: {}, doc });
+    await handleLogsExport(ctx);
+    expect(created.length).toBe(1);
+    expect(created[0].download).toBe("massa-ai-logs-a_b.jsonl");
+    expect(created[0].click).toHaveBeenCalled();
+  });
+
+  it("includes the current from/to/level/q filters in the export query", async () => {
+    const fetchMock = mock(async () => makeExportResponse("f.jsonl", ""));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsFrom: "2026-08-09T10:00", logsTo: "2026-08-09T11:00", logsLevel: "warn", logsQuery: "boom" },
+    });
+    await handleLogsExport(ctx);
+    const [url] = fetchMock.mock.calls[0] as any[];
+    expect(String(url)).toContain("level=warn");
+    expect(String(url)).toContain("q=boom");
+    expect(String(url)).toContain("from=");
+    expect(String(url)).toContain("to=");
+  });
+
+  it("banners an error on a non-ok response, without throwing", async () => {
+    (globalThis as any).fetch = mock(async () => ({ ok: false, status: 401 }));
+    const ctx = makeCtx({ state: {} });
+    await handleLogsExport(ctx);
+    expect(ctx.root.children[0].textContent).toContain("Export failed");
+    expect(ctx.root.children[0].textContent).toContain("401");
+  });
+
+  it("banners an error on network failure, without throwing", async () => {
+    (globalThis as any).fetch = mock(async () => {
+      throw new Error("network down");
+    });
+    const ctx = makeCtx({ state: {} });
+    await handleLogsExport(ctx);
+    expect(ctx.root.children[0].textContent).toContain("Export failed");
+    expect(ctx.root.children[0].textContent).toContain("network down");
   });
 });

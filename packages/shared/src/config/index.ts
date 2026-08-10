@@ -14,6 +14,7 @@ import "../env.js";
 
 import path from "path";
 import { loadConfigSafe, getConfigDir } from "./config-loader";
+import { SCHEDULER_JOB_KINDS, type SchedulerConfig } from "./massa-ai-config";
 
 /**
  * Default LLM model for NL/instruction-shaped sites. Pure-instruct (non-thinking)
@@ -228,12 +229,40 @@ export interface ServerConfig {
     corsOrigins: string[];
   };
 
-  // Logging
+  // Logging (LOG-01, LOG-02, LOG-07). `file`, `enableFileSink`, `bufferSize`,
+  // `maxFileSizeMb`, and `maxFiles` are always concretely resolved — never
+  // partial — mirroring `scheduler.jobs` below: a caller never needs its own
+  // literal-default fallback.
   logging: {
     level: "debug" | "info" | "warn" | "error";
     enableMetrics: boolean;
-    /** Optional absolute path to additionally append log lines to (opt-in). */
-    file?: string;
+    /**
+     * Always a concrete absolute path: `MASSA_AI_LOG_FILE` > non-empty
+     * `logging.file` > `<dataDir>/logs/massa-ai.log`. An empty or absent
+     * `logging.file` means "use the default path", never "disable the sink"
+     * (pre-mortem #1) — `enableFileSink` is the only disable.
+     */
+    file: string;
+    /** The ONLY way to disable the file sink (LOG-02 AC 2b). Default `true`. */
+    enableFileSink: boolean;
+    /** In-process ring-buffer capacity (LOG-01). Default 2000. */
+    bufferSize: number;
+    /** Rotate the sink once it exceeds this size in MB (LOG-07). Default 32. */
+    maxFileSizeMb: number;
+    /** Rotated files retained alongside the live file (LOG-07). Default 5. */
+    maxFiles: number;
+  };
+
+  // Scheduler (SCH-01..03, SCH-06) — resolved `env > config.json > literal
+  // default`, mirroring every other section above. `jobs` is fully resolved
+  // (never partial) — every one of the five registered kinds always has a
+  // concrete `enabled`/`intervalMs`, even when neither env nor config.json
+  // names it, so a caller never needs its own literal-default fallback.
+  scheduler: {
+    enabled: boolean;
+    tickMs: number;
+    maxConcurrent: number;
+    jobs: Record<(typeof SCHEDULER_JOB_KINDS)[number], { enabled: boolean; intervalMs: number }>;
   };
 
   // Synapse — cognitive modulation layer (focus, retention, prioritization, speed).
@@ -330,6 +359,82 @@ function envList(key: string, fallback: string[]): string[] {
   if (s === undefined) return fallback;
   const parsed = s.split(",").map((v) => v.trim()).filter((v) => v.length > 0);
   return parsed.length > 0 ? parsed : fallback;
+}
+
+// ── Scheduler (SCH-01..03, SCH-06) ───────────────────────────────────────────
+
+/**
+ * Never-throwing accessor for the file-config `scheduler` block. `fileConfig`
+ * below is already built from `loadConfigSafe()` (never throws — falls back to
+ * `defaultMassaAiConfig` on a missing/corrupt/unreadable `config.json`), so
+ * this wrapper is a second, explicit guard scoped to the one block this
+ * feature adds — mirroring the fallback discipline `Logger.ensureInitialized`
+ * uses (SCH-06: unreadable config must resolve to the literal defaults, never
+ * throw, however the block is reached).
+ */
+function readSchedulerConfig(rawFileConfig: unknown): SchedulerConfig {
+  try {
+    const cfg = rawFileConfig as { scheduler?: SchedulerConfig } | null | undefined;
+    return cfg?.scheduler ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Per-job env var names + literal default interval, mirroring
+ * `packages/core/src/services/scheduler/scheduler-defaults.ts`'
+ * `DEFAULT_SCHEDULED_JOBS` exactly (SCH-02: "literal defaults unchanged from
+ * DEFAULT_SCHEDULED_JOBS"). Duplicated rather than imported because `core`
+ * depends on `shared`, not the reverse — this is the shared-side mirror of
+ * that table, not a second source of truth for the job *handlers*.
+ */
+const SCHEDULER_JOB_ENV: Record<
+  (typeof SCHEDULER_JOB_KINDS)[number],
+  { enabledVar: string; intervalVar: string; defaultIntervalMs: number }
+> = {
+  "memory-consolidation": {
+    enabledVar: "MASSA_AI_SCHEDULER_CONSOLIDATION_ENABLED",
+    intervalVar: "MASSA_AI_SCHEDULER_CONSOLIDATION_INTERVAL_MS",
+    defaultIntervalMs: 30 * 60 * 1000,
+  },
+  "decay-sweep": {
+    enabledVar: "MASSA_AI_SCHEDULER_DECAY_ENABLED",
+    intervalVar: "MASSA_AI_SCHEDULER_DECAY_INTERVAL_MS",
+    defaultIntervalMs: 60 * 60 * 1000,
+  },
+  "auto-improve": {
+    enabledVar: "MASSA_AI_SCHEDULER_AUTO_IMPROVE_ENABLED",
+    intervalVar: "MASSA_AI_SCHEDULER_AUTO_IMPROVE_INTERVAL_MS",
+    defaultIntervalMs: 30 * 60 * 1000,
+  },
+  "observation-bridge": {
+    enabledVar: "MASSA_AI_SCHEDULER_OBSERVATION_BRIDGE_ENABLED",
+    intervalVar: "MASSA_AI_SCHEDULER_OBSERVATION_BRIDGE_INTERVAL_MS",
+    defaultIntervalMs: 30 * 60 * 1000,
+  },
+  "checkpoint-purge": {
+    enabledVar: "MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_ENABLED",
+    intervalVar: "MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_INTERVAL_MS",
+    defaultIntervalMs: 60 * 60 * 1000,
+  },
+};
+
+/** Resolve one job's `{enabled, intervalMs}` as `env > config.json > literal`
+ *  (SCH-02). Every registered kind's literal `enabled` default is `false`,
+ *  matching `DEFAULT_SCHEDULED_JOBS[*].defaultEnabled` — the
+ *  `MASSA_AI_SCHEDULER_SAFE_DEFAULTS` preset stays a `core`-only concern
+ *  (`scheduler-defaults.ts`'s `applySafeDefaults`), applied below this layer. */
+function resolveSchedulerJob(
+  kind: (typeof SCHEDULER_JOB_KINDS)[number],
+  fileJobs: SchedulerConfig["jobs"],
+): { enabled: boolean; intervalMs: number } {
+  const meta = SCHEDULER_JOB_ENV[kind];
+  const fileJob = fileJobs?.[kind];
+  return {
+    enabled: envBool(meta.enabledVar, fileJob?.enabled ?? false),
+    intervalMs: envNum(meta.intervalVar, fileJob?.intervalMs ?? meta.defaultIntervalMs),
+  };
 }
 
 // ── Wave 5 FR-11 / AD-W5-005: capture-policy config validation ──────────────
@@ -530,11 +635,15 @@ const fileCacheL2Bytes = fileConfig.cache?.l2MaxSizeMB
   ? fileConfig.cache.l2MaxSizeMB * 1024 * 1024
   : undefined;
 
+// Resolved once and reused by both `dataDir` and the logging block's default
+// file-sink path (LOG-02) — the two must agree on the same value.
+const resolvedDataDir = getGlobalDataDir();
+
 export const defaultConfig: ServerConfig = {
   name: "massa-ai-server",
   version: "1.0.0",
 
-  dataDir: getGlobalDataDir(),
+  dataDir: resolvedDataDir,
 
   cache: {
     l1: {
@@ -854,9 +963,51 @@ export const defaultConfig: ServerConfig = {
       process.env.ENABLE_METRICS === "true" ||
       (process.env.ENABLE_METRICS === undefined &&
         !!fileConfig.logging?.enableMetrics),
-    // env > config.json, matching `level`'s precedence above (AD-010).
-    file: process.env.MASSA_AI_LOG_FILE || fileConfig.logging?.file || undefined,
+    // env > non-empty config.json > default (LOG-02, AD-010). `||` already
+    // treats an empty-string `logging.file` as falsy, so an explicit `""`
+    // written by an unrelated Config save falls straight through to the
+    // default path rather than being read as "disabled" (pre-mortem #1) —
+    // disabling is the separate `enableFileSink` boolean below.
+    file:
+      process.env.MASSA_AI_LOG_FILE ||
+      fileConfig.logging?.file ||
+      path.join(resolvedDataDir, "logs", "massa-ai.log"),
+    // LOG-02 AC 2b: the ONLY way to disable the file sink. Default true.
+    enableFileSink: envBool(
+      "MASSA_AI_LOG_ENABLE_FILE_SINK",
+      fileConfig.logging?.enableFileSink ?? true,
+    ),
+    // LOG-01: in-process ring-buffer capacity.
+    bufferSize: envNum("MASSA_AI_LOG_BUFFER_SIZE", fileConfig.logging?.bufferSize ?? 2000),
+    // LOG-07: size-capped rotation.
+    maxFileSizeMb: envNum(
+      "MASSA_AI_LOG_MAX_FILE_SIZE_MB",
+      fileConfig.logging?.maxFileSizeMb ?? 32,
+    ),
+    maxFiles: envNum("MASSA_AI_LOG_MAX_FILES", fileConfig.logging?.maxFiles ?? 5),
   },
+
+  // SCH-01..03, SCH-06: `env > config.json > literal default`, absent-key
+  // behavior unchanged from before this section existed (`fileConfig.scheduler`
+  // is `undefined` on any config.json that predates it, so every value falls
+  // straight through to its env-or-literal resolution below).
+  scheduler: (() => {
+    const fileScheduler = readSchedulerConfig(fileConfig);
+    return {
+      enabled: envBool("MASSA_AI_SCHEDULER_ENABLED", fileScheduler.enabled ?? false),
+      tickMs: envNum("MASSA_AI_SCHEDULER_TICK_MS", fileScheduler.tickMs ?? 60_000),
+      maxConcurrent: envNum(
+        "MASSA_AI_SCHEDULER_MAX_CONCURRENT",
+        fileScheduler.maxConcurrent ?? 2,
+      ),
+      jobs: Object.fromEntries(
+        SCHEDULER_JOB_KINDS.map((kind) => [
+          kind,
+          resolveSchedulerJob(kind, fileScheduler.jobs),
+        ]),
+      ) as Record<(typeof SCHEDULER_JOB_KINDS)[number], { enabled: boolean; intervalMs: number }>,
+    };
+  })(),
 
   synapse: {
     enabled: process.env.SYNAPSE_ENABLED !== "false",
@@ -991,6 +1142,11 @@ export class Config {
       rateLimit: { ...defaults.rateLimit, ...overrides.rateLimit },
       security: { ...defaults.security, ...overrides.security },
       logging: { ...defaults.logging, ...overrides.logging },
+      scheduler: {
+        ...defaults.scheduler,
+        ...overrides.scheduler,
+        jobs: { ...defaults.scheduler.jobs, ...overrides.scheduler?.jobs },
+      },
       synapse: {
         ...defaults.synapse,
         ...overrides.synapse,

@@ -2,13 +2,38 @@ import { describe, it, expect } from "bun:test";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
-const { renderConfig, buildConfigSectionBody } = {
+const { renderConfig, buildConfigSectionBody, collectConfigSectionFields } = {
   ...mod,
   ...UI,
 } as {
   renderConfig: (data: unknown, opts?: { writeMode?: boolean }) => string;
   buildConfigSectionBody: (sectionKey: string, fieldValues: Record<string, unknown>) => Record<string, unknown>;
+  collectConfigSectionFields: (root: unknown, section: string) => Record<string, unknown>;
 };
+
+// ── Minimal fake-DOM element/root for collectConfigSectionFields (T7, SCH-08) ─
+// Mirrors admin-handlers.test.ts's makeInput/makeRoot shape: querySelectorAll
+// filters by data-section, elements expose dataset/type/value/checked.
+
+interface FakeFieldEl {
+  dataset: { section: string; field: string };
+  type: string;
+  value: string;
+  checked?: boolean;
+}
+
+function makeFieldEl(section: string, field: string, type: string, value: string, checked?: boolean): FakeFieldEl {
+  return { dataset: { section, field }, type, value, checked };
+}
+
+function makeSectionRoot(elements: FakeFieldEl[]) {
+  return {
+    querySelectorAll: (sel: string) => {
+      const val = sel.match(/data-section="([^"]+)"/)?.[1] || "";
+      return elements.filter((e) => e.dataset.section === val);
+    },
+  };
+}
 
 const SAMPLE_CONFIG_DATA = {
   config: {
@@ -33,9 +58,9 @@ const SAMPLE_CONFIG_DATA = {
 describe("renderConfig — 15 sectioned forms (CFG-01)", () => {
   const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
 
-  it("renders all 15 sections", () => {
+  it("renders all 16 sections", () => {
     const sectionCount = (html.match(/class="config-section"/g) || []).length;
-    expect(sectionCount).toBe(15);
+    expect(sectionCount).toBe(16);
   });
 
   it("renders Database section with typed fields", () => {
@@ -263,11 +288,75 @@ describe("buildConfigSectionBody — partial body construction (CFG-03)", () => 
   });
 });
 
+describe("renderConfig — scheduler section (SCH-08)", () => {
+  const schedulerConfig = {
+    enabled: true,
+    tickMs: 30000,
+    maxConcurrent: 3,
+    jobs: {
+      "memory-consolidation": { enabled: true, intervalMs: 300000 },
+      "decay-sweep": { enabled: false, intervalMs: 600000 },
+      "auto-improve": { enabled: true, intervalMs: 900000 },
+      "observation-bridge": { enabled: false, intervalMs: 120000 },
+      "checkpoint-purge": { enabled: true, intervalMs: 86400000 },
+    },
+  };
+
+  it("renders the scheduler section with top-level and per-kind nested fields", () => {
+    const html = renderConfig({ config: { scheduler: schedulerConfig }, restartNeededSections: [] }, { writeMode: true });
+    expect(html).toContain("Scheduler");
+    expect(html).toContain('data-section="scheduler"');
+    expect(html).toContain('data-field="enabled"');
+    expect(html).toContain('data-field="tickMs"');
+    expect(html).toContain('data-field="maxConcurrent"');
+    for (const kind of ["memory-consolidation", "decay-sweep", "auto-improve", "observation-bridge", "checkpoint-purge"]) {
+      expect(html).toContain('data-field="jobs.' + kind + '.enabled"');
+      expect(html).toContain('data-field="jobs.' + kind + '.intervalMs"');
+    }
+  });
+
+  it("renders scheduler booleans as checkboxes and intervals as number inputs", () => {
+    const html = renderConfig({ config: { scheduler: schedulerConfig }, restartNeededSections: [] }, { writeMode: true });
+    const idx = html.indexOf('data-field="jobs.decay-sweep.enabled"');
+    const tagStart = html.lastIndexOf("<input", idx);
+    expect(html.slice(tagStart, idx + 40)).toContain('type="checkbox"');
+    const intervalIdx = html.indexOf('data-field="jobs.decay-sweep.intervalMs"');
+    const intervalTagStart = html.lastIndexOf("<input", intervalIdx);
+    expect(html.slice(intervalTagStart, intervalIdx + 40)).toContain('type="number"');
+  });
+
+  it("round-trips render -> collectConfigSectionFields -> buildConfigSectionBody for the nested jobs.<kind>.<field> tree", () => {
+    const html = renderConfig({ config: { scheduler: schedulerConfig }, restartNeededSections: [] }, { writeMode: true });
+    expect(html).toContain('data-section="scheduler"');
+
+    const root = makeSectionRoot([
+      makeFieldEl("scheduler", "enabled", "checkbox", "", true),
+      makeFieldEl("scheduler", "tickMs", "number", "30000"),
+      makeFieldEl("scheduler", "maxConcurrent", "number", "3"),
+      makeFieldEl("scheduler", "jobs.memory-consolidation.enabled", "checkbox", "", true),
+      makeFieldEl("scheduler", "jobs.memory-consolidation.intervalMs", "number", "300000"),
+      makeFieldEl("scheduler", "jobs.decay-sweep.enabled", "checkbox", "", false),
+      makeFieldEl("scheduler", "jobs.decay-sweep.intervalMs", "number", "600000"),
+      makeFieldEl("scheduler", "jobs.auto-improve.enabled", "checkbox", "", true),
+      makeFieldEl("scheduler", "jobs.auto-improve.intervalMs", "number", "900000"),
+      makeFieldEl("scheduler", "jobs.observation-bridge.enabled", "checkbox", "", false),
+      makeFieldEl("scheduler", "jobs.observation-bridge.intervalMs", "number", "120000"),
+      makeFieldEl("scheduler", "jobs.checkpoint-purge.enabled", "checkbox", "", true),
+      makeFieldEl("scheduler", "jobs.checkpoint-purge.intervalMs", "number", "86400000"),
+    ]);
+
+    const fieldValues = collectConfigSectionFields(root, "scheduler");
+    const body = buildConfigSectionBody("scheduler", fieldValues) as { scheduler: typeof schedulerConfig };
+
+    expect(body.scheduler).toEqual(schedulerConfig);
+  });
+});
+
 describe("renderConfig — empty config", () => {
-  it("renders all 15 sections even when config is empty", () => {
+  it("renders all 16 sections even when config is empty", () => {
     const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
     const sectionCount = (html.match(/class="config-section"/g) || []).length;
-    expect(sectionCount).toBe(15);
+    expect(sectionCount).toBe(16);
   });
 });
 
@@ -299,7 +388,7 @@ describe("renderConfig — per-section field guides (CFG-03)", () => {
   it("renders a details field guide per section", () => {
     const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
     const guideCount = (html.match(/class="config-field-guide"/g) || []).length;
-    expect(guideCount).toBe(15);
+    expect(guideCount).toBe(16);
   });
 
   it("field guide summary is 'Field guide'", () => {

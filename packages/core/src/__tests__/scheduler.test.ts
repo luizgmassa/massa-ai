@@ -15,7 +15,7 @@
  * with an in-memory store + explicit tickIntervalMs/maxConcurrent/enabled.
  */
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import {
   parseCron,
   nextCronRun,
@@ -1114,5 +1114,159 @@ describe("singleton", () => {
     const b = getScheduler();
     expect(a).not.toBe(b);
     resetScheduler();
+  });
+});
+
+// ── SCH-02: ctor resolution chain (T6) ──────────────────────────────────────
+//
+// opts.X ?? env ?? config ?? literal. The `SchedulerOptions` test seams above
+// (every `new Scheduler({ store, tickIntervalMs, maxConcurrent, enabled })`
+// call in this file) stay first in precedence and are unchanged by T6 — they
+// never reach the config layer at all, which the "existing seam-based cases
+// stay green" run above (49 pass, pre-existing DATABASE_URL-gated failures
+// aside) already proves.
+//
+// `@massa-ai/shared`'s `config` singleton is fixed at first import for the
+// whole process (`export const config = new Config()`, built once from
+// `loadConfigSafe()`), and this file's own static imports already trigger
+// that import before any test body runs. Testing "config beats literal"
+// therefore needs `config.get` itself to be swappable per case, so this
+// block mocks `@massa-ai/shared` (verified in this repo: `mock.module`
+// rebinds a namespace already imported by another already-loaded module —
+// see the mock-module-registers-by-resolved-path project memory) rather than
+// writing a real config.json, which the frozen singleton would never re-read
+// within this process.
+//
+// pre-mortem #7: every case here supplies its own in-memory `store` (never
+// omitted), so the ctor never reaches `getScheduledJobStore()` — the one
+// path in this file that requires a live `DATABASE_URL` (see the pre-existing
+// "singleton" failures above, unrelated to this block). `resetScheduler()`
+// in `beforeEach` additionally guards against a `getScheduler()`-cached
+// instance from an earlier describe block leaking a mocked config forward.
+describe("SCH-02 ctor resolution chain (T6)", () => {
+  const STUB_LOGGER = {
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    metric: () => {},
+    child(): typeof STUB_LOGGER {
+      return STUB_LOGGER;
+    },
+  };
+
+  const ENV_KEYS = [
+    "MASSA_AI_SCHEDULER_ENABLED",
+    "MASSA_AI_SCHEDULER_TICK_MS",
+    "MASSA_AI_SCHEDULER_MAX_CONCURRENT",
+  ];
+
+  function mockSchedulerConfig(
+    scheduler: { enabled?: boolean; tickMs?: number; maxConcurrent?: number } | undefined,
+  ): void {
+    mock.module("@massa-ai/shared", () => ({
+      config: { get: (key: string) => (key === "scheduler" ? scheduler : undefined) },
+      logger: STUB_LOGGER,
+    }));
+  }
+
+  function privateFields(
+    scheduler: Scheduler,
+  ): { tickIntervalMs: number; maxConcurrent: number; enabled: boolean } {
+    return scheduler as unknown as {
+      tickIntervalMs: number;
+      maxConcurrent: number;
+      enabled: boolean;
+    };
+  }
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) delete process.env[key];
+    resetScheduler();
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) delete process.env[key];
+    resetScheduler();
+  });
+
+  test("opts beat env, config, and literal all together", () => {
+    process.env.MASSA_AI_SCHEDULER_TICK_MS = "9999";
+    process.env.MASSA_AI_SCHEDULER_MAX_CONCURRENT = "9";
+    process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
+    mockSchedulerConfig({ enabled: false, tickMs: 1111, maxConcurrent: 1 });
+
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({
+      store,
+      tickIntervalMs: 555,
+      maxConcurrent: 3,
+      enabled: false,
+    });
+    const fields = privateFields(scheduler);
+    expect(fields.tickIntervalMs).toBe(555);
+    expect(fields.maxConcurrent).toBe(3);
+    expect(fields.enabled).toBe(false);
+  });
+
+  test("env beats config and literal when opts are absent", () => {
+    process.env.MASSA_AI_SCHEDULER_TICK_MS = "4242";
+    process.env.MASSA_AI_SCHEDULER_MAX_CONCURRENT = "6";
+    process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
+    mockSchedulerConfig({ enabled: false, tickMs: 1111, maxConcurrent: 1 });
+
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store });
+    const fields = privateFields(scheduler);
+    expect(fields.tickIntervalMs).toBe(4242);
+    expect(fields.maxConcurrent).toBe(6);
+    expect(fields.enabled).toBe(true);
+  });
+
+  test("config beats literal when opts and env are absent", () => {
+    mockSchedulerConfig({ enabled: true, tickMs: 12345, maxConcurrent: 7 });
+
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store });
+    const fields = privateFields(scheduler);
+    expect(fields.tickIntervalMs).toBe(12345);
+    expect(fields.maxConcurrent).toBe(7);
+    expect(fields.enabled).toBe(true);
+  });
+
+  test("config partially set: unset fields still fall through to literal", () => {
+    // Only `tickMs` present in config — `enabled`/`maxConcurrent` must fall
+    // all the way to their literal defaults, not to `undefined`.
+    mockSchedulerConfig({ tickMs: 7000 });
+
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store });
+    const fields = privateFields(scheduler);
+    expect(fields.tickIntervalMs).toBe(7000);
+    expect(fields.maxConcurrent).toBe(2);
+    expect(fields.enabled).toBe(false);
+  });
+
+  test("literal defaults when opts, env, and config are all absent", () => {
+    mockSchedulerConfig(undefined);
+
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store });
+    const fields = privateFields(scheduler);
+    expect(fields.tickIntervalMs).toBe(60_000);
+    expect(fields.maxConcurrent).toBe(2);
+    expect(fields.enabled).toBe(false);
+  });
+
+  test("a defined-but-invalid MASSA_AI_SCHEDULER_ENABLED resolves to false directly, not the config layer", () => {
+    // Unchanged pre-T6 behavior: a set-but-non-"true"/"1" value is `false`
+    // outright — it does not fall through to config, even when config says
+    // enabled:true.
+    process.env.MASSA_AI_SCHEDULER_ENABLED = "yes";
+    mockSchedulerConfig({ enabled: true });
+
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store });
+    expect(privateFields(scheduler).enabled).toBe(false);
   });
 });

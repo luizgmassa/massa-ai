@@ -13,6 +13,7 @@ const {
   renderMemoryBrowser,
   renderProposals,
   renderConfig,
+  renderLogs,
   renderProfiles,
   renderProfilesView,
   renderModelRegistry,
@@ -745,11 +746,14 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(html).toContain("active");
   });
 
-  it("renderProfiles shows installed with marketplace message when no variant profiles (UIC-05, T9: Save & Apply / Model Catalog nomenclature)", () => {
+  it("renderProfiles shows installed with a no-variants message when no variant profiles, that does NOT assert a marketplace install can't switch (CPP-09, T20, design § 4e)", () => {
     const html = renderProfiles({ hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.41.0", availableProfiles: [] }] }, { writeMode: false });
     expect(html).toContain("claude");
     expect(html).not.toContain("Not installed");
-    expect(html).toContain("marketplace");
+    // AD-020: a marketplace install CAN switch profiles for Claude, so the
+    // no-variants copy must not carry that now-false claim.
+    expect(html).not.toContain("marketplace");
+    expect(html).toContain("No profile variants are installed for this host");
     expect(html).toContain("MASSA_AI_MODEL_PROFILE");
     expect(html).toContain("Save &amp; Apply");
     expect(html).toContain("Model Catalog");
@@ -804,6 +808,134 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(calls.some((u) => u.includes("/api/v1/profiles"))).toBe(true);
     expect(doc.getElementById("app").innerHTML).toContain("Profiles");
     delete (globalThis as any).location;
+  });
+});
+
+// ── Logs tab (T14, LOG-13) ───────────────────────────────────────────────────
+
+describe("renderLogs (T14, LOG-13)", () => {
+  const baseData = {
+    success: true,
+    data: {
+      entries: [
+        { seq: 1, ts: "2026-01-01T00:00:00.000Z", level: "info", message: "server started" },
+        { seq: 0, ts: "2026-01-01T00:00:01.000Z", level: "warn", message: "slow query", meta: { ms: 900 } },
+      ],
+      total: 2,
+      source: "file",
+      truncated: false,
+    },
+  };
+
+  it("renders every control: from/to, level select, substring input, Live toggle, Export", () => {
+    const html = renderLogs(baseData, {});
+    expect(html).toContain('data-logs="from"');
+    expect(html).toContain('data-logs="to"');
+    expect(html).toContain('data-logs="level"');
+    expect(html).toContain('data-logs="q"');
+    expect(html).toContain('data-action="logs-live-toggle"');
+    expect(html).toContain('data-action="logs-export"');
+    expect(html).toContain('data-action="logs-refresh"');
+    expect(html).toContain('type="datetime-local"');
+  });
+
+  it("renders the entry table with time, level, message", () => {
+    const html = renderLogs(baseData, {});
+    expect(html).toContain("server started");
+    expect(html).toContain("slow query");
+    expect(html).toContain("2026-01-01T00:00:00.000Z");
+    expect(html).toContain("info");
+    expect(html).toContain("warn");
+    expect(html).toContain("&quot;ms&quot;:900");
+  });
+
+  it("round-trips the current filter selection from state", () => {
+    const html = renderLogs(baseData, {
+      logsFrom: "2026-01-01T00:00",
+      logsTo: "2026-01-02T00:00",
+      logsLevel: "warn",
+      logsQuery: "slow",
+      logsLive: true,
+    });
+    expect(html).toContain('value="2026-01-01T00:00"');
+    expect(html).toContain('value="2026-01-02T00:00"');
+    expect(html).toContain('value="slow"');
+    expect(html).toMatch(/<option value="warn" selected>/);
+    expect(html).toContain('data-action="logs-live-toggle" checked');
+  });
+
+  it('source:"buffer" shows an in-memory note', () => {
+    const html = renderLogs(
+      { success: true, data: { entries: [], total: 0, source: "buffer", truncated: false } },
+      {},
+    );
+    expect(html).toContain("in-process ring buffer");
+  });
+
+  it("an empty result shows an empty state, not an error or a bare table", () => {
+    const html = renderLogs(
+      { success: true, data: { entries: [], total: 0, source: "file", truncated: false } },
+      {},
+    );
+    expect(html).toContain("No log entries match this range");
+    expect(html).not.toContain("<table");
+  });
+
+  it("discloses the live/history process-scope mismatch (pre-mortem #5)", () => {
+    const html = renderLogs(baseData, {});
+    expect(html).toContain("this server process");
+    expect(html).toContain("stdio MCP server");
+  });
+
+  it("shows a truncated note when the scan bound was hit", () => {
+    const html = renderLogs(
+      { success: true, data: { entries: [], total: 0, source: "file", truncated: true } },
+      {},
+    );
+    expect(html).toContain("scan bound");
+  });
+
+  it("renders an error block when the request failed", () => {
+    const html = renderLogs({ success: false, error: "boom" }, {});
+    expect(html).toContain("boom");
+  });
+
+  it("index.html has a Logs nav item between Dashboard and Config", () => {
+    const navMatch = INDEX_HTML.match(/<nav class="nav">([\s\S]*?)<\/nav>/);
+    expect(navMatch).not.toBeNull();
+    const nav = navMatch![1];
+    const dashboardIdx = nav.indexOf("#/dashboard");
+    const logsIdx = nav.indexOf("#/logs");
+    const configIdx = nav.indexOf("#/config");
+    expect(dashboardIdx).toBeGreaterThan(-1);
+    expect(logsIdx).toBeGreaterThan(dashboardIdx);
+    expect(configIdx).toBeGreaterThan(logsIdx);
+    expect(nav).toContain('<a href="#/logs">Logs</a>');
+  });
+
+  it("the nav href and the viewFromHash allow-list agree (dispatch stub routes without error)", async () => {
+    const { doc } = makeFakeDom();
+    (globalThis as any).location = { hash: "#/logs" };
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      calls.push(String(url));
+      return {
+        headers: { get: () => "application/json" },
+        json: async () => baseData,
+      };
+    }) as unknown as typeof fetch;
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(calls.some((u) => u.includes("/api/v1/logs"))).toBe(true);
+    expect(doc.getElementById("app").innerHTML).toContain("server started");
+    delete (globalThis as any).location;
+  });
+
+  it("is visible without write mode (a read-only tab — export needs no write mode either)", () => {
+    // renderLogs takes no writeMode gate at all; the presence of the Export
+    // control regardless of any write-mode flag IS the read-only contract.
+    const html = renderLogs(baseData, {});
+    expect(html).toContain('data-action="logs-export"');
   });
 });
 
@@ -931,6 +1063,87 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       const html = renderMemoryBrowser(data, { filters: {} });
       expect(html).not.toContain("Create Memory");
       expect(html).not.toContain('data-action="memory-create"');
+    });
+  });
+
+  describe("memory bulk delete (MBD-01, MBD-02)", () => {
+    const EMPTY_DATA = { data: { memories: [], total: 0, limit: 50, offset: 0 } };
+
+    it("renders the bulk-delete control when write mode on and a project is selected", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "proj-1" });
+      expect(html).toContain('data-action="memory-delete-project"');
+      expect(html).toContain("proj-1");
+      expect(html).not.toContain("Select a project to enable bulk delete.");
+    });
+
+    it("renders the select-a-project message when write mode on and no project is selected", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "" });
+      expect(html).not.toContain('data-action="memory-delete-project"');
+      expect(html).toContain("Select a project to enable bulk delete.");
+    });
+
+    it("hides the bulk-delete control when write mode off and a project is selected", () => {
+      disableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "proj-1" });
+      expect(html).not.toContain('data-action="memory-delete-project"');
+      expect(html).not.toContain("Select a project to enable bulk delete.");
+    });
+
+    it("hides the bulk-delete control when write mode off and no project is selected", () => {
+      disableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "" });
+      expect(html).not.toContain('data-action="memory-delete-project"');
+      expect(html).not.toContain("Select a project to enable bulk delete.");
+    });
+
+    it("renders the inline confirmation form when memoryBulkForm is open", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, {
+        filters: {},
+        project: "proj-1",
+        memoryBulkForm: {},
+      });
+      expect(html).toContain('data-bulk="confirm-id"');
+      expect(html).toContain('data-action="memory-delete-project-confirm"');
+      expect(html).toContain('data-action="memory-delete-project-cancel"');
+      expect(html).not.toContain('class="form-error"');
+    });
+
+    it("renders the form-error line when memoryBulkForm carries an error", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, {
+        filters: {},
+        project: "proj-1",
+        memoryBulkForm: { error: "Project id does not match." },
+      });
+      expect(html).toContain('class="form-error"');
+      expect(html).toContain("Project id does not match.");
+    });
+
+    // Pre-mortem #6: the reported count can exceed the rows this tab lists,
+    // because deleteByProject has no `deleted_at` predicate and resolves
+    // aliases. design.md records the disclosure as an applied revision.
+    it("discloses that tombstoned rows are included and the index is untouched", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, {
+        filters: {},
+        project: "proj-1",
+        memoryBulkForm: {},
+      });
+      expect(html).toContain("tombstones");
+      expect(html).toContain("may exceed the rows listed above");
+      expect(html).toContain("This cannot be undone.");
+      // The non-interference half of MBD-07, stated to the operator.
+      expect(html).toMatch(/Vectors, keyword rows and the symbol graph are left untouched/);
+    });
+
+    it("shows no scope disclosure while the confirmation form is closed", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "proj-1" });
+      expect(html).toContain('data-action="memory-delete-project"');
+      expect(html).not.toContain("tombstones");
     });
   });
 

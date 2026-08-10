@@ -528,6 +528,89 @@ try {
 NODE
 }
 
+# ── Marketplace install-path resolution (T19, CPP-07) ───────────────────────
+# Mirrors packages/shared/src/profile-switch/claude-marketplace.ts's
+# resolveClaudeMarketplaceRoot exactly (same selection rule: scope:"user"
+# preferred, then most recent lastUpdated, then last entry in array order;
+# require the resolved installPath to exist on disk) so the shell installer
+# and the TS switch engine agree on which cache directory is "current".
+# Never caches — the path is version pinned and moves on every
+# `claude plugin update`. Prints the resolved installPath, or "" when
+# unresolvable (absent/corrupt registry, no record, or a path that doesn't
+# exist on disk). Never throws.
+resolve_claude_install_path() {
+  local runner="$1"
+  "$runner" - "$PLUGIN_REGISTRY" "$PLUGIN_ID" <<'NODE'
+const fs = require("fs");
+const [, , file, id] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const records = data && data.plugins ? data.plugins[id] : null;
+  if (!Array.isArray(records) || records.length === 0) process.exit(0);
+  const userScoped = records.filter((r) => r && r.scope === "user");
+  const pool = userScoped.length > 0 ? userScoped : records;
+  let best;
+  let bestTime = -Infinity;
+  for (const record of pool) {
+    const parsed = record && record.lastUpdated ? Date.parse(record.lastUpdated) : NaN;
+    if (Number.isFinite(parsed) && parsed >= bestTime) {
+      best = record;
+      bestTime = parsed;
+    }
+  }
+  const selected = best || pool[pool.length - 1];
+  const installPath = selected && selected.installPath;
+  if (!installPath) process.exit(0);
+  if (!fs.existsSync(installPath)) process.exit(0);
+  process.stdout.write(installPath);
+} catch { /* unresolvable — absent file, unreadable file, unparseable JSON */ }
+NODE
+}
+
+# Re-applies the recorded model profile to the marketplace install root after
+# a `claude plugin update` succeeds (CPP-07). AD-015 (read-only): this
+# function, like recorded_profile above, NEVER writes
+# platforms.claude.modelProfile — the switch engine
+# (packages/shared/src/profile-switch/) is its sole writer. An update moves
+# installPath to a new version-pinned cache directory, whose agents/ ships
+# the bundle's DEFAULT profile; without this re-apply step a switched
+# operator would silently revert to that default on every update (context.md
+# finding #4). Every failure path is a logged no-op, never a failure — a
+# missing recorded profile, an unresolvable install path, or a profile the
+# new bundle doesn't ship under agent-profiles/ all mean "nothing to
+# re-apply", not an install error.
+apply_recorded_profile_after_update() {
+  local runner="$1"
+  local install_path profile variant_dir copied=0 f name
+  install_path="$(resolve_claude_install_path "$runner")"
+  if [[ -z "$install_path" ]]; then
+    vecho "  ↷ no resolvable marketplace install path — skipping recorded-profile re-apply"
+    return 0
+  fi
+  profile="$(recorded_profile "$runner")"
+  if [[ -z "$profile" ]]; then
+    vecho "  ↷ no recorded model profile for claude — skipping recorded-profile re-apply"
+    return 0
+  fi
+  variant_dir="$install_path/agent-profiles/$profile"
+  if [[ ! -d "$variant_dir" ]]; then
+    echo "  ⚠ recorded model profile '$profile' is not available under the updated bundle at $install_path — leaving its default agents in place" >&2
+    return 0
+  fi
+  mkdir -p "$install_path/agents"
+  for f in "$variant_dir/"massa-ai-*.md; do
+    [[ -f "$f" ]] || continue
+    name="$(basename "$f")"
+    cp "$f" "$install_path/agents/$name"
+    copied=$((copied + 1))
+  done
+  if [[ "$copied" -gt 0 ]]; then
+    vecho "  ↷ re-applied recorded model profile '$profile' (${copied} files) to $install_path/agents"
+  else
+    vecho "  ↷ recorded model profile '$profile' variant directory has no massa-ai-*.md files — nothing to re-apply"
+  fi
+}
+
 # ── Plugin-registry registration (delegated to the claude CLI) ──────────────
 # The CLI owns the registry format, so it is the only supported way to make the
 # plugin appear in /plugin. Every failure path returns non-zero and the caller
@@ -623,6 +706,10 @@ refresh_marketplace_cache() {
     if installer_host_cli_supports claude plugin update; then
       if claude plugin update "$PLUGIN_ID" </dev/null >/dev/null 2>&1; then
         vecho "  + refreshed marketplace cache: ${served} → ${bundle}"
+        # CPP-07: an update just moved installPath to a new version-pinned
+        # cache directory; re-apply any previously recorded model profile
+        # before it silently reverts to the new bundle's default agents.
+        apply_recorded_profile_after_update "$runner"
       else
         echo "  ⚠ 'claude plugin update ${PLUGIN_ID}' failed — Claude keeps serving ${served}; re-run the installer or run the update manually" >&2
       fi

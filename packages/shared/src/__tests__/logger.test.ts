@@ -2,20 +2,44 @@
  * Logger unit tests.
  * Mocks ../config/index so the Logger's lazy init reads a controlled config.
  * Covers: levels, filtering, formatting, write streams, error meta, metric,
- * child logger, fallback when config throws.
+ * child logger, fallback when config throws, the file sink (log-sink.ts) and
+ * the ring buffer (log-buffer.ts) wiring added by T11 (LOG-01, LOG-02).
  */
 
 import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { logBuffer } from "../utils/log-buffer.js";
 
 // ── Config mock (resilient: handles all keys any utils module may call,
 //    so cross-file mock contamination cannot throw) ──
-let configState: { level: string; enableMetrics: boolean; file?: string } = {
+interface LoggingState {
+  level: string;
+  enableMetrics: boolean;
+  file?: string;
+  enableFileSink: boolean;
+  bufferSize: number;
+  maxFileSizeMb: number;
+  maxFiles: number;
+}
+
+// Mirrors config/index.ts's T8 defaults so a test that only overrides `level`
+// (or another single field) still gets a fully-concrete `logging` block —
+// `enableFileSink` defaulting true here matters: the pre-T11 mock only ever
+// had to model `level`/`enableMetrics`/`file`, and an under-specified
+// `configState` would silently resolve `enableFileSink`/`maxFileSizeMb`/
+// `maxFiles` to `undefined`, breaking the "sink on" cases below.
+const DEFAULT_LOGGING_STATE: LoggingState = {
   level: "info",
   enableMetrics: false,
+  enableFileSink: true,
+  bufferSize: 2000,
+  maxFileSizeMb: 32,
+  maxFiles: 5,
 };
+
+let configState: Partial<LoggingState> = {};
 let configGetShouldThrow = false;
 let securityState = { sanitizeInputs: true, maxInputLength: 100000 };
 let rateLimitState = { requestsPerMinute: 60, tokensPerMinute: 100000 };
@@ -24,7 +48,7 @@ mock.module("../config/index.js", () => ({
   config: {
     get: (key: string) => {
       if (configGetShouldThrow) throw new Error("config not ready");
-      if (key === "logging") return configState;
+      if (key === "logging") return { ...DEFAULT_LOGGING_STATE, ...configState };
       if (key === "security") return securityState;
       if (key === "rateLimit") return rateLimitState;
       return undefined;
@@ -45,6 +69,7 @@ describe("Logger", () => {
     configGetShouldThrow = false;
     logSpy = spyOn(console, "log").mockImplementation(() => {});
     errSpy = spyOn(console, "error").mockImplementation(() => {});
+    logBuffer._resetForTesting();
   });
 
   afterEach(() => {
@@ -312,7 +337,10 @@ describe("Logger", () => {
       expect(lines[1]).toContain("second line");
     });
 
-    test("sink on but path unwritable: does not throw and stderr still emits", () => {
+    test("sink on, absent parent directory: directory is created and the line lands (T10 pre-mortem #2)", () => {
+      // appendLine (T10) now creates the parent directory once per resolved
+      // path — a plain "no-such-dir" case is no longer a broken-sink case,
+      // it is the default-on-sink-must-not-be-silently-dead regression test.
       configState = {
         level: "info",
         enableMetrics: false,
@@ -320,6 +348,96 @@ describe("Logger", () => {
       };
       expect(() => loggerInstance.info("resilient")).not.toThrow();
       expect(errSpy).toHaveBeenCalledTimes(1);
+      const created = path.join(tmpDir, "no-such-dir", "nested", "massa-ai.log");
+      expect(fs.existsSync(created)).toBe(true);
+      expect(fs.readFileSync(created, "utf-8")).toContain("resilient");
+    });
+
+    test("sink on but path genuinely unwritable: does not throw, stderr still emits, buffer still receives", () => {
+      // A real "unwritable" case now needs a path whose parent segment is
+      // itself a regular file — mkdirSync(dirname, {recursive:true}) then
+      // fails with ENOTDIR, which appendLine swallows.
+      const blocker = path.join(tmpDir, "blocker-file");
+      fs.writeFileSync(blocker, "not a directory");
+      configState = {
+        level: "info",
+        enableMetrics: false,
+        file: path.join(blocker, "nested", "massa-ai.log"),
+      };
+      expect(() => loggerInstance.info("resilient")).not.toThrow();
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      // The broken sink must not take the ring buffer down with it.
+      expect(logBuffer.snapshot()[0]?.message).toBe("resilient");
+    });
+
+    test("sink off (enableFileSink:false): file untouched even though a path is configured", () => {
+      configState = {
+        level: "info",
+        enableMetrics: false,
+        file: logFile,
+        enableFileSink: false,
+      };
+      loggerInstance.info("sink disabled");
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(fs.existsSync(logFile)).toBe(false);
+    });
+  });
+
+  describe("ring buffer wiring (LOG-01, T11)", () => {
+    test("the buffer receives structured meta alongside stderr", () => {
+      configState = { level: "info", enableMetrics: false };
+      loggerInstance.info("buffered message", { a: 1, nested: { b: 2 } });
+      const entries = logBuffer.snapshot();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].message).toBe("buffered message");
+      expect(entries[0].level).toBe("info");
+      expect(entries[0].meta).toEqual({ a: 1, nested: { b: 2 } });
+      expect(typeof entries[0].ts).toBe("string");
+    });
+
+    test("no meta key on the entry when meta is omitted", () => {
+      configState = { level: "info", enableMetrics: false };
+      loggerInstance.info("plain buffered");
+      const entries = logBuffer.snapshot();
+      expect(entries[0].meta).toBeUndefined();
+    });
+
+    test("every level reaches the buffer with its own lowercase tag", () => {
+      configState = { level: "debug", enableMetrics: false };
+      loggerInstance.debug("d");
+      loggerInstance.info("i");
+      loggerInstance.warn("w");
+      loggerInstance.error("e");
+      const entries = logBuffer.snapshot(); // newest-first
+      expect(entries.map((e) => e.level)).toEqual(["error", "warn", "info", "debug"]);
+    });
+
+    test("a suppressed level (below threshold) never reaches the buffer", () => {
+      configState = { level: "warn", enableMetrics: false };
+      loggerInstance.debug("suppressed");
+      loggerInstance.info("also suppressed");
+      expect(logBuffer.size()).toBe(0);
+    });
+
+    test("child() context reaches the buffer's meta", () => {
+      configState = { level: "debug", enableMetrics: false };
+      const child = loggerInstance.child({ reqId: "child-abc" });
+      child.info("from child", { extra: 9 });
+      const entries = logBuffer.snapshot();
+      expect(entries[0].message).toBe("from child");
+      expect(entries[0].meta).toEqual({ reqId: "child-abc", extra: 9 });
+    });
+
+    test("logger.emit sets the buffer capacity from logging.bufferSize", () => {
+      configState = { level: "info", enableMetrics: false, bufferSize: 3 };
+      loggerInstance.info("1");
+      loggerInstance.info("2");
+      loggerInstance.info("3");
+      loggerInstance.info("4");
+      // Capacity 3 → oldest entry evicted.
+      expect(logBuffer.size()).toBe(3);
+      const messages = logBuffer.snapshot().map((e) => e.message);
+      expect(messages).toEqual(["4", "3", "2"]);
     });
   });
 });

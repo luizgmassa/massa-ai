@@ -320,6 +320,57 @@ export function renderProjects(data, opts) {
   );
 }
 
+/** Renders the bulk-delete control for the Memory tab (design "1. Memory bulk
+ *  delete (MBD)", spec P1-Bulk ACs 1-4). Gated on write mode + a selected
+ *  project (MBD-01); the inline confirmation form appears only when
+ *  `state.memoryBulkForm` is open (MBD-02) — shape `null | { error?: string }`,
+ *  mirroring `state.registryForm`'s open/closed convention. The confirm value
+ *  is read from `[data-bulk="confirm-id"]` at submit time (T2), never from
+ *  `btn.dataset` — the fake-DOM harness's synthetic clicks carry an empty
+ *  dataset. */
+function renderMemoryBulkDelete(state) {
+  const writeMode = isWriteModeEnabled();
+  if (!writeMode) return "";
+  const project = state.project;
+  if (!project) {
+    return '<p class="muted">Select a project to enable bulk delete.</p>';
+  }
+  const trigger =
+    '<button type="button" class="btn btn-danger" data-action="memory-delete-project">Delete all memories for ' +
+    escapeHtml(project) +
+    "</button>";
+  const formState = state.memoryBulkForm;
+  let form = "";
+  if (formState) {
+    const errorLine = formState.error
+      ? '<p class="form-error">' + escapeHtml(formState.error) + "</p>"
+      : "";
+    // Pre-mortem #6: `deleteByProject` deletes on the CANONICAL project id with
+    // no `deleted_at` predicate, while this tab's list filters
+    // `deleted_at IS NULL` and matches the id literally. The reported count can
+    // therefore legitimately exceed the rows on screen — saying so here makes
+    // that a specified outcome instead of something that reads as a bug.
+    const scopeNote =
+      '<p class="muted bulk-delete-scope">Permanently deletes every memory for ' +
+      escapeHtml(project) +
+      ", including already-deleted rows still held as tombstones — so the reported " +
+      "count may exceed the rows listed above. Vectors, keyword rows and the symbol " +
+      "graph are left untouched. This cannot be undone.</p>";
+    form =
+      '<div class="bulk-delete-inline-form form-field">' +
+      errorLine +
+      scopeNote +
+      "<label>Retype &quot;" +
+      escapeHtml(project) +
+      '&quot; to confirm<input type="text" data-bulk="confirm-id" /></label>' +
+      '<div class="button-row">' +
+      '<button type="button" class="btn btn-danger" data-action="memory-delete-project-confirm">Confirm Delete</button>' +
+      '<button type="button" class="btn btn-secondary" data-action="memory-delete-project-cancel">Cancel</button>' +
+      "</div></div>";
+  }
+  return '<div class="bulk-delete">' + trigger + form + "</div>";
+}
+
 export function renderMemoryBrowser(data, state) {
   state = state || {};
   if (!data || data.success === false) {
@@ -435,9 +486,12 @@ export function renderMemoryBrowser(data, state) {
       "</div>"
     : "";
 
+  const bulkDelete = renderMemoryBulkDelete(state);
+
   return (
     '<section class="view"><h2>Memory</h2>' +
     filterBar +
+    bulkDelete +
     body +
     pager +
     createForm +
@@ -679,6 +733,123 @@ export function renderCheckpoints(data) {
   return '<section class="view"><h2>Checkpoints</h2>' + body + createForm + helpCard + "</section>";
 }
 
+/** Converts a `datetime-local` input's value (no timezone, no seconds — e.g.
+ *  "2026-08-10T10:00") into the ISO-8601 UTC string `GET /api/v1/logs`
+ *  expects, interpreting it in the browser's local timezone. Returns
+ *  `undefined` for an empty or unparseable value so the caller can omit the
+ *  query param entirely rather than send an invalid range. */
+function logsDatetimeLocalToIso(value) {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+/** Logs tab renderer (design "3f. Web UI `#/logs`", LOG-13). Renders the
+ *  from/to/level/substring filter bar, the Live toggle, the Export control,
+ *  and the entry table — all read from `state.logs*` so a re-render
+ *  round-trips the operator's current filter selection. The Live toggle's
+ *  fetch + ReadableStream tail and the Export button's download are wired in
+ *  `wireViewHandlers` (T15, LOG-14, LOG-15) via `handleLogsLiveToggle` /
+ *  `handleLogsExport`, defined near `runLogsLiveStream`. */
+const LOGS_LEVEL_OPTIONS = ["debug", "info", "warn", "error", "raw"];
+
+function renderLogEntryRow(entry) {
+  const meta = entry && entry.meta ? " " + escapeHtml(JSON.stringify(entry.meta)) : "";
+  return (
+    "<tr>" +
+    "<td>" + escapeHtml((entry && entry.ts) || "") + "</td>" +
+    '<td><span class="log-level log-level-' + escapeHtml((entry && entry.level) || "") + '">' +
+    escapeHtml((entry && entry.level) || "") +
+    "</span></td>" +
+    '<td class="content-cell">' + escapeHtml((entry && entry.message) || "") + meta + "</td>" +
+    "</tr>"
+  );
+}
+
+export function renderLogs(data, state) {
+  state = state || {};
+  if (!data || data.success === false) {
+    return '<section class="view"><h2>Logs</h2>' + errorBlock(data) + "</section>";
+  }
+  const payload = data.data || data;
+  const entries = (payload && payload.entries) || [];
+  const total = (payload && payload.total) || 0;
+  const source = (payload && payload.source) || "file";
+  const truncated = !!(payload && payload.truncated);
+
+  const levelOpts =
+    '<option value=""' + (state.logsLevel ? "" : " selected") + ">(any)</option>" +
+    LOGS_LEVEL_OPTIONS.map(
+      (l) => '<option value="' + l + '"' + (state.logsLevel === l ? " selected" : "") + ">" + l + "</option>",
+    ).join("");
+
+  const filterBar =
+    '<div class="filters logs-filters">' +
+    '<label>from <input type="datetime-local" data-logs="from" value="' +
+    escapeHtml(state.logsFrom || "") +
+    '"/></label>' +
+    '<label>to <input type="datetime-local" data-logs="to" value="' +
+    escapeHtml(state.logsTo || "") +
+    '"/></label>' +
+    '<label>level <select data-logs="level">' +
+    levelOpts +
+    "</select></label>" +
+    '<label>contains <input type="text" data-logs="q" value="' +
+    escapeHtml(state.logsQuery || "") +
+    '"/></label>' +
+    '<button type="button" data-action="logs-refresh">apply</button>' +
+    '<label class="logs-live-toggle"><input type="checkbox" data-action="logs-live-toggle"' +
+    (state.logsLive ? " checked" : "") +
+    '/> Live</label>' +
+    '<button type="button" data-action="logs-export">Export</button>' +
+    "</div>";
+
+  // Pre-mortem #5: the live region is scoped to THIS server process, while
+  // the file sink is appended by every massa-ai process (including the
+  // stdio MCP server) — a range query may legitimately contain entries Live
+  // never showed. Always shown, not conditional on Live being on, so the
+  // scope difference is disclosed before an operator ever notices it.
+  const liveScopeDisclosure =
+    '<p class="muted logs-live-disclosure">Live shows only this server process\'s entries. The file sink is written ' +
+    "by every massa-ai process, including the stdio MCP server, so a range query below may include entries Live " +
+    "never showed.</p>";
+
+  const sourceNote =
+    source === "buffer"
+      ? '<p class="muted logs-source-note">Serving from the in-process ring buffer — no on-disk sink is currently ' +
+        "readable, so history is limited to this process's recent lines.</p>"
+      : "";
+
+  const truncatedNote = truncated
+    ? '<p class="muted logs-truncated-note">The 64 MB scan bound was reached — this range may be incomplete.</p>'
+    : "";
+
+  let body;
+  if (entries.length === 0) {
+    body = '<p class="empty logs-empty">No log entries match this range.</p>';
+  } else {
+    body =
+      '<p class="muted logs-total">' +
+      escapeHtml(String(entries.length)) +
+      " of " +
+      escapeHtml(String(total)) +
+      " entries</p>" +
+      '<table class="grid logs-table"><thead><tr><th>time</th><th>level</th><th>message</th></tr></thead><tbody>' +
+      entries.map(renderLogEntryRow).join("") +
+      "</tbody></table>";
+  }
+
+  return (
+    '<section class="view"><h2>Logs</h2>' +
+    filterBar +
+    liveScopeDisclosure +
+    sourceNote +
+    truncatedNote +
+    body +
+    "</section>"
+  );
+}
+
 // ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
 
 /**
@@ -863,6 +1034,28 @@ const CONFIG_SECTIONS = [
       { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key required on every request except `/health`, `/swagger`, and `/ui`. Auto-provisioned on first start. Changing this requires a restart." },
       { name: "corsOrigins", type: "string[]", label: "CORS Origins", guide: "Comma-separated list of allowed CORS origins. Empty means no CORS." },
       { name: "allowedExtensions", type: "string[]", label: "Allowed Extensions", guide: "Comma-separated list of file extensions allowed for indexing." },
+    ],
+  },
+  {
+    // SCH-08. Job kinds mirror packages/shared/src/config/massa-ai-config.ts's
+    // SCHEDULER_JOB_KINDS; app.js is plain browser JS with no build-time
+    // import of @massa-ai/shared, so the five kinds are listed literally here.
+    key: "scheduler",
+    label: "Scheduler",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables the background job scheduler (memory-consolidation, decay-sweep, auto-improve, observation-bridge, checkpoint-purge)." },
+      { name: "tickMs", type: "number", label: "Tick Interval (ms)", guide: "How often the scheduler checks whether a job is due to run, in milliseconds. Minimum `1000`." },
+      { name: "maxConcurrent", type: "number", label: "Max Concurrent Jobs", guide: "Maximum number of scheduled jobs allowed to run at the same time. Minimum `1`." },
+      { name: "jobs.memory-consolidation.enabled", type: "boolean", label: "Memory Consolidation Enabled", guide: "When checked, the memory-consolidation job runs on its own schedule." },
+      { name: "jobs.memory-consolidation.intervalMs", type: "number", label: "Memory Consolidation Interval (ms)", guide: "Interval between memory-consolidation runs, in milliseconds. Minimum `60000`." },
+      { name: "jobs.decay-sweep.enabled", type: "boolean", label: "Decay Sweep Enabled", guide: "When checked, the decay-sweep job runs on its own schedule." },
+      { name: "jobs.decay-sweep.intervalMs", type: "number", label: "Decay Sweep Interval (ms)", guide: "Interval between decay-sweep runs, in milliseconds. Minimum `60000`." },
+      { name: "jobs.auto-improve.enabled", type: "boolean", label: "Auto Improve Enabled", guide: "When checked, the auto-improve job runs on its own schedule." },
+      { name: "jobs.auto-improve.intervalMs", type: "number", label: "Auto Improve Interval (ms)", guide: "Interval between auto-improve runs, in milliseconds. Minimum `60000`." },
+      { name: "jobs.observation-bridge.enabled", type: "boolean", label: "Observation Bridge Enabled", guide: "When checked, the observation-bridge job runs on its own schedule." },
+      { name: "jobs.observation-bridge.intervalMs", type: "number", label: "Observation Bridge Interval (ms)", guide: "Interval between observation-bridge runs, in milliseconds. Minimum `60000`." },
+      { name: "jobs.checkpoint-purge.enabled", type: "boolean", label: "Checkpoint Purge Enabled", guide: "When checked, the checkpoint-purge job runs on its own schedule." },
+      { name: "jobs.checkpoint-purge.intervalMs", type: "number", label: "Checkpoint Purge Interval (ms)", guide: "Interval between checkpoint-purge runs, in milliseconds. Minimum `60000`." },
     ],
   },
 ];
@@ -1069,10 +1262,17 @@ export function renderProfiles(data, opts) {
     }
 
     if (available.length === 0) {
+      // T20 (CPP-09, design § 4e): this copy must NOT assert that a
+      // marketplace install can't switch profiles — that claim is false for
+      // Claude since AD-020 (T16-T19 gave Claude a marketplace-aware
+      // resolver). A host can legitimately have no variant directories for
+      // other reasons too (e.g. the installer never ran the variant-sync
+      // step), so the message stays host-route-agnostic and just names the
+      // MASSA_AI_MODEL_PROFILE + Save & Apply path.
       return (
         '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
         "<h3>" + escapeHtml(hostName) + "</h3>" +
-        '<p class="muted">Installed via marketplace (no per-profile variant directories). To switch profiles, set <code>MASSA_AI_MODEL_PROFILE</code> and use Save &amp; Apply on the Model Catalog tab.</p>' +
+        '<p class="muted">No profile variants are installed for this host. Re-run the installer, or use <code>MASSA_AI_MODEL_PROFILE</code> with Save &amp; Apply on the Model Catalog tab.</p>' +
         "</div>"
       );
     }
@@ -1840,6 +2040,78 @@ export async function handleConfigReveal(ctx, targetId, section, field) {
   }
 }
 
+/** Opens the inline bulk-delete confirmation form (MBD-04): T1's
+ *  `renderMemoryBulkDelete` renders the retype-to-confirm form only while
+ *  `state.memoryBulkForm` is truthy. */
+export function handleMemoryDeleteProjectOpen(ctx) {
+  ctx.state.memoryBulkForm = { error: null };
+  ctx.render();
+}
+
+/** Closes the inline bulk-delete confirmation form without issuing any
+ *  request (MBD-04). */
+export function handleMemoryDeleteProjectCancel(ctx) {
+  ctx.state.memoryBulkForm = null;
+  ctx.render();
+}
+
+/** Bulk-delete confirm handler (design "1. Memory bulk delete (MBD)",
+ *  MBD-03..06). The typed confirmation value is read from
+ *  `[data-bulk="confirm-id"]` — NEVER from `btn.dataset` — because the
+ *  fake-DOM harness's synthetic `startApp` clicks fire every registered
+ *  `data-action` handler against a generic child whose dataset carries none
+ *  of this form's keys. Reading through the DOM lookup means a genuinely
+ *  absent/mismatched value fails the exact-match guard instead of reading a
+ *  stale or empty dataset property as a false confirmation.
+ *
+ *  The in-flight guard lives on `ctx.state`, never module scope —
+ *  `handleServerRestart`'s recorded precedent (a module-level flag latched by
+ *  one harness's never-resolving request would disable the handler for every
+ *  later caller in the same process). */
+export async function handleMemoryDeleteProject(ctx) {
+  const state = ctx.state || (ctx.state = {});
+  if (state.memoryBulkDeleteInFlight) return;
+
+  const input = ctx.root && ctx.root.querySelector ? ctx.root.querySelector('[data-bulk="confirm-id"]') : null;
+  if (!input) return;
+
+  const typed = input.value;
+  const project = state.project;
+  if (typed !== project) {
+    state.memoryBulkForm = { error: "Project id does not match." };
+    ctx.render();
+    return;
+  }
+
+  state.memoryBulkDeleteInFlight = true;
+  try {
+    const res = await ctx.api.request("/api/v1/project/reset", {
+      method: "POST",
+      body: { projectId: project, clearVectors: false, clearSymbols: false, clearMemories: true },
+    });
+    if (res && res.success === false) {
+      const errors = Array.isArray(res.errors) ? res.errors : [];
+      const message = errors.length > 0 ? errors.join("; ") : (res.error || "Bulk delete failed.");
+      state.memoryBulkForm = { error: message };
+      showBanner(ctx.root, "error", "Bulk delete failed: " + message);
+      ctx.render();
+      return;
+    }
+    const data = (res && res.data) || {};
+    const deleted = data.memoriesDeleted != null ? data.memoriesDeleted : 0;
+    state.memoryBulkForm = null;
+    showBanner(ctx.root, "success", "Deleted " + String(deleted) + " memories for " + project + ".");
+    ctx.render();
+  } catch (e) {
+    const message = String((e && e.message) || e);
+    state.memoryBulkForm = { error: message };
+    showBanner(ctx.root, "error", "Bulk delete failed: " + message);
+    ctx.render();
+  } finally {
+    state.memoryBulkDeleteInFlight = false;
+  }
+}
+
 // ── Profiles tab switcher + switch handler (Component 2) ─────────────────────
 
 const PROFILES_TAB_STORAGE_KEY = "massa-ai-profiles-tab";
@@ -2421,6 +2693,175 @@ export async function handleRegistrySaveAndApply(ctx) {
   }
 }
 
+// ── Logs tab: live tail + export (design "3f. Web UI `#/logs`", T15,
+// LOG-14, LOG-15) ────────────────────────────────────────────────────────
+// EventSource is not usable for the live tail: it cannot set request
+// headers, and every non-public route requires `x-api-key` (AD-011) —
+// putting the key in the query string would leak it into access logs and
+// browser history. So this mirrors `runRegenerateStream`'s own fetch +
+// ReadableStream + hand-rolled `data:` frame parsing above.
+
+/** Aborts any in-flight Logs live-tail stream (LOG-14/15 teardown). Called
+ *  both when the Live toggle switches off and from `render()`'s
+ *  navigate-away guard — mirroring `clearIndexPoll()`'s discipline for the
+ *  projects index poll. Exported so both call sites and tests share the
+ *  exact same teardown, never a re-implemented copy. */
+export function stopLogsLiveStream(ctx) {
+  const state = (ctx && ctx.state) || (ctx && (ctx.state = {})) || {};
+  if (state.logsStreamAbort && typeof state.logsStreamAbort.abort === "function") {
+    state.logsStreamAbort.abort();
+  }
+  state.logsStreamAbort = null;
+}
+
+/** Appends one streamed entry to `state.logsEntries` and, when the Logs
+ *  table is currently on screen, prepends its row directly into
+ *  `table.logs-table tbody` — LOG-14's "append without re-issuing the range
+ *  query": no `ctx.api.request` call happens on this path at all. When no
+ *  table is on screen yet (e.g. the range query rendered the empty state),
+ *  the entry is still recorded in `state.logsEntries` but nothing is
+ *  patched into the DOM until the next explicit "apply" — patching the
+ *  empty-state markup into a table shell here would itself be a local
+ *  re-render of the whole view, which is more than "append" and is not
+ *  covered by an independent test. */
+function appendLogsLiveEntry(ctx, entry) {
+  const state = ctx.state || (ctx.state = {});
+  state.logsEntries = state.logsEntries || [];
+  state.logsEntries.push(entry);
+  const root = ctx.root;
+  const tbody = root && root.querySelector ? root.querySelector("table.logs-table tbody") : null;
+  if (tbody) {
+    tbody.innerHTML = renderLogEntryRow(entry) + tbody.innerHTML;
+  }
+}
+
+/** Opens the `/api/v1/logs/stream` live tail and appends every frame it
+ *  emits (LOG-14). No-op whenever `ctx.state.logsLive` is false — this is
+ *  the load-bearing guard: the fake-DOM harness's synthetic `startApp`
+ *  dispatch fires every wired `data-action`/`change` handler against a
+ *  generic child, and `handleLogsLiveToggle` reading that child's `checked`
+ *  (always falsy there) already keeps `logsLive` off in that case, but this
+ *  second, independent check means a caller can never open a real,
+ *  never-resolving fetch by invoking this function directly with `logsLive`
+ *  unset either. LOG-15: any stream failure that is not our own teardown
+ *  abort turns Live off, banners the error, and leaves every already
+ *  rendered/appended row exactly where it was — this function never calls
+ *  `ctx.render()`. */
+export async function runLogsLiveStream(ctx) {
+  const state = ctx.state || (ctx.state = {});
+  if (!state.logsLive) return;
+  if (state.logsStreamInFlight) return; // in-flight guard, ctx.state-scoped
+  state.logsStreamInFlight = true;
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  state.logsStreamAbort = controller;
+  try {
+    const headers = ctx.api && ctx.api.authHeaders ? ctx.api.authHeaders() : {};
+    const res = await fetch("/api/v1/logs/stream", {
+      headers,
+      signal: controller ? controller.signal : undefined,
+    });
+    if (!res || !res.body || !res.body.getReader) {
+      throw new Error("stream unavailable");
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (state.logsLive) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const line = frame.trim();
+        if (!line.startsWith("data:")) continue; // heartbeat `:` comments and blanks
+        let entry;
+        try {
+          entry = JSON.parse(line.slice(5).trim());
+        } catch {
+          continue;
+        }
+        appendLogsLiveEntry(ctx, entry);
+      }
+    }
+  } catch (e) {
+    const aborted = !!(controller && controller.signal && controller.signal.aborted);
+    if (!aborted) {
+      // LOG-15: a genuine failure (never our own navigate-away/toggle-off
+      // abort) turns Live off and banners the error, keeping prior rows.
+      state.logsLive = false;
+      showBanner(ctx.root, "error", "Live log stream failed: " + String((e && e.message) || e));
+    }
+  } finally {
+    state.logsStreamInFlight = false;
+    if (state.logsStreamAbort === controller) state.logsStreamAbort = null;
+  }
+}
+
+/** Live toggle change handler (LOG-14). Reads the checkbox's real `.checked`
+ *  via `root.querySelector` — never the event target or a dataset value —
+ *  matching this file's established rule (`handleMemoryDeleteProject`'s
+ *  precedent) that a synthetic harness event must resolve through the real
+ *  DOM lookup rather than being trusted at face value. */
+export function handleLogsLiveToggle(ctx) {
+  const state = ctx.state || (ctx.state = {});
+  const el = ctx.root && ctx.root.querySelector ? ctx.root.querySelector('[data-action="logs-live-toggle"]') : null;
+  const checked = !!(el && el.checked);
+  state.logsLive = checked;
+  if (checked) {
+    runLogsLiveStream(ctx);
+  } else {
+    stopLogsLiveStream(ctx);
+  }
+}
+
+/** Export handler (design § 3f "Export"). A normal `fetch` carrying the
+ *  `x-api-key` header, then an object-URL anchor click — a plain `<a href>`
+ *  would send no header and 401. */
+export async function handleLogsExport(ctx) {
+  const state = ctx.state || (ctx.state = {});
+  const params = new URLSearchParams();
+  const fromIso = logsDatetimeLocalToIso(state.logsFrom);
+  const toIso = logsDatetimeLocalToIso(state.logsTo);
+  if (fromIso) params.set("from", fromIso);
+  if (toIso) params.set("to", toIso);
+  if (state.logsLevel) params.set("level", state.logsLevel);
+  if (state.logsQuery) params.set("q", state.logsQuery);
+  params.set("format", "jsonl");
+  const qs = params.toString();
+  try {
+    const headers = ctx.api && ctx.api.authHeaders ? ctx.api.authHeaders() : {};
+    const res = await fetch("/api/v1/logs/export" + (qs ? "?" + qs : ""), { headers });
+    if (!res || res.ok === false) {
+      const status = res && res.status ? " (" + res.status + ")" : "";
+      showBanner(ctx.root, "error", "Export failed" + status + ".");
+      return;
+    }
+    if (typeof res.blob !== "function" || typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
+      showBanner(ctx.root, "error", "Export failed: download unavailable in this environment.");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const disposition = res.headers && typeof res.headers.get === "function" ? res.headers.get("content-disposition") : null;
+    const match = disposition && /filename="([^"]+)"/.exec(disposition);
+    const filename = (match && match[1]) || "massa-ai-logs.jsonl";
+    const doc = ctx.doc;
+    const a = doc && doc.createElement ? doc.createElement("a") : null;
+    if (a) {
+      a.href = url;
+      a.download = filename;
+      if (doc.body && doc.body.appendChild) doc.body.appendChild(a);
+      if (typeof a.click === "function") a.click();
+      if (doc.body && doc.body.removeChild) doc.body.removeChild(a);
+    }
+    if (typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(url);
+  } catch (e) {
+    showBanner(ctx.root, "error", "Export failed: " + String((e && e.message) || e));
+  }
+}
+
 function startApp(opts) {
   opts = opts || {};
   const doc = opts.document || (typeof document !== "undefined" ? document : null);
@@ -2447,6 +2888,17 @@ function startApp(opts) {
     indexJobPhase: null,
     indexJobFileCount: null,
     indexPollInterval: null,
+    // Logs tab (design § 3f, LOG-13): from/to/level/q filters, the Live
+    // toggle, the streamed-entry accumulator, and the live stream's
+    // AbortController — the last two are populated by T15's handlers, not by
+    // this render path.
+    logsFrom: "",
+    logsTo: "",
+    logsLevel: "",
+    logsQuery: "",
+    logsLive: false,
+    logsEntries: [],
+    logsStreamAbort: null,
   };
   try {
     if (typeof localStorage !== "undefined") {
@@ -2469,7 +2921,7 @@ function startApp(opts) {
   }
   function viewFromHash(h) {
     const name = (h || "").replace(/^#\/?/, "");
-    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard", "config", "profiles", "model-registry"].includes(name)
+    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard", "logs", "config", "profiles", "model-registry"].includes(name)
       ? name
       : "projects";
   }
@@ -2493,6 +2945,10 @@ function startApp(opts) {
     setNavActive();
     // F4 fold: clear index poll interval when navigating away from projects
     if (state.view !== "projects") clearIndexPoll();
+    // T15 (LOG-14/15 teardown): abort any in-flight Logs live-tail stream
+    // when navigating away from the logs view — mirrors clearIndexPoll()'s
+    // discipline above.
+    if (state.view !== "logs") stopLogsLiveStream({ state });
     try {
       if (state.view === "projects") {
         const data = await api.request("/api/v1/project/list");
@@ -2518,7 +2974,11 @@ function startApp(opts) {
           body.minImportance = Number(state.memoryFilters.minImportance);
         if (state.project) body.projectId = state.project;
         const data = await api.request("/api/v1/memory/list", { method: "POST", body });
-        root.innerHTML = renderMemoryBrowser(data, { filters: state.memoryFilters });
+        root.innerHTML = renderMemoryBrowser(data, {
+          filters: state.memoryFilters,
+          project: state.project,
+          memoryBulkForm: state.memoryBulkForm,
+        });
       } else if (state.view === "search") {
         let data = null;
         if (state.searchQuery.trim()) {
@@ -2553,6 +3013,17 @@ function startApp(opts) {
       } else if (state.view === "dashboard") {
         const data = await fetchDashboardData(api);
         root.innerHTML = renderDashboard(data);
+      } else if (state.view === "logs") {
+        const params = new URLSearchParams();
+        const fromIso = logsDatetimeLocalToIso(state.logsFrom);
+        const toIso = logsDatetimeLocalToIso(state.logsTo);
+        if (fromIso) params.set("from", fromIso);
+        if (toIso) params.set("to", toIso);
+        if (state.logsLevel) params.set("level", state.logsLevel);
+        if (state.logsQuery) params.set("q", state.logsQuery);
+        const qs = params.toString();
+        const data = await api.request("/api/v1/logs" + (qs ? "?" + qs : ""));
+        root.innerHTML = renderLogs(data, state);
       } else if (state.view === "config") {
         const data = await api.request("/api/v1/config");
         if (data && data.success === false) {
@@ -2608,6 +3079,22 @@ function startApp(opts) {
     });
     root.querySelector('[data-action="memory-next"]')?.addEventListener("click", () => {
       state.memoryOffset += 50;
+      render();
+    });
+    // logs filters (T14, LOG-13). The Live toggle (`logs-live-toggle`) and
+    // Export button (`logs-export`) are wired below, in the ctx-scoped block
+    // (T15, LOG-14, LOG-15) — their handlers take `ctx`, like every other
+    // admin-portal handler, so they are unit-testable outside this closure.
+    root.querySelectorAll("[data-logs]").forEach((el) => {
+      el.addEventListener("change", () => {
+        const field = el.dataset.logs;
+        if (field === "from") state.logsFrom = el.value;
+        else if (field === "to") state.logsTo = el.value;
+        else if (field === "level") state.logsLevel = el.value;
+        else if (field === "q") state.logsQuery = el.value;
+      });
+    });
+    root.querySelector('[data-action="logs-refresh"]')?.addEventListener("click", () => {
       render();
     });
     // write mode: memory edit/delete
@@ -2733,6 +3220,33 @@ function startApp(opts) {
     });
     // admin-portal-enhancements: config save/reveal
     const ctx = { api, root, state, render, doc };
+    // admin-portal-ops-suite (T2, MBD-03..06): memory bulk-delete open/confirm/cancel
+    root.querySelectorAll('[data-action="memory-delete-project"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleMemoryDeleteProjectOpen(ctx);
+      });
+    });
+    root.querySelectorAll('[data-action="memory-delete-project-confirm"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleMemoryDeleteProject(ctx);
+      });
+    });
+    root.querySelectorAll('[data-action="memory-delete-project-cancel"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleMemoryDeleteProjectCancel(ctx);
+      });
+    });
+    // admin-portal-ops-suite (T15, LOG-14, LOG-15): Logs tab Live toggle +
+    // Export. `change`, not `click` — a checkbox's real signal — and the
+    // handler re-reads `.checked` from the DOM rather than trusting the
+    // event, so the fake-DOM harness's synthetic firing (a generic child
+    // whose `checked` is always falsy) can only ever turn Live off.
+    root.querySelector('[data-action="logs-live-toggle"]')?.addEventListener("change", () => {
+      handleLogsLiveToggle(ctx);
+    });
+    root.querySelector('[data-action="logs-export"]')?.addEventListener("click", () => {
+      handleLogsExport(ctx);
+    });
     root.querySelectorAll('[data-action="config-save"]').forEach((btn) => {
       btn.addEventListener("click", () => {
         const section = btn.dataset.section;
@@ -3026,6 +3540,10 @@ function startApp(opts) {
   themeToggle?.addEventListener("click", () => toggleTheme(doc));
   projectSelect?.addEventListener("change", () => {
     state.project = projectSelect.value;
+    // Edge case (spec P1-Bulk): a project change while the bulk-delete
+    // confirmation is open closes it without issuing a request — the typed
+    // value belonged to the previous project.
+    state.memoryBulkForm = null;
     render();
   });
   doc.querySelectorAll(".nav a").forEach((a) => {
@@ -3146,8 +3664,10 @@ const MASSA_AI_UI = {
   renderProposals,
   renderCheckpoints,
   renderDashboard,
+  renderLogs,
   renderConfig,
   buildConfigSectionBody,
+  collectConfigSectionFields,
   renderProfiles,
   renderModelRegistry,
   splitModelId,
@@ -3162,6 +3682,13 @@ const MASSA_AI_UI = {
   handleConfigSave,
   handleServerRestart,
   handleConfigReveal,
+  handleMemoryDeleteProjectOpen,
+  handleMemoryDeleteProjectCancel,
+  handleMemoryDeleteProject,
+  stopLogsLiveStream,
+  runLogsLiveStream,
+  handleLogsLiveToggle,
+  handleLogsExport,
   renderProfilesView,
   handleProfilesTabSwitch,
   handleProfileSwitch,

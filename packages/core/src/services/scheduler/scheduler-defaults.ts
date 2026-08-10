@@ -29,9 +29,18 @@
  * DELETE of already-expired rows, not an indexing job.
  */
 
-import { logger } from "@massa-ai/shared";
+import { loadConfigSafe, logger } from "@massa-ai/shared";
 import type { Scheduler } from "./scheduler.js";
 import type { JobKind, ScheduleSpec } from "./scheduler-types.js";
+
+/** Raw per-job file-config block (mirrors `SchedulerJobConfig` in
+ *  `packages/shared/src/config/massa-ai-config.ts`, which is not part of
+ *  `@massa-ai/shared`'s public export surface — duplicated as a minimal
+ *  local shape rather than widening that package's exports for one type). */
+interface FileSchedulerJob {
+  enabled?: boolean;
+  intervalMs?: number;
+}
 
 // ── Default intervals (conservative) ─────────────────────────────────────────
 
@@ -100,17 +109,58 @@ export const DEFAULT_SCHEDULED_JOBS: DefaultJobDef[] = [
   },
 ];
 
-function envBool(key: string, fallback: boolean): boolean {
+/**
+ * `env > config.json's raw scheduler.jobs[kind] > fallback` (SCH-02).
+ *
+ * `fileValue` is the raw, all-optional file-config value — deliberately NOT
+ * `config.get("scheduler")` from `@massa-ai/shared`, whose per-job
+ * `enabled`/`intervalMs` are already fully resolved (`env > file > false`) at
+ * that layer and therefore never `undefined`. Feeding that already-resolved
+ * value in as the "config" layer here would make `fallback` (this file's own
+ * `applySafeDefaults`/`DEFAULT_SCHEDULED_JOBS` literal) unreachable.
+ *
+ * A *defined* env value that is neither "true" nor "1" resolves to `false`
+ * directly (unchanged from the pre-T5 behavior) — it does not fall through
+ * to `fileValue`. Only an *unset* env var consults the file layer.
+ */
+function envBool(key: string, fileValue: boolean | undefined, fallback: boolean): boolean {
   const raw = process.env[key];
-  if (raw === undefined) return fallback;
+  if (raw === undefined) return fileValue ?? fallback;
   return raw === "true" || raw === "1";
 }
 
-function envNum(key: string, fallback: number): number {
+/**
+ * `env > config.json's raw scheduler.jobs[kind] > fallback` (SCH-02). An
+ * unset, empty, or invalid (non-finite / non-positive) env value all fall
+ * through to `fileValue`, then `fallback` — unchanged observable behavior
+ * from the pre-T5 two-arg form for every case with no file layer present
+ * (every existing test), and consistent with the design's `??` chain when a
+ * file layer *is* present.
+ */
+function envNum(key: string, fileValue: number | undefined, fallback: number): number {
   const raw = process.env[key];
-  if (raw === undefined || raw === "") return fallback;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
+  if (raw !== undefined && raw !== "") {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return fileValue ?? fallback;
+}
+
+/**
+ * Never-throwing accessor for the raw file-config `scheduler.jobs` block
+ * (SCH-06) — mirrors `packages/shared/src/config/index.ts`'s own
+ * `readSchedulerConfig()` wrapper, reading `config.json` fresh via
+ * `loadConfigSafe()` (itself never-throwing) rather than the eagerly
+ * resolved `config.get("scheduler")` singleton (see `envBool`/`envNum`
+ * above for why that distinction matters here).
+ */
+function readFileSchedulerJobs(): Record<string, FileSchedulerJob> | undefined {
+  try {
+    const raw = loadConfigSafe().scheduler?.jobs;
+    return raw as Record<string, FileSchedulerJob> | undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -125,7 +175,9 @@ function envNum(key: string, fallback: number): number {
  * NOT as a separate export (silent no-op if caller forgets).
  */
 function applySafeDefaults(job: DefaultJobDef): DefaultJobDef {
-  if (!envBool("MASSA_AI_SCHEDULER_SAFE_DEFAULTS", false)) {
+  // No file-config middle layer for the preset switch itself — it stays a
+  // pure env toggle (env > literal), unchanged from before this task.
+  if (!envBool("MASSA_AI_SCHEDULER_SAFE_DEFAULTS", undefined, false)) {
     return job;
   }
   if (job.jobKind === "memory-consolidation") {
@@ -216,14 +268,23 @@ export function registerDefaultJobs(scheduler: Scheduler): void {
 
   // ── Default job definitions ───────────────────────────────────────────────
 
+  // One read of the raw file config for all five kinds (SCH-02) — cheaper
+  // than a per-kind disk read, and `readFileSchedulerJobs()` never throws.
+  const fileJobs = readFileSchedulerJobs();
+
   for (const rawDef of DEFAULT_SCHEDULED_JOBS) {
     // Apply the safe-defaults preset BEFORE the envBool loop reads
     // `defaultEnabled`. This ensures the preset is wired into the registration
-    // path (pre-mortem F5: not a separate export).
+    // path (pre-mortem F5: not a separate export). `applySafeDefaults` keeps
+    // its current position: it runs BEFORE the literal default is read, so
+    // MASSA_AI_SCHEDULER_SAFE_DEFAULTS still preloads consolidation + decay
+    // while both env and config.json still win over the preset.
     const def = applySafeDefaults(rawDef);
-    const enabled = envBool(def.enableEnvVar, def.defaultEnabled);
+    const fileJob = fileJobs?.[def.jobKind];
+    const enabled = envBool(def.enableEnvVar, fileJob?.enabled, def.defaultEnabled);
     const intervalMs = envNum(
       def.intervalEnvVar,
+      fileJob?.intervalMs,
       def.schedule.intervalMs ?? THIRTY_MIN,
     );
     const schedule: ScheduleSpec = { type: "interval", intervalMs };

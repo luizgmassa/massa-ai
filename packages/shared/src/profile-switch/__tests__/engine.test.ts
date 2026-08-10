@@ -51,6 +51,31 @@ function writeState(h: string, state: unknown): string {
   return p;
 }
 
+/** Stages `<h>/.claude/plugins/installed_plugins.json` naming `installPath`
+ * as the single "user"-scoped record for the massa-ai plugin — the fixture
+ * `resolveClaudeMarketplaceRoot` (claude-marketplace.test.ts's own subject)
+ * reads. Does NOT create `installPath` itself — callers stage that
+ * separately so a test can exercise the "path missing on disk" case too. */
+function stageMarketplaceRegistry(h: string, installPath: string): void {
+  const registryPath = path.join(h, ".claude", "plugins", "installed_plugins.json");
+  fs.mkdirSync(path.dirname(registryPath), { recursive: true });
+  fs.writeFileSync(
+    registryPath,
+    JSON.stringify(
+      {
+        version: 1,
+        plugins: {
+          "massa-ai@massa-ai": [
+            { scope: "user", installPath, version: "1.0.0", installedAt: "2026-01-01T00:00:00Z", lastUpdated: "2026-01-01T00:00:00Z" },
+          ],
+        },
+      },
+      null,
+      2,
+    ),
+  );
+}
+
 describe("listProfiles", () => {
   test("lists available profiles per host purely from on-disk variant dirs, no registry access", () => {
     stageVariant(home, "claude", "balanced", { "massa-ai-planner.md": "b" });
@@ -296,7 +321,12 @@ describe("switchProfile — Error Handling Strategy: marketplace-route refusal (
     expect(fs.readFileSync(activeFile, "utf-8")).toBe("sonnet"); // untouched
   });
 
-  test('installRoute "marketplace" refuses with dev-path guidance', () => {
+  // T18/CPP-06: claude+marketplace now PROCEEDS when the install root
+  // resolves (see the dedicated "Claude marketplace parity" describe block
+  // below) — this fixture stages no `installed_plugins.json`, so the root is
+  // genuinely unresolvable and the failure below is CPP-06's "unresolved
+  // path" reason, not the pre-T18 blanket marketplace refusal.
+  test('installRoute "marketplace" with no resolvable install root fails, naming the unresolved registry path', () => {
     stageVariant(home, "claude", "work", { "massa-ai-planner.md": "opus" });
     stageActive(home, "claude", { "massa-ai-planner.md": "sonnet" });
     writeState(home, {
@@ -307,6 +337,97 @@ describe("switchProfile — Error Handling Strategy: marketplace-route refusal (
     const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
     expect(report.hosts[0].status).toBe("failed");
     expect(report.hosts[0].reason).toMatch(/marketplace/i);
+    expect(report.hosts[0].reason).toContain(path.join(home, ".claude", "plugins", "installed_plugins.json"));
+    // Never falls back to the $HOME-derived file-route path (CPP-06) — the
+    // staged ~/.claude/agents/massa-ai-planner.md is untouched.
+    const activeFile = path.join(layoutFor(home, "claude").activeDir, "massa-ai-planner.md");
+    expect(fs.readFileSync(activeFile, "utf-8")).toBe("sonnet");
+  });
+});
+
+describe("Claude marketplace parity (T18, CPP-03..06)", () => {
+  test("(CPP-03) listProfiles reports installed:true + variants from the resolved marketplace root", () => {
+    const cacheRoot = path.join(home, ".claude", "plugins", "cache", "massa-ai", "massa-ai", "1.0.0");
+    fs.mkdirSync(path.join(cacheRoot, "agent-profiles", "balanced"), { recursive: true });
+    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "balanced", "massa-ai-planner.md"), "b");
+    fs.mkdirSync(path.join(cacheRoot, "agents"), { recursive: true });
+    stageMarketplaceRegistry(home, cacheRoot);
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
+    });
+
+    const inv = listProfiles({ targetHome: home });
+    const claude = inv.hosts.find((h) => h.host === "claude")!;
+    expect(claude.installed).toBe(true);
+    expect(claude.availableProfiles).toEqual(["balanced"]);
+  });
+
+  test("(CPP-06) listProfiles reports installed:false + no variants when the marketplace root is unresolvable", () => {
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
+    });
+    // No installed_plugins.json staged — root genuinely unresolvable.
+
+    const inv = listProfiles({ targetHome: home });
+    const claude = inv.hosts.find((h) => h.host === "claude")!;
+    expect(claude.installed).toBe(false);
+    expect(claude.availableProfiles).toEqual([]);
+  });
+
+  test("(CPP-04) switchProfile on a resolved marketplace root copies into <root>/agents and records modelProfile only after the copy", () => {
+    const cacheRoot = path.join(home, ".claude", "plugins", "cache", "massa-ai", "massa-ai", "2.0.0");
+    fs.mkdirSync(path.join(cacheRoot, "agent-profiles", "work"), { recursive: true });
+    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "work", "massa-ai-planner.md"), "opus");
+    fs.mkdirSync(path.join(cacheRoot, "agents"), { recursive: true });
+    fs.writeFileSync(path.join(cacheRoot, "agents", "massa-ai-planner.md"), "sonnet");
+    stageMarketplaceRegistry(home, cacheRoot);
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
+    });
+
+    const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
+    expect(report.hosts[0].status).toBe("switched");
+    expect(report.hosts[0].filesChanged).toBe(1);
+    expect(fs.readFileSync(path.join(cacheRoot, "agents", "massa-ai-planner.md"), "utf-8")).toBe("opus");
+
+    const stateAfter = JSON.parse(fs.readFileSync(statePath(home), "utf-8"));
+    expect(stateAfter.platforms.claude.modelProfile.profile).toBe("work");
+    // Never wrote the $HOME-derived file-route path.
+    expect(fs.existsSync(path.join(home, ".claude", "agents"))).toBe(false);
+  });
+
+  test("(CPP-05) re-switching to the already-active marketplace profile still reports switched with a file count, never an error", () => {
+    const cacheRoot = path.join(home, ".claude", "plugins", "cache", "massa-ai", "massa-ai", "3.0.0");
+    fs.mkdirSync(path.join(cacheRoot, "agent-profiles", "cheap"), { recursive: true });
+    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "cheap", "massa-ai-planner.md"), "haiku");
+    fs.mkdirSync(path.join(cacheRoot, "agents"), { recursive: true });
+    stageMarketplaceRegistry(home, cacheRoot);
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
+    });
+
+    switchProfile({ profile: "cheap", host: "claude", targetHome: home });
+    const report = switchProfile({ profile: "cheap", host: "claude", targetHome: home });
+    expect(report.hosts[0].status).toBe("switched");
+    expect(report.hosts[0].filesChanged).toBe(1);
+  });
+
+  test("codex marketplace-route switch still refuses even after the host-aware detectRoute wiring, reason names codex only", () => {
+    stageVariant(home, "codex", "work", { "massa-ai-planner.toml": "opus" });
+    stageActive(home, "codex", { "massa-ai-planner.toml": "sonnet" });
+    writeState(home, {
+      version: 2,
+      platforms: { codex: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
+    });
+
+    const report = switchProfile({ profile: "work", host: "codex", targetHome: home });
+    expect(report.hosts[0].status).toBe("failed");
+    expect(report.hosts[0].reason).toMatch(/codex/i);
+    expect(report.hosts[0].reason).not.toMatch(/claude/i);
   });
 });
 

@@ -36,6 +36,29 @@ function writeState(h: string, state: unknown): void {
   fs.writeFileSync(p, JSON.stringify(state, null, 2) + "\n");
 }
 
+/** Mirrors engine.test.ts's fixture: stages `<h>/.claude/plugins/
+ * installed_plugins.json` naming `installPath` as the single "user"-scoped
+ * record for the massa-ai plugin. */
+function stageMarketplaceRegistry(h: string, installPath: string): void {
+  const registryPath = path.join(h, ".claude", "plugins", "installed_plugins.json");
+  fs.mkdirSync(path.dirname(registryPath), { recursive: true });
+  fs.writeFileSync(
+    registryPath,
+    JSON.stringify(
+      {
+        version: 1,
+        plugins: {
+          "massa-ai@massa-ai": [
+            { scope: "user", installPath, version: "1.0.0", installedAt: "2026-01-01T00:00:00Z", lastUpdated: "2026-01-01T00:00:00Z" },
+          ],
+        },
+      },
+      null,
+      2,
+    ),
+  );
+}
+
 function layoutFor(host: Host): HostFileLayout {
   const layout = resolveHostLayout(host, { targetHome: home });
   if (layout.route !== "files") throw new Error(`expected files route for ${host}`);
@@ -207,5 +230,43 @@ describe("syncGeneratedVariants", () => {
     } finally {
       fs.chmodSync(claudeDest, 0o700);
     }
+  });
+
+  // ── T18 (CPP-03..06): the regenerate bridge composes the resolved claude
+  // marketplace root so it writes into the cache bundle's agent-profiles/,
+  // not the $HOME-derived path a plain (non-marketplace) install would use.
+
+  test("(T18) a resolved marketplace root redirects the sync into the cache bundle's agent-profiles/", () => {
+    const cacheRoot = path.join(home, ".claude", "plugins", "cache", "massa-ai", "massa-ai", "1.0.0");
+    fs.mkdirSync(path.join(cacheRoot, "agent-profiles", "balanced"), { recursive: true });
+    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "balanced", "massa-ai-x.md"), "v0");
+    stageMarketplaceRegistry(home, cacheRoot);
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
+    });
+    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
+
+    const results = syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
+
+    expect(results[0].status).toBe("synced");
+    expect(results[0].files).toBe(1);
+    expect(fs.readFileSync(path.join(cacheRoot, "agent-profiles", "balanced", "massa-ai-x.md"), "utf8")).toBe("v1");
+    // Never wrote the $HOME-derived (non-marketplace) path.
+    expect(fs.existsSync(path.join(home, ".claude", "massa-ai"))).toBe(false);
+  });
+
+  test("(T18) an unresolvable marketplace root falls through to the ordinary F6 skip, never throws", () => {
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
+    });
+    // No installed_plugins.json staged — root genuinely unresolvable.
+    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
+
+    const results = syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
+
+    expect(results[0].status).toBe("skipped");
+    expect(results[0].reason).toContain("variant tree not present");
   });
 });

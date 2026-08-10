@@ -1,6 +1,31 @@
 import path from "path";
 import { configDir } from "./xdg";
 
+/** Registered scheduler job kinds exposed on the config surface. The row ids
+ *  (`scheduled-*`) stay an implementation detail; the kind is the contract
+ *  shared by handler registration and the env var names. */
+export const SCHEDULER_JOB_KINDS = [
+  "memory-consolidation",
+  "decay-sweep",
+  "auto-improve",
+  "observation-bridge",
+  "checkpoint-purge",
+] as const;
+
+export interface SchedulerJobConfig {
+  enabled?: boolean;
+  /** Interval between runs. Cron is deliberately not exposed here — see spec
+   *  Out of Scope. */
+  intervalMs?: number;
+}
+
+export interface SchedulerConfig {
+  enabled?: boolean;
+  tickMs?: number;
+  maxConcurrent?: number;
+  jobs?: Partial<Record<(typeof SCHEDULER_JOB_KINDS)[number], SchedulerJobConfig>>;
+}
+
 export interface MassaAiConfig {
   database?: {
     // Optional DATABASE_URL home (secret). Seeded into process.env at runtime
@@ -51,11 +76,22 @@ export interface MassaAiConfig {
     level: "debug" | "info" | "warn" | "error";
     enableMetrics: boolean;
     /**
-     * Optional absolute path to additionally append log lines to. Opt-in;
-     * unset means stderr-only (unchanged default behavior). Overridden by
+     * Optional absolute path to append log lines to. Empty or absent means
+     * "use the default path" (`<dataDir>/logs/massa-ai.log`) — it must NOT be
+     * read as "disable the sink" (LOG-02 / pre-mortem #1). Overridden by
      * MASSA_AI_LOG_FILE (env > config, matching the `level` precedence).
+     * Disabling the sink is the explicit `enableFileSink: false` below, the
+     * ONLY way to do so.
      */
     file?: string;
+    /** The ONLY way to disable the file sink (LOG-02 AC 2b). Default `true`. */
+    enableFileSink?: boolean;
+    /** In-process ring-buffer capacity (LOG-01). Default 2000. */
+    bufferSize?: number;
+    /** Rotate the sink once it exceeds this size in MB (LOG-07). Default 32. */
+    maxFileSizeMb?: number;
+    /** Rotated files retained alongside the live file (LOG-07). Default 5. */
+    maxFiles?: number;
   };
   // Keys below mirror the runtime ServerConfig declarations (index.ts) so the
   // interface describes what the loader/runtime actually produces. See
@@ -149,8 +185,16 @@ export interface MassaAiConfig {
     // load time because it would silently index nothing.
     allowedExtensions?: string[];
   };
-  // NOTE: `scheduler` is intentionally NOT a config key — it is env-driven
-  // (MASSA_AI_SCHEDULER_ENABLED + job-stale/reaper env vars). Do not add it.
+  // REVERSED 2026-08-09 (user, feature `admin-portal-ops-suite`, AD-020): this
+  // key previously read "`scheduler` is intentionally NOT a config key — it is
+  // env-driven (MASSA_AI_SCHEDULER_ENABLED + job-stale/reaper env vars). Do not
+  // add it." The env-only surface is unreachable for a packaged install (no
+  // supported way to turn periodic jobs on without setting process env vars),
+  // so `scheduler` is now a first-class `config.json` section, resolved
+  // `env > config.json > literal default` in `config/index.ts` (SCH-01..03,
+  // SCH-06) exactly like every other section — this comment records the
+  // reversal rather than silently deleting the prior decision.
+  scheduler?: SchedulerConfig;
 }
 
 /**
