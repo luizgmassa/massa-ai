@@ -46,6 +46,7 @@ import { configRoutes } from "./routes/config.js";
 import { modelRegistryRoutes } from "./routes/model-registry.js";
 import { modelRegistryStreamRoutes } from "./routes/model-registry-stream.js";
 import { restartRoutes } from "./routes/restart.js";
+import { logsRoutes } from "./routes/logs.js";
 import { setServerStopper, setJobsStopper, gracefulShutdown } from "./lifecycle.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
@@ -111,6 +112,7 @@ const app = new Elysia({ adapter: node() })
           { name: "web", description: "SSRF-guarded web fetch + HTML→md + index (fetch_and_index)" },
           { name: "webUi", description: "Read-only memory/search web browser (Phase 8)" },
           { name: "profiles", description: "Model-profile switch: list shipped profiles, switch installed agents" },
+          { name: "logs", description: "Log read: range/level/substring query, export, live SSE tail" },
         ],
         components: {
           securitySchemes: {
@@ -153,6 +155,7 @@ const app = new Elysia({ adapter: node() })
   .use(modelRegistryRoutes)
   .use(modelRegistryStreamRoutes)
   .use(restartRoutes)
+  .use(logsRoutes)
   .get("/health", () => buildHealthResponse(getParserReadiness()));
 
 // SEC-01: resolve (and if necessary provision) the API key BEFORE the port
