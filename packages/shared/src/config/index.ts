@@ -1291,4 +1291,12 @@ export {
 
 // Integer env-var parser — fixes the falsy-`0` footgun in `Number(env) || d`.
 export { parsePositiveIntEnv } from "./int-env";
+
+export {
+  resolveEmbeddingDimensions,
+  knownEmbeddingDimensions,
+  knownEmbeddingModels,
+  DEFAULT_EMBEDDING_DIMENSIONS,
+  type ResolvedEmbeddingDimensions,
+} from "./embedding-dimensions";
 export type { ParseIntEnvOptions } from "./int-env";

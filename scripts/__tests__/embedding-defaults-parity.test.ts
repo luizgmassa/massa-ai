@@ -53,9 +53,20 @@ function referencePair(): { model: string; dims: string } {
 
   // Second defining module must agree — a drift between the two reference
   // sources is itself a defect this test should catch.
+  //
+  // That module used to be `embeddings/config.ts`, keyed on its `?? <dims>`
+  // literal. The literal is gone: the ollama width now resolves through
+  // `resolveEmbeddingDimensions`, so config.ts names no width at all and the
+  // canonical model→width statement moved to `embedding-dimensions.ts`. A
+  // repoint rather than a relaxation — a sweep whose anchor its own subject
+  // deleted reports a clean population it can no longer see, so this asserts
+  // against the table that now holds the fact.
+  const table = read("packages/shared/src/config/embedding-dimensions.ts");
+  expect(table).toContain(`"${model}": ${dims}`);
+  // config.ts must still name the model default even though it no longer
+  // names a width, so a model change there cannot pass unnoticed.
   const core = read("packages/core/src/services/embeddings/config.ts");
   expect(core).toContain(`"${model}"`);
-  expect(core).toContain(`?? ${dims}`);
   return { model, dims };
 }
 
@@ -277,5 +288,46 @@ describe("embedding defaults parity (EDC-06)", () => {
     expect(`${[...distinct].join(" vs ")} across ${pairs.length} writers`).toBe(
       `${ref.model}/${ref.dims} across ${pairs.length} writers`,
     );
+  });
+
+  /**
+   * The model→width table exists twice — in bash for the installers, in
+   * TypeScript for the runtime — because a shell installer cannot import a
+   * module. That is the same duplication shape that produced the original
+   * 4096/2560 defect, so the two are compared to EACH OTHER rather than each
+   * being checked against the reference separately: two tables can both be
+   * internally consistent while disagreeing, which is exactly how the two
+   * config CLIs above drifted for a release.
+   */
+  test("the bash and TypeScript model→width tables are the same table", () => {
+    const shellBody = /installer_embedding_dimensions\(\)\s*\{[\s\S]*?\n\}/.exec(
+      read("scripts/lib/installer-api-key.sh"),
+    )?.[0];
+    expect(shellBody).toBeDefined();
+    const shellPairs: Record<string, number> = {};
+    for (const m of shellBody!.matchAll(/^\s*([A-Za-z0-9._:-]+)\)\s*echo\s+(\d+)\s*;;/gm)) {
+      shellPairs[m[1]!] = Number(m[2]);
+    }
+
+    const tsBody = /KNOWN_EMBEDDING_DIMENSIONS[^=]*=\s*\{([\s\S]*?)\n\};/.exec(
+      read("packages/shared/src/config/embedding-dimensions.ts"),
+    )?.[1];
+    expect(tsBody).toBeDefined();
+    const tsPairs: Record<string, number> = {};
+    for (const m of tsBody!.matchAll(/"([^"]+)":\s*(\d+)/g)) {
+      tsPairs[m[1]!] = Number(m[2]);
+    }
+
+    // Both populations printed beside the verdict: a regex that silently
+    // matched nothing would otherwise read as two agreeing empty tables.
+    console.log(
+      `[parity] model→width entries — bash ${Object.keys(shellPairs).length}, ` +
+        `TypeScript ${Object.keys(tsPairs).length}`,
+    );
+    expect(Object.keys(shellPairs).length).toBeGreaterThan(2);
+    // Exact set equality, so a model added to one table and not the other is
+    // as red as a changed width.
+    expect(tsPairs).toEqual(shellPairs);
+    expect(tsPairs[ref.model]).toBe(Number(ref.dims));
   });
 });
