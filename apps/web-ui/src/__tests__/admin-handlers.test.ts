@@ -16,6 +16,9 @@ const {
   showBanner,
   handleConfigSave,
   handleConfigReveal,
+  handleMemoryDeleteProjectOpen,
+  handleMemoryDeleteProjectCancel,
+  handleMemoryDeleteProject,
   handleProfileSwitch,
   handleProfilesTabSwitch,
   handleRegistryCellEdit,
@@ -44,6 +47,9 @@ const {
   showBanner: (root: MockRoot, type: string, message: string, opts?: { persist?: boolean }) => MockElement;
   handleConfigSave: (ctx: any, section: string) => Promise<void>;
   handleConfigReveal: (ctx: any, targetId: string, section?: string, field?: string) => Promise<void>;
+  handleMemoryDeleteProjectOpen: (ctx: any) => void;
+  handleMemoryDeleteProjectCancel: (ctx: any) => void;
+  handleMemoryDeleteProject: (ctx: any) => Promise<void>;
   handleProfileSwitch: (ctx: any, profile: string, host: string) => Promise<void>;
   handleProfilesTabSwitch: (ctx: any, tab: string) => void;
   handleRegistryCellEdit: (ctx: any, profile: string, host: string, tier: string, field: string, value: string | null) => void;
@@ -138,6 +144,10 @@ function makeRoot(children: MockElement[] = []): MockRoot {
         if (sel.startsWith("[data-target=")) {
           const val = sel.match(/data-target="([^"]+)"/)?.[1] || "";
           return c.dataset["target"] === val;
+        }
+        if (sel.startsWith("[data-bulk=")) {
+          const val = sel.match(/data-bulk="([^"]+)"/)?.[1] || "";
+          return c.dataset["bulk"] === val;
         }
         return false;
       });
@@ -402,6 +412,134 @@ describe("handleConfigReveal — toggle input type + fetch real value (CFG-06, C
     await handleConfigReveal(ctx, "config-database-url", "database", "url");
     expect(input.type).toBe("password");
     expect(input.value).toBe("postgres://real");
+  });
+});
+
+// ── Memory bulk delete (MBD-03..06, T2) ───────────────────────────────────────
+
+function makeConfirmIdInput(value: string): MockElement {
+  return makeInput({ bulk: "confirm-id" }, "text", value);
+}
+
+describe("handleMemoryDeleteProjectOpen / handleMemoryDeleteProjectCancel — form open/close (MBD-04)", () => {
+  it("open sets state.memoryBulkForm and re-renders", () => {
+    const render = mock(() => {});
+    const ctx = makeCtx({ state: { project: "proj-a" }, render });
+    handleMemoryDeleteProjectOpen(ctx);
+    expect(ctx.state.memoryBulkForm).toEqual({ error: null });
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("cancel clears state.memoryBulkForm and re-renders, issuing no request", () => {
+    const request = mock(async () => ({ success: true }));
+    const render = mock(() => {});
+    const ctx = makeCtx({ state: { project: "proj-a", memoryBulkForm: { error: null } }, api: { request }, render });
+    handleMemoryDeleteProjectCancel(ctx);
+    expect(ctx.state.memoryBulkForm).toBeNull();
+    expect(render).toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleMemoryDeleteProject — typed-match guard, request body, results (MBD-03..06)", () => {
+  it("POSTs the exact request body on an exact typed match", async () => {
+    const request = mock(async () => ({ success: true, data: { projectId: "proj-a", memoriesDeleted: 7 } }));
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("proj-a")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(request).toHaveBeenCalledTimes(1);
+    const call = request.mock.calls[0] as any[];
+    expect(call[0]).toBe("/api/v1/project/reset");
+    expect(call[1]).toEqual({
+      method: "POST",
+      body: { projectId: "proj-a", clearVectors: false, clearSymbols: false, clearMemories: true },
+    });
+  });
+
+  it("displays memoriesDeleted and re-renders on success, closing the form", async () => {
+    const request = mock(async () => ({ success: true, data: { projectId: "proj-a", memoriesDeleted: 7 } }));
+    const render = mock(() => {});
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("proj-a")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+      render,
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(ctx.root.children[0].textContent).toContain("7");
+    expect(ctx.state.memoryBulkForm).toBeNull();
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("a mismatched typed value renders the exact error and issues ZERO api.request calls (MBD-05 discriminating case)", async () => {
+    const request = mock(async () => ({ success: true }));
+    const render = mock(() => {});
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("wrong-id")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+      render,
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(request).not.toHaveBeenCalled();
+    expect(ctx.state.memoryBulkForm).toEqual({ error: "Project id does not match." });
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("bails with no request and no render when the confirm-id input is absent", async () => {
+    const request = mock(async () => ({ success: true }));
+    const render = mock(() => {});
+    const ctx = makeCtx({
+      rootChildren: [],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+      render,
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(request).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("success:false renders the returned errors and claims no deletion", async () => {
+    const request = mock(async () => ({ success: false, data: {}, errors: ["memories: db unavailable"] }));
+    const render = mock(() => {});
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("proj-a")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+      render,
+    });
+    await handleMemoryDeleteProject(ctx);
+    expect(ctx.root.children[0].textContent).toContain("db unavailable");
+    expect(ctx.root.children[0].textContent).not.toMatch(/deleted \d/i);
+    expect(ctx.state.memoryBulkForm).toEqual({ error: "memories: db unavailable" });
+    expect(render).toHaveBeenCalled();
+  });
+
+  it("re-entrancy guard: a second call while in flight issues no second request", async () => {
+    let resolveFirst: (() => void) | undefined;
+    const request = mock(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = () => resolve({ success: true, data: { memoriesDeleted: 1 } });
+        }),
+    );
+    const ctx = makeCtx({
+      rootChildren: [makeConfirmIdInput("proj-a")],
+      state: { project: "proj-a", memoryBulkForm: { error: null } },
+      api: { request },
+    });
+    const firstCall = handleMemoryDeleteProject(ctx);
+    // The in-flight flag is set synchronously before the first await yields.
+    expect(ctx.state.memoryBulkDeleteInFlight).toBe(true);
+    await handleMemoryDeleteProject(ctx);
+    expect(request).toHaveBeenCalledTimes(1);
+    resolveFirst?.();
+    await firstCall;
+    expect(ctx.state.memoryBulkDeleteInFlight).toBe(false);
   });
 });
 

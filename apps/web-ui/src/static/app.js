@@ -1882,6 +1882,78 @@ export async function handleConfigReveal(ctx, targetId, section, field) {
   }
 }
 
+/** Opens the inline bulk-delete confirmation form (MBD-04): T1's
+ *  `renderMemoryBulkDelete` renders the retype-to-confirm form only while
+ *  `state.memoryBulkForm` is truthy. */
+export function handleMemoryDeleteProjectOpen(ctx) {
+  ctx.state.memoryBulkForm = { error: null };
+  ctx.render();
+}
+
+/** Closes the inline bulk-delete confirmation form without issuing any
+ *  request (MBD-04). */
+export function handleMemoryDeleteProjectCancel(ctx) {
+  ctx.state.memoryBulkForm = null;
+  ctx.render();
+}
+
+/** Bulk-delete confirm handler (design "1. Memory bulk delete (MBD)",
+ *  MBD-03..06). The typed confirmation value is read from
+ *  `[data-bulk="confirm-id"]` — NEVER from `btn.dataset` — because the
+ *  fake-DOM harness's synthetic `startApp` clicks fire every registered
+ *  `data-action` handler against a generic child whose dataset carries none
+ *  of this form's keys. Reading through the DOM lookup means a genuinely
+ *  absent/mismatched value fails the exact-match guard instead of reading a
+ *  stale or empty dataset property as a false confirmation.
+ *
+ *  The in-flight guard lives on `ctx.state`, never module scope —
+ *  `handleServerRestart`'s recorded precedent (a module-level flag latched by
+ *  one harness's never-resolving request would disable the handler for every
+ *  later caller in the same process). */
+export async function handleMemoryDeleteProject(ctx) {
+  const state = ctx.state || (ctx.state = {});
+  if (state.memoryBulkDeleteInFlight) return;
+
+  const input = ctx.root && ctx.root.querySelector ? ctx.root.querySelector('[data-bulk="confirm-id"]') : null;
+  if (!input) return;
+
+  const typed = input.value;
+  const project = state.project;
+  if (typed !== project) {
+    state.memoryBulkForm = { error: "Project id does not match." };
+    ctx.render();
+    return;
+  }
+
+  state.memoryBulkDeleteInFlight = true;
+  try {
+    const res = await ctx.api.request("/api/v1/project/reset", {
+      method: "POST",
+      body: { projectId: project, clearVectors: false, clearSymbols: false, clearMemories: true },
+    });
+    if (res && res.success === false) {
+      const errors = Array.isArray(res.errors) ? res.errors : [];
+      const message = errors.length > 0 ? errors.join("; ") : (res.error || "Bulk delete failed.");
+      state.memoryBulkForm = { error: message };
+      showBanner(ctx.root, "error", "Bulk delete failed: " + message);
+      ctx.render();
+      return;
+    }
+    const data = (res && res.data) || {};
+    const deleted = data.memoriesDeleted != null ? data.memoriesDeleted : 0;
+    state.memoryBulkForm = null;
+    showBanner(ctx.root, "success", "Deleted " + String(deleted) + " memories for " + project + ".");
+    ctx.render();
+  } catch (e) {
+    const message = String((e && e.message) || e);
+    state.memoryBulkForm = { error: message };
+    showBanner(ctx.root, "error", "Bulk delete failed: " + message);
+    ctx.render();
+  } finally {
+    state.memoryBulkDeleteInFlight = false;
+  }
+}
+
 // ── Profiles tab switcher + switch handler (Component 2) ─────────────────────
 
 const PROFILES_TAB_STORAGE_KEY = "massa-ai-profiles-tab";
@@ -2560,7 +2632,11 @@ function startApp(opts) {
           body.minImportance = Number(state.memoryFilters.minImportance);
         if (state.project) body.projectId = state.project;
         const data = await api.request("/api/v1/memory/list", { method: "POST", body });
-        root.innerHTML = renderMemoryBrowser(data, { filters: state.memoryFilters });
+        root.innerHTML = renderMemoryBrowser(data, {
+          filters: state.memoryFilters,
+          project: state.project,
+          memoryBulkForm: state.memoryBulkForm,
+        });
       } else if (state.view === "search") {
         let data = null;
         if (state.searchQuery.trim()) {
@@ -2775,6 +2851,22 @@ function startApp(opts) {
     });
     // admin-portal-enhancements: config save/reveal
     const ctx = { api, root, state, render, doc };
+    // admin-portal-ops-suite (T2, MBD-03..06): memory bulk-delete open/confirm/cancel
+    root.querySelectorAll('[data-action="memory-delete-project"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleMemoryDeleteProjectOpen(ctx);
+      });
+    });
+    root.querySelectorAll('[data-action="memory-delete-project-confirm"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleMemoryDeleteProject(ctx);
+      });
+    });
+    root.querySelectorAll('[data-action="memory-delete-project-cancel"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleMemoryDeleteProjectCancel(ctx);
+      });
+    });
     root.querySelectorAll('[data-action="config-save"]').forEach((btn) => {
       btn.addEventListener("click", () => {
         const section = btn.dataset.section;
@@ -3068,6 +3160,10 @@ function startApp(opts) {
   themeToggle?.addEventListener("click", () => toggleTheme(doc));
   projectSelect?.addEventListener("change", () => {
     state.project = projectSelect.value;
+    // Edge case (spec P1-Bulk): a project change while the bulk-delete
+    // confirmation is open closes it without issuing a request — the typed
+    // value belonged to the previous project.
+    state.memoryBulkForm = null;
     render();
   });
   doc.querySelectorAll(".nav a").forEach((a) => {
@@ -3204,6 +3300,9 @@ const MASSA_AI_UI = {
   handleConfigSave,
   handleServerRestart,
   handleConfigReveal,
+  handleMemoryDeleteProjectOpen,
+  handleMemoryDeleteProjectCancel,
+  handleMemoryDeleteProject,
   renderProfilesView,
   handleProfilesTabSwitch,
   handleProfileSwitch,
