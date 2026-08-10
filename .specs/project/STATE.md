@@ -39,7 +39,55 @@
   file-route migration runbook lives in HANDOFF.
 
 
-## Admin Portal UX Overhaul (**VALIDATED PASS 2026-08-09** — T1-T15 + 2 fix loops, 18 commits + validation close-out; push/PR authorized)
+
+## workflow-interaction-policies (2026-08-09)
+
+- **Objective**: land the operator's interaction-policy directives across the
+  spec-driven/TDD/design workflows — hard-cap spec-driven batch workers at max 3
+  tasks/worker (ideal 2), enforce phase sizing to the same budget from Tasks time
+  (with a `validate_tasks.ts` ERROR gate), remove every numeric per-turn question
+  cap across spec-driven/TDD/design in favor of an ask-first-for-important-decisions
+  stance, and add a pre-implementation change-summary stage (Stage 1.5 — Summarize)
+  to `implementation-delivery.md`.
+- projectId: `massa-ai` · workflowSessionId: `spec-workflow-interaction-policies` ·
+  workflow: spec-driven · branch `spec/workflow-interaction-policies`, worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-workflow-interaction-policies`. 4 batch
+  workers split the 9 tasks across 4 phases (`4 Phases = 9 Tasks`, phases sized to
+  the new rule: max 3 tasks each); this close-out is Batch Worker 4 (T7, T9, T8).
+- Contract: `.specs/features/workflow-interaction-policies/{spec,design,tasks}.md`.
+- Commits so far: `af1b24d7` spec+design+tasks → `99aed979` T1 sub-agents.md
+  packing budget → `79752fdd` T2 tasks.md phase-granularity rule → `f0caf90b` T3
+  execute.md budget mirrors + over-sized-phase valve + summary hook → `68137985`
+  T4 workflows/spec-driven.md mirrors + version 1.4.0 → `987207fc` T5
+  implementation-delivery.md Stage 1.5 → `fed3d175` T6 discuss.md/specify.md
+  question policy → `ecc2096b` T6 follow-up (sibling numeric caps in discuss
+  Guided algorithm) → `c9400ae9` T7 tdd + workflows/design.md question policy →
+  `0bcd2063` T9 validate_tasks.ts per-phase max-3 error + sensors → (T8 close-out,
+  this commit).
+- Decisions: the hard ≤3-tasks-per-phase rule has no carve-out (D12 — no
+  `~1.5×`/`~10+ tasks`/tight-chain exception survives); the new per-phase check
+  is an **error**, not a warning (D14), enforced by `validate_tasks.ts` at Tasks
+  time rather than only surfacing at Execute; numeric question caps are removed
+  everywhere they appeared (spec-driven discuss/specify, tdd discovery + workflow,
+  design.md) in favor of ask rather than assume when in doubt on an important
+  decision; Stage 1.5's summary is a **self-sufficient anchor** (D13) — it is
+  presented alongside the existing Stage 3 delivery-authorization ask defined in
+  the same shared reference, so no per-workflow anchor is required and no new
+  standalone gate is introduced.
+- Straggler closed post-close-out: the `at most three` cap the T8 sweep
+  surfaced in `skills/massa-ai/references/ticket/intake-and-sources.md:19`
+  was fixed by follow-up commit `61434ca` (user's cap-removal decision reads
+  "everywhere a workflow interviews you — no stragglers"); spec success
+  criteria amended to name the site. No open residual from the sweep.
+- Validation: **PASS** (independent verifier, 2026-08-09) — 16/16 WF ACs
+  evidenced, 8 gates re-run green, discrimination sensor 3/4 killed (M3
+  heading-only deletion survived the substring gate — low, documented in
+  validation.md as a follow-up sensor recommendation). Reviewer's 2 blocking
+  bookkeeping findings fixed in `e5c18736`.
+- Next step: PR from `spec/workflow-interaction-policies` (push+PR
+  authorized); merge remains the user's decision.
+
+## Previous — Admin Portal UX Overhaul (**VALIDATED PASS 2026-08-09** — T1-T15 + 2 fix loops, 18 commits + validation close-out; push/PR authorized)
 
 - Validation: **PASS**, 32/32 ACs evidenced (verifier corrected its own first-pass
   36/39 denominator by re-deriving from spec.md: 8+5+5+6+2+6 = 32), 5/5 mutations

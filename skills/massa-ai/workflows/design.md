@@ -3,7 +3,7 @@ name: design
 description: "Implements or updates a concrete mobile UI from structured Figma evidence or screenshots when no saved audit report exists; route comparisons to mobile-figma-audit."
 license: MIT
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 ### Design
@@ -23,7 +23,7 @@ Not for Flutter, React Native, web UI, generic Figma exploration, variable-only 
 1. Resolve/reuse `workflowSessionId`: `design-[entity]`.
 2. Load `references/mobile-figma-matcher/repository-detection.md`, `references/mobile-figma-matcher/core.md`, `references/mobile-context.md`, `references/codebase-investigation.md`, `references/verification-ladder.md`, and `references/naming-standards.md` (before introducing or renaming identifiers, screens, components, attributes, or implementation-facing names — English-conversion rule applies). When Figma links or node IDs are provided, load `references/figma-pre-analysis.md` and run its two-stage sequential retrieval protocol before building the Figma Evidence Packet. Load `references/context-firewall.md` before large design/runtime artifacts and `references/synapse-policy.md` when repeated massa-ai searches are expected.
 3. `recall` -> load current component conventions, design-system rules, approved platform/accessibility deviations, prior Figma mappings, asset pipelines, and reusable render recipes. Memory is context, not proof.
-4. Require a concrete feature/module target plus at least one design source: readable Figma node/selection or supplied screenshots. Resolve required visual and interactive states plus a requirements source for behavior not represented in the design source. Ask only when target ownership, runtime platforms, platform-frame mappings, or screenshot authority stay ambiguous after source inspection.
+4. Require a concrete feature/module target plus at least one design source: readable Figma node/selection or supplied screenshots. Resolve required visual and interactive states plus a requirements source for behavior not represented in the design source. Ask whenever target ownership, runtime platforms, platform-frame mappings, screenshot authority, or any other important decision remains ambiguous or in doubt after source inspection.
 5. Follow `references/design-implementation.md` for the Target Surface Packet, the Figma Evidence / Screenshot Context Packet, the Design-To-Code Mapping Matrix, sizing and the verification recipe, coherent-slice implementation rules, per-slice verification, completion criteria, and the completion report — the single normative copy of this direction set, shared with `spec-driven`/`feature` under Figma ingestion.
 6. Persist only durable token/component mappings, approved deviations, source-set ownership rules, asset-pipeline rules, or reusable render recipes after Importance Calibration. Use `workflow:design` and required project/session/entity/memory tags.
 7. Complete `references/evidence-gate.md`. Model visual judgment alone cannot satisfy completion.

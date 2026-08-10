@@ -71,7 +71,7 @@ Do not use week-based project-size heuristics. Effort estimates are useful only 
 
 Inspect first, ask second. Ask only when the answer changes architecture, scope, a public contract, safety, rollout, or acceptance.
 
-- Group at most three related questions per turn.
+- Group related questions naturally per turn — no numeric cap, ask as many as the open decisions require; when in doubt on an important decision, ask rather than assume.
 - Offer meaningful choices when alternatives are known; otherwise ask concise free-form questions.
 - Ask in the user's language.
 - Do not require owner, team, ticket, API, risk-count, or timeline fields merely to satisfy a template.

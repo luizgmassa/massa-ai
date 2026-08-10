@@ -88,9 +88,9 @@ Shared rules for every pace:
 
 1. Classify upcoming decisions as **independent** vs **dependent**.
 2. Low-stakes / safe-to-default → state the assumption and invite correction (no blocking question).
-3. Independent product decisions → ask **at most 2** in the same turn, each with options + recommended default.
+3. Independent product decisions → ask them together in the same turn — as many as the open decision set requires, each with options + recommended default.
 4. Dependent decisions → ask **exactly one**, wait, then continue (the earlier answer should prune later questions).
-5. Never dump 3+ questions in one turn. Never ask what the code already answers.
+5. Never dump unrelated questions as one bulk form. Never ask what the code already answers.
 6. Stop the area as soon as enough is decided.
 
 **Detailed:** Walk selected gray areas as a strict decision tree — one concrete question per turn, dependency order, wait for each answer before the next. Use when the user wants maximum control or the feature is highly ambiguous.
@@ -196,7 +196,7 @@ Discuss is done when every gray area is either resolved with the user, recorded 
 ## Tips
 
 - **Pace is a user choice; Guided is the default** — Quick for speed, Guided for balance, Detailed for Socratic depth; honor mid-discussion switches
-- **Guided ≠ interrogation and ≠ form dump** — Assume-first when safe, ≤2 independent questions per turn, one-at-a-time only when answers depend on each other
+- **Guided ≠ interrogation and ≠ form dump** — no numeric cap on questions; ask as many as the open decisions require. Group independent questions naturally per turn, one-at-a-time only when answers depend on each other. Ask-first for important or uncertain decisions; only genuinely trivial, safe details may be assumed, and every assumption is recorded
 - **Look it up, don't ask** — Resolve anything discoverable from the code yourself; ask only genuine product decisions
 - **Decisions, not vision** — "Card-based layout with subtle shadows" is a decision. "Should feel modern" is not.
 - **Scope is sacred** — Deferred Ideas captures scope creep without losing ideas

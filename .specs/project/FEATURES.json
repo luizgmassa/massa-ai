@@ -1200,6 +1200,19 @@
    "notes": "EXECUTE COMPLETE 2026-08-09: T1-T15, 16 commits on spec/admin-portal-ux-overhaul from main @ v1.43.0 (b1831197). 5 batch workers, T1-T15 (3 Phases = 15 Tasks) + this close-out. APUX-01..14 delivered: agentTiers registry section (schema/validate/merge/normalize/count, T1), generator per-agent resolution + stale-agent warn (T2), agents array in GET /api/v1/model-registry (T3), Tool+Tier leading grid columns (T4), Provider/Model split fields + hints (T5), Per-Agent Tier Overrides table (T6), inline dropdown forms replacing prompt()/alert() (T7), unified Save & Apply with restart banner (T8), Scheme A nomenclature incl. extended 4-word negative-vocabulary sensor (overlay/tombstoned/registry/host, T9), Projects Delete + Files header (T10), shared CSS pass (buttons/forms/help-card/code, T11), Config+Checkpoints polish (T12), Dashboard stat cards (T13), plain-English help cards on all five tabs (T14). Gates measured 2026-08-09: web-ui 456 pass/0 fail, model-profiles+generate-subagent-artifacts 124 pass/0 fail, tools-api model-registry+round-trip 23 pass/0 fail, type-check 6/6, oxlint exit 0, generate:artifacts --check no drift, check_specs_delivered exit 0. Validation pending: dispatch verification-agent (author != verifier) to write validation.md. Push/PR authorized (not taken unattended)."
   },
   {
+   "slug": "workflow-interaction-policies",
+   "title": "Implementation-workflow interaction policies — worker batch cap max3/ideal2, unlimited ask-first questions, pre-implementation change summary",
+   "status": "in_progress",
+   "workflow": "spec-driven",
+   "branch": "spec/workflow-interaction-policies",
+   "phases": {
+    "specify": true,
+    "design": true,
+    "tasks": true,
+    "execute": true
+   }
+  },
+  {
    "id": "claude-marketplace-cache-refresh",
    "slug": "claude-marketplace-cache-refresh",
    "title": "Claude marketplace cache refresh — update-on-mismatch + truthful served-version recording",

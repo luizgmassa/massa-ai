@@ -3,7 +3,7 @@ name: spec-driven
 description: "Use this workflow for explicit spec-driven requests and broad, ambiguous, migration-heavy, or cross-boundary delivery needing requirements-through-verification control."
 license: MIT
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 ### Spec-Driven
@@ -50,7 +50,7 @@ Complexity determines depth, not a fixed pipeline. Assess scope first, apply onl
 | Large | >10 tasks OR multi-component feature | Full spec + requirement IDs | Architecture + components | Full breakdown + deps | Implement + verify per task |
 | Complex | Ambiguity or new domain (unfamiliar vocabulary, no prior pattern) | Full spec + discuss gray areas | Research + architecture | Breakdown + phase plan | Implement + interactive UAT |
 
-A "Phase" is an ordered group of Tasks sharing a dependency boundary or a checkpoint commit — distinct from a single Task or atomic step. Report sizing in the uniform vocabulary: `1 Phase = X Tasks`; the whole plan is `Y Phases = Z Tasks`. The sub-agent offer fires when a formal `tasks.md` has more than 3 Tasks — packing itself still uses ~7-Task Phase groups; a 4–8-Task feature is offered as a single Phase-group worker.
+A "Phase" is an ordered group of Tasks sharing a dependency boundary or a checkpoint commit — distinct from a single Task or atomic step. Report sizing in the uniform vocabulary: `1 Phase = X Tasks`; the whole plan is `Y Phases = Z Tasks`. The sub-agent offer fires when a formal `tasks.md` has more than 3 Tasks — packing uses max-3-Task Phase groups (ideal 2); a feature over 3 Tasks always packs into at least two Phase-group workers.
 
 - Specify and Execute are always required.
 - Design is skipped when straightforward (no architectural decisions, no new patterns).
@@ -108,7 +108,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Run repo-rules discovery from `references/repo-rules-discovery.md` before the first repository mutation: record the harness sources loaded (or `repo-rules: none present`), and implement so every new or changed file conforms to the target repo's module layout, unit-test location, and testing-area conventions. A repo rule wins over a skill default for placement and gate commands; record any deviation with an explicit reason. Never fabricate rules or create `.claude/`/`.cursor/` directories the repo lacks.
    - Use the Test Coverage Matrix and Gate Check Commands from `tasks.md`, or state their inline equivalents when Tasks was skipped.
    - Ask the MCP and skill question in Tasks or inline Execute when tool choice can change correctness or verification.
-   - If a formal `tasks.md` has more than 3 Tasks, present the sub-agent offer from `references/spec-driven/sub-agents.md` before starting Execute — even when packing yields a single Phase group (a 4–8-Task feature is offered as one Phase-group worker).
+   - If a formal `tasks.md` has more than 3 Tasks, present the sub-agent offer from `references/spec-driven/sub-agents.md` before starting Execute — packing uses max 3 Tasks per worker (ideal 2), so a triggered feature always yields at least two Phase-group workers; the offer message begins with the Stage 1.5 change summary (see `references/implementation-delivery.md`).
    - Implement one atomic step or approved task at a time.
    - For long-running task sequences, use the checkpoint mechanism in `references/spec-driven/execute.md` (Pause / End of Session) so progress is resumable after interruption.
    - Use per-task commits when the environment and user permissions allow commits; otherwise record the skipped reason.

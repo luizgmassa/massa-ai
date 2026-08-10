@@ -84,6 +84,8 @@ If needed:
 
 **Facts you look up; decisions you ask.** Anything discoverable by reading the environment (the codebase, config, docs, existing conventions) you resolve yourself through the Knowledge Verification Chain — do not spend the user's attention asking for it. Reserve questions for genuine decisions that are the user's to make: scope, priorities, product behavior, trade-offs. A question you could have answered by reading the code erodes trust and wastes a turn.
 
+**No limit on the number of clarifying questions.** Ask as many as the open decisions require — there is no numeric cap. When in doubt, unsure, or facing an important decision, ask rather than assume.
+
 **Challenge vagueness.** Never accept fuzzy answers. "Good" means what? "Users" means who? "Simple" means how? Make the abstract concrete: "Walk me through using this." "What does that actually look like?"
 
 **Know when to stop — then run the dimensions sweep.** When you understand what they're building, why, who it's for, and what done looks like, run a closing **implicit-requirement dimensions sweep** before offering to proceed:
@@ -129,7 +131,7 @@ Before Design, Tasks, or Execute — and before presenting the spec for confirma
 
 3. **Unambiguity + precision (hard).** Every AC must (a) have a single interpretation and (b) define a precise, spec-defined expected outcome. Any AC that fails either check: resolve with the user, split it, or log it as an explicit assumption with the chosen interpretation and rationale. No AC proceeds readable two ways or with an undefined outcome.
 
-4. **Open-questions / assumptions closure.** Each question must be either (a) resolved with the user OR (b) recorded as an **assumption** (chosen default + rationale) in the spec's Assumptions & Open Questions section. If the user accepts a default, record it as an accepted assumption with the affected requirement IDs. Nothing proceeds unmarked.
+4. **Open-questions / assumptions closure.** Each question must be either (a) resolved with the user OR (b) recorded as an **assumption** (chosen default + rationale) in the spec's Assumptions & Open Questions section. If the user accepts a default, record it as an accepted assumption with the affected requirement IDs. Nothing proceeds unmarked. Recording an assumption **without** asking is allowed only for genuinely trivial/safe details or questions the user explicitly deferred; important decisions — behavior, scope, data, security/privacy, compatibility, acceptance — are resolved by asking, never by silent default.
 
 5. **Declined gray areas become assumptions.** Any gray area the user declined to discuss or that went undiscussed is written to the spec's Assumptions & Open Questions section (agent's chosen default + rationale) — never silently dropped. Refused, deferred, or intentionally excluded areas go in the out-of-scope table. See [discuss.md](discuss.md).
 

@@ -3,7 +3,7 @@ name: tdd
 description: "Use this workflow to write a Technical Design Document once one product direction is selected and no unresolved API, data, security, or rollout decision blocks implementation."
 license: MIT
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 ### TDD (Technical Design Document)
@@ -32,7 +32,7 @@ Load `references/project-context.md` (intake sweep) before the first substantive
      - external or cross-service integration → Dependencies and Security are mandatory.
 4. Resolve only material unknowns:
    - Reuse facts already available in source or approved documents.
-   - Ask at most three related questions at a time, in the user's language.
+   - Group related questions naturally, in the user's language — no numeric cap; ask as many as the open decisions require.
    - Distinguish verified facts, evidence-backed inferences, proposed decisions, and unresolved questions.
    - Never invent owners, links, APIs, schemas, vendors, dates, thresholds, estimates, approvals, or project facts to complete a template.
 5. Load `references/tdd/document-contract.md`, plus `references/naming-standards.md` when the design names proposed components, modules, states, events, schemas, or fields, and draft the smallest decision-complete TDD for the selected depth.

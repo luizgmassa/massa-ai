@@ -11,38 +11,38 @@ Use during Execute when formal task planning has more than 3 tasks, when the use
 
 Conflating the two (one worker per phase) is what fragments execution: a feature's dependency-layer count has nothing to do with the ideal per-worker workload. Batching by task budget separates the two concerns without breaking phases.
 
-**Trigger:** Count total tasks across all phases. If the feature has **more than 3 tasks**, offer the user phase-batch sub-agents before starting Execute — even when packing yields a single batch (a 4–8-task feature is offered as one batch worker). If the feature has 3 or fewer tasks, execute inline in the main window — no sub-agents spawned, no offer made.
+**Trigger:** Count total tasks across all phases. If the feature has **more than 3 tasks**, offer the user phase-batch sub-agents before starting Execute — under the **max 3 tasks per worker, ideal 2** budget, a triggered feature always packs into at least two workers, so the offer is never for a single batch. If the feature has 3 or fewer tasks, execute inline in the main window — no sub-agents spawned, no offer made.
 
-**Batching algorithm (task budget ≈ 7 tasks/worker, phase-aligned):**
+**Batching algorithm (task budget: max 3 tasks per worker, ideal 2, phase-aligned):**
 
-The benchmarked sweet spot is ~7 tasks of context per worker (~20 tasks → 3 workers). Pack whole phases into that budget:
+Pack whole phases into that budget, greedily, in phase order:
 
 1. Count total tasks `T`.
 2. If `T ≤ 3` → inline, no sub-agents, no offer.
-3. Otherwise (even for `T` as low as 4) offer sub-agents and walk phases **in order**, accumulating whole phases into the current batch. When the batch's running task count reaches ~7 **and** phases remain, close the batch and start the next.
+3. Otherwise offer sub-agents and walk phases **in order**, accumulating whole phases into the current batch. When adding the next phase would push the batch's running task count above 3 **and** phases remain, close the batch and start the next with that phase.
 4. **Never split a phase** across workers — the cut only ever lands on a phase boundary. This preserves dependency ordering and keeps a phase's tasks + shared context in one worker.
-5. If the final batch is a lone tail (1–2 tasks), fold it into the previous batch.
+5. A trailing batch under budget is expected and correct — it is not folded into the previous batch when that would push the previous batch over 3.
 
-Result ≈ `ceil(T / 7)` workers, scaling linearly. Unevenness is absorbed by greedy packing — phases never need to divide evenly. Worked examples (20 tasks):
+Result: at least `ceil(T / 3)` workers, ~`T / 2` typical once phases are sized to the ideal of 2. Unevenness is absorbed by greedy packing — phases never need to divide evenly. Example: 20 tasks → roughly 7–10 workers, depending on phase sizes. Worked examples:
 
-- Phases `[3,3,3,3,4,4]` → `{P1+P2=6, P3+P4=6, P5+P6=8}` = **3 workers**
-- Phases `[8,2,2,8]` → `{P1=8, P2+P3=4, P4=8}` = **3 workers** (no even split needed)
-- Phases `[5,5,5,5]` → `{P1+P2=10, P3+P4=10}` = **2 workers** (phases too coarse to hit 3 — see below)
+- Phases `[2,2,3]` → `{P1=2}, {P2=2}, {P3=3}` = **3 workers** (no neighbor has budget room left to combine into)
+- Phases `[3,3,3,3]` → `{P1=3}, {P2=3}, {P3=3}, {P4=3}` = **4 workers** (every phase already sits at the budget)
+- Phases `[1,2,2]` → `{P1+P2=3}, {P3=2}` = **2 workers** (small phases combine up to the budget)
 
-**Coarse-phase caveat:** Because the cut lands only on phase boundaries, very coarse phases limit how finely you can pack. If a single phase alone exceeds ~1.5× the budget (~10+ tasks), that is a Tasks-authoring smell — split it into real sub-phases during Tasks (at a genuine dependency/cohesion boundary), never at dispatch time.
+A phase larger than 3 tasks is a Tasks-authoring defect — split it during Tasks, never at dispatch time.
 
 **Offer-then-confirm (never auto-spawn):**
 
-> "This feature has [T] tasks across [N] phases. I can pack them into [K] sub-agents (~7 tasks each, whole phases per worker) — every worker runs its phases in order, reports a compact summary, and the orchestrator advances to the next batch. This keeps the main window lean without over-fragmenting. Want to proceed that way?"
+> "This feature has [T] tasks across [N] phases. I can pack them into [K] sub-agents (2–3 tasks each, whole phases per worker) — every worker runs its phases in order, reports a compact summary, and the orchestrator advances to the next batch. This keeps the main window lean without over-fragmenting. Want to proceed that way?"
 
-The user must explicitly accept. If they decline (or if the feature fits one batch), execute inline.
+The user must explicitly accept. If they decline, execute inline instead of dispatching sub-agents.
 
 **Execution model — one worker per task-budgeted batch, sequential:**
 
 ```
-Phases 1+2 (7 tasks)  ──→ Batch Worker 1 ──→ compact summary ──→ orchestrator updates tasks.md
-Phases 3+4 (6 tasks)  ──→ Batch Worker 2 ──→ compact summary ──→ orchestrator updates tasks.md
-Phase 5    (7 tasks)  ──→ Batch Worker 3 ──→ compact summary ──→ orchestrator updates tasks.md
+Phase 1 (3 tasks)  ──→ Batch Worker 1 ──→ compact summary ──→ orchestrator updates tasks.md
+Phase 2 (2 tasks)  ──→ Batch Worker 2 ──→ compact summary ──→ orchestrator updates tasks.md
+Phase 3 (3 tasks)  ──→ Batch Worker 3 ──→ compact summary ──→ orchestrator updates tasks.md
 ...
 ```
 
@@ -108,7 +108,7 @@ Delegated work returns through the compact summary contract above. Planning, tas
 
 **The orchestrating agent's role during Execute:**
 
-1. Count total tasks and pack phases into task-budgeted batches (~7 tasks each) — if that yields more than one batch, offer batch sub-agents and wait for the user to accept
+1. Count total tasks and pack phases into task-budgeted batches (max 3 tasks each, ideal 2) — offer batch sub-agents and wait for the user to accept
 2. Dispatch the next batch to a worker (or execute inline if not using sub-agents)
 3. Receive the compact summary
 4. Update `.specs/features/<slug>/tasks.md` with results
@@ -187,9 +187,9 @@ Judge the tier by the work in front of the role, not by the role's title:
 | Design phase | High ambiguity, hard-to-reverse structural decisions | `deep` |
 | Batch worker — core-domain or high-ambiguity phase | Non-obvious logic, tricky edge cases, novel integration | `deep` |
 | Batch worker — mechanical phase | Entities, DTOs, config, wiring, straightforward CRUD against a settled pattern | `light` / `standard` |
-| Verifier | Adversarial reasoning: designs mutations, re-derives coverage, judges outcome precision | `deep` (always — see below) |
+| Verifier | Adversarial reasoning: designs mutations, re-derives coverage, judges outcome precision | `deep` (always — per the Rules of thumb below) |
 | Specify / Tasks authoring | Structured but judgment-heavy | `standard` / `deep` |
-| Read-only specialist (audit-specialist, context-curator, furps-analyst, investigator, mobile-specialist, navigator, requirements-analyst, reviewer) | No write access — findings, investigation, or review quality is the entire deliverable, with no implementation pass downstream to catch a missed nuance | `deep` (always — see below) |
+| Read-only specialist (audit-specialist, context-curator, furps-analyst, investigator, mobile-specialist, navigator, requirements-analyst, reviewer) | No write access — findings, investigation, or review quality is the entire deliverable, with no implementation pass downstream to catch a missed nuance | `deep` (always — per the Rules of thumb below) |
 
 **Rules of thumb:**
 
