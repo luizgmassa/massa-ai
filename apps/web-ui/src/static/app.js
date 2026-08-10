@@ -824,6 +824,17 @@ export function renderLogs(data, state) {
     ? '<p class="muted logs-truncated-note">The 64 MB scan bound was reached — this range may be incomplete.</p>'
     : "";
 
+  // With zero rows the table shell is rendered ONLY when Live is on, and that
+  // is load-bearing rather than cosmetic: `appendLogsLiveEntry` patches into
+  // `table.logs-table tbody` and does nothing when no such element exists, so
+  // a range that matched nothing swallowed every live entry silently — Live
+  // looked broken while the stream was in fact delivering, and the rows
+  // appeared only after a refresh re-ran the range query. Scoped to Live
+  // rather than rendered unconditionally so the ordinary empty state stays a
+  // message and not a bare table (LOG-13's own decision, pinned by its test).
+  // The empty message is a sibling of the table so the append path can remove
+  // just it.
+  const wantsLiveShell = entries.length === 0 && !!state.logsLive;
   let body;
   if (entries.length === 0) {
     body = '<p class="empty logs-empty">No log entries match this range.</p>';
@@ -833,7 +844,10 @@ export function renderLogs(data, state) {
       escapeHtml(String(entries.length)) +
       " of " +
       escapeHtml(String(total)) +
-      " entries</p>" +
+      " entries</p>";
+  }
+  if (entries.length > 0 || wantsLiveShell) {
+    body +=
       '<table class="grid logs-table"><thead><tr><th>time</th><th>level</th><th>message</th></tr></thead><tbody>' +
       entries.map(renderLogEntryRow).join("") +
       "</tbody></table>";
@@ -2732,6 +2746,12 @@ function appendLogsLiveEntry(ctx, entry) {
   const tbody = root && root.querySelector ? root.querySelector("table.logs-table tbody") : null;
   if (tbody) {
     tbody.innerHTML = renderLogEntryRow(entry) + tbody.innerHTML;
+    // "No log entries match this range" is true of the range query and false
+    // the moment a live row lands beneath it. Removing it here rather than
+    // re-rendering keeps this path what LOG-14 requires: an append, with no
+    // range query re-issued.
+    const emptyNote = root.querySelector ? root.querySelector(".logs-empty") : null;
+    if (emptyNote && emptyNote.remove) emptyNote.remove();
   }
 }
 
@@ -2809,10 +2829,43 @@ export function handleLogsLiveToggle(ctx) {
   const el = ctx.root && ctx.root.querySelector ? ctx.root.querySelector('[data-action="logs-live-toggle"]') : null;
   const checked = !!(el && el.checked);
   state.logsLive = checked;
+  writeLogsLivePreference(checked);
   if (checked) {
     runLogsLiveStream(ctx);
   } else {
     stopLogsLiveStream(ctx);
+  }
+}
+
+/** Live is a per-tab preference, and it used to live only in `state`, which a
+ *  reload discards — so every refresh silently turned the live tail off again
+ *  while the operator believed it was still on. Persisted the same way the
+ *  Profiles tab persists its selected sub-tab (`localStorage`, every access
+ *  wrapped: it throws outright under some privacy modes, and is simply absent
+ *  in the fake-DOM test harness). */
+const LOGS_LIVE_STORAGE_KEY = "massa-ai-logs-live";
+
+function writeLogsLivePreference(value) {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(LOGS_LIVE_STORAGE_KEY, value ? "true" : "false");
+    }
+  } catch {
+    // localStorage unavailable — the toggle still works for this page's life.
+  }
+}
+
+/** The stored preference, or `undefined` when nothing was ever stored — the
+ *  caller must be able to tell "explicitly off" from "never chosen", so an
+ *  absent key can keep the off-by-default behaviour without recording it. */
+export function readLogsLivePreference() {
+  try {
+    if (typeof localStorage === "undefined") return undefined;
+    const raw = localStorage.getItem(LOGS_LIVE_STORAGE_KEY);
+    if (raw === null || raw === undefined) return undefined;
+    return raw === "true";
+  } catch {
+    return undefined;
   }
 }
 
@@ -3023,7 +3076,16 @@ function startApp(opts) {
         if (state.logsQuery) params.set("q", state.logsQuery);
         const qs = params.toString();
         const data = await api.request("/api/v1/logs" + (qs ? "?" + qs : ""));
+        // Seed Live from the stored preference only when this session has not
+        // decided yet, so a toggle made in this page always outranks it.
+        if (state.logsLive === undefined) {
+          const stored = readLogsLivePreference();
+          if (stored !== undefined) state.logsLive = stored;
+        }
         root.innerHTML = renderLogs(data, state);
+        // Resume the tail after the markup exists — `appendLogsLiveEntry`
+        // needs the tbody it patches into to be on screen already.
+        if (state.logsLive) runLogsLiveStream({ api, root, state, render });
       } else if (state.view === "config") {
         const data = await api.request("/api/v1/config");
         if (data && data.success === false) {

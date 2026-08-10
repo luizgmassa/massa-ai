@@ -872,6 +872,22 @@ describe("renderLogs (T14, LOG-13)", () => {
     expect(html).toContain("in-process ring buffer");
   });
 
+  it("an empty result WITH Live on still renders the tbody the live tail appends into", () => {
+    // The defect this pins: `appendLogsLiveEntry` patches into
+    // `table.logs-table tbody` and does nothing when no such element exists,
+    // so a range that matched nothing swallowed every streamed row — Live
+    // looked broken while the stream was in fact delivering, and the entries
+    // appeared only after a refresh re-ran the range query.
+    const html = renderLogs(
+      { success: true, data: { entries: [], total: 0, source: "file", truncated: false } },
+      { logsLive: true },
+    );
+    expect(html).toContain("<tbody></tbody>");
+    expect(html).toContain('class="grid logs-table"');
+    // The range really did match nothing, and keeps saying so until a row lands.
+    expect(html).toContain("No log entries match this range");
+  });
+
   it("an empty result shows an empty state, not an error or a bare table", () => {
     const html = renderLogs(
       { success: true, data: { entries: [], total: 0, source: "file", truncated: false } },
