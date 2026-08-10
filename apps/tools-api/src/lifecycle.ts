@@ -72,6 +72,19 @@ export function _setLifecycleSeamsForTesting(seams: LifecycleSeams | null): void
   testSeams = seams;
 }
 
+/**
+ * Test-only: exposes the production default seams directly. `shutdownAndRestart`
+ * and `gracefulShutdown` only reach `defaultSeams()` when no seams are supplied
+ * AND `testSeams` is unset — going through either of those in a unit test would
+ * really spawn a child process and call `process.exit`, truncating the shared
+ * test batch (see the module docblock). This lets a test exercise each closure
+ * — `stopServer`/`stopJobs` delegation, the core-services `disconnect`, the
+ * `Bun.spawn` call, and the `process.exit` call — directly and in isolation.
+ */
+export function _getDefaultSeamsForTesting(): LifecycleSeams {
+  return defaultSeams();
+}
+
 let testMode: RestartMode | null = null;
 /** Test-only: pins detectRestartMode's result. The default docker probe reads
  *  the real /.dockerenv, which would flip route-test verdicts when the suite
