@@ -54,6 +54,12 @@ export interface ResolveHostLayoutOpts {
    * When set for a host, it replaces the whole `$HOME`-derived root for that
    * host — not just a suffix. */
   projectRoot?: Partial<Record<Host, string>>;
+  /** Pre-resolved marketplace bundle root per host. Supplied by the caller
+   * (engine/variant-sync) so this module keeps owning no fs access. When
+   * present for claude, it replaces the whole `$HOME`-derived root —
+   * `projectRoot.claude` still keeps precedence over it, since an explicit
+   * `--project` override is a stronger statement than a discovered install. */
+  marketplaceRoot?: Partial<Record<Host, string>>;
 }
 
 const CURSOR_SKIP_REASON = "all tiers inherit — Cursor publishes no resolvable model IDs";
@@ -84,6 +90,15 @@ export function resolveHostLayout(host: Host, opts: ResolveHostLayoutOpts = {}):
       return { host, route: "skip", reason: CURSOR_SKIP_REASON };
 
     case "claude": {
+      const marketplaceRoot = opts.marketplaceRoot?.claude;
+      if (override === undefined && marketplaceRoot !== undefined) {
+        return fileLayout(
+          host,
+          path.join(marketplaceRoot, "agents"),
+          "massa-ai-*.md",
+          path.join(marketplaceRoot, "agent-profiles"),
+        );
+      }
       const root = override ?? path.join(targetHome, ".claude");
       return fileLayout(
         host,
@@ -120,11 +135,30 @@ export type RouteDecision = { kind: "proceed" } | { kind: "refuse"; reason: stri
  * indistinguishable from "not installed", so guessing would risk a
  * switched-but-never-read report. Absent field (pre-feature install, or a
  * host never installed) refuses loud with guidance to re-run the installer.
+ *
+ * `host` is an OPTIONAL TRAILING parameter (pre-mortem #3, binding):
+ * `detectRoute` is re-exported from `packages/shared/src/index.ts` and is
+ * therefore published `@massa-ai/shared` API. A leading `host` parameter
+ * would put a `PlatformRecord` in the host slot for any out-of-tree caller,
+ * making `route` read `undefined` and every host refuse. With the parameter
+ * trailing and optional, every existing single-argument call compiles and
+ * behaves identically, and the marketplace-proceed path activates only when
+ * a caller explicitly supplies `host: "claude"` — omitting it keeps today's
+ * conservative refusal.
  */
-export function detectRoute(platform: PlatformRecord | undefined): RouteDecision {
+export function detectRoute(platform: PlatformRecord | undefined, host?: Host): RouteDecision {
   const route = platform?.installRoute;
   if (route === "file") return { kind: "proceed" };
   if (route === "marketplace") {
+    if (host === "claude") return { kind: "proceed" };
+    if (host === "codex") {
+      return {
+        kind: "refuse",
+        reason:
+          "codex marketplace-route installs are refused (in-place bundle rewrite would dirty a checkout " +
+          "and break the drift gate) — use the dev path: MASSA_AI_MODEL_PROFILE + regenerate.",
+      };
+    }
     return {
       kind: "refuse",
       reason:

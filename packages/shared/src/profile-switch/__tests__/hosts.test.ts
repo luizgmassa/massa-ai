@@ -66,6 +66,38 @@ describe("resolveHostLayout — path table matches design exactly", () => {
   test("HOSTS lists exactly claude, codex, cursor, opencode", () => {
     expect([...HOSTS].sort()).toEqual(["claude", "codex", "cursor", "opencode"]);
   });
+
+  test("claude: marketplaceRoot replaces the whole $HOME-derived root", () => {
+    const layout = resolveHostLayout("claude", {
+      targetHome,
+      marketplaceRoot: { claude: "/market/massa-ai/1.2.3" },
+    });
+    expect(layout.route).toBe("files");
+    if (layout.route !== "files") throw new Error("expected files route");
+    expect(layout.activeDir).toBe(path.join("/market/massa-ai/1.2.3", "agents"));
+    expect(layout.activeGlob).toBe("massa-ai-*.md");
+    expect(layout.variantsRoot).toBe(path.join("/market/massa-ai/1.2.3", "agent-profiles"));
+    expect(layout.variantDir("cheap")).toBe(path.join("/market/massa-ai/1.2.3", "agent-profiles", "cheap"));
+  });
+
+  test("claude: projectRoot beats marketplaceRoot when both are supplied", () => {
+    const layout = resolveHostLayout("claude", {
+      targetHome,
+      projectRoot: { claude: "/proj/.claude" },
+      marketplaceRoot: { claude: "/market/massa-ai/1.2.3" },
+    });
+    expect(layout.route).toBe("files");
+    if (layout.route !== "files") throw new Error("expected files route");
+    expect(layout.activeDir).toBe(path.join("/proj/.claude", "agents"));
+    expect(layout.variantsRoot).toBe(path.join("/proj/.claude", "massa-ai", "agent-profiles"));
+  });
+
+  test("claude: no marketplaceRoot.claude falls back to the $HOME-derived root unchanged", () => {
+    const layout = resolveHostLayout("claude", { targetHome, marketplaceRoot: { codex: "/market/.codex" } });
+    expect(layout.route).toBe("files");
+    if (layout.route !== "files") throw new Error("expected files route");
+    expect(layout.activeDir).toBe(path.join(targetHome, ".claude", "agents"));
+  });
 });
 
 describe("detectRoute (F1) — the route-absent fixture refuses, never guesses", () => {
@@ -96,5 +128,51 @@ describe("detectRoute (F1) — the route-absent fixture refuses, never guesses",
     const platform: PlatformRecord = { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" };
     const decision = detectRoute(platform);
     expect(decision.kind).toBe("proceed");
+  });
+});
+
+describe("detectRoute — host-aware marketplace proceed (T17, pre-mortem #3)", () => {
+  const marketplacePlatform: PlatformRecord = {
+    root: "/x",
+    skills: [],
+    skillsOwner: "plugin",
+    installRoute: "marketplace",
+  };
+
+  test('claude + host:"claude" proceeds on the marketplace route', () => {
+    const decision = detectRoute(marketplacePlatform, "claude");
+    expect(decision.kind).toBe("proceed");
+  });
+
+  test('codex + host:"codex" refuses with a reason naming codex only', () => {
+    const decision = detectRoute(marketplacePlatform, "codex");
+    expect(decision.kind).toBe("refuse");
+    if (decision.kind === "refuse") {
+      expect(decision.reason).toMatch(/codex/i);
+      expect(decision.reason).not.toMatch(/claude/i);
+    }
+  });
+
+  test("omitting host keeps the conservative marketplace refusal", () => {
+    const decision = detectRoute(marketplacePlatform);
+    expect(decision.kind).toBe("refuse");
+    if (decision.kind === "refuse") {
+      expect(decision.reason).toMatch(/marketplace/i);
+    }
+  });
+
+  test("absent route still refuses even when a host is supplied", () => {
+    const platform: PlatformRecord = { root: "/x", skills: [], skillsOwner: "plugin" };
+    const decision = detectRoute(platform, "claude");
+    expect(decision.kind).toBe("refuse");
+  });
+
+  test("the four existing single-argument detectRoute calls keep their current verdicts", () => {
+    const absentPlatform: PlatformRecord = { root: "/x", skills: [], skillsOwner: "plugin" };
+    expect(detectRoute(absentPlatform).kind).toBe("refuse");
+    expect(detectRoute(undefined).kind).toBe("refuse");
+    expect(detectRoute(marketplacePlatform).kind).toBe("refuse");
+    const filePlatform: PlatformRecord = { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" };
+    expect(detectRoute(filePlatform).kind).toBe("proceed");
   });
 });
