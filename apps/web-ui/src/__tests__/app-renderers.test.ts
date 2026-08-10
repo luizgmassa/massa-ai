@@ -746,11 +746,14 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(html).toContain("active");
   });
 
-  it("renderProfiles shows installed with marketplace message when no variant profiles (UIC-05, T9: Save & Apply / Model Catalog nomenclature)", () => {
+  it("renderProfiles shows installed with a no-variants message when no variant profiles, that does NOT assert a marketplace install can't switch (CPP-09, T20, design § 4e)", () => {
     const html = renderProfiles({ hosts: [{ host: "claude", installed: true, skipped: false, skipReason: null, activeProfile: "balanced", bundleVersion: "1.41.0", availableProfiles: [] }] }, { writeMode: false });
     expect(html).toContain("claude");
     expect(html).not.toContain("Not installed");
-    expect(html).toContain("marketplace");
+    // AD-020: a marketplace install CAN switch profiles for Claude, so the
+    // no-variants copy must not carry that now-false claim.
+    expect(html).not.toContain("marketplace");
+    expect(html).toContain("No profile variants are installed for this host");
     expect(html).toContain("MASSA_AI_MODEL_PROFILE");
     expect(html).toContain("Save &amp; Apply");
     expect(html).toContain("Model Catalog");

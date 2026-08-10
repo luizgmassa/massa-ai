@@ -1250,10 +1250,17 @@ export function renderProfiles(data, opts) {
     }
 
     if (available.length === 0) {
+      // T20 (CPP-09, design § 4e): this copy must NOT assert that a
+      // marketplace install can't switch profiles — that claim is false for
+      // Claude since AD-020 (T16-T19 gave Claude a marketplace-aware
+      // resolver). A host can legitimately have no variant directories for
+      // other reasons too (e.g. the installer never ran the variant-sync
+      // step), so the message stays host-route-agnostic and just names the
+      // MASSA_AI_MODEL_PROFILE + Save & Apply path.
       return (
         '<div class="profile-host" data-host="' + escapeHtml(hostName) + '">' +
         "<h3>" + escapeHtml(hostName) + "</h3>" +
-        '<p class="muted">Installed via marketplace (no per-profile variant directories). To switch profiles, set <code>MASSA_AI_MODEL_PROFILE</code> and use Save &amp; Apply on the Model Catalog tab.</p>' +
+        '<p class="muted">No profile variants are installed for this host. Re-run the installer, or use <code>MASSA_AI_MODEL_PROFILE</code> with Save &amp; Apply on the Model Catalog tab.</p>' +
         "</div>"
       );
     }
