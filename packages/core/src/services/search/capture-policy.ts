@@ -19,59 +19,21 @@
 
 import type { ApplyPolicyFn, Disposition, Policy } from "./capture-policy-interfaces.js";
 
-// ── Bounds (FR-11) ────────────────────────────────────────────────────────────
-
-export const MAX_MATCH_WORK = 100_000;
-export const MAX_IGNORE_PATTERNS = 1_024;
-
-// ── Default policy (migrated from DEFAULT_IGNORES) ──────────────────────────
+// ── Bounds + default policy (FR-11) ─────────────────────────────────────────
 
 /**
- * Default capture policy migrated from `DEFAULT_IGNORES`. Each `DEFAULT_IGNORES`
- * entry becomes a `Drop` rule. The wrapper (`ignore-patterns.ts`) still owns
- * the `.gitignore` merge; this policy is the fallback when no project policy
- * is configured.
- *
- * The patterns are gitignore-style globs consumed by the `Ignore` library in
- * the wrapper. `applyPolicy` itself does simple glob matching via
- * `minimatch`-compatible semantics (the `matchesGlob` helper below).
+ * Re-exported from `@massa-ai/shared`, which now owns the single declaration.
+ * These three values were previously duplicated: once here and once in the
+ * shared config layer, which is how the Admin Portal ended up rendering
+ * "not configured" for a policy that was in force the whole time. `core`
+ * depends on `shared`, so this direction is the only legal one.
  */
-export const DEFAULT_POLICY: Policy = {
-  rules: [
-    { pattern: "**/node_modules/**", disposition: "Drop" },
-    { pattern: "**/.git/**", disposition: "Drop" },
-    { pattern: "**/dist/**", disposition: "Drop" },
-    { pattern: "**/build/**", disposition: "Drop" },
-    { pattern: "**/coverage/**", disposition: "Drop" },
-    { pattern: ".env", disposition: "Drop" },
-    { pattern: ".env.*", disposition: "Drop" },
-    { pattern: "**/generated/**", disposition: "Drop" },
-    { pattern: "**/*.generated.*", disposition: "Drop" },
-    { pattern: "**/*.d.ts", disposition: "Drop" },
-    { pattern: "**/__tests__/**", disposition: "Drop" },
-    { pattern: "**/tests/**", disposition: "Drop" },
-    { pattern: "**/*.test.ts", disposition: "Drop" },
-    { pattern: "**/*.test.tsx", disposition: "Drop" },
-    { pattern: "**/*.test.js", disposition: "Drop" },
-    { pattern: "**/*.test.jsx", disposition: "Drop" },
-    { pattern: "**/*.spec.ts", disposition: "Drop" },
-    { pattern: "**/*.spec.tsx", disposition: "Drop" },
-    { pattern: "**/*.spec.js", disposition: "Drop" },
-    { pattern: "**/*.spec.jsx", disposition: "Drop" },
-    { pattern: "**/benchmarks/**", disposition: "Drop" },
-    { pattern: "**/fixtures/**", disposition: "Drop" },
-    { pattern: "**/*.wasm*", disposition: "Drop" },
-    { pattern: "**/*.min.*", disposition: "Drop" },
-    { pattern: "**/*.map", disposition: "Drop" },
-    { pattern: "**/lock.yaml", disposition: "Drop" },
-    { pattern: "**/pnpm-lock.yaml", disposition: "Drop" },
-    { pattern: "**/package-lock.json", disposition: "Drop" },
-    { pattern: "**/bun.lockb", disposition: "Drop" },
-    { pattern: "**/yarn.lock", disposition: "Drop" },
-  ],
-  maxMatchWork: MAX_MATCH_WORK,
-  maxIgnorePatterns: MAX_IGNORE_PATTERNS,
-};
+import { MAX_MATCH_WORK, MAX_IGNORE_PATTERNS, DEFAULT_CAPTURE_POLICY } from "@massa-ai/shared";
+
+// Imported and then re-exported, not `export … from`: `validatePolicy` below
+// reads MAX_IGNORE_PATTERNS, and a re-export never binds a local name.
+export { MAX_MATCH_WORK, MAX_IGNORE_PATTERNS };
+export const DEFAULT_POLICY: Policy = DEFAULT_CAPTURE_POLICY;
 
 // ── Glob matching ────────────────────────────────────────────────────────────
 

@@ -643,11 +643,14 @@ falls back to its rule-based path.
 > reasoning channel and silently degraded). Override either with the env vars
 > above.
 
-> **Embeddings note:** The config default embedding model is `nomic-embed-text:latest`
-> (see `massa-ai-config.ts`). `qwen3-embedding:4b` (2560d) balances recall and on-device speed
-> than `nomic-embed-text` or `bge-m3` but is slower — bulk indexing a large corpus
-> takes minutes. Override via `OLLAMA_EMBEDDING_MODEL` or config `embedding.model`.
-> Switch to `bge-m3` (1024d) for speed if its recall quality is sufficient.
+> **Embeddings note:** The config default embedding model is `qwen3-embedding:4b`
+> (2560d — see `massa-ai-config.ts`). It balances recall against on-device speed
+> better than `nomic-embed-text` (768d) or `bge-m3` (1024d), but it is slower:
+> bulk indexing a large corpus takes minutes. Override via
+> `OLLAMA_EMBEDDING_MODEL` or config `embedding.model`, and move
+> `embedding.dimensions` with it — a width that disagrees with what the model
+> returns fails loudly rather than degrading. Switch to `bge-m3` for speed if
+> its recall quality is sufficient.
 
 ---
 

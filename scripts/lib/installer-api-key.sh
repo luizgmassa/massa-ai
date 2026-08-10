@@ -95,12 +95,104 @@ installer_report_api_key() {
   echo "  Every route except /health, /swagger and /ui needs it as the 'x-api-key' header."
 }
 
+# installer_embedding_dimensions <model>
+#
+# The embedding width a model actually produces. This used to be the literal
+# 4096 in the config.json template below while the model written beside it was
+# qwen3-embedding:4b, which is 2560 — so every fresh install started with a
+# dimensions value its own model could not produce. The 2026-08 parity sweep
+# fixed install.sh, the Dockerfile, setup-ollama-wsl.sh and the config CLI and
+# missed this template, because the sweep's completeness scan keys on the
+# literal `OLLAMA_EMBEDDING_` and this file has never contained it.
+#
+# The pairs mirror .env.example's documented alternatives. An unrecognized
+# model falls back to the reference default rather than guessing.
+installer_embedding_dimensions() {
+  case "$1" in
+    qwen3-embedding:8b) echo 4096 ;;
+    qwen3-embedding:4b) echo 2560 ;;
+    qwen3-embedding:0.6b) echo 1024 ;;
+    bge-m3) echo 1024 ;;
+    *) echo "${OLLAMA_EMBEDDING_DIMENSIONS:-2560}" ;;
+  esac
+}
+
+# installer_capture_policy_block
+#
+# Emits the `"capturePolicy"` member of config.json, trailing comma included.
+#
+# The thirty Drop rules are the ones that were already in force through
+# `DEFAULT_CAPTURE_POLICY`; writing them makes the Admin Portal's Capture
+# Policy tab show what the indexer is doing instead of "not configured", and
+# makes the list editable without first knowing it exists.
+#
+# This is a second copy of a list `packages/shared` owns, which is exactly the
+# shape of drift that produced the 4096/2560 defect above. It is held closed by
+# `scripts/__tests__/installer-config-template.test.ts`, which compares this
+# emitter's output against DEFAULT_CAPTURE_POLICY rule for rule — a shell
+# installer cannot import a TypeScript module, so a gate is the available
+# substitute for a shared declaration.
+installer_capture_policy_block() {
+  # Declining writes no member at all, which is a real choice rather than an
+  # empty one: the same rules stay in force through the built-in default, they
+  # are simply not editable from the Admin Portal. The emitted block carries
+  # its own trailing comma, so omitting it leaves valid JSON.
+  [ "${CAPTURE_POLICY_ENABLED:-true}" = "true" ] || return 0
+
+  cat <<'POLICYEOF'
+  "capturePolicy": {
+    "rules": [
+      { "pattern": "**/node_modules/**", "disposition": "Drop" },
+      { "pattern": "**/.git/**", "disposition": "Drop" },
+      { "pattern": "**/dist/**", "disposition": "Drop" },
+      { "pattern": "**/build/**", "disposition": "Drop" },
+      { "pattern": "**/coverage/**", "disposition": "Drop" },
+      { "pattern": ".env", "disposition": "Drop" },
+      { "pattern": ".env.*", "disposition": "Drop" },
+      { "pattern": "**/generated/**", "disposition": "Drop" },
+      { "pattern": "**/*.generated.*", "disposition": "Drop" },
+      { "pattern": "**/*.d.ts", "disposition": "Drop" },
+      { "pattern": "**/__tests__/**", "disposition": "Drop" },
+      { "pattern": "**/tests/**", "disposition": "Drop" },
+      { "pattern": "**/*.test.ts", "disposition": "Drop" },
+      { "pattern": "**/*.test.tsx", "disposition": "Drop" },
+      { "pattern": "**/*.test.js", "disposition": "Drop" },
+      { "pattern": "**/*.test.jsx", "disposition": "Drop" },
+      { "pattern": "**/*.spec.ts", "disposition": "Drop" },
+      { "pattern": "**/*.spec.tsx", "disposition": "Drop" },
+      { "pattern": "**/*.spec.js", "disposition": "Drop" },
+      { "pattern": "**/*.spec.jsx", "disposition": "Drop" },
+      { "pattern": "**/benchmarks/**", "disposition": "Drop" },
+      { "pattern": "**/fixtures/**", "disposition": "Drop" },
+      { "pattern": "**/*.wasm*", "disposition": "Drop" },
+      { "pattern": "**/*.min.*", "disposition": "Drop" },
+      { "pattern": "**/*.map", "disposition": "Drop" },
+      { "pattern": "**/lock.yaml", "disposition": "Drop" },
+      { "pattern": "**/pnpm-lock.yaml", "disposition": "Drop" },
+      { "pattern": "**/package-lock.json", "disposition": "Drop" },
+      { "pattern": "**/bun.lockb", "disposition": "Drop" },
+      { "pattern": "**/yarn.lock", "disposition": "Drop" }
+    ],
+    "maxMatchWork": 100000,
+    "maxIgnorePatterns": 1024
+  },
+POLICYEOF
+}
+
 # installer_write_config <config_file> <api_key>
 #
 # Write the wizard's config.json. Reads the tunables the wizard resolved as
 # globals (DATABASE_URL, EMBEDDING_MODEL, OLLAMA_URL, LLM_MODEL, CODE_MODEL,
-# SEARCH_QU_ENABLED, SEARCH_RERANK_ENABLED, DATA_DIR) and takes the key
+# DATA_DIR, and one *_ENABLED global per prompted feature) and takes the key
 # explicitly, because the key is the one field that must survive a rewrite.
+#
+# Every *_ENABLED default below is the literal this template used to hardcode,
+# so a caller that sets none of them writes the same config.json as before.
+# The two exceptions are deliberate and new: `scheduler`, which no install had
+# at all (leaving the Admin Portal's Scheduler tab blank and periodic jobs
+# unreachable without setting process env vars), and `capturePolicy`, written
+# explicitly so the rules dropping files from the index are visible rather
+# than implicit.
 #
 # Lives here rather than inline in setup-local-first.sh so the provisioning
 # contract can be executed by scripts/tests/test-setup-local-first-api-key.sh
@@ -109,6 +201,8 @@ installer_report_api_key() {
 installer_write_config() {
   local config_file="$1"
   local api_key="$2"
+  local dimensions
+  dimensions="$(installer_embedding_dimensions "${EMBEDDING_MODEL}")"
 
   mkdir -p "$(dirname "$config_file")"
 
@@ -124,10 +218,10 @@ installer_write_config() {
     "provider": "ollama",
     "model": "${EMBEDDING_MODEL}",
     "baseURL": "${OLLAMA_URL}",
-    "dimensions": 4096
+    "dimensions": ${dimensions}
   },
   "llm": {
-    "enabled": true,
+    "enabled": ${LLM_ENABLED:-true},
     "baseUrl": "http://localhost:11434/v1",
     "apiKey": "ollama",
     "model": "${LLM_MODEL}",
@@ -169,14 +263,14 @@ installer_write_config() {
       "coldThreshold": 0.2
     },
     "bootstrap": {
-      "enabled": true,
+      "enabled": ${MEMORY_BOOTSTRAP_ENABLED:-true},
       "maxSeedMemories": 8,
       "centralityLimit": 10,
       "gitLogLimit": 20,
       "refreshEnabled": true
     },
     "autoImprove": {
-      "enabled": true,
+      "enabled": ${MEMORY_AUTO_IMPROVE_ENABLED:-true},
       "reviewGate": false,
       "minObservations": 8,
       "minIntervalMs": 300000,
@@ -186,22 +280,59 @@ installer_write_config() {
       "minFixHits": 2
     },
     "autoImportance": {
-      "enabled": true
+      "enabled": ${MEMORY_AUTO_IMPORTANCE_ENABLED:-true}
     }
   },
   "hooks": {
-    "enabled": true,
+    "enabled": ${HOOKS_ENABLED:-true},
     "maxPayloadBytes": 65536,
     "queue": {
       "maxPending": 256
     },
     "bridge": {
-      "enabled": true,
+      "enabled": ${HOOKS_BRIDGE_ENABLED:-true},
       "minObservations": 8,
       "minIntervalMs": 300000,
       "maxWindow": 8
     }
   },
+  "handoffs": {
+    "enabled": ${HANDOFFS_ENABLED:-true}
+  },
+  "impact": {
+    "bfsCteEnabled": ${IMPACT_BFS_CTE_ENABLED:-false}
+  },
+  "synapse": {
+    "enabled": ${SYNAPSE_ENABLED:-true}
+  },
+  "scheduler": {
+    "enabled": ${SCHEDULER_ENABLED:-true},
+    "tickMs": 60000,
+    "maxConcurrent": 2,
+    "jobs": {
+      "memory-consolidation": {
+        "enabled": ${SCHEDULER_CONSOLIDATION_ENABLED:-true},
+        "intervalMs": 1800000
+      },
+      "decay-sweep": {
+        "enabled": ${SCHEDULER_DECAY_ENABLED:-true},
+        "intervalMs": 3600000
+      },
+      "auto-improve": {
+        "enabled": ${SCHEDULER_AUTO_IMPROVE_ENABLED:-false},
+        "intervalMs": 1800000
+      },
+      "observation-bridge": {
+        "enabled": ${SCHEDULER_OBSERVATION_BRIDGE_ENABLED:-false},
+        "intervalMs": 1800000
+      },
+      "checkpoint-purge": {
+        "enabled": ${SCHEDULER_CHECKPOINT_PURGE_ENABLED:-false},
+        "intervalMs": 3600000
+      }
+    }
+  },
+$(installer_capture_policy_block)
   "dataDir": "${DATA_DIR}",
   "logging": {
     "level": "info",

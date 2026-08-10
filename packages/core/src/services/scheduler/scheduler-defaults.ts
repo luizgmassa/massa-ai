@@ -29,7 +29,7 @@
  * DELETE of already-expired rows, not an indexing job.
  */
 
-import { loadConfigSafe, logger } from "@massa-ai/shared";
+import { loadRawUserConfig, logger } from "@massa-ai/shared";
 import type { Scheduler } from "./scheduler.js";
 import type { JobKind, ScheduleSpec } from "./scheduler-types.js";
 
@@ -148,15 +148,27 @@ function envNum(key: string, fileValue: number | undefined, fallback: number): n
 
 /**
  * Never-throwing accessor for the raw file-config `scheduler.jobs` block
- * (SCH-06) — mirrors `packages/shared/src/config/index.ts`'s own
- * `readSchedulerConfig()` wrapper, reading `config.json` fresh via
- * `loadConfigSafe()` (itself never-throwing) rather than the eagerly
- * resolved `config.get("scheduler")` singleton (see `envBool`/`envNum`
- * above for why that distinction matters here).
+ * (SCH-06), reading `config.json` fresh via `loadRawUserConfig()` (itself
+ * never-throwing).
+ *
+ * It must be the RAW file read, and there are now two ways to get that wrong.
+ * `config.get("scheduler")` is the one `envBool`/`envNum` above already warn
+ * about: fully resolved, never `undefined`. `loadConfigSafe()` is the second,
+ * and it is the one that actually shipped a defect — it folds
+ * `defaultMassaAiConfig` in, so once the scheduler gained real defaults every
+ * job's `enabled` arrived as a defined `false` and `envBool`'s `fileValue ??
+ * fallback` could no longer reach `applySafeDefaults`. The safe-defaults
+ * preset silently stopped enabling anything, with `MASSA_AI_SCHEDULER_SAFE_
+ * DEFAULTS=true` still set.
+ *
+ * The distinction this file depends on is between "the user wrote false" and
+ * "the user wrote nothing". Only a raw read can tell those apart, and only
+ * that distinction lets a user's explicit `false` beat the preset while the
+ * mere default does not.
  */
 function readFileSchedulerJobs(): Record<string, FileSchedulerJob> | undefined {
   try {
-    const raw = loadConfigSafe().scheduler?.jobs;
+    const raw = loadRawUserConfig().scheduler?.jobs;
     return raw as Record<string, FileSchedulerJob> | undefined;
   } catch {
     return undefined;

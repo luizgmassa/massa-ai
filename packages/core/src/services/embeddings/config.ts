@@ -5,7 +5,7 @@
  * Supports: OpenAI, Google, Cohere, Ollama (local), Mistral
  */
 
-import { parsePositiveIntEnv, loadConfigSafe } from "@massa-ai/shared/config";
+import { parsePositiveIntEnv, loadConfigSafe, resolveEmbeddingDimensions } from "@massa-ai/shared/config";
 import { logger } from "@massa-ai/shared";
 
 export interface EmbeddingProviderConfig {
@@ -230,13 +230,36 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
   ollama: (() => {
     const file = fileFor("ollama");
     const model = process.env.OLLAMA_EMBEDDING_MODEL || file?.model || "qwen3-embedding:4b";
+    // `env > the model's known native width > config.json > default`. The
+    // known width outranks config.json deliberately: fixing the installer
+    // template only fixes what a NEW install writes, and an install carrying
+    // `qwen3-embedding:4b` beside `4096` does not degrade — every embedding
+    // path throws DimensionMismatchError, because `createEmbeddingProvider`
+    // refuses to fall through rather than silently losing retrieval quality.
+    // A known model's width is a fact, not a preference, so correcting it here
+    // is what lets an existing install recover without hand-editing JSON. An
+    // unknown model keeps whatever the file says — it may be a truncated or
+    // fine-tuned variant whose width only the user knows.
+    // Only a finite positive integer counts as an env override. The previous
+    // form was `env ? Number(env) : …`, which turned a typo into `NaN` and
+    // configured the provider with it; falling through to the model's known
+    // width is strictly better than that and cannot mask a valid value.
+    const rawEnvDimensions = Number(process.env.OLLAMA_EMBEDDING_DIMENSIONS);
+    const envDimensions =
+      Number.isInteger(rawEnvDimensions) && rawEnvDimensions > 0 ? rawEnvDimensions : undefined;
+    const resolvedDimensions = resolveEmbeddingDimensions(model, file?.dimensions, envDimensions);
+    if (resolvedDimensions.correctedFrom !== undefined) {
+      logger.warn(
+        `[ollama] config.json records embedding.dimensions ${resolvedDimensions.correctedFrom} for model ` +
+          `"${model}", which emits ${resolvedDimensions.dimensions}. Using ${resolvedDimensions.dimensions}. ` +
+          "Update embedding.dimensions in config.json (or set OLLAMA_EMBEDDING_DIMENSIONS) to silence this.",
+      );
+    }
     return {
       provider: "ollama",
       model,
       baseURL: process.env.OLLAMA_BASE_URL || file?.baseURL || "http://localhost:11434",
-      dimensions: process.env.OLLAMA_EMBEDDING_DIMENSIONS
-        ? Number(process.env.OLLAMA_EMBEDDING_DIMENSIONS)
-        : (file?.dimensions ?? 2560),
+      dimensions: resolvedDimensions.dimensions,
       priority: selectedProvider === "ollama" ? 1 : 50, // Highest priority by default (selectedProvider falls back to ollama)
       timeout: 300000, // 5 minutes (local can be slow on first run)
       maxRetries: 2,

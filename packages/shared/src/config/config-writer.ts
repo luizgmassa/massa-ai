@@ -1,6 +1,12 @@
 import fs from "fs";
 import path from "path";
-import { loadConfig, saveConfig, getConfigPath, writeFileAtomically } from "./config-loader";
+import {
+  loadConfig,
+  saveConfig,
+  getConfigPath,
+  writeFileAtomically,
+  mergeSchedulerSection,
+} from "./config-loader";
 import { SCHEDULER_JOB_KINDS, type MassaAiConfig } from "./massa-ai-config";
 
 const MASK_SENTINEL = "***";
@@ -424,6 +430,16 @@ export function savePartialConfig(partial: Partial<MassaAiConfig>): SavePartialC
   }
 
   const merged: MassaAiConfig = { ...current, ...mergedPartial };
+
+  // Sections merge by top-level replacement, which is wrong for `scheduler`
+  // alone: it is the one section the Admin Portal can submit a single field
+  // of, and the replacement would drop `tickMs`, `maxConcurrent` and the five
+  // job rows out of config.json. Only merge when the save actually names the
+  // section — an untouched `current.scheduler` must pass through byte-identical
+  // or `changedRestartSections` reports a restart nobody asked for.
+  if (mergedPartial.scheduler !== undefined) {
+    merged.scheduler = mergeSchedulerSection(current.scheduler, mergedPartial.scheduler);
+  }
 
   const configPath = getConfigPath();
   if (fs.existsSync(configPath)) {

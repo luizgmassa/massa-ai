@@ -1,6 +1,49 @@
 # massa-ai Spec State
 
-## Current — Installer/Restart/Dims batch (**VALIDATED PASS ×3 2026-08-09** — 10 commits, verifier independent; push/PR next)
+## Current — Admin Portal config + installer defaults (**GATES GREEN 2026-08-10** — 7 commits; push/PR next, DO NOT MERGE)
+
+- projectId `massa-ai` · workflowSessionId `debug-admin-portal-config-installer-defaults` ·
+  workflow **debug** · branch `fix/admin-portal-config-installer-defaults` from
+  `origin/main` @ `398dc647` (v1.47.0), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-admin-config-defaults`.
+- Report: `.specs/debug/admin-portal-config-installer-defaults/REPORT.md` (debug
+  workflow Output Contract; `check_specs_delivered.ts --kind debug` gates it).
+- Five reported symptoms, four root causes. Logs-tab 404 and the missing Claude
+  profile row were **one** cause: `@elysiajs/node` defaults `reusePort` to true, so
+  a stale server bound beside the live one and macOS routed every request to the
+  first-bound socket. Also: `defaultMassaAiConfig` carried neither `scheduler` nor
+  `capturePolicy` (14 of 16 portal sections); the installer template hardcoded
+  `dimensions: 4096` beside a 2560-wide model; and the installer's prompt sat behind
+  a first-run-only gate.
+- Found while fixing, not reported: `savePartialConfig` erased the rest of the
+  scheduler block on a one-field save and reported a phantom restart every time;
+  the opencode config CLI still wrote nomic-embed-text/768 while the mcp-client copy
+  wrote qwen3-embedding:4b/2560; the README contradicted the file it cited.
+- **Regression caught during verification and fixed** (`aa4d3ae8`): giving
+  `scheduler` defaults made the file layer unable to report absence, so
+  `MASSA_AI_SCHEDULER_SAFE_DEFAULTS=true` silently stopped enabling any job.
+  `loadRawUserConfig()` restores that distinction. Measured against the same file on
+  `main` @ `398dc647`: main 26/0, branch 22/4 before the fix.
+- Decision correction to surface at review: the chosen installer option's preview
+  showed `checkpoint-purge: true`, but its description named the existing
+  `MASSA_AI_SCHEDULER_SAFE_DEFAULTS` preset, and `applySafeDefaults` enables only
+  memory-consolidation + decay-sweep. The named mechanism won — checkpoint-purge
+  ships **off**. Runtime literal `scheduler.enabled` stays `false`; only the
+  installer writes `true`.
+- Gates (real exit codes, all 0): lint · type-check 6/6 · build 5/5 ·
+  `turbo test --force` 11/11 (157/157 core groups) · `test:scripts` 1773/0 + 8 shell
+  groups · `test:plugins` 135/0 · web-ui 522/0 · security-allowlist PASS 0
+  violations · setup-local-first api-key 26/0. Scratch `XDG_CONFIG_HOME` on every
+  run.
+- Known environmental noise on this host: `mcp-client`
+  `embedded-api-client-endpoints.test.ts` hit the 5 s per-test timeout 4× inside a
+  10-way turbo run, then passed standalone (97/0, 923 ms) and on re-run. Host load
+  5.15 with a permanent runaway (PID 75218, ~99% CPU since 30 Jul). CI unaffected.
+- Next: push + PR. **No self-merge** — merging `main` auto-cuts a release, and that
+  go-ahead was explicitly withheld. CHANGELOG carries `### Added` + `### Fixed`
+  under `[Unreleased]` → a **minor** bump on merge.
+
+## Previous — Installer/Restart/Dims batch (**MERGED 2026-08-09 as PR #100** — 10 commits, verifier independent)
 
 - projectId `massa-ai` · workflowSessionId `spec-installer-marketplace-update` ·
   workflow spec-driven · branch `spec/installer-restart-embedding` from `main`
@@ -34,9 +77,9 @@
   embedded-endpoints flakes on cold local Ollama (warm run green; CI
   unaffected); `test-plugin-auto-install` harness-uninstall case needs
   `bun run build` (opencode dist) in a fresh worktree.
-- Next: push + PR (one PR, three features, CHANGELOG has Added+Fixed →
-  minor release on merge). No self-merge — PR handed to Luiz. Machine-side
-  file-route migration runbook lives in HANDOFF.
+- Closed: merged as PR #100 (`bf2d0de1`); the minor release it predicted cut as
+  part of the v1.4x line. Machine-side file-route migration runbook lives in
+  HANDOFF.
 
 
 

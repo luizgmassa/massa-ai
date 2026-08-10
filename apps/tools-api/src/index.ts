@@ -173,13 +173,37 @@ await listenAfterParserValidation({
     // the listen callback's server handle: `app.stop()` dispatches to the
     // web-standard adapter's stop under `adapter: node()` and throws
     // "Elysia isn't running" (measured; restart-e2e.test.ts guards this).
-    app.listen(PORT, (server) => {
-      // The `void` is intentional: server.stop() → net.Server.close() only
-      // schedules the fd close, and the drain's next await (Prisma
-      // disconnect) yields the ticks that complete it. Do not "fix" this to
-      // await a value stop() does not provide.
-      setServerStopper(() => void (server as unknown as { stop: () => unknown }).stop());
-    });
+    // `reusePort: false` is load-bearing, not a tidy-up. `@elysiajs/node`
+    // defaults it to TRUE, so `app.listen(PORT, cb)` binds a SECOND process
+    // over a live server with no error at all: both listen callbacks fire,
+    // both PIDs appear in `lsof -iTCP:3333`, and macOS routes every request
+    // to the FIRST-bound socket. A restarted API then serves nothing while a
+    // stale process answers forever — measured, and the cause of a real
+    // split-brain where /api/v1/logs 404'd and the Claude profile row came
+    // back empty from a server three weeks out of date. Plain `node:http` on
+    // the same Bun raises EADDRINUSE cross-process; only the adapter's
+    // default suppresses it. Isolated: `exclusive: true` alone does NOT
+    // restore the error.
+    try {
+      app.listen({ port: Number(PORT), reusePort: false }, (server) => {
+        // The `void` is intentional: server.stop() → net.Server.close() only
+        // schedules the fd close, and the drain's next await (Prisma
+        // disconnect) yields the ticks that complete it. Do not "fix" this to
+        // await a value stop() does not provide.
+        setServerStopper(() => void (server as unknown as { stop: () => unknown }).stop());
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === "EADDRINUSE") {
+        console.error(
+          `Port ${PORT} is already in use — another massa-ai Tools API is running.\n` +
+            `Stop it first, or start this one on another port:\n` +
+            `  lsof -nP -iTCP:${PORT} -sTCP:LISTEN\n` +
+            `  MASSA_AI_API_PORT=<other> bun run dev:api`,
+        );
+        process.exit(1);
+      }
+      throw error;
+    }
   },
   onValidationFailure: (error) => {
     console.error(

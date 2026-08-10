@@ -553,6 +553,109 @@ describe("GET /api/v1/logs/stream — SSE tail", () => {
   });
 });
 
+// ── The live tail follows the SINK FILE, not just this process's buffer ─────
+//
+// The buffer holds only entries THIS process logged, while the sink is written
+// by every massa-ai process — including the stdio MCP server, which is where
+// most of an install's traffic comes from. Subscribing to the buffer alone
+// made the tail correct and useless: an idle API server streamed nothing while
+// the file grew, so a refresh (a range query over the file) was the only thing
+// that ever showed the new lines.
+
+describe("GET /api/v1/logs/stream — tails the sink file (cross-process entries)", () => {
+  afterEach(() => {
+    delete process.env.MASSA_AI_SSE_SINK_POLL_MS;
+  });
+
+  test("a line appended by ANOTHER writer reaches the stream, with nothing in this process's buffer", async () => {
+    process.env.MASSA_AI_SSE_SINK_POLL_MS = "20";
+    const sink = loggingConfigFixture.file as string;
+    // The sink exists and has prior content, so the tail starts at its END:
+    // history belongs to the range query, not to a live tail.
+    fs.writeFileSync(sink, formatLine("2026-01-01T00:00:00.000Z", "INFO", "old line") + "\n");
+
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    expect(res.status).toBe(200);
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    try {
+      // Appended the way a different process would: the API server's own
+      // logBuffer is never touched here.
+      fs.appendFileSync(sink, formatLine("2026-01-01T00:00:01.000Z", "WARN", "from another process") + "\n");
+
+      let text = "";
+      // Read until a data: frame arrives (heartbeats and chunk boundaries
+      // mean one read is not guaranteed to be the frame).
+      for (let i = 0; i < 40 && !text.includes("data: "); i++) {
+        const { value } = await reader.read();
+        text += decoder.decode(value ?? new Uint8Array(), { stream: true });
+      }
+      const frame = text.split("\n\n").find((f) => f.startsWith("data: "));
+      expect(frame).toBeDefined();
+      const parsed = JSON.parse(frame!.slice("data: ".length).trim());
+      expect(parsed.message).toBe("from another process");
+      expect(parsed.level).toBe("warn");
+      // Emphatically not from the buffer — the entry was never pushed there.
+      expect(logBuffer.snapshot()).toEqual([]);
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
+  }, 15_000);
+
+  test("pre-existing content is not replayed into the tail", async () => {
+    process.env.MASSA_AI_SSE_SINK_POLL_MS = "20";
+    const sink = loggingConfigFixture.file as string;
+    fs.writeFileSync(
+      sink,
+      formatLine("2026-01-01T00:00:00.000Z", "INFO", "history one") + "\n" +
+        formatLine("2026-01-01T00:00:01.000Z", "INFO", "history two") + "\n",
+    );
+
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    try {
+      fs.appendFileSync(sink, formatLine("2026-01-01T00:00:02.000Z", "INFO", "the new one") + "\n");
+      let text = "";
+      for (let i = 0; i < 40 && !text.includes("data: "); i++) {
+        const { value } = await reader.read();
+        text += decoder.decode(value ?? new Uint8Array(), { stream: true });
+      }
+      expect(text).toContain("the new one");
+      expect(text).not.toContain("history one");
+      expect(text).not.toContain("history two");
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
+  }, 15_000);
+
+  test("with a readable sink the buffer is NOT also subscribed — no entry arrives twice", async () => {
+    // The file is a superset of the buffer (this process writes to it too), so
+    // tailing both would double every locally-logged line.
+    process.env.MASSA_AI_SSE_SINK_POLL_MS = "20";
+    fs.writeFileSync(loggingConfigFixture.file as string, "");
+    const before = liveSubscriberCount;
+
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    try {
+      expect(liveSubscriberCount).toBe(before);
+    } finally {
+      await res.body!.getReader().cancel().catch(() => {});
+    }
+  });
+
+  test("no readable sink falls back to the buffer subscription", async () => {
+    // No file written in this test, mirroring LOG-09's own degradation.
+    const before = liveSubscriberCount;
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    try {
+      expect(liveSubscriberCount).toBe(before + 1);
+    } finally {
+      await res.body!.getReader().cancel().catch(() => {});
+    }
+  });
+});
+
 // ── SSE heartbeat + max-duration auto-close, driven by the per-request env ─
 // ── overrides (mirrors events.test.ts's own approach) ───────────────────────
 

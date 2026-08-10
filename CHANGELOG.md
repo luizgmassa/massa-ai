@@ -7,6 +7,147 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The installer now asks about every feature, on every install.**
+  `setup-local-first.sh` wrapped its prompt in a first-run guard, so once `.env`
+  existed there was no supported way to change an answer from the installer —
+  and only two answers existed to change. LLM, memory bootstrap, auto-improve,
+  auto-importance, hooks and the hook bridge were hardcoded `true` in the config
+  template, while impact analysis, Synapse, handoffs, the scheduler and the
+  capture policy had no prompt at all: nine of the Admin Portal's Config
+  sections were decided for the user and never shown. All four groups (Search;
+  LLM/Memory/Hooks/Handoffs; Impact Analysis/Synapse; Scheduler/Capture Policy)
+  are now asked, every answer prefilled from the `config.json` already on disk,
+  so Enter keeps what is installed and a re-run is both a safe no-op and the way
+  to change your mind. The "do not ask twice in one install" property the old
+  first-run gate was really after is now a once-per-install marker, so
+  `install.sh` asking first suppresses the wizard's copy rather than the mere
+  presence of a file doing it. Both installers source one prompt library
+  (`scripts/lib/installer-feature-prompts.sh`) instead of the pasted copies that
+  had already drifted in their tty redirection; reading `config.json` goes
+  through node/bun because bash cannot parse JSON safely, and only lines the
+  reader itself produced (`NAME=true` / `NAME=false`) are evaluated, so a
+  hostile `config.json` cannot reach the shell. A missing runtime, an absent
+  file and a corrupt file all fall back to the built-in defaults rather than
+  failing an install.
+
+### Fixed
+
+- **A second API process could silently bind an already-served port.**
+  `@elysiajs/node` defaults `reusePort` to true, so `app.listen(PORT, cb)` bound
+  a second process over a live server with no error at all: both listen
+  callbacks fired, both PIDs appeared in `lsof -iTCP:3333`, and macOS routed
+  every request to the first-bound socket. A restarted API then served nothing
+  while a stale process answered forever — which is what made `/api/v1/logs`
+  return `NOT_FOUND` and the Claude row of `/api/v1/profiles` come back with an
+  empty `availableProfiles`, both from a server three weeks out of date, while
+  the current process sat unused on the same port. `index.ts` now passes
+  `reusePort: false`, restoring the cross-process `EADDRINUSE` that plain
+  `node:http` raises on the same Bun; isolated per option, `exclusive: true`
+  alone does not restore it.
+- **Scheduler and Capture Policy rendered blank in the Config tab.**
+  `GET /api/v1/config` returned fourteen of the portal's sixteen sections:
+  `defaultMassaAiConfig` carried no `scheduler` key and `capturePolicy:
+  undefined`, and `loadConfig()` deep-merges eleven named sections including
+  neither — so the Scheduler tab had no fields and the Capture Policy tab said
+  "not configured" while thirty Drop rules were dropping files from every index.
+  Both now resolve to a real value, the scheduler literals mirroring what
+  `config/index.ts` already resolves as `env > config.json > literal`.
+  `scheduler.enabled` deliberately stays `false` in that literal — flipping it
+  would start five background jobs on every existing install and every CI run at
+  upgrade time — so the installer's prompt is where a user opts in.
+  `DEFAULT_POLICY`'s thirty rules were declared twice, in core and beside the
+  shared config layer; `shared` now owns the single declaration and core
+  re-exports it, which is the only legal direction. Because a section with
+  defaults can no longer report itself absent, `@massa-ai/shared` also exports
+  `loadRawUserConfig()` — the literal contents of `config.json` with nothing
+  merged in — for the callers that resolve `env > config.json > their own
+  fallback` and need the middle layer to be able to say nothing. The scheduler's
+  own registration is one: reading the merged view there made
+  `MASSA_AI_SCHEDULER_SAFE_DEFAULTS=true` stop enabling anything, because every
+  job's `enabled` arrived as a defined `false`. A user's explicit `false` in
+  `config.json` still overrides the preset; only the default no longer does.
+- **Saving one scheduler field erased the rest of the block.**
+  `savePartialConfig` replaced a top-level section wholesale, so the portal
+  ticking one checkbox wrote `{"enabled":true}` over the stored block and a
+  hand-tuned job interval was gone from `config.json`. It also reported a
+  restart as needed on every scheduler save, because the stored value it
+  compared against had been filled in by `loadConfig` and the freshly-written
+  one had not. Both sides now share one merge.
+- **A fresh install started with an embedding width its own model cannot emit.**
+  The `config.json` template in `scripts/lib/installer-api-key.sh` hardcoded
+  `"dimensions": 4096` beside a `qwen3-embedding:4b` model, which produces 2560.
+  The width now derives from the model through a table mirroring the
+  alternatives `.env.example` documents, and an unrecognized model falls back to
+  the reference default rather than to the largest number in the file. The
+  template also gains the two sections no install has ever written: `scheduler`
+  (the safe-defaults preset — memory-consolidation and decay-sweep only,
+  matching `applySafeDefaults`, with auto-improve, observation-bridge and
+  checkpoint-purge off) and an explicit `capturePolicy`, so the rules dropping
+  files from the index are visible and editable. Every feature toggle became a
+  variable whose default is the literal the template used to hardcode, so a
+  caller that sets none of them writes the same `config.json` as before.
+- **An install created before the template fix kept an embedding width its model
+  cannot emit, and every embedding call failed.** Correcting the installer only
+  fixes what a *new* install writes; a machine already carrying
+  `qwen3-embedding:4b` beside `"dimensions": 4096` kept it, and that is not
+  cosmetic — `createEmbeddingProvider` refuses to fall through on a dimension
+  mismatch (deliberately, so retrieval never silently degrades), so every
+  embedding path threw `DimensionMismatchError` until the file was hand-edited.
+  Note that `bun run diagnose` reports the *model's* width and so looks healthy
+  either way. The width now resolves `env > the model's known native width >
+  config.json > default`: a known model's width is a fact rather than a
+  preference, so it outranks a file value contradicting it and warns once, while
+  an explicit env var still wins and an unknown model keeps whatever the file
+  says. A non-numeric `OLLAMA_EMBEDDING_DIMENSIONS`, which previously reached
+  the provider as `NaN`, now falls through to the known width.
+- **The Logs tab's live tail showed nothing on an idle server, because it only
+  followed the API process's own entries.** `GET /api/v1/logs/stream` subscribed
+  to the in-process ring buffer, while the file sink is appended by *every*
+  massa-ai process — including the stdio MCP server, which is where most of an
+  install's log traffic comes from. The stream now tails the newest sink file
+  instead, falling back to the buffer only when no sink is readable (mirroring
+  the range query's own degradation); it is not both, because the file is a
+  superset of the buffer and tailing both would double every local entry. The
+  tail starts at end-of-file so history is not replayed, follows rotation by
+  re-listing rather than holding a descriptor, carries partial trailing lines
+  between polls, and caps each read so a burst is delayed rather than dropped.
+  Poll interval overridable with `MASSA_AI_SSE_SINK_POLL_MS`.
+- **The Capture Policy "Rules (JSON)" field showed `[object Object]` once per
+  rule, and could not be saved.** The field was declared as a string list, whose
+  renderer joins the array — correct for CORS origins, wrong for a list of
+  `{pattern, disposition}` objects — and whose save path splits the input on
+  commas, so submitting the form sent one junk string per rule to a validator
+  that requires objects. It is now a JSON textarea that round-trips the
+  structure, distinguishes an empty box (block absent, built-in `DEFAULT_POLICY`
+  applies) from an empty rule list, and reports unparseable JSON in a banner
+  instead of submitting it. The section only became reachable when
+  `capturePolicy` gained a default, above.
+- **The Logs tab's live tail did not survive a page refresh, and showed nothing
+  when the range matched no rows.** The stream was never at fault — the server
+  emits frames correctly — but Live was held only in page state, so every reload
+  silently turned it off, and it is now persisted across reloads (an in-page
+  toggle still wins). Separately, streamed rows are appended straight into the
+  results table so no range query is re-issued, and the empty state rendered no
+  table at all: every live entry landed nowhere until a refresh's range query
+  displayed it. The table shell is now rendered for a zero-row range while Live
+  is on, and the "no entries match this range" note is removed once a row lands
+  beneath it. Live remains scoped to the API server process — entries from the
+  stdio MCP server still appear only in a range query, as the tab discloses.
+- **`massa-ai-config use ollama` wrote different embedding defaults depending on
+  which copy of the CLI you ran.** `apps/opencode-plugin`'s config CLI still
+  defaulted to nomic-embed-text/768 while `apps/mcp-client`'s wrote
+  qwen3-embedding:4b/2560 — the earlier sweep corrected one copy of a duplicated
+  surface and left the other. Each pair was internally consistent, which is why
+  nothing caught it: the defect was divergence between writers, not a mismatch
+  inside one. `embedding-defaults-parity.test.ts` gains a completeness scan keyed
+  on the defect's shape (any file writing an embedding block with a literal
+  width, asserted as an exact set) rather than on the one literal
+  `OLLAMA_EMBEDDING_` that the installer template has never contained, plus an
+  explicit cross-writer check comparing the two CLIs to each other. The README
+  claimed a default embedding model contradicted by the file it cited.
+
 ## [1.47.0] - 2026-08-10
 
 ### Added

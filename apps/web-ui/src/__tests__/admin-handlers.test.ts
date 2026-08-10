@@ -2082,6 +2082,44 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     expect(request).not.toHaveBeenCalled();
   });
 
+  it("patches a streamed row into an empty-range tbody and drops the stale empty note", async () => {
+    // Both halves of the empty-range case: the row has somewhere to land, and
+    // "No log entries match this range" stops sitting above a table that now
+    // has one. Removing the note rather than re-rendering keeps this an
+    // append — LOG-14 forbids re-issuing the range query on this path.
+    const sseChunks = [
+      'data: {"seq":1,"ts":"2026-08-09T00:00:00.000Z","level":"info","message":"live one"}\n\n',
+    ];
+    (globalThis as any).fetch = mock(async () => makeSseResponse(sseChunks));
+    const request = mock(async () => ({ success: true, data: { entries: [], total: 0 } }));
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request, authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    // `makeRoot` resolves only `#id` and `[data-*=…]` selectors, so it returns
+    // null for both selectors this path uses — against it the assertions would
+    // pass whether or not the code patched anything. This root answers exactly
+    // the two selectors production queries, and nothing else.
+    const tbody = { innerHTML: "" };
+    const dom: { emptyNote: { remove: () => void } | null } = { emptyNote: null };
+    dom.emptyNote = { remove: () => { dom.emptyNote = null; } };
+    ctx.root = {
+      children: [],
+      innerHTML: "",
+      querySelector: (sel: string) => {
+        if (sel === "table.logs-table tbody") return tbody;
+        if (sel === ".logs-empty") return dom.emptyNote;
+        return null;
+      },
+    };
+
+    await runLogsLiveStream(ctx);
+
+    expect(tbody.innerHTML).toContain("live one");
+    expect(dom.emptyNote).toBeNull(); // the stale "no entries" note was removed
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("sends the x-api-key auth header on the stream fetch", async () => {
     const fetchMock = mock(async () => makeSseResponse([]));
     (globalThis as any).fetch = fetchMock;

@@ -20,6 +20,48 @@ export function configExists(): boolean {
   return fs.existsSync(CONFIG_FILE);
 }
 
+type SchedulerSection = NonNullable<MassaAiConfig["scheduler"]>;
+type SchedulerJobs = NonNullable<SchedulerSection["jobs"]>;
+
+/** Merges each registered job row over a base row, so a partial row keeps the
+ *  fields it did not name. Unknown keys in `incoming` are ignored — the
+ *  registered kinds are the contract. */
+function mergeSchedulerJobs(
+  base: SchedulerJobs | undefined,
+  incoming: SchedulerJobs | undefined,
+): SchedulerJobs {
+  const defaults = defaultMassaAiConfig.scheduler?.jobs ?? {};
+  const merged: SchedulerJobs = {};
+  for (const kind of Object.keys(defaults) as Array<keyof SchedulerJobs>) {
+    merged[kind] = { ...defaults[kind], ...base?.[kind], ...incoming?.[kind] };
+  }
+  return merged;
+}
+
+/**
+ * Merges a scheduler section over a base one, one level deeper than a spread.
+ *
+ * Shared by `loadConfig` (defaults ← config.json) and `savePartialConfig`
+ * (stored ← submitted), and it has to be both places. `savePartialConfig`
+ * replaces a top-level section wholesale, so a submission naming only
+ * `{"enabled": true}` would erase `tickMs`, `maxConcurrent` and all five job
+ * rows from config.json — silently discarding any non-default interval the
+ * user had set. It also made every scheduler save report a restart as needed,
+ * because the stored value it was compared against had been filled in by
+ * `loadConfig` and the freshly-written one had not.
+ */
+export function mergeSchedulerSection(
+  base: SchedulerSection | undefined,
+  incoming: SchedulerSection | undefined,
+): SchedulerSection {
+  return {
+    ...defaultMassaAiConfig.scheduler,
+    ...base,
+    ...incoming,
+    jobs: mergeSchedulerJobs(base?.jobs, incoming?.jobs),
+  };
+}
+
 export function loadConfig(): MassaAiConfig {
   if (!fs.existsSync(CONFIG_FILE)) {
     return defaultMassaAiConfig;
@@ -43,6 +85,16 @@ export function loadConfig(): MassaAiConfig {
       hooks: { ...defaultMassaAiConfig.hooks, ...userConfig.hooks },
       handoffs: { ...defaultMassaAiConfig.handoffs, ...userConfig.handoffs },
       security: { ...defaultMassaAiConfig.security, ...userConfig.security },
+      // Needs a merge level of its own: a config.json carrying only
+      // `{"scheduler":{"enabled":true}}` would otherwise drop tickMs,
+      // maxConcurrent and all five job rows through the `...userConfig`
+      // spread, and the Admin Portal would render a Scheduler tab with one
+      // field on it.
+      scheduler: mergeSchedulerSection(undefined, userConfig.scheduler),
+      // Deliberately NOT merged: a rule list is ordered and first-match-wins,
+      // so merging a user's rules with the defaults would silently reorder
+      // their policy. A configured block replaces the default wholesale.
+      capturePolicy: userConfig.capturePolicy ?? defaultMassaAiConfig.capturePolicy,
     };
   } catch (error) {
     console.error(`Error loading config from ${CONFIG_FILE}:`, error);
@@ -51,10 +103,52 @@ export function loadConfig(): MassaAiConfig {
 }
 
 /**
+ * The literal contents of `config.json`, with NO defaults merged in — an absent
+ * file, an absent section and an absent field all stay `undefined`.
+ *
+ * This exists because {@link loadConfig} answers a different question. Its job
+ * is "what is the effective configuration", so it folds `defaultMassaAiConfig`
+ * in and never returns an absent section; that is what the Admin Portal needs,
+ * and it is why every one of its sections renders. But a caller resolving
+ * `env > config.json > its own fallback` needs the middle layer to be able to
+ * say *nothing* — otherwise `fileValue ?? fallback` always stops at the merged
+ * default and the caller's own fallback becomes dead code.
+ *
+ * `scheduler-defaults.ts` is exactly that caller, and it is why this function
+ * exists: its safe-defaults preset supplies `defaultEnabled: true` as the
+ * fallback layer, and folding the default `enabled: false` in as the "file"
+ * layer silently disabled the preset. Its docblock had already named the
+ * hazard for `config.get("scheduler")`; the defect arrived through
+ * `loadConfigSafe()` instead, which is the same hazard through a second door.
+ * A user's explicit `false` in config.json must still win over the preset —
+ * only the *default* must not — which is precisely the distinction a raw read
+ * preserves and a merged read destroys.
+ *
+ * Never throws: a missing file, unreadable file or malformed JSON all return an
+ * empty object, matching {@link loadConfigSafe}'s contract for a layer that
+ * must never abort startup.
+ */
+export function loadRawUserConfig(): Partial<MassaAiConfig> {
+  try {
+    if (!fs.existsSync(CONFIG_FILE)) return {};
+    const parsed = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    // A JSON scalar or array parses fine but is not a config object; treating
+    // it as one would hand callers `.scheduler` off a string.
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as Partial<MassaAiConfig>;
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Never-throwing wrapper around {@link loadConfig}. Returns the defaults on any
  * error (missing/invalid file, JSON parse failure, FS error). Used by env.ts
  * and config/index.ts where config.json is a best-effort middle-precedence
  * layer and must never abort startup.
+ *
+ * Returns the *effective* config, defaults folded in. When you need to know
+ * what the file itself actually said, use {@link loadRawUserConfig}.
  */
 export function loadConfigSafe(): MassaAiConfig {
   try {
