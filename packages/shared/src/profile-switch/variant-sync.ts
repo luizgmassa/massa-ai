@@ -38,8 +38,11 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import crypto from "node:crypto";
 import { HOSTS, type Host, resolveHostLayout } from "./hosts.js";
+import { readInstallState, type InstallState } from "./state.js";
+import { resolveClaudeMarketplaceRoot } from "./claude-marketplace.js";
 
 export interface VariantSyncHostResult {
   readonly host: Host;
@@ -62,6 +65,31 @@ export interface VariantSyncOptions {
   readonly sourceRoot: string | null;
   readonly targetHome?: string;
   readonly hosts?: readonly Host[];
+}
+
+function defaultStatePath(targetHome: string): string {
+  return path.join(targetHome, ".config", "massa-ai", "install-state.json");
+}
+
+/**
+ * Composes the claude marketplace install root once per call (design § 4c,
+ * verbatim — the same helper `engine.ts` carries for `listProfiles` /
+ * `switchProfile`, duplicated here rather than exported/imported: both are
+ * private, and the state each reads is loaded independently in its own
+ * caller). Every host but claude, and every claude install whose recorded
+ * route isn't `"marketplace"`, yields an empty map — `resolveHostLayout`
+ * then falls through to its normal `$HOME`-derived path, unchanged from
+ * before this task. An unresolvable claude root maps `claude` to `undefined`
+ * on purpose: `syncHost` treats that identically to "no marketplace root
+ * supplied" and falls through to the ordinary `$HOME`-derived layout, which
+ * still resolves deterministically to a path a plain (non-marketplace)
+ * claude install would use — there is no destructive write to guard against
+ * here, unlike `engine.ts`'s CPP-06 special case for `switchProfile`.
+ */
+function marketplaceRoots(targetHome: string, state: InstallState): Partial<Record<Host, string>> {
+  return state.platforms.claude?.installRoute === "marketplace"
+    ? { claude: resolveClaudeMarketplaceRoot({ targetHome }) ?? undefined }
+    : {};
 }
 
 let tempFileCounter = 0;
@@ -98,8 +126,13 @@ function isSafeDirName(name: string): boolean {
   return path.basename(name) === name;
 }
 
-function syncHost(host: Host, sourceRoot: string, targetHome: string | undefined): VariantSyncHostResult {
-  const layout = resolveHostLayout(host, { targetHome });
+function syncHost(
+  host: Host,
+  sourceRoot: string,
+  targetHome: string | undefined,
+  marketplaceRoot: Partial<Record<Host, string>>,
+): VariantSyncHostResult {
+  const layout = resolveHostLayout(host, { targetHome, marketplaceRoot });
   if (layout.route === "skip") {
     return { host, status: "skipped", profiles: [], retained: [], files: 0, reason: layout.reason };
   }
@@ -177,9 +210,16 @@ export function syncGeneratedVariants(opts: VariantSyncOptions): VariantSyncHost
   }
 
   const sourceRoot = opts.sourceRoot;
+  const targetHome = opts.targetHome ?? os.homedir();
+  // Read-only — never creates install-state.json or its parent directories;
+  // a missing file resolves to the empty v2 default (state.ts), so an
+  // absent state simply yields an empty marketplaceRoots() map below.
+  const state = readInstallState(defaultStatePath(targetHome));
+  const roots = marketplaceRoots(targetHome, state);
+
   return hosts.map((host) => {
     try {
-      return syncHost(host, sourceRoot, opts.targetHome);
+      return syncHost(host, sourceRoot, opts.targetHome, roots);
     } catch (err) {
       return { host, status: "failed", profiles: [], retained: [], files: 0, error: (err as Error).message };
     }

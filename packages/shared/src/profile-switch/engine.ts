@@ -18,6 +18,7 @@ import crypto from "node:crypto";
 import { HOSTS, type Host, resolveHostLayout, detectRoute, type HostFileLayout } from "./hosts.js";
 import { readInstallState, updatePlatform, UnwritableInstallStateError, type InstallState } from "./state.js";
 import { acquireLock, type AcquireLockOptions } from "./lock.js";
+import { resolveClaudeMarketplaceRoot } from "./claude-marketplace.js";
 import type { HostProfileState, ProfileInventory, HostSwitchResult, HostSwitchStatus, SwitchReport } from "./report.js";
 
 export class SwitchEngineError extends Error {
@@ -58,6 +59,35 @@ function resolveCommon(opts: CommonOpts): { targetHome: string; stateFilePath: s
   return { targetHome, stateFilePath };
 }
 
+/**
+ * Composes the claude marketplace install root once per call (design § 4c,
+ * verbatim — shared by `listProfiles`, `switchProfile`, and
+ * `variant-sync.ts`'s `syncGeneratedVariants`). Every host but claude, and
+ * every claude install whose recorded route isn't `"marketplace"`, yields an
+ * empty map — `resolveHostLayout` then falls through to its normal
+ * `$HOME`-derived (or `projectRoot`) path, unchanged from before this task.
+ * `undefined` for `claude` specifically means "route is marketplace but the
+ * root could not be resolved" — callers must special-case that (CPP-06),
+ * never pass it through to `resolveHostLayout` expecting a safe fallback.
+ */
+function marketplaceRoots(targetHome: string, state: InstallState): Partial<Record<Host, string>> {
+  return state.platforms.claude?.installRoute === "marketplace"
+    ? { claude: resolveClaudeMarketplaceRoot({ targetHome }) ?? undefined }
+    : {};
+}
+
+/** CPP-06: the reason string for a claude marketplace switch whose install
+ * root could not be resolved — names the registry path resolution was
+ * attempted against, per spec P1-Claude AC6 ("a reason naming the unresolved
+ * path"). */
+function claudeMarketplaceUnresolvedReason(targetHome: string): string {
+  const registryPath = path.join(targetHome, ".claude", "plugins", "installed_plugins.json");
+  return (
+    `claude installRoute is "marketplace" but no install root could be resolved from ${registryPath} ` +
+    "— re-run the Claude plugin installer, or verify the plugin registry file"
+  );
+}
+
 // ── listProfiles ─────────────────────────────────────────────────────────
 
 export interface ListProfilesOptions extends CommonOpts {
@@ -90,10 +120,26 @@ export interface ListProfilesOptions extends CommonOpts {
 export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
   const { targetHome, stateFilePath } = resolveCommon(opts);
   const state = readInstallState(stateFilePath);
+  const roots = marketplaceRoots(targetHome, state);
   const universe = opts.hosts ?? HOSTS;
 
   const hosts: HostProfileState[] = universe.map((host) => {
-    const layout = resolveHostLayout(host, { targetHome, projectRoot: opts.projectRoot });
+    // CPP-06: a marketplace route whose install root is unresolvable reports
+    // installed:false with no available profiles — never the file-route
+    // fallback resolveHostLayout would otherwise compute for claude.
+    if (host === "claude" && state.platforms.claude?.installRoute === "marketplace" && roots.claude === undefined) {
+      const platform = state.platforms.claude;
+      return {
+        host,
+        installed: false,
+        skipped: false,
+        skipReason: null,
+        activeProfile: platform.modelProfile?.profile ?? opts.hostDefaults?.[host] ?? "balanced",
+        bundleVersion: platform.plugin?.version ?? null,
+        availableProfiles: [],
+      };
+    }
+    const layout = resolveHostLayout(host, { targetHome, projectRoot: opts.projectRoot, marketplaceRoot: roots });
     if (layout.route === "skip") {
       return {
         host,
@@ -234,10 +280,31 @@ export function switchProfile(opts: SwitchProfileOptions): SwitchReport {
   const state: InstallState = readInstallState(stateFilePath);
   if (!dryRun) assertStateWritable(stateFilePath);
 
-  const layouts = universe.map((host) => ({ host, layout: resolveHostLayout(host, { targetHome, projectRoot: opts.projectRoot }) }));
-  const skipRows: HostSwitchResult[] = layouts
-    .filter((l) => l.layout.route === "skip")
-    .map((l) => ({ host: l.host, status: "skipped" as HostSwitchStatus, reason: (l.layout as { reason: string }).reason }));
+  const roots = marketplaceRoots(targetHome, state);
+
+  // CPP-06: a claude marketplace route whose install root cannot be resolved
+  // fails loud, naming the unresolved registry path, and is excluded from
+  // layout resolution entirely — never falling through to resolveHostLayout's
+  // file-route defaults for claude.
+  const unresolvedRows: HostSwitchResult[] = [];
+  const resolvableUniverse = universe.filter((host) => {
+    if (host !== "claude") return true;
+    if (state.platforms.claude?.installRoute !== "marketplace") return true;
+    if (roots.claude !== undefined) return true;
+    unresolvedRows.push({ host, status: "failed", reason: claudeMarketplaceUnresolvedReason(targetHome) });
+    return false;
+  });
+
+  const layouts = resolvableUniverse.map((host) => ({
+    host,
+    layout: resolveHostLayout(host, { targetHome, projectRoot: opts.projectRoot, marketplaceRoot: roots }),
+  }));
+  const skipRows: HostSwitchResult[] = [
+    ...unresolvedRows,
+    ...layouts
+      .filter((l) => l.layout.route === "skip")
+      .map((l) => ({ host: l.host, status: "skipped" as HostSwitchStatus, reason: (l.layout as { reason: string }).reason })),
+  ];
 
   const fileHosts = layouts.filter(
     (l): l is { host: Host; layout: HostFileLayout } => l.layout.route === "files",
@@ -287,7 +354,7 @@ export function switchProfile(opts: SwitchProfileOptions): SwitchReport {
         continue;
       }
 
-      const route = detectRoute(state.platforms[h.host]);
+      const route = detectRoute(state.platforms[h.host], h.host);
       if (route.kind === "refuse") {
         rows.push({ host: h.host, status: "failed", reason: route.reason });
         continue;
