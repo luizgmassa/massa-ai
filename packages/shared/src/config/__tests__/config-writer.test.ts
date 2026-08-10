@@ -641,6 +641,167 @@ describe("config-writer: savePartialConfig returns restartNeededSections", () =>
   });
 });
 
+// ── T4: scheduler save validation and restart section (SCH-04, SCH-05, SCH-07) ──
+
+describe("config-writer: scheduler validation bounds (SCH-04)", () => {
+  test("rejects tickMs below 1000, naming scheduler.tickMs", () => {
+    const { exitCode, stdout } = runWriter(
+      "scheduler-bad-tickms",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({ scheduler: { tickMs: 999 } });
+      console.log(JSON.stringify(result));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const result = JSON.parse(stdout);
+    expect(result.success).toBe(false);
+    expect(result.details.some((d: string) => d.includes("scheduler.tickMs"))).toBe(true);
+  });
+
+  test("rejects maxConcurrent below 1, naming scheduler.maxConcurrent", () => {
+    const { exitCode, stdout } = runWriter(
+      "scheduler-bad-maxconcurrent",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({ scheduler: { maxConcurrent: 0 } });
+      console.log(JSON.stringify(result));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const result = JSON.parse(stdout);
+    expect(result.success).toBe(false);
+    expect(result.details.some((d: string) => d.includes("scheduler.maxConcurrent"))).toBe(true);
+  });
+
+  test("rejects an intervalMs below 60000, naming the offending job path", () => {
+    const { exitCode, stdout } = runWriter(
+      "scheduler-bad-interval",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({
+        scheduler: { jobs: { "decay-sweep": { intervalMs: 59999 } } },
+      });
+      console.log(JSON.stringify(result));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const result = JSON.parse(stdout);
+    expect(result.success).toBe(false);
+    expect(result.details.some((d: string) => d.includes("scheduler.jobs.decay-sweep.intervalMs"))).toBe(true);
+  });
+
+  test("rejects an unknown scheduler.jobs key, naming that key", () => {
+    const { exitCode, stdout } = runWriter(
+      "scheduler-bad-job-key",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({
+        scheduler: { jobs: { "not-a-real-kind": { enabled: true } } },
+      });
+      console.log(JSON.stringify(result));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const result = JSON.parse(stdout);
+    expect(result.success).toBe(false);
+    expect(result.details.some((d: string) => d.includes("scheduler.jobs.not-a-real-kind"))).toBe(true);
+  });
+
+  test("accepts values at the exact bounds (1000, 1, 60000)", () => {
+    const { exitCode, stdout } = runWriter(
+      "scheduler-boundary-ok",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({
+        scheduler: {
+          enabled: true,
+          tickMs: 1000,
+          maxConcurrent: 1,
+          jobs: { "checkpoint-purge": { enabled: true, intervalMs: 60000 } },
+        },
+      });
+      console.log(JSON.stringify({ success: result.success }));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout).success).toBe(true);
+  });
+
+  test("a rejected scheduler save leaves config.json byte-unchanged", () => {
+    const { exitCode: seedExit } = runWriter(
+      "scheduler-reject-seed",
+      `
+      import { saveConfig } from ${JSON.stringify(LOADER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      saveConfig(defaultMassaAiConfig);
+      `,
+    );
+    expect(seedExit).toBe(0);
+
+    const before = fs.readFileSync(home.configPath, "utf-8");
+
+    const { exitCode, stdout } = runWriter(
+      "scheduler-reject-save",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      const result = savePartialConfig({ scheduler: { tickMs: 1 } });
+      console.log(JSON.stringify({ success: result.success }));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout).success).toBe(false);
+
+    const after = fs.readFileSync(home.configPath, "utf-8");
+    expect(after).toBe(before);
+
+    // No backup should have been created for a rejected save either.
+    const entries = fs.readdirSync(home.configDir);
+    expect(entries.filter((e) => e.startsWith("config.json.bak."))).toEqual([]);
+  });
+});
+
+describe("config-writer: scheduler restart section (SCH-07)", () => {
+  test("restartNeededSections includes scheduler whenever the key is present", () => {
+    const { exitCode, stdout } = runWriter(
+      "scheduler-restart-present",
+      `
+      import { restartNeededSections } from ${JSON.stringify(WRITER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+      const sections = restartNeededSections({ ...defaultMassaAiConfig, scheduler: { enabled: true } });
+      console.log(JSON.stringify(sections));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout)).toContain("scheduler");
+  });
+
+  test("changedRestartSections includes scheduler on a real change and excludes it on an unchanged re-save", () => {
+    const { exitCode, stdout, stderr } = runWriter(
+      "scheduler-changed-sections",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+
+      const scheduler = { enabled: true, tickMs: 30000 };
+      const first = savePartialConfig({ scheduler });
+      const resave = savePartialConfig({ scheduler: { ...scheduler } });
+      const changed = savePartialConfig({ scheduler: { ...scheduler, tickMs: 45000 } });
+      console.log(JSON.stringify({
+        first: first.success && first.changedRestartSections,
+        resave: resave.success && resave.changedRestartSections,
+        changed: changed.success && changed.changedRestartSections,
+      }));
+      `,
+    );
+    expect(stderr).toBe("");
+    expect(exitCode).toBe(0);
+    const out = JSON.parse(stdout);
+    expect(out.first).toContain("scheduler");
+    expect(out.resave).toEqual([]);
+    expect(out.changed).toContain("scheduler");
+  });
+});
+
 // ── APCR-08: secret files are owner-only, backups bounded ────────────────
 
 /** POSIX file mode bits, ignoring the file-type bits `fs.Stats.mode` also carries. */

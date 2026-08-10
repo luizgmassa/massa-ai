@@ -1,10 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { loadConfig, saveConfig, getConfigPath, writeFileAtomically } from "./config-loader";
-import type { MassaAiConfig } from "./massa-ai-config";
+import { SCHEDULER_JOB_KINDS, type MassaAiConfig } from "./massa-ai-config";
 
 const MASK_SENTINEL = "***";
-const RESTART_SECTIONS = ["database", "embedding", "llm", "security"];
+const RESTART_SECTIONS = ["database", "embedding", "llm", "security", "scheduler"];
 const VALID_EMBEDDING_PROVIDERS = ["ollama", "mistral", "openai", "google", "cohere"];
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"];
 /** Keep the 10 most recent `config.json.bak.<ISO>` files; delete older ones (APCR-08.4). No
@@ -40,6 +40,7 @@ export function restartNeededSections(config: MassaAiConfig): string[] {
     if (s === "embedding") return config.embedding !== undefined;
     if (s === "llm") return config.llm !== undefined;
     if (s === "security") return config.security !== undefined;
+    if (s === "scheduler") return config.scheduler !== undefined;
     return false;
   });
 }
@@ -328,6 +329,31 @@ function validatePartial(partial: Partial<MassaAiConfig>): string[] {
         details.push("security.allowedExtensions must be a non-empty array");
       else if (!sec.allowedExtensions.every((e) => typeof e === "string" && e.startsWith(".") && e.length >= 2))
         details.push("security.allowedExtensions[] must be dot-prefixed extensions");
+    }
+  }
+
+  if (partial.scheduler !== undefined) {
+    const sch = partial.scheduler;
+    if (sch.enabled !== undefined && !checkBoolean(sch.enabled))
+      details.push("scheduler.enabled must be a boolean");
+    if (sch.tickMs !== undefined && !checkNumber(sch.tickMs, 1000))
+      details.push("scheduler.tickMs must be a number >= 1000");
+    if (sch.maxConcurrent !== undefined && !checkNumber(sch.maxConcurrent, 1))
+      details.push("scheduler.maxConcurrent must be a number >= 1");
+    if (sch.jobs !== undefined) {
+      for (const [kind, job] of Object.entries(sch.jobs)) {
+        if (!(SCHEDULER_JOB_KINDS as readonly string[]).includes(kind)) {
+          details.push(
+            `scheduler.jobs.${kind} is not a registered job kind (expected one of: ${SCHEDULER_JOB_KINDS.join(", ")})`,
+          );
+          continue;
+        }
+        if (job === undefined || job === null) continue;
+        if (job.enabled !== undefined && !checkBoolean(job.enabled))
+          details.push(`scheduler.jobs.${kind}.enabled must be a boolean`);
+        if (job.intervalMs !== undefined && !checkNumber(job.intervalMs, 60000))
+          details.push(`scheduler.jobs.${kind}.intervalMs must be a number >= 60000`);
+      }
     }
   }
 
