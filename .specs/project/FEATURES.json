@@ -1271,6 +1271,26 @@
    "notes": "VALIDATED PASS 2026-08-09 (validation.md): APR-01..09 + plan-challenge R1-R4; hybrid mode locked by user decision (supervised exit / unsupervised self-respawn / dev-watch 409); real-process e2e proved flush-before-stop and caught app.stop() node-adapter defect; diff-based changedRestartSections; seam guard + negative MCP parity assertion; 2 mutations killed. Residual (accepted): respawn-rebind timing and signal-path drain proven at seam level only.",
    "spec": ".specs/features/admin-portal-restart/spec.md",
    "tasks": ".specs/features/admin-portal-restart/tasks.md"
+  },
+  {
+   "id": "admin-portal-ops-suite",
+   "slug": "admin-portal-ops-suite",
+   "title": "Admin portal operations suite — bulk memory delete, scheduler config section, Logs tab (live tail + range + export), Claude marketplace profile parity",
+   "status": "complete",
+   "priority": "P1",
+   "phases": {
+    "specify": true,
+    "design": true,
+    "tasks": true,
+    "execute": true
+   },
+   "branch": "spec/admin-portal-ops-suite",
+   "created": "2026-08-09",
+   "depends_on": ["model-profile-switching", "admin-portal-restart"],
+   "design": ".specs/features/admin-portal-ops-suite/design.md",
+   "notes": "VALIDATED PASS WITH FINDINGS 2026-08-10 (validation.md), verifier independent of all 7 phase builders. 33/33 requirement IDs SATISFIED after two post-verification repairs; 7/7 mutations killed across guard-logic, wire-protocol content-type, async-stream teardown, caching-contract, precedence-ordering, route-scope and UI-disclosure classes; 7/7 pre-mortem findings conformed. 22 commits (T1-T20 + 2 repairs). AD-020 supersedes the marketplace half of model-profile-switching's F1 refusal for claude only; codex keeps it. The verifier caught two gaps the green suites could not: MBD-06/07's promised route assertions were never written (closed, b47b8de4) and pre-mortem #6's tombstone disclosure was recorded as applied but never coded (closed, cfe09133). Residual (accepted, in HANDOFF): LOG-14/15's DOM-append path and abort-discrimination are proven at data level with a FakeAbortController, not DOM/platform level; the project-select-closes-open-form edge case has no dedicated test. UNVERIFIABLE FROM THIS REPO: Claude's plugin-cache refresh cadence — a mandatory post-restart acceptance step is required before the CPP slice is end-to-end validated.",
+   "spec": ".specs/features/admin-portal-ops-suite/spec.md",
+   "tasks": ".specs/features/admin-portal-ops-suite/tasks.md"
   }
  ],
  "active_feature": null

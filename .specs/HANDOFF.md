@@ -1,4 +1,132 @@
-# Handoff — installer/restart/dims batch (VALIDATED PASS ×3 2026-08-09 — push/PR pending)
+# Handoff — admin-portal-ops-suite (VALIDATED 2026-08-10 — push/PR pending, DO NOT MERGE)
+
+Session `spec-admin-portal-ops-suite` · workflow spec-driven · branch
+`spec/admin-portal-ops-suite` from `origin/main` @ `c82d8f92` (v1.46.0) ·
+worktree `/Users/luizmassa/Projects/massa-ai-wt-admin-portal-ops-suite`.
+Contract: `.specs/features/admin-portal-ops-suite/{spec,design,tasks,context,validation}.md`.
+
+## State
+
+Execute complete: **22 commits** — T1–T20 across 7 sequential phase workers
+(one `massa-ai-builder` per phase, single shared worktree, one atomic commit per
+task), plus 2 post-verification repairs, plus this close-out. Validation PASS
+WITH FINDINGS by an independent `massa-ai-verification-agent` that authored none
+of the implementation; both of its actionable findings are now **closed**, and
+the third (T21 close-out never run) is closed by this commit.
+
+**33/33 requirement IDs SATISFIED. 7/7 pre-mortem findings conformed. 7/7
+mutations killed.** Remaining: push the branch, open the PR, drive CI green,
+hand to Luiz. **Do not merge** — merging `main` auto-cuts a release, and that
+go-ahead was explicitly withheld. CHANGELOG carries `### Added` + `### Fixed`
+under `[Unreleased]` → a **minor** bump cuts on merge.
+
+## MANDATORY acceptance step — cannot be closed by CI (CPP slice)
+
+Claude's plugin-cache refresh cadence is **not verifiable from this repository**.
+The only evidence is that `installed_plugins.json`'s `lastUpdated` moved with the
+installer's own `claude plugin update` and with none of the 189 recorded session
+startups — suggestive, not proof. So after merging and installing:
+
+1. Switch Claude to a non-default profile (Models tab, or `POST /api/v1/profiles/switch`).
+2. **Fully restart the Claude Code session** — not a new tab, a full restart.
+3. Re-read `<installPath>/agents/massa-ai-builder.md` and check its model line.
+
+If it still carries the switched profile, CPP is validated end-to-end. **If it
+reverted to the bundle default, report the reversion — do not report the switch
+as effective.** The recorded `platforms.claude.modelProfile` stays authoritative
+and the CPP-07 installer re-apply (proven by
+`scripts/tests/test-plugin-marketplace-cache-refresh.sh` scenarios 6–7) is the
+supported recovery path. Resolve `<installPath>` from
+`~/.claude/plugins/installed_plugins.json`; it is version-pinned and moves on
+every plugin update, which is exactly why nothing caches it.
+
+## What the verifier caught that the green suites could not
+
+Both gaps sat behind fully green gates — which is the point of the independent pass:
+
+- **MBD-06/07** — `tasks.md`'s Test Coverage Matrix and `design.md`'s
+  Verification Design table both promised a `routes/project.test.ts` extension
+  asserting the memories-only scope; it was never written, and every pre-existing
+  reset case posts a bare `{projectId}` taking the full-scope defaults. Closed in
+  `b47b8de4`; mutating `if (clearVectors)` → `if (true)` turns it RED (16/2).
+- **Pre-mortem #6** — `design.md` recorded the tombstone disclosure as an
+  *applied* revision; it was never coded. Closed in `cfe09133`; dropping the note
+  turns the new case RED (521/1).
+
+Both were proven by an observed red before commit, and both restores used file
+copies — never `git checkout`, which restores to HEAD rather than to the
+pre-mutation state.
+
+## Note for whoever next appends a decision to STATE.md
+
+`.specs/project/STATE.md` has **two** `## Decisions` headings — **L3735**
+(AD-007..AD-015) and **L3845** (AD-001..AD-006 plus AD-016..AD-019). No single
+table holds "AD-007..AD-019", so an instruction phrased that way is ambiguous.
+**AD-020 was appended after AD-019 in the L3845 table**, with an inline HTML
+comment recording why, so the numeric sequence stays contiguous and findable.
+The duplicate heading is a pre-existing rotation defect, recorded in this
+feature's design Risks table; repairing it is its own task and was left alone.
+
+## Residual risks (accepted, recorded in validation.md)
+
+- **LOG-14/15 are proven at data level, not DOM/platform level.** The live
+  `tbody.innerHTML` append path is asserted only through the `state.logsEntries`
+  accumulator, and the abort-vs-genuine-failure branch through a hand-rolled
+  `FakeAbortController`, not the platform global. Production paths are simple by
+  inspection; closing these needs a seeded-DOM harness the suite doesn't have.
+- **The empty-state → first-live-entry DOM transition is unasserted.** With no
+  `table.logs-table` rendered yet, the first live entry lands in
+  `state.logsEntries` but is not patched into the DOM until the next apply.
+- **The project-select-closes-open-form edge case has no dedicated test.** The
+  behavior lives inline in `startApp()`'s `projectSelect` change listener; making
+  it unit-testable means extracting it the way `handleMemoryDeleteProjectCancel`
+  already is.
+- **Sink-directory-creation failure → `source:"buffer"` is structurally correct
+  but not integration-tested.** It holds because a failed `mkdirSync` means the
+  file never exists, so `logs.ts`'s `files.length === 0` check falls through.
+- **Rotation across processes is best-effort.** Every massa-ai process appends to
+  one sink with `O_APPEND` (so no line is truncated), but a rotation race can
+  misfile a few lines. Documented in the spec, not engineered around.
+- **Pre-existing, out of scope:** `apps/tools-api/src/routes/project.test.ts`'s
+  header comment names `project-reset.test.ts` and `project-identity.test.ts` as
+  siblings; neither exists. Zero diff in this branch — worth a follow-up.
+
+## Environmental traps when re-running the gates
+
+`bun run test:scripts` fails exactly 2 tests in
+`scripts/__tests__/generate-subagent-artifacts.test.ts`
+(`opencode/agent-profiles/local_models drift detected`) on a machine whose real
+`~/.config/massa-ai/model-profiles.json` defines a `local_models` overlay —
+`generate:artifacts` reads the effective registry while `--check` compares
+against builtin-only output. Under `XDG_CONFIG_HOME=$(mktemp -d)` that file is
+53 pass / 0 fail. CI has no config file and never sees it. This sandbox also has
+no `DATABASE_URL` exported; prefix Postgres-touching runs with
+`postgresql://massa_ai:massa_ai_password@localhost:5432/massa_ai`. **Any figure
+quoted from those suites must name which config state it was measured in.**
+
+## Gates at delivery (exit codes captured, not eyeballed)
+
+| Gate | Exit | Result |
+| --- | --- | --- |
+| `bun run lint` | 0 | clean |
+| `bun run type-check` | 0 | 6/6 tasks |
+| `bun run test` | 0 | 11/11 tasks, 157 isolation groups |
+| `bun run test:scripts` (scratch `XDG_CONFIG_HOME`) | 0 | 1739 pass / 0 fail |
+| `bun run test:plugins` | 0 | 135 pass / 0 fail |
+| `cd apps/web-ui && bun test` | 0 | 522 pass / 0 fail |
+| `bun test apps/tools-api/src/routes/project.test.ts` | 0 | 18 pass / 0 fail |
+| `check_specs_delivered.ts admin-portal-ops-suite` | 0 | 0 errors |
+
+Note `check_specs_delivered.ts` checks file **presence and tracked status**, not
+content — it reported 0 errors while the entire close-out was still missing. It
+is not a substitute for reading the artifacts.
+
+## Next Step
+
+Push `spec/admin-portal-ops-suite`, `gh pr create`, `gh pr checks --watch`, up to
+3 repair iterations if CI goes red, then stop and hand over. No self-merge.
+
+## Previous handoff — installer/restart/dims batch (VALIDATED PASS ×3 2026-08-09 — push/PR pending)
 
 Session `spec-installer-marketplace-update` · workflow spec-driven · branch
 `spec/installer-restart-embedding` from `main` @ `6c438a98` (v1.44.0) ·

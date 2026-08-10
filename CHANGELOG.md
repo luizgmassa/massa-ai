@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Bulk memory delete from the Memory tab.** One control clears every memory of
+  the selected project behind an inline typed-confirmation form (retype the
+  projectId — `confirm()` cannot take typed input). It reuses the existing
+  `POST /api/v1/project/reset` with `clearVectors:false, clearSymbols:false,
+  clearMemories:true`, so the project's vectors, keyword rows and symbol graph
+  survive and the existing `operation_log` audit row is written unchanged. The
+  confirmation states what a count larger than the visible row total means:
+  `deleteByProject` has no `deleted_at` predicate and resolves retired project
+  aliases, so already-tombstoned rows are deleted too.
+- **`scheduler` is now a first-class `config.json` section, editable from the
+  Config tab.** `enabled`, `tickMs`, `maxConcurrent` and a `jobs` map keyed by
+  the five registered job kinds each resolve `env > config.json > literal
+  default`, with `DEFAULT_SCHEDULED_JOBS` unchanged and `MASSA_AI_SCHEDULER_*`
+  still winning — a packaged install no longer needs environment variables on
+  the server process. Saves are bounds-checked (`tickMs >= 1000`,
+  `maxConcurrent >= 1`, every `intervalMs >= 60000`, `jobs` keys restricted to
+  the registered kinds) with the offending path named, and `scheduler` joins
+  `RESTART_SECTIONS` so it reuses the shipped restart banner and Restart button.
+- **Logs tab: live tail, closed-range filter, and export.** Every emitted log
+  line now also lands in an in-process ring buffer (`logging.bufferSize`,
+  default 2000) and a rotating file sink (`logging.maxFileSizeMb`/`maxFiles`,
+  defaults 32 MB / 5), at `MASSA_AI_LOG_FILE`, else a non-empty `logging.file`,
+  else `<dataDir>/logs/massa-ai.log` — with the parent directory created before
+  the first write. Three authenticated routes serve it: `GET /api/v1/logs`
+  (range/level/substring over the sink files, newest-first, 64 MB scan bound
+  with a `truncated` flag, falling back to the buffer as `source:"buffer"` when
+  no file is readable), `GET /api/v1/logs/stream` (SSE), and
+  `GET /api/v1/logs/export` (`application/x-ndjson` or `text/plain`,
+  `Content-Disposition: attachment`). The emitted line format is byte-identical
+  to before, so existing `logging.file` consumers are unaffected. The tab
+  labels its live region as this server's own process — the file sink is shared
+  by every massa-ai process including the stdio MCP server, so a range query
+  can legitimately contain lines the live tail never showed.
+- **Claude profile switching at parity with Codex and OpenCode.** A
+  marketplace-route Claude install is now switchable: the Models tab lists the
+  variants under the plugin's own versioned cache and switches them, resolving
+  `installPath` from `~/.claude/plugins/installed_plugins.json` on every call
+  and never caching it (the path is version-pinned and moves on every update).
+  The Claude installer re-applies the recorded `platforms.claude.modelProfile`
+  after a `claude plugin update`, so an update no longer silently reverts the
+  operator to the bundle default. A Codex marketplace switch is still refused,
+  with a reason that now names codex only.
+
+### Fixed
+
+- **The Models tab no longer tells Claude users that a marketplace install
+  cannot switch profiles.** That claim was measured false: Claude copies the
+  bundle into `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`,
+  outside any checkout, carrying both `agents/` and `agent-profiles/`. The
+  no-variants message now explains the `MASSA_AI_MODEL_PROFILE` + Save & Apply
+  path without asserting anything about marketplace installs.
+- **`MASSA_AI_SCHEDULER_OBSERVATION_BRIDGE_INTERVAL_MS` reached tests as
+  `undefined`.** It was missing from `turbo.json`'s `passThroughEnv` because it
+  is read through a dynamic `process.env[def.intervalEnvVar]` index, which the
+  literal-accessor sensor cannot see — so it worked under a direct `bun test`
+  and silently did nothing under `bun run test`.
+
 ## [1.46.0] - 2026-08-10
 
 ### Added
