@@ -1,4 +1,60 @@
-# Handoff — admin-portal-ux-overhaul (EXECUTE COMPLETE 2026-08-09 — T1-T15, 16 commits, five batch workers; validation pending; push/PR authorized)
+# Handoff — installer/restart/dims batch (VALIDATED PASS ×3 2026-08-09 — push/PR pending)
+
+Session `spec-installer-marketplace-update` · workflow spec-driven · branch
+`spec/installer-restart-embedding` from `main` @ `6c438a98` (v1.44.0) ·
+worktree `/Users/luizmassa/Projects/massa-ai-wt-installer-restart-embedding`.
+Contracts: `.specs/features/{claude-marketplace-cache-refresh,
+embedding-dims-consistency,admin-portal-restart}/` (spec + validation each;
+all three PASS, verifier independent, 4/4 mutations killed).
+
+## State
+
+Implementation, review (no blocking findings, 6 advisories applied or
+accepted), and validation complete. Remaining: push branch, open PR, hand to
+Luiz for review/merge (no self-merge). CHANGELOG carries Added + Fixed under
+[Unreleased] → minor release cuts on merge.
+
+## Machine runbook — migrate Claude host to file route (user-run, one-time)
+
+Why: the marketplace route serves a version-pinned cache (currently 1.28.0
+while the repo is at 1.44.0) and refuses profile switching by design. File
+route gives automatic profile switching (parity with codex/opencode) and
+removes the stale-cache class permanently. Reverses the earlier deliberate
+marketplace-route dedupe decision — Luiz's call, staged not executed
+(permission classifier blocks live ~/.claude writes from the agent).
+
+```bash
+# 1. Remove the marketplace-served plugin (routes are mutually exclusive;
+#    skipping this duplicates hooks + commands):
+claude plugin uninstall massa-ai@massa-ai
+# 2. Reinstall on the file route from the repo checkout:
+MASSA_AI_SKIP_PLUGIN_REGISTRY=1 bash apps/claude-plugin/install.sh
+# 3. Optional: drop the dangling marketplace entry:
+claude plugin marketplace remove massa-ai
+# 4. Restart the Claude Code session.
+# Verify: ~/.claude/massa-ai/agent-profiles/ lists profiles;
+#   install-state.json claude installRoute == "file";
+#   Web UI Profiles tab shows Switch buttons for claude.
+```
+
+Alternative (stay on marketplace): `claude plugin update massa-ai@massa-ai`
+after every release; post-merge the installer does this automatically from
+the NEXT version bump onward (CMR fix; the current poisoned record is why
+one manual update or the migration above is still needed once).
+
+Embedding config on this machine: already `qwen3-embedding:4b`/2560 in
+`~/.config/massa-ai/config.json` — no action.
+
+## Residual risks (accepted, recorded in validation.md files)
+
+- Respawn-rebind timing proven at seam-order level; supervised-mode flush
+  proven by real-process e2e; a real respawn+rebind e2e is a candidate
+  follow-up.
+- Signal-path drain has unit coverage only.
+- Local gates on this machine need scratch XDG_CONFIG_HOME (profile overlay)
+  and a warm Ollama (embedded-endpoints suite); CI is unaffected by both.
+
+## Previous handoff — admin-portal-ux-overhaul (EXECUTE COMPLETE 2026-08-09 — T1-T15, 16 commits, five batch workers; validation pending; push/PR authorized)
 
 Session `spec-admin-portal-ux-overhaul` · workflow spec-driven (Large) ·
 branch `spec/admin-portal-ux-overhaul` from `main` @ `b1831197` (v1.43.0) ·
