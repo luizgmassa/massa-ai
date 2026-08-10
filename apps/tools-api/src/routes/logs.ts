@@ -347,6 +347,101 @@ function renderTxtLine(entry: LogEntry): string {
 const SSE_HEARTBEAT_MS_DEFAULT = 15_000;
 const SSE_MAX_DURATION_MS_DEFAULT = 10 * 60 * 1000; // 10 minutes
 
+/** How often the live tail checks the sink for appended bytes. A log tail is
+ *  not a low-latency channel, and a shorter interval buys nothing but stat
+ *  syscalls on an idle server. */
+const SINK_POLL_MS_DEFAULT = 1_000;
+
+/** Per-poll read ceiling. A burst larger than this is not dropped — the offset
+ *  advances by what was read, so the next poll continues where this one
+ *  stopped — it just cannot arrive as one unbounded allocation. */
+const SINK_POLL_MAX_BYTES = 1024 * 1024;
+
+/**
+ * Tail the newest sink file, emitting each newly appended line as a
+ * `LogEntry`. Returns an unsubscribe function, or `undefined` when no sink
+ * file is readable — the caller falls back to the in-process ring buffer,
+ * matching `scanEntries`' own `source: "buffer"` degradation.
+ *
+ * Starts at the CURRENT end of file, not at the beginning: the contract this
+ * replaces is "entries pushed after you subscribed", and replaying history
+ * into a live tail would duplicate whatever the range query already rendered.
+ *
+ * Rotation is handled by re-listing every poll rather than by holding a
+ * descriptor. `sinkFiles` is newest-first, so a new newest path means the sink
+ * rotated and the tail follows it from byte 0; a file that shrank underneath
+ * us was truncated in place, which is the same thing without a rename.
+ */
+function startSinkTail(enqueue: (entry: LogEntry) => void): (() => void) | undefined {
+  const loggingConfig = config.get("logging");
+  const filePath = loggingConfig.file;
+  if (!filePath) return undefined;
+
+  const initial = activeReader.listFiles(filePath, loggingConfig.maxFiles);
+  if (initial.length === 0) return undefined;
+
+  let currentFile = initial[0] as string;
+  let offset: number;
+  try {
+    offset = fs.statSync(currentFile).size;
+  } catch {
+    return undefined;
+  }
+
+  // A trailing partial line: the writer may append mid-line between polls, and
+  // parsing half a line would emit a bogus `raw` entry AND lose the real one.
+  let carry = "";
+  let prevTs = new Date().toISOString();
+  let seq = 0;
+
+  const pollMs = Number(process.env.MASSA_AI_SSE_SINK_POLL_MS) || SINK_POLL_MS_DEFAULT;
+
+  const timer = setInterval(() => {
+    try {
+      const newest = activeReader.listFiles(filePath, loggingConfig.maxFiles)[0];
+      if (newest && newest !== currentFile) {
+        currentFile = newest;
+        offset = 0;
+        carry = "";
+      }
+      const size = fs.statSync(currentFile).size;
+      if (size < offset) {
+        offset = 0;
+        carry = "";
+      }
+      if (size === offset) return;
+
+      const length = Math.min(size - offset, SINK_POLL_MAX_BYTES);
+      const buf = Buffer.alloc(length);
+      const fd = fs.openSync(currentFile, "r");
+      try {
+        fs.readSync(fd, buf, 0, length, offset);
+      } finally {
+        fs.closeSync(fd);
+      }
+      offset += length;
+
+      const text = carry + buf.toString("utf8");
+      const lines = text.split("\n");
+      carry = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line.trim() === "") continue;
+        const parsed = parseLine(line, prevTs);
+        prevTs = parsed.ts;
+        enqueue({ ...parsed.entry, seq: ++seq });
+      }
+    } catch {
+      // A poll that cannot stat or read is not fatal to the stream: the sink
+      // may be mid-rotation. The next poll re-lists and recovers.
+    }
+  }, pollMs);
+
+  // `unref` where available so an open tail cannot hold the process alive.
+  (timer as unknown as { unref?: () => void }).unref?.();
+
+  return () => clearInterval(timer);
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
@@ -440,9 +535,27 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
             }
           };
 
-          unsubscribe = logBuffer.subscribe((entry: LogEntry) => {
-            enqueue(entry);
-          });
+          // Source selection, and the reason it is not "both". The ring
+          // buffer holds only THIS process's entries, while the sink file is
+          // appended by every massa-ai process — including the stdio MCP
+          // server, which is where most of a working install's log traffic
+          // comes from. Subscribing to the buffer alone made the live tail
+          // correct and useless: an idle API server emitted nothing while the
+          // file grew, so Live looked broken and a refresh (a range query over
+          // the file) was the only thing that ever showed the new lines.
+          //
+          // The file is a superset of the buffer — this process writes to it
+          // too — so tailing BOTH would double every local entry. Tail the
+          // file when one is readable, and fall back to the buffer when none
+          // is, exactly mirroring the range query's own `source` semantics.
+          const tail = startSinkTail(enqueue);
+          if (tail) {
+            unsubscribe = tail;
+          } else {
+            unsubscribe = logBuffer.subscribe((entry: LogEntry) => {
+              enqueue(entry);
+            });
+          }
 
           heartbeatTimer = setInterval(() => {
             if (closed) {
