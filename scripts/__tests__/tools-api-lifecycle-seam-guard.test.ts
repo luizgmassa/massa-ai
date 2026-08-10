@@ -19,6 +19,10 @@ const ROOT = join(import.meta.dir, "..", "..");
 const SPAWN_ALLOWLIST = new Set([
   "apps/tools-api/src/routes/web-ui-static-dir.test.ts",
   "apps/tools-api/src/routes/restart-e2e.test.ts",
+  // Two processes racing one port is untestable in-process: one process
+  // cannot race its own bind the way two do. The children rethrow rather than
+  // exit, so the process.exit ban above still holds for this file.
+  "apps/tools-api/src/port-exclusivity-e2e.test.ts",
 ]);
 
 describe("tools-api test files never exit or spawn outside the lifecycle seams", () => {

@@ -17,8 +17,15 @@ import path from "node:path";
  */
 const REPO_ROOT = path.resolve(import.meta.dir, "../../..");
 
-/** `OPTS` is interpolated so both arms run the SAME probe, differing only in
- *  the listen options — that is the discrimination sensor for this fix. */
+/** The listen options are interpolated so both arms run the SAME probe,
+ *  differing only in that argument — the discrimination sensor for this fix.
+ *
+ *  The child reports a refused bind by printing and then RETHROWING, never by
+ *  calling the exit builtin: `tools-api-lifecycle-seam-guard.test.ts` bans
+ *  that literal across every tools-api test, because tools-api's isolated
+ *  runner classifies only `mock.module(`, so a real one truncates the shared
+ *  batch with a clean exit code. Rethrowing also proves more — the process
+ *  genuinely died rather than choosing a code on its way out. */
 const probeSource = (opts: string) => `
 import { Elysia } from "elysia";
 import { node } from "@elysiajs/node";
@@ -29,13 +36,14 @@ try {
   app.listen(${opts}, () => console.log("LISTENING"));
 } catch (error) {
   console.log("FAILED:" + (error?.code ?? String(error)));
-  process.exit(9);
+  throw error;
 }
 process.on("uncaughtException", (error) => {
   console.log("FAILED:" + (error?.code ?? error.message));
-  process.exit(9);
+  throw error;
 });
-setTimeout(() => process.exit(0), 15_000);
+// Bounded life so a probe that neither binds nor throws cannot outlive the run.
+setTimeout(() => { throw new Error("probe timeout"); }, 15_000);
 `;
 
 interface ProbeRun {
@@ -98,7 +106,8 @@ describe("port exclusivity (two real processes, one real port)", () => {
 
     expect(run.first).toBe("LISTENING");
     expect(run.second).toBe("FAILED:EADDRINUSE");
-    expect(run.secondExit).toBe(9);
+    // Died, rather than reporting a failure and staying up.
+    expect(run.secondExit).not.toBe(0);
     // The survivor is the original server, still serving.
     expect(run.who).toBe("A");
   }, 60_000);
