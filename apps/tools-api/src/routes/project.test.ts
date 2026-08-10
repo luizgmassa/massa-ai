@@ -225,6 +225,75 @@ describe("POST /api/v1/project/reset error branches", () => {
   });
 });
 
+/**
+ * MBD-06 / MBD-07 — the memories-only scope combination the Memory tab's bulk
+ * delete sends. This is the ONLY caller shape that sets all three flags
+ * explicitly, and the one the feature's Test Coverage Matrix names; every other
+ * case above posts a bare `{projectId}` and takes the full-scope defaults, so
+ * the skipped-branch behavior below is otherwise unexercised.
+ */
+describe("POST /api/v1/project/reset memories-only scope (MBD-06, MBD-07)", () => {
+  const MEMORIES_ONLY = {
+    clearVectors: false,
+    clearSymbols: false,
+    clearMemories: true,
+  };
+
+  test("leaves vectors, keyword rows and the symbol graph untouched", async () => {
+    const vectorsBefore = vectorDelete.mock.calls.length;
+    const keywordsBefore = keywordDelete.mock.calls.length;
+    const symbolsBefore = removeWorkspace.mock.calls.length;
+
+    const res = await req("POST", "/api/v1/project/reset", {
+      projectId: "mem-only",
+      ...MEMORIES_ONLY,
+    });
+
+    expect(res.json.success).toBe(true);
+    // Not merely "unchanged counts" — the skipped `if` blocks must never run.
+    expect(vectorDelete.mock.calls.length).toBe(vectorsBefore);
+    expect(keywordDelete.mock.calls.length).toBe(keywordsBefore);
+    expect(removeWorkspace.mock.calls.length).toBe(symbolsBefore);
+    // …and their result keys are absent, not zero — a zero would read as
+    // "cleared nothing" instead of "was never in scope".
+    expect(res.json.data).not.toHaveProperty("vectorsDeleted");
+    expect(res.json.data).not.toHaveProperty("keywordsDeleted");
+    expect(res.json.data).not.toHaveProperty("symbolsCleared");
+    expect(res.json.data.memoriesDeleted).toBe(4);
+  });
+
+  test("writes an operation_log row recording the exact requested scopes", async () => {
+    await req("POST", "/api/v1/project/reset", {
+      projectId: "mem-only-audit",
+      ...MEMORIES_ONLY,
+    });
+
+    const row = (recordOperation.mock.calls.at(-1) as any[])?.[0];
+    expect(row?.op).toBe("project_reset");
+    expect(row?.projectId).toBe("mem-only-audit");
+    expect(row?.scope?.requestedScopes).toEqual({
+      vectors: false,
+      symbols: false,
+      memories: true,
+    });
+    expect(row?.result).toBe("success");
+    expect(row?.meta).toEqual({ memoriesDeleted: 4 });
+  });
+
+  test("a re-delete finding nothing still succeeds with memoriesDeleted:0", async () => {
+    memoryDelete.mockImplementationOnce(async () => 0);
+
+    const res = await req("POST", "/api/v1/project/reset", {
+      projectId: "mem-only-again",
+      ...MEMORIES_ONLY,
+    });
+
+    expect(res.json.success).toBe(true);
+    expect(res.json.data.memoriesDeleted).toBe(0);
+    expect((recordOperation.mock.calls.at(-1) as any[])?.[0]?.result).toBe("success");
+  });
+});
+
 describe("POST /api/v1/project/rename non-identity rethrow", () => {
   test("a generic (non ProjectIdentityError) error propagates as 500", async () => {
     identityApply.mockImplementationOnce(async () => {
