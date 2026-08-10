@@ -1121,6 +1121,30 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       expect(html).toContain('class="form-error"');
       expect(html).toContain("Project id does not match.");
     });
+
+    // Pre-mortem #6: the reported count can exceed the rows this tab lists,
+    // because deleteByProject has no `deleted_at` predicate and resolves
+    // aliases. design.md records the disclosure as an applied revision.
+    it("discloses that tombstoned rows are included and the index is untouched", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, {
+        filters: {},
+        project: "proj-1",
+        memoryBulkForm: {},
+      });
+      expect(html).toContain("tombstones");
+      expect(html).toContain("may exceed the rows listed above");
+      expect(html).toContain("This cannot be undone.");
+      // The non-interference half of MBD-07, stated to the operator.
+      expect(html).toMatch(/Vectors, keyword rows and the symbol graph are left untouched/);
+    });
+
+    it("shows no scope disclosure while the confirmation form is closed", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "proj-1" });
+      expect(html).toContain('data-action="memory-delete-project"');
+      expect(html).not.toContain("tombstones");
+    });
   });
 
   describe("handoff create + cancel (HAND-02, HAND-04)", () => {

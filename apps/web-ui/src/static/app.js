@@ -345,9 +345,21 @@ function renderMemoryBulkDelete(state) {
     const errorLine = formState.error
       ? '<p class="form-error">' + escapeHtml(formState.error) + "</p>"
       : "";
+    // Pre-mortem #6: `deleteByProject` deletes on the CANONICAL project id with
+    // no `deleted_at` predicate, while this tab's list filters
+    // `deleted_at IS NULL` and matches the id literally. The reported count can
+    // therefore legitimately exceed the rows on screen — saying so here makes
+    // that a specified outcome instead of something that reads as a bug.
+    const scopeNote =
+      '<p class="muted bulk-delete-scope">Permanently deletes every memory for ' +
+      escapeHtml(project) +
+      ", including already-deleted rows still held as tombstones — so the reported " +
+      "count may exceed the rows listed above. Vectors, keyword rows and the symbol " +
+      "graph are left untouched. This cannot be undone.</p>";
     form =
       '<div class="bulk-delete-inline-form form-field">' +
       errorLine +
+      scopeNote +
       "<label>Retype &quot;" +
       escapeHtml(project) +
       '&quot; to confirm<input type="text" data-bulk="confirm-id" /></label>' +
