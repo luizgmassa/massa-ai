@@ -38,11 +38,42 @@ let loggingConfigFixture: LoggingConfigFixture = {
 };
 
 const actualShared = require("@massa-ai/shared");
+
+// T13: a subscriber-count wrapper around the REAL `logBuffer` singleton.
+// `subscribe`/`push`/etc. all still delegate to the real implementation — the
+// only addition is `liveSubscriberCount`, so the T13 SSE cancel-teardown test
+// can assert "cancel() unsubscribed" behaviorally (subscriber count back to
+// baseline) rather than by waiting on real heartbeat/close timers.
+let liveSubscriberCount = 0;
+const realLogBuffer = actualShared.logBuffer as typeof actualShared.logBuffer;
+const instrumentedLogBuffer = {
+  push: (entry: Parameters<typeof realLogBuffer.push>[0]) => realLogBuffer.push(entry),
+  snapshot: (opts?: Parameters<typeof realLogBuffer.snapshot>[0]) => realLogBuffer.snapshot(opts),
+  subscribe: (fn: Parameters<typeof realLogBuffer.subscribe>[0]) => {
+    liveSubscriberCount++;
+    const unsubscribe = realLogBuffer.subscribe(fn);
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      liveSubscriberCount--;
+      unsubscribe();
+    };
+  },
+  setCapacity: (n: number) => realLogBuffer.setCapacity(n),
+  size: () => realLogBuffer.size(),
+  _resetForTesting: () => {
+    realLogBuffer._resetForTesting();
+    liveSubscriberCount = 0;
+  },
+};
+
 mock.module("@massa-ai/shared", () => ({
   ...actualShared,
   config: {
     get: (key: string) => (key === "logging" ? loggingConfigFixture : actualShared.config.get(key)),
   },
+  logBuffer: instrumentedLogBuffer,
 }));
 
 import { logsRoutes, __setLogsReaderForTests, type LogsFileReader } from "./logs.js";
@@ -314,6 +345,50 @@ describe("LOG-12 — reading logs never writes back into the buffer", () => {
   });
 });
 
+// ── GET /api/v1/logs/stream — SSE tail (T13, LOG-05) ────────────────────────
+
+describe("GET /api/v1/logs/stream — SSE tail", () => {
+  test("a pushed entry reaches the stream as a data: frame", async () => {
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type") || "").toContain("text/event-stream");
+    expect(res.body).not.toBeNull();
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    try {
+      // `start()` runs synchronously during Response construction (above),
+      // so the subscription is already live by the time we push.
+      logBuffer.push({ ts: "2026-01-01T00:00:00.000Z", level: "info", message: "live entry" });
+      const { value } = await reader.read();
+      const text = decoder.decode(value);
+      expect(text.startsWith("data: ")).toBe(true);
+      const parsed = JSON.parse(text.slice("data: ".length).trim());
+      expect(parsed.message).toBe("live entry");
+      expect(parsed.level).toBe("info");
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
+  });
+
+  test("cancel() unsubscribes — asserted by the buffer's live subscriber count, not by timing", async () => {
+    const before = liveSubscriberCount;
+
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    expect(liveSubscriberCount).toBe(before + 1);
+
+    const reader = res.body!.getReader();
+    await reader.cancel();
+
+    expect(liveSubscriberCount).toBe(before);
+  });
+
+  test("no logger import guard also covers the stream route (LOG-12)", () => {
+    const src = fs.readFileSync(path.join(import.meta.dir, "logs.ts"), "utf8");
+    expect(src).not.toMatch(/\blogger\.(debug|info|warn|error)\(/);
+  });
+});
+
 // ── Export (LOG-06): explicit Response, real HTTP only ─────────────────────
 
 describe("GET /api/v1/logs/export — zero-match range still 200s with an empty body", () => {
@@ -380,6 +455,11 @@ afterAll(() => {
 describe("SEC — /api/v1/logs* over a real socket (LOG-11, AD-011)", () => {
   test("GET /api/v1/logs without a key returns 401 (route is registered, not 404)", async () => {
     const res = await fetch(`${base}/api/v1/logs`);
+    expect(res.status).toBe(401);
+  }, 15_000);
+
+  test("GET /api/v1/logs/stream without a key returns 401 (route is registered, not 404)", async () => {
+    const res = await fetch(`${base}/api/v1/logs/stream`);
     expect(res.status).toBe(401);
   }, 15_000);
 

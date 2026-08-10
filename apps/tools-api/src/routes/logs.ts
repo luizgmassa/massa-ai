@@ -4,9 +4,13 @@
  *   GET /api/v1/logs         — range/level/substring query over the file sink,
  *                              falling back to the in-process ring buffer.
  *   GET /api/v1/logs/export  — the same range as a downloadable jsonl/txt file.
- *
- * `GET /api/v1/logs/stream` (LOG-05) is T13 — deliberately not in this file
- * yet; it slots in beside these two once T13 lands.
+ *   GET /api/v1/logs/stream  — SSE tail of newly buffered entries (LOG-05,
+ *                              T13). Reuses `events.ts`'s discipline exactly:
+ *                              heartbeat interval, max-duration auto-close,
+ *                              and teardown in the `ReadableStream` `cancel()`
+ *                              hook — a function returned from `start` is
+ *                              ignored by the ReadableStream contract and
+ *                              would leak the subscription and both timers.
  *
  * LOG-12 — THIS MODULE IMPORTS NO LOGGER. Logging its own reads would push a
  * new entry into the very ring buffer / file sink it just read, which is the
@@ -329,6 +333,11 @@ function renderTxtLine(entry: LogEntry): string {
   return `[${entry.ts}] [${entry.level.toUpperCase()}] ${entry.message}${metaStr}`;
 }
 
+// ── SSE tail (LOG-05) ───────────────────────────────────────────────────────
+
+const SSE_HEARTBEAT_MS_DEFAULT = 15_000;
+const SSE_MAX_DURATION_MS_DEFAULT = 10 * 60 * 1000; // 10 minutes
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
@@ -392,6 +401,91 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
         summary: "Download the queried log range as jsonl or txt",
         description:
           "Same query surface as GET /api/v1/logs (minus limit/offset — the full matching range is returned) plus format=jsonl|txt. Responds with Content-Disposition: attachment and a filename carrying the range. A range matching zero entries still returns an empty (200) download.",
+      },
+    },
+  )
+  .get(
+    "/stream",
+    () => {
+      // Read per-request, mirroring events.ts, so an env override is honored
+      // even when this module was first imported under the default.
+      const HEARTBEAT_MS = Number(process.env.MASSA_AI_SSE_HEARTBEAT_MS) || SSE_HEARTBEAT_MS_DEFAULT;
+      const MAX_DURATION_MS = Number(process.env.MASSA_AI_SSE_MAX_DURATION_MS) || SSE_MAX_DURATION_MS_DEFAULT;
+
+      const encoder = new TextEncoder();
+      let closed = false;
+      // Hoisted to handler scope so `cancel` (a sibling of `start`, not
+      // nested in it) can tear them down; `start` populates them.
+      let unsubscribe: (() => void) | undefined;
+      let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+      let closeTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const stream = new ReadableStream({
+        start(controller) {
+          const enqueue = (data: unknown) => {
+            if (closed) return;
+            try {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+            } catch {
+              closed = true;
+            }
+          };
+
+          unsubscribe = logBuffer.subscribe((entry: LogEntry) => {
+            enqueue(entry);
+          });
+
+          heartbeatTimer = setInterval(() => {
+            if (closed) {
+              clearInterval(heartbeatTimer);
+              return;
+            }
+            try {
+              controller.enqueue(encoder.encode(`: heartbeat\n\n`));
+            } catch {
+              closed = true;
+              clearInterval(heartbeatTimer);
+            }
+          }, HEARTBEAT_MS);
+
+          closeTimer = setTimeout(() => {
+            closed = true;
+            unsubscribe?.();
+            clearInterval(heartbeatTimer);
+            try {
+              controller.close();
+            } catch {
+              // already closed
+            }
+          }, MAX_DURATION_MS);
+        },
+        // Cleanup on stream cancel (client disconnected). `cancel` is the
+        // only reliable teardown seam: ReadableStream ignores a function
+        // returned from `start` (it only awaits a returned promise), so a
+        // start-return cleanup would silently leak the subscription + timers.
+        cancel() {
+          closed = true;
+          unsubscribe?.();
+          if (heartbeatTimer) clearInterval(heartbeatTimer);
+          if (closeTimer) clearTimeout(closeTimer);
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    },
+    {
+      detail: {
+        ...LOGS_DETAIL,
+        summary: "SSE tail of newly buffered log entries",
+        description:
+          "Server-Sent Events stream emitting `data: <LogEntry JSON>` for every entry subsequently pushed into the in-process ring buffer, plus `: heartbeat` comments. Same heartbeat and max-duration auto-close behavior as GET /api/v1/events. Scoped to this server process — a separate range query over the file sink may contain entries this stream never showed (e.g. from the stdio MCP server).",
       },
     },
   );
