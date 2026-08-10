@@ -1,4 +1,55 @@
-# Handoff — admin-portal-ops-suite (VALIDATED 2026-08-10 — push/PR pending, DO NOT MERGE)
+# Handoff — admin-portal-config-installer-defaults (GATES GREEN 2026-08-10 — push/PR pending, DO NOT MERGE)
+
+Session `debug-admin-portal-config-installer-defaults` · workflow **debug** · branch
+`fix/admin-portal-config-installer-defaults` from `origin/main` @ `398dc647` (v1.47.0) ·
+worktree `/Users/luizmassa/Projects/massa-ai-wt-admin-config-defaults`.
+Report: `.specs/debug/admin-portal-config-installer-defaults/REPORT.md`.
+
+## State
+
+7 commits. Five reported symptoms → four root causes (two symptoms shared one), plus
+three defects found while fixing and one regression this branch introduced and then
+fixed. All gates green with real exit codes — see the report's verification table.
+
+**Do not merge.** Merging `main` auto-cuts a release and that go-ahead was explicitly
+withheld. CHANGELOG carries `### Added` + `### Fixed` under `[Unreleased]` → **minor**
+bump on merge.
+
+## Decision correction to surface at review
+
+The installer's scheduler option was chosen from a preview showing
+`checkpoint-purge: true`, but the same option's description said it mirrors the existing
+`MASSA_AI_SCHEDULER_SAFE_DEFAULTS` preset — and `applySafeDefaults` enables only
+`memory-consolidation` + `decay-sweep`. The **named mechanism won**: checkpoint-purge
+ships off. If the preview was the intent rather than the description, that is a one-line
+change to the installer's preset and needs saying now.
+
+## Two operational items for the user, outside this PR
+
+1. **Restart the `:3333` API after this merges.** The process currently serving it is one
+   this session started from the repo source (PID 72647); the stale duplicate (PID 81182,
+   started 2026-08-09 22:40) was killed. Only a restart puts the new fail-loud bind in
+   effect — until then a duplicate bind is still silent.
+2. **Unrelated runaway: PID 75218**, `bun test src/__tests__/rlm-admin.te…`, running since
+   30 Jul at ~99% CPU, ~15690 CPU-minutes. It is a standing source of test-timeout noise
+   on this host. **Not killed** — that is the user's call.
+
+## Environmental traps when re-running the gates
+
+- Scratch `XDG_CONFIG_HOME` on **every** run: a real `~/.config/massa-ai/config.json`
+  has `llm.enabled: true` and breaks drift gates and LLM-reaching suites.
+- `bun run test` under turbo cancels sibling tasks when one fails, so a real failure in a
+  later package can be hidden entirely by an unrelated flake in an earlier one. That is
+  how the scheduler regression stayed invisible for a full aggregate run. When a package
+  fails, re-run before believing the failure list is complete.
+- `mcp-client` `embedded-api-client-endpoints.test.ts` is contention-sensitive here: 4
+  timeouts at 5001 ms inside a 10-way turbo run, 97/0 in 923 ms standalone.
+
+## Next Step
+
+Push, `gh pr create`, `gh pr checks --watch`, then hand to Luiz. No self-merge.
+
+## Previous handoff — admin-portal-ops-suite (MERGED 2026-08-10 as PR #101, released v1.47.0)
 
 Session `spec-admin-portal-ops-suite` · workflow spec-driven · branch
 `spec/admin-portal-ops-suite` from `origin/main` @ `c82d8f92` (v1.46.0) ·
@@ -126,7 +177,7 @@ is not a substitute for reading the artifacts.
 Push `spec/admin-portal-ops-suite`, `gh pr create`, `gh pr checks --watch`, up to
 3 repair iterations if CI goes red, then stop and hand over. No self-merge.
 
-## Previous handoff — installer/restart/dims batch (VALIDATED PASS ×3 2026-08-09 — push/PR pending)
+## Previous handoff — installer/restart/dims batch (MERGED 2026-08-09 as PR #100)
 
 Session `spec-installer-marketplace-update` · workflow spec-driven · branch
 `spec/installer-restart-embedding` from `main` @ `6c438a98` (v1.44.0) ·
