@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Restart Server button in the admin portal, with a diff-based restart proposal.**
+  `POST /api/v1/system/restart` drains gracefully (listener, job reaper, scheduler,
+  Prisma) after the response is delivered, then exits for the supervisor to respawn
+  (`MASSA_AI_SUPERVISED=1` or Docker) or spawns its own detached replacement when
+  unsupervised; under the dev watcher it refuses with a 409. The Config tab gains the
+  button (write-mode gated, polls `/health` until the server is back), and saving a
+  config section now reports which restart-relevant values actually changed — an
+  unchanged re-save or masked-secret echo no longer suggests a restart.
+
 ### Fixed
 
 - **Embedding model/dimension pairs aligned to the 4b/2560 default on every surface.**

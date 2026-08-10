@@ -982,7 +982,13 @@ export function renderConfig(data, opts) {
     '</div>' +
     '</details>';
 
-  return '<section class="view"><h2>Config</h2>' + helpCard + cards + "</section>";
+  // Restart Server action (APR-04). One action surface: the save-flow's
+  // restart proposal banner points here instead of embedding a second button.
+  const restartBtn = writeMode
+    ? '<button type="button" class="restart-server-btn btn-danger" data-action="server-restart">Restart Server</button>'
+    : "";
+
+  return '<section class="view"><h2>Config' + restartBtn + "</h2>" + helpCard + cards + "</section>";
 }
 
 function setByPath(obj, dottedPath, value) {
@@ -1717,11 +1723,73 @@ export async function handleConfigSave(ctx, section) {
       showBanner(ctx.root, "error", "Save failed: " + details);
       return;
     }
-    showBanner(ctx.root, "success", "Config section " + section + " saved. Backup created.");
+    const changed = (res && res.data && res.data.changedRestartSections) || [];
+    if (changed.length > 0) {
+      // Diff-based restart proposal (APR-05): only when a restart-relevant
+      // value actually changed in THIS save. Persistent — the running
+      // process will not pick the change up on its own.
+      showBanner(
+        ctx.root,
+        "success",
+        "Config section " + section + " saved. Restart required to apply: " + changed.join(", ") +
+          " — use the Restart Server button to apply now.",
+        { persist: true },
+      );
+    } else {
+      showBanner(ctx.root, "success", "Config section " + section + " saved. Backup created.");
+    }
     ctx.render();
   } catch (e) {
     showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
   }
+}
+
+/** Restart the API server (APR-04): confirm, POST, then poll /health until
+ *  the replacement answers. Poll knobs are injectable for tests. */
+export async function handleServerRestart(ctx, opts) {
+  opts = opts || {};
+  const pollIntervalMs = opts.pollIntervalMs !== undefined ? opts.pollIntervalMs : 1000;
+  const maxAttempts = opts.maxAttempts !== undefined ? opts.maxAttempts : 30;
+  if (!confirm("Restart the massa-ai API server? In-flight requests will be dropped.")) return;
+  let res;
+  try {
+    res = await ctx.api.request("/api/v1/system/restart", { method: "POST", body: {} });
+  } catch (e) {
+    showBanner(ctx.root, "error", "Restart request failed: " + String((e && e.message) || e));
+    return;
+  }
+  if (!res || res.success === false) {
+    // 409 dev-watch carries a specific reason — show it verbatim, never a
+    // generic message (APUX fix-loop 1 lesson).
+    const reason = (res && (res.reason || res.error)) || "restart refused";
+    showBanner(ctx.root, "error", "Restart refused: " + reason);
+    return;
+  }
+  showBanner(
+    ctx.root,
+    "success",
+    "Restarting (" + res.mode + " mode)… waiting for the server to come back.",
+    { persist: true },
+  );
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+    try {
+      const health = await ctx.api.request("/health");
+      if (health) {
+        showBanner(ctx.root, "success", "Server is back up.");
+        ctx.render();
+        return;
+      }
+    } catch {
+      // Expected while the listener is down — keep polling.
+    }
+  }
+  showBanner(
+    ctx.root,
+    "error",
+    "Server did not come back after " + Math.round((maxAttempts * pollIntervalMs) / 1000) +
+      " s — check the server process (respawn mode cannot recover if the replacement failed to bind).",
+  );
 }
 
 export async function handleConfigReveal(ctx, targetId, section, field) {
@@ -2661,6 +2729,12 @@ function startApp(opts) {
         handleConfigReveal(ctx, target, btn.dataset.section, btn.dataset.field);
       });
     });
+    // admin-portal-restart (APR-04): server restart button
+    root.querySelectorAll('[data-action="server-restart"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleServerRestart(ctx);
+      });
+    });
     // admin-portal-enhancements: profiles tab switcher + switch
     root.querySelectorAll('[data-action="profiles-tab"]').forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -3068,6 +3142,7 @@ const MASSA_AI_UI = {
   startApp,
   showBanner,
   handleConfigSave,
+  handleServerRestart,
   handleConfigReveal,
   renderProfilesView,
   handleProfilesTabSwitch,
