@@ -735,9 +735,10 @@ function logsDatetimeLocalToIso(value) {
 /** Logs tab renderer (design "3f. Web UI `#/logs`", LOG-13). Renders the
  *  from/to/level/substring filter bar, the Live toggle, the Export control,
  *  and the entry table — all read from `state.logs*` so a re-render
- *  round-trips the operator's current filter selection. The Live toggle and
- *  Export button are rendered but deliberately left unwired here: their
- *  fetch + ReadableStream / download logic is T15 (LOG-14, LOG-15). */
+ *  round-trips the operator's current filter selection. The Live toggle's
+ *  fetch + ReadableStream tail and the Export button's download are wired in
+ *  `wireViewHandlers` (T15, LOG-14, LOG-15) via `handleLogsLiveToggle` /
+ *  `handleLogsExport`, defined near `runLogsLiveStream`. */
 const LOGS_LEVEL_OPTIONS = ["debug", "info", "warn", "error", "raw"];
 
 function renderLogEntryRow(entry) {
@@ -2673,6 +2674,175 @@ export async function handleRegistrySaveAndApply(ctx) {
   }
 }
 
+// ── Logs tab: live tail + export (design "3f. Web UI `#/logs`", T15,
+// LOG-14, LOG-15) ────────────────────────────────────────────────────────
+// EventSource is not usable for the live tail: it cannot set request
+// headers, and every non-public route requires `x-api-key` (AD-011) —
+// putting the key in the query string would leak it into access logs and
+// browser history. So this mirrors `runRegenerateStream`'s own fetch +
+// ReadableStream + hand-rolled `data:` frame parsing above.
+
+/** Aborts any in-flight Logs live-tail stream (LOG-14/15 teardown). Called
+ *  both when the Live toggle switches off and from `render()`'s
+ *  navigate-away guard — mirroring `clearIndexPoll()`'s discipline for the
+ *  projects index poll. Exported so both call sites and tests share the
+ *  exact same teardown, never a re-implemented copy. */
+export function stopLogsLiveStream(ctx) {
+  const state = (ctx && ctx.state) || (ctx && (ctx.state = {})) || {};
+  if (state.logsStreamAbort && typeof state.logsStreamAbort.abort === "function") {
+    state.logsStreamAbort.abort();
+  }
+  state.logsStreamAbort = null;
+}
+
+/** Appends one streamed entry to `state.logsEntries` and, when the Logs
+ *  table is currently on screen, prepends its row directly into
+ *  `table.logs-table tbody` — LOG-14's "append without re-issuing the range
+ *  query": no `ctx.api.request` call happens on this path at all. When no
+ *  table is on screen yet (e.g. the range query rendered the empty state),
+ *  the entry is still recorded in `state.logsEntries` but nothing is
+ *  patched into the DOM until the next explicit "apply" — patching the
+ *  empty-state markup into a table shell here would itself be a local
+ *  re-render of the whole view, which is more than "append" and is not
+ *  covered by an independent test. */
+function appendLogsLiveEntry(ctx, entry) {
+  const state = ctx.state || (ctx.state = {});
+  state.logsEntries = state.logsEntries || [];
+  state.logsEntries.push(entry);
+  const root = ctx.root;
+  const tbody = root && root.querySelector ? root.querySelector("table.logs-table tbody") : null;
+  if (tbody) {
+    tbody.innerHTML = renderLogEntryRow(entry) + tbody.innerHTML;
+  }
+}
+
+/** Opens the `/api/v1/logs/stream` live tail and appends every frame it
+ *  emits (LOG-14). No-op whenever `ctx.state.logsLive` is false — this is
+ *  the load-bearing guard: the fake-DOM harness's synthetic `startApp`
+ *  dispatch fires every wired `data-action`/`change` handler against a
+ *  generic child, and `handleLogsLiveToggle` reading that child's `checked`
+ *  (always falsy there) already keeps `logsLive` off in that case, but this
+ *  second, independent check means a caller can never open a real,
+ *  never-resolving fetch by invoking this function directly with `logsLive`
+ *  unset either. LOG-15: any stream failure that is not our own teardown
+ *  abort turns Live off, banners the error, and leaves every already
+ *  rendered/appended row exactly where it was — this function never calls
+ *  `ctx.render()`. */
+export async function runLogsLiveStream(ctx) {
+  const state = ctx.state || (ctx.state = {});
+  if (!state.logsLive) return;
+  if (state.logsStreamInFlight) return; // in-flight guard, ctx.state-scoped
+  state.logsStreamInFlight = true;
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  state.logsStreamAbort = controller;
+  try {
+    const headers = ctx.api && ctx.api.authHeaders ? ctx.api.authHeaders() : {};
+    const res = await fetch("/api/v1/logs/stream", {
+      headers,
+      signal: controller ? controller.signal : undefined,
+    });
+    if (!res || !res.body || !res.body.getReader) {
+      throw new Error("stream unavailable");
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (state.logsLive) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const line = frame.trim();
+        if (!line.startsWith("data:")) continue; // heartbeat `:` comments and blanks
+        let entry;
+        try {
+          entry = JSON.parse(line.slice(5).trim());
+        } catch {
+          continue;
+        }
+        appendLogsLiveEntry(ctx, entry);
+      }
+    }
+  } catch (e) {
+    const aborted = !!(controller && controller.signal && controller.signal.aborted);
+    if (!aborted) {
+      // LOG-15: a genuine failure (never our own navigate-away/toggle-off
+      // abort) turns Live off and banners the error, keeping prior rows.
+      state.logsLive = false;
+      showBanner(ctx.root, "error", "Live log stream failed: " + String((e && e.message) || e));
+    }
+  } finally {
+    state.logsStreamInFlight = false;
+    if (state.logsStreamAbort === controller) state.logsStreamAbort = null;
+  }
+}
+
+/** Live toggle change handler (LOG-14). Reads the checkbox's real `.checked`
+ *  via `root.querySelector` — never the event target or a dataset value —
+ *  matching this file's established rule (`handleMemoryDeleteProject`'s
+ *  precedent) that a synthetic harness event must resolve through the real
+ *  DOM lookup rather than being trusted at face value. */
+export function handleLogsLiveToggle(ctx) {
+  const state = ctx.state || (ctx.state = {});
+  const el = ctx.root && ctx.root.querySelector ? ctx.root.querySelector('[data-action="logs-live-toggle"]') : null;
+  const checked = !!(el && el.checked);
+  state.logsLive = checked;
+  if (checked) {
+    runLogsLiveStream(ctx);
+  } else {
+    stopLogsLiveStream(ctx);
+  }
+}
+
+/** Export handler (design § 3f "Export"). A normal `fetch` carrying the
+ *  `x-api-key` header, then an object-URL anchor click — a plain `<a href>`
+ *  would send no header and 401. */
+export async function handleLogsExport(ctx) {
+  const state = ctx.state || (ctx.state = {});
+  const params = new URLSearchParams();
+  const fromIso = logsDatetimeLocalToIso(state.logsFrom);
+  const toIso = logsDatetimeLocalToIso(state.logsTo);
+  if (fromIso) params.set("from", fromIso);
+  if (toIso) params.set("to", toIso);
+  if (state.logsLevel) params.set("level", state.logsLevel);
+  if (state.logsQuery) params.set("q", state.logsQuery);
+  params.set("format", "jsonl");
+  const qs = params.toString();
+  try {
+    const headers = ctx.api && ctx.api.authHeaders ? ctx.api.authHeaders() : {};
+    const res = await fetch("/api/v1/logs/export" + (qs ? "?" + qs : ""), { headers });
+    if (!res || res.ok === false) {
+      const status = res && res.status ? " (" + res.status + ")" : "";
+      showBanner(ctx.root, "error", "Export failed" + status + ".");
+      return;
+    }
+    if (typeof res.blob !== "function" || typeof URL === "undefined" || typeof URL.createObjectURL !== "function") {
+      showBanner(ctx.root, "error", "Export failed: download unavailable in this environment.");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const disposition = res.headers && typeof res.headers.get === "function" ? res.headers.get("content-disposition") : null;
+    const match = disposition && /filename="([^"]+)"/.exec(disposition);
+    const filename = (match && match[1]) || "massa-ai-logs.jsonl";
+    const doc = ctx.doc;
+    const a = doc && doc.createElement ? doc.createElement("a") : null;
+    if (a) {
+      a.href = url;
+      a.download = filename;
+      if (doc.body && doc.body.appendChild) doc.body.appendChild(a);
+      if (typeof a.click === "function") a.click();
+      if (doc.body && doc.body.removeChild) doc.body.removeChild(a);
+    }
+    if (typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(url);
+  } catch (e) {
+    showBanner(ctx.root, "error", "Export failed: " + String((e && e.message) || e));
+  }
+}
+
 function startApp(opts) {
   opts = opts || {};
   const doc = opts.document || (typeof document !== "undefined" ? document : null);
@@ -2756,6 +2926,10 @@ function startApp(opts) {
     setNavActive();
     // F4 fold: clear index poll interval when navigating away from projects
     if (state.view !== "projects") clearIndexPoll();
+    // T15 (LOG-14/15 teardown): abort any in-flight Logs live-tail stream
+    // when navigating away from the logs view — mirrors clearIndexPoll()'s
+    // discipline above.
+    if (state.view !== "logs") stopLogsLiveStream({ state });
     try {
       if (state.view === "projects") {
         const data = await api.request("/api/v1/project/list");
@@ -2889,9 +3063,9 @@ function startApp(opts) {
       render();
     });
     // logs filters (T14, LOG-13). The Live toggle (`logs-live-toggle`) and
-    // Export button (`logs-export`) are rendered by renderLogs but
-    // deliberately left unwired here — their fetch + ReadableStream /
-    // download logic is T15 (LOG-14, LOG-15).
+    // Export button (`logs-export`) are wired below, in the ctx-scoped block
+    // (T15, LOG-14, LOG-15) — their handlers take `ctx`, like every other
+    // admin-portal handler, so they are unit-testable outside this closure.
     root.querySelectorAll("[data-logs]").forEach((el) => {
       el.addEventListener("change", () => {
         const field = el.dataset.logs;
@@ -3042,6 +3216,17 @@ function startApp(opts) {
       btn.addEventListener("click", () => {
         handleMemoryDeleteProjectCancel(ctx);
       });
+    });
+    // admin-portal-ops-suite (T15, LOG-14, LOG-15): Logs tab Live toggle +
+    // Export. `change`, not `click` — a checkbox's real signal — and the
+    // handler re-reads `.checked` from the DOM rather than trusting the
+    // event, so the fake-DOM harness's synthetic firing (a generic child
+    // whose `checked` is always falsy) can only ever turn Live off.
+    root.querySelector('[data-action="logs-live-toggle"]')?.addEventListener("change", () => {
+      handleLogsLiveToggle(ctx);
+    });
+    root.querySelector('[data-action="logs-export"]')?.addEventListener("click", () => {
+      handleLogsExport(ctx);
     });
     root.querySelectorAll('[data-action="config-save"]').forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -3481,6 +3666,10 @@ const MASSA_AI_UI = {
   handleMemoryDeleteProjectOpen,
   handleMemoryDeleteProjectCancel,
   handleMemoryDeleteProject,
+  stopLogsLiveStream,
+  runLogsLiveStream,
+  handleLogsLiveToggle,
+  handleLogsExport,
   renderProfilesView,
   handleProfilesTabSwitch,
   handleProfileSwitch,
