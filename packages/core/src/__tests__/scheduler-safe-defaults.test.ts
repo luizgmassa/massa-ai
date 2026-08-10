@@ -427,3 +427,137 @@ describe("T29: Scheduler safe-defaults preset", () => {
     scheduler.stop();
   });
 });
+
+// ── SCH-02: per-kind config.json resolution (T5) ────────────────────────────
+//
+// `env > config.json's raw scheduler.jobs[kind] > applySafeDefaults-adjusted
+// literal`. `@massa-ai/shared`'s `config` singleton is fixed at first import
+// for the whole process, but `registerDefaultJobs` deliberately reads the raw
+// file layer via `loadConfigSafe()` (re-reads config.json fresh on every
+// call) rather than the frozen singleton — see scheduler-defaults.ts's own
+// `envBool`/`envNum` doc comments for why the singleton's already-resolved
+// per-job value would make this file's own literal fallback unreachable.
+//
+// This block mocks `@massa-ai/shared` (verified in this repo: `mock.module`
+// rebinds a namespace already imported by another already-loaded module) so
+// no test ever writes to a real config.json, in-scratch or otherwise
+// (pre-mortem #7 — never touch `~/.config/massa-ai`, and this file's own
+// static imports already fixed the real singleton's value for this process
+// before any test body runs).
+describe("SCH-02 per-kind config.json resolution (T5)", () => {
+  const STUB_LOGGER = {
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    metric: () => {},
+    child(): typeof STUB_LOGGER {
+      return STUB_LOGGER;
+    },
+  };
+
+  function mockFileSchedulerJobs(
+    jobs: Record<string, { enabled?: boolean; intervalMs?: number }> | undefined,
+  ): void {
+    mock.module("@massa-ai/shared", () => ({
+      config: { get: () => undefined },
+      logger: STUB_LOGGER,
+      loadConfigSafe: () => (jobs === undefined ? {} : { scheduler: { jobs } }),
+    }));
+  }
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+    resetScheduledJobStore();
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+    resetScheduledJobStore();
+  });
+
+  test("config.json enables a job when no env is set", () => {
+    mockFileSchedulerJobs({ "auto-improve": { enabled: true, intervalMs: 45_000 } });
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    registerDefaultJobs(scheduler);
+    const jobs = jobByName(scheduler);
+    expect(jobs["auto-improve"]?.enabled).toBe(true);
+    expect(jobs["auto-improve"]?.schedule.intervalMs).toBe(45_000);
+    // A kind absent from the mocked file falls all the way to its literal
+    // default — the file layer doesn't leak across kinds.
+    expect(jobs["decay-sweep"]?.enabled).toBe(false);
+  });
+
+  test("env beats config.json for the same job", () => {
+    process.env.MASSA_AI_SCHEDULER_AUTO_IMPROVE_ENABLED = "true";
+    mockFileSchedulerJobs({ "auto-improve": { enabled: false, intervalMs: 999 } });
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    registerDefaultJobs(scheduler);
+    const jobs = jobByName(scheduler);
+    // enabled: env (true) wins over config.json (false).
+    expect(jobs["auto-improve"]?.enabled).toBe(true);
+    // intervalMs: no env override for this field -> config.json wins.
+    expect(jobs["auto-improve"]?.schedule.intervalMs).toBe(999);
+  });
+
+  test("config.json's intervalMs beats the core-only literal default", () => {
+    mockFileSchedulerJobs({ "decay-sweep": { intervalMs: 111_111 } });
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    registerDefaultJobs(scheduler);
+    const jobs = jobByName(scheduler);
+    expect(jobs["decay-sweep"]?.schedule.intervalMs).toBe(111_111);
+    // enabled wasn't in the mocked file for this kind -> literal (false).
+    expect(jobs["decay-sweep"]?.enabled).toBe(false);
+  });
+
+  test("safe-defaults preset is still overridden by config.json (explicit disable)", () => {
+    process.env.MASSA_AI_SCHEDULER_SAFE_DEFAULTS = "true";
+    mockFileSchedulerJobs({ "memory-consolidation": { enabled: false } });
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    registerDefaultJobs(scheduler);
+    const jobs = jobByName(scheduler);
+    // The preset alone would enable consolidation; config.json's explicit
+    // `false` wins over that preset-adjusted literal.
+    expect(jobs["memory-consolidation"]?.enabled).toBe(false);
+    // intervalMs wasn't in the mocked file -> the preset-adjusted literal
+    // (>= 30 min) still applies for that field specifically.
+    expect(jobs["memory-consolidation"]?.schedule.intervalMs).toBeGreaterThanOrEqual(30 * 60 * 1000);
+    // decay-sweep is untouched by the mocked file -> preset still enables it.
+    expect(jobs["decay-sweep"]?.enabled).toBe(true);
+  });
+
+  test("safe-defaults preset is still overridden by env (regression parity with the mocked file layer)", () => {
+    process.env.MASSA_AI_SCHEDULER_SAFE_DEFAULTS = "true";
+    process.env.MASSA_AI_SCHEDULER_CONSOLIDATION_ENABLED = "false";
+    mockFileSchedulerJobs({ "memory-consolidation": { enabled: true } });
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    registerDefaultJobs(scheduler);
+    const jobs = jobByName(scheduler);
+    // env (false) beats both config.json (true) and the preset (true).
+    expect(jobs["memory-consolidation"]?.enabled).toBe(false);
+  });
+
+  test("no config.json scheduler block: behavior unchanged from the literal/preset chain", () => {
+    mockFileSchedulerJobs(undefined);
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({ store, enabled: true });
+    registerDefaultJobs(scheduler);
+    const jobs = jobByName(scheduler);
+    expect(jobs["memory-consolidation"]?.enabled).toBe(false);
+    expect(jobs["decay-sweep"]?.enabled).toBe(false);
+    expect(jobs["auto-improve"]?.enabled).toBe(false);
+    expect(jobs["observation-bridge"]?.enabled).toBe(false);
+    expect(jobs["decay-sweep"]?.schedule.intervalMs).toBe(60 * 60 * 1000);
+  });
+});
