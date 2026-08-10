@@ -115,7 +115,9 @@ describe("index.ts startup ordering (SEC-01 AC2)", () => {
     // If this ever inverts, an unwritable config would bind an unauthenticated
     // listener and only then fail — the exact exposure SEC-01 closes.
     const authAt = INDEX_SOURCE.indexOf("initAuthOrExit()");
-    const listenAt = INDEX_SOURCE.indexOf("app.listen(PORT)");
+    // No closing paren: the listen call carries the lifecycle stopper
+    // callback (APR-03), and the anchor must survive either shape.
+    const listenAt = INDEX_SOURCE.indexOf("app.listen(PORT");
     expect(authAt).toBeGreaterThan(-1);
     expect(listenAt).toBeGreaterThan(-1);
     expect(authAt).toBeLessThan(listenAt);

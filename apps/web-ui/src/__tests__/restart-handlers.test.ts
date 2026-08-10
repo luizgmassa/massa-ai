@@ -92,6 +92,15 @@ describe("handleServerRestart (APR-04)", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it("re-entrancy: an in-flight restart on the same app instance no-ops", async () => {
+    (globalThis as any).confirm = mock(() => true);
+    const request = mock(async () => ({ success: true }));
+    const ctx = makeCtx({ api: { request }, state: { serverRestartInFlight: true } });
+    await handleServerRestart(ctx);
+    expect(request).not.toHaveBeenCalled();
+    expect((globalThis as any).confirm).not.toHaveBeenCalled();
+  });
+
   it("409 refusal shows the server's reason verbatim", async () => {
     (globalThis as any).confirm = mock(() => true);
     const reason = "dev watcher active (bun --watch owns this process's lifecycle)";

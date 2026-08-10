@@ -984,11 +984,13 @@ export function renderConfig(data, opts) {
 
   // Restart Server action (APR-04). One action surface: the save-flow's
   // restart proposal banner points here instead of embedding a second button.
+  // Sibling of the heading, not inside it — a button has no place in an h2's
+  // content model.
   const restartBtn = writeMode
     ? '<button type="button" class="restart-server-btn btn-danger" data-action="server-restart">Restart Server</button>'
     : "";
 
-  return '<section class="view"><h2>Config' + restartBtn + "</h2>" + helpCard + cards + "</section>";
+  return '<section class="view"><div class="view-header"><h2>Config</h2>' + restartBtn + "</div>" + helpCard + cards + "</section>";
 }
 
 function setByPath(obj, dottedPath, value) {
@@ -1750,7 +1752,23 @@ export async function handleServerRestart(ctx, opts) {
   opts = opts || {};
   const pollIntervalMs = opts.pollIntervalMs !== undefined ? opts.pollIntervalMs : 1000;
   const maxAttempts = opts.maxAttempts !== undefined ? opts.maxAttempts : 30;
+  // Re-entrancy guard: a second click during the poll loop would interleave
+  // two banner cycles. Scoped to the app instance's state, NOT the module —
+  // a module-level flag latched by one harness's never-resolving request
+  // would silently disable the handler for every later caller in the same
+  // process. Server-side arm/consume is already one-shot.
+  const state = ctx.state || (ctx.state = {});
+  if (state.serverRestartInFlight) return;
   if (!confirm("Restart the massa-ai API server? In-flight requests will be dropped.")) return;
+  state.serverRestartInFlight = true;
+  try {
+    await runServerRestart(ctx, pollIntervalMs, maxAttempts);
+  } finally {
+    state.serverRestartInFlight = false;
+  }
+}
+
+async function runServerRestart(ctx, pollIntervalMs, maxAttempts) {
   let res;
   try {
     res = await ctx.api.request("/api/v1/system/restart", { method: "POST", body: {} });

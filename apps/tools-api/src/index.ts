@@ -171,6 +171,10 @@ await listenAfterParserValidation({
     // web-standard adapter's stop under `adapter: node()` and throws
     // "Elysia isn't running" (measured; restart-e2e.test.ts guards this).
     app.listen(PORT, (server) => {
+      // The `void` is intentional: server.stop() → net.Server.close() only
+      // schedules the fd close, and the drain's next await (Prisma
+      // disconnect) yields the ticks that complete it. Do not "fix" this to
+      // await a value stop() does not provide.
       setServerStopper(() => void (server as unknown as { stop: () => unknown }).stop());
     });
   },

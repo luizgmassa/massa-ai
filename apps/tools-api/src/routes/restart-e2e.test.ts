@@ -53,22 +53,28 @@ describe("restart flush-before-stop (real process, real socket)", () => {
           stdout: "pipe",
           stderr: "pipe",
         });
-        const reader = proc.stdout.getReader();
-        const { value } = await reader.read();
-        reader.releaseLock();
-        expect(new TextDecoder().decode(value)).toContain("READY");
+        try {
+          const reader = proc.stdout.getReader();
+          const { value } = await reader.read();
+          reader.releaseLock();
+          expect(new TextDecoder().decode(value)).toContain("READY");
 
-        const res = await fetch(`http://localhost:${port}/api/v1/system/restart`, {
-          method: "POST",
-        });
-        expect(res.status).toBe(200);
-        expect(res.headers.get("content-type") ?? "").toContain("application/json");
-        // .json() throws on a truncated body — this IS the race assertion.
-        const body = (await res.json()) as Record<string, unknown>;
-        expect(body).toEqual({ success: true, restarting: true, mode: "supervised" });
+          const res = await fetch(`http://localhost:${port}/api/v1/system/restart`, {
+            method: "POST",
+          });
+          expect(res.status).toBe(200);
+          expect(res.headers.get("content-type") ?? "").toContain("application/json");
+          // .json() throws on a truncated body — this IS the race assertion.
+          const body = (await res.json()) as Record<string, unknown>;
+          expect(body).toEqual({ success: true, restarting: true, mode: "supervised" });
 
-        const exitCode = await proc.exited;
-        expect(exitCode).toBe(0);
+          const exitCode = await proc.exited;
+          expect(exitCode).toBe(0);
+        } finally {
+          // A mid-iteration assertion failure must not leave a port-bound,
+          // busy-looping child behind (the dangling-process flake class).
+          proc.kill();
+        }
       }
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
