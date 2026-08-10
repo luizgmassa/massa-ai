@@ -82,7 +82,7 @@ Commands:
 Examples:
   massa-ai-config init
   massa-ai-config init --mistral your-api-key
-  massa-ai-config use ollama --model nomic-embed-text:latest
+  massa-ai-config use ollama --model qwen3-embedding:4b
   massa-ai-config use mistral --api-key your-key
   massa-ai-config set embedding.dimensions 1024
   massa-ai-config agents install --user
@@ -236,9 +236,12 @@ export async function runCli(argv: string[]): Promise<number> {
     if (provider === "ollama") {
       config.embedding = {
         provider: "ollama",
-        model: (options.model as string) || "nomic-embed-text:latest",
+        model: (options.model as string) || "qwen3-embedding:4b",
         baseURL: (options["base-url"] as string) || "http://localhost:11434",
-        dimensions: 768,
+        // Must match the default model's output width: qwen3-embedding:4b
+        // emits 2560-d vectors, and refuseOnDimensionMismatch fails loudly
+        // on a config that disagrees with what the model returns.
+        dimensions: 2560,
       };
     } else if (provider === "mistral") {
       if (!options["api-key"]) {
