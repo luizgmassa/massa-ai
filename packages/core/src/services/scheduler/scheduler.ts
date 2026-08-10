@@ -39,7 +39,7 @@
  * MASSA_AI_SCHEDULER_<KIND>_ENABLED=true before boot.
  */
 
-import { logger } from "@massa-ai/shared";
+import { config, logger } from "@massa-ai/shared";
 import { parsePositiveIntEnv } from "@massa-ai/shared/config";
 import {
   parseCron,
@@ -76,9 +76,30 @@ const DEFAULTS = {
   maxConcurrent: 2,
 } as const;
 
-function readEnabled(): boolean {
+/**
+ * `MASSA_AI_SCHEDULER_ENABLED` read as a tri-state: `undefined` only when the
+ * env var is genuinely unset, so the ctor's `opts.enabled ?? env ?? config ??
+ * literal` chain (SCH-02) can fall through to the config layer. A *defined*
+ * value that is neither "true" nor "1" resolves to `false` directly
+ * (unchanged from the pre-T6 behavior) rather than falling through.
+ */
+function readEnabledEnv(): boolean | undefined {
   const raw = process.env.MASSA_AI_SCHEDULER_ENABLED;
+  if (raw === undefined) return undefined;
   return raw === "true" || raw === "1";
+}
+
+/**
+ * Parse a positive-integer env var as a tri-state: `undefined` when unset,
+ * empty, or invalid, so the ctor's chain can fall through past it. Reuses
+ * `parsePositiveIntEnv`'s validation (integer, floor >= 1) via the `NaN`
+ * sentinel default — a raw value that fails validation returns the sentinel
+ * back unchanged, which this then maps to `undefined`.
+ */
+function envPositiveInt(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw === "") return undefined;
+  const parsed = parsePositiveIntEnv(raw, NaN);
+  return Number.isNaN(parsed) ? undefined : parsed;
 }
 
 export class Scheduler {
@@ -99,13 +120,32 @@ export class Scheduler {
 
   constructor(opts: SchedulerOptions = {}) {
     this.store = opts.store ?? getScheduledJobStore();
+
+    // SCH-02: opts.X ?? env ?? config ?? literal. The `SchedulerOptions` test
+    // seams (`opts.*`) stay first in precedence, unchanged. `config.get`
+    // (unlike scheduler-defaults.ts's per-job raw file read) is the right
+    // middle layer here: it is `@massa-ai/shared`'s own fully-resolved
+    // `env > config.json > literal` value for these exact three fields, and
+    // its literal defaults already match `DEFAULTS` below, so there is no
+    // core-only fallback beneath it that reading the resolved value could
+    // make unreachable.
+    const schedulerConfig = config.get("scheduler");
+
     this.tickIntervalMs =
       opts.tickIntervalMs ??
-      parsePositiveIntEnv(process.env.MASSA_AI_SCHEDULER_TICK_MS, DEFAULTS.tickMs);
+      envPositiveInt(process.env.MASSA_AI_SCHEDULER_TICK_MS) ??
+      schedulerConfig?.tickMs ??
+      DEFAULTS.tickMs;
     this.maxConcurrent =
       opts.maxConcurrent ??
-      parsePositiveIntEnv(process.env.MASSA_AI_SCHEDULER_MAX_CONCURRENT, DEFAULTS.maxConcurrent);
-    this.enabled = opts.enabled ?? readEnabled();
+      envPositiveInt(process.env.MASSA_AI_SCHEDULER_MAX_CONCURRENT) ??
+      schedulerConfig?.maxConcurrent ??
+      DEFAULTS.maxConcurrent;
+    this.enabled =
+      opts.enabled ??
+      readEnabledEnv() ??
+      schedulerConfig?.enabled ??
+      false;
   }
 
   // ── Registry ──────────────────────────────────────────────────────────────
