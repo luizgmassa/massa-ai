@@ -76,7 +76,7 @@ mock.module("@massa-ai/shared", () => ({
   logBuffer: instrumentedLogBuffer,
 }));
 
-import { logsRoutes, __setLogsReaderForTests, type LogsFileReader } from "./logs.js";
+import { logsRoutes, __setLogsReaderForTests, realReadTail, type LogsFileReader } from "./logs.js";
 import { logBuffer, type LogEntry } from "@massa-ai/shared";
 
 const app = new Elysia().use(logsRoutes);
@@ -218,6 +218,37 @@ describe("GET /api/v1/logs — file sink range/level/substring (LOG-03)", () => 
   });
 });
 
+// ── Trailing-JSON meta parsing edge cases (splitMessageAndMeta) ────────────
+
+describe("GET /api/v1/logs — trailing-JSON meta parsing edge cases", () => {
+  test("a boundary candidate that fails to parse falls back to the plain message (no meta)", async () => {
+    // "{bad}" is not valid JSON (bare identifier as a value). No earlier
+    // " {" boundary exists, so the scan exhausts and the whole rest becomes
+    // the message.
+    fs.writeFileSync(loggingConfigFixture.file, formatLine("2026-01-01T00:00:00.000Z", "INFO", "note {bad}") + "\n");
+
+    const res = await get("/api/v1/logs");
+    expect(res.status).toBe(200);
+    expect(res.json.data.entries[0].message).toBe("note {bad}");
+    expect(res.json.data.entries[0].meta).toBeUndefined();
+  });
+
+  test("the scan retries an earlier boundary after a later (nested-looking) one fails to parse", async () => {
+    // Rightmost " {" boundary is the inner `{"b":2}` — `{"b":2}}` alone is
+    // invalid JSON (an extra closing brace), so the scan backs up to the
+    // outer boundary, where the whole `{"a": {"b":2}}` IS valid JSON.
+    fs.writeFileSync(
+      loggingConfigFixture.file,
+      formatLine("2026-01-01T00:00:00.000Z", "INFO", 'note {"a": {"b":2}}') + "\n",
+    );
+
+    const res = await get("/api/v1/logs");
+    expect(res.status).toBe(200);
+    expect(res.json.data.entries[0].message).toBe("note");
+    expect(res.json.data.entries[0].meta).toEqual({ a: { b: 2 } });
+  });
+});
+
 // ── LOG-04: validation before any I/O ───────────────────────────────────────
 
 describe("GET /api/v1/logs — validation before any read (LOG-04)", () => {
@@ -276,6 +307,46 @@ describe("GET /api/v1/logs — validation before any read (LOG-04)", () => {
     expect(spy.readTailCalls()).toBe(0);
   });
 
+  test('non-numeric "limit" returns 400 naming "limit", and never reads a file', async () => {
+    const spy = installSpyReader();
+
+    const res = await get("/api/v1/logs?limit=abc");
+    expect(res.status).toBe(400);
+    expect(res.json.error).toContain('"limit"');
+    expect(spy.listFilesCalls()).toBe(0);
+    expect(spy.readTailCalls()).toBe(0);
+  });
+
+  test('negative "limit" returns 400 naming "limit", and never reads a file', async () => {
+    const spy = installSpyReader();
+
+    const res = await get("/api/v1/logs?limit=-1");
+    expect(res.status).toBe(400);
+    expect(res.json.error).toContain('"limit"');
+    expect(spy.listFilesCalls()).toBe(0);
+    expect(spy.readTailCalls()).toBe(0);
+  });
+
+  test('non-numeric "offset" returns 400 naming "offset", and never reads a file', async () => {
+    const spy = installSpyReader();
+
+    const res = await get("/api/v1/logs?offset=abc");
+    expect(res.status).toBe(400);
+    expect(res.json.error).toContain('"offset"');
+    expect(spy.listFilesCalls()).toBe(0);
+    expect(spy.readTailCalls()).toBe(0);
+  });
+
+  test('negative "offset" returns 400 naming "offset", and never reads a file', async () => {
+    const spy = installSpyReader();
+
+    const res = await get("/api/v1/logs?offset=-1");
+    expect(res.status).toBe(400);
+    expect(res.json.error).toContain('"offset"');
+    expect(spy.listFilesCalls()).toBe(0);
+    expect(spy.readTailCalls()).toBe(0);
+  });
+
   test("the same validation applies to /export, and never reads a file", async () => {
     const spy = installSpyReader();
 
@@ -313,6 +384,66 @@ describe("GET /api/v1/logs — absent sink file serves the buffer (LOG-09)", () 
   });
 });
 
+// ── realReadTail — direct unit coverage of the real reader's non-happy paths
+// ── (unreachable through the route without a >64 MB fixture file) ──────────
+
+describe("realReadTail — non-happy paths (direct call)", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-logs-realreadtail-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("statSync throwing (file does not exist) returns empty content, untruncated", () => {
+    const result = realReadTail(path.join(dir, "does-not-exist.log"), 1024);
+    expect(result).toEqual({ content: "", truncated: false });
+  });
+
+  test("readFileSync throwing on a stat-able but unreadable small file returns empty content, untruncated", () => {
+    if (process.getuid?.() === 0) {
+      // Root ignores the 0o000 mode bit — the read would succeed, making
+      // this case vacuous. Skip under root (CI may run as root).
+      return;
+    }
+    const file = path.join(dir, "unreadable-small.log");
+    fs.writeFileSync(file, "short content\n");
+    fs.chmodSync(file, 0o000);
+    try {
+      const result = realReadTail(file, 1024); // size <= maxBytes → non-tail branch
+      expect(result).toEqual({ content: "", truncated: false });
+    } finally {
+      fs.chmodSync(file, 0o644);
+    }
+  });
+
+  test("size > maxBytes reads the TAIL, discarding a partial leading line fragment", () => {
+    const file = path.join(dir, "tail.log");
+    fs.writeFileSync(file, "AAAA\nBBBB\nCCCC"); // 14 bytes, no trailing newline
+    const result = realReadTail(file, 5);
+    // start = 14-5=9 → raw 5 bytes "\nCCCC" → first newline at index 0 → "CCCC"
+    expect(result).toEqual({ content: "CCCC", truncated: true });
+  });
+
+  test("openSync/readSync throwing on an unreadable file past the tail bound returns empty content, truncated:true", () => {
+    if (process.getuid?.() === 0) {
+      return;
+    }
+    const file = path.join(dir, "unreadable-large.log");
+    fs.writeFileSync(file, "0123456789012345678901234567890123456789"); // 42 bytes
+    fs.chmodSync(file, 0o000);
+    try {
+      const result = realReadTail(file, 5); // size(42) > maxBytes(5) → tail branch, open denied
+      expect(result).toEqual({ content: "", truncated: true });
+    } finally {
+      fs.chmodSync(file, 0o644);
+    }
+  });
+});
+
 // ── LOG-10: a repeated query with no intervening writes is stable ──────────
 
 describe("GET /api/v1/logs — repeated query is stable (LOG-10)", () => {
@@ -343,6 +474,39 @@ describe("LOG-12 — reading logs never writes back into the buffer", () => {
 
     expect(logBuffer.size()).toBe(sizeBefore);
   });
+});
+
+// ── Scan-budget exhaustion sets truncated:true before a later file's own ───
+// ── read ever happens ───────────────────────────────────────────────────────
+
+describe("GET /api/v1/logs — scan-budget exhaustion across files", () => {
+  test("a first file whose returned content alone consumes the whole 64 MB scan budget truncates before the second file is ever read", async () => {
+    // MAX_SCAN_BYTES is a fixed 64 MiB module constant, so the "budget
+    // already exhausted before this file" branch (distinct from "this
+    // file's own read was truncated") needs a first file whose returned
+    // content is itself >= the full budget.
+    const BUDGET = 64 * 1024 * 1024;
+    const bigContent = "x".repeat(BUDGET); // untruncated per the reader, but consumes the whole budget
+    let readTailCalls = 0;
+    const reader: LogsFileReader = {
+      listFiles: () => ["/fake/one.log", "/fake/two.log"],
+      readTail: (file: string) => {
+        readTailCalls++;
+        if (file === "/fake/one.log") return { content: bigContent, truncated: false };
+        throw new Error("the second file must never be read once the budget is exhausted");
+      },
+    };
+    __setLogsReaderForTests(reader);
+
+    // limit=0 keeps the response body small — `total` still reflects the
+    // full (huge single-entry) scan, but the giant entry itself is never
+    // serialized into the JSON page.
+    const res = await get("/api/v1/logs?limit=0");
+    expect(res.status).toBe(200);
+    expect(res.json.data.truncated).toBe(true);
+    expect(res.json.data.total).toBe(1);
+    expect(readTailCalls).toBe(1);
+  }, 20_000);
 });
 
 // ── GET /api/v1/logs/stream — SSE tail (T13, LOG-05) ────────────────────────
@@ -389,7 +553,176 @@ describe("GET /api/v1/logs/stream — SSE tail", () => {
   });
 });
 
+// ── SSE heartbeat + max-duration auto-close, driven by the per-request env ─
+// ── overrides (mirrors events.test.ts's own approach) ───────────────────────
+
+describe("GET /api/v1/logs/stream — heartbeat + auto-close via env overrides", () => {
+  afterEach(() => {
+    delete process.env.MASSA_AI_SSE_HEARTBEAT_MS;
+    delete process.env.MASSA_AI_SSE_MAX_DURATION_MS;
+  });
+
+  // Mirrors events.test.ts's own `drain`: polling reads are issued on a
+  // fixed interval without waiting for each to resolve first, so each
+  // eventually-fulfilled read (in the FIFO order the stream enqueued them)
+  // appends its chunk whenever it lands — matching the pattern already
+  // proven to observe heartbeat frames in that file.
+  async function drain(reader: any, ms: number): Promise<string> {
+    const decoder = new TextDecoder();
+    let raw = "";
+    const timer = setInterval(() => {
+      reader.read().then(
+        ({ value, done }: any) => {
+          if (done) return;
+          if (value) raw += decoder.decode(value, { stream: true });
+        },
+        () => {},
+      );
+    }, 5);
+    await new Promise((r) => setTimeout(r, ms));
+    clearInterval(timer);
+    return raw;
+  }
+
+  test("a heartbeat comment frame arrives, and the stream auto-closes at the overridden max duration", async () => {
+    process.env.MASSA_AI_SSE_HEARTBEAT_MS = "10";
+    process.env.MASSA_AI_SSE_MAX_DURATION_MS = "50";
+
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    const reader = res.body!.getReader();
+    const raw = await drain(reader, 120);
+    expect(raw).toContain(": heartbeat");
+
+    // Past max-duration, the close timer has already called controller.close()
+    // — a subsequent read resolves done rather than hanging.
+    const after = await Promise.race([
+      reader.read(),
+      new Promise<{ done: boolean }>((resolve) => setTimeout(() => resolve({ done: true }), 300)),
+    ]);
+    expect(after.done).toBe(true);
+    await reader.cancel().catch(() => {});
+  }, 15_000);
+});
+
+// ── SSE enqueue-throw guards: `controller.enqueue` failing sets `closed` and
+// ── stops any further frame from being pushed (both the data path and the
+// ── heartbeat path share the same defensive shape) ──────────────────────────
+
+describe("GET /api/v1/logs/stream — enqueue-throw guards close the stream", () => {
+  test("a controller.enqueue throw on a pushed entry sets closed and guards further data frames", async () => {
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    const reader = res.body!.getReader();
+    const originalEncode = TextEncoder.prototype.encode;
+    try {
+      (TextEncoder.prototype as any).encode = function (): never {
+        throw new Error("simulated encode failure");
+      };
+      logBuffer.push({ ts: "2026-01-01T00:00:00.000Z", level: "info", message: "will fail to enqueue" });
+    } finally {
+      TextEncoder.prototype.encode = originalEncode;
+    }
+
+    // `closed` is now true (set inside `enqueue`'s catch) — a subsequent push
+    // must never reach `controller.enqueue` at all (enqueue's own `if
+    // (closed) return` guard), so no frame ever arrives.
+    logBuffer.push({ ts: "2026-01-01T00:00:01.000Z", level: "info", message: "should never arrive" });
+    const outcome = await Promise.race([
+      reader.read().then(() => "frame-arrived"),
+      new Promise<string>((resolve) => setTimeout(() => resolve("timeout"), 100)),
+    ]);
+    expect(outcome).toBe("timeout");
+    await reader.cancel().catch(() => {});
+  }, 15_000);
+
+  test("a controller.enqueue throw during a heartbeat tick sets closed and clears the heartbeat interval", async () => {
+    process.env.MASSA_AI_SSE_HEARTBEAT_MS = "10";
+    process.env.MASSA_AI_SSE_MAX_DURATION_MS = "5000";
+    try {
+      const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+      const reader = res.body!.getReader();
+      const originalEncode = TextEncoder.prototype.encode;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (TextEncoder.prototype as any).encode = function (): never {
+          throw new Error("simulated encode failure");
+        };
+        await new Promise((r) => setTimeout(r, 40)); // let >=1 heartbeat tick fire and throw
+      } finally {
+        TextEncoder.prototype.encode = originalEncode;
+      }
+
+      // The heartbeat's own catch set `closed = true` and cleared its
+      // interval — a subsequent push must not produce a frame either.
+      logBuffer.push({ ts: "2026-01-01T00:00:02.000Z", level: "info", message: "should never arrive" });
+      const outcome = await Promise.race([
+        reader.read().then(() => "frame-arrived"),
+        new Promise<string>((resolve) => setTimeout(() => resolve("timeout"), 100)),
+      ]);
+      expect(outcome).toBe("timeout");
+      await reader.cancel().catch(() => {});
+    } finally {
+      delete process.env.MASSA_AI_SSE_HEARTBEAT_MS;
+      delete process.env.MASSA_AI_SSE_MAX_DURATION_MS;
+    }
+  }, 15_000);
+
+  test("a heartbeat tick after `closed` was already set by a data-push throw self-clears its own interval", async () => {
+    // A data-push throw (unlike the heartbeat's own throw) sets `closed`
+    // WITHOUT clearing `heartbeatTimer` — only the heartbeat tick itself, or
+    // the max-duration close, does that. So a short heartbeat interval here
+    // reaches the heartbeat's `if (closed) { clearInterval(...); return; }`
+    // guard on its very next tick.
+    process.env.MASSA_AI_SSE_HEARTBEAT_MS = "10";
+    process.env.MASSA_AI_SSE_MAX_DURATION_MS = "5000";
+    try {
+      const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+      const reader = res.body!.getReader();
+      const originalEncode = TextEncoder.prototype.encode;
+      try {
+        (TextEncoder.prototype as any).encode = function (): never {
+          throw new Error("simulated encode failure");
+        };
+        logBuffer.push({ ts: "2026-01-01T00:00:00.000Z", level: "info", message: "will fail to enqueue" });
+      } finally {
+        TextEncoder.prototype.encode = originalEncode;
+      }
+
+      // `closed` is true, `heartbeatTimer` is still armed — wait past its
+      // next tick, which self-clears on observing `closed`.
+      await new Promise((r) => setTimeout(r, 40));
+
+      logBuffer.push({ ts: "2026-01-01T00:00:01.000Z", level: "info", message: "should never arrive" });
+      const outcome = await Promise.race([
+        reader.read().then(() => "frame-arrived"),
+        new Promise<string>((resolve) => setTimeout(() => resolve("timeout"), 100)),
+      ]);
+      expect(outcome).toBe("timeout");
+      await reader.cancel().catch(() => {});
+    } finally {
+      delete process.env.MASSA_AI_SSE_HEARTBEAT_MS;
+      delete process.env.MASSA_AI_SSE_MAX_DURATION_MS;
+    }
+  }, 15_000);
+});
+
 // ── Export (LOG-06): explicit Response, real HTTP only ─────────────────────
+
+describe("GET /api/v1/logs/export — txt rendering (renderTxtLine)", () => {
+  test("format=txt renders meta as trailing JSON for an entry with meta, and omits it for one without", async () => {
+    const lines = [
+      formatLine("2026-01-01T00:00:00.000Z", "WARN", "slow query", { ms: 900 }),
+      formatLine("2026-01-01T00:01:00.000Z", "INFO", "plain entry"),
+    ];
+    fs.writeFileSync(loggingConfigFixture.file, lines.join("\n") + "\n");
+
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/export?format=txt"));
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const textLines = text.split("\n");
+    expect(textLines).toContain("[2026-01-01T00:01:00.000Z] [INFO] plain entry");
+    expect(textLines).toContain('[2026-01-01T00:00:00.000Z] [WARN] slow query {"ms":900}');
+  });
+});
 
 describe("GET /api/v1/logs/export — zero-match range still 200s with an empty body", () => {
   test("an export matching zero entries returns 200 with an empty body, never an error", async () => {

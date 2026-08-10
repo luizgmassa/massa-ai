@@ -169,7 +169,16 @@ export interface LogsFileReader {
   readTail(filePath: string, maxBytes: number): { content: string; truncated: boolean };
 }
 
-function realReadTail(filePath: string, maxBytes: number): { content: string; truncated: boolean } {
+/**
+ * Exported ONLY for `realReadTail`'s own non-happy-path unit coverage
+ * (statSync/readFileSync/openSync-readSync failure branches): those branches
+ * are unreachable through the route without a file that exceeds the fixed
+ * 64 MB `MAX_SCAN_BYTES` scan bound, which a test cannot practically write.
+ * Calling it directly with a small `maxBytes` reaches the same code with a
+ * small fixture. Production code never imports this export directly —
+ * `realReader.readTail` (below) is still the only production call site.
+ */
+export function realReadTail(filePath: string, maxBytes: number): { content: string; truncated: boolean } {
   let size: number;
   try {
     size = fs.statSync(filePath).size;
