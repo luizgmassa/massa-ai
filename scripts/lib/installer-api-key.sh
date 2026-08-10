@@ -133,6 +133,12 @@ installer_embedding_dimensions() {
 # installer cannot import a TypeScript module, so a gate is the available
 # substitute for a shared declaration.
 installer_capture_policy_block() {
+  # Declining writes no member at all, which is a real choice rather than an
+  # empty one: the same rules stay in force through the built-in default, they
+  # are simply not editable from the Admin Portal. The emitted block carries
+  # its own trailing comma, so omitting it leaves valid JSON.
+  [ "${CAPTURE_POLICY_ENABLED:-true}" = "true" ] || return 0
+
   cat <<'POLICYEOF'
   "capturePolicy": {
     "rules": [
