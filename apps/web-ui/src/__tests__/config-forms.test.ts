@@ -382,6 +382,54 @@ describe("renderConfig — capturePolicy not-configured indicator (CFG-01)", () 
     }, { writeMode: true });
     expect(html).not.toContain("config-info-note");
   });
+
+  it("renders the rules as JSON, never as joined objects", () => {
+    // The shipped defect: `rules` was declared `string[]`, which renders by
+    // joining — so thirty rule OBJECTS displayed as thirty "[object Object]".
+    const rules = [
+      { pattern: "**/node_modules/**", disposition: "Drop" },
+      { pattern: "**/*.ts", disposition: "Keep" },
+    ];
+    const html = renderConfig(
+      { config: { capturePolicy: { maxMatchWork: 100, maxIgnorePatterns: 50, rules } }, restartNeededSections: [] },
+      { writeMode: true },
+    );
+    expect(html).not.toContain("[object Object]");
+    expect(html).toContain("**/node_modules/**");
+    expect(html).toContain("Drop");
+    // A textarea, because the value is structured and cannot fit an <input>.
+    expect(html).toMatch(/<textarea[^>]*data-field="rules"/);
+  });
+});
+
+describe("buildConfigSectionBody — json fields (capturePolicy.rules)", () => {
+  it("parses the textarea's JSON back into structure, not into split strings", () => {
+    // As `string[]` this split on commas, so the round trip turned a rule list
+    // into a list of fragments — a body the server's validator rejects for a
+    // reason that names the wrong problem.
+    const body = buildConfigSectionBody("capturePolicy", {
+      rules: '[{"pattern":"**/*.ts","disposition":"Keep"}]',
+      maxMatchWork: "100",
+      maxIgnorePatterns: "50",
+    }) as any;
+    expect(body.capturePolicy.rules).toEqual([{ pattern: "**/*.ts", disposition: "Keep" }]);
+  });
+
+  it("treats an empty textarea as absent, not as an empty rule list", () => {
+    // Absent means "the built-in DEFAULT_POLICY applies"; `[]` would be a
+    // policy that captures everything. They are not the same submission.
+    const body = buildConfigSectionBody("capturePolicy", {
+      rules: "   ",
+      maxMatchWork: "100",
+    }) as any;
+    expect(body.capturePolicy.rules).toBeUndefined();
+  });
+
+  it("throws on unparseable JSON rather than submitting the raw text", () => {
+    expect(() =>
+      buildConfigSectionBody("capturePolicy", { rules: "[{oops" }),
+    ).toThrow(/Rules \(JSON\)/);
+  });
 });
 
 describe("renderConfig — per-section field guides (CFG-03)", () => {

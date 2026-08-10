@@ -914,7 +914,11 @@ const CONFIG_SECTIONS = [
     fields: [
       { name: "maxMatchWork", type: "number", label: "Max Match Work", guide: "Maximum glob match operations before bailing. Default: 100000." },
       { name: "maxIgnorePatterns", type: "number", label: "Max Ignore Patterns", guide: "Maximum ignore patterns allowed. Default: 1024." },
-      { name: "rules", type: "string[]", label: "Rules (JSON)", guide: "Capture rules as JSON array of {pattern, disposition: Keep|Drop|MetadataOnly}. When absent, the built-in `DEFAULT_POLICY` applies." },
+      // `json`, not `string[]`: these are objects, and `string[]` renders by
+      // joining, so thirty rules displayed as thirty "[object Object]" — and
+      // saving that split the placeholder text back on commas, submitting
+      // thirty junk strings for a field whose validator demands objects.
+      { name: "rules", type: "json", label: "Rules (JSON)", guide: "Capture rules as JSON array of {pattern, disposition: Keep|Drop|MetadataOnly}. When absent, the built-in `DEFAULT_POLICY` applies." },
     ],
   },
   {
@@ -1121,6 +1125,13 @@ function renderConfigField(sectionKey, field, value) {
   } else if (field.type === "string[]") {
     const arrVal = Array.isArray(value) ? value.join(", ") : displayValue;
     inputHtml = '<input type="text" id="' + fieldId + '" name="' + inputName + '" value="' + escapeHtml(arrVal) + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="string[]" placeholder="comma-separated" />';
+  } else if (field.type === "json") {
+    // A textarea, because the value is structured and a single-line input
+    // cannot show it. `undefined` renders empty rather than the string
+    // "undefined" — an absent block is meaningful here (it means the built-in
+    // default applies), so it must round-trip as absent and not as text.
+    const jsonVal = value === undefined || value === null ? "" : JSON.stringify(value, null, 2);
+    inputHtml = '<textarea id="' + fieldId + '" name="' + inputName + '" rows="12" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="json" spellcheck="false">' + escapeHtml(jsonVal) + "</textarea>";
   } else {
     const inputType = isSensitive ? "password" : "text";
     inputHtml = '<input type="' + inputType + '" id="' + fieldId + '" name="' + inputName + '" value="' + escapeHtml(displayValue) + '" data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="text" />';
@@ -1230,6 +1241,25 @@ export function buildConfigSectionBody(sectionKey, fieldValues) {
       val = raw && typeof raw === "string"
         ? raw.split(",").map((s) => s.trim()).filter(Boolean)
         : Array.isArray(raw) ? raw : [];
+    } else if (field.type === "json") {
+      // An empty textarea means "no configured block", which is not the same
+      // as an empty array: absent lets the server's own default apply, while
+      // `[]` would be a policy with no rules at all.
+      const text = typeof raw === "string" ? raw.trim() : "";
+      if (text === "") {
+        val = undefined;
+      } else {
+        try {
+          val = JSON.parse(text);
+        } catch (e) {
+          // Thrown, never coerced. Submitting unparseable text would either be
+          // rejected by the server with a message about the wrong thing, or —
+          // worse — accepted as a string where a structure was meant.
+          throw new Error(
+            'Field "' + field.label + '" is not valid JSON: ' + ((e && e.message) || String(e)),
+          );
+        }
+      }
     }
     if (val !== undefined) setByPath(nested, field.name, val);
   }
@@ -1931,7 +1961,16 @@ export async function handleConfigSave(ctx, section) {
   const label = sectionDef ? sectionDef.label : section;
   if (!confirm("Save " + label + " config? A backup will be created.")) return;
   const fieldValues = collectConfigSectionFields(ctx.root, section);
-  const body = buildConfigSectionBody(section, fieldValues);
+  // Built outside the request try/catch, and a `json` field throws on
+  // unparseable text — so it needs its own guard, or a typo in the Rules box
+  // would reject as an unhandled error with no banner at all.
+  let body;
+  try {
+    body = buildConfigSectionBody(section, fieldValues);
+  } catch (e) {
+    showBanner(ctx.root, "error", "Save failed: " + ((e && e.message) || String(e)));
+    return;
+  }
   try {
     const res = await ctx.api.request("/api/v1/config", { method: "PUT", body });
     if (res && res.success === false) {
