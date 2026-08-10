@@ -88,6 +88,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   files from the index are visible and editable. Every feature toggle became a
   variable whose default is the literal the template used to hardcode, so a
   caller that sets none of them writes the same `config.json` as before.
+- **An install created before the template fix kept an embedding width its model
+  cannot emit, and every embedding call failed.** Correcting the installer only
+  fixes what a *new* install writes; a machine already carrying
+  `qwen3-embedding:4b` beside `"dimensions": 4096` kept it, and that is not
+  cosmetic — `createEmbeddingProvider` refuses to fall through on a dimension
+  mismatch (deliberately, so retrieval never silently degrades), so every
+  embedding path threw `DimensionMismatchError` until the file was hand-edited.
+  Note that `bun run diagnose` reports the *model's* width and so looks healthy
+  either way. The width now resolves `env > the model's known native width >
+  config.json > default`: a known model's width is a fact rather than a
+  preference, so it outranks a file value contradicting it and warns once, while
+  an explicit env var still wins and an unknown model keeps whatever the file
+  says. A non-numeric `OLLAMA_EMBEDDING_DIMENSIONS`, which previously reached
+  the provider as `NaN`, now falls through to the known width.
+- **The Logs tab's live tail did not survive a page refresh, and showed nothing
+  when the range matched no rows.** The stream was never at fault — the server
+  emits frames correctly — but Live was held only in page state, so every reload
+  silently turned it off, and it is now persisted across reloads (an in-page
+  toggle still wins). Separately, streamed rows are appended straight into the
+  results table so no range query is re-issued, and the empty state rendered no
+  table at all: every live entry landed nowhere until a refresh's range query
+  displayed it. The table shell is now rendered for a zero-row range while Live
+  is on, and the "no entries match this range" note is removed once a row lands
+  beneath it. Live remains scoped to the API server process — entries from the
+  stdio MCP server still appear only in a range query, as the tab discloses.
 - **`massa-ai-config use ollama` wrote different embedding defaults depending on
   which copy of the CLI you ran.** `apps/opencode-plugin`'s config CLI still
   defaulted to nomic-embed-text/768 while `apps/mcp-client`'s wrote
