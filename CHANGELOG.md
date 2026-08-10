@@ -102,6 +102,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an explicit env var still wins and an unknown model keeps whatever the file
   says. A non-numeric `OLLAMA_EMBEDDING_DIMENSIONS`, which previously reached
   the provider as `NaN`, now falls through to the known width.
+- **The Logs tab's live tail showed nothing on an idle server, because it only
+  followed the API process's own entries.** `GET /api/v1/logs/stream` subscribed
+  to the in-process ring buffer, while the file sink is appended by *every*
+  massa-ai process — including the stdio MCP server, which is where most of an
+  install's log traffic comes from. The stream now tails the newest sink file
+  instead, falling back to the buffer only when no sink is readable (mirroring
+  the range query's own degradation); it is not both, because the file is a
+  superset of the buffer and tailing both would double every local entry. The
+  tail starts at end-of-file so history is not replayed, follows rotation by
+  re-listing rather than holding a descriptor, carries partial trailing lines
+  between polls, and caps each read so a burst is delayed rather than dropped.
+  Poll interval overridable with `MASSA_AI_SSE_SINK_POLL_MS`.
+- **The Capture Policy "Rules (JSON)" field showed `[object Object]` once per
+  rule, and could not be saved.** The field was declared as a string list, whose
+  renderer joins the array — correct for CORS origins, wrong for a list of
+  `{pattern, disposition}` objects — and whose save path splits the input on
+  commas, so submitting the form sent one junk string per rule to a validator
+  that requires objects. It is now a JSON textarea that round-trips the
+  structure, distinguishes an empty box (block absent, built-in `DEFAULT_POLICY`
+  applies) from an empty rule list, and reports unparseable JSON in a banner
+  instead of submitting it. The section only became reachable when
+  `capturePolicy` gained a default, above.
 - **The Logs tab's live tail did not survive a page refresh, and showed nothing
   when the range matched no rows.** The stream was never at fault — the server
   emits frames correctly — but Live was held only in page state, so every reload
