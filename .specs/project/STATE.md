@@ -1,5 +1,45 @@
 # massa-ai Spec State
 
+## Current — Installer/Restart/Dims batch (**VALIDATED PASS ×3 2026-08-09** — 10 commits, verifier independent; push/PR next)
+
+- projectId `massa-ai` · workflowSessionId `spec-installer-marketplace-update` ·
+  workflow spec-driven · branch `spec/installer-restart-embedding` from `main`
+  @ `6c438a98` (v1.44.0), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-installer-restart-embedding`.
+- Three features, each with its own spec + validation (all PASS, 4/4 scratch
+  mutations killed, evidence re-derived by the verification agent):
+  - `claude-marketplace-cache-refresh` — installer runs `claude plugin update`
+    when the served version is older than the bundle (never downgrades) and
+    records the version the CLI actually serves; mock-CLI shell suite 24/24.
+  - `embedding-dims-consistency` — premise re-measured: 4b/2560 already the
+    default since v1.33.0; fixed the sweep's stragglers (Dockerfile 8b/4096,
+    install.sh + setup-ollama-wsl.sh 4096, config-cli 768, UI guide, docs) and
+    added the per-dialect parity sensor with a completeness scan.
+  - `admin-portal-restart` — hybrid restart endpoint (supervised exit /
+    unsupervised self-respawn / dev-watch 409; user-locked decision), Config
+    tab Restart button with /health poll, diff-based `changedRestartSections`
+    proposal banner. Real-process e2e caught the Elysia node-adapter
+    `app.stop()` defect; stopper is the listen callback's `server.stop()`.
+- Final gates (measured, exit codes captured): lint 0 · type-check 6/6 ·
+  `turbo test --force` 11/11 (DATABASE_URL + sandbox=none) ·
+  `test:scripts` 1736/0 + all shell suites (scratch XDG_CONFIG_HOME —
+  local profile overlay breaks drift gates otherwise) · `test:plugins` 135/0 ·
+  web-ui 477/0 · security-allowlist PASS (new reviewed bun-spawn entry).
+- Deviations recorded: CMR T1+T2 delivered as one atomic commit (single data
+  flow, halves non-functional alone); batch-worker offer not taken
+  (sequential single-worktree edits, no disjoint write sets); APR proposal
+  banner references the header Restart button instead of embedding a second
+  one (single action surface; fake-DOM banner infra has no wired children).
+- Environmental notes for future gates on this machine: mcp-client
+  embedded-endpoints flakes on cold local Ollama (warm run green; CI
+  unaffected); `test-plugin-auto-install` harness-uninstall case needs
+  `bun run build` (opencode dist) in a fresh worktree.
+- Next: push + PR (one PR, three features, CHANGELOG has Added+Fixed →
+  minor release on merge). No self-merge — PR handed to Luiz. Machine-side
+  file-route migration runbook lives in HANDOFF.
+
+
+
 ## workflow-interaction-policies (2026-08-09)
 
 - **Objective**: land the operator's interaction-policy directives across the

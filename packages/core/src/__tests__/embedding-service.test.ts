@@ -144,7 +144,7 @@ describe("EmbeddingService", () => {
 
   // BUG-01: the 384 fallback went with the random vectors. Reporting a
   // plausible width for a provider that does not exist is the same class of
-  // lie -- and the real default (OLLAMA_EMBEDDING_DIMENSIONS) is 4096, so the
+  // lie -- and the real default (OLLAMA_EMBEDDING_DIMENSIONS) is 2560, so the
   // fallback was not even the right number.
   test("getDimensions throws when no provider is available", async () => {
     initShouldThrow = true;

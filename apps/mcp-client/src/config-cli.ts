@@ -232,7 +232,10 @@ export async function runCli(argv: string[]): Promise<number> {
         provider: "ollama",
         model: (options.model as string) || "qwen3-embedding:4b",
         baseURL: (options["base-url"] as string) || "http://localhost:11434",
-        dimensions: 768,
+        // Must match the default model's output width: qwen3-embedding:4b
+        // emits 2560-d vectors, and refuseOnDimensionMismatch fails loudly
+        // on a config that disagrees with what the model returns.
+        dimensions: 2560,
       };
     } else if (provider === "mistral") {
       if (!options["api-key"]) {

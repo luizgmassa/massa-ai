@@ -42,6 +42,7 @@ export {
   savePartialConfig,
   maskSensitive,
   restartNeededSections,
+  changedRestartSections,
   type SavePartialConfigResult,
 } from "./config/index.js";
 

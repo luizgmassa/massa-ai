@@ -59,7 +59,7 @@ npx @massa-ai/mcp-client --config-show
 npx @massa-ai/mcp-client --config-path
 npx @massa-ai/mcp-client --config-dir
 npx @massa-ai/mcp-client --config-init
-npx @massa-ai/mcp-client --config-set embedding.dimensions 4096
+npx @massa-ai/mcp-client --config-set embedding.dimensions 2560
 ```
 
 Provider initialization supports Ollama plus `--mistral` and `--openai`

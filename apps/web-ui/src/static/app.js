@@ -705,7 +705,7 @@ const CONFIG_SECTIONS = [
       { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., `qwen3-embedding:4b` for Ollama)." },
       { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically `http://localhost:11434`." },
       { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama. Changing this requires a restart." },
-      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 4096 for `qwen3-embedding:4b`)." },
+      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 2560 for `qwen3-embedding:4b`)." },
     ],
   },
   {
@@ -982,7 +982,15 @@ export function renderConfig(data, opts) {
     '</div>' +
     '</details>';
 
-  return '<section class="view"><h2>Config</h2>' + helpCard + cards + "</section>";
+  // Restart Server action (APR-04). One action surface: the save-flow's
+  // restart proposal banner points here instead of embedding a second button.
+  // Sibling of the heading, not inside it — a button has no place in an h2's
+  // content model.
+  const restartBtn = writeMode
+    ? '<button type="button" class="restart-server-btn btn-danger" data-action="server-restart">Restart Server</button>'
+    : "";
+
+  return '<section class="view"><div class="view-header"><h2>Config</h2>' + restartBtn + "</div>" + helpCard + cards + "</section>";
 }
 
 function setByPath(obj, dottedPath, value) {
@@ -1717,11 +1725,89 @@ export async function handleConfigSave(ctx, section) {
       showBanner(ctx.root, "error", "Save failed: " + details);
       return;
     }
-    showBanner(ctx.root, "success", "Config section " + section + " saved. Backup created.");
+    const changed = (res && res.data && res.data.changedRestartSections) || [];
+    if (changed.length > 0) {
+      // Diff-based restart proposal (APR-05): only when a restart-relevant
+      // value actually changed in THIS save. Persistent — the running
+      // process will not pick the change up on its own.
+      showBanner(
+        ctx.root,
+        "success",
+        "Config section " + section + " saved. Restart required to apply: " + changed.join(", ") +
+          " — use the Restart Server button to apply now.",
+        { persist: true },
+      );
+    } else {
+      showBanner(ctx.root, "success", "Config section " + section + " saved. Backup created.");
+    }
     ctx.render();
   } catch (e) {
     showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
   }
+}
+
+/** Restart the API server (APR-04): confirm, POST, then poll /health until
+ *  the replacement answers. Poll knobs are injectable for tests. */
+export async function handleServerRestart(ctx, opts) {
+  opts = opts || {};
+  const pollIntervalMs = opts.pollIntervalMs !== undefined ? opts.pollIntervalMs : 1000;
+  const maxAttempts = opts.maxAttempts !== undefined ? opts.maxAttempts : 30;
+  // Re-entrancy guard: a second click during the poll loop would interleave
+  // two banner cycles. Scoped to the app instance's state, NOT the module —
+  // a module-level flag latched by one harness's never-resolving request
+  // would silently disable the handler for every later caller in the same
+  // process. Server-side arm/consume is already one-shot.
+  const state = ctx.state || (ctx.state = {});
+  if (state.serverRestartInFlight) return;
+  if (!confirm("Restart the massa-ai API server? In-flight requests will be dropped.")) return;
+  state.serverRestartInFlight = true;
+  try {
+    await runServerRestart(ctx, pollIntervalMs, maxAttempts);
+  } finally {
+    state.serverRestartInFlight = false;
+  }
+}
+
+async function runServerRestart(ctx, pollIntervalMs, maxAttempts) {
+  let res;
+  try {
+    res = await ctx.api.request("/api/v1/system/restart", { method: "POST", body: {} });
+  } catch (e) {
+    showBanner(ctx.root, "error", "Restart request failed: " + String((e && e.message) || e));
+    return;
+  }
+  if (!res || res.success === false) {
+    // 409 dev-watch carries a specific reason — show it verbatim, never a
+    // generic message (APUX fix-loop 1 lesson).
+    const reason = (res && (res.reason || res.error)) || "restart refused";
+    showBanner(ctx.root, "error", "Restart refused: " + reason);
+    return;
+  }
+  showBanner(
+    ctx.root,
+    "success",
+    "Restarting (" + res.mode + " mode)… waiting for the server to come back.",
+    { persist: true },
+  );
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+    try {
+      const health = await ctx.api.request("/health");
+      if (health) {
+        showBanner(ctx.root, "success", "Server is back up.");
+        ctx.render();
+        return;
+      }
+    } catch {
+      // Expected while the listener is down — keep polling.
+    }
+  }
+  showBanner(
+    ctx.root,
+    "error",
+    "Server did not come back after " + Math.round((maxAttempts * pollIntervalMs) / 1000) +
+      " s — check the server process (respawn mode cannot recover if the replacement failed to bind).",
+  );
 }
 
 export async function handleConfigReveal(ctx, targetId, section, field) {
@@ -2661,6 +2747,12 @@ function startApp(opts) {
         handleConfigReveal(ctx, target, btn.dataset.section, btn.dataset.field);
       });
     });
+    // admin-portal-restart (APR-04): server restart button
+    root.querySelectorAll('[data-action="server-restart"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleServerRestart(ctx);
+      });
+    });
     // admin-portal-enhancements: profiles tab switcher + switch
     root.querySelectorAll('[data-action="profiles-tab"]').forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -3068,6 +3160,7 @@ const MASSA_AI_UI = {
   startApp,
   showBanner,
   handleConfigSave,
+  handleServerRestart,
   handleConfigReveal,
   renderProfilesView,
   handleProfilesTabSwitch,

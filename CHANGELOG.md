@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Restart Server button in the admin portal, with a diff-based restart proposal.**
+  `POST /api/v1/system/restart` drains gracefully (listener, job reaper, scheduler,
+  Prisma) after the response is delivered, then exits for the supervisor to respawn
+  (`MASSA_AI_SUPERVISED=1` or Docker) or spawns its own detached replacement when
+  unsupervised; under the dev watcher it refuses with a 409. The Config tab gains the
+  button (write-mode gated, polls `/health` until the server is back), and saving a
+  config section now reports which restart-relevant values actually changed — an
+  unchanged re-save or masked-secret echo no longer suggests a restart.
+
+### Fixed
+
+- **Embedding model/dimension pairs aligned to the 4b/2560 default on every surface.**
+  The v1.33.0 default swap missed four surfaces, three of them shipping internally
+  inconsistent pairs that `refuseOnDimensionMismatch` turns into a hard fail at first
+  embed: the Docker image (`qwen3-embedding:8b`/4096), `install.sh` and
+  `setup-ollama-wsl.sh` (4b model beside 4096 dims), and `massa-ai-config use ollama`
+  (4b beside 768). All now write `qwen3-embedding:4b`/2560, the Web UI dimensions guide
+  and docs examples say 2560, and a new parity test extracts every surface's pair with
+  per-dialect anchors — failing by name on any future sweep-missed surface.
+- **Marketplace-route Claude installs now pick up new bundle versions.** `claude plugin
+  install` is an idempotent no-op on an already-installed plugin, so the CLI kept serving
+  its version-pinned cache snapshot forever (observed: 1.28.0 served while the bundle and
+  `install-state.json` both said 1.44.0). The installer now compares the served version
+  against the bundle after registration, runs `claude plugin update` only when served is
+  older (never downgrades), and records the version the CLI actually serves — or no
+  version at all when the registry entry is unreadable, so the next run retries instead
+  of trusting a stale claim.
+
 ## [1.45.0] - 2026-08-09
 
 ### Changed

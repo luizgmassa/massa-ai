@@ -1103,7 +1103,7 @@ export {
   migrateDataDirOnce,
 } from "./config-loader";
 
-export { savePartialConfig, maskSensitive, restartNeededSections } from "./config-writer";
+export { savePartialConfig, maskSensitive, restartNeededSections, changedRestartSections } from "./config-writer";
 export type { SavePartialConfigResult } from "./config-writer";
 
 export { configDir } from "./xdg";

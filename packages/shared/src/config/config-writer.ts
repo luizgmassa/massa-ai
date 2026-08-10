@@ -13,7 +13,16 @@ const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"];
 const BACKUP_RETENTION_LIMIT = 10;
 
 export type SavePartialConfigResult =
-  | { success: true; config: MassaAiConfig; restartNeededSections: string[] }
+  | {
+      success: true;
+      config: MassaAiConfig;
+      restartNeededSections: string[];
+      /** Diff-based: restart sections whose stored value actually changed in
+       *  THIS save. Unlike the presence-based restartNeededSections (a static
+       *  "changing this requires restart" marker), an unchanged re-save or a
+       *  masked-sentinel echo yields []. */
+      changedRestartSections: string[];
+    }
   | { success: false; details: string[] };
 
 export function maskSensitive(config: MassaAiConfig): MassaAiConfig {
@@ -33,6 +42,37 @@ export function restartNeededSections(config: MassaAiConfig): string[] {
     if (s === "security") return config.security !== undefined;
     return false;
   });
+}
+
+/** Structural equality, key-order independent. `before[s]` comes from disk and
+ *  `after[s]` from freshly parsed client JSON, so serialized comparison would
+ *  false-positive on key order alone. */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a as object);
+  const kb = Object.keys(b as object);
+  if (ka.length !== kb.length) return false;
+  return ka.every((k) =>
+    deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
+  );
+}
+
+/**
+ * The restart sections whose stored value actually changed between two config
+ * trees (APR-05). Runs on post-unmask values — savePartialConfig calls it with
+ * the pre-save `current` and the merged result, after applyMaskedSentinel has
+ * restored any `"***"` echoes, so a save that changes nothing reports nothing.
+ */
+export function changedRestartSections(before: MassaAiConfig, after: MassaAiConfig): string[] {
+  return RESTART_SECTIONS.filter(
+    (s) =>
+      !deepEqual(
+        (before as unknown as Record<string, unknown>)[s],
+        (after as unknown as Record<string, unknown>)[s],
+      ),
+  );
 }
 
 /**
@@ -375,5 +415,6 @@ export function savePartialConfig(partial: Partial<MassaAiConfig>): SavePartialC
     success: true,
     config: merged,
     restartNeededSections: restartNeededSections(merged),
+    changedRestartSections: changedRestartSections(current, merged),
   };
 }

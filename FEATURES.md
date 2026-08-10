@@ -1279,7 +1279,7 @@ npx @massa-ai/mcp-client --config-init --openai your-api-key    # OpenAI
 npx @massa-ai/mcp-client --config-init --ollama-model qwen3-embedding
 
 # Set specific configuration values
-npx @massa-ai/mcp-client --config-set embedding.dimensions 4096
+npx @massa-ai/mcp-client --config-set embedding.dimensions 2560
 ```
 
 ---
