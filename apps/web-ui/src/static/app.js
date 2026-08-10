@@ -320,6 +320,45 @@ export function renderProjects(data, opts) {
   );
 }
 
+/** Renders the bulk-delete control for the Memory tab (design "1. Memory bulk
+ *  delete (MBD)", spec P1-Bulk ACs 1-4). Gated on write mode + a selected
+ *  project (MBD-01); the inline confirmation form appears only when
+ *  `state.memoryBulkForm` is open (MBD-02) — shape `null | { error?: string }`,
+ *  mirroring `state.registryForm`'s open/closed convention. The confirm value
+ *  is read from `[data-bulk="confirm-id"]` at submit time (T2), never from
+ *  `btn.dataset` — the fake-DOM harness's synthetic clicks carry an empty
+ *  dataset. */
+function renderMemoryBulkDelete(state) {
+  const writeMode = isWriteModeEnabled();
+  if (!writeMode) return "";
+  const project = state.project;
+  if (!project) {
+    return '<p class="muted">Select a project to enable bulk delete.</p>';
+  }
+  const trigger =
+    '<button type="button" class="btn btn-danger" data-action="memory-delete-project">Delete all memories for ' +
+    escapeHtml(project) +
+    "</button>";
+  const formState = state.memoryBulkForm;
+  let form = "";
+  if (formState) {
+    const errorLine = formState.error
+      ? '<p class="form-error">' + escapeHtml(formState.error) + "</p>"
+      : "";
+    form =
+      '<div class="bulk-delete-inline-form form-field">' +
+      errorLine +
+      "<label>Retype &quot;" +
+      escapeHtml(project) +
+      '&quot; to confirm<input type="text" data-bulk="confirm-id" /></label>' +
+      '<div class="button-row">' +
+      '<button type="button" class="btn btn-danger" data-action="memory-delete-project-confirm">Confirm Delete</button>' +
+      '<button type="button" class="btn btn-secondary" data-action="memory-delete-project-cancel">Cancel</button>' +
+      "</div></div>";
+  }
+  return '<div class="bulk-delete">' + trigger + form + "</div>";
+}
+
 export function renderMemoryBrowser(data, state) {
   state = state || {};
   if (!data || data.success === false) {
@@ -435,9 +474,12 @@ export function renderMemoryBrowser(data, state) {
       "</div>"
     : "";
 
+  const bulkDelete = renderMemoryBulkDelete(state);
+
   return (
     '<section class="view"><h2>Memory</h2>' +
     filterBar +
+    bulkDelete +
     body +
     pager +
     createForm +

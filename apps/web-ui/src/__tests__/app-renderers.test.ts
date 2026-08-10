@@ -934,6 +934,63 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
     });
   });
 
+  describe("memory bulk delete (MBD-01, MBD-02)", () => {
+    const EMPTY_DATA = { data: { memories: [], total: 0, limit: 50, offset: 0 } };
+
+    it("renders the bulk-delete control when write mode on and a project is selected", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "proj-1" });
+      expect(html).toContain('data-action="memory-delete-project"');
+      expect(html).toContain("proj-1");
+      expect(html).not.toContain("Select a project to enable bulk delete.");
+    });
+
+    it("renders the select-a-project message when write mode on and no project is selected", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "" });
+      expect(html).not.toContain('data-action="memory-delete-project"');
+      expect(html).toContain("Select a project to enable bulk delete.");
+    });
+
+    it("hides the bulk-delete control when write mode off and a project is selected", () => {
+      disableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "proj-1" });
+      expect(html).not.toContain('data-action="memory-delete-project"');
+      expect(html).not.toContain("Select a project to enable bulk delete.");
+    });
+
+    it("hides the bulk-delete control when write mode off and no project is selected", () => {
+      disableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, { filters: {}, project: "" });
+      expect(html).not.toContain('data-action="memory-delete-project"');
+      expect(html).not.toContain("Select a project to enable bulk delete.");
+    });
+
+    it("renders the inline confirmation form when memoryBulkForm is open", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, {
+        filters: {},
+        project: "proj-1",
+        memoryBulkForm: {},
+      });
+      expect(html).toContain('data-bulk="confirm-id"');
+      expect(html).toContain('data-action="memory-delete-project-confirm"');
+      expect(html).toContain('data-action="memory-delete-project-cancel"');
+      expect(html).not.toContain('class="form-error"');
+    });
+
+    it("renders the form-error line when memoryBulkForm carries an error", () => {
+      enableWrite();
+      const html = renderMemoryBrowser(EMPTY_DATA, {
+        filters: {},
+        project: "proj-1",
+        memoryBulkForm: { error: "Project id does not match." },
+      });
+      expect(html).toContain('class="form-error"');
+      expect(html).toContain("Project id does not match.");
+    });
+  });
+
   describe("handoff create + cancel (HAND-02, HAND-04)", () => {
     it("renders create-handoff form when write mode on + project selected", () => {
       enableWrite();
