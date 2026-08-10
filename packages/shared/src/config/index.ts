@@ -14,7 +14,11 @@ import "../env.js";
 
 import path from "path";
 import { loadConfigSafe, getConfigDir } from "./config-loader";
-import { SCHEDULER_JOB_KINDS, type SchedulerConfig } from "./massa-ai-config";
+import {
+  MAX_IGNORE_PATTERNS,
+  SCHEDULER_JOB_KINDS,
+  type SchedulerConfig,
+} from "./massa-ai-config";
 
 /**
  * Default LLM model for NL/instruction-shaped sites. Pure-instruct (non-thinking)
@@ -439,10 +443,10 @@ function resolveSchedulerJob(
 
 // ── Wave 5 FR-11 / AD-W5-005: capture-policy config validation ──────────────
 
-/** Maximum files to scan before refusing (FR-11 `MAX_MATCH_WORK`). */
-export const MAX_MATCH_WORK = 100_000;
-/** Maximum number of Drop patterns allowed (FR-11 `MAX_IGNORE_PATTERNS`). */
-export const MAX_IGNORE_PATTERNS = 1_024;
+/** Declared alongside `DEFAULT_CAPTURE_POLICY`, which consumes them, so the
+ *  bound a policy carries and the bound its validator enforces cannot drift.
+ *  Re-exported here because this module's path is the published one. */
+export { MAX_MATCH_WORK, MAX_IGNORE_PATTERNS } from "./massa-ai-config";
 
 /**
  * Validate a `capturePolicy` config block at load time. Throws TypeError on:
@@ -1245,7 +1249,11 @@ export class Config {
 export const config = new Config();
 
 export type { MassaAiConfig } from "./massa-ai-config";
-export { defaultMassaAiConfig } from "./massa-ai-config";
+export {
+  defaultMassaAiConfig,
+  DEFAULT_CAPTURE_POLICY,
+  DEFAULT_SCHEDULER_CONFIG,
+} from "./massa-ai-config";
 
 export {
   getConfigDir,

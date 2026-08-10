@@ -257,6 +257,88 @@ export interface SynapseConfig {
   };
 }
 
+/** Maximum files to scan before refusing (FR-11 `MAX_MATCH_WORK`). */
+export const MAX_MATCH_WORK = 100_000;
+/** Maximum number of Drop patterns allowed (FR-11 `MAX_IGNORE_PATTERNS`). */
+export const MAX_IGNORE_PATTERNS = 1_024;
+
+/**
+ * The capture policy in force when `config.json` names none — the single
+ * source for what used to be declared twice: here and as `DEFAULT_POLICY` in
+ * `packages/core/src/services/search/capture-policy.ts`, which now re-exports
+ * this (`core` depends on `shared`, never the reverse).
+ *
+ * It is a REAL default, not `undefined`. Leaving it absent made
+ * `GET /api/v1/config` return 14 of the Admin Portal's 16 sections, so the
+ * Capture Policy tab rendered "not configured" while these 30 rules were the
+ * ones actually dropping files from every index.
+ *
+ * Content-identical to the previous core-side literal, which is what keeps
+ * this a disclosure rather than a behavior change: `getActivePolicy()` used to
+ * fall through to that literal and now receives this one.
+ */
+export const DEFAULT_CAPTURE_POLICY: NonNullable<MassaAiConfig["capturePolicy"]> = {
+  rules: [
+    { pattern: "**/node_modules/**", disposition: "Drop" },
+    { pattern: "**/.git/**", disposition: "Drop" },
+    { pattern: "**/dist/**", disposition: "Drop" },
+    { pattern: "**/build/**", disposition: "Drop" },
+    { pattern: "**/coverage/**", disposition: "Drop" },
+    { pattern: ".env", disposition: "Drop" },
+    { pattern: ".env.*", disposition: "Drop" },
+    { pattern: "**/generated/**", disposition: "Drop" },
+    { pattern: "**/*.generated.*", disposition: "Drop" },
+    { pattern: "**/*.d.ts", disposition: "Drop" },
+    { pattern: "**/__tests__/**", disposition: "Drop" },
+    { pattern: "**/tests/**", disposition: "Drop" },
+    { pattern: "**/*.test.ts", disposition: "Drop" },
+    { pattern: "**/*.test.tsx", disposition: "Drop" },
+    { pattern: "**/*.test.js", disposition: "Drop" },
+    { pattern: "**/*.test.jsx", disposition: "Drop" },
+    { pattern: "**/*.spec.ts", disposition: "Drop" },
+    { pattern: "**/*.spec.tsx", disposition: "Drop" },
+    { pattern: "**/*.spec.js", disposition: "Drop" },
+    { pattern: "**/*.spec.jsx", disposition: "Drop" },
+    { pattern: "**/benchmarks/**", disposition: "Drop" },
+    { pattern: "**/fixtures/**", disposition: "Drop" },
+    { pattern: "**/*.wasm*", disposition: "Drop" },
+    { pattern: "**/*.min.*", disposition: "Drop" },
+    { pattern: "**/*.map", disposition: "Drop" },
+    { pattern: "**/lock.yaml", disposition: "Drop" },
+    { pattern: "**/pnpm-lock.yaml", disposition: "Drop" },
+    { pattern: "**/package-lock.json", disposition: "Drop" },
+    { pattern: "**/bun.lockb", disposition: "Drop" },
+    { pattern: "**/yarn.lock", disposition: "Drop" },
+  ],
+  maxMatchWork: MAX_MATCH_WORK,
+  maxIgnorePatterns: MAX_IGNORE_PATTERNS,
+};
+
+/**
+ * Scheduler defaults mirroring the literal fallbacks `config/index.ts`
+ * resolves as `env > config.json > literal` (SCH-01..03). The mirror is the
+ * point: this block is what `loadConfig()` — and therefore the Admin Portal —
+ * shows for an install whose `config.json` predates the section, so it has to
+ * report what is genuinely running rather than an aspiration.
+ *
+ * `enabled: false` is deliberate even though the installer now writes `true`
+ * on a fresh install. Flipping the literal would start five background jobs
+ * on every existing install and every CI run at upgrade time; the installer's
+ * prompt is where a user opts in.
+ */
+export const DEFAULT_SCHEDULER_CONFIG: SchedulerConfig = {
+  enabled: false,
+  tickMs: 60_000,
+  maxConcurrent: 2,
+  jobs: {
+    "memory-consolidation": { enabled: false, intervalMs: 30 * 60 * 1000 },
+    "decay-sweep": { enabled: false, intervalMs: 60 * 60 * 1000 },
+    "auto-improve": { enabled: false, intervalMs: 30 * 60 * 1000 },
+    "observation-bridge": { enabled: false, intervalMs: 30 * 60 * 1000 },
+    "checkpoint-purge": { enabled: false, intervalMs: 60 * 60 * 1000 },
+  },
+};
+
 export const defaultMassaAiConfig: MassaAiConfig = {
   database: {
     url: "",
@@ -281,10 +363,12 @@ export const defaultMassaAiConfig: MassaAiConfig = {
   impact: {
     bfsCteEnabled: false,
   },
-  // Wave 5 FR-11: capture policy absent by default → the pure module's
-  // DEFAULT_POLICY (migrated from DEFAULT_IGNORES) is used. When present,
-  // the config loader validates bounds + denyUnknownFields.
-  capturePolicy: undefined,
+  // Wave 5 FR-11: the default capture policy is surfaced rather than left
+  // `undefined`. Same 30 Drop rules `getActivePolicy()` already fell back to,
+  // now visible in `GET /api/v1/config` and the Admin Portal's Capture Policy
+  // tab. A `config.json` block still replaces it wholesale (rule lists merge
+  // by replacement, never by append — see `loadConfig`).
+  capturePolicy: DEFAULT_CAPTURE_POLICY,
   cache: {
     enabled: true,
     l1MaxSizeMB: 100,
@@ -410,4 +494,8 @@ export const defaultMassaAiConfig: MassaAiConfig = {
   security: {
     corsOrigins: [],
   },
+  // Present, not absent: an install whose config.json predates the section
+  // otherwise showed the Admin Portal's Scheduler tab with no fields at all.
+  // These are the same literals `config/index.ts` resolves against.
+  scheduler: DEFAULT_SCHEDULER_CONFIG,
 };

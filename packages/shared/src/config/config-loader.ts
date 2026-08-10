@@ -20,6 +20,48 @@ export function configExists(): boolean {
   return fs.existsSync(CONFIG_FILE);
 }
 
+type SchedulerSection = NonNullable<MassaAiConfig["scheduler"]>;
+type SchedulerJobs = NonNullable<SchedulerSection["jobs"]>;
+
+/** Merges each registered job row over a base row, so a partial row keeps the
+ *  fields it did not name. Unknown keys in `incoming` are ignored — the
+ *  registered kinds are the contract. */
+function mergeSchedulerJobs(
+  base: SchedulerJobs | undefined,
+  incoming: SchedulerJobs | undefined,
+): SchedulerJobs {
+  const defaults = defaultMassaAiConfig.scheduler?.jobs ?? {};
+  const merged: SchedulerJobs = {};
+  for (const kind of Object.keys(defaults) as Array<keyof SchedulerJobs>) {
+    merged[kind] = { ...defaults[kind], ...base?.[kind], ...incoming?.[kind] };
+  }
+  return merged;
+}
+
+/**
+ * Merges a scheduler section over a base one, one level deeper than a spread.
+ *
+ * Shared by `loadConfig` (defaults ← config.json) and `savePartialConfig`
+ * (stored ← submitted), and it has to be both places. `savePartialConfig`
+ * replaces a top-level section wholesale, so a submission naming only
+ * `{"enabled": true}` would erase `tickMs`, `maxConcurrent` and all five job
+ * rows from config.json — silently discarding any non-default interval the
+ * user had set. It also made every scheduler save report a restart as needed,
+ * because the stored value it was compared against had been filled in by
+ * `loadConfig` and the freshly-written one had not.
+ */
+export function mergeSchedulerSection(
+  base: SchedulerSection | undefined,
+  incoming: SchedulerSection | undefined,
+): SchedulerSection {
+  return {
+    ...defaultMassaAiConfig.scheduler,
+    ...base,
+    ...incoming,
+    jobs: mergeSchedulerJobs(base?.jobs, incoming?.jobs),
+  };
+}
+
 export function loadConfig(): MassaAiConfig {
   if (!fs.existsSync(CONFIG_FILE)) {
     return defaultMassaAiConfig;
@@ -43,6 +85,16 @@ export function loadConfig(): MassaAiConfig {
       hooks: { ...defaultMassaAiConfig.hooks, ...userConfig.hooks },
       handoffs: { ...defaultMassaAiConfig.handoffs, ...userConfig.handoffs },
       security: { ...defaultMassaAiConfig.security, ...userConfig.security },
+      // Needs a merge level of its own: a config.json carrying only
+      // `{"scheduler":{"enabled":true}}` would otherwise drop tickMs,
+      // maxConcurrent and all five job rows through the `...userConfig`
+      // spread, and the Admin Portal would render a Scheduler tab with one
+      // field on it.
+      scheduler: mergeSchedulerSection(undefined, userConfig.scheduler),
+      // Deliberately NOT merged: a rule list is ordered and first-match-wins,
+      // so merging a user's rules with the defaults would silently reorder
+      // their policy. A configured block replaces the default wholesale.
+      capturePolicy: userConfig.capturePolicy ?? defaultMassaAiConfig.capturePolicy,
     };
   } catch (error) {
     console.error(`Error loading config from ${CONFIG_FILE}:`, error);
