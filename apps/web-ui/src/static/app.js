@@ -907,6 +907,28 @@ const CONFIG_SECTIONS = [
       { name: "allowedExtensions", type: "string[]", label: "Allowed Extensions", guide: "Comma-separated list of file extensions allowed for indexing." },
     ],
   },
+  {
+    // SCH-08. Job kinds mirror packages/shared/src/config/massa-ai-config.ts's
+    // SCHEDULER_JOB_KINDS; app.js is plain browser JS with no build-time
+    // import of @massa-ai/shared, so the five kinds are listed literally here.
+    key: "scheduler",
+    label: "Scheduler",
+    fields: [
+      { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables the background job scheduler (memory-consolidation, decay-sweep, auto-improve, observation-bridge, checkpoint-purge)." },
+      { name: "tickMs", type: "number", label: "Tick Interval (ms)", guide: "How often the scheduler checks whether a job is due to run, in milliseconds. Minimum `1000`." },
+      { name: "maxConcurrent", type: "number", label: "Max Concurrent Jobs", guide: "Maximum number of scheduled jobs allowed to run at the same time. Minimum `1`." },
+      { name: "jobs.memory-consolidation.enabled", type: "boolean", label: "Memory Consolidation Enabled", guide: "When checked, the memory-consolidation job runs on its own schedule." },
+      { name: "jobs.memory-consolidation.intervalMs", type: "number", label: "Memory Consolidation Interval (ms)", guide: "Interval between memory-consolidation runs, in milliseconds. Minimum `60000`." },
+      { name: "jobs.decay-sweep.enabled", type: "boolean", label: "Decay Sweep Enabled", guide: "When checked, the decay-sweep job runs on its own schedule." },
+      { name: "jobs.decay-sweep.intervalMs", type: "number", label: "Decay Sweep Interval (ms)", guide: "Interval between decay-sweep runs, in milliseconds. Minimum `60000`." },
+      { name: "jobs.auto-improve.enabled", type: "boolean", label: "Auto Improve Enabled", guide: "When checked, the auto-improve job runs on its own schedule." },
+      { name: "jobs.auto-improve.intervalMs", type: "number", label: "Auto Improve Interval (ms)", guide: "Interval between auto-improve runs, in milliseconds. Minimum `60000`." },
+      { name: "jobs.observation-bridge.enabled", type: "boolean", label: "Observation Bridge Enabled", guide: "When checked, the observation-bridge job runs on its own schedule." },
+      { name: "jobs.observation-bridge.intervalMs", type: "number", label: "Observation Bridge Interval (ms)", guide: "Interval between observation-bridge runs, in milliseconds. Minimum `60000`." },
+      { name: "jobs.checkpoint-purge.enabled", type: "boolean", label: "Checkpoint Purge Enabled", guide: "When checked, the checkpoint-purge job runs on its own schedule." },
+      { name: "jobs.checkpoint-purge.intervalMs", type: "number", label: "Checkpoint Purge Interval (ms)", guide: "Interval between checkpoint-purge runs, in milliseconds. Minimum `60000`." },
+    ],
+  },
 ];
 
 /**
@@ -3286,6 +3308,7 @@ const MASSA_AI_UI = {
   renderDashboard,
   renderConfig,
   buildConfigSectionBody,
+  collectConfigSectionFields,
   renderProfiles,
   renderModelRegistry,
   splitModelId,
