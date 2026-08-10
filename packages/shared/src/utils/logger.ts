@@ -4,9 +4,10 @@
  * Structured logging with levels and metadata support
  */
 
-import fs from 'node:fs';
 import { ILogger } from '../types/interfaces.js';
 import { config } from '../config/index.js';
+import { appendLine } from './log-sink.js';
+import { logBuffer, type LogEntry } from './log-buffer.js';
 
 export enum LogLevel {
   DEBUG = 0,
@@ -15,10 +16,29 @@ export enum LogLevel {
   ERROR = 3
 }
 
+/** Uppercase label used in the formatted line — unchanged from the pre-T11 format. */
+const LOG_LEVEL_LABELS: Record<LogLevel, string> = {
+  [LogLevel.DEBUG]: 'DEBUG',
+  [LogLevel.INFO]: 'INFO',
+  [LogLevel.WARN]: 'WARN',
+  [LogLevel.ERROR]: 'ERROR',
+};
+
+/** Lowercase tag used by the ring buffer (`LogEntry.level`, LOG-01). */
+const LOG_LEVEL_BUFFER_TAGS: Record<LogLevel, LogEntry['level']> = {
+  [LogLevel.DEBUG]: 'debug',
+  [LogLevel.INFO]: 'info',
+  [LogLevel.WARN]: 'warn',
+  [LogLevel.ERROR]: 'error',
+};
+
 export class Logger implements ILogger {
   private _level?: LogLevel;
   private _enableMetrics?: boolean;
   private _logFilePath?: string;
+  private _enableFileSink?: boolean;
+  private _maxFileSizeBytes?: number;
+  private _maxFiles?: number;
   private _initialized = false;
 
   constructor() {
@@ -36,13 +56,25 @@ export class Logger implements ILogger {
         this._enableMetrics = loggingConfig.enableMetrics;
         // env > config.json precedence is already resolved by config/index.ts
         // (mirrors `level`'s MASSA_AI_LOG_FILE/LOG_LEVEL handling), so this is
-        // a plain read.
+        // a plain read. `file` is always concrete since T8 (LOG-02).
         this._logFilePath = loggingConfig.file;
+        // LOG-02 AC 2b: the ONLY way to disable the file sink.
+        this._enableFileSink = loggingConfig.enableFileSink;
+        this._maxFileSizeBytes = loggingConfig.maxFileSizeMb * 1024 * 1024;
+        this._maxFiles = loggingConfig.maxFiles;
+        // LOG-01: push the resolved ring-buffer capacity into the buffer
+        // every time config is (re-)read here.
+        logBuffer.setCapacity(loggingConfig.bufferSize);
       } catch {
-        // Fallback if config is not available yet
+        // Fallback if config is not available yet — no sink, matching the
+        // pre-T11 fallback behavior (stderr-only).
         this._level = LogLevel.INFO;
         this._enableMetrics = false;
         this._logFilePath = undefined;
+        this._enableFileSink = false;
+        this._maxFileSizeBytes = 32 * 1024 * 1024;
+        this._maxFiles = 5;
+        logBuffer.setCapacity(2000);
       }
       this._initialized = true;
     }
@@ -61,6 +93,21 @@ export class Logger implements ILogger {
   private get logFilePath(): string | undefined {
     this.ensureInitialized();
     return this._logFilePath;
+  }
+
+  private get enableFileSink(): boolean {
+    this.ensureInitialized();
+    return this._enableFileSink!;
+  }
+
+  private get maxFileSizeBytes(): number {
+    this.ensureInitialized();
+    return this._maxFileSizeBytes!;
+  }
+
+  private get maxFiles(): number {
+    this.ensureInitialized();
+    return this._maxFiles!;
   }
 
   /**
@@ -89,49 +136,63 @@ export class Logger implements ILogger {
   private formatMessage(
     level: string,
     message: string,
-    meta?: Record<string, unknown>
+    meta?: Record<string, unknown>,
+    timestamp: string = new Date().toISOString()
   ): string {
-    const timestamp = new Date().toISOString();
     const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
     return `[${timestamp}] [${level}] ${message}${metaStr}`;
   }
 
   /**
-   * Write log message to stderr, and additionally to a file when the opt-in
-   * sink (MASSA_AI_LOG_FILE env or config `logging.file`) is configured.
-   * All logs (DEBUG, INFO, WARN, ERROR) go to stderr, unconditionally and
-   * unchanged. Stdout must remain pristine for stdio MCP protocol (pure
-   * JSON-RPC) — the file sink never touches stdout.
+   * Emit one log record: stderr (always, unchanged format), the file sink
+   * (only when `logging.enableFileSink` resolves true and a path is
+   * available), and the in-process ring buffer (always — LOG-01/LOG-02).
+   *
+   * Ordering is load-bearing: stdout must remain pristine for the stdio MCP
+   * protocol (pure JSON-RPC), so `console.error` (stderr) goes FIRST and
+   * unconditionally, before either of the two additive sinks are touched.
    */
-  private write(message: string, _level: LogLevel): void {
-    console.error(message);
-    const filePath = this.logFilePath;
-    if (filePath) {
-      try {
-        // Sync append, v1: no rotation. A broken/unwritable path must not
-        // crash logging or ever fall back to stdout.
-        fs.appendFileSync(filePath, message + '\n');
-      } catch {
-        // Best-effort sink; stderr above already carried the line.
+  private emit(level: LogLevel, message: string, meta?: Record<string, unknown>): void {
+    const ts = new Date().toISOString();
+    const line = this.formatMessage(LOG_LEVEL_LABELS[level], message, meta, ts);
+    console.error(line);
+
+    if (this.enableFileSink) {
+      const filePath = this.logFilePath;
+      if (filePath) {
+        // appendLine never throws — a broken/unwritable path degrades to
+        // stderr-only exactly as before (pre-mortem #2's `getLastError()`
+        // is the reportable trace, not an exception here).
+        appendLine(
+          { filePath, maxFileSizeBytes: this.maxFileSizeBytes, maxFiles: this.maxFiles },
+          line,
+        );
       }
     }
+
+    logBuffer.push({
+      ts,
+      level: LOG_LEVEL_BUFFER_TAGS[level],
+      message,
+      ...(meta ? { meta } : {}),
+    });
   }
 
   debug(message: string, meta?: Record<string, unknown>): void {
     if (this.shouldLog(LogLevel.DEBUG)) {
-      this.write(this.formatMessage('DEBUG', message, meta), LogLevel.DEBUG);
+      this.emit(LogLevel.DEBUG, message, meta);
     }
   }
 
   info(message: string, meta?: Record<string, unknown>): void {
     if (this.shouldLog(LogLevel.INFO)) {
-      this.write(this.formatMessage('INFO', message, meta), LogLevel.INFO);
+      this.emit(LogLevel.INFO, message, meta);
     }
   }
 
   warn(message: string, meta?: Record<string, unknown>): void {
     if (this.shouldLog(LogLevel.WARN)) {
-      this.write(this.formatMessage('WARN', message, meta), LogLevel.WARN);
+      this.emit(LogLevel.WARN, message, meta);
     }
   }
 
@@ -145,7 +206,7 @@ export class Logger implements ILogger {
           stack: error.stack
         }
       } : meta;
-      this.write(this.formatMessage('ERROR', message, errorMeta), LogLevel.ERROR);
+      this.emit(LogLevel.ERROR, message, errorMeta);
     }
   }
 

@@ -3,7 +3,9 @@
  */
 
 export { logger, Logger, LogLevel } from './logger.js';
-export { 
+export { logBuffer, type LogBuffer, type LogEntry } from './log-buffer.js';
+export { appendLine, sinkFiles, getLastError, type LogSinkOptions } from './log-sink.js';
+export {
   sanitizeInput, 
   sanitizeFTS5Query,
   isValidUserId,
