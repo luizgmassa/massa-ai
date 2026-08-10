@@ -46,7 +46,7 @@ afterEach(() => {
   _setLifecycleSeamsForTesting(null);
   _setRestartModeForTesting(null);
   consumeArmedRestart();
-  __setAuthKeyForTests(null);
+  __setAuthKeyForTests(undefined);
 });
 
 async function post(headers: Record<string, string> = {}) {
