@@ -721,6 +721,122 @@ export function renderCheckpoints(data) {
   return '<section class="view"><h2>Checkpoints</h2>' + body + createForm + helpCard + "</section>";
 }
 
+/** Converts a `datetime-local` input's value (no timezone, no seconds — e.g.
+ *  "2026-08-10T10:00") into the ISO-8601 UTC string `GET /api/v1/logs`
+ *  expects, interpreting it in the browser's local timezone. Returns
+ *  `undefined` for an empty or unparseable value so the caller can omit the
+ *  query param entirely rather than send an invalid range. */
+function logsDatetimeLocalToIso(value) {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+/** Logs tab renderer (design "3f. Web UI `#/logs`", LOG-13). Renders the
+ *  from/to/level/substring filter bar, the Live toggle, the Export control,
+ *  and the entry table — all read from `state.logs*` so a re-render
+ *  round-trips the operator's current filter selection. The Live toggle and
+ *  Export button are rendered but deliberately left unwired here: their
+ *  fetch + ReadableStream / download logic is T15 (LOG-14, LOG-15). */
+const LOGS_LEVEL_OPTIONS = ["debug", "info", "warn", "error", "raw"];
+
+function renderLogEntryRow(entry) {
+  const meta = entry && entry.meta ? " " + escapeHtml(JSON.stringify(entry.meta)) : "";
+  return (
+    "<tr>" +
+    "<td>" + escapeHtml((entry && entry.ts) || "") + "</td>" +
+    '<td><span class="log-level log-level-' + escapeHtml((entry && entry.level) || "") + '">' +
+    escapeHtml((entry && entry.level) || "") +
+    "</span></td>" +
+    '<td class="content-cell">' + escapeHtml((entry && entry.message) || "") + meta + "</td>" +
+    "</tr>"
+  );
+}
+
+export function renderLogs(data, state) {
+  state = state || {};
+  if (!data || data.success === false) {
+    return '<section class="view"><h2>Logs</h2>' + errorBlock(data) + "</section>";
+  }
+  const payload = data.data || data;
+  const entries = (payload && payload.entries) || [];
+  const total = (payload && payload.total) || 0;
+  const source = (payload && payload.source) || "file";
+  const truncated = !!(payload && payload.truncated);
+
+  const levelOpts =
+    '<option value=""' + (state.logsLevel ? "" : " selected") + ">(any)</option>" +
+    LOGS_LEVEL_OPTIONS.map(
+      (l) => '<option value="' + l + '"' + (state.logsLevel === l ? " selected" : "") + ">" + l + "</option>",
+    ).join("");
+
+  const filterBar =
+    '<div class="filters logs-filters">' +
+    '<label>from <input type="datetime-local" data-logs="from" value="' +
+    escapeHtml(state.logsFrom || "") +
+    '"/></label>' +
+    '<label>to <input type="datetime-local" data-logs="to" value="' +
+    escapeHtml(state.logsTo || "") +
+    '"/></label>' +
+    '<label>level <select data-logs="level">' +
+    levelOpts +
+    "</select></label>" +
+    '<label>contains <input type="text" data-logs="q" value="' +
+    escapeHtml(state.logsQuery || "") +
+    '"/></label>' +
+    '<button type="button" data-action="logs-refresh">apply</button>' +
+    '<label class="logs-live-toggle"><input type="checkbox" data-action="logs-live-toggle"' +
+    (state.logsLive ? " checked" : "") +
+    '/> Live</label>' +
+    '<button type="button" data-action="logs-export">Export</button>' +
+    "</div>";
+
+  // Pre-mortem #5: the live region is scoped to THIS server process, while
+  // the file sink is appended by every massa-ai process (including the
+  // stdio MCP server) — a range query may legitimately contain entries Live
+  // never showed. Always shown, not conditional on Live being on, so the
+  // scope difference is disclosed before an operator ever notices it.
+  const liveScopeDisclosure =
+    '<p class="muted logs-live-disclosure">Live shows only this server process\'s entries. The file sink is written ' +
+    "by every massa-ai process, including the stdio MCP server, so a range query below may include entries Live " +
+    "never showed.</p>";
+
+  const sourceNote =
+    source === "buffer"
+      ? '<p class="muted logs-source-note">Serving from the in-process ring buffer — no on-disk sink is currently ' +
+        "readable, so history is limited to this process's recent lines.</p>"
+      : "";
+
+  const truncatedNote = truncated
+    ? '<p class="muted logs-truncated-note">The 64 MB scan bound was reached — this range may be incomplete.</p>'
+    : "";
+
+  let body;
+  if (entries.length === 0) {
+    body = '<p class="empty logs-empty">No log entries match this range.</p>';
+  } else {
+    body =
+      '<p class="muted logs-total">' +
+      escapeHtml(String(entries.length)) +
+      " of " +
+      escapeHtml(String(total)) +
+      " entries</p>" +
+      '<table class="grid logs-table"><thead><tr><th>time</th><th>level</th><th>message</th></tr></thead><tbody>' +
+      entries.map(renderLogEntryRow).join("") +
+      "</tbody></table>";
+  }
+
+  return (
+    '<section class="view"><h2>Logs</h2>' +
+    filterBar +
+    liveScopeDisclosure +
+    sourceNote +
+    truncatedNote +
+    body +
+    "</section>"
+  );
+}
+
 // ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
 
 /**
@@ -2583,6 +2699,17 @@ function startApp(opts) {
     indexJobPhase: null,
     indexJobFileCount: null,
     indexPollInterval: null,
+    // Logs tab (design § 3f, LOG-13): from/to/level/q filters, the Live
+    // toggle, the streamed-entry accumulator, and the live stream's
+    // AbortController — the last two are populated by T15's handlers, not by
+    // this render path.
+    logsFrom: "",
+    logsTo: "",
+    logsLevel: "",
+    logsQuery: "",
+    logsLive: false,
+    logsEntries: [],
+    logsStreamAbort: null,
   };
   try {
     if (typeof localStorage !== "undefined") {
@@ -2605,7 +2732,7 @@ function startApp(opts) {
   }
   function viewFromHash(h) {
     const name = (h || "").replace(/^#\/?/, "");
-    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard", "config", "profiles", "model-registry"].includes(name)
+    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard", "logs", "config", "profiles", "model-registry"].includes(name)
       ? name
       : "projects";
   }
@@ -2693,6 +2820,17 @@ function startApp(opts) {
       } else if (state.view === "dashboard") {
         const data = await fetchDashboardData(api);
         root.innerHTML = renderDashboard(data);
+      } else if (state.view === "logs") {
+        const params = new URLSearchParams();
+        const fromIso = logsDatetimeLocalToIso(state.logsFrom);
+        const toIso = logsDatetimeLocalToIso(state.logsTo);
+        if (fromIso) params.set("from", fromIso);
+        if (toIso) params.set("to", toIso);
+        if (state.logsLevel) params.set("level", state.logsLevel);
+        if (state.logsQuery) params.set("q", state.logsQuery);
+        const qs = params.toString();
+        const data = await api.request("/api/v1/logs" + (qs ? "?" + qs : ""));
+        root.innerHTML = renderLogs(data, state);
       } else if (state.view === "config") {
         const data = await api.request("/api/v1/config");
         if (data && data.success === false) {
@@ -2748,6 +2886,22 @@ function startApp(opts) {
     });
     root.querySelector('[data-action="memory-next"]')?.addEventListener("click", () => {
       state.memoryOffset += 50;
+      render();
+    });
+    // logs filters (T14, LOG-13). The Live toggle (`logs-live-toggle`) and
+    // Export button (`logs-export`) are rendered by renderLogs but
+    // deliberately left unwired here — their fetch + ReadableStream /
+    // download logic is T15 (LOG-14, LOG-15).
+    root.querySelectorAll("[data-logs]").forEach((el) => {
+      el.addEventListener("change", () => {
+        const field = el.dataset.logs;
+        if (field === "from") state.logsFrom = el.value;
+        else if (field === "to") state.logsTo = el.value;
+        else if (field === "level") state.logsLevel = el.value;
+        else if (field === "q") state.logsQuery = el.value;
+      });
+    });
+    root.querySelector('[data-action="logs-refresh"]')?.addEventListener("click", () => {
       render();
     });
     // write mode: memory edit/delete
@@ -3306,6 +3460,7 @@ const MASSA_AI_UI = {
   renderProposals,
   renderCheckpoints,
   renderDashboard,
+  renderLogs,
   renderConfig,
   buildConfigSectionBody,
   collectConfigSectionFields,

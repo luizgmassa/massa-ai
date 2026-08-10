@@ -13,6 +13,7 @@ const {
   renderMemoryBrowser,
   renderProposals,
   renderConfig,
+  renderLogs,
   renderProfiles,
   renderProfilesView,
   renderModelRegistry,
@@ -804,6 +805,134 @@ describe("admin portal nav + footer + routing (T9)", () => {
     expect(calls.some((u) => u.includes("/api/v1/profiles"))).toBe(true);
     expect(doc.getElementById("app").innerHTML).toContain("Profiles");
     delete (globalThis as any).location;
+  });
+});
+
+// ── Logs tab (T14, LOG-13) ───────────────────────────────────────────────────
+
+describe("renderLogs (T14, LOG-13)", () => {
+  const baseData = {
+    success: true,
+    data: {
+      entries: [
+        { seq: 1, ts: "2026-01-01T00:00:00.000Z", level: "info", message: "server started" },
+        { seq: 0, ts: "2026-01-01T00:00:01.000Z", level: "warn", message: "slow query", meta: { ms: 900 } },
+      ],
+      total: 2,
+      source: "file",
+      truncated: false,
+    },
+  };
+
+  it("renders every control: from/to, level select, substring input, Live toggle, Export", () => {
+    const html = renderLogs(baseData, {});
+    expect(html).toContain('data-logs="from"');
+    expect(html).toContain('data-logs="to"');
+    expect(html).toContain('data-logs="level"');
+    expect(html).toContain('data-logs="q"');
+    expect(html).toContain('data-action="logs-live-toggle"');
+    expect(html).toContain('data-action="logs-export"');
+    expect(html).toContain('data-action="logs-refresh"');
+    expect(html).toContain('type="datetime-local"');
+  });
+
+  it("renders the entry table with time, level, message", () => {
+    const html = renderLogs(baseData, {});
+    expect(html).toContain("server started");
+    expect(html).toContain("slow query");
+    expect(html).toContain("2026-01-01T00:00:00.000Z");
+    expect(html).toContain("info");
+    expect(html).toContain("warn");
+    expect(html).toContain("&quot;ms&quot;:900");
+  });
+
+  it("round-trips the current filter selection from state", () => {
+    const html = renderLogs(baseData, {
+      logsFrom: "2026-01-01T00:00",
+      logsTo: "2026-01-02T00:00",
+      logsLevel: "warn",
+      logsQuery: "slow",
+      logsLive: true,
+    });
+    expect(html).toContain('value="2026-01-01T00:00"');
+    expect(html).toContain('value="2026-01-02T00:00"');
+    expect(html).toContain('value="slow"');
+    expect(html).toMatch(/<option value="warn" selected>/);
+    expect(html).toContain('data-action="logs-live-toggle" checked');
+  });
+
+  it('source:"buffer" shows an in-memory note', () => {
+    const html = renderLogs(
+      { success: true, data: { entries: [], total: 0, source: "buffer", truncated: false } },
+      {},
+    );
+    expect(html).toContain("in-process ring buffer");
+  });
+
+  it("an empty result shows an empty state, not an error or a bare table", () => {
+    const html = renderLogs(
+      { success: true, data: { entries: [], total: 0, source: "file", truncated: false } },
+      {},
+    );
+    expect(html).toContain("No log entries match this range");
+    expect(html).not.toContain("<table");
+  });
+
+  it("discloses the live/history process-scope mismatch (pre-mortem #5)", () => {
+    const html = renderLogs(baseData, {});
+    expect(html).toContain("this server process");
+    expect(html).toContain("stdio MCP server");
+  });
+
+  it("shows a truncated note when the scan bound was hit", () => {
+    const html = renderLogs(
+      { success: true, data: { entries: [], total: 0, source: "file", truncated: true } },
+      {},
+    );
+    expect(html).toContain("scan bound");
+  });
+
+  it("renders an error block when the request failed", () => {
+    const html = renderLogs({ success: false, error: "boom" }, {});
+    expect(html).toContain("boom");
+  });
+
+  it("index.html has a Logs nav item between Dashboard and Config", () => {
+    const navMatch = INDEX_HTML.match(/<nav class="nav">([\s\S]*?)<\/nav>/);
+    expect(navMatch).not.toBeNull();
+    const nav = navMatch![1];
+    const dashboardIdx = nav.indexOf("#/dashboard");
+    const logsIdx = nav.indexOf("#/logs");
+    const configIdx = nav.indexOf("#/config");
+    expect(dashboardIdx).toBeGreaterThan(-1);
+    expect(logsIdx).toBeGreaterThan(dashboardIdx);
+    expect(configIdx).toBeGreaterThan(logsIdx);
+    expect(nav).toContain('<a href="#/logs">Logs</a>');
+  });
+
+  it("the nav href and the viewFromHash allow-list agree (dispatch stub routes without error)", async () => {
+    const { doc } = makeFakeDom();
+    (globalThis as any).location = { hash: "#/logs" };
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: string) => {
+      calls.push(String(url));
+      return {
+        headers: { get: () => "application/json" },
+        json: async () => baseData,
+      };
+    }) as unknown as typeof fetch;
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(calls.some((u) => u.includes("/api/v1/logs"))).toBe(true);
+    expect(doc.getElementById("app").innerHTML).toContain("server started");
+    delete (globalThis as any).location;
+  });
+
+  it("is visible without write mode (a read-only tab — export needs no write mode either)", () => {
+    // renderLogs takes no writeMode gate at all; the presence of the Export
+    // control regardless of any write-mode flag IS the read-only contract.
+    const html = renderLogs(baseData, {});
+    expect(html).toContain('data-action="logs-export"');
   });
 });
 
