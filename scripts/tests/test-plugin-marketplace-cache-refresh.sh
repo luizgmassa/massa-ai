@@ -45,6 +45,9 @@ fi
 #   MOCK_UPDATE_FAIL=1      `plugin update` exits 1 without touching the registry
 #   MOCK_NO_UPDATE_SUBCOMMAND=1  `plugin update --help` exits 1 (old CLI)
 #   MOCK_SOURCE_VERSION     version `plugin update` re-materializes to
+#   MOCK_INSTALL_PATH       installPath seeded into the registry (default /mock;
+#                            CPP-07 scenario points this at a real directory so
+#                            the post-update re-apply step has something to read)
 MOCK_BIN="$ROOT/mockbin"
 mkdir -p "$MOCK_BIN"
 cat > "$MOCK_BIN/claude" <<'MOCK'
@@ -59,8 +62,8 @@ case "$*" in
   "plugin install"*)
     mkdir -p "$(dirname "$REG")"
     if [[ ! -f "$REG" ]]; then
-      printf '{"version":2,"plugins":{"massa-ai@massa-ai":[{"scope":"user","version":"%s","installPath":"/mock"}]}}\n' \
-        "${MOCK_SEED_VERSION}" > "$REG"
+      printf '{"version":2,"plugins":{"massa-ai@massa-ai":[{"scope":"user","version":"%s","installPath":"%s"}]}}\n' \
+        "${MOCK_SEED_VERSION}" "${MOCK_INSTALL_PATH:-/mock}" > "$REG"
     fi
     exit 0 ;;
   "plugin update"*)
@@ -95,7 +98,10 @@ const fs = require("fs");
 const [, , file, field] = process.argv;
 try {
   const rec = JSON.parse(fs.readFileSync(file, "utf8")).platforms.claude;
-  const v = field === "plugin.version" ? rec.plugin && rec.plugin.version : rec[field];
+  const v =
+    field === "plugin.version" ? rec.plugin && rec.plugin.version :
+    field === "modelProfile.profile" ? rec.modelProfile && rec.modelProfile.profile :
+    rec[field];
   if (typeof v === "string") process.stdout.write(v);
 } catch { /* absent */ }
 NODE
@@ -164,5 +170,54 @@ assert_eq "no update call" "$(update_calls)" "0"
 assert_contains "stderr warns the served version is unreadable" "$OUT" "could not read the served plugin version"
 assert_eq "no plugin.version claimed" "$(state_field plugin.version)" ""
 assert_eq "installRoute still recorded" "$(state_field installRoute)" "marketplace"
+
+echo ""
+echo "Scenario 6 (CPP-07): after a marketplace update, a recorded model profile is re-applied to the new install root"
+# Seed a recorded profile BEFORE running the installer — T19 (AD-015) only
+# ever READS platforms.claude.modelProfile; only the switch engine writes it.
+NAME6=cpp7-reapply
+SCEN_PRE6="$ROOT/$NAME6"
+mkdir -p "$SCEN_PRE6/.config/massa-ai"
+printf '{"version":2,"platforms":{"claude":{"root":"/irrelevant","skillsOwner":"plugin","skills":["massa-ai","persona-router"],"modelProfile":{"profile":"cheap","switchedAt":"2026-01-01T00:00:00.000Z"}}}}\n' \
+  > "$SCEN_PRE6/.config/massa-ai/install-state.json"
+
+# The marketplace install root the mock CLI records (CPP-01/06 topology). It
+# ships a "cheap" variant whose massa-ai-builder.md content differs from the
+# bundle-default copy already in agents/, so a content diff proves the
+# re-apply actually ran rather than a no-op copy.
+INSTALL_ROOT6="$ROOT/$NAME6-install-root"
+mkdir -p "$INSTALL_ROOT6/agents" "$INSTALL_ROOT6/agent-profiles/cheap"
+printf '# massa-ai-owned\nmodel: bundle-default\n' > "$INSTALL_ROOT6/agents/massa-ai-builder.md"
+printf '# massa-ai-owned\nmodel: cheap-variant\n' > "$INSTALL_ROOT6/agent-profiles/cheap/massa-ai-builder.md"
+
+export MOCK_SEED_VERSION="0.0.1" MOCK_INSTALL_PATH="$INSTALL_ROOT6"
+unset MOCK_UPDATE_FAIL MOCK_NO_UPDATE_SUBCOMMAND 2>/dev/null || true
+run_scenario "$NAME6"
+assert_eq "installer exits 0" "$CODE" "0"
+assert_eq "one plugin update call (served older than bundle)" "$(update_calls)" "1"
+assert_contains "agents/massa-ai-builder.md now carries the recorded 'cheap' variant" \
+  "$(cat "$INSTALL_ROOT6/agents/massa-ai-builder.md")" "cheap-variant"
+assert_not_contains "agents/massa-ai-builder.md no longer carries the bundle default" \
+  "$(cat "$INSTALL_ROOT6/agents/massa-ai-builder.md")" "bundle-default"
+assert_eq "recorded modelProfile is unchanged — the installer only ever reads it (AD-015)" \
+  "$(state_field modelProfile.profile)" "cheap"
+unset MOCK_INSTALL_PATH
+
+echo ""
+echo "Scenario 7 (CPP-07): no recorded profile → re-apply is a logged no-op, and the installer never invents modelProfile"
+NAME7=cpp7-noop
+INSTALL_ROOT7="$ROOT/$NAME7-install-root"
+mkdir -p "$INSTALL_ROOT7/agents" "$INSTALL_ROOT7/agent-profiles/cheap"
+printf '# massa-ai-owned\nmodel: bundle-default\n' > "$INSTALL_ROOT7/agents/massa-ai-builder.md"
+printf '# massa-ai-owned\nmodel: cheap-variant\n' > "$INSTALL_ROOT7/agent-profiles/cheap/massa-ai-builder.md"
+
+export MOCK_SEED_VERSION="0.0.1" MOCK_INSTALL_PATH="$INSTALL_ROOT7"
+run_scenario "$NAME7"
+assert_eq "installer exits 0" "$CODE" "0"
+assert_eq "one plugin update call" "$(update_calls)" "1"
+assert_contains "agents/massa-ai-builder.md keeps the bundle default (nothing recorded to re-apply)" \
+  "$(cat "$INSTALL_ROOT7/agents/massa-ai-builder.md")" "bundle-default"
+assert_eq "the installer never wrote a modelProfile of its own" "$(state_field modelProfile.profile)" ""
+unset MOCK_INSTALL_PATH
 
 summary "plugin marketplace cache refresh"
