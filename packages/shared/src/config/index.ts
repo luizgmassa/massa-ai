@@ -229,12 +229,28 @@ export interface ServerConfig {
     corsOrigins: string[];
   };
 
-  // Logging
+  // Logging (LOG-01, LOG-02, LOG-07). `file`, `enableFileSink`, `bufferSize`,
+  // `maxFileSizeMb`, and `maxFiles` are always concretely resolved — never
+  // partial — mirroring `scheduler.jobs` below: a caller never needs its own
+  // literal-default fallback.
   logging: {
     level: "debug" | "info" | "warn" | "error";
     enableMetrics: boolean;
-    /** Optional absolute path to additionally append log lines to (opt-in). */
-    file?: string;
+    /**
+     * Always a concrete absolute path: `MASSA_AI_LOG_FILE` > non-empty
+     * `logging.file` > `<dataDir>/logs/massa-ai.log`. An empty or absent
+     * `logging.file` means "use the default path", never "disable the sink"
+     * (pre-mortem #1) — `enableFileSink` is the only disable.
+     */
+    file: string;
+    /** The ONLY way to disable the file sink (LOG-02 AC 2b). Default `true`. */
+    enableFileSink: boolean;
+    /** In-process ring-buffer capacity (LOG-01). Default 2000. */
+    bufferSize: number;
+    /** Rotate the sink once it exceeds this size in MB (LOG-07). Default 32. */
+    maxFileSizeMb: number;
+    /** Rotated files retained alongside the live file (LOG-07). Default 5. */
+    maxFiles: number;
   };
 
   // Scheduler (SCH-01..03, SCH-06) — resolved `env > config.json > literal
@@ -619,11 +635,15 @@ const fileCacheL2Bytes = fileConfig.cache?.l2MaxSizeMB
   ? fileConfig.cache.l2MaxSizeMB * 1024 * 1024
   : undefined;
 
+// Resolved once and reused by both `dataDir` and the logging block's default
+// file-sink path (LOG-02) — the two must agree on the same value.
+const resolvedDataDir = getGlobalDataDir();
+
 export const defaultConfig: ServerConfig = {
   name: "massa-ai-server",
   version: "1.0.0",
 
-  dataDir: getGlobalDataDir(),
+  dataDir: resolvedDataDir,
 
   cache: {
     l1: {
@@ -943,8 +963,28 @@ export const defaultConfig: ServerConfig = {
       process.env.ENABLE_METRICS === "true" ||
       (process.env.ENABLE_METRICS === undefined &&
         !!fileConfig.logging?.enableMetrics),
-    // env > config.json, matching `level`'s precedence above (AD-010).
-    file: process.env.MASSA_AI_LOG_FILE || fileConfig.logging?.file || undefined,
+    // env > non-empty config.json > default (LOG-02, AD-010). `||` already
+    // treats an empty-string `logging.file` as falsy, so an explicit `""`
+    // written by an unrelated Config save falls straight through to the
+    // default path rather than being read as "disabled" (pre-mortem #1) —
+    // disabling is the separate `enableFileSink` boolean below.
+    file:
+      process.env.MASSA_AI_LOG_FILE ||
+      fileConfig.logging?.file ||
+      path.join(resolvedDataDir, "logs", "massa-ai.log"),
+    // LOG-02 AC 2b: the ONLY way to disable the file sink. Default true.
+    enableFileSink: envBool(
+      "MASSA_AI_LOG_ENABLE_FILE_SINK",
+      fileConfig.logging?.enableFileSink ?? true,
+    ),
+    // LOG-01: in-process ring-buffer capacity.
+    bufferSize: envNum("MASSA_AI_LOG_BUFFER_SIZE", fileConfig.logging?.bufferSize ?? 2000),
+    // LOG-07: size-capped rotation.
+    maxFileSizeMb: envNum(
+      "MASSA_AI_LOG_MAX_FILE_SIZE_MB",
+      fileConfig.logging?.maxFileSizeMb ?? 32,
+    ),
+    maxFiles: envNum("MASSA_AI_LOG_MAX_FILES", fileConfig.logging?.maxFiles ?? 5),
   },
 
   // SCH-01..03, SCH-06: `env > config.json > literal default`, absent-key

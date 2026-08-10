@@ -76,11 +76,22 @@ export interface MassaAiConfig {
     level: "debug" | "info" | "warn" | "error";
     enableMetrics: boolean;
     /**
-     * Optional absolute path to additionally append log lines to. Opt-in;
-     * unset means stderr-only (unchanged default behavior). Overridden by
+     * Optional absolute path to append log lines to. Empty or absent means
+     * "use the default path" (`<dataDir>/logs/massa-ai.log`) — it must NOT be
+     * read as "disable the sink" (LOG-02 / pre-mortem #1). Overridden by
      * MASSA_AI_LOG_FILE (env > config, matching the `level` precedence).
+     * Disabling the sink is the explicit `enableFileSink: false` below, the
+     * ONLY way to do so.
      */
     file?: string;
+    /** The ONLY way to disable the file sink (LOG-02 AC 2b). Default `true`. */
+    enableFileSink?: boolean;
+    /** In-process ring-buffer capacity (LOG-01). Default 2000. */
+    bufferSize?: number;
+    /** Rotate the sink once it exceeds this size in MB (LOG-07). Default 32. */
+    maxFileSizeMb?: number;
+    /** Rotated files retained alongside the live file (LOG-07). Default 5. */
+    maxFiles?: number;
   };
   // Keys below mirror the runtime ServerConfig declarations (index.ts) so the
   // interface describes what the loader/runtime actually produces. See
