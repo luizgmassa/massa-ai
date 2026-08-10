@@ -249,3 +249,102 @@ describe("scheduler + capturePolicy reach loadConfig()", () => {
     expect(JSON.parse(run.stdout)).toEqual({ scheduler: true, capturePolicy: true });
   });
 });
+
+/**
+ * `loadRawUserConfig` vs `loadConfig` — the distinction between "the user wrote
+ * false" and "the user wrote nothing".
+ *
+ * Giving `scheduler` real defaults is what made this contract load-bearing, and
+ * it broke a caller the same commit: `scheduler-defaults.ts` resolves
+ * `env > config.json > its own preset-adjusted literal`, so a middle layer that
+ * can never say "absent" makes the third layer dead code. Its safe-defaults
+ * preset stopped enabling anything while `MASSA_AI_SCHEDULER_SAFE_DEFAULTS=true`
+ * was still set.
+ *
+ * These cases pin the property at the layer that owns it, not only at the one
+ * caller that noticed — the scheduler's own suite mocks this reader out, so it
+ * cannot see a regression here.
+ */
+describe("loadRawUserConfig — the file layer can say 'absent'", () => {
+  /** Both readers from ONE subprocess, so no ordering or freezing difference
+   *  between them can be mistaken for the behaviour under test. */
+  const BOTH = `
+import { loadConfig, loadRawUserConfig } from ${JSON.stringify(LOADER)};
+const raw = loadRawUserConfig();
+process.stdout.write(JSON.stringify({
+  rawScheduler: raw.scheduler ?? null,
+  rawKeys: Object.keys(raw).sort(),
+  resolvedConsolidation: loadConfig().scheduler?.jobs?.["memory-consolidation"] ?? null,
+}));
+`;
+
+  function readBoth(configJson: string | null): {
+    rawScheduler: Record<string, unknown> | null;
+    rawKeys: string[];
+    resolvedConsolidation: Record<string, unknown> | null;
+  } {
+    if (configJson !== null) {
+      fs.mkdirSync(home.configDir, { recursive: true });
+      fs.writeFileSync(home.configPath, configJson);
+    }
+    const run = runIsolated(home, "raw-vs-resolved", BOTH);
+    expect(run.exitCode).toBe(0);
+    return JSON.parse(run.stdout);
+  }
+
+  test("no config.json at all: raw is empty, resolved carries the default", () => {
+    const { rawScheduler, rawKeys, resolvedConsolidation } = readBoth(null);
+    expect(rawScheduler).toBeNull();
+    expect(rawKeys).toEqual([]);
+    // The defined `false` that made the caller's own fallback unreachable.
+    expect(resolvedConsolidation).toEqual({ enabled: false, intervalMs: 1_800_000 });
+  });
+
+  test("config.json without a scheduler section: raw still says absent", () => {
+    const { rawScheduler, rawKeys, resolvedConsolidation } = readBoth(
+      JSON.stringify({ logging: { level: "debug" } }),
+    );
+    expect(rawScheduler).toBeNull();
+    expect(rawKeys).toEqual(["logging"]);
+    expect(resolvedConsolidation).toEqual({ enabled: false, intervalMs: 1_800_000 });
+  });
+
+  test("one configured job does not fill in its four siblings", () => {
+    // The exact key set, not a count: a reader that helpfully merged the other
+    // four registered kinds in would still report one *configured* job while
+    // silently answering for kinds the user never mentioned.
+    const { rawScheduler } = readBoth(
+      JSON.stringify({ scheduler: { jobs: { "auto-improve": { enabled: true } } } }),
+    );
+    expect(rawScheduler).not.toBeNull();
+    const jobs = (rawScheduler as { jobs: Record<string, unknown> }).jobs;
+    expect(Object.keys(jobs)).toEqual(["auto-improve"]);
+    expect(rawScheduler).toEqual({ jobs: { "auto-improve": { enabled: true } } });
+  });
+
+  test("an explicit false survives: it is a value, not an absence", () => {
+    const { rawScheduler } = readBoth(
+      JSON.stringify({ scheduler: { jobs: { "decay-sweep": { enabled: false } } } }),
+    );
+    // The whole point of the raw read: this `false` must still beat the
+    // safe-defaults preset, while the merged default `false` must not.
+    expect(rawScheduler).toEqual({ jobs: { "decay-sweep": { enabled: false } } });
+  });
+
+  test("malformed and non-object config.json return {} rather than throwing", () => {
+    for (const bad of ["{ not json", '"a string"', "[1,2,3]", "null"]) {
+      fs.mkdirSync(home.configDir, { recursive: true });
+      fs.writeFileSync(home.configPath, bad);
+      const run = runIsolated(
+        home,
+        "raw-bad",
+        `
+import { loadRawUserConfig } from ${JSON.stringify(LOADER)};
+process.stdout.write(JSON.stringify(loadRawUserConfig()));
+`,
+      );
+      expect(run.exitCode).toBe(0);
+      expect(JSON.parse(run.stdout)).toEqual({});
+    }
+  });
+});

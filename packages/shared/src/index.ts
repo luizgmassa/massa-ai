@@ -29,6 +29,7 @@ export {
   configExists,
   loadConfig,
   loadConfigSafe,
+  loadRawUserConfig,
   saveConfig,
   initConfig,
   getConfigForEnv,

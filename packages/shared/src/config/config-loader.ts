@@ -103,10 +103,52 @@ export function loadConfig(): MassaAiConfig {
 }
 
 /**
+ * The literal contents of `config.json`, with NO defaults merged in — an absent
+ * file, an absent section and an absent field all stay `undefined`.
+ *
+ * This exists because {@link loadConfig} answers a different question. Its job
+ * is "what is the effective configuration", so it folds `defaultMassaAiConfig`
+ * in and never returns an absent section; that is what the Admin Portal needs,
+ * and it is why every one of its sections renders. But a caller resolving
+ * `env > config.json > its own fallback` needs the middle layer to be able to
+ * say *nothing* — otherwise `fileValue ?? fallback` always stops at the merged
+ * default and the caller's own fallback becomes dead code.
+ *
+ * `scheduler-defaults.ts` is exactly that caller, and it is why this function
+ * exists: its safe-defaults preset supplies `defaultEnabled: true` as the
+ * fallback layer, and folding the default `enabled: false` in as the "file"
+ * layer silently disabled the preset. Its docblock had already named the
+ * hazard for `config.get("scheduler")`; the defect arrived through
+ * `loadConfigSafe()` instead, which is the same hazard through a second door.
+ * A user's explicit `false` in config.json must still win over the preset —
+ * only the *default* must not — which is precisely the distinction a raw read
+ * preserves and a merged read destroys.
+ *
+ * Never throws: a missing file, unreadable file or malformed JSON all return an
+ * empty object, matching {@link loadConfigSafe}'s contract for a layer that
+ * must never abort startup.
+ */
+export function loadRawUserConfig(): Partial<MassaAiConfig> {
+  try {
+    if (!fs.existsSync(CONFIG_FILE)) return {};
+    const parsed = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    // A JSON scalar or array parses fine but is not a config object; treating
+    // it as one would hand callers `.scheduler` off a string.
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as Partial<MassaAiConfig>;
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Never-throwing wrapper around {@link loadConfig}. Returns the defaults on any
  * error (missing/invalid file, JSON parse failure, FS error). Used by env.ts
  * and config/index.ts where config.json is a best-effort middle-precedence
  * layer and must never abort startup.
+ *
+ * Returns the *effective* config, defaults folded in. When you need to know
+ * what the file itself actually said, use {@link loadRawUserConfig}.
  */
 export function loadConfigSafe(): MassaAiConfig {
   try {

@@ -433,10 +433,19 @@ describe("T29: Scheduler safe-defaults preset", () => {
 // `env > config.json's raw scheduler.jobs[kind] > applySafeDefaults-adjusted
 // literal`. `@massa-ai/shared`'s `config` singleton is fixed at first import
 // for the whole process, but `registerDefaultJobs` deliberately reads the raw
-// file layer via `loadConfigSafe()` (re-reads config.json fresh on every
+// file layer via `loadRawUserConfig()` (re-reads config.json fresh on every
 // call) rather than the frozen singleton — see scheduler-defaults.ts's own
 // `envBool`/`envNum` doc comments for why the singleton's already-resolved
 // per-job value would make this file's own literal fallback unreachable.
+//
+// The reader is `loadRawUserConfig()` and not `loadConfigSafe()`, which this
+// block used to mock. `loadConfigSafe` folds `defaultMassaAiConfig` in, so
+// once the scheduler gained real defaults every job's `enabled` arrived as a
+// defined `false` and the preset above became unreachable — the same hazard
+// the singleton has, through a second door. The mock must name whichever
+// function production actually calls: a missing export lands in
+// `readFileSchedulerJobs`'s catch and looks exactly like "no file config",
+// which is why the preset block, not this one, is what fails when they drift.
 //
 // This block mocks `@massa-ai/shared` (verified in this repo: `mock.module`
 // rebinds a namespace already imported by another already-loaded module) so
@@ -462,7 +471,7 @@ describe("SCH-02 per-kind config.json resolution (T5)", () => {
     mock.module("@massa-ai/shared", () => ({
       config: { get: () => undefined },
       logger: STUB_LOGGER,
-      loadConfigSafe: () => (jobs === undefined ? {} : { scheduler: { jobs } }),
+      loadRawUserConfig: () => (jobs === undefined ? {} : { scheduler: { jobs } }),
     }));
   }
 
