@@ -32,10 +32,11 @@ Load `references/project-context.md` (intake sweep) before the first substantive
    - If an RFC is needed but absent and the user does not know the missing context, assume the decision is not made and route to `workflows/rfc.md`.
    - Require a source-backed or user-confirmed title, date, status, context, decision, consequences, links, and supersession status before drafting.
 6. Draft the ADR using the project's template when available; otherwise use the format selected via `references/adr-authoring.md`'s fallback questions. Tie claims to source confidence: confirmed, user-provided, recalled, inferred, or unresolved.
-7. Save the generated ADR using the selected output target:
+7. Run the configured Plan Challenge Gate before saving. ADR decisions require the full gate under the default policy (`adr` is named in the full-gate set of the canonical Plan Challenge Policy); revise valid critical or high findings before the record is written, especially a decision presented without its rejected alternatives, consequences stated only as benefits, an unstated assumption the decision depends on, and status quo or sunk-cost bias in the framing. A challenge that invalidates the decision means the decision is not final — route to `workflows/rfc.md` rather than recording it.
+8. Save the generated ADR using the selected output target:
    - Default: write to the project's standard ADR directory in Default mode. In Plan Mode, propose the path and content without writing.
    - Confluence: when requested and a parent page link is provided, write a child page through Atlassian MCP and report the resulting page link.
    - Fallback: if Confluence was requested without a parent link or Atlassian MCP is unavailable, ask for the parent link or permission to write local Markdown under `.adr/`.
    - Use sequential numbering from the selected local ADR directory when writing Markdown.
-8. At completion, persist the decision via `remember` as a scored `decision` memory (`memory:semantic`), linking the ADR file path and source context used.
-9. Complete the Evidence Gate from `references/evidence-gate.md`.
+9. At completion, persist the decision via `remember` as a scored `decision` memory (`memory:semantic`), linking the ADR file path and source context used.
+10. Complete the Evidence Gate from `references/evidence-gate.md`.
