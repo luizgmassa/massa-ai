@@ -14,6 +14,13 @@
 // ── Constants ──────────────────────────────────────────────────────────────
 
 import { renderDashboard, fetchDashboardData } from "./dashboard.js";
+import { escapeHtml, truncate, errorBlock, renderGuideText } from "./lib/html.js";
+import { markdownToHtml } from "./lib/markdown.js";
+import { initTheme, toggleTheme } from "./lib/theme.js";
+import { readInjectedApiKey, isWriteModeEnabled, createApiClient } from "./lib/api-client.js";
+import { showBanner } from "./lib/banner.js";
+
+export { escapeHtml, markdownToHtml, initTheme, toggleTheme, isWriteModeEnabled, showBanner };
 
 export const MEMORY_TYPES = ["critical", "conversation", "code", "decision", "pattern"];
 
@@ -35,204 +42,6 @@ export const MEMORY_LEVELS = [
  * is what keeps this bound to the real route response.
  */
 export const CHECKPOINTS_LIST_BODY = { limit: 50, format: "json" };
-
-const THEME_STORAGE_KEY = "massa-ai-ui-theme";
-
-/**
- * Check if write mode is enabled.
- *
- * Default is ON when the caller is trusted (the massa-ai-api-key meta tag is
- * present in the document, injected by the server for local callers). The
- * MASSA_AI_WEB_WRITE_MODE env flag and the localStorage massa-ai-write-mode
- * value remain as explicit opt-out escape hatches and are checked BEFORE the
- * trusted-caller default so an operator can force write-mode off even when the
- * tag is present.
- */
-export function isWriteModeEnabled() {
-  if (typeof globalThis !== "undefined" && globalThis.MASSA_AI_WEB_WRITE_MODE === false) return false;
-  try {
-    if (localStorage.getItem("massa-ai-write-mode") === "false") return false;
-  } catch {
-    // localStorage unavailable (test/Node without DOM) — fall through
-  }
-  if (readInjectedApiKey(typeof document !== "undefined" ? document : null)) return true;
-  if (typeof globalThis !== "undefined" && globalThis.MASSA_AI_WEB_WRITE_MODE === true) return true;
-  try {
-    return localStorage.getItem("massa-ai-write-mode") === "true";
-  } catch {
-    return false;
-  }
-}
-
-// ── HTML escaping ──────────────────────────────────────────────────────────
-
-export function escapeHtml(s) {
-  if (s === null || s === undefined) return "";
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-// ── Markdown renderer (marked + DOMPurify with XSS prevention) ──────────────
-
-/**
- * Render markdown to safe HTML using marked + DOMPurify.
- * Falls back to the built-in minimal renderer when the CDN libraries are not
- * loaded (e.g., in test environments without a DOM).
- *
- * SECURITY: never use raw innerHTML with unsanitized markdown output.
- * DOMPurify.sanitize() strips XSS vectors (scripts, event handlers, etc.).
- * F4 mitigation: stored markdown cannot inject scripts.
- */
-export function markdownToHtml(md) {
-  if (!md) return "";
-  const text = String(md);
-
-  // Use marked + DOMPurify when available (browser with CDN scripts loaded)
-  if (typeof globalThis !== "undefined") {
-    const markedLib = globalThis.marked;
-    const purifyLib = globalThis.DOMPurify;
-    if (markedLib && purifyLib) {
-      try {
-        const rawHtml = markedLib.parse(text);
-        return purifyLib.sanitize(rawHtml);
-      } catch {
-        // fall through to minimal renderer on parse error
-      }
-    }
-  }
-
-  // Fallback: minimal built-in renderer (no table support, but safe)
-  return _minimalMarkdownToHtml(text);
-}
-
-/**
- * Minimal built-in markdown renderer — escapes all raw text first so injected
- * HTML/tags cannot execute. Used as fallback when marked/DOMPurify are not
- * available (tests, non-browser). Supported: headings, bold, italic, inline
- * code, fenced code blocks, lists, links, paragraphs.
- */
-function _minimalMarkdownToHtml(md) {
-  const lines = String(md).replace(/\r\n?/g, "\n").split("\n");
-  const out = [];
-  let i = 0;
-  let inUl = false;
-  let inOl = false;
-  let para = [];
-
-  const flushLists = () => {
-    if (inUl) {
-      out.push("</ul>");
-      inUl = false;
-    }
-    if (inOl) {
-      out.push("</ol>");
-      inOl = false;
-    }
-  };
-  const flushPara = () => {
-    if (para.length > 0) {
-      out.push("<p>" + inline(para.join(" ")) + "</p>");
-      para = [];
-    }
-  };
-
-  function inline(text) {
-    let t = escapeHtml(text);
-    const codeStash = [];
-    t = t.replace(/`([^`]+)`/g, (_m, c) => {
-      codeStash.push(c);
-      return "@@MASSA_AICODE" + (codeStash.length - 1) + "@@";
-    });
-    t = t.replace(
-      /\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
-      (_m, label, url) =>
-        '<a href="' + url + '" rel="noopener noreferrer" target="_blank">' + label + "</a>",
-    );
-    t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    t = t.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-    t = t.replace(/@@MASSA_AICODE(\d+)@@/g, (_m, idx) => "<code>" + codeStash[Number(idx)] + "</code>");
-    return t;
-  }
-
-  while (i < lines.length) {
-    const line = lines[i];
-
-    const fence = line.match(/^```(\w*)\s*$/);
-    if (fence) {
-      flushPara();
-      flushLists();
-      const lang = fence[1] || "";
-      const codeLines = [];
-      i++;
-      while (i < lines.length && !/^```\s*$/.test(lines[i])) {
-        codeLines.push(lines[i]);
-        i++;
-      }
-      i++;
-      const cls = lang ? ' class="language-' + escapeHtml(lang) + '"' : "";
-      out.push("<pre><code" + cls + ">" + escapeHtml(codeLines.join("\n")) + "</code></pre>");
-      continue;
-    }
-
-    const h = line.match(/^(#{1,6})\s+(.*)$/);
-    if (h) {
-      flushPara();
-      flushLists();
-      const level = h[1].length;
-      out.push("<h" + level + ">" + inline(h[2]) + "</h" + level + ">");
-      i++;
-      continue;
-    }
-
-    if (/^\s*[-*]\s+/.test(line)) {
-      flushPara();
-      if (inOl) {
-        out.push("</ol>");
-        inOl = false;
-      }
-      if (!inUl) {
-        out.push("<ul>");
-        inUl = true;
-      }
-      out.push("<li>" + inline(line.replace(/^\s*[-*]\s+/, "")) + "</li>");
-      i++;
-      continue;
-    }
-
-    if (/^\s*\d+\.\s+/.test(line)) {
-      flushPara();
-      if (inUl) {
-        out.push("</ul>");
-        inUl = false;
-      }
-      if (!inOl) {
-        out.push("<ol>");
-        inOl = true;
-      }
-      out.push("<li>" + inline(line.replace(/^\s*\d+\.\s+/, "")) + "</li>");
-      i++;
-      continue;
-    }
-
-    if (line.trim() === "") {
-      flushPara();
-      flushLists();
-      i++;
-      continue;
-    }
-
-    flushLists();
-    para.push(line);
-    i++;
-  }
-  flushPara();
-  flushLists();
-  return out.join("\n");
-}
 
 // ── View renderers (pure: ({ data, state }) => htmlString) ─────────────────
 
@@ -1078,20 +887,6 @@ const CONFIG_SECTIONS = [
   },
 ];
 
-/**
- * Renders a Field guide `dd` value (T12, APUX-09/APUX-11, design D-6): escapes
- * the whole string first, then turns any `` `backtick` `` span into `<code>`.
- * The guide strings themselves carry the backtick markers around their
- * machine tokens (env-style URLs, model ids, paths, identifiers) — chosen
- * over a token-matching regex because it is small and fully deterministic:
- * every wrapped span is one this function's own caller opted into, not a
- * pattern guess that could over- or under-match prose.
- */
-function renderGuideText(s) {
-  const escaped = escapeHtml(s);
-  return escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
-}
-
 function getConfigFieldValue(config, sectionKey, fieldName) {
   if (sectionKey === "dataDir") return config[sectionKey] || "";
   const section = config[sectionKey];
@@ -1789,21 +1584,6 @@ export function renderModelRegistry(data, opts) {
 
 // ── Helpers used by renderers ──────────────────────────────────────────────
 
-function truncate(s, n) {
-  if (s.length <= n) return s;
-  return s.slice(0, n) + "…";
-}
-
-function errorBlock(data) {
-  const raw = (data && data.error) || "Request failed.";
-  const msg = typeof raw === "string"
-    ? raw
-    : (raw && typeof raw === "object" && (raw.message || raw.code))
-      ? [raw.code, raw.message].filter(Boolean).join(": ")
-      : JSON.stringify(raw);
-  return '<div class="error">' + escapeHtml(msg) + "</div>";
-}
-
 /** Normalize the SearchMemoriesTool response shape into a flat result list. */
 function extractSearchResults(data) {
   const payload = data && (data.data || data);
@@ -1830,118 +1610,10 @@ function extractCheckpointRows(data) {
   return null;
 }
 
-// ── Theme helpers ──────────────────────────────────────────────────────────
-
-export function initTheme(doc, store) {
-  doc = doc || (typeof document !== "undefined" ? document : null);
-  store = store || (typeof localStorage !== "undefined" ? localStorage : null);
-  let theme = "light";
-  try {
-    if (store) {
-      const t = store.getItem(THEME_STORAGE_KEY);
-      if (t === "dark" || t === "light") theme = t;
-    }
-  } catch {}
-  if (doc && doc.documentElement) {
-    doc.documentElement.setAttribute("data-theme", theme);
-  }
-  return theme;
-}
-
-export function toggleTheme(doc, store) {
-  doc = doc || (typeof document !== "undefined" ? document : null);
-  store = store || (typeof localStorage !== "undefined" ? localStorage : null);
-  if (!doc || !doc.documentElement) return "light";
-  const current = doc.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-  const next = current === "dark" ? "light" : "dark";
-  doc.documentElement.setAttribute("data-theme", next);
-  try {
-    if (store) store.setItem(THEME_STORAGE_KEY, next);
-  } catch {}
-  return next;
-}
-
-// ── Browser bootstrap (guarded; skipped under test/Node) ───────────────────
-
-// Every /api/v1/* route now requires a key (SEC-01). The dashboard has no
-// login: the server stamps the key into this page's <head> when the request
-// came from a caller it trusts, and we read it back here. When the tag is
-// absent the caller was untrusted, requests go out without the header, and the
-// server answers 401 — the server-rendered banner already explains why.
-function readInjectedApiKey(doc) {
-  try {
-    if (!doc || typeof doc.querySelector !== "function") return null;
-    const el = doc.querySelector('meta[name="massa-ai-api-key"]');
-    if (!el || typeof el.getAttribute !== "function") return null;
-    const value = el.getAttribute("content");
-    return value && value.trim() ? value.trim() : null;
-  } catch {
-    return null;
-  }
-}
-
-function createApiClient(opts) {
-  opts = opts || {};
-  const base = opts.base != null ? opts.base : "";
-  const fetchImpl = opts.fetch || (typeof fetch !== "undefined" ? fetch : null);
-  const doc = opts.document || (typeof document !== "undefined" ? document : null);
-  // opts.apiKey is the explicit seam tests use; otherwise read the meta tag.
-  const apiKey = opts.apiKey !== undefined ? opts.apiKey : readInjectedApiKey(doc);
-  async function request(path, init) {
-    init = init || {};
-    if (!fetchImpl) throw new Error("fetch unavailable");
-    const url = base + path;
-    const headers = {};
-    if (init.body) headers["content-type"] = "application/json";
-    if (apiKey) headers["x-api-key"] = apiKey;
-    const res = await fetchImpl(url, {
-      method: init.method || "GET",
-      headers: Object.keys(headers).length > 0 ? headers : undefined,
-      body: init.body ? JSON.stringify(init.body) : undefined,
-    });
-    const ct = res.headers.get("content-type") || "";
-    if (ct.includes("application/json")) {
-      return await res.json();
-    }
-    return await res.text();
-  }
-  return { request, authHeaders: () => (apiKey ? { "x-api-key": apiKey } : {}) };
-}
-
 // ── Admin portal enhancement handlers (exported, context-injected) ──────────
 // These are module-level pure-ish functions taking a ctx { api, root, state,
 // render, doc }. startApp() builds ctx and wires them in wireViewHandlers().
 // Tests inject mock ctx. This avoids a startApp DOM harness for handler tests.
-
-const BANNER_AUTOHIDE_MS = 6000;
-
-/** @param {object} [opts] - `{ persist: true }` (T8, P1-C AC2) skips the 6 s
- *  auto-hide for a success banner — used for the Save & Apply completion
- *  banner, which must stay visible until the operator dismisses/navigates. */
-export function showBanner(root, type, message, opts) {
-  const persist = !!(opts && opts.persist);
-  // Clear existing banner(s) — only one at a time.
-  const existing = root.querySelectorAll ? root.querySelectorAll(".success, .error") : [];
-  existing.forEach((b) => { if (b.remove) b.remove(); });
-  const div = {
-    className: (type === "success" ? "success" : "error") + (persist ? " banner-persist" : ""),
-    textContent: message,
-    style: {},
-    remove: () => {},
-    addEventListener: () => {},
-  };
-  // Prepend to root (top of view). Use insertBefore if firstChild exists.
-  try {
-    if (root.insertBefore) root.insertBefore(div, root.firstChild || null);
-    else if (root.children) root.children.unshift(div);
-  } catch {
-    // best effort
-  }
-  if (type === "success" && !persist && typeof setTimeout !== "undefined") {
-    setTimeout(() => { if (div.remove) div.remove(); }, BANNER_AUTOHIDE_MS);
-  }
-  return div;
-}
 
 /** Collect field values for a config section from the rendered DOM. */
 function collectConfigSectionFields(root, section) {
