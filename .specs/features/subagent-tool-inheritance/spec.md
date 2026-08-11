@@ -233,7 +233,9 @@ claim without a sensor decays.
 
 **Acceptance Criteria**:
 
-1. The Cursor, Codex, and OpenCode emitters SHALL produce byte-identical output before and after this change for every charter. <!-- ubiquitous -->
+1. The Cursor, Codex, and OpenCode emitter functions SHALL be unchanged — zero diff lines in `emitCursor`, `emitCodex`, and `emitOpenCode` — and SHALL produce byte-identical output for an unchanged charter input. <!-- ubiquitous -->
+
+> **Amended after verification.** This criterion originally demanded that the three hosts' *generated artifacts* be byte-identical before and after. That is structurally unachievable in this feature and was wrong when written: STI-04 edits 18 charter **bodies**, and every host embeds the charter body verbatim in its agent file, so all four hosts' artifacts necessarily differ by exactly the sanctioned STI-04 line. The property actually worth guarding is that the *emitters* did not change and that no host gained an MCP-blocking construct — which is what STI-03.2-.5 assert and what sensor S4 enforces. `design.md`'s Tech Decisions table already chose "one-time measurement + a permanent construct sensor" over a byte-freeze fixture for exactly this reason, so the design and this clause disagreed; the design was right. Amended rather than deleted so the original intent stays legible.
 2. The generated Cursor agent files SHALL contain no `tools` key. <!-- ubiquitous -->
 3. The generated Codex agent files SHALL contain no `tools` key and no `mcp_servers` key, so MCP inherits from the parent config. <!-- ubiquitous -->
 4. The generated OpenCode agent files SHALL contain no `tools` key, and their `permission` map SHALL deny no MCP pattern. <!-- ubiquitous -->
@@ -428,8 +430,8 @@ before, or the bundles carry a prohibition against a tool the agent already has.
 - [ ] A `designer` sub-agent dispatched from a Figma-MCP-active session
       completes a Figma MCP call.
 - [ ] `massa-ai-navigator.md` is byte-identical to its pre-change form.
-- [ ] Cursor, Codex, and OpenCode bundles are byte-identical to their pre-change
-      form.
+- [ ] The Cursor, Codex, and OpenCode emitter functions carry zero diff lines, and
+      their bundles differ only by the sanctioned STI-04 charter-body line.
 - [ ] Zero matches for the nesting prohibition across `skills/` and all four
       generated bundles; 18 matches for the retained router/persona clause.
 - [ ] Every new sensor has a recorded observed-RED mutation result.

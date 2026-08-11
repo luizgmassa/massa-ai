@@ -841,12 +841,19 @@ describe("nesting prohibition retirement: references carry no spawn prohibition"
   test("no file under references/ contains a spawn prohibition of any shape (S6)", async () => {
     const files = await referenceMarkdownFiles();
     expect(files.length).toBeGreaterThan(20); // guard the guard
+    // STI-04.5 requires the failure to name the file AND the line. Reporting the
+    // file alone leaves a reader grepping a 500-line reference for a paraphrase the
+    // class pattern matched but they cannot see, so the offender is reported as
+    // `path:line: <the matching line>`.
     const offenders: string[] = [];
     for (const file of files) {
-      const body = await fs.readFile(file, "utf8");
-      if (SPAWN_PROHIBITION_CLASS.test(body)) {
-        offenders.push(path.relative(REPO_ROOT, file));
-      }
+      const rel = path.relative(REPO_ROOT, file);
+      const lines = (await fs.readFile(file, "utf8")).split(/\r?\n/);
+      lines.forEach((line, i) => {
+        if (SPAWN_PROHIBITION_CLASS.test(line)) {
+          offenders.push(`${rel}:${i + 1}: ${line.trim()}`);
+        }
+      });
     }
     expect(offenders).toEqual([]);
   });

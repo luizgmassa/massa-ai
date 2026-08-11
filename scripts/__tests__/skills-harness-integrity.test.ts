@@ -504,12 +504,21 @@ describe("charter permission matches the shipped artifact", () => {
   test("no charter contains a spawn prohibition of any shape (S5)", async () => {
     const names = await charterNames();
     expect(names.length).toBeGreaterThanOrEqual(17); // guard the guard
+    // STI-04.5 requires the failure to name the file AND the line, so the offender
+    // is reported as `skills/agents/<name>/SKILL.md:<line>: <the matching line>`
+    // rather than the bare charter name — a charter is long enough that the name
+    // alone leaves the reader hunting for the paraphrase the class pattern matched.
     const offenders: string[] = [];
     for (const name of names) {
-      const charter = await read(
-        path.join(SKILLS_DIR, "agents", name, "SKILL.md"),
-      );
-      if (SPAWN_PROHIBITION_CLASS.test(charter)) offenders.push(name);
+      const rel = `skills/agents/${name}/SKILL.md`;
+      const lines = (
+        await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"))
+      ).split(/\r?\n/);
+      lines.forEach((line, i) => {
+        if (SPAWN_PROHIBITION_CLASS.test(line)) {
+          offenders.push(`${rel}:${i + 1}: ${line.trim()}`);
+        }
+      });
     }
     expect(offenders).toEqual([]);
   });
