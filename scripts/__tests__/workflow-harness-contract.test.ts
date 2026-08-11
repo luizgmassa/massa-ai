@@ -730,3 +730,80 @@ describe("plan challenge: every full-gate workflow carries the gate step", () =>
     expect(without).toEqual([]);
   });
 });
+
+// ── 12. Designer dispatch: presence and wording uniformity ────────────────
+//
+// .specs/features/designer-agent/ — DSG-05, DSG-06.
+//
+// Added after independent verification: two mutations survived every gate in
+// the suite. Removing the whole `massa-ai-designer` block from one of the seven
+// workflows was caught by NOTHING (the duplication ceiling shifted as a side
+// effect of the line-window moving, which is not a check), and rewording one
+// block's `trigger:` so the seven disagree was caught by nothing at all.
+//
+// The design named that drift risk and closed it with a one-time manual grep.
+// A grep run once is not a sensor — it cannot fail on the edit that comes after
+// it. This group is that grep, committed.
+//
+// Both directions, in the shape group 4 already uses for IMPLEMENTATION_WORKFLOWS:
+// exactly these seven carry the block, and the trigger line is byte-identical
+// across all of them. Uniformity is load-bearing, not cosmetic — the trigger
+// sentence is what states the dispatch is mandatory-on-condition, so one file
+// drifting to weaker wording silently makes it advisory there.
+
+describe("designer dispatch: exactly 7 workflows, one wording", () => {
+  /**
+   * The screen-capable workflows (spec A1). Hardcoded deliberately, unlike
+   * ADRG-02's parsed list: there is no policy sentence enumerating these, and
+   * the point of the check is that the set cannot change silently. Adding an
+   * eighth screen workflow SHOULD require editing this list.
+   */
+  const SCREEN_WORKFLOWS = [
+    "design.md",
+    "feature.md",
+    "general.md",
+    "implementation/implementation-fix.md",
+    "mobile-figma/mobile-figma-audit.md",
+    "mobile-figma/mobile-figma-fix.md",
+    "spec-driven.md",
+  ] as const;
+
+  const DISPATCH_HEADER = "> **Dispatch: `massa-ai-designer`**";
+  const TRIGGER_PREFIX = "> - trigger: the task creates or modifies a user-facing screen";
+
+  test("each of the 7 carries the designer dispatch block", async () => {
+    const without: string[] = [];
+    for (const rel of SCREEN_WORKFLOWS) {
+      const body = await readWorkflow(rel);
+      if (!body.includes(DISPATCH_HEADER)) without.push(rel);
+    }
+    expect(without).toEqual([]);
+  });
+
+  test("no OTHER workflow carries it", async () => {
+    // Negative control: without this, adding the block everywhere would pass.
+    const extra: string[] = [];
+    for (const rel of await listWorkflows()) {
+      if ((SCREEN_WORKFLOWS as readonly string[]).includes(rel)) continue;
+      const body = await readWorkflow(rel);
+      if (body.includes(DISPATCH_HEADER)) extra.push(rel);
+    }
+    expect(extra).toEqual([]);
+  });
+
+  test("the trigger line is byte-identical across all 7", async () => {
+    const seen = new Map<string, string[]>();
+    for (const rel of SCREEN_WORKFLOWS) {
+      const line = (await readWorkflow(rel))
+        .split(/\r?\n/)
+        .find((l) => l.startsWith(TRIGGER_PREFIX));
+      // A missing trigger line is its own failure, distinct from a divergent one.
+      expect(line, `${rel} has no designer trigger line`).toBeDefined();
+      const key = line!.trim();
+      seen.set(key, [...(seen.get(key) ?? []), rel]);
+    }
+    // Guard the guard: 7 files must have been read, not 0.
+    expect([...seen.values()].flat().length).toBe(SCREEN_WORKFLOWS.length);
+    expect([...seen.keys()].length, `divergent trigger wording: ${JSON.stringify([...seen.entries()], null, 1)}`).toBe(1);
+  });
+});

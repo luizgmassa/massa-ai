@@ -2,21 +2,57 @@
 
 - Feature slug: `designer-agent`
 - Branch `feat/designer-agent`, worktree `/Users/luizmassa/Projects/massa-ai-wt-designer-agent`
-- Base `origin/main` @ `f8427283`; commit range `f8427283..e51d3297` (11 commits, T1-T13)
+- Base `origin/main` @ `f8427283`; commit range `f8427283..HEAD` (15 commits: 14 through
+  the close-out `87647f13`, plus `T15` closing the verifier's finding)
 - Date: 2026-08-11
 
 ## Verdict
 
-**PASS WITH ONE DISCLOSED LIMITATION.** 13 of 13 requirement IDs satisfied. Every
-deterministic gate green. The limitation is DSG-08's portal half — see the AC table.
+**PASS.** 13 of 13 requirement IDs satisfied, confirmed by an independent verifier. Every
+deterministic gate green.
 
-**Independence: NOT satisfied.** The author-vs-verifier split the spec-driven Execute gate
-requires was not achieved: the `massa-ai-verification-agent` dispatch was skipped because
-platform policy for this session forbids spawning subagents, and the standalone fresh-eyes
-fallback was run by the same agent that wrote the code. That is a real weakening of this
-verdict, recorded here rather than papered over. Every claim below is backed by a command
-whose output was read in-session, so the evidence is reproducible even where the
-independence is not.
+**Independence: SATISFIED, on a second pass.** This document was first written by the
+*author*, and said so. A `massa-ai-verification-agent` was subsequently dispatched
+(user-requested) and re-derived every claim without inheriting this file's conclusions. Its
+report is folded in below. Both the original author-written verdict and the verifier's
+corrections to it are kept, because the difference between them is the most useful thing
+here.
+
+### What the independent pass changed
+
+| Author's claim | Verifier's finding |
+| --- | --- |
+| DSG-08 "SATISFIED (partial method)" — portal loader executed, HTTP route not exercised | **Upgraded to fully SATISFIED.** The verifier invoked the real Elysia route in-process (`app.handle()`): `status 200`, `agents.length 18`, `{"name":"designer","charterTier":"standard"}`, and confirmed `model-registry.ts:79-92` is wired into the GET response at line 120. The author's disclosed limitation is closed |
+| "13/13 satisfied, every gate green" | **True, but the gates were weaker than claimed.** The author ran discrimination mutations against ADRG-01/02 only, and *none* against DSG-01..DSG-11. Two mutations survived every suite — see below |
+| "commit range `f8427283..e51d3297` (11 commits, T1-T13)" | **Wrong count.** That range is **13** commits, and it omitted the close-out commit `87647f13`. Corrected above |
+
+### The gap the independent pass found
+
+Two mutations survived every gate in the repository:
+
+1. Removing the entire `massa-ai-designer` dispatch block from one of the seven workflows.
+   Nothing caught it. The duplication ceiling shifted as a side effect of the line window
+   moving, which is not a check.
+2. Rewording one block's `trigger:` line so the seven no longer agree. Nothing caught it —
+   and that line is what states the dispatch is mandatory-on-condition, so one file drifting
+   to weaker wording silently makes it advisory there.
+
+`design.md` named this exact drift risk and "closed" it with a one-time manual grep. **A
+grep run once is not a sensor** — it cannot fail on the edit that comes after it. Closed in
+T15 by committing that grep as group 12 of `workflow-harness-contract.test.ts`: both
+directions (exactly these 7 carry the block, no other workflow does) plus byte-identical
+trigger text across all 7.
+
+Re-run of the two survivors against the new sensor, plus a negative control:
+
+| Mutation | Before T15 | After T15 |
+| --- | --- | --- |
+| Remove the whole block from `general.md` | survived | **RED (2 fail)** |
+| Reword one `trigger:` line | survived | **RED (1 fail)** |
+| Add the block to an 8th workflow (`debug.md`) — negative control | n/a | **RED (1 fail)** |
+
+Baseline GREEN before and GREEN after; all three restores SHA-256-verified against their
+pre-mutation hashes, restored from in-memory copies, never `git checkout`.
 
 ## Gate results
 
@@ -49,7 +85,7 @@ are closed below.
 | DSG-05 | SATISFIED | 7 `**Dispatch: \`massa-ai-designer\`**` blocks, 1 per file, each with all 8 packet body fields + `persona`. Integrity dispatch-resolution green (expect() calls 214 → 221) |
 | DSG-06 | SATISFIED | `grep -lF` on the shared trigger sentence returns **exactly 7** workflow files — the design's named drift risk, closed by emitting all 7 from one authored text |
 | DSG-07 | SATISFIED | Screen Implementation Exception in `agent-orchestration.md`; `charterPaths).toEqual([])` and "carries no second roster" both still green |
-| DSG-08 | **SATISFIED (partial method)** | Bundles: 18 files/host × 4 = 72; 396 variants; `--check` no drift. Portal: `loadAllCharters()` executed → 18 charters, `{"name":"designer","charterTier":"standard"}`. **Limitation:** that is the loader `model-registry.ts`'s `loadAgentsInventory` calls and the same `{name, charterTier}` mapping, executed directly. The HTTP route itself was **not** exercised (it needs a running server and an API key), so the JSON wire shape is inferred from one line of source, not measured |
+| DSG-08 | **SATISFIED** (verifier closed the author's limitation) | Bundles: 18 files/host × 4 = 72; 396 variants; `--check` no drift. Portal: the verifier invoked the real Elysia route in-process — `status 200`, `agents.length 18`, `{"name":"designer","charterTier":"standard"}` — and confirmed the route at `model-registry.ts:120` returns what `loadAgentsInventory` (`:79-92`) produces. The author had only executed the underlying loader |
 | DSG-09 | SATISFIED | 7 generator-side suites + 5 install-path suites + config-CLI + both shell installers. Duplication ceiling 483 → 498, raised with the differential measurement its own comment demands |
 | DSG-10 | SATISFIED | Roster gate offender list **empty**. That gate reads `git ls-files` with no path filter and is the acceptance authority, not a hand list |
 | DSG-11 | SATISFIED | New "Scoped writer" row in `references/spec-driven/sub-agents.md`; `designer` deliberately **not** added to the read-only row, so the deep-tier rule does not misapply |
@@ -75,9 +111,6 @@ are closed below.
 
 ## Residual risk
 
-- **No independent verifier** (stated above). The strongest compensating evidence is that
-  every acceptance claim is a command result, and that three of the six real failures were
-  found by gates rather than by the author's own reading.
 - **`mobile-figma-audit` is the first findings-only workflow to dispatch a write-permitted
   charter.** Accepted risk, `spec.md` A8. No host enforces the packet's `read-only` line;
   the constraint is the packet plus the charter's Restrictions (which win on conflict). The
@@ -85,6 +118,14 @@ are closed below.
 - **The designer dispatch is prose, not an executable gate.** No CI sensor can prove an
   orchestrator actually dispatched it on a screen task; the sensors prove the blocks exist,
   resolve to a shipped artifact on all 4 hosts, and are worded identically.
-- **DSG-08's HTTP layer** — see the AC table.
 - **Live behavior of the charter is unexercised.** No screen was implemented by `designer`
-  in this session; the charter is validated structurally.
+  in this session; the charter is validated structurally by both passes.
+- **Declined, with reason:** the verifier's second (Low) finding — that running
+  `bun run test:scripts` concurrently with itself produces spurious shell-suite failures
+  and SIGTERM/ENOENT noise on a loaded host — is an artifact of its own investigation, not
+  a property of this feature. It is real and worth a `CONTRIBUTING.md` caveat, but writing
+  it here would be scope creep on a feature branch that ships an agent and a gate. Recorded
+  so the next session can pick it up deliberately.
+- **Not re-derived by the verifier:** the author's T0 baseline (259 pass) and the
+  "1769 tests / 10 fail → 4 were provisioning" claim. Plausible per `CLAUDE.md`'s
+  documented provisioning gotcha, but taken on the author's word.
