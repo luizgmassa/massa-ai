@@ -567,17 +567,17 @@ finish(true, bak, 1);
 NODE
 }
 
-# ── Advisory: where the 17 subagent specialists come from ──────────────────
+# ── Advisory: where the 18 subagent specialists come from ──────────────────
 # Suppressed when a plugin installer is the caller (it just ran that command).
 # Gated behind verbose.
 specialist_hint() {
   [ "${MASSA_AI_SUPPRESS_SPECIALIST_HINT:-0}" = "1" ] && return 0
   [ "$VERBOSE" != "1" ] && return 0
   case "$1" in
-    claude-code) echo "  💡 17 subagent specialists: apps/claude-plugin/install.sh --user" ;;
-    codex) echo "  💡 17 subagent specialists: apps/codex-plugin/install.sh --user" ;;
-    cursor) echo "  💡 17 subagent specialists: apps/cursor-plugin/install.sh --user" ;;
-    opencode) echo "  💡 17 subagent specialists: massa-ai-config agents install --user" ;;
+    claude-code) echo "  💡 18 subagent specialists: apps/claude-plugin/install.sh --user" ;;
+    codex) echo "  💡 18 subagent specialists: apps/codex-plugin/install.sh --user" ;;
+    cursor) echo "  💡 18 subagent specialists: apps/cursor-plugin/install.sh --user" ;;
+    opencode) echo "  💡 18 subagent specialists: massa-ai-config agents install --user" ;;
     *) echo "" ;;
   esac
 }

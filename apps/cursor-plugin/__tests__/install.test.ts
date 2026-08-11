@@ -266,7 +266,7 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     ).toBe(false);
   });
 
-  // ── T6: 17 subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
+  // ── T6: 18 subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
   const SPECIALIST_NAMES = [
     "investigator",
     "planner",
@@ -285,9 +285,10 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     "navigator",
     "meta-judge",
     "judge",
+    "designer",
   ];
 
-  test("CRS-01/CRS-04/DOC-01: install copies all 17 specialists into ~/.cursor/agents/ as regular files + prints summary", async () => {
+  test("CRS-01/CRS-04/DOC-01: install copies all 18 specialists into ~/.cursor/agents/ as regular files + prints summary", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
@@ -303,14 +304,14 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     const files = (await fs.readdir(agentsDir)).filter(
       (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
     );
-    expect(files.length).toBe(17);
+    expect(files.length).toBe(18);
     // Nothing is bundled into the plugin dir anymore
     expect(
       await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai/agents")),
     ).toBe(false);
 
-    // Install output mentions the 17 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("17 subagent specialists");
+    // Install output mentions the 18 subagent specialists (DOC-01)
+    expect(res.stdout).toContain("18 subagent specialists");
   });
 
   test("migration: a pre-fix agents copy inside the plugin dir is removed on install", async () => {

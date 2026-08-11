@@ -98,7 +98,7 @@ describe("extractArtifactPaths", () => {
     const paths = extractArtifactPaths(workflowText);
     expect(paths).toContain("packages/shared/dist");
     // apps/opencode-plugin/agents is the PDO-26 fix: without it, the staged-copy this
-    // script reproduces cannot see the 17 agent charters declared in package.json#files.
+    // script reproduces cannot see the 18 agent charters declared in package.json#files.
     expect(paths).toContain("apps/opencode-plugin/agents");
     // apps/opencode-plugin/command (T11, WFC-09): package.json#files declares
     // "command/*.md" — same PDO-26 defect shape as agents/ if this artifact

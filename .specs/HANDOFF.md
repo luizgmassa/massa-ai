@@ -1,4 +1,46 @@
-# Handoff — admin-portal-config-installer-defaults (GATES GREEN 2026-08-10 — push/PR pending, DO NOT MERGE)
+# Handoff — designer-agent (VALIDATED 2026-08-11 — 11 commits, gates green; unpushed, push/PR = user decision)
+
+Session `spec-designer-agent` · workflow **spec-driven** · persona pin
+`context-skill-harness-engineer-architect` · branch `feat/designer-agent` from
+`origin/main` @ `f8427283`, worktree `/Users/luizmassa/Projects/massa-ai-wt-designer-agent`.
+Range `f8427283..e51d3297`.
+
+Two deliverables, disjoint commits.
+
+1. **ADR/refactor Plan Challenge Gate (T1-T2, commits `28fefc94`, `8dc274dc`).**
+   `skills/AGENTS.md` named six workflows in the full-gate set; `adr.md` and
+   `refactor.md` carried no gate step. Both now run it inline. The recurrence
+   sensor (`workflow-harness-contract.test.ts` group 11) **parses** the workflow
+   list out of the policy sentence rather than hardcoding it, and found
+   `refactor.md` on its first run. Mutation-proved GREEN → RED(1) / RED(1) /
+   RED(3) → GREEN with SHA-verified in-memory restores.
+
+2. **`designer` sub-agent, the 18th specialist (T3-T13, 9 commits).** Charter at
+   `skills/agents/designer/SKILL.md`, tier `standard`, `permission: write`
+   narrowed to the UI layer. Dispatched from 7 screen-capable workflows under a
+   new Screen Implementation Exception; the dispatch is mandatory once the task
+   touches a screen and silent otherwise. Full 4-host parity: 72 agent files
+   (was 68), 396 variants (was 374), every installer/gate/doc/marketplace moved
+   17 → 18.
+
+**Gates (all green, 2026-08-11):** lint 0 errors · type-check 6/6 ·
+`generate:artifacts --check` no drift · `test:scripts` **1777 pass / 0 fail** ·
+`test:plugins` **135 pass / 0 fail** · opencode `agents-install` 7/0.
+
+**Read `.specs/features/designer-agent/validation.md` before merging.** Its verdict
+is PASS **with independence NOT satisfied** — the `verification-agent` dispatch was
+skipped (platform policy forbade spawning subagents this session) and the fresh-eyes
+fallback was run by the author. An independent verification pass is the single
+highest-value thing a next session can add.
+
+**Worktree provisioning note:** this worktree needed `bun install`, `bun run build`
+**and** `bunx prisma generate` before `test:scripts` could go green. Four of the
+first run's ten failures were that, not code — do not read them as regressions.
+
+**Next step:** push `feat/designer-agent` and open the PR (not yet authorized), or
+run an independent verification pass first.
+
+## Previous handoff — admin-portal-config-installer-defaults (GATES GREEN 2026-08-10 — push/PR pending, DO NOT MERGE)
 
 Session `debug-admin-portal-config-installer-defaults` · workflow **debug** · branch
 `fix/admin-portal-config-installer-defaults` from `origin/main` @ `398dc647` (v1.47.0) ·

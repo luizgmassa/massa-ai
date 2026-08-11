@@ -1,1297 +1,1320 @@
 {
- "project": "massa-ai",
- "version": 1,
- "source": ".specs/features/local-first-memory-platform-roadmap/spec.md",
- "features": [
-  {
-   "slug": "phase-0-quick-wins",
-   "title": "Phase 0 — Quick wins (0a upload gate, 0b reindex cap, 0c memory CRUD, 0d checkpoint MCP)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": false,
-    "tasks": "inline",
-    "execute": true
-   }
-  },
-  {
-   "slug": "phase-1-memory-foundation",
-   "title": "Phase 1 — Memory-quality foundation (decay fn, LLM consolidation, durable sessions/jobs)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "phase-2-query-understanding",
-   "title": "Phase 2 — Query understanding (LLM rewrite + HyDE, config-gated, silent-degrade)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "phase-3-hook-capture",
-   "title": "Phase 3 — Passive memory capture (hook ingestion, Observation store, single-writer queue + 429, consolidation bridge, hook scripts)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "phase-4-bootstrap",
-   "title": "Phase 4 — Bootstrap from repo (scan git/README/docs/manifests/centrality → LLM/rule-based seed memories, idempotent, bootstrap:completed event)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "phase-6-handoffs",
-   "title": "Phase 6 — Cross-session handoffs (HandoffStore + HandoffService begin/accept/cancel/listPending + dual-write memory + handoff:accepted event + auto-injector + MCP tools + route)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "phase-5-auto-improve",
-   "title": "Phase 5 — Auto-improvement loop (ProposalStore + AutoImproveJob rule-based pattern detection + LLM-optional enrichment + review-gate/auto-approve + apply/reject state machine + memory:auto-improved event + MCP tools + route)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "phase-7-retrieval-polish",
-   "title": "Phase 7 — Retrieval + compression polish (reranker, salience-judge, graph BFS stream, LLM compression, chromadb dead-code removal)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "phase-8-web-ui",
-   "title": "Phase 8 — Web UI [G5] (read-only HTML browser over SQLite memories + FTS5 search + handoffs + checkpoints + indexed projects, served via Tools API, vanilla HTML/CSS/JS, markdown + dark mode, no new core logic)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "local-first-memory-platform-roadmap",
-   "title": "Local-first memory platform roadmap",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "installer-environment-hooks-and-web-ui",
-   "title": "Pure Hedgehog — installer, environment, hooks, and UI scripts",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "installer-llm-search-quality-toggles",
-   "title": "Woolly Giggling Beaver — installer LLM search-quality toggles",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "project-identity-rename",
-   "title": "Project identity rename to massa-ai",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "qwen-model-defaults",
-   "title": "Qwen embedding 8B and LLM default swap",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "web-ui-asset-resolution",
-   "title": "Web UI HTML and asset-resolution repair",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "native-postgresql-installer",
-   "title": "Native PostgreSQL installer and Docker warning",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "installer-config-regeneration",
-   "title": "Installer config regeneration and source clone path",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "live-stack-e2e-coverage",
-   "title": "Live-stack MCP and HTTP E2E coverage",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "e2e-coverage-audit-remediation",
-   "title": "T14 E2E coverage-audit remediation",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "e2e-coverage-side-findings",
-   "title": "E2E coverage side findings A–E",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "native-ts-platform-expansion",
-   "title": "Eager Hummingbird implementation and hardening",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "read-file-cache-correctness",
-   "title": "Declarative Tower cache correctness",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "e2e-hardening-and-graph-parity",
-   "title": "Rippling Dove hardening and E2E expansion",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "repository-maintenance-2026-07-12",
-   "title": "Repository maintenance and PostgreSQL verification",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "close-maintenance-next-steps-2026-07-13",
-   "title": "Close maintenance next steps: Synapse, bounded search, deterministic qwen, destructive recovery, and path identity",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "sqlite-removal",
-   "title": "PostgreSQL-only storage; SQLite runtime removal",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "sqlite-removal-followup",
-   "title": "SQLite removal non-gating follow-ups (legacy Prisma probe rerun, qwen fixture manifest rebuild, final aggregate capture)",
-   "status": "in_progress",
-   "priority": "P2",
-   "phases": {
-    "specify": true,
-    "design": false,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "multi-language-tree-sitter-breadth",
-   "title": "Native Tree-sitter structural indexing across 33 extensions",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "installer-race-safety",
-   "title": "M19 — installer race safety",
-   "status": "complete",
-   "priority": "P0",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "synapse-mcp-parity-discovery-pagination",
-   "title": "M20 + M54 — Synapse MCP parity and discovery pagination",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "tiered-fail-loud-search",
-   "title": "M50 — corruption surfacing and tiered fail-loud search",
-   "status": "complete",
-   "priority": "P0",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "transactional-project-identity",
-   "title": "M16 + M17 — project rename, merge, and cache invalidation",
-   "status": "complete",
-   "priority": "P0",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "hook-attribution-repair",
-   "title": "M45 + M47 — sticky hook attribution and repair",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "linux-native-structural-runtime",
-   "title": "M21 — native Linux glibc x64 support",
-   "status": "complete",
-   "priority": "P0",
-   "phases": {
-    "specify": true,
-    "design": false,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "native-runtime-rebaseline",
-   "title": "Wave 3 follow-up — native runtime re-baseline to Bun 1.3.14 + six-suite classification + cross-platform re-verification",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "wave-4-correctness-hygiene",
-   "title": "Wave 4 — Correctness, hygiene, and spec reconciliation (N1 generation staleness, N4 clamped-list totals, N6 enum teaching errors, N7 untracked merge + secrets denylist, N8 git-ref guard, N9 read_file cap, N10 SQL bounds, N25 spec reconciliation, M29 sqlite-removal close, N33 dead code sweep, N34 CI grammar gate, N36 xdg extraction, M35 scheduler seam)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "wave-5-cross-pollination",
-   "title": "Wave 5 — Cross-pollination features (N2 cycle detection, N3 BFS CTE, N5 grouped tree, N41 cbm drift, N11 lease single-writer, N12 idempotent import, N13 capture policy, N14 persisted scheduler, N26 synapse_task_begin/end, N27 SSE push, N15 Moonshot transport, N16 server-side filter revalidation, N45 hook-attribution confirmation)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "wave-6-architecture-features",
-   "title": "Wave 6 — Architecture and medium features (N31 god-files, N32 embedded MCP, N30 hook binary, N20 parallel tests, N21 test-seam, N28 dashboard, N29 scheduler preset, N17 harness protocol, N18 deterministic script, N19 auth, N42 path recovery, M25 name resolution, M26 JSON extraction, M62 tree-sitter GLR)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "codex-cursor-plugin-parity",
-   "title": "Codex + Cursor Plugin Parity — Native plugin bundles for Codex and Cursor + four-plugin installer parity (Claude, Codex, Cursor, OpenCode)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "subagent-skills-plugin-parity",
-   "title": "Subagent Skills Plugin Parity — Ship the 12 sub-agent specialists as host-native subagent definitions across Claude Code, Codex, Cursor, and OpenCode plugins",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "notes": "Validated PASS 2026-07-23 (independent verifier, bc57daa..80994eb, T1-T12 all done). Registry lagged reality until 2026-08-03 (DA-11/DI-03): phases sat 'pending' for a feature whose validation.md had verified the shipped work; roster later grew 12 -> 17 under the generator features."
-  },
-  {
-   "slug": "workflow-tools-adaptation",
-   "title": "Workflow Tools Adaptation — Adapt massa-ai workflows to use the full 52-tool surface (checkpoints, handoffs, bootstrap, compact_snapshot, trace_path, impact_analysis, code execution, full Synapse, read_file, symbol_snippet, memory ops, analytics) with canonical un-prefixed naming",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "slug": "repo-rename-massa-ai-part2",
-   "title": "Repository rename part 2 — residual th0th/massa-th0th references removed across bun.lock, CHANGELOG, .specs, skills, plugin agents, docs, source",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": false,
-    "tasks": "inline",
-    "execute": true
-   },
-   "spec": ".specs/features/repo-rename-massa-ai-part2/spec.md"
-  },
-  {
-   "slug": "repo-rename-massa-ai",
-   "title": "Repository rename to massa-ai (from prior massa-th0th identity)",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/repo-rename-massa-ai/spec.md"
-  },
-  {
-   "slug": "coverage-90pct",
-   "title": "Coverage >90% unit tests across monorepo",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/coverage-90pct/spec.md",
-   "validation": ".specs/features/coverage-90pct/validation.md"
-  },
-  {
-   "slug": "install-harness-migration",
-   "title": "Install harness migration — TS→bash installers, MCP single writer, unified wiring",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/install-harness-migration/spec.md",
-   "design": ".specs/features/install-harness-migration/design.md",
-   "tasks": ".specs/features/install-harness-migration/tasks.md",
-   "validation": ".specs/features/install-harness-migration/validation.md"
-  },
-  {
-   "slug": "auto-release-versioning",
-   "title": "Auto release versioning — CHANGELOG-derived bump, GitHub Release, GitHub Packages, no Deployments",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/auto-release-versioning/spec.md",
-   "design": ".specs/features/auto-release-versioning/design.md",
-   "tasks": ".specs/features/auto-release-versioning/tasks.md",
-   "validation": ".specs/features/auto-release-versioning/validation.md"
-  },
-  {
-   "slug": "workflow-harness-overhaul",
-   "title": "Workflow harness overhaul — remove chat-restart/context-handoff, add delivery, annotation, root-cause and project-context contracts",
-   "status": "in_progress",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/workflow-harness-overhaul/spec.md",
-   "design": ".specs/features/workflow-harness-overhaul/design.md",
-   "tasks": ".specs/features/workflow-harness-overhaul/tasks.md",
-   "validation": ".specs/features/workflow-harness-overhaul/validation.md"
-  },
-  {
-   "slug": "audit-remediation-2026-07",
-   "title": "Audit remediation 2026-07 — unauthenticated-RCE fix, CORS lockdown, 6 correctness bugs, and 5 tech-debt items",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/audit-remediation-2026-07/spec.md",
-   "design": ".specs/features/audit-remediation-2026-07/design.md",
-   "tasks": ".specs/features/audit-remediation-2026-07/tasks.md",
-   "validation": ".specs/features/audit-remediation-2026-07/validation.md",
-   "validation_pr2": ".specs/features/audit-remediation-2026-07/validation-pr2.md"
-  },
-  {
-   "slug": "core-layering-god-module-split",
-   "title": "Core layering and god-module split — retire the controllers layer, break the contextual-search-rlm facade, rename rlm-* once",
-   "status": "complete",
-   "priority": "P2",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/core-layering-god-module-split/spec.md",
-   "depends_on": [
-    "sensor-repair-2026-07"
-   ],
-   "design": ".specs/features/core-layering-god-module-split/design.md",
-   "tasks": ".specs/features/core-layering-god-module-split/tasks.md",
-   "notes": "Umbrella over four PRs (AS-05). PR-A sensor-repair-2026-07 complete; PR-B merged #53, v1.16.0; PR-C core-layering-controller-retirement merged #59, v1.17.0; PR-D core-layering-read-file-split EXECUTE COMPLETE 2026-08-03 (was 'in Specify' here — the exact stale-field class its own RFS-05 AC-1 polices). phases.execute was false through PR-B and PR-C and is corrected here — Execute has happened twice. Status flipped to complete at PR-D's T23: GMS-02's headline closed at PR-D's T15 (check-tools-thin PASS 0 of 30, wired into ci.yml's build) and thirty-three corrections C1-C33 are indexed in the spec. PR-D's T25 independent validation ran 2026-08-03 in a fresh conversation (the user's authorship decision) and returned PASS -- validation.md is the record; push, PR and --no-ff merge remain.",
-   "validation": ".specs/features/core-layering-god-module-split/validation.md"
-  },
-  {
-   "slug": "core-layering-controller-retirement",
-   "title": "Core layering — controller retirement (PR-C): kernel tier, controllers/ retired into services/, AC-1's import check shipped with the restructuring",
-   "status": "complete",
-   "priority": "P2",
-   "workflow": "spec-driven",
-   "branch": "spec/pr-c-execute",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/core-layering-controller-retirement/spec.md",
-   "design": ".specs/features/core-layering-controller-retirement/design.md",
-   "tasks": ".specs/features/core-layering-controller-retirement/tasks.md",
-   "depends_on": [
-    "core-layering-god-module-split"
-   ],
-   "notes": "PR-C of 4 under core-layering-god-module-split. Executed GMS-01 (all six ACs) and GMS-02 AC-2 only; GMS-02 AC-1 is PR-D's by C13. All 20 tasks shipped in 22 commits; T18 independent validation PASS (author != verifier), see validation.md. Merged as #59 (2bea11e, --no-ff, parents 450352b + 2ea4ebd) and released v1.17.0 on 2026-07-31.",
-   "validation": ".specs/features/core-layering-controller-retirement/validation.md"
-  },
-  {
-   "slug": "core-layering-read-file-split",
-   "title": "Core layering — read_file.ts split (PR-D): GMS-02 AC-1 and its headline, a tools/ thinness gate that did not exist, and the deferrals PR-C could not price",
-   "status": "complete",
-   "priority": "P2",
-   "workflow": "spec-driven",
-   "branch": "spec/pr-d-read-file-split",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/core-layering-read-file-split/spec.md",
-   "depends_on": [
-    "core-layering-controller-retirement"
-   ],
-   "notes": "PR-D of 4, the last. TASKS COMPLETE 2026-07-31 -- 28 task rows, eight phases, 78 distinct files; cut resolved as ONE PR with eight phased commits, artifacts and code on one branch (so the no-changelog label must NOT be used), CHANGELOG under ### Changed + ### Removed (both minor here; CONTRIBUTING makes Removed a minor, not a major). C33 is the fortieth plan defect and the highest-consequence line in tasks.md: Phase 4 as designed could NOT close the gate -- index_project.ts handle() is 128 lines and all three extracted spans sit outside it, so the handle() <= 120 clause stayed red and T15 could not wire the gate to CI. Closed by a new task T14b extracting the 45-line managed-run lease block, handle() 128 -> ~87. Closes GMS-02 AC-1 and the GMS-02 headline. Specify complete; DESIGN COMPLETE 2026-07-31 -- sized at six changes and nine new files under the 90% per-file coverage floor. Five decisions with rejected options: rename services/graph/ -> services/memory-graph/ (7 git mv, 19 importers, 28 import lines, 6 mock.module); delete the dangling check-coverage EXCLUSIONS entry and add an existence assert to the gate's TEST, not the gate; N = 125; handle() sheds all 98 of its non-delegation lines so the extraction is 490 of 707 (69.3%), not 392; and the shared LRU lands in services/cache/lru-evict.ts rather than kernel/, which stays at 11. Five corrections owed back to the parent spec.md: C28 (AS-06's named sensor cannot discriminate -- check-core-layering's FORBIDDEN.tools is empty by the declared order), C29, C30, C31, C32 -- the 35th through 39th plan defects across the umbrella. RFS-01's gate gains a third clause (handle() body <= 120, band [113,128) measured) and ships on a TypeScript AST rather than a regex, because 'no private method' is the wrong predicate: private run: (...) => ... is a function-typed FIELD in 4 files and a literal reading makes the frozen base 6 of 30 instead of 2. Two full Plan Challenge gates run; the Design one returned twelve findings across two modes, all twelve re-measured and confirmed, all twelve revising the document. EXECUTE COMPLETE 2026-08-03 through T24 -- all eight phases closed, 29 task rows (the 28 here was pre-T8b), final write-set sum 112 / union 86, EIGHTY-NINE plan defects (C34-C84 internal + C28-C33 indexed into the parent at T20). RFS-01 AC-1 closed at T15: check-tools-thin wired into ci.yml's build, PASS 0 of 30 / 398 members post-T19. N=125 landed at 124. The rename landed T16+T17 as one measured commit; RFS-04's removals at T19 (published surface verified against a proven-fresh npm pack); the twenty design.md corrections at T20b; C28-C33 + layer figures (three frames) into the parent at T20; the coverage-gate existence pin at T21 (red observed first); Phase 6's prose carriers at T18; CLAUDE.md/ONBOARDING figures at T22. T25 independent validation DONE 2026-08-03 by a fresh-conversation verifier (the user's authorship decision): VERDICT PASS, no surviving mutant across ten verifier-chosen faults, all five re-takes reproduced from raw data, both open criteria questions answered in the amendments' favour -- validation.md is the record. Push, PR and --no-ff merge are the user's next step.",
-   "design": ".specs/features/core-layering-read-file-split/design.md",
-   "tasks": ".specs/features/core-layering-read-file-split/tasks.md"
-  },
-  {
-   "slug": "sensor-repair-2026-07",
-   "title": "Sensor repair 2026-07 — reset the coverage gate's database, wire it into CI, stop tests reading the real config, content-anchor the needles fixture, honour includePersistent",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/sensor-repair-2026-07/spec.md",
-   "design": ".specs/features/sensor-repair-2026-07/design.md",
-   "tasks": ".specs/features/sensor-repair-2026-07/tasks.md",
-   "validation": ".specs/features/sensor-repair-2026-07/validation.md"
-  },
-  {
-   "slug": "plugin-auto-install",
-   "title": "Plugin auto-install — host detection + version-gated upgrade for the four plugin bundles",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/plugin-auto-install/spec.md",
-   "design": ".specs/features/plugin-auto-install/design.md",
-   "tasks": ".specs/features/plugin-auto-install/tasks.md",
-   "validation": ".specs/features/plugin-auto-install/validation.md"
-  },
-  {
-   "slug": "judge-with-debate",
-   "title": "Judge With Debate — meta-judge eval spec + 3 model-diverse judges debating to consensus; standalone workflow + 2 new sub-agent charters",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/judge-with-debate/spec.md",
-   "design": ".specs/features/judge-with-debate/design.md",
-   "tasks": ".specs/features/judge-with-debate/tasks.md",
-   "validation": ".specs/features/judge-with-debate/validation.md"
-  },
-  {
-   "slug": "model-profile-registry",
-   "title": "Model Profile Registry — central tier/profile registry for agent and workflow model selection across four harness CLIs",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/model-profile-registry/spec.md",
-   "design": ".specs/features/model-profile-registry/design.md",
-   "tasks": ".specs/features/model-profile-registry/tasks.md",
-   "fool": ".specs/features/model-profile-registry/fool.md",
-   "validation": ".specs/features/model-profile-registry/validation.md"
-  },
-  {
-   "slug": "skills-directive-dedup",
-   "title": "skills/ directive dedup — single-source restatements, fix drift, and the four correctness defects the duplication was hiding",
-   "status": "in_progress",
-   "workflow": "spec-driven",
-   "branch": "refactor/skills-directive-dedup",
-   "notes": "T1-T5 of 12 committed and green at ed1028e; T6-T12 not started. Not pushed, no PR. See .specs/HANDOFF.md."
-  },
-  {
-   "slug": "cross-pollination-ports",
-   "title": "Cross-pollination ports & gap closure — implement live PORT-01..07 + DB-05/06/07/08/09/10 fixes + lessons from the 2026-07-29 portability report",
-   "status": "complete",
-   "workflow": "spec-driven",
-   "branch": "feature/cross-pollination-ports",
-   "notes": "VALIDATED PASS 2026-08-03 (35/35 ACs, 6/6 mutations killed). Merged as PR #61 @ 0084d1a, released v1.19.0 @ 8e63477; CI + Coverage + Release green on the merge sha, so T7/T8's deferred real-CI confirmation landed. AD-014 added."
-  },
-  {
-   "slug": "da-inventory-closure",
-   "title": "DA Inventory Closure — triage DA-01..DA-17 from the cross-pollination report at v1.19.0; fix the 7 live rows, record the rest",
-   "status": "complete",
-   "priority": "P1",
-   "workflow": "spec-driven",
-   "branch": "spec/da-inventory-closure",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "notes": "VALIDATED PASS 2026-08-03 (independent verifier; all live DI ACs evidenced, DI-02 mutation re-derived + killed, gates exit 0). 17 DA rows: 7 FIX shipped, 8 RESOLVED evidenced, 1 ROUTED (DA-10), 2 ACCEPTED (DA-04, DA-13). DI-05 withdrawn at Design D0 (SEN-03 had already shipped the fix). L-001 promoted to confirmed. .specs/reports/ removed after a 14-file dispositioned sweep. PR from spec/da-inventory-closure; merge = user's decision."
-  },
-  {
-   "slug": "tlc-330-harness-update",
-   "title": "TLC 3.3.0 Harness Update — port TLC's four deterministic validator scripts + check_specs_delivered.py, EARS ACs, discuss pace system, git-stash ban + porcelain baseline, status-before-commit reorder, deliver-specs-before-PR gate, batch-trigger lowering, verification-agent deep-tier pin, lessons.py Unicode dedup fix",
-   "status": "complete",
-   "priority": "P1",
-   "workflow": "spec-driven",
-   "branch": "spec/tlc-330-harness-update",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/tlc-330-harness-update/spec.md",
-   "design": ".specs/features/tlc-330-harness-update/design.md",
-   "tasks": ".specs/features/tlc-330-harness-update/tasks.md",
-   "notes": "T1-T18 + FT1-FT2 + Phase 5 amendment (T19-T22) complete. Independently validated: iteration 1 FAIL -> FT1/FT2 -> iteration 2 PASS; Phase 5 iteration 3 FAIL (PYTS spec population undercount) -> FT3 -> re-verify. validation.md at .specs/features/tlc-330-harness-update/validation.md. PR #64 open. massa-ai MCP unreachable this session; .specs/ is canonical. See .specs/HANDOFF.md."
-  },
-  {
-   "slug": "python-to-typescript-scripts",
-   "title": "Python → TypeScript scripts migration — port all 8 Python scripts (6 skill validators/lessons + 2 repo dev scripts) to Bun TypeScript with CLI/exit/output parity, dual-run characterization, per-script atomic deletion, and full python3 wiring rewire (sweep-derived work list: 41 python3 lines / 25 skill files + 16 non-literal .py refs + tests + package.json at authoring)",
-   "status": "complete",
-   "priority": "P2",
-   "workflow": "spec-driven",
-   "branch": "spec/python-to-typescript-scripts",
-   "phases": {
-    "specify": "complete",
-    "design": "complete",
-    "tasks": "complete",
-    "execute": "complete"
-   },
-   "spec": ".specs/features/python-to-typescript-scripts/spec.md"
-  },
-  {
-   "slug": "workflow-policy-updates",
-   "title": "Workflow policy updates WFP-01..05 — Compose @Preview rule for implementation workflows, PR-description currency after each push, Figma pre-analysis + sequential retrieval subagent protocol, abbreviation expansion, uniform Phase/Task batching vocabulary",
-   "status": "complete",
-   "priority": "P2",
-   "workflow": "spec-driven",
-   "branch": "spec/workflow-policy-updates",
-   "phases": {
-    "specify": "complete",
-    "design": "complete",
-    "tasks": "complete",
-    "execute": "complete"
-   },
-   "spec": ".specs/features/workflow-policy-updates/spec.md",
-   "design": ".specs/features/workflow-policy-updates/design.md",
-   "tasks": ".specs/features/workflow-policy-updates/tasks.md",
-   "notes": "T1-T5 complete, independently validated (all 5 WFP ACs PASS, 3/3 mutations killed; validation.md). PR #66, CI 14/14 green. Merge = user's decision. Plan Challenge pre_mortem F1-F6 folded before Execute. massa-ai MCP unreachable this session; .specs/ canonical."
-  },
-  {
-   "slug": "subagent-orchestration-io",
-   "title": "Sub-agent orchestration I/O — orchestrator working-memory rules (no transcript polling, wave cap 4, consolidation signal, git safety, non-inheritance, 40-line return bound), canonical Capability Packet + AGENTS.md parity sensor, standard dispatch blocks for judge-with-debate and furps-refinement",
-   "status": "complete",
-   "priority": "P2",
-   "workflow": "spec-driven",
-   "branch": "spec/subagent-orchestration-io",
-   "phases": {
-    "specify": "complete",
-    "design": "complete",
-    "tasks": "complete",
-    "execute": "complete"
-   },
-   "spec": ".specs/features/subagent-orchestration-io/spec.md",
-   "design": ".specs/features/subagent-orchestration-io/design.md",
-   "tasks": ".specs/features/subagent-orchestration-io/tasks.md",
-   "notes": "T1-T8 complete, independently validated PASS (9/9 ORC ACs, 3/3 discrimination mutations killed, 4 gates green; validation.md). Census 24->27 dispatch blocks; parity sensor observed red then green. massa-ai MCP unreachable; .specs/ canonical. Merged as PR #67 @ 5b338af4, released v1.24.0 (its pre-merge 'push/PR deferred' note was stale by the time of that merge; corrected here during the persona-router-token-optimization main merge)."
-  },
-  {
-   "slug": "persona-router-token-optimization",
-   "title": "Persona Router Token Optimization — pin fast path, SKILL.md slim, catalog v2 two-tier, prompt compression, route memory, machine dedupe, size-budget + double-surface gates",
-   "status": "complete",
-   "priority": "P1",
-   "workflow": "spec-driven",
-   "branch": "spec/persona-router-token-optimization",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/persona-router-token-optimization/spec.md",
-   "design": ".specs/features/persona-router-token-optimization/design.md",
-   "tasks": ".specs/features/persona-router-token-optimization/tasks.md",
-   "validation": ".specs/features/persona-router-token-optimization/validation.md",
-   "notes": "T0-T9 complete, independently VALIDATED PASS 2026-08-04 (5/5 scratch mutations killed, all six task-listed gates green; PRT-02 AC1-3 live walkthrough pending-restart per Plan Challenge F6, PRT-06 documented-contract only — MCP unreachable). T7 machine dedupe done with prompt-by-prompt user approvals after a classifier denial; falsifying re-check caught + removed a stale handoff-writer agent (roster exactly 17); dead th0th MCP entry removed (user-approved extra). origin/main v1.24.0 merged in at ad04e953. PR #68 open, CI 14/14 green; merge = user's decision. Full Plan Challenge (pre_mortem): F1-F6 folded before Execute."
-  },
-  {
-   "slug": "skill-token-optimization",
-   "title": "Skill token optimization — lazy-load mobile/Figma/SonarQube + high-value extractions, validator top pack, caveman compression of 140 skill files",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": false
-   }
-  },
-  {
-   "slug": "model-profile-switching",
-   "title": "Model Profile Switching — pre-rendered per-profile agent variants in plugin bundles + switch-time re-render engine (MCP profile_set/profile_list, config-cli profile subcommand, OpenCode in-process tool, Claude skill), install-state.json profile record surviving upgrades",
-   "status": "complete",
-   "priority": "P1",
-   "workflow": "spec-driven",
-   "branch": "spec/model-profile-switching",
-   "phases": {
-    "specify": "complete",
-    "design": "complete",
-    "tasks": "complete",
-    "execute": "complete"
-   },
-   "spec": ".specs/features/model-profile-switching/spec.md",
-   "depends_on": [
-    "model-profile-registry"
-   ],
-   "design": ".specs/features/model-profile-switching/design.md",
-   "tasks": ".specs/features/model-profile-switching/tasks.md",
-   "notes": "EXECUTE COMPLETE 2026-08-04: T1-T16 by 3 confirmed batch workers + 2 inline main-agent repairs (security-allowlist entry for lock.ts execFileSync; T17 close-out), 19 commits. Re-measured figures: 374 variant files across 22 (host,profile) pairs at 17 each; MCP tools 52->54 across 3 pinned locations (a third, undocumented pin found in tool-definitions-synapse.test.ts); OpenCode in-process tools 13->14 (closed the stale 13-vs-14 doc gap). Two recorded deviations: publish.yml + package.json files extension (required by MPS-01 AC4); codex/opencode have no marketplace mode -> installRoute unconditionally file. AD-015 appended. Full gate matrix exit 0. VALIDATED PASS 2026-08-04 (independent verifier, author != verifier): 22/22 ACs evidenced, 7/7 discrimination mutations killed (0 survivors, 0 exclusions), 9/9 gates green on verifier-owned runs. PR from spec/model-profile-switching; merge = user decision (minor release).",
-   "validation": ".specs/features/model-profile-switching/validation.md"
-  },
-  {
-   "slug": "workflow-metadata-headers",
-   "title": "Agent Skills-style YAML frontmatter (name, description, license, metadata.version \"1.0.0\") on all 36 skills/massa-ai/workflows files, real-YAML-parse gate, bundle regen",
-   "status": "complete",
-   "priority": "P3",
-   "workflow": "spec-driven",
-   "branch": "spec/workflow-metadata-headers",
-   "phases": {
-    "specify": "complete",
-    "design": "skipped — format fixed by agentskills.io spec + repo SKILL.md convention; safety valve armed",
-    "tasks": "complete",
-    "execute": true
-   },
-   "spec": ".specs/features/workflow-metadata-headers/spec.md",
-   "tasks": ".specs/features/workflow-metadata-headers/tasks.md",
-   "notes": "User-directed 2026-08-04, pattern ref https://agentskills.io/specification. Plan Challenge full pre_mortem: F1 critical (unquoted YAML scalars break on 8/36 opening paragraphs) folded — hand-authored double-quoted descriptions + real-parser sensor. 1 Phase = 5 Tasks; T1-T4 batch worker (user-approved), T5 delivery under Execute go-ahead. T2 @ bfddbb69 (recovered via parent cherry-pick after wrong-branch incident — concurrent session checkout; original b98dcbf2 orphaned, sibling branch untouched). T3 @ 32f54c83 (--check exit 0). T4: lint 0; test:scripts 1329/4 — 4 fails are worktree-contamination, AC5 amended (CI authoritative); duplication ceiling 331→471 documented; worker hit API weekly limit, T4 finished inline by main agent."
-  },
-  {
-   "id": "registry-cleanup-skill-imports",
-   "slug": "registry-cleanup-skill-imports",
-   "title": "skills/AGENTS.md registry cleanup + coding-guidelines/skill-architect/to-prd imports",
-   "status": "complete",
-   "created": "2026-08-05",
-   "depends_on": [],
-   "artifacts": [
-    "spec.md",
-    "design.md",
-    "tasks.md"
-   ]
-  },
-  {
-   "id": "untracked-generated-bundles",
-   "slug": "untracked-generated-bundles",
-   "status": "complete",
-   "created": "2026-08-05",
-   "description": "Stop tracking generated plugin bundles; generate at pack/install/CI time",
-   "dependencies": []
-  },
-  {
-   "id": "plugin-architecture-unification",
-   "slug": "plugin-architecture-unification",
-   "title": "AD-017: plugins deliver, MCP serves tools, hooks observe — OpenCode MCP re-registration, sentinel-gated harness skip, Cursor bridge dedupe, hooks-only OpenCode plugin",
-   "status": "complete",
-   "created": "2026-08-05",
-   "depends_on": [],
-   "artifacts": [
-    "spec.md",
-    "design.md",
-    "tasks.md",
-    "context.md",
-    "validation.md"
-   ],
-   "notes": "Merged as PR #74 @ 46e7af97 (status flipped from in-progress during the pr-review-workflow main merge)."
-  },
-  {
-   "id": "pr-review-workflow",
-   "slug": "pr-review-workflow",
-   "title": "PR Review Workflow — six-dimension hosted GitHub PR / GitLab MR review posting inline findings + consolidated summary via gh/glab, massa-ai roster dispatches, .specs/ requirements integration",
-   "status": "complete",
-   "created": "2026-08-05",
-   "workflow": "spec-driven",
-   "branch": "spec/pr-review-workflow",
-   "depends_on": [],
-   "artifacts": [
-    "spec.md",
-    "design.md",
-    "tasks.md",
-    "validation.md"
-   ],
-   "notes": "VALIDATED PASS 2026-08-05 (independent verifier, author != verifier): 26/26 lettered ACs, 5/5 discrimination mutations killed (0 survivors), 6 suites 131/0 on verifier-owned runs, parity no drift, SKILL.md 20091 B. test:scripts 1451/4 — 4 fails are the .claude/worktrees needle-anchor contamination class, CI authoritative. Push/PR = user decision. NOTE: its T6 commit c4b4d6cb landed on spec/discovery-workflow (shared-checkout incident, recorded in STATE); suggested repair: git branch -f spec/pr-review-workflow c4b4d6cb before push."
-  },
-  {
-   "id": "discovery-workflow",
-   "slug": "discovery-workflow",
-   "title": "Discovery Workflow — product brainstorming thinking partner (four modes, seven frameworks, five-stage session rhythm, conduct contract) adapted from anthropics/knowledge-work-plugins product-brainstorming (Apache-2.0), mandatory to-prd PRD offer at Capture, router row + tier-4 clause, count locks 39→40 / complement 23→24, WMH license allowlist +Apache-2.0",
-   "status": "complete",
-   "created": "2026-08-05",
-   "workflow": "spec-driven",
-   "branch": "spec/discovery-workflow",
-   "depends_on": [
-    "pr-review-workflow"
-   ],
-   "artifacts": [
-    "spec.md",
-    "design.md",
-    "tasks.md",
-    "validation.md"
-   ],
-   "notes": "VALIDATED PASS 2026-08-05 (independent verifier, author != verifier): 15/15 lettered ACs, 4/4 discrimination mutations killed (0 survivors, hash-verified restores), named suites 131/0 + parity no drift + SKILL.md 20293 B + doc-paths 0 misses + lint 0 on verifier-owned re-runs; observed-red 39/23 reproduced in a scratch worktree at 231a9357. test:scripts 1451/4 — 4 fails are the .claude/worktrees needle-anchor contamination class, CI authoritative. Push/PR = user decision; see STATE for the c4b4d6cb shared-checkout incident repair (fast-forward spec/pr-review-workflow first)."
-  },
-  {
-   "id": "agent-era-harness-upgrades",
-   "slug": "agent-era-harness-upgrades",
-   "title": "Agent-Era Harness Upgrades — lessons.ts trust ramp + metric trend, massa-ai-reviewer dispatch in 14 workflows, tests five-gate error-class model + tests lens, feature-workflow AC anchor, code-quality/refactor/coding-guidelines agent-read-aware rewrites (file-size ~500/~600 per user amendment)",
-   "status": "complete",
-   "priority": "P1",
-   "workflow": "spec-driven",
-   "branch": "spec/agent-era-harness-upgrades",
-   "notes": "Merged (main released v1.31.0/v1.32.0 with its entries); status flipped from stale in-progress during the workflow-commands main merge.",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/agent-era-harness-upgrades/spec.md",
-   "design": ".specs/features/agent-era-harness-upgrades/design.md",
-   "tasks": ".specs/features/agent-era-harness-upgrades/tasks.md",
-   "created": "2026-08-05",
-   "dependencies": []
-  },
-  {
-   "id": "workflow-commands",
-   "slug": "workflow-commands",
-   "status": "complete",
-   "created": "2026-08-05",
-   "description": "Per-workflow slash commands on all four hosts (e.g. /massa-ai:debug), generated from the workflow inventory",
-   "dependencies": []
-  },
-  {
-   "id": "worktree-isolation-gate",
-   "slug": "worktree-isolation-gate",
-   "title": "Worktree Isolation Gate — one identical explicit action line (execute implementation-delivery.md Stage 0–1 before the first file edit, record worktree path + branch or a verbatim legal skip reason) in all 16 implementation workflows; Stage 1 record-evidence + never-switch-branches-in-shared-checkout cross-session rule; per-file + uniformity sensor in workflow-harness-contract; hook-level blocking deferred (observation-only hook contract)",
-   "status": "complete",
-   "priority": "P1",
-   "workflow": "spec-driven",
-   "branch": "spec/worktree-isolation-gate",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/worktree-isolation-gate/spec.md",
-   "design": ".specs/features/worktree-isolation-gate/design.md",
-   "tasks": ".specs/features/worktree-isolation-gate/tasks.md",
-   "created": "2026-08-06",
-   "dependencies": [],
-   "validation": ".specs/features/worktree-isolation-gate/validation.md",
-   "notes": "VALIDATED PASS 2026-08-06 (independent verifier, author != verifier, iteration 1 of 3): 6/6 ACs, 3/3 discrimination mutations killed (pass-1 survivor was the AC4 Stage 1 sensor the coverage matrix claimed but never wrote — fixed a8360f18, re-injected, killed). Gates: harness-contract 68/0, duplication excess 483 <= 483 @ w4, integrity 32/0, venue-parity 21/0, generate:artifacts --check clean, validate_state exit 0. Push/PR = user decision."
-  },
-  {
-   "id": "workflow-reuse-naming-figma",
-   "slug": "workflow-reuse-naming-figma",
-   "title": "Workflow Reuse-Scan, English Naming, Figma Wiring — mandatory subagent reuse scan in all 16 implementation workflows (post-Specify pre-Design/Tasks in spec-driven); English-only naming conversion rule; per-link Figma wiring tables (8 columns, 13 categories) for spec-driven/feature on any platform with validate_figma_wiring.ts backing and Figma-MCP execute retrieval; design workflow directions abstracted to design-implementation.md",
-   "status": "complete",
-   "priority": "P1",
-   "workflow": "spec-driven",
-   "branch": "spec/worktree-isolation-gate",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/worktree-isolation-gate/spec.md",
-   "design": ".specs/features/worktree-isolation-gate/design.md",
-   "tasks": ".specs/features/worktree-isolation-gate/tasks.md",
-   "created": "2026-08-06",
-   "dependencies": [],
-   "validation": ".specs/features/worktree-isolation-gate/validation.md",
-   "notes": "VALIDATED PASS 2026-08-06 (independent verifier, author != verifier, iteration 1 of 3): 6/6 ACs, 3/3 discrimination mutations killed (pass-1 survivor was the AC4 Stage 1 sensor the coverage matrix claimed but never wrote — fixed a8360f18, re-injected, killed). Gates: harness-contract 68/0, duplication excess 483 <= 483 @ w4, integrity 32/0, venue-parity 21/0, generate:artifacts --check clean, validate_state exit 0. Push/PR = user decision."
-  },
-  {
-   "id": "admin-portal",
-   "slug": "admin-portal",
-   "title": "Admin Portal — Full CRUD Web UI: config GET/PUT, checkpoint delete, model-profile registry overlay CRUD, write-mode default ON for trusted local callers",
-   "status": "complete",
-   "priority": "P1",
-   "workflow": "spec-driven",
-   "branch": "spec/admin-portal",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "spec": ".specs/features/admin-portal/spec.md",
-   "design": ".specs/features/admin-portal/design.md",
-   "tasks": ".specs/features/admin-portal/tasks.md",
-   "depends_on": [
-    "phase-8-web-ui"
-   ],
-   "created": "2026-08-07",
-   "notes": "EXECUTE COMPLETE 2026-08-07: T1-T15, 15 task commits on spec/admin-portal (5 planning + 15 task). Inline execution (sub-agents unavailable this session). 61 ACs across 5 phases. Per-task gates green: write-mode 23, web-ui 132->220, config-forms 32, app-renderers 74, registry-editor 31, model-profiles 48, generate:artifacts --check exit 0, type-check green. Validation pending (standalone fresh-eyes fallback). Push/PR authorized; merge = user decision."
-  },
-  {
-   "id": "admin-portal-ui-fixes",
-   "slug": "admin-portal-ui-fixes",
-   "title": "Admin Portal UI Fixes — consistent CSS for action buttons/forms, Projects grid table, Checkpoints Edit button, Config checkbox alignment, Profiles marketplace install detection, Edit Registry error display, errorBlock object-error rendering",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": false,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "spec/admin-portal-ui-fixes",
-   "spec": ".specs/features/admin-portal-ui-fixes/spec.md",
-   "tasks": ".specs/features/admin-portal-ui-fixes/tasks.md",
-   "validation": ".specs/features/admin-portal-ui-fixes/validation.md",
-   "created": "2026-08-08",
-   "notes": "VALIDATED PASS 2026-08-08: T1-T6 (6 ACs UIC-01..06) + errorBlock object-error fix. 6/6 ACs, 3/4 mutations killed (1 CSS-only not unit-testable). web-ui 285 pass. Push/PR = user decision."
-  },
-  {
-   "id": "registry-help-dropdown-workflow-tiers",
-   "slug": "registry-help-dropdown-workflow-tiers",
-   "title": "Registry Help, Opencode Dropdown, and Workflow Tiers — help section for 6 buttons, opencode effort dropdown constrained to low/medium/high/max, workflow tiers UI add/remove with live workflow-name picker",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": false,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "spec/admin-portal-ui-fixes",
-   "spec": ".specs/features/registry-help-dropdown-workflow-tiers/spec.md",
-   "tasks": ".specs/features/registry-help-dropdown-workflow-tiers/tasks.md",
-   "validation": ".specs/features/registry-help-dropdown-workflow-tiers/validation.md",
-   "created": "2026-08-08",
-   "depends_on": [
-    "admin-portal-ui-fixes"
-   ],
-   "notes": "VALIDATED PASS 2026-08-08: T7-T10 (4 ACs REG-01..04). 4/4 ACs, 3/3 mutations killed. web-ui 298 pass, scripts 113 pass, generator --check exit 0. Design: Option A3 (no generator changes; UI + validation only). Push/PR = user decision."
-  },
-  {
-   "id": "admin-portal-enhancements",
-   "slug": "admin-portal-enhancements",
-   "title": "Admin Portal Enhancements — handlers, styling, confirm, progress UX, registry sub-tab",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "spec/admin-portal-enhancements",
-   "spec": ".specs/features/admin-portal-enhancements/spec.md",
-   "design": ".specs/features/admin-portal-enhancements/design.md",
-   "tasks": ".specs/features/admin-portal-enhancements/tasks.md",
-   "created": "2026-08-08",
-   "notes": "VALIDATED PASS 2026-08-08: T1-T9, 9 task commits on spec/admin-portal-enhancements (2 planning + 9 task). Inline execution (sub-agents unavailable). 51 ACs across 3 phases = 9 tasks. Plan Challenge full gate 7 findings all folded (F1-F7). Per-task gates green: model-registry-stream 7, web-ui 220->278, type-check 6/6, test:plugins 135/0. New backend route POST /api/v1/model-registry/regenerate-stream (SSE). Frontend: showBanner, config save/reveal confirm, profiles tab switcher, registry in-memory overlay CRUD + save/clear, regenerate streaming, index progress + poll fallback, CSS design system. Standalone fresh-eyes validation PASS: 51/51 ACs matched, 5/5 discrimination mutations killed (1 fix applied for PRG-02 gap, re-verified). Push/PR = user decision."
-  },
-  {
-   "id": "config-capture-reveal-field-guides",
-   "slug": "config-capture-reveal-field-guides",
-   "title": "Config Tab: Capture Policy indicator, reveal real values, per-section field guides",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": false,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "spec/admin-portal-ui-fixes",
-   "spec": ".specs/features/config-capture-reveal-field-guides/spec.md",
-   "tasks": ".specs/features/config-capture-reveal-field-guides/tasks.md",
-   "validation": ".specs/features/config-capture-reveal-field-guides/validation.md",
-   "created": "2026-08-08",
-   "depends_on": [
-    "admin-portal-ui-fixes"
-   ],
-   "notes": "VALIDATED PASS 2026-08-08: T11-T14 (3 ACs CFG-01..03). 3/3 ACs, 3/3 mutations killed. web-ui 307 pass, tools-api config 14 pass, type-check 6/6, lint 0. New GET /api/v1/config/reveal endpoint. Push/PR = user decision."
-  },
-  {
-   "id": "admin-portal-correctness-repair",
-   "slug": "admin-portal-correctness-repair",
-   "title": "Admin Portal Correctness Repair — 8 correctness defects, 2 security issues, 1 dedupe, 5 state drifts from v1.41.0+v1.42.0",
-   "status": "complete",
-   "priority": "P0",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "fix/admin-portal-correctness-repair",
-   "spec": ".specs/features/admin-portal-correctness-repair/spec.md",
-   "design": ".specs/features/admin-portal-correctness-repair/design.md",
-   "tasks": ".specs/features/admin-portal-correctness-repair/tasks.md",
-   "validation": ".specs/features/admin-portal-correctness-repair/validation.md",
-   "created": "2026-08-08",
-   "depends_on": [
-    "admin-portal",
-    "admin-portal-enhancements",
-    "admin-portal-ui-fixes",
-    "registry-help-dropdown-workflow-tiers",
-    "config-capture-reveal-field-guides"
-   ],
-   "notes": "VALIDATED PASS 2026-08-08: T1-T11 + 3 fix-loop commits, 19 commits from 69c0632c (56a409ec spec+design+tasks .. close-out). Two batch workers (W1: T1-T8; W2: T9-T11) plus one fix loop. 39/39 ACs evidenced, 5/5 mutations killed, 0 survivors. Validation ran twice: iteration 1 FAILed (3 mutations survived on APCR-01 — the P0 core had no direct sensor because scripts/__tests__/model-profiles.test.ts was never extended, and APCR-01.10 was computed but never surfaced in the response body); fix loop 1 closed both, re-verify PASS. 5 audit mechanisms amended after re-measurement (A1-A5, see spec.md). Design caught the REG-03 workflow-tier-remove regression deep merge would have caused (null tombstone). Plan Challenge full gate folded 5 more ACs, including APCR-06.6 — the server-side status fix alone left the UI rendering a success banner from exitCode alone. Gates measured on this branch: web-ui 337 pass (0 fail, baseline 320), shared 327 pass (0 fail, baseline 322), tools-api 29 groups all pass, core --unit --filter='vector|postgres|store' 16 groups all pass, type-check 6/6 (--force), oxlint exit 0, test:scripts exit 0, generate:artifacts --check no drift, validate_state.ts exit 1 with 52 errors (all legacy; this feature clean and absent from the failing bracket), check_specs_delivered exit 0. Release derivation: 1.42.0 -> 1.43.0 (minor). Not pushed — push/PR/merge = user decision."
-  },
-  {
-   "id": "admin-portal-ux-overhaul",
-   "slug": "admin-portal-ux-overhaul",
-   "title": "Admin Portal UX Overhaul — per-agent tier overrides, catalog grid restructure, unified Save & Apply, plain-English nomenclature, five-tab polish",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "spec/admin-portal-ux-overhaul",
-   "spec": ".specs/features/admin-portal-ux-overhaul/spec.md",
-   "design": ".specs/features/admin-portal-ux-overhaul/design.md",
-   "tasks": ".specs/features/admin-portal-ux-overhaul/tasks.md",
-   "created": "2026-08-09",
-   "depends_on": [
-    "admin-portal-correctness-repair"
-   ],
-   "notes": "EXECUTE COMPLETE 2026-08-09: T1-T15, 16 commits on spec/admin-portal-ux-overhaul from main @ v1.43.0 (b1831197). 5 batch workers, T1-T15 (3 Phases = 15 Tasks) + this close-out. APUX-01..14 delivered: agentTiers registry section (schema/validate/merge/normalize/count, T1), generator per-agent resolution + stale-agent warn (T2), agents array in GET /api/v1/model-registry (T3), Tool+Tier leading grid columns (T4), Provider/Model split fields + hints (T5), Per-Agent Tier Overrides table (T6), inline dropdown forms replacing prompt()/alert() (T7), unified Save & Apply with restart banner (T8), Scheme A nomenclature incl. extended 4-word negative-vocabulary sensor (overlay/tombstoned/registry/host, T9), Projects Delete + Files header (T10), shared CSS pass (buttons/forms/help-card/code, T11), Config+Checkpoints polish (T12), Dashboard stat cards (T13), plain-English help cards on all five tabs (T14). Gates measured 2026-08-09: web-ui 456 pass/0 fail, model-profiles+generate-subagent-artifacts 124 pass/0 fail, tools-api model-registry+round-trip 23 pass/0 fail, type-check 6/6, oxlint exit 0, generate:artifacts --check no drift, check_specs_delivered exit 0. Validation pending: dispatch verification-agent (author != verifier) to write validation.md. Push/PR authorized (not taken unattended)."
-  },
-  {
-   "slug": "workflow-interaction-policies",
-   "title": "Implementation-workflow interaction policies — worker batch cap max3/ideal2, unlimited ask-first questions, pre-implementation change summary",
-   "status": "in_progress",
-   "workflow": "spec-driven",
-   "branch": "spec/workflow-interaction-policies",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   }
-  },
-  {
-   "id": "claude-marketplace-cache-refresh",
-   "slug": "claude-marketplace-cache-refresh",
-   "title": "Claude marketplace cache refresh — update-on-mismatch + truthful served-version recording",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "spec/installer-restart-embedding",
-   "created": "2026-08-09",
-   "depends_on": [],
-   "design": ".specs/features/claude-marketplace-cache-refresh/design.md",
-   "notes": "VALIDATED PASS 2026-08-09 (validation.md): CMR-01..07, AC-1..7 evidenced; mock-CLI suite 24/24; mutation killed (compare inversion, 8/24 red); plugin update verified against real CLI in isolated temp HOME (spec R1). Accepted risk R2: poisoned records self-heal only at next version bump; this machine handled by file-route runbook (HANDOFF).",
-   "spec": ".specs/features/claude-marketplace-cache-refresh/spec.md",
-   "tasks": ".specs/features/claude-marketplace-cache-refresh/tasks.md"
-  },
-  {
-   "id": "embedding-dims-consistency",
-   "slug": "embedding-dims-consistency",
-   "title": "Embedding dims consistency — align every model/dims surface to qwen3-embedding:4b / 2560",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "spec/installer-restart-embedding",
-   "created": "2026-08-09",
-   "depends_on": [],
-   "design": null,
-   "notes": "VALIDATED PASS 2026-08-09 (validation.md): premise re-measured (2560/4b already default since v1.33.0); EDC-01..08 fixed Dockerfile 8b/4096, install.sh + setup-ollama-wsl.sh 4096, config-cli 768, UI guide text, docs; parity sensor with per-dialect extractors + completeness scan, observed red naming all 5 violations; mutation killed. Design phase skipped: literal alignment + one sensor, no architectural decision.",
-   "spec": ".specs/features/embedding-dims-consistency/spec.md",
-   "tasks": null
-  },
-  {
-   "id": "admin-portal-restart",
-   "slug": "admin-portal-restart",
-   "title": "Admin portal restart — hybrid-mode restart endpoint + button + diff-based restart proposal",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "spec/installer-restart-embedding",
-   "created": "2026-08-09",
-   "depends_on": [],
-   "design": ".specs/features/admin-portal-restart/design.md",
-   "notes": "VALIDATED PASS 2026-08-09 (validation.md): APR-01..09 + plan-challenge R1-R4; hybrid mode locked by user decision (supervised exit / unsupervised self-respawn / dev-watch 409); real-process e2e proved flush-before-stop and caught app.stop() node-adapter defect; diff-based changedRestartSections; seam guard + negative MCP parity assertion; 2 mutations killed. Residual (accepted): respawn-rebind timing and signal-path drain proven at seam level only.",
-   "spec": ".specs/features/admin-portal-restart/spec.md",
-   "tasks": ".specs/features/admin-portal-restart/tasks.md"
-  },
-  {
-   "id": "admin-portal-ops-suite",
-   "slug": "admin-portal-ops-suite",
-   "title": "Admin portal operations suite — bulk memory delete, scheduler config section, Logs tab (live tail + range + export), Claude marketplace profile parity",
-   "status": "complete",
-   "priority": "P1",
-   "phases": {
-    "specify": true,
-    "design": true,
-    "tasks": true,
-    "execute": true
-   },
-   "branch": "spec/admin-portal-ops-suite",
-   "created": "2026-08-09",
-   "depends_on": ["model-profile-switching", "admin-portal-restart"],
-   "design": ".specs/features/admin-portal-ops-suite/design.md",
-   "notes": "VALIDATED PASS WITH FINDINGS 2026-08-10 (validation.md), verifier independent of all 7 phase builders. 33/33 requirement IDs SATISFIED after two post-verification repairs; 7/7 mutations killed across guard-logic, wire-protocol content-type, async-stream teardown, caching-contract, precedence-ordering, route-scope and UI-disclosure classes; 7/7 pre-mortem findings conformed. 22 commits (T1-T20 + 2 repairs). AD-020 supersedes the marketplace half of model-profile-switching's F1 refusal for claude only; codex keeps it. The verifier caught two gaps the green suites could not: MBD-06/07's promised route assertions were never written (closed, b47b8de4) and pre-mortem #6's tombstone disclosure was recorded as applied but never coded (closed, cfe09133). Residual (accepted, in HANDOFF): LOG-14/15's DOM-append path and abort-discrimination are proven at data level with a FakeAbortController, not DOM/platform level; the project-select-closes-open-form edge case has no dedicated test. UNVERIFIABLE FROM THIS REPO: Claude's plugin-cache refresh cadence — a mandatory post-restart acceptance step is required before the CPP slice is end-to-end validated.",
-   "spec": ".specs/features/admin-portal-ops-suite/spec.md",
-   "tasks": ".specs/features/admin-portal-ops-suite/tasks.md"
-  }
- ],
- "active_feature": null
+  "project": "massa-ai",
+  "version": 1,
+  "source": ".specs/features/local-first-memory-platform-roadmap/spec.md",
+  "features": [
+    {
+      "slug": "phase-0-quick-wins",
+      "title": "Phase 0 — Quick wins (0a upload gate, 0b reindex cap, 0c memory CRUD, 0d checkpoint MCP)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": "inline",
+        "execute": true
+      }
+    },
+    {
+      "slug": "phase-1-memory-foundation",
+      "title": "Phase 1 — Memory-quality foundation (decay fn, LLM consolidation, durable sessions/jobs)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "phase-2-query-understanding",
+      "title": "Phase 2 — Query understanding (LLM rewrite + HyDE, config-gated, silent-degrade)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "phase-3-hook-capture",
+      "title": "Phase 3 — Passive memory capture (hook ingestion, Observation store, single-writer queue + 429, consolidation bridge, hook scripts)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "phase-4-bootstrap",
+      "title": "Phase 4 — Bootstrap from repo (scan git/README/docs/manifests/centrality → LLM/rule-based seed memories, idempotent, bootstrap:completed event)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "phase-6-handoffs",
+      "title": "Phase 6 — Cross-session handoffs (HandoffStore + HandoffService begin/accept/cancel/listPending + dual-write memory + handoff:accepted event + auto-injector + MCP tools + route)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "phase-5-auto-improve",
+      "title": "Phase 5 — Auto-improvement loop (ProposalStore + AutoImproveJob rule-based pattern detection + LLM-optional enrichment + review-gate/auto-approve + apply/reject state machine + memory:auto-improved event + MCP tools + route)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "phase-7-retrieval-polish",
+      "title": "Phase 7 — Retrieval + compression polish (reranker, salience-judge, graph BFS stream, LLM compression, chromadb dead-code removal)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "phase-8-web-ui",
+      "title": "Phase 8 — Web UI [G5] (read-only HTML browser over SQLite memories + FTS5 search + handoffs + checkpoints + indexed projects, served via Tools API, vanilla HTML/CSS/JS, markdown + dark mode, no new core logic)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "local-first-memory-platform-roadmap",
+      "title": "Local-first memory platform roadmap",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "installer-environment-hooks-and-web-ui",
+      "title": "Pure Hedgehog — installer, environment, hooks, and UI scripts",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "installer-llm-search-quality-toggles",
+      "title": "Woolly Giggling Beaver — installer LLM search-quality toggles",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "project-identity-rename",
+      "title": "Project identity rename to massa-ai",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "qwen-model-defaults",
+      "title": "Qwen embedding 8B and LLM default swap",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "web-ui-asset-resolution",
+      "title": "Web UI HTML and asset-resolution repair",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "native-postgresql-installer",
+      "title": "Native PostgreSQL installer and Docker warning",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "installer-config-regeneration",
+      "title": "Installer config regeneration and source clone path",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "live-stack-e2e-coverage",
+      "title": "Live-stack MCP and HTTP E2E coverage",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "e2e-coverage-audit-remediation",
+      "title": "T14 E2E coverage-audit remediation",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "e2e-coverage-side-findings",
+      "title": "E2E coverage side findings A–E",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "native-ts-platform-expansion",
+      "title": "Eager Hummingbird implementation and hardening",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "read-file-cache-correctness",
+      "title": "Declarative Tower cache correctness",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "e2e-hardening-and-graph-parity",
+      "title": "Rippling Dove hardening and E2E expansion",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "repository-maintenance-2026-07-12",
+      "title": "Repository maintenance and PostgreSQL verification",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "close-maintenance-next-steps-2026-07-13",
+      "title": "Close maintenance next steps: Synapse, bounded search, deterministic qwen, destructive recovery, and path identity",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "sqlite-removal",
+      "title": "PostgreSQL-only storage; SQLite runtime removal",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "sqlite-removal-followup",
+      "title": "SQLite removal non-gating follow-ups (legacy Prisma probe rerun, qwen fixture manifest rebuild, final aggregate capture)",
+      "status": "in_progress",
+      "priority": "P2",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "multi-language-tree-sitter-breadth",
+      "title": "Native Tree-sitter structural indexing across 33 extensions",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "installer-race-safety",
+      "title": "M19 — installer race safety",
+      "status": "complete",
+      "priority": "P0",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "synapse-mcp-parity-discovery-pagination",
+      "title": "M20 + M54 — Synapse MCP parity and discovery pagination",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "tiered-fail-loud-search",
+      "title": "M50 — corruption surfacing and tiered fail-loud search",
+      "status": "complete",
+      "priority": "P0",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "transactional-project-identity",
+      "title": "M16 + M17 — project rename, merge, and cache invalidation",
+      "status": "complete",
+      "priority": "P0",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "hook-attribution-repair",
+      "title": "M45 + M47 — sticky hook attribution and repair",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "linux-native-structural-runtime",
+      "title": "M21 — native Linux glibc x64 support",
+      "status": "complete",
+      "priority": "P0",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "native-runtime-rebaseline",
+      "title": "Wave 3 follow-up — native runtime re-baseline to Bun 1.3.14 + six-suite classification + cross-platform re-verification",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "wave-4-correctness-hygiene",
+      "title": "Wave 4 — Correctness, hygiene, and spec reconciliation (N1 generation staleness, N4 clamped-list totals, N6 enum teaching errors, N7 untracked merge + secrets denylist, N8 git-ref guard, N9 read_file cap, N10 SQL bounds, N25 spec reconciliation, M29 sqlite-removal close, N33 dead code sweep, N34 CI grammar gate, N36 xdg extraction, M35 scheduler seam)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "wave-5-cross-pollination",
+      "title": "Wave 5 — Cross-pollination features (N2 cycle detection, N3 BFS CTE, N5 grouped tree, N41 cbm drift, N11 lease single-writer, N12 idempotent import, N13 capture policy, N14 persisted scheduler, N26 synapse_task_begin/end, N27 SSE push, N15 Moonshot transport, N16 server-side filter revalidation, N45 hook-attribution confirmation)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "wave-6-architecture-features",
+      "title": "Wave 6 — Architecture and medium features (N31 god-files, N32 embedded MCP, N30 hook binary, N20 parallel tests, N21 test-seam, N28 dashboard, N29 scheduler preset, N17 harness protocol, N18 deterministic script, N19 auth, N42 path recovery, M25 name resolution, M26 JSON extraction, M62 tree-sitter GLR)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "codex-cursor-plugin-parity",
+      "title": "Codex + Cursor Plugin Parity — Native plugin bundles for Codex and Cursor + four-plugin installer parity (Claude, Codex, Cursor, OpenCode)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "subagent-skills-plugin-parity",
+      "title": "Subagent Skills Plugin Parity — Ship the 12 sub-agent specialists as host-native subagent definitions across Claude Code, Codex, Cursor, and OpenCode plugins",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "notes": "Validated PASS 2026-07-23 (independent verifier, bc57daa..80994eb, T1-T12 all done). Registry lagged reality until 2026-08-03 (DA-11/DI-03): phases sat 'pending' for a feature whose validation.md had verified the shipped work; roster later grew 12 -> 17 under the generator features."
+    },
+    {
+      "slug": "workflow-tools-adaptation",
+      "title": "Workflow Tools Adaptation — Adapt massa-ai workflows to use the full 52-tool surface (checkpoints, handoffs, bootstrap, compact_snapshot, trace_path, impact_analysis, code execution, full Synapse, read_file, symbol_snippet, memory ops, analytics) with canonical un-prefixed naming",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "slug": "repo-rename-massa-ai-part2",
+      "title": "Repository rename part 2 — residual th0th/massa-th0th references removed across bun.lock, CHANGELOG, .specs, skills, plugin agents, docs, source",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": "inline",
+        "execute": true
+      },
+      "spec": ".specs/features/repo-rename-massa-ai-part2/spec.md"
+    },
+    {
+      "slug": "repo-rename-massa-ai",
+      "title": "Repository rename to massa-ai (from prior massa-th0th identity)",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/repo-rename-massa-ai/spec.md"
+    },
+    {
+      "slug": "coverage-90pct",
+      "title": "Coverage >90% unit tests across monorepo",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/coverage-90pct/spec.md",
+      "validation": ".specs/features/coverage-90pct/validation.md"
+    },
+    {
+      "slug": "install-harness-migration",
+      "title": "Install harness migration — TS→bash installers, MCP single writer, unified wiring",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/install-harness-migration/spec.md",
+      "design": ".specs/features/install-harness-migration/design.md",
+      "tasks": ".specs/features/install-harness-migration/tasks.md",
+      "validation": ".specs/features/install-harness-migration/validation.md"
+    },
+    {
+      "slug": "auto-release-versioning",
+      "title": "Auto release versioning — CHANGELOG-derived bump, GitHub Release, GitHub Packages, no Deployments",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/auto-release-versioning/spec.md",
+      "design": ".specs/features/auto-release-versioning/design.md",
+      "tasks": ".specs/features/auto-release-versioning/tasks.md",
+      "validation": ".specs/features/auto-release-versioning/validation.md"
+    },
+    {
+      "slug": "workflow-harness-overhaul",
+      "title": "Workflow harness overhaul — remove chat-restart/context-handoff, add delivery, annotation, root-cause and project-context contracts",
+      "status": "in_progress",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/workflow-harness-overhaul/spec.md",
+      "design": ".specs/features/workflow-harness-overhaul/design.md",
+      "tasks": ".specs/features/workflow-harness-overhaul/tasks.md",
+      "validation": ".specs/features/workflow-harness-overhaul/validation.md"
+    },
+    {
+      "slug": "audit-remediation-2026-07",
+      "title": "Audit remediation 2026-07 — unauthenticated-RCE fix, CORS lockdown, 6 correctness bugs, and 5 tech-debt items",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/audit-remediation-2026-07/spec.md",
+      "design": ".specs/features/audit-remediation-2026-07/design.md",
+      "tasks": ".specs/features/audit-remediation-2026-07/tasks.md",
+      "validation": ".specs/features/audit-remediation-2026-07/validation.md",
+      "validation_pr2": ".specs/features/audit-remediation-2026-07/validation-pr2.md"
+    },
+    {
+      "slug": "core-layering-god-module-split",
+      "title": "Core layering and god-module split — retire the controllers layer, break the contextual-search-rlm facade, rename rlm-* once",
+      "status": "complete",
+      "priority": "P2",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/core-layering-god-module-split/spec.md",
+      "depends_on": [
+        "sensor-repair-2026-07"
+      ],
+      "design": ".specs/features/core-layering-god-module-split/design.md",
+      "tasks": ".specs/features/core-layering-god-module-split/tasks.md",
+      "notes": "Umbrella over four PRs (AS-05). PR-A sensor-repair-2026-07 complete; PR-B merged #53, v1.16.0; PR-C core-layering-controller-retirement merged #59, v1.17.0; PR-D core-layering-read-file-split EXECUTE COMPLETE 2026-08-03 (was 'in Specify' here — the exact stale-field class its own RFS-05 AC-1 polices). phases.execute was false through PR-B and PR-C and is corrected here — Execute has happened twice. Status flipped to complete at PR-D's T23: GMS-02's headline closed at PR-D's T15 (check-tools-thin PASS 0 of 30, wired into ci.yml's build) and thirty-three corrections C1-C33 are indexed in the spec. PR-D's T25 independent validation ran 2026-08-03 in a fresh conversation (the user's authorship decision) and returned PASS -- validation.md is the record; push, PR and --no-ff merge remain.",
+      "validation": ".specs/features/core-layering-god-module-split/validation.md"
+    },
+    {
+      "slug": "core-layering-controller-retirement",
+      "title": "Core layering — controller retirement (PR-C): kernel tier, controllers/ retired into services/, AC-1's import check shipped with the restructuring",
+      "status": "complete",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/pr-c-execute",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/core-layering-controller-retirement/spec.md",
+      "design": ".specs/features/core-layering-controller-retirement/design.md",
+      "tasks": ".specs/features/core-layering-controller-retirement/tasks.md",
+      "depends_on": [
+        "core-layering-god-module-split"
+      ],
+      "notes": "PR-C of 4 under core-layering-god-module-split. Executed GMS-01 (all six ACs) and GMS-02 AC-2 only; GMS-02 AC-1 is PR-D's by C13. All 20 tasks shipped in 22 commits; T18 independent validation PASS (author != verifier), see validation.md. Merged as #59 (2bea11e, --no-ff, parents 450352b + 2ea4ebd) and released v1.17.0 on 2026-07-31.",
+      "validation": ".specs/features/core-layering-controller-retirement/validation.md"
+    },
+    {
+      "slug": "core-layering-read-file-split",
+      "title": "Core layering — read_file.ts split (PR-D): GMS-02 AC-1 and its headline, a tools/ thinness gate that did not exist, and the deferrals PR-C could not price",
+      "status": "complete",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/pr-d-read-file-split",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/core-layering-read-file-split/spec.md",
+      "depends_on": [
+        "core-layering-controller-retirement"
+      ],
+      "notes": "PR-D of 4, the last. TASKS COMPLETE 2026-07-31 -- 28 task rows, eight phases, 78 distinct files; cut resolved as ONE PR with eight phased commits, artifacts and code on one branch (so the no-changelog label must NOT be used), CHANGELOG under ### Changed + ### Removed (both minor here; CONTRIBUTING makes Removed a minor, not a major). C33 is the fortieth plan defect and the highest-consequence line in tasks.md: Phase 4 as designed could NOT close the gate -- index_project.ts handle() is 128 lines and all three extracted spans sit outside it, so the handle() <= 120 clause stayed red and T15 could not wire the gate to CI. Closed by a new task T14b extracting the 45-line managed-run lease block, handle() 128 -> ~87. Closes GMS-02 AC-1 and the GMS-02 headline. Specify complete; DESIGN COMPLETE 2026-07-31 -- sized at six changes and nine new files under the 90% per-file coverage floor. Five decisions with rejected options: rename services/graph/ -> services/memory-graph/ (7 git mv, 19 importers, 28 import lines, 6 mock.module); delete the dangling check-coverage EXCLUSIONS entry and add an existence assert to the gate's TEST, not the gate; N = 125; handle() sheds all 98 of its non-delegation lines so the extraction is 490 of 707 (69.3%), not 392; and the shared LRU lands in services/cache/lru-evict.ts rather than kernel/, which stays at 11. Five corrections owed back to the parent spec.md: C28 (AS-06's named sensor cannot discriminate -- check-core-layering's FORBIDDEN.tools is empty by the declared order), C29, C30, C31, C32 -- the 35th through 39th plan defects across the umbrella. RFS-01's gate gains a third clause (handle() body <= 120, band [113,128) measured) and ships on a TypeScript AST rather than a regex, because 'no private method' is the wrong predicate: private run: (...) => ... is a function-typed FIELD in 4 files and a literal reading makes the frozen base 6 of 30 instead of 2. Two full Plan Challenge gates run; the Design one returned twelve findings across two modes, all twelve re-measured and confirmed, all twelve revising the document. EXECUTE COMPLETE 2026-08-03 through T24 -- all eight phases closed, 29 task rows (the 28 here was pre-T8b), final write-set sum 112 / union 86, EIGHTY-NINE plan defects (C34-C84 internal + C28-C33 indexed into the parent at T20). RFS-01 AC-1 closed at T15: check-tools-thin wired into ci.yml's build, PASS 0 of 30 / 398 members post-T19. N=125 landed at 124. The rename landed T16+T17 as one measured commit; RFS-04's removals at T19 (published surface verified against a proven-fresh npm pack); the twenty design.md corrections at T20b; C28-C33 + layer figures (three frames) into the parent at T20; the coverage-gate existence pin at T21 (red observed first); Phase 6's prose carriers at T18; CLAUDE.md/ONBOARDING figures at T22. T25 independent validation DONE 2026-08-03 by a fresh-conversation verifier (the user's authorship decision): VERDICT PASS, no surviving mutant across ten verifier-chosen faults, all five re-takes reproduced from raw data, both open criteria questions answered in the amendments' favour -- validation.md is the record. Push, PR and --no-ff merge are the user's next step.",
+      "design": ".specs/features/core-layering-read-file-split/design.md",
+      "tasks": ".specs/features/core-layering-read-file-split/tasks.md"
+    },
+    {
+      "slug": "sensor-repair-2026-07",
+      "title": "Sensor repair 2026-07 — reset the coverage gate's database, wire it into CI, stop tests reading the real config, content-anchor the needles fixture, honour includePersistent",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/sensor-repair-2026-07/spec.md",
+      "design": ".specs/features/sensor-repair-2026-07/design.md",
+      "tasks": ".specs/features/sensor-repair-2026-07/tasks.md",
+      "validation": ".specs/features/sensor-repair-2026-07/validation.md"
+    },
+    {
+      "slug": "plugin-auto-install",
+      "title": "Plugin auto-install — host detection + version-gated upgrade for the four plugin bundles",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/plugin-auto-install/spec.md",
+      "design": ".specs/features/plugin-auto-install/design.md",
+      "tasks": ".specs/features/plugin-auto-install/tasks.md",
+      "validation": ".specs/features/plugin-auto-install/validation.md"
+    },
+    {
+      "slug": "judge-with-debate",
+      "title": "Judge With Debate — meta-judge eval spec + 3 model-diverse judges debating to consensus; standalone workflow + 2 new sub-agent charters",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/judge-with-debate/spec.md",
+      "design": ".specs/features/judge-with-debate/design.md",
+      "tasks": ".specs/features/judge-with-debate/tasks.md",
+      "validation": ".specs/features/judge-with-debate/validation.md"
+    },
+    {
+      "slug": "model-profile-registry",
+      "title": "Model Profile Registry — central tier/profile registry for agent and workflow model selection across four harness CLIs",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/model-profile-registry/spec.md",
+      "design": ".specs/features/model-profile-registry/design.md",
+      "tasks": ".specs/features/model-profile-registry/tasks.md",
+      "fool": ".specs/features/model-profile-registry/fool.md",
+      "validation": ".specs/features/model-profile-registry/validation.md"
+    },
+    {
+      "slug": "skills-directive-dedup",
+      "title": "skills/ directive dedup — single-source restatements, fix drift, and the four correctness defects the duplication was hiding",
+      "status": "in_progress",
+      "workflow": "spec-driven",
+      "branch": "refactor/skills-directive-dedup",
+      "notes": "T1-T5 of 12 committed and green at ed1028e; T6-T12 not started. Not pushed, no PR. See .specs/HANDOFF.md."
+    },
+    {
+      "slug": "cross-pollination-ports",
+      "title": "Cross-pollination ports & gap closure — implement live PORT-01..07 + DB-05/06/07/08/09/10 fixes + lessons from the 2026-07-29 portability report",
+      "status": "complete",
+      "workflow": "spec-driven",
+      "branch": "feature/cross-pollination-ports",
+      "notes": "VALIDATED PASS 2026-08-03 (35/35 ACs, 6/6 mutations killed). Merged as PR #61 @ 0084d1a, released v1.19.0 @ 8e63477; CI + Coverage + Release green on the merge sha, so T7/T8's deferred real-CI confirmation landed. AD-014 added."
+    },
+    {
+      "slug": "da-inventory-closure",
+      "title": "DA Inventory Closure — triage DA-01..DA-17 from the cross-pollination report at v1.19.0; fix the 7 live rows, record the rest",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/da-inventory-closure",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "notes": "VALIDATED PASS 2026-08-03 (independent verifier; all live DI ACs evidenced, DI-02 mutation re-derived + killed, gates exit 0). 17 DA rows: 7 FIX shipped, 8 RESOLVED evidenced, 1 ROUTED (DA-10), 2 ACCEPTED (DA-04, DA-13). DI-05 withdrawn at Design D0 (SEN-03 had already shipped the fix). L-001 promoted to confirmed. .specs/reports/ removed after a 14-file dispositioned sweep. PR from spec/da-inventory-closure; merge = user's decision."
+    },
+    {
+      "slug": "tlc-330-harness-update",
+      "title": "TLC 3.3.0 Harness Update — port TLC's four deterministic validator scripts + check_specs_delivered.py, EARS ACs, discuss pace system, git-stash ban + porcelain baseline, status-before-commit reorder, deliver-specs-before-PR gate, batch-trigger lowering, verification-agent deep-tier pin, lessons.py Unicode dedup fix",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/tlc-330-harness-update",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/tlc-330-harness-update/spec.md",
+      "design": ".specs/features/tlc-330-harness-update/design.md",
+      "tasks": ".specs/features/tlc-330-harness-update/tasks.md",
+      "notes": "T1-T18 + FT1-FT2 + Phase 5 amendment (T19-T22) complete. Independently validated: iteration 1 FAIL -> FT1/FT2 -> iteration 2 PASS; Phase 5 iteration 3 FAIL (PYTS spec population undercount) -> FT3 -> re-verify. validation.md at .specs/features/tlc-330-harness-update/validation.md. PR #64 open. massa-ai MCP unreachable this session; .specs/ is canonical. See .specs/HANDOFF.md."
+    },
+    {
+      "slug": "python-to-typescript-scripts",
+      "title": "Python → TypeScript scripts migration — port all 8 Python scripts (6 skill validators/lessons + 2 repo dev scripts) to Bun TypeScript with CLI/exit/output parity, dual-run characterization, per-script atomic deletion, and full python3 wiring rewire (sweep-derived work list: 41 python3 lines / 25 skill files + 16 non-literal .py refs + tests + package.json at authoring)",
+      "status": "complete",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/python-to-typescript-scripts",
+      "phases": {
+        "specify": "complete",
+        "design": "complete",
+        "tasks": "complete",
+        "execute": "complete"
+      },
+      "spec": ".specs/features/python-to-typescript-scripts/spec.md"
+    },
+    {
+      "slug": "workflow-policy-updates",
+      "title": "Workflow policy updates WFP-01..05 — Compose @Preview rule for implementation workflows, PR-description currency after each push, Figma pre-analysis + sequential retrieval subagent protocol, abbreviation expansion, uniform Phase/Task batching vocabulary",
+      "status": "complete",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/workflow-policy-updates",
+      "phases": {
+        "specify": "complete",
+        "design": "complete",
+        "tasks": "complete",
+        "execute": "complete"
+      },
+      "spec": ".specs/features/workflow-policy-updates/spec.md",
+      "design": ".specs/features/workflow-policy-updates/design.md",
+      "tasks": ".specs/features/workflow-policy-updates/tasks.md",
+      "notes": "T1-T5 complete, independently validated (all 5 WFP ACs PASS, 3/3 mutations killed; validation.md). PR #66, CI 14/14 green. Merge = user's decision. Plan Challenge pre_mortem F1-F6 folded before Execute. massa-ai MCP unreachable this session; .specs/ canonical."
+    },
+    {
+      "slug": "subagent-orchestration-io",
+      "title": "Sub-agent orchestration I/O — orchestrator working-memory rules (no transcript polling, wave cap 4, consolidation signal, git safety, non-inheritance, 40-line return bound), canonical Capability Packet + AGENTS.md parity sensor, standard dispatch blocks for judge-with-debate and furps-refinement",
+      "status": "complete",
+      "priority": "P2",
+      "workflow": "spec-driven",
+      "branch": "spec/subagent-orchestration-io",
+      "phases": {
+        "specify": "complete",
+        "design": "complete",
+        "tasks": "complete",
+        "execute": "complete"
+      },
+      "spec": ".specs/features/subagent-orchestration-io/spec.md",
+      "design": ".specs/features/subagent-orchestration-io/design.md",
+      "tasks": ".specs/features/subagent-orchestration-io/tasks.md",
+      "notes": "T1-T8 complete, independently validated PASS (9/9 ORC ACs, 3/3 discrimination mutations killed, 4 gates green; validation.md). Census 24->27 dispatch blocks; parity sensor observed red then green. massa-ai MCP unreachable; .specs/ canonical. Merged as PR #67 @ 5b338af4, released v1.24.0 (its pre-merge 'push/PR deferred' note was stale by the time of that merge; corrected here during the persona-router-token-optimization main merge)."
+    },
+    {
+      "slug": "persona-router-token-optimization",
+      "title": "Persona Router Token Optimization — pin fast path, SKILL.md slim, catalog v2 two-tier, prompt compression, route memory, machine dedupe, size-budget + double-surface gates",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/persona-router-token-optimization",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/persona-router-token-optimization/spec.md",
+      "design": ".specs/features/persona-router-token-optimization/design.md",
+      "tasks": ".specs/features/persona-router-token-optimization/tasks.md",
+      "validation": ".specs/features/persona-router-token-optimization/validation.md",
+      "notes": "T0-T9 complete, independently VALIDATED PASS 2026-08-04 (5/5 scratch mutations killed, all six task-listed gates green; PRT-02 AC1-3 live walkthrough pending-restart per Plan Challenge F6, PRT-06 documented-contract only — MCP unreachable). T7 machine dedupe done with prompt-by-prompt user approvals after a classifier denial; falsifying re-check caught + removed a stale handoff-writer agent (roster exactly 17); dead th0th MCP entry removed (user-approved extra). origin/main v1.24.0 merged in at ad04e953. PR #68 open, CI 14/14 green; merge = user's decision. Full Plan Challenge (pre_mortem): F1-F6 folded before Execute."
+    },
+    {
+      "slug": "skill-token-optimization",
+      "title": "Skill token optimization — lazy-load mobile/Figma/SonarQube + high-value extractions, validator top pack, caveman compression of 140 skill files",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": false
+      }
+    },
+    {
+      "slug": "model-profile-switching",
+      "title": "Model Profile Switching — pre-rendered per-profile agent variants in plugin bundles + switch-time re-render engine (MCP profile_set/profile_list, config-cli profile subcommand, OpenCode in-process tool, Claude skill), install-state.json profile record surviving upgrades",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/model-profile-switching",
+      "phases": {
+        "specify": "complete",
+        "design": "complete",
+        "tasks": "complete",
+        "execute": "complete"
+      },
+      "spec": ".specs/features/model-profile-switching/spec.md",
+      "depends_on": [
+        "model-profile-registry"
+      ],
+      "design": ".specs/features/model-profile-switching/design.md",
+      "tasks": ".specs/features/model-profile-switching/tasks.md",
+      "notes": "EXECUTE COMPLETE 2026-08-04: T1-T16 by 3 confirmed batch workers + 2 inline main-agent repairs (security-allowlist entry for lock.ts execFileSync; T17 close-out), 19 commits. Re-measured figures: 374 variant files across 22 (host,profile) pairs at 17 each; MCP tools 52->54 across 3 pinned locations (a third, undocumented pin found in tool-definitions-synapse.test.ts); OpenCode in-process tools 13->14 (closed the stale 13-vs-14 doc gap). Two recorded deviations: publish.yml + package.json files extension (required by MPS-01 AC4); codex/opencode have no marketplace mode -> installRoute unconditionally file. AD-015 appended. Full gate matrix exit 0. VALIDATED PASS 2026-08-04 (independent verifier, author != verifier): 22/22 ACs evidenced, 7/7 discrimination mutations killed (0 survivors, 0 exclusions), 9/9 gates green on verifier-owned runs. PR from spec/model-profile-switching; merge = user decision (minor release).",
+      "validation": ".specs/features/model-profile-switching/validation.md"
+    },
+    {
+      "slug": "workflow-metadata-headers",
+      "title": "Agent Skills-style YAML frontmatter (name, description, license, metadata.version \"1.0.0\") on all 36 skills/massa-ai/workflows files, real-YAML-parse gate, bundle regen",
+      "status": "complete",
+      "priority": "P3",
+      "workflow": "spec-driven",
+      "branch": "spec/workflow-metadata-headers",
+      "phases": {
+        "specify": "complete",
+        "design": "skipped — format fixed by agentskills.io spec + repo SKILL.md convention; safety valve armed",
+        "tasks": "complete",
+        "execute": true
+      },
+      "spec": ".specs/features/workflow-metadata-headers/spec.md",
+      "tasks": ".specs/features/workflow-metadata-headers/tasks.md",
+      "notes": "User-directed 2026-08-04, pattern ref https://agentskills.io/specification. Plan Challenge full pre_mortem: F1 critical (unquoted YAML scalars break on 8/36 opening paragraphs) folded — hand-authored double-quoted descriptions + real-parser sensor. 1 Phase = 5 Tasks; T1-T4 batch worker (user-approved), T5 delivery under Execute go-ahead. T2 @ bfddbb69 (recovered via parent cherry-pick after wrong-branch incident — concurrent session checkout; original b98dcbf2 orphaned, sibling branch untouched). T3 @ 32f54c83 (--check exit 0). T4: lint 0; test:scripts 1329/4 — 4 fails are worktree-contamination, AC5 amended (CI authoritative); duplication ceiling 331→471 documented; worker hit API weekly limit, T4 finished inline by main agent."
+    },
+    {
+      "id": "registry-cleanup-skill-imports",
+      "slug": "registry-cleanup-skill-imports",
+      "title": "skills/AGENTS.md registry cleanup + coding-guidelines/skill-architect/to-prd imports",
+      "status": "complete",
+      "created": "2026-08-05",
+      "depends_on": [],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md"
+      ]
+    },
+    {
+      "id": "untracked-generated-bundles",
+      "slug": "untracked-generated-bundles",
+      "status": "complete",
+      "created": "2026-08-05",
+      "description": "Stop tracking generated plugin bundles; generate at pack/install/CI time",
+      "dependencies": []
+    },
+    {
+      "id": "plugin-architecture-unification",
+      "slug": "plugin-architecture-unification",
+      "title": "AD-017: plugins deliver, MCP serves tools, hooks observe — OpenCode MCP re-registration, sentinel-gated harness skip, Cursor bridge dedupe, hooks-only OpenCode plugin",
+      "status": "complete",
+      "created": "2026-08-05",
+      "depends_on": [],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md",
+        "context.md",
+        "validation.md"
+      ],
+      "notes": "Merged as PR #74 @ 46e7af97 (status flipped from in-progress during the pr-review-workflow main merge)."
+    },
+    {
+      "id": "pr-review-workflow",
+      "slug": "pr-review-workflow",
+      "title": "PR Review Workflow — six-dimension hosted GitHub PR / GitLab MR review posting inline findings + consolidated summary via gh/glab, massa-ai roster dispatches, .specs/ requirements integration",
+      "status": "complete",
+      "created": "2026-08-05",
+      "workflow": "spec-driven",
+      "branch": "spec/pr-review-workflow",
+      "depends_on": [],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md",
+        "validation.md"
+      ],
+      "notes": "VALIDATED PASS 2026-08-05 (independent verifier, author != verifier): 26/26 lettered ACs, 5/5 discrimination mutations killed (0 survivors), 6 suites 131/0 on verifier-owned runs, parity no drift, SKILL.md 20091 B. test:scripts 1451/4 — 4 fails are the .claude/worktrees needle-anchor contamination class, CI authoritative. Push/PR = user decision. NOTE: its T6 commit c4b4d6cb landed on spec/discovery-workflow (shared-checkout incident, recorded in STATE); suggested repair: git branch -f spec/pr-review-workflow c4b4d6cb before push."
+    },
+    {
+      "id": "discovery-workflow",
+      "slug": "discovery-workflow",
+      "title": "Discovery Workflow — product brainstorming thinking partner (four modes, seven frameworks, five-stage session rhythm, conduct contract) adapted from anthropics/knowledge-work-plugins product-brainstorming (Apache-2.0), mandatory to-prd PRD offer at Capture, router row + tier-4 clause, count locks 39→40 / complement 23→24, WMH license allowlist +Apache-2.0",
+      "status": "complete",
+      "created": "2026-08-05",
+      "workflow": "spec-driven",
+      "branch": "spec/discovery-workflow",
+      "depends_on": [
+        "pr-review-workflow"
+      ],
+      "artifacts": [
+        "spec.md",
+        "design.md",
+        "tasks.md",
+        "validation.md"
+      ],
+      "notes": "VALIDATED PASS 2026-08-05 (independent verifier, author != verifier): 15/15 lettered ACs, 4/4 discrimination mutations killed (0 survivors, hash-verified restores), named suites 131/0 + parity no drift + SKILL.md 20293 B + doc-paths 0 misses + lint 0 on verifier-owned re-runs; observed-red 39/23 reproduced in a scratch worktree at 231a9357. test:scripts 1451/4 — 4 fails are the .claude/worktrees needle-anchor contamination class, CI authoritative. Push/PR = user decision; see STATE for the c4b4d6cb shared-checkout incident repair (fast-forward spec/pr-review-workflow first)."
+    },
+    {
+      "id": "agent-era-harness-upgrades",
+      "slug": "agent-era-harness-upgrades",
+      "title": "Agent-Era Harness Upgrades — lessons.ts trust ramp + metric trend, massa-ai-reviewer dispatch in 14 workflows, tests five-gate error-class model + tests lens, feature-workflow AC anchor, code-quality/refactor/coding-guidelines agent-read-aware rewrites (file-size ~500/~600 per user amendment)",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/agent-era-harness-upgrades",
+      "notes": "Merged (main released v1.31.0/v1.32.0 with its entries); status flipped from stale in-progress during the workflow-commands main merge.",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/agent-era-harness-upgrades/spec.md",
+      "design": ".specs/features/agent-era-harness-upgrades/design.md",
+      "tasks": ".specs/features/agent-era-harness-upgrades/tasks.md",
+      "created": "2026-08-05",
+      "dependencies": []
+    },
+    {
+      "id": "workflow-commands",
+      "slug": "workflow-commands",
+      "status": "complete",
+      "created": "2026-08-05",
+      "description": "Per-workflow slash commands on all four hosts (e.g. /massa-ai:debug), generated from the workflow inventory",
+      "dependencies": []
+    },
+    {
+      "id": "worktree-isolation-gate",
+      "slug": "worktree-isolation-gate",
+      "title": "Worktree Isolation Gate — one identical explicit action line (execute implementation-delivery.md Stage 0–1 before the first file edit, record worktree path + branch or a verbatim legal skip reason) in all 16 implementation workflows; Stage 1 record-evidence + never-switch-branches-in-shared-checkout cross-session rule; per-file + uniformity sensor in workflow-harness-contract; hook-level blocking deferred (observation-only hook contract)",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/worktree-isolation-gate",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/worktree-isolation-gate/spec.md",
+      "design": ".specs/features/worktree-isolation-gate/design.md",
+      "tasks": ".specs/features/worktree-isolation-gate/tasks.md",
+      "created": "2026-08-06",
+      "dependencies": [],
+      "validation": ".specs/features/worktree-isolation-gate/validation.md",
+      "notes": "VALIDATED PASS 2026-08-06 (independent verifier, author != verifier, iteration 1 of 3): 6/6 ACs, 3/3 discrimination mutations killed (pass-1 survivor was the AC4 Stage 1 sensor the coverage matrix claimed but never wrote — fixed a8360f18, re-injected, killed). Gates: harness-contract 68/0, duplication excess 483 <= 483 @ w4, integrity 32/0, venue-parity 21/0, generate:artifacts --check clean, validate_state exit 0. Push/PR = user decision."
+    },
+    {
+      "id": "workflow-reuse-naming-figma",
+      "slug": "workflow-reuse-naming-figma",
+      "title": "Workflow Reuse-Scan, English Naming, Figma Wiring — mandatory subagent reuse scan in all 16 implementation workflows (post-Specify pre-Design/Tasks in spec-driven); English-only naming conversion rule; per-link Figma wiring tables (8 columns, 13 categories) for spec-driven/feature on any platform with validate_figma_wiring.ts backing and Figma-MCP execute retrieval; design workflow directions abstracted to design-implementation.md",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/worktree-isolation-gate",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/worktree-isolation-gate/spec.md",
+      "design": ".specs/features/worktree-isolation-gate/design.md",
+      "tasks": ".specs/features/worktree-isolation-gate/tasks.md",
+      "created": "2026-08-06",
+      "dependencies": [],
+      "validation": ".specs/features/worktree-isolation-gate/validation.md",
+      "notes": "VALIDATED PASS 2026-08-06 (independent verifier, author != verifier, iteration 1 of 3): 6/6 ACs, 3/3 discrimination mutations killed (pass-1 survivor was the AC4 Stage 1 sensor the coverage matrix claimed but never wrote — fixed a8360f18, re-injected, killed). Gates: harness-contract 68/0, duplication excess 483 <= 483 @ w4, integrity 32/0, venue-parity 21/0, generate:artifacts --check clean, validate_state exit 0. Push/PR = user decision."
+    },
+    {
+      "id": "admin-portal",
+      "slug": "admin-portal",
+      "title": "Admin Portal — Full CRUD Web UI: config GET/PUT, checkpoint delete, model-profile registry overlay CRUD, write-mode default ON for trusted local callers",
+      "status": "complete",
+      "priority": "P1",
+      "workflow": "spec-driven",
+      "branch": "spec/admin-portal",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "spec": ".specs/features/admin-portal/spec.md",
+      "design": ".specs/features/admin-portal/design.md",
+      "tasks": ".specs/features/admin-portal/tasks.md",
+      "depends_on": [
+        "phase-8-web-ui"
+      ],
+      "created": "2026-08-07",
+      "notes": "EXECUTE COMPLETE 2026-08-07: T1-T15, 15 task commits on spec/admin-portal (5 planning + 15 task). Inline execution (sub-agents unavailable this session). 61 ACs across 5 phases. Per-task gates green: write-mode 23, web-ui 132->220, config-forms 32, app-renderers 74, registry-editor 31, model-profiles 48, generate:artifacts --check exit 0, type-check green. Validation pending (standalone fresh-eyes fallback). Push/PR authorized; merge = user decision."
+    },
+    {
+      "id": "admin-portal-ui-fixes",
+      "slug": "admin-portal-ui-fixes",
+      "title": "Admin Portal UI Fixes — consistent CSS for action buttons/forms, Projects grid table, Checkpoints Edit button, Config checkbox alignment, Profiles marketplace install detection, Edit Registry error display, errorBlock object-error rendering",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-ui-fixes",
+      "spec": ".specs/features/admin-portal-ui-fixes/spec.md",
+      "tasks": ".specs/features/admin-portal-ui-fixes/tasks.md",
+      "validation": ".specs/features/admin-portal-ui-fixes/validation.md",
+      "created": "2026-08-08",
+      "notes": "VALIDATED PASS 2026-08-08: T1-T6 (6 ACs UIC-01..06) + errorBlock object-error fix. 6/6 ACs, 3/4 mutations killed (1 CSS-only not unit-testable). web-ui 285 pass. Push/PR = user decision."
+    },
+    {
+      "id": "registry-help-dropdown-workflow-tiers",
+      "slug": "registry-help-dropdown-workflow-tiers",
+      "title": "Registry Help, Opencode Dropdown, and Workflow Tiers — help section for 6 buttons, opencode effort dropdown constrained to low/medium/high/max, workflow tiers UI add/remove with live workflow-name picker",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-ui-fixes",
+      "spec": ".specs/features/registry-help-dropdown-workflow-tiers/spec.md",
+      "tasks": ".specs/features/registry-help-dropdown-workflow-tiers/tasks.md",
+      "validation": ".specs/features/registry-help-dropdown-workflow-tiers/validation.md",
+      "created": "2026-08-08",
+      "depends_on": [
+        "admin-portal-ui-fixes"
+      ],
+      "notes": "VALIDATED PASS 2026-08-08: T7-T10 (4 ACs REG-01..04). 4/4 ACs, 3/3 mutations killed. web-ui 298 pass, scripts 113 pass, generator --check exit 0. Design: Option A3 (no generator changes; UI + validation only). Push/PR = user decision."
+    },
+    {
+      "id": "admin-portal-enhancements",
+      "slug": "admin-portal-enhancements",
+      "title": "Admin Portal Enhancements — handlers, styling, confirm, progress UX, registry sub-tab",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-enhancements",
+      "spec": ".specs/features/admin-portal-enhancements/spec.md",
+      "design": ".specs/features/admin-portal-enhancements/design.md",
+      "tasks": ".specs/features/admin-portal-enhancements/tasks.md",
+      "created": "2026-08-08",
+      "notes": "VALIDATED PASS 2026-08-08: T1-T9, 9 task commits on spec/admin-portal-enhancements (2 planning + 9 task). Inline execution (sub-agents unavailable). 51 ACs across 3 phases = 9 tasks. Plan Challenge full gate 7 findings all folded (F1-F7). Per-task gates green: model-registry-stream 7, web-ui 220->278, type-check 6/6, test:plugins 135/0. New backend route POST /api/v1/model-registry/regenerate-stream (SSE). Frontend: showBanner, config save/reveal confirm, profiles tab switcher, registry in-memory overlay CRUD + save/clear, regenerate streaming, index progress + poll fallback, CSS design system. Standalone fresh-eyes validation PASS: 51/51 ACs matched, 5/5 discrimination mutations killed (1 fix applied for PRG-02 gap, re-verified). Push/PR = user decision."
+    },
+    {
+      "id": "config-capture-reveal-field-guides",
+      "slug": "config-capture-reveal-field-guides",
+      "title": "Config Tab: Capture Policy indicator, reveal real values, per-section field guides",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-ui-fixes",
+      "spec": ".specs/features/config-capture-reveal-field-guides/spec.md",
+      "tasks": ".specs/features/config-capture-reveal-field-guides/tasks.md",
+      "validation": ".specs/features/config-capture-reveal-field-guides/validation.md",
+      "created": "2026-08-08",
+      "depends_on": [
+        "admin-portal-ui-fixes"
+      ],
+      "notes": "VALIDATED PASS 2026-08-08: T11-T14 (3 ACs CFG-01..03). 3/3 ACs, 3/3 mutations killed. web-ui 307 pass, tools-api config 14 pass, type-check 6/6, lint 0. New GET /api/v1/config/reveal endpoint. Push/PR = user decision."
+    },
+    {
+      "id": "admin-portal-correctness-repair",
+      "slug": "admin-portal-correctness-repair",
+      "title": "Admin Portal Correctness Repair — 8 correctness defects, 2 security issues, 1 dedupe, 5 state drifts from v1.41.0+v1.42.0",
+      "status": "complete",
+      "priority": "P0",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "fix/admin-portal-correctness-repair",
+      "spec": ".specs/features/admin-portal-correctness-repair/spec.md",
+      "design": ".specs/features/admin-portal-correctness-repair/design.md",
+      "tasks": ".specs/features/admin-portal-correctness-repair/tasks.md",
+      "validation": ".specs/features/admin-portal-correctness-repair/validation.md",
+      "created": "2026-08-08",
+      "depends_on": [
+        "admin-portal",
+        "admin-portal-enhancements",
+        "admin-portal-ui-fixes",
+        "registry-help-dropdown-workflow-tiers",
+        "config-capture-reveal-field-guides"
+      ],
+      "notes": "VALIDATED PASS 2026-08-08: T1-T11 + 3 fix-loop commits, 19 commits from 69c0632c (56a409ec spec+design+tasks .. close-out). Two batch workers (W1: T1-T8; W2: T9-T11) plus one fix loop. 39/39 ACs evidenced, 5/5 mutations killed, 0 survivors. Validation ran twice: iteration 1 FAILed (3 mutations survived on APCR-01 — the P0 core had no direct sensor because scripts/__tests__/model-profiles.test.ts was never extended, and APCR-01.10 was computed but never surfaced in the response body); fix loop 1 closed both, re-verify PASS. 5 audit mechanisms amended after re-measurement (A1-A5, see spec.md). Design caught the REG-03 workflow-tier-remove regression deep merge would have caused (null tombstone). Plan Challenge full gate folded 5 more ACs, including APCR-06.6 — the server-side status fix alone left the UI rendering a success banner from exitCode alone. Gates measured on this branch: web-ui 337 pass (0 fail, baseline 320), shared 327 pass (0 fail, baseline 322), tools-api 29 groups all pass, core --unit --filter='vector|postgres|store' 16 groups all pass, type-check 6/6 (--force), oxlint exit 0, test:scripts exit 0, generate:artifacts --check no drift, validate_state.ts exit 1 with 52 errors (all legacy; this feature clean and absent from the failing bracket), check_specs_delivered exit 0. Release derivation: 1.42.0 -> 1.43.0 (minor). Not pushed — push/PR/merge = user decision."
+    },
+    {
+      "id": "admin-portal-ux-overhaul",
+      "slug": "admin-portal-ux-overhaul",
+      "title": "Admin Portal UX Overhaul — per-agent tier overrides, catalog grid restructure, unified Save & Apply, plain-English nomenclature, five-tab polish",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-ux-overhaul",
+      "spec": ".specs/features/admin-portal-ux-overhaul/spec.md",
+      "design": ".specs/features/admin-portal-ux-overhaul/design.md",
+      "tasks": ".specs/features/admin-portal-ux-overhaul/tasks.md",
+      "created": "2026-08-09",
+      "depends_on": [
+        "admin-portal-correctness-repair"
+      ],
+      "notes": "EXECUTE COMPLETE 2026-08-09: T1-T15, 16 commits on spec/admin-portal-ux-overhaul from main @ v1.43.0 (b1831197). 5 batch workers, T1-T15 (3 Phases = 15 Tasks) + this close-out. APUX-01..14 delivered: agentTiers registry section (schema/validate/merge/normalize/count, T1), generator per-agent resolution + stale-agent warn (T2), agents array in GET /api/v1/model-registry (T3), Tool+Tier leading grid columns (T4), Provider/Model split fields + hints (T5), Per-Agent Tier Overrides table (T6), inline dropdown forms replacing prompt()/alert() (T7), unified Save & Apply with restart banner (T8), Scheme A nomenclature incl. extended 4-word negative-vocabulary sensor (overlay/tombstoned/registry/host, T9), Projects Delete + Files header (T10), shared CSS pass (buttons/forms/help-card/code, T11), Config+Checkpoints polish (T12), Dashboard stat cards (T13), plain-English help cards on all five tabs (T14). Gates measured 2026-08-09: web-ui 456 pass/0 fail, model-profiles+generate-subagent-artifacts 124 pass/0 fail, tools-api model-registry+round-trip 23 pass/0 fail, type-check 6/6, oxlint exit 0, generate:artifacts --check no drift, check_specs_delivered exit 0. Validation pending: dispatch verification-agent (author != verifier) to write validation.md. Push/PR authorized (not taken unattended)."
+    },
+    {
+      "slug": "workflow-interaction-policies",
+      "title": "Implementation-workflow interaction policies — worker batch cap max3/ideal2, unlimited ask-first questions, pre-implementation change summary",
+      "status": "in_progress",
+      "workflow": "spec-driven",
+      "branch": "spec/workflow-interaction-policies",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      }
+    },
+    {
+      "id": "claude-marketplace-cache-refresh",
+      "slug": "claude-marketplace-cache-refresh",
+      "title": "Claude marketplace cache refresh — update-on-mismatch + truthful served-version recording",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/installer-restart-embedding",
+      "created": "2026-08-09",
+      "depends_on": [],
+      "design": ".specs/features/claude-marketplace-cache-refresh/design.md",
+      "notes": "VALIDATED PASS 2026-08-09 (validation.md): CMR-01..07, AC-1..7 evidenced; mock-CLI suite 24/24; mutation killed (compare inversion, 8/24 red); plugin update verified against real CLI in isolated temp HOME (spec R1). Accepted risk R2: poisoned records self-heal only at next version bump; this machine handled by file-route runbook (HANDOFF).",
+      "spec": ".specs/features/claude-marketplace-cache-refresh/spec.md",
+      "tasks": ".specs/features/claude-marketplace-cache-refresh/tasks.md"
+    },
+    {
+      "id": "embedding-dims-consistency",
+      "slug": "embedding-dims-consistency",
+      "title": "Embedding dims consistency — align every model/dims surface to qwen3-embedding:4b / 2560",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/installer-restart-embedding",
+      "created": "2026-08-09",
+      "depends_on": [],
+      "design": null,
+      "notes": "VALIDATED PASS 2026-08-09 (validation.md): premise re-measured (2560/4b already default since v1.33.0); EDC-01..08 fixed Dockerfile 8b/4096, install.sh + setup-ollama-wsl.sh 4096, config-cli 768, UI guide text, docs; parity sensor with per-dialect extractors + completeness scan, observed red naming all 5 violations; mutation killed. Design phase skipped: literal alignment + one sensor, no architectural decision.",
+      "spec": ".specs/features/embedding-dims-consistency/spec.md",
+      "tasks": null
+    },
+    {
+      "id": "admin-portal-restart",
+      "slug": "admin-portal-restart",
+      "title": "Admin portal restart — hybrid-mode restart endpoint + button + diff-based restart proposal",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/installer-restart-embedding",
+      "created": "2026-08-09",
+      "depends_on": [],
+      "design": ".specs/features/admin-portal-restart/design.md",
+      "notes": "VALIDATED PASS 2026-08-09 (validation.md): APR-01..09 + plan-challenge R1-R4; hybrid mode locked by user decision (supervised exit / unsupervised self-respawn / dev-watch 409); real-process e2e proved flush-before-stop and caught app.stop() node-adapter defect; diff-based changedRestartSections; seam guard + negative MCP parity assertion; 2 mutations killed. Residual (accepted): respawn-rebind timing and signal-path drain proven at seam level only.",
+      "spec": ".specs/features/admin-portal-restart/spec.md",
+      "tasks": ".specs/features/admin-portal-restart/tasks.md"
+    },
+    {
+      "id": "admin-portal-ops-suite",
+      "slug": "admin-portal-ops-suite",
+      "title": "Admin portal operations suite — bulk memory delete, scheduler config section, Logs tab (live tail + range + export), Claude marketplace profile parity",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "spec/admin-portal-ops-suite",
+      "created": "2026-08-09",
+      "depends_on": [
+        "model-profile-switching",
+        "admin-portal-restart"
+      ],
+      "design": ".specs/features/admin-portal-ops-suite/design.md",
+      "notes": "VALIDATED PASS WITH FINDINGS 2026-08-10 (validation.md), verifier independent of all 7 phase builders. 33/33 requirement IDs SATISFIED after two post-verification repairs; 7/7 mutations killed across guard-logic, wire-protocol content-type, async-stream teardown, caching-contract, precedence-ordering, route-scope and UI-disclosure classes; 7/7 pre-mortem findings conformed. 22 commits (T1-T20 + 2 repairs). AD-020 supersedes the marketplace half of model-profile-switching's F1 refusal for claude only; codex keeps it. The verifier caught two gaps the green suites could not: MBD-06/07's promised route assertions were never written (closed, b47b8de4) and pre-mortem #6's tombstone disclosure was recorded as applied but never coded (closed, cfe09133). Residual (accepted, in HANDOFF): LOG-14/15's DOM-append path and abort-discrimination are proven at data level with a FakeAbortController, not DOM/platform level; the project-select-closes-open-form edge case has no dedicated test. UNVERIFIABLE FROM THIS REPO: Claude's plugin-cache refresh cadence — a mandatory post-restart acceptance step is required before the CPP slice is end-to-end validated.",
+      "spec": ".specs/features/admin-portal-ops-suite/spec.md",
+      "tasks": ".specs/features/admin-portal-ops-suite/tasks.md"
+    },
+    {
+      "id": "designer-agent",
+      "slug": "designer-agent",
+      "title": "Designer sub-agent (18th specialist) + ADR/refactor Plan Challenge Gate",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "feat/designer-agent",
+      "created": "2026-08-11",
+      "depends_on": [],
+      "spec": ".specs/features/designer-agent/spec.md",
+      "design": ".specs/features/designer-agent/design.md",
+      "tasks": ".specs/features/designer-agent/tasks.md",
+      "notes": "VALIDATED PASS 2026-08-11 (validation.md), independently verified by a massa-ai-verification-agent on a second pass. 13/13 requirement IDs satisfied. Gates: lint 0 errors, type-check 6/6, generate --check no drift, test:scripts 1780 pass/0 fail, test:plugins 135 pass/0 fail, opencode agents-install 7/0. THE INDEPENDENT PASS FOUND A REAL GAP THE AUTHOR MISSED: the author ran discrimination mutations against ADRG-01/02 only and none against DSG-01..DSG-11, and two mutations survived every suite -- removing a whole massa-ai-designer dispatch block from one of the 7 workflows, and rewording one block's trigger line so the 7 disagree (that line is what makes the dispatch mandatory-on-condition, so drift silently makes it advisory). design.md had named the drift risk and closed it with a one-time manual grep; a grep run once cannot fail on the next edit. Closed in T15 as group 12 of workflow-harness-contract.test.ts (both directions + byte-identical trigger text); both survivors now RED(2)/RED(1), negative control RED(1), restores SHA-verified. The verifier also upgraded DSG-08 from the author's 'partial method' to fully SATISFIED by invoking the real Elysia route in-process (200, agents.length 18, designer/standard), and corrected the author's commit count (13 in f8427283..e51d3297, not 11). Residual: mobile-figma-audit is the first findings-only workflow dispatching a write-permitted charter (spec A8, accepted); the designer charter has no live screen run; the verifier's Low finding about concurrent test:scripts runs on a loaded host is declined as scope creep and left for a deliberate CONTRIBUTING.md follow-up."
+    }
+  ],
+  "active_feature": null
 }

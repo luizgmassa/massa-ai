@@ -202,7 +202,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     ).toBe(false);
   });
 
-  // ── T5: 17 subagent TOML agents (CDX-01,02,05,06,07 + DOC-01) ──────────────
+  // ── T5: 18 subagent TOML agents (CDX-01,02,05,06,07 + DOC-01) ──────────────
   const SPECIALIST_NAMES = [
     "investigator",
     "planner",
@@ -221,13 +221,14 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     "navigator",
     "meta-judge",
     "judge",
+    "designer",
   ];
 
-  test("CDX-01/DOC-01: user-scope install writes 17 TOML agents to ~/.codex/agents/ + prints summary", async () => {
+  test("CDX-01/DOC-01: user-scope install writes 18 TOML agents to ~/.codex/agents/ + prints summary", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    // 17 TOML files at ~/.codex/agents/massa-ai-<name>.toml (OUTSIDE plugin dir)
+    // 18 TOML files at ~/.codex/agents/massa-ai-<name>.toml (OUTSIDE plugin dir)
     const agentsDir = path.join(tmp, ".codex/agents");
     for (const name of SPECIALIST_NAMES) {
       expect(
@@ -237,8 +238,8 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     // Agents dir is OUTSIDE the plugin dir
     expect(agentsDir).not.toContain("plugins");
 
-    // Install output mentions the 17 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("17 subagent specialists");
+    // Install output mentions the 18 subagent specialists (DOC-01)
+    expect(res.stdout).toContain("18 subagent specialists");
   });
 
   test("CDX-07: each TOML has # massa-ai-owned top comment", async () => {

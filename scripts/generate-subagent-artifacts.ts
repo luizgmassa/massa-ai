@@ -6,7 +6,7 @@
  * apps/{claude,codex,cursor,opencode}-plugin/agents/. Outputs are checked into
  * git so the plugins ship without a runtime build step.
  *
- *   bun run scripts/generate-subagent-artifacts.ts        # emit 68 files (17 x 4 hosts)
+ *   bun run scripts/generate-subagent-artifacts.ts        # emit 72 files (18 x 4 hosts)
  *   bun run scripts/generate-subagent-artifacts.ts --check # drift gate: diff vs checked-in
  *
  * Model + effort + permission are PINNED per host (spec, NOT advisory). A parity
@@ -89,20 +89,22 @@ const SPECIALIST_NAMES = [
   "navigator",
   "meta-judge",
   "judge",
+  "designer",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
 // ── Write-permission set (spec AC CLA-03 / design.md) ───────────────────────
-// These four charters declare `permission: write` (test-engineer,
-// documentation-agent, and judge are scoped writers: test files / doc files /
-// the agent's own judge-N report only, with a disjoint write set). Charter
-// frontmatter and this set must agree —
+// These five charters declare `permission: write` (test-engineer,
+// documentation-agent, judge, and designer are scoped writers: test files /
+// doc files / the agent's own judge-N report / UI-layer files only, each with
+// a disjoint write set). Charter frontmatter and this set must agree —
 // scripts/__tests__/skills-harness-integrity.test.ts enforces that.
 const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
   "builder",
   "test-engineer",
   "documentation-agent",
   "judge",
+  "designer",
 ]);
 
 // ── Model + effort resolution ───────────────────────────────────────────────

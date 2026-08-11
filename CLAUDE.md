@@ -323,7 +323,7 @@ variable; copy it to `.env` and edit there.
 ### Agent-harness surface
 
 `skills/` holds the repo-local skills (`massa-ai` router, `persona-router`, `agents/`);
-`skills/AGENTS.md` is the registry for the 17 sub-agent specialists **and** the single
+`skills/AGENTS.md` is the registry for the 18 sub-agent specialists **and** the single
 source of the Persona Router / Plan Challenge / Conversation Feedback policies (the
 `<!-- massa-ai:bootstrap -->` block the installer copies to `<host>/AGENTS.md`). MCP tool
 contracts and the Synapse lifecycle live in `skills/massa-ai/references/mcp-tools.md` and

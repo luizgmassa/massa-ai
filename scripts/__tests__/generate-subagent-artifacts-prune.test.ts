@@ -54,9 +54,9 @@ describe("emitAll — prune-before-emit (T2, UGB-04)", () => {
       await emitAll(dirs, {}, ["claude"]);
 
       await expect(fs.access(staleFile)).rejects.toThrow();
-      // The real 17 charters are still there — prune did not clobber emit.
+      // The real 18 charters are still there — prune did not clobber emit.
       const files = (await fs.readdir(dirs.claude)).filter((f) => f.endsWith(".md"));
-      expect(files.length).toBe(17);
+      expect(files.length).toBe(18);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }

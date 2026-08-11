@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A new `designer` sub-agent — the 18th specialist — owns user-facing screens.**
+  None of the 17 existing charters owned screen implementation or conformance
+  against a design source, so screen work was done inline or by a generic
+  `builder` with no charter-level obligation to read the design. `designer`
+  verifies and implements screens, reading Figma through MCP when a link or node
+  id is supplied, and reports a missing or unreachable design source as a skipped
+  sensor rather than passing silently. Tier `standard`; `permission: write`
+  narrowed by its own Restrictions to the UI layer — screen, view, component,
+  layout, style, theme and design-token files — with the same disjoint-write-set
+  constraint as `builder`. Production logic needed to make a screen correct is
+  reported as a finding, not written.
+
+  It ships to all four hosts (Claude, Codex, Cursor, OpenCode) at full parity:
+  72 generated agent files instead of 68, 396 profile variants instead of 374,
+  and every installer, roster gate, doc and marketplace description moved from 17
+  to 18. The admin portal needed no change — it enumerates `skills/agents/`
+  charters at request time — and that was confirmed by executing the loader the
+  route uses, not by reading its source.
+
+  Seven workflows now dispatch it, and the dispatch is **mandatory once the task
+  creates or modifies a screen**: `design`, `mobile-figma-audit`,
+  `mobile-figma-fix`, `feature`, `general`, `spec-driven` and
+  `implementation-fix`. That condition is the whole gate — on a task with no
+  screen surface it does not fire at all, which is what lets the three
+  general-purpose workflows carry it without firing it on every task. It is
+  recorded as a third standing policy exception beside Plan Challenge and
+  Independent Verification. `mobile-figma-audit` was also the only `*-audit`
+  workflow with no agent dispatch of any kind; its packet passes `read-only`,
+  since that workflow is findings-only.
+
+### Fixed
+
+- **`adr` and `refactor` were named in the Plan Challenge Policy's full-gate set
+  but ran no gate.** `skills/AGENTS.md` lists six workflows that take the full
+  gate. `rfc` and `tdd` each carried an explicit step; `adr` and `refactor`
+  carried none — so the gate reached them only if the orchestrator recalled the
+  bootstrap list unaided, which is exactly what every other workflow-side
+  contract in this repo is written inline to avoid. Both now run it: `adr` before
+  the record is saved, since a decision a challenge invalidates is not final and
+  belongs in `rfc`.
+
+  The recurrence guard **parses that workflow list out of the policy sentence**
+  instead of hardcoding it. A hardcoded copy would need the same edit the
+  workflow needs, from the same person, in the same commit, so it could not catch
+  the next omission — and the parsing version found `refactor` on its first run.
+  Its own population check fails if the sentence is reworded into an empty or
+  partial parse, so it cannot pass vacuously.
+
 ## [1.49.0] - 2026-08-11
 
 ### Changed

@@ -337,7 +337,7 @@ above** and several contain traps that will bite you. Read the named sources.
 | **Prisma schema + 24 migrations** | `packages/core/prisma/` | The entire persistence schema. Excluded from the graph. |
 | **Release chain** | `CLAUDE.md` § Releasing, `CONTRIBUTING.md` | Fully automatic and full of load-bearing traps — never write the skip-ci marker literally in a commit body; cross-package `@massa-ai/*` deps are `workspace:*` or the exact root version; the bump commit needs a deploy key. |
 | **CHANGELOG gate** | `CONTRIBUTING.md` § CHANGELOG authoring | A PR that doesn't touch `CHANGELOG.md` **fails CI** without the `no-changelog` label. |
-| **Agent-harness surface** | `skills/AGENTS.md`, `CLAUDE.md` | 17 sub-agent specialists, 4 plugin hosts, generated artifacts with parity tests. `apps/*-plugin/skills/` are byte-identical generated copies — never edit them directly, edit `skills/` and regenerate. |
+| **Agent-harness surface** | `skills/AGENTS.md`, `CLAUDE.md` | 18 sub-agent specialists, 4 plugin hosts, generated artifacts with parity tests. `apps/*-plugin/skills/` are byte-identical generated copies — never edit them directly, edit `skills/` and regenerate. |
 | **Installers** | `scripts/install-{skills,agents,harness}.sh` | Bash, not TypeScript. `install-agents.sh` is the **only** writer of host MCP config. |
 | **Build/CI config** | `turbo.json`, `.github/workflows/` | Any env var a test reads must be in `turbo.json` → `tasks.test.passThroughEnv` or it arrives `undefined` under `bun run test`. |
 | **`.specs/`** | `.specs/project/STATE.md`, `HANDOFF.md` | The source of truth for in-flight work. |

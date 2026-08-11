@@ -107,7 +107,7 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     expect(block).not.toContain("UAS_");
   });
 
-  test("sub-agent registry preserved (17 agents)", async () => {
+  test("sub-agent registry preserved (18 agents)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "AGENTS.md"));
     expect(content).toContain("investigator");
     expect(content).toContain("planner");
@@ -732,10 +732,10 @@ describe("agents harness routing", () => {
     "architecture-specialist", "test-engineer", "documentation-agent",
     "audit-specialist", "mobile-specialist",
     "plan-critic", "furps-analyst", "navigator",
-    "meta-judge", "judge",
+    "meta-judge", "judge", "designer",
   ];
 
-  test("skills/agents/ exists with one subdir per agent (17)", async () => {
+  test("skills/agents/ exists with one subdir per agent (18)", async () => {
     expect(await fileExists(AGENTS_SUBDIR)).toBe(true);
     const entries = await fs.readdir(AGENTS_SUBDIR, { withFileTypes: true });
     const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();

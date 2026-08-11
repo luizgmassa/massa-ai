@@ -275,7 +275,7 @@ bash apps/cursor-plugin/install.sh --uninstall
 
 ### OpenCode plugin (`apps/opencode-plugin/`)
 
-**What it bundles:** hooks only (AD-017: plugins deliver, MCP serves tools, hooks observe) — 6 in-process lifecycle handlers and 17 subagent specialists. It registers zero in-process tools; the massa-ai MCP server (54 tools) is registered alongside it via `scripts/install-agents.sh --agent opencode`, same as every other host. It is published as `@massa-ai/opencode-plugin`. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai` and `persona-router` skills plus the 17 agent charters, so a registry install needs no repository checkout.
+**What it bundles:** hooks only (AD-017: plugins deliver, MCP serves tools, hooks observe) — 6 in-process lifecycle handlers and 18 subagent specialists. It registers zero in-process tools; the massa-ai MCP server (54 tools) is registered alongside it via `scripts/install-agents.sh --agent opencode`, same as every other host. It is published as `@massa-ai/opencode-plugin`. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai` and `persona-router` skills plus the 18 agent charters, so a registry install needs no repository checkout.
 
 **Hook events (in-process, 6 lifecycle handlers):** `session.created`, `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`, `dispose` — all registered in-process by the plugin. No external hooks file needed.
 
@@ -363,11 +363,11 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 ---
 
-## Subagent Skills (17 Specialists)
+## Subagent Skills (18 Specialists)
 
-**What:** massa-ai defines 17 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
+**What:** massa-ai defines 18 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
 
-**The 17 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, plan-critic, furps-analyst, navigator, meta-judge, judge.
+**The 18 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, designer, plan-critic, furps-analyst, navigator, meta-judge, judge.
 
 Workflows dispatch these agents under their **host-registered** names, prefixed `massa-ai-` (for example `massa-ai-investigator`). The bare charter name is the registry key, not the dispatch name.
 
@@ -382,7 +382,7 @@ Workflows dispatch these agents under their **host-registered** names, prefixed 
 | Cursor | `apps/cursor-plugin/agents/massa-ai-*.md` → bundled in plugin `agents/` dir | `.md` (YAML frontmatter: `name`, `description`, `model`, `readonly` — Cursor's entire documented schema; **no** `tools`, **no** `reasoningEffort`) | Name prefix `massa-ai-` (removed with plugin dir) |
 | OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (shipped IN the npm package, installed outside the plugin dir) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission` — **no** `name`, **no** `metadata`) | `<!-- massa-ai-owned: true -->` as the first body line |
 
-> Codex and OpenCode agents are *installed* outside the plugin dir because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. They are still **shipped inside** their npm package — OpenCode's `files` declares `agents/*.md`, and until the package-contents gate landed those 17 charters were silently missing from every published tarball, because the publish job has no `actions/checkout` and the build artifact never uploaded `agents/`. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
+> Codex and OpenCode agents are *installed* outside the plugin dir because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. They are still **shipped inside** their npm package — OpenCode's `files` declares `agents/*.md`, and until the package-contents gate landed those 18 charters were silently missing from every published tarball, because the publish job has no `actions/checkout` and the build artifact never uploaded `agents/`. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
 
 ### Model pinning (one registry, resolved at build time)
 
@@ -443,6 +443,7 @@ the charters and is the only role-keyed model table in this file.
 | documentation-agent | light |
 | audit-specialist | deep |
 | mobile-specialist | deep |
+| designer | standard |
 | plan-critic | deep |
 | furps-analyst | deep |
 | navigator | deep |
@@ -481,7 +482,7 @@ there is no `tools` allowlist. OpenCode forwards **unrecognized frontmatter keys
 provider as model options**, which is why `name` and `metadata` had to leave OpenCode's
 frontmatter. The ownership marker inside `metadata` was not deleted, it **moved** to a body
 comment: `massa-ai-config agents uninstall` scopes by that literal substring, so removing it
-would have matched zero files and orphaned 17 installed agents.
+would have matched zero files and orphaned 18 installed agents.
 
 Every OpenCode agent also sets `mode: all`, which is not a model decision but is easy to
 mistake for one. OpenCode's Tab switcher lists `primary` and `all` agents only, so the earlier
@@ -523,7 +524,7 @@ always or pass vacuously.
 
 ### Permission mapping (read-only vs write)
 
-Write-permitted agents: `builder`, `test-engineer`, `documentation-agent` (the last two are scoped writers — test files / doc files only, with a disjoint write set). All others are read-only. Each charter's `metadata.permission` must agree with the shipped artifact; `scripts/__tests__/skills-harness-integrity.test.ts` enforces that.
+Write-permitted agents: `builder`, `test-engineer`, `documentation-agent`, `judge`, `designer` (all but `builder` are scoped writers — test files / doc files / the agent's own judge-N report / UI-layer files only, each with a disjoint write set). All others are read-only. Each charter's `metadata.permission` must agree with the shipped artifact; `scripts/__tests__/skills-harness-integrity.test.ts` enforces that.
 
 | Host | Read-only | Write |
 | --- | --- | --- |
@@ -536,10 +537,10 @@ Write-permitted agents: `builder`, `test-engineer`, `documentation-agent` (the l
 
 ### Generator + parity contract
 
-- **Generator:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` (17 charters) plus `skills/model-profiles.json`, and emits 68 files (17 × 4 hosts) into `apps/*/agents/`. Run via `bun run scripts/generate-subagent-artifacts.ts`, optionally `--profile=<name>`. Outputs checked into git.
+- **Generator:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` (18 charters) plus `skills/model-profiles.json`, and emits 72 files (18 × 4 hosts) into `apps/*/agents/`. Run via `bun run scripts/generate-subagent-artifacts.ts`, optionally `--profile=<name>`. Outputs checked into git.
 - **Resolver:** `scripts/lib/model-profiles.ts` loads and validates the registry, selects the profile, and resolves `tier → {model, effort}`. It reports **every** registry violation in one throw, and has no dependency outside `node:fs`/`node:path` so it runs in the deterministic gate. Covered by `scripts/__tests__/model-profiles.test.ts`.
 - **Drift gate:** `bun run scripts/generate-subagent-artifacts.ts --check` emits to a temp dir and diffs against checked-in files. Exit non-zero on drift.
-- **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts registry-derived model/effort/permission pinning, name-collision-free, exact 17 per host, per-host allowed-key conformance with the defining doc URL cited, Codex TOML round-trip + owned marker, the OpenCode body marker, and a frozen-baseline diff against `origin/main`'s artifacts that must contain exactly the pin changes the spec authorises. It also carries the doc-drift test for this file's role→tier table.
+- **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts registry-derived model/effort/permission pinning, name-collision-free, exact 18 per host, per-host allowed-key conformance with the defining doc URL cited, Codex TOML round-trip + owned marker, the OpenCode body marker, and a frozen-baseline diff against `origin/main`'s artifacts that must contain exactly the pin changes the spec authorises. It also carries the doc-drift test for this file's role→tier table.
 - **Harness integrity:** `scripts/__tests__/skills-harness-integrity.test.ts` asserts every workflow `Dispatch:` block names an agent that exists in all four host dirs, every role in `references/agent-orchestration.md` has a real charter, and charter permission matches the shipped artifact.
 
 **Spec:** `.specs/features/subagent-skills-plugin-parity/` (the specialists and the four host
@@ -1294,7 +1295,7 @@ The repo ships repo-local skills plus a unified TypeScript installer that symlin
 
 1. **Bootstrap contract** (top, between `<!-- massa-ai:bootstrap:start -->` and `<!-- massa-ai:bootstrap:end -->` markers): the coding session startup contract that activates the skill stack — `caveman full` → `coding-guidelines` → `massa-ai` → `persona-router`. Includes the persona router policy, plan challenge policy, conversation feedback policy, RTK rules, indexing/context hygiene, and dedupe/lazy-load guardrails.
 
-2. **Sub-agent registry** (bottom): the 17 reusable sub-agent specialist registry (investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, plan-critic, furps-analyst, navigator, meta-judge, judge) with capability packet and output contract definitions.
+2. **Sub-agent registry** (bottom): the 18 reusable sub-agent specialist registry (investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, designer, plan-critic, furps-analyst, navigator, meta-judge, judge) with capability packet and output contract definitions.
 
 The installer writes the bootstrap block into each tool's `AGENTS.md` using the same markers, replacing any existing block. The sub-agent registry is not written — it is consumed by workflows that dispatch agents.
 
@@ -1456,7 +1457,7 @@ Ported from the old repo's Python test suite to TypeScript/bun test:
 | `scripts/tests/test-install-agents-claude-hooks.sh` | 15 | Plugin hooks, permissions, and user keys survive an MCP write into the shared `settings.json` |
 | `scripts/tests/test-install-harness-cli.sh` | 25 | Step selection, ordering, verbatim argv forwarding to the sub-installers, exit-code propagation |
 | `scripts/tests/test-mcp-single-writer.sh` | 36 | Regression guard: no plugin ships or copies an MCP file, all three delegate, exactly one registration after (re)install |
-| `scripts/__tests__/subagent-parity.test.ts` | 17 | Drift gate, exact-17-per-host, name-collision, model+effort pinning (Claude/Codex/Cursor/OpenCode), permission boundary, Codex TOML round-trip+marker, OpenCode permission+marker, FEATURES.md table parity |
+| `scripts/__tests__/subagent-parity.test.ts` | 18 | Drift gate, exact-18-per-host, name-collision, model+effort pinning (Claude/Codex/Cursor/OpenCode), permission boundary, Codex TOML round-trip+marker, OpenCode permission+marker, FEATURES.md table parity |
 
 Run everything (TypeScript suites plus every `scripts/tests/*.sh` suite) with `bun run test:scripts` — the same command CI runs.
 

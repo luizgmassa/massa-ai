@@ -45,7 +45,7 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
  * edit that needs a reason in the commit message — that friction is the point.
  */
 // 331 since ALLWF-03 (tlc-330-harness-update): pinning the 8 remaining
-// read-only charters to `model_tier: deep` (14/17 now deep) made their
+// read-only charters to `model_tier: deep` (14/18 now deep) made their
 // frontmatter runs identical across files — +18 excess of mandated
 // uniformity, not prose drift. Measured differentially: main 313 → branch
 // 331, every new block is charter frontmatter around the shared tier line.
@@ -67,7 +67,28 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
 // runs x5 and x2 copies, one 17-line run, one 8-line `permissions:
 // read-only` run) — attribution printed block-by-block during the merge of
 // v1.30.0, recorded in the raising commit.
-const EXCESS_CEILING = 483;
+//
+// 498 since DSG-05/06 (designer-agent): the `massa-ai-designer` dispatch block
+// instantiated in 7 screen-capable workflows must be structurally identical per
+// the dispatch contract — skills-harness-integrity parses these blocks, and the
+// uniform trigger sentence is what stops "mandatory" reading as advisory in one
+// file — so its shared runs are mandated uniformity, not prose drift. Measured
+// differentially against origin/main @ f8427283 with CONTENT-HASH attribution
+// (a JSON set-diff reports 43 of 43 branch blocks "new", because every block
+// record embeds absolute paths and the base tree is a temp checkout): base
+// excess 478 → branch 498, delta +20. Exactly 5 duplicated runs are new and 0
+// were removed; all 5 are the designer template (13L x2 across feature.md +
+// spec-driven.md, 12L x2 across implementation-fix.md + mobile-figma-fix.md,
+// and the general.md / design.md / mobile-figma-audit.md instances).
+//
+// Two figures in that paragraph deliberately disagree: the per-block
+// Σ(occurrences−1)×length derivation gives 25, the tree-level delta is 20.
+// Runs overlap, so the rows do not sum to the total — the tree-level 478 → 498
+// is the authoritative measurement and the row breakdown is attribution only.
+//
+// The base measured 478, five under the previous 483 ceiling. This raise
+// consumes that pre-existing headroom rather than pretending it was not there.
+const EXCESS_CEILING = 498;
 const CEILING_WINDOW = 4;
 
 let dir: string;

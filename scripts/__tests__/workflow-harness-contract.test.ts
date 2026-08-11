@@ -395,9 +395,9 @@ describe("invariants: the references still encode the decisions that were made",
 
 // ── 6. Roster count ───────────────────────────────────────────────────────
 
-describe("roster: nothing advertises a specialist count other than 17", () => {
+describe("roster: nothing advertises a specialist count other than 18", () => {
   /** The roster size every current-tense claim must agree with. */
-  const ROSTER = 17;
+  const ROSTER = 18;
 
   /**
    * A count-shaped claim, matched within ONE line.
@@ -431,6 +431,16 @@ describe("roster: nothing advertises a specialist count other than 17", () => {
     "made the 12 specialists unselectable by hand",
     // The frozen parity baseline predates judge/meta-judge, by construction.
     "only ever names the 15 specialists that existed there",
+    // scripts/__tests__/fixtures/pyts-golden/lessons.json and
+    // lessons-store-snapshot.json are FROZEN inputs: pyts-golden.test.ts
+    // imports them (`with { type: "json" }` / `{ type: "text" }`) and writes
+    // them into a temp root, so their text IS the fixture and editing it
+    // breaks the golden comparison. The sentences narrate lesson L-007 -- a
+    // past 15 -> 17 roster change that went red in CI -- and are correct as
+    // written. Two substrings, because the store keeps a normalized `key`
+    // beside the prose `text`. (designer-agent, D-8.)
+    "A registry-count change (15→17 specialists)",
+    "a registry count change 15 17 specialists",
   ];
 
   const SELF = "scripts/__tests__/workflow-harness-contract.test.ts";
@@ -494,19 +504,19 @@ describe("roster: nothing advertises a specialist count other than 17", () => {
 
   test("a correct count in any spelling passes", () => {
     for (const text of [
-      "17 specialists",
-      "17 subagent specialists",
-      "17 sub-agent specialists",
-      "17 reusable sub-agent specialists",
+      "18 specialists",
+      "18 subagent specialists",
+      "18 sub-agent specialists",
+      "18 reusable sub-agent specialists",
     ]) {
       expect(COUNT_CLAIM.exec(text)![1]).toBe(String(ROSTER));
     }
   });
 
-  test("the shell installers advertise 17", async () => {
+  test("the shell installers advertise 18", async () => {
     for (const rel of ["install.sh", "scripts/install-agents.sh"]) {
       const body = await fs.readFile(path.join(REPO_ROOT, rel), "utf8");
-      expect(body).toContain("17 subagent specialists");
+      expect(body).toContain("18 subagent specialists");
     }
   });
 });
@@ -655,5 +665,145 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
     expect(reuseClause).toBeGreaterThan(specifyStep);
     expect(designDecision).toBeGreaterThan(reuseClause);
     expect(tasksDecision).toBeGreaterThan(designDecision);
+  });
+});
+
+// ── 11. Plan Challenge Gate coverage ──────────────────────────────────────
+//
+// .specs/features/designer-agent/ — ADRG-01, ADRG-02.
+//
+// `skills/AGENTS.md` names the workflows that take the full Plan Challenge
+// Gate. `workflows/adr.md` was named there and carried no gate step at all,
+// and `workflows/refactor.md` carried none either — the policy reached both
+// only if the orchestrator recalled the bootstrap list unaided. Every other
+// workflow-side contract in this repo is inline in its own file for exactly
+// that reason (references/agent-orchestration.md: "Every dispatch block in a
+// workflow carries the prefixed name inline so dispatch never depends on this
+// file being loaded").
+//
+// The list is PARSED from the policy sentence, never hardcoded here. A
+// hardcoded copy would need the same edit the workflow needs, by the same
+// person, in the same commit — so it could not catch the next omission. The
+// policy line is the population.
+
+describe("plan challenge: every full-gate workflow carries the gate step", () => {
+  const REGISTRY = path.join(REPO_ROOT, "skills", "AGENTS.md");
+  const MARKER = "Load full `workflows/the-fool.md` when the workflow is";
+
+  /**
+   * Backtick-quoted workflow names from the policy sentence, up to its first
+   * `;` (after which the sentence lists risk domains, not workflows).
+   * Newline-tolerant: the sentence wraps across lines in the source.
+   */
+  async function fullGateWorkflows(): Promise<string[]> {
+    const body = await fs.readFile(REGISTRY, "utf8");
+    const start = body.indexOf(MARKER);
+    expect(start, `policy sentence not found in skills/AGENTS.md — marker: ${MARKER}`).toBeGreaterThan(-1);
+    const rest = body.slice(start + MARKER.length);
+    const clause = rest.slice(0, rest.indexOf(";")).replace(/\s+/g, " ");
+    return [...clause.matchAll(/`([a-z-]+)`/g)].map((m) => m[1]!);
+  }
+
+  test("the parsed population is real, not a vacuous empty list", async () => {
+    // Guard the guard. A reworded policy sentence that yields [] or a partial
+    // parse would make every assertion below pass by matching nothing.
+    const names = await fullGateWorkflows();
+    expect(names.length).toBeGreaterThanOrEqual(6);
+    expect(names).toContain("adr");
+    expect(names).toContain("refactor");
+  });
+
+  test("every named workflow exists on disk", async () => {
+    const names = await fullGateWorkflows();
+    const onDisk = new Set(await listWorkflows());
+    const missing = names.filter((n) => !onDisk.has(`${n}.md`));
+    expect(missing).toEqual([]);
+  });
+
+  test("every named workflow runs the Plan Challenge Gate", async () => {
+    const names = await fullGateWorkflows();
+    const without: string[] = [];
+    for (const name of names) {
+      const body = await readWorkflow(`${name}.md`);
+      if (!/Plan Challenge (lite )?[Gg]ate/.test(body)) without.push(`${name}.md`);
+    }
+    expect(without).toEqual([]);
+  });
+});
+
+// ── 12. Designer dispatch: presence and wording uniformity ────────────────
+//
+// .specs/features/designer-agent/ — DSG-05, DSG-06.
+//
+// Added after independent verification: two mutations survived every gate in
+// the suite. Removing the whole `massa-ai-designer` block from one of the seven
+// workflows was caught by NOTHING (the duplication ceiling shifted as a side
+// effect of the line-window moving, which is not a check), and rewording one
+// block's `trigger:` so the seven disagree was caught by nothing at all.
+//
+// The design named that drift risk and closed it with a one-time manual grep.
+// A grep run once is not a sensor — it cannot fail on the edit that comes after
+// it. This group is that grep, committed.
+//
+// Both directions, in the shape group 4 already uses for IMPLEMENTATION_WORKFLOWS:
+// exactly these seven carry the block, and the trigger line is byte-identical
+// across all of them. Uniformity is load-bearing, not cosmetic — the trigger
+// sentence is what states the dispatch is mandatory-on-condition, so one file
+// drifting to weaker wording silently makes it advisory there.
+
+describe("designer dispatch: exactly 7 workflows, one wording", () => {
+  /**
+   * The screen-capable workflows (spec A1). Hardcoded deliberately, unlike
+   * ADRG-02's parsed list: there is no policy sentence enumerating these, and
+   * the point of the check is that the set cannot change silently. Adding an
+   * eighth screen workflow SHOULD require editing this list.
+   */
+  const SCREEN_WORKFLOWS = [
+    "design.md",
+    "feature.md",
+    "general.md",
+    "implementation/implementation-fix.md",
+    "mobile-figma/mobile-figma-audit.md",
+    "mobile-figma/mobile-figma-fix.md",
+    "spec-driven.md",
+  ] as const;
+
+  const DISPATCH_HEADER = "> **Dispatch: `massa-ai-designer`**";
+  const TRIGGER_PREFIX = "> - trigger: the task creates or modifies a user-facing screen";
+
+  test("each of the 7 carries the designer dispatch block", async () => {
+    const without: string[] = [];
+    for (const rel of SCREEN_WORKFLOWS) {
+      const body = await readWorkflow(rel);
+      if (!body.includes(DISPATCH_HEADER)) without.push(rel);
+    }
+    expect(without).toEqual([]);
+  });
+
+  test("no OTHER workflow carries it", async () => {
+    // Negative control: without this, adding the block everywhere would pass.
+    const extra: string[] = [];
+    for (const rel of await listWorkflows()) {
+      if ((SCREEN_WORKFLOWS as readonly string[]).includes(rel)) continue;
+      const body = await readWorkflow(rel);
+      if (body.includes(DISPATCH_HEADER)) extra.push(rel);
+    }
+    expect(extra).toEqual([]);
+  });
+
+  test("the trigger line is byte-identical across all 7", async () => {
+    const seen = new Map<string, string[]>();
+    for (const rel of SCREEN_WORKFLOWS) {
+      const line = (await readWorkflow(rel))
+        .split(/\r?\n/)
+        .find((l) => l.startsWith(TRIGGER_PREFIX));
+      // A missing trigger line is its own failure, distinct from a divergent one.
+      expect(line, `${rel} has no designer trigger line`).toBeDefined();
+      const key = line!.trim();
+      seen.set(key, [...(seen.get(key) ?? []), rel]);
+    }
+    // Guard the guard: 7 files must have been read, not 0.
+    expect([...seen.values()].flat().length).toBe(SCREEN_WORKFLOWS.length);
+    expect([...seen.keys()].length, `divergent trigger wording: ${JSON.stringify([...seen.entries()], null, 1)}`).toBe(1);
   });
 });

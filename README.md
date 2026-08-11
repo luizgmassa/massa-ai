@@ -99,7 +99,7 @@ the repo's `dist/index.js` (re-run the installer after `bun run build` to
 refresh it — a symlink here used to go dead whenever the gitignored `dist/`
 vanished, and OpenCode skips an unresolvable local plugin silently), adds
 `"./plugins/massa-ai/index.js"` to the `plugin` array of `opencode.json`, and
-symlinks the 17 specialist agents into `~/.config/opencode/agents/`. The plugin
+symlinks the 18 specialist agents into `~/.config/opencode/agents/`. The plugin
 is hooks-only (AD-017: plugins deliver, MCP serves tools, hooks observe) — it
 registers zero in-process tools, so the installer delegates MCP registration to
 `scripts/install-agents.sh --agent opencode`, giving you all 54 MCP tools
@@ -175,10 +175,10 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 
 | Tool | Install command | Events | Bundles | Trust step? |
 |------|----------------|--------|---------|-------------|
-| **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + 17 subagent specialists + hooks into `settings.json` | No |
-| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 17 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + MCP into `~/.codex/config.toml` | Yes — run `/hooks` in Codex |
-| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 17 subagent specialists | No |
-| **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | MCP into `opencode.json`/`opencode.jsonc` (54 tools) + lifecycle handlers + 17 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
+| **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + 18 subagent specialists + hooks into `settings.json` | No |
+| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 18 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + MCP into `~/.codex/config.toml` | Yes — run `/hooks` in Codex |
+| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 18 subagent specialists | No |
+| **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | MCP into `opencode.json`/`opencode.jsonc` (54 tools) + lifecycle handlers + 18 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
 Each plugin also ships generated slash commands — one per massa-ai workflow (40 today)
 (`/massa-ai:debug`, `$debug`, etc., naming varies by host) — alongside the 6
@@ -280,18 +280,18 @@ plugin does not remove the MCP entry — plugin lifecycle and MCP tool-surface
 lifecycle are independent; remove the entry with
 `bash scripts/install-agents.sh --agent opencode --uninstall` if wanted.
 
-**17 subagent specialists:** all four plugins ship the 17 massa-ai
+**18 subagent specialists:** all four plugins ship the 18 massa-ai
 sub-agent specialists (investigator, planner, builder, reviewer,
 context-curator, verification-agent, requirements-analyst,
 architecture-specialist, test-engineer, documentation-agent,
-audit-specialist, mobile-specialist, plan-critic, furps-analyst,
+audit-specialist, mobile-specialist, designer, plan-critic, furps-analyst,
 navigator, meta-judge, judge) as host-native subagent definitions, registered
 under the prefixed names `massa-ai-<role>`.
 Model + effort are pinned per host: Claude `effort: high` + aliases
 (haiku/sonnet/opus); Codex `model_reasoning_effort = "high"` + IDs
 (gpt-5.4-mini/gpt-5.6-terra/gpt-5.6-sol); Cursor/OpenCode
 `reasoningEffort: max` + charter model hints (DeepSeek V4 Pro / GLM-5.2 /
-MiniMax M3 / kimi-k3). See [FEATURES.md → Subagent Skills (17 Specialists)](./FEATURES.md#subagent-skills-17-specialists)
+MiniMax M3 / kimi-k3). See [FEATURES.md → Subagent Skills (18 Specialists)](./FEATURES.md#subagent-skills-18-specialists)
 for the full per-agent model/effort/permission tables, file locations, and
 the generator + parity-test contract.
 

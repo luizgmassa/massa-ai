@@ -1,9 +1,9 @@
 /**
  * Subagent parity test (T4).
  *
- * Asserts the 17 specialist agent files shipped across 4 hosts are byte-identical
+ * Asserts the 18 specialist agent files shipped across 4 hosts are byte-identical
  * to generator output (drift gate), correctly pinned per spec (model + effort +
- * permission), collision-free against host built-ins, exactly 17 per host, and
+ * permission), collision-free against host built-ins, exactly 18 per host, and
  * that Codex TOML parses with the # massa-ai-owned marker.
  *
  * Model and effort expectations come from `skills/model-profiles.json` plus each
@@ -78,6 +78,7 @@ const SPECIALIST_NAMES = [
   "navigator",
   "meta-judge",
   "judge",
+  "designer",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
@@ -86,6 +87,7 @@ const WRITE_AGENTS = new Set<SpecialistName>([
   "test-engineer",
   "documentation-agent",
   "judge",
+  "designer",
 ]);
 
 // ── Model + effort come from the REGISTRY, not a table copied into this file ──
@@ -213,39 +215,39 @@ describe("subagent parity — drift gate (CLA-07/CDX-08/CRS-06/OPC-08)", () => {
   });
 });
 
-describe("subagent parity — exact 17 names per host (CLA-09/CRS-07/OPC-09)", () => {
-  test("claude: exactly 17 specialist .md files with the registry names", async () => {
+describe("subagent parity — exact 18 names per host (CLA-09/CRS-07/OPC-09)", () => {
+  test("claude: exactly 18 specialist .md files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/claude-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
       (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
     );
-    expect(files.length).toBe(17);
+    expect(files.length).toBe(18);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("codex: exactly 17 specialist .toml files with the registry names", async () => {
+  test("codex: exactly 18 specialist .toml files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/codex-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".toml"));
-    expect(files.length).toBe(17);
+    expect(files.length).toBe(18);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.toml$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("cursor: exactly 17 specialist .md files", async () => {
+  test("cursor: exactly 18 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/cursor-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
       (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
     );
-    expect(files.length).toBe(17);
+    expect(files.length).toBe(18);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("opencode: exactly 17 specialist .md files", async () => {
+  test("opencode: exactly 18 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/opencode-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".md"));
-    expect(files.length).toBe(17);
+    expect(files.length).toBe(18);
     const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
@@ -257,7 +259,7 @@ describe("subagent parity — exact 17 names per host (CLA-09/CRS-07/OPC-09)", (
 // see the commit message), not copied from design.md/tasks.md — the standing lesson
 // ("subagent numbers need re-measuring") applies to a NEW population exactly as much
 // as an edited one.
-describe("subagent parity — variant bundles: exact 17 per (host, supported profile) (MPS-01/MPS-12)", () => {
+describe("subagent parity — variant bundles: exact 18 per (host, supported profile) (MPS-01/MPS-12)", () => {
   const HOST_EXT: Record<RegistryHost, string> = {
     claude: "md",
     codex: "toml",
@@ -279,13 +281,13 @@ describe("subagent parity — variant bundles: exact 17 per (host, supported pro
   });
 
   for (const { host, profile } of cases) {
-    test(`${host}/${profile}: exactly 17 specialist .${HOST_EXT[host]} files with the registry names`, async () => {
+    test(`${host}/${profile}: exactly 18 specialist .${HOST_EXT[host]} files with the registry names`, async () => {
       const ext = HOST_EXT[host];
       const dir = path.join(REPO_ROOT, `apps/${host}-plugin/agent-profiles/${profile}`);
       const files = (await fs.readdir(dir)).filter(
         (f) => f.startsWith("massa-ai-") && f.endsWith(`.${ext}`),
       );
-      expect(files.length).toBe(17);
+      expect(files.length).toBe(18);
       const names = files.map((f) =>
         f.replace(/^massa-ai-/, "").replace(new RegExp(`\\.${ext}$`), ""),
       );
