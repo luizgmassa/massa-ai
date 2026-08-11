@@ -1,6 +1,6 @@
 {
   "name": "massa-ai",
-  "version": "1.50.0",
+  "version": "1.51.0",
   "description": "massa-ai — semantic code search, memory, and context compression for Codex",
   "author": {
     "name": "Luiz Massa",
