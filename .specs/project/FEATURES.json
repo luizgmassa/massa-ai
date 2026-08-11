@@ -1314,6 +1314,26 @@
       "design": ".specs/features/designer-agent/design.md",
       "tasks": ".specs/features/designer-agent/tasks.md",
       "notes": "VALIDATED PASS 2026-08-11 (validation.md), independently verified by a massa-ai-verification-agent on a second pass. 13/13 requirement IDs satisfied. Gates: lint 0 errors, type-check 6/6, generate --check no drift, test:scripts 1780 pass/0 fail, test:plugins 135 pass/0 fail, opencode agents-install 7/0. THE INDEPENDENT PASS FOUND A REAL GAP THE AUTHOR MISSED: the author ran discrimination mutations against ADRG-01/02 only and none against DSG-01..DSG-11, and two mutations survived every suite -- removing a whole massa-ai-designer dispatch block from one of the 7 workflows, and rewording one block's trigger line so the 7 disagree (that line is what makes the dispatch mandatory-on-condition, so drift silently makes it advisory). design.md had named the drift risk and closed it with a one-time manual grep; a grep run once cannot fail on the next edit. Closed in T15 as group 12 of workflow-harness-contract.test.ts (both directions + byte-identical trigger text); both survivors now RED(2)/RED(1), negative control RED(1), restores SHA-verified. The verifier also upgraded DSG-08 from the author's 'partial method' to fully SATISFIED by invoking the real Elysia route in-process (200, agents.length 18, designer/standard), and corrected the author's commit count (13 in f8427283..e51d3297, not 11). Residual: mobile-figma-audit is the first findings-only workflow dispatching a write-permitted charter (spec A8, accepted); the designer charter has no live screen run; the verifier's Low finding about concurrent test:scripts runs on a loaded host is declined as scope creep and left for a deliberate CONTRIBUTING.md follow-up."
+    },
+    {
+      "id": "subagent-tool-inheritance",
+      "slug": "subagent-tool-inheritance",
+      "title": "Sub-agent tool inheritance — Claude MCP allowlist -> denylist fix, nesting-prohibition retirement, dispatch model/effort announcement",
+      "status": "in_progress",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "fix/subagent-tool-inheritance",
+      "created": "2026-08-11",
+      "depends_on": [],
+      "spec": ".specs/features/subagent-tool-inheritance/spec.md",
+      "design": ".specs/features/subagent-tool-inheritance/design.md",
+      "tasks": ".specs/features/subagent-tool-inheritance/tasks.md",
+      "notes": "EXECUTE COMPLETE 2026-08-11: T1-T9, 9 task commits + 1 spec+design commit on fix/subagent-tool-inheritance from origin/main @ c32b8a22, 4 sequential batch workers (this entry written by Batch Worker 4, T7-T9). Fixes STI-01/02/03: 17 of 18 Claude sub-agent charters emitted a tools: allowlist excluding every MCP tool by omission; emitClaude now emits disallowedTools: Write, Edit, NotebookEdit for read-only charters and neither key for write charters, navigator unchanged, Cursor/Codex/OpenCode measured unaffected and sensor-guarded. STI-04: nesting prohibition retired from 18 charters + 4 reference lines (true count, spec's first sweep undercounted at 3). STI-05: every roster dispatch announces model/effort from the installed agent file, S8/S9 guard against drift. STI-15 (T7/T8): host-capabilities.ts gained a toolGating field (denylist/none/sandbox/permission-map) with per-host verbatim citations; CLAUDE.md + CHANGELOG.md record the contract (Fixed/Changed/Added under [Unreleased], minor bump). Gates: lint 0, type-check 6/6, generate:artifacts --check no drift, test:scripts 1804 pass/0 fail (baseline 1803/0). REAL REGRESSION FOUND, OUT OF THIS BATCH'S WRITE SET: test:plugins 134 pass/1 fail -- apps/claude-plugin/__tests__/install.test.ts's CLA-02 test asserts the pre-fix allowlist contract against the real installed bundle and reddens because write agents now carry no tools: line; this file was never touched by T1-T9 and its gate (test:plugins) only runs at T9's build level, so it stayed invisible through T1-T8. Not fixed by this batch (outside its file-scoped write set); needs a follow-up task mirroring T2's subagent-parity.test.ts rewrite. STI-14 (live-host MCP dispatch behavioral check) NOT RUN -- no MCP-active host session reachable from this worktree; recorded as a skipped sensor. The disallowedTools-honoured-on-plugin-sub-agents assumption stays evidence-grade B. validation.md not yet written (independent verifier's task). Push/PR = user decision; DO NOT MERGE before the CLA-02 regression is fixed and STI-14 is resolved or explicitly accepted."
     }
   ],
   "active_feature": null

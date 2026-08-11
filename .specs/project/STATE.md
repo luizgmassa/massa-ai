@@ -1,6 +1,52 @@
 # massa-ai Spec State
 
-## Current — Designer sub-agent (18th specialist) + ADR/refactor Plan Challenge Gate (**VALIDATED 2026-08-11** — 11 commits, gates green; unpushed, DO NOT MERGE without an independent verification pass)
+## Current — Sub-agent tool inheritance (**EXECUTE COMPLETE 2026-08-11** — 10 commits, 4 sequential batch workers; a real, out-of-batch-scope test regression found in the T9 build gate; unpushed, DO NOT MERGE without fixing it and an independent verification pass)
+
+- projectId `massa-ai` · workflowSessionId `spec-subagent-tool-inheritance` · workflow
+  **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch
+  `fix/subagent-tool-inheritance` from `origin/main` @ `c32b8a22`, worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-subagent-tool-inheritance`. Range
+  `f5dc2637..<this commit>` (10 commits: 1 spec+design + 9 task commits, 4 batch workers).
+- Artifacts: `.specs/features/subagent-tool-inheritance/{spec,design,tasks}.md`.
+  `validation.md` not yet written — that is an independent verifier's task, not this
+  batch's.
+- Fixes STI-01/02/03: 17 of 18 Claude sub-agent charters emitted a `tools:` allowlist
+  that excludes every MCP tool by omission. `emitClaude` now emits `disallowedTools:
+  Write, Edit, NotebookEdit` for read-only charters and neither key for write charters;
+  `navigator` keeps its allowlist byte-identical. Cursor/Codex/OpenCode measured
+  unaffected, guarded by a new per-host MCP-blocking-construct sensor.
+- STI-04: the "Never spawn subagents" prohibition retired from 18 charters + 4 shared
+  reference lines (the true count — the spec's first sweep undercounted at 3).
+- STI-05: every massa-ai roster dispatch now announces model/effort read from the
+  installed agent file, guarded by S8/S9 against drift from `resolveHostLayout`.
+- STI-15 (this batch, T7/T8): `scripts/lib/host-capabilities.ts` gained a `toolGating`
+  field, one value per host with its verbatim documentation citation
+  (`"denylist" | "none" | "sandbox" | "permission-map"`), documentation-bearing only.
+  `CLAUDE.md`'s agent-harness section and `CHANGELOG.md` (`### Fixed`/`### Changed`/
+  `### Added` under `[Unreleased]` → minor bump) record the contract.
+- **T9 build gate found a real, pre-existing regression outside this batch's write
+  set.** `bun run test:plugins` → **134 pass / 1 fail**:
+  `apps/claude-plugin/__tests__/install.test.ts` "CLA-02: read-only agents lack
+  Write/Edit; write agents include them" asserts the pre-fix allowlist contract against
+  the real installed bundle (`tools:` line contains `Write`/`Edit` for write agents) —
+  the same vacuous-then-broken shape `design.md`'s Risks table already named and closed
+  for `scripts/__tests__/subagent-parity.test.ts` (T2's scope), but this is a **separate
+  file** T2 never touched. It was invisible through T1-T8 because none of those tasks'
+  gates ran `test:plugins` — only T9's build gate does. Left unfixed: this capability
+  packet's write set is `scripts/lib/host-capabilities.ts`, `CLAUDE.md`,
+  `CHANGELOG.md`, and the three `.specs/` state artifacts only; fixing a plugin test
+  file is out of scope for this batch and reported rather than silently patched.
+- Other gates measured 2026-08-11: `bun run lint` 0 errors ·
+  `bun run type-check` 6/6 · `XDG_CONFIG_HOME=$(mktemp -d) bun
+  scripts/generate-subagent-artifacts.ts --check` no drift ·
+  `bun run test:scripts` **1804 pass / 0 fail** across 80 TS files + 21 shell suites
+  (baseline at HEAD was 1803/0; +1 new `toolGating` assertion test from T7).
+- STI-14 (live-host MCP dispatch check) **not run** — no MCP-active host session is
+  reachable from this batch-worker worktree. Recorded as a skipped sensor, not a pass.
+  The `disallowedTools`-honoured-on-plugin-sub-agents assumption stays evidence-grade
+  **B**; STI-14 is the only thing that closes it to A. See `.specs/HANDOFF.md`.
+
+## Previous — Designer sub-agent (18th specialist) + ADR/refactor Plan Challenge Gate (**VALIDATED 2026-08-11** — 11 commits, gates green; unpushed, DO NOT MERGE without an independent verification pass)
 
 - projectId `massa-ai` · workflowSessionId `spec-designer-agent` · workflow **spec-driven**
   · persona pin `context-skill-harness-engineer-architect` · branch `feat/designer-agent`
