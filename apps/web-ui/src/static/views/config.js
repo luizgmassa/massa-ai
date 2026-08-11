@@ -353,15 +353,22 @@ const UNSAFE_PATH_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
 
 function setByPath(obj, dottedPath, value) {
   const parts = dottedPath.split(".");
-  if (parts.some((p) => UNSAFE_PATH_SEGMENTS.has(p))) return;
   let cur = obj;
+  // Guarded immediately before each write rather than once up front: the check
+  // has to sit on the assignment it protects for the property chain to be
+  // provably safe at every hop (and for CodeQL's prototype-pollution query to
+  // read it as a sanitizer, which a single up-front `some()` is not).
   for (let i = 0; i < parts.length - 1; i++) {
-    if (!Object.prototype.hasOwnProperty.call(cur, parts[i]) || typeof cur[parts[i]] !== "object" || cur[parts[i]] === null) {
-      cur[parts[i]] = {};
+    const key = parts[i];
+    if (UNSAFE_PATH_SEGMENTS.has(key)) return;
+    if (!Object.prototype.hasOwnProperty.call(cur, key) || typeof cur[key] !== "object" || cur[key] === null) {
+      cur[key] = {};
     }
-    cur = cur[parts[i]];
+    cur = cur[key];
   }
-  cur[parts[parts.length - 1]] = value;
+  const last = parts[parts.length - 1];
+  if (UNSAFE_PATH_SEGMENTS.has(last)) return;
+  cur[last] = value;
 }
 
 export function buildConfigSectionBody(sectionKey, fieldValues) {
