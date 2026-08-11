@@ -807,3 +807,58 @@ describe("designer dispatch: exactly 7 workflows, one wording", () => {
     expect([...seen.keys()].length, `divergent trigger wording: ${JSON.stringify([...seen.entries()], null, 1)}`).toBe(1);
   });
 });
+
+// ── 13. Nesting prohibition retirement (STI-04 / S6, S7) ──────────────────
+//
+// .specs/features/subagent-tool-inheritance/spec.md STI-04. The blanket
+// "never spawn subagents" direction is retired from every reference that
+// carried it in different words. Swept as a class -- a spawn verb followed
+// (within a couple of words) by a "sub-...agent(s)" noun -- rather than any
+// one literal phrase, because a literal-phrase sweep for the charter wording
+// missed `references/spec-driven/sub-agents.md:70` ("It does NOT spawn
+// further sub-agents."), caught only by re-enumerating the class. See
+// design.md Verification Design, sensors S6 and S7.
+
+describe("nesting prohibition retirement: references carry no spawn prohibition", () => {
+  const SPAWN_PROHIBITION_CLASS =
+    /\bspawn(?:s|ing|ed)?\s+(?:\w+\s+){0,2}(?:sub-?){1,3}agents?\b/i;
+
+  /** Every .md file under skills/massa-ai/references/, recursively. */
+  async function referenceMarkdownFiles(): Promise<string[]> {
+    const out: string[] = [];
+    async function walk(dir: string): Promise<void> {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) await walk(full);
+        else if (entry.name.endsWith(".md")) out.push(full);
+      }
+    }
+    await walk(REFERENCES_DIR);
+    return out.sort();
+  }
+
+  test("no file under references/ contains a spawn prohibition of any shape (S6)", async () => {
+    const files = await referenceMarkdownFiles();
+    expect(files.length).toBeGreaterThan(20); // guard the guard
+    const offenders: string[] = [];
+    for (const file of files) {
+      const body = await fs.readFile(file, "utf8");
+      if (SPAWN_PROHIBITION_CLASS.test(body)) {
+        offenders.push(path.relative(REPO_ROOT, file));
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("spec-driven/sub-agents.md still states the batch-worker sequential-execution rule (S7)", async () => {
+    const body = await readReference("spec-driven/sub-agents.md");
+    expect(body).toContain(
+      "Execution is strictly sequential within and across batches — there is no intra-phase or intra-batch parallelism.",
+    );
+    // The rule now lives under a retitled heading, not the retired "No
+    // nesting:" label -- both directions are asserted so a heading revert
+    // without dropping the sentence still fails here.
+    expect(body).toContain("**Sequential execution:**");
+    expect(body).not.toContain("**No nesting:**");
+  });
+});

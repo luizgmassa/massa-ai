@@ -67,7 +67,7 @@ commits in the feature worktree.
 
 **What a batch worker does:**
 
-Executes ALL tasks in its assigned batch **in order** — finishing every task in one phase before starting the next phase in the batch — following the `references/spec-driven/execute.md` cycle for each task (implement → gate → atomic commit). It does NOT spawn further sub-agents. After completing all tasks in the batch, the worker reports a **compact summary** to the orchestrator using the structured return contract:
+Executes ALL tasks in its assigned batch **in order** — finishing every task in one phase before starting the next phase in the batch — following the `references/spec-driven/execute.md` cycle for each task (implement → gate → atomic commit). After completing all tasks in the batch, the worker reports a **compact summary** to the orchestrator using the structured return contract:
 
 ```
 Batch (phases [N]–[M]) return:
@@ -84,7 +84,7 @@ Batch (phases [N]–[M]) return:
 
 No raw logs, no full test output — only the above fields keep the main context clean.
 
-**No nesting:** Batch workers execute their tasks themselves. They never spawn sub-sub-agents. Execution is strictly sequential within and across batches — there is no intra-phase or intra-batch parallelism.
+**Sequential execution:** Batch workers execute their tasks themselves. Execution is strictly sequential within and across batches — there is no intra-phase or intra-batch parallelism.
 
 **Orchestrator context discipline:** the orchestrator consumes only the compact
 summary above. It must never read a worker's transcript, JSONL, or intermediate
