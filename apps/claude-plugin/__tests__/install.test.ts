@@ -265,35 +265,52 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     expect(res.stdout).toContain("18 subagent specialists");
   });
 
-  test("CLA-02: read-only agents lack Write/Edit; write agents include them", async () => {
+  // STI-01/STI-02: the installed bundle's tool gating, asserted end-to-end against
+  // files install.sh actually wrote — the one place this contract is checked after
+  // installation rather than at generation time.
+  //
+  // The pre-STI-01 version of this test read only a `tools:` line and asserted
+  // substring ABSENCE for read-only agents. Once the generator stopped emitting that
+  // key, `toolsLine` became "" for every read-only agent and the check passed
+  // vacuously, while the write-agent branch failed outright. Both halves below assert
+  // the PRESENCE of the expected gating key, so neither can pass on an empty line.
+  test("CLA-02: read-only agents deny writes via disallowedTools; write agents inherit; navigator keeps its allowlist", async () => {
     runInstall(["--user"], { HOME: tmp });
-    const readOnlyAgents = SPECIALIST_NAMES.filter(
-      (n) =>
-        n !== "builder" &&
-        n !== "test-engineer" &&
-        n !== "documentation-agent" &&
-        n !== "judge" &&
-        n !== "designer",
-    );
     const writeAgents = ["builder", "test-engineer", "documentation-agent", "judge", "designer"];
+    // The sole AGENT_TOOLS_OVERRIDE member: index-first, so it keeps an explicit
+    // allowlist and does NOT inherit the session's MCP servers (a deliberate exception).
+    const allowlistAgents = ["navigator"];
+    const denylistAgents = SPECIALIST_NAMES.filter(
+      (n) => !writeAgents.includes(n) && !allowlistAgents.includes(n),
+    );
 
-    for (const name of readOnlyAgents) {
+    const gatingLines = async (name: string) => {
       const content = await fs.readFile(
         path.join(tmp, `.claude/agents/massa-ai-${name}.md`),
         "utf8",
       );
-      const toolsLine = content.split("\n").find((l) => l.startsWith("tools:")) ?? "";
-      expect(toolsLine).not.toContain("Write");
-      expect(toolsLine).not.toContain("Edit");
+      const lines = content.split("\n");
+      return {
+        tools: lines.find((l) => l.startsWith("tools:")) ?? null,
+        disallowed: lines.find((l) => l.startsWith("disallowedTools:")) ?? null,
+      };
+    };
+
+    for (const name of denylistAgents) {
+      const { tools, disallowed } = await gatingLines(name);
+      expect(disallowed).toBe("disallowedTools: Write, Edit, NotebookEdit");
+      expect(tools).toBeNull();
     }
     for (const name of writeAgents) {
-      const content = await fs.readFile(
-        path.join(tmp, `.claude/agents/massa-ai-${name}.md`),
-        "utf8",
-      );
-      const toolsLine = content.split("\n").find((l) => l.startsWith("tools:")) ?? "";
-      expect(toolsLine).toContain("Write");
-      expect(toolsLine).toContain("Edit");
+      const { tools, disallowed } = await gatingLines(name);
+      // Neither key: the agent inherits the full session pool, MCP tools included.
+      expect(tools).toBeNull();
+      expect(disallowed).toBeNull();
+    }
+    for (const name of allowlistAgents) {
+      const { tools, disallowed } = await gatingLines(name);
+      expect(tools).toBe('tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]');
+      expect(disallowed).toBeNull();
     }
   });
 
