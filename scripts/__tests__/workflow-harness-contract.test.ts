@@ -395,9 +395,9 @@ describe("invariants: the references still encode the decisions that were made",
 
 // ── 6. Roster count ───────────────────────────────────────────────────────
 
-describe("roster: nothing advertises a specialist count other than 17", () => {
+describe("roster: nothing advertises a specialist count other than 18", () => {
   /** The roster size every current-tense claim must agree with. */
-  const ROSTER = 17;
+  const ROSTER = 18;
 
   /**
    * A count-shaped claim, matched within ONE line.
@@ -431,6 +431,16 @@ describe("roster: nothing advertises a specialist count other than 17", () => {
     "made the 12 specialists unselectable by hand",
     // The frozen parity baseline predates judge/meta-judge, by construction.
     "only ever names the 15 specialists that existed there",
+    // scripts/__tests__/fixtures/pyts-golden/lessons.json and
+    // lessons-store-snapshot.json are FROZEN inputs: pyts-golden.test.ts
+    // imports them (`with { type: "json" }` / `{ type: "text" }`) and writes
+    // them into a temp root, so their text IS the fixture and editing it
+    // breaks the golden comparison. The sentences narrate lesson L-007 -- a
+    // past 15 -> 17 roster change that went red in CI -- and are correct as
+    // written. Two substrings, because the store keeps a normalized `key`
+    // beside the prose `text`. (designer-agent, D-8.)
+    "A registry-count change (15→17 specialists)",
+    "a registry count change 15 17 specialists",
   ];
 
   const SELF = "scripts/__tests__/workflow-harness-contract.test.ts";
@@ -494,19 +504,19 @@ describe("roster: nothing advertises a specialist count other than 17", () => {
 
   test("a correct count in any spelling passes", () => {
     for (const text of [
-      "17 specialists",
-      "17 subagent specialists",
-      "17 sub-agent specialists",
-      "17 reusable sub-agent specialists",
+      "18 specialists",
+      "18 subagent specialists",
+      "18 sub-agent specialists",
+      "18 reusable sub-agent specialists",
     ]) {
       expect(COUNT_CLAIM.exec(text)![1]).toBe(String(ROSTER));
     }
   });
 
-  test("the shell installers advertise 17", async () => {
+  test("the shell installers advertise 18", async () => {
     for (const rel of ["install.sh", "scripts/install-agents.sh"]) {
       const body = await fs.readFile(path.join(REPO_ROOT, rel), "utf8");
-      expect(body).toContain("17 subagent specialists");
+      expect(body).toContain("18 subagent specialists");
     }
   });
 });
