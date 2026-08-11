@@ -228,7 +228,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     expect(afterSecond).toBe(afterFirst);
   });
 
-  // ── T3: 17 subagent specialists (CLA-01, CLA-02, CLA-05, CLA-06, DOC-01) ──
+  // ── T3: 18 subagent specialists (CLA-01, CLA-02, CLA-05, CLA-06, DOC-01) ──
   const SPECIALIST_NAMES = [
     "investigator",
     "planner",
@@ -247,30 +247,35 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     "navigator",
     "meta-judge",
     "judge",
+    "designer",
   ];
 
-  test("CLA-01/DOC-01: user-scope install copies 17 subagent specialists + prints summary line", async () => {
+  test("CLA-01/DOC-01: user-scope install copies 18 subagent specialists + prints summary line", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    // 17 specialist agent files at ~/.claude/agents/massa-ai-<name>.md
+    // 18 specialist agent files at ~/.claude/agents/massa-ai-<name>.md
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/massa-ai-${name}.md`)),
       ).toBe(true);
     }
 
-    // Install output mentions the 17 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("17 subagent specialists");
+    // Install output mentions the 18 subagent specialists (DOC-01)
+    expect(res.stdout).toContain("18 subagent specialists");
   });
 
   test("CLA-02: read-only agents lack Write/Edit; write agents include them", async () => {
     runInstall(["--user"], { HOME: tmp });
     const readOnlyAgents = SPECIALIST_NAMES.filter(
       (n) =>
-        n !== "builder" && n !== "test-engineer" && n !== "documentation-agent" && n !== "judge",
+        n !== "builder" &&
+        n !== "test-engineer" &&
+        n !== "documentation-agent" &&
+        n !== "judge" &&
+        n !== "designer",
     );
-    const writeAgents = ["builder", "test-engineer", "documentation-agent", "judge"];
+    const writeAgents = ["builder", "test-engineer", "documentation-agent", "judge", "designer"];
 
     for (const name of readOnlyAgents) {
       const content = await fs.readFile(
@@ -294,7 +299,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
 
   test("CLA-05: uninstall removes every massa-ai-owned specialist, preserves user agents", async () => {
     runInstall(["--user"], { HOME: tmp });
-    // Sanity: all 17 specialists present before uninstall
+    // Sanity: all 18 specialists present before uninstall
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/massa-ai-${name}.md`)),
