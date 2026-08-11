@@ -89,6 +89,7 @@
         "MASSA_AI_SSE_SINK_POLL_MS",
         "MASSA_AI_UPLOAD_DIR",
         "MASSA_AI_WEB_UI_TRUST_LOCAL",
+        "MASSA_AI_WRITE_GOLDEN",
         "RUN_E2E",
         "RUN_E2E_DESTRUCTIVE",
         "RUN_POSTGRES_TESTS"

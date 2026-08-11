@@ -24,7 +24,11 @@ import { DEFAULT_CAPTURE_POLICY } from "../../packages/shared/src/config/massa-a
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const LIB = path.join(REPO_ROOT, "scripts/lib/installer-api-key.sh");
-const APP_JS = path.join(REPO_ROOT, "apps/web-ui/src/static/app.js");
+/** `CONFIG_SECTIONS` moved out of app.js into the Config tab's own module when
+ *  the web UI bundle was split; app.js is now a barrel and carries no section
+ *  table. Only the path changed — the population and the assertion below are
+ *  the same. */
+const CONFIG_VIEW_JS = path.join(REPO_ROOT, "apps/web-ui/src/static/views/config.js");
 
 interface WrittenConfig {
   embedding: { model: string; dimensions: number };
@@ -176,9 +180,10 @@ describe("installer config template — scheduler", () => {
 
 describe("installer config template — section coverage", () => {
   test("every Admin Portal Config section is written", () => {
-    // Population from app.js, the artifact being audited — a section added to
-    // the portal that the installer never writes fails here.
-    const source = fs.readFileSync(APP_JS, "utf8");
+    // Population from the portal's own Config module, the artifact being
+    // audited — a section added to the portal that the installer never writes
+    // fails here.
+    const source = fs.readFileSync(CONFIG_VIEW_JS, "utf8");
     const sections = [...new Set([...source.matchAll(/^\s*key:\s*"([^"]+)",/gm)].map((m) => m[1]))];
     expect(sections.length).toBeGreaterThanOrEqual(16);
 
