@@ -657,3 +657,66 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
     expect(tasksDecision).toBeGreaterThan(designDecision);
   });
 });
+
+// ── 11. Plan Challenge Gate coverage ──────────────────────────────────────
+//
+// .specs/features/designer-agent/ — ADRG-01, ADRG-02.
+//
+// `skills/AGENTS.md` names the workflows that take the full Plan Challenge
+// Gate. `workflows/adr.md` was named there and carried no gate step at all,
+// and `workflows/refactor.md` carried none either — the policy reached both
+// only if the orchestrator recalled the bootstrap list unaided. Every other
+// workflow-side contract in this repo is inline in its own file for exactly
+// that reason (references/agent-orchestration.md: "Every dispatch block in a
+// workflow carries the prefixed name inline so dispatch never depends on this
+// file being loaded").
+//
+// The list is PARSED from the policy sentence, never hardcoded here. A
+// hardcoded copy would need the same edit the workflow needs, by the same
+// person, in the same commit — so it could not catch the next omission. The
+// policy line is the population.
+
+describe("plan challenge: every full-gate workflow carries the gate step", () => {
+  const REGISTRY = path.join(REPO_ROOT, "skills", "AGENTS.md");
+  const MARKER = "Load full `workflows/the-fool.md` when the workflow is";
+
+  /**
+   * Backtick-quoted workflow names from the policy sentence, up to its first
+   * `;` (after which the sentence lists risk domains, not workflows).
+   * Newline-tolerant: the sentence wraps across lines in the source.
+   */
+  async function fullGateWorkflows(): Promise<string[]> {
+    const body = await fs.readFile(REGISTRY, "utf8");
+    const start = body.indexOf(MARKER);
+    expect(start, `policy sentence not found in skills/AGENTS.md — marker: ${MARKER}`).toBeGreaterThan(-1);
+    const rest = body.slice(start + MARKER.length);
+    const clause = rest.slice(0, rest.indexOf(";")).replace(/\s+/g, " ");
+    return [...clause.matchAll(/`([a-z-]+)`/g)].map((m) => m[1]!);
+  }
+
+  test("the parsed population is real, not a vacuous empty list", async () => {
+    // Guard the guard. A reworded policy sentence that yields [] or a partial
+    // parse would make every assertion below pass by matching nothing.
+    const names = await fullGateWorkflows();
+    expect(names.length).toBeGreaterThanOrEqual(6);
+    expect(names).toContain("adr");
+    expect(names).toContain("refactor");
+  });
+
+  test("every named workflow exists on disk", async () => {
+    const names = await fullGateWorkflows();
+    const onDisk = new Set(await listWorkflows());
+    const missing = names.filter((n) => !onDisk.has(`${n}.md`));
+    expect(missing).toEqual([]);
+  });
+
+  test("every named workflow runs the Plan Challenge Gate", async () => {
+    const names = await fullGateWorkflows();
+    const without: string[] = [];
+    for (const name of names) {
+      const body = await readWorkflow(`${name}.md`);
+      if (!/Plan Challenge (lite )?[Gg]ate/.test(body)) without.push(`${name}.md`);
+    }
+    expect(without).toEqual([]);
+  });
+});

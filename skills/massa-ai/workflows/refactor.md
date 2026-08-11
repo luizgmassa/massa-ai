@@ -92,7 +92,8 @@ Before the first repository mutation, load `references/implementation-delivery.m
 
 - The fix→re-verify cycle for a PR group is capped by the Bounded Fix→Re-verify Loop's 3-iteration limit in `references/verification-ladder.md` (cap reached → `Blocked`); that is distinct from the two-consecutive-failed-fix edit-attempt breaker in `references/root-cause-scripts.md`, which fires on repeated failed edits against one symptom while moving code and neither consumes nor resets the verify-cycle count.
 
-13. Complete the Evidence Gate from `references/evidence-gate.md`
+13. Run the configured Plan Challenge Gate on the refactor plan before the first behavior-preserving edit. Low-risk refactor plans use the Plan Challenge lite gate first; full The Fool is reserved for explicit challenge, high-risk domains, plans touching more than 5 files/classes/modules, or lite escalation. Revise valid critical or high findings — for a refactor the assumption most worth challenging is that the existing tests actually pin the behavior being preserved.
+14. Complete the Evidence Gate from `references/evidence-gate.md`
 
 ## Failure Handling
 
