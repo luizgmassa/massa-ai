@@ -715,11 +715,22 @@ describe("Models catalog inline-form button-row grouping (T11, APUX-09, P2-F AC4
 // whole-file scan, so the (out-of-scope) Memory tab prompt() at a different
 // function is never a false positive here.
 
-const APP_JS_SOURCE = fs.readFileSync(path.join(import.meta.dir, "..", "static", "app.js"), "utf8");
+/** The Models tab moved to its own modules when app.js was split: the catalog
+ *  renderer in `views/registry.js`, every `handleRegistry*` in
+ *  `views/registry-state.js`, and `renderProfilesView` in `views/profiles.js`.
+ *  All three are read so the scanned population is exactly the one this sensor
+ *  was written against — reading fewer would silently shrink it, and the
+ *  span-count sanity assertion below is what catches that (it did, twice,
+ *  during the split). */
+const MODELS_TAB_SOURCE = [
+  fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "registry.js"), "utf8"),
+  fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "registry-state.js"), "utf8"),
+  fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "profiles.js"), "utf8"),
+].join("\n");
 
-/** The Memory tab moved to its own module when app.js was split. This sensor's
- *  control case reads it from there; the assertion itself is unchanged, only
- *  the file the source is read from. */
+/** The Memory tab moved to its own module too. This sensor's control case reads
+ *  it from there; the assertion itself is unchanged, only the file the source
+ *  is read from. */
 const MEMORY_VIEW_SOURCE = fs.readFileSync(
   path.join(import.meta.dir, "..", "static", "views", "memory.js"),
   "utf8",
@@ -781,7 +792,7 @@ function extractFunctionSpans(source: string, namePattern: RegExp): { name: stri
 }
 
 describe("no-prompt/no-alert structural sensor — Models tab (T7, P2-D AC6)", () => {
-  const targetSpans = extractFunctionSpans(APP_JS_SOURCE, /^(handleRegistry\w+|renderModelRegistry|renderProfilesView)$/);
+  const targetSpans = extractFunctionSpans(MODELS_TAB_SOURCE, /^(handleRegistry\w+|renderModelRegistry|renderProfilesView)$/);
 
   it("finds at least the known Models-tab handler + renderer functions (sensor sanity — a 0-span result proves nothing)", () => {
     const names = targetSpans.map((s) => s.name);

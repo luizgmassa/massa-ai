@@ -161,6 +161,39 @@ Restore verification: `YES` (pre- and post-SHA identical).
 | Phase | Scope | Gate |
 |---|---|---|
 | P1 | Characterization assets only, no source moves | both new suites green; 5/5 mutations killed |
-| P2 | `lib/{html,markdown,theme,api-client,banner}.js` — pure moves, all already 100% | golden + surface + 528 green |
-| P3 | `views/{search,proposals,config,profiles,registry,logs}.js` — pure moves; served-module route test | golden + surface + 528 green; per-file coverage ≥ 90% |
-| P4 | `startApp` decomposition into `ctx` handlers, `start-app.js`, new tests for the six below-floor files, three sensors repointed | full suite + `bun run test:coverage --only=apps/web-ui` green |
+| P2 | `lib/{html,markdown,theme,api-client,banner}.js` — pure moves, all already 100% | golden + surface + 622 green |
+| P3 | `views/{projects,memory,handoffs,proposals,checkpoints}.js` + `lib/forms.js`; `startApp`'s closure handlers become `ctx` functions; new tests for the four below-floor files | 673 green; per-file coverage ≥ 90% |
+| P4 | `views/{search,logs,config,profiles,registry,registry-state}.js`, `wire-view-handlers.js`, `start-app.js`, `app.js` as barrel; module-graph guard; sensors repointed | 700 green; every file ≥ 90% |
+
+### Two deviations from the plan, and why
+
+1. **P3 and P4 swapped order.** The plan moved the pure renderers first and
+   decomposed `startApp` last. That would have made `start-app.js` import the
+   handlers still living in `app.js` while `app.js` imported `startApp` — a
+   module cycle held together only by function hoisting. Extracting the four
+   tabs whose handlers were trapped in `startApp` first, then everything else,
+   avoids the cycle entirely and keeps `app.js` above the coverage floor at
+   every intermediate commit.
+
+2. **Two extra modules, forced by the repo's own guideline.** The plan's
+   `views/registry.js` came out at 948 lines and `start-app.js` at 678, both
+   over the "flag anything above ~600 lines" rule in
+   `references/coding-guidelines.md`. `views/registry-state.js` (overlay CRUD +
+   the Save & Apply stream) and `wire-view-handlers.js` (312 lines of pure DOM
+   binding) were split out rather than raising the guard's threshold to fit
+   what the refactor happened to produce. Final layout is 18 static modules,
+   largest 550 lines.
+
+## Pre-existing bug found, deliberately not fixed
+
+`views/logs.js`: the persisted Live-tail preference never applies on reload.
+`render()` consults `readLogsLivePreference()` only when
+`state.logsLive === undefined`, and `start-app.js`'s state initializer sets
+`logsLive: false` — so the seeding branch is unreachable and Live silently
+reverts to off on every page load, which is precisely the failure the
+preference was added to prevent.
+
+Two dead lines, counted against `views/logs.js`'s coverage. Left in place: this
+refactor is behavior-preserving, and folding a behavior change into a structural
+one makes both harder to review. Recorded in the CHANGELOG under the same
+entry.

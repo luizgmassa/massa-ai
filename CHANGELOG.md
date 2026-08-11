@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Web UI's 3832-line `app.js` is now eighteen modules, one per tab.**
+  Every renderer sat in one blob and every handler in another, so touching the
+  Memory tab meant editing two distant regions of a file no single read holds.
+  The static bundle is now `lib/` (five shared leaves: HTML escaping, markdown,
+  theme, API client, banner), `views/` (one module per tab, each owning its
+  renderer *and* its write handlers), `wire-view-handlers.js`,
+  `start-app.js`, and `app.js` as a barrel. No module exceeds 600 lines, and a
+  test enforces that so one tab cannot quietly grow back into a god-file.
+  Behavior is unchanged and proved so rather than asserted: a committed
+  372 KB fixture pins the byte-exact output of every renderer across 85 inputs,
+  and a second sensor freezes both export surfaces — the 55 named exports and
+  the 59 `MASSA_AI_UI` keys, which are deliberately different sets.
+
+  The blocker was coverage, not structure. `apps/web-ui` sits under a blocking
+  90%-per-file floor, and `app.js`'s 92.22% turned out to be `startApp`'s
+  74.07% diluted by the 98.6% around it — so *any* split that separated the two
+  failed the gate, and extracting only the worst chunks still landed at 89.95%.
+  `startApp`'s handlers were closures capturing its scope, unreachable without a
+  fake-DOM harness; they are now `ctx`-taking module functions, the shape
+  `app.js` already documented for exactly this reason. That made 101 new tests
+  possible over paths that had never run: the create/edit/delete flows, the
+  index-status poll's 150-poll cap and terminal teardown, and `render()`'s
+  per-tab dispatch, hash routing, `beforeunload` guard and SSE subscription.
+  Coverage went 92.22% on one file to every one of the twenty at or above the
+  floor, with `start-app.js` at 97.19%.
+
+  Three tests read `app.js` source verbatim to scan function spans. Their
+  subjects moved, so they now read the files those subjects live in — every
+  assertion byte-identical, each re-proved red by mutation before being
+  trusted. A new module-graph test closes the failure this refactor could
+  otherwise have shipped silently: `/ui/*` answers an unresolved path with
+  `index.html`, so a wrong import specifier would serve HTML where the browser
+  expects a module — blank tab, green test suite.
+
+  One pre-existing bug was found and deliberately **not** fixed, because this
+  change is behavior-preserving: the Logs tab's persisted Live-tail preference
+  never applies on reload. `readLogsLivePreference()` is consulted only when
+  `state.logsLive === undefined`, and the state initializer sets it to `false`,
+  so the seeding branch is unreachable and Live silently reverts to off on every
+  page load. It is recorded here and in the refactor's characterization notes
+  rather than folded into a structural change.
+
 ## [1.48.0] - 2026-08-10
 
 ### Added

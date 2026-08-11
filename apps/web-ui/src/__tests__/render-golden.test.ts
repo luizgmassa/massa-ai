@@ -26,7 +26,13 @@ import { describe, it, expect } from "bun:test";
 import fs from "fs";
 import path from "path";
 
-const mod = (await import("../static/app.js")) as Record<string, (...args: unknown[]) => unknown>;
+// Through `unknown`: the namespace also carries non-callable exports
+// (`CHECKPOINTS_LIST_BODY`, `MEMORY_TYPES`), so it does not overlap a
+// call-signature index type directly.
+const mod = (await import("../static/app.js")) as unknown as Record<
+  string,
+  (...args: unknown[]) => unknown
+>;
 
 const FIXTURE_PATH = path.join(import.meta.dir, "fixtures", "render-golden.json");
 

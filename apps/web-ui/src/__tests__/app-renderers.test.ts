@@ -1643,7 +1643,10 @@ describe("Models tab nomenclature Scheme A (T9, APUX-07, P2-D AC1)", () => {
 // its no-prompt/no-alert sensor) and assert the exact confirm() literal
 // lives inside it.
 
-const WIRE_VIEW_HANDLERS_SOURCE = fs.readFileSync(path.join(STATIC_DIR, "app.js"), "utf8");
+// `wireViewHandlers` moved to its own module when app.js was split into lib/ +
+// views/ + a barrel. Only the file the source is read from changed; every
+// assertion below is unchanged.
+const WIRE_VIEW_HANDLERS_SOURCE = fs.readFileSync(path.join(STATIC_DIR, "wire-view-handlers.js"), "utf8");
 
 /** Extracts the full source text of a single top-level `function name() { ... }`
  *  declaration using a small brace-depth lexer that ignores braces inside
