@@ -24,11 +24,14 @@ import os from "node:os";
 import path from "node:path";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
-const APP_JS = path.join(REPO_ROOT, "apps/web-ui/src/static/app.js");
+/** `CONFIG_SECTIONS` moved out of app.js into the Config tab's own module when
+ *  the web UI bundle was split; app.js is now a barrel and carries no section
+ *  table. Only the path changed — the regex and the assertions are unchanged. */
+const CONFIG_VIEW_JS = path.join(REPO_ROOT, "apps/web-ui/src/static/views/config.js");
 
-/** The `key:` of every entry in app.js's Config-tab section table. */
+/** The `key:` of every entry in the portal's Config-tab section table. */
 function portalSectionKeys(): string[] {
-  const source = fs.readFileSync(APP_JS, "utf8");
+  const source = fs.readFileSync(CONFIG_VIEW_JS, "utf8");
   const keys = [...source.matchAll(/^\s*key:\s*"([^"]+)",/gm)].map((m) => m[1]);
   return [...new Set(keys)];
 }

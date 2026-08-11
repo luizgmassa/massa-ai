@@ -25,7 +25,29 @@ const ui = require("../../../web-ui/src/static/app.js") as {
 };
 
 const STATIC_DIR = path.resolve(__dirname, "../../../web-ui/src/static");
-const APP_JS = fs.readFileSync(path.join(STATIC_DIR, "app.js"), "utf-8");
+
+/**
+ * The whole browser bundle's source, concatenated.
+ *
+ * This used to be `app.js` alone, back when `app.js` was the entire web UI. The
+ * bundle is now `app.js` (a barrel) plus `lib/` and `views/` modules, so reading
+ * one file would scan a few dozen lines of re-exports: the negative assertion
+ * below would pass vacuously, and the positive one would find nothing. Reading
+ * the directory keeps the scanned subject the same thing it always was — every
+ * line of web UI source that ships.
+ */
+function readBundleSource(dir: string): string {
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .flatMap((e) => {
+      const abs = path.join(dir, e.name);
+      if (e.isDirectory()) return [readBundleSource(abs)];
+      return e.isFile() && e.name.endsWith(".js") ? [fs.readFileSync(abs, "utf-8")] : [];
+    })
+    .join("\n");
+}
+
+const APP_JS = readBundleSource(STATIC_DIR);
 const INDEX_HTML = fs.readFileSync(path.join(STATIC_DIR, "index.html"), "utf-8");
 
 // FORBIDDEN_MUTATING_PATHS was removed by admin-portal UX-11.

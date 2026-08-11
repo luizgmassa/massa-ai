@@ -344,11 +344,21 @@ export function renderConfig(data, opts) {
   return '<section class="view"><div class="view-header"><h2>Config</h2>' + restartBtn + "</div>" + helpCard + cards + "</section>";
 }
 
+/** Segments that would reach `Object.prototype` instead of the object being
+ *  built. Every real path segment comes from `CONFIG_SECTIONS`' hardcoded
+ *  `field.name` table, so none of these can occur today and refusing them
+ *  changes no output — but a walker that assigns down a dotted path is worth
+ *  making unable to pollute regardless of who calls it next. */
+const UNSAFE_PATH_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
 function setByPath(obj, dottedPath, value) {
   const parts = dottedPath.split(".");
+  if (parts.some((p) => UNSAFE_PATH_SEGMENTS.has(p))) return;
   let cur = obj;
   for (let i = 0; i < parts.length - 1; i++) {
-    if (!cur[parts[i]] || typeof cur[parts[i]] !== "object") cur[parts[i]] = {};
+    if (!Object.prototype.hasOwnProperty.call(cur, parts[i]) || typeof cur[parts[i]] !== "object" || cur[parts[i]] === null) {
+      cur[parts[i]] = {};
+    }
     cur = cur[parts[i]];
   }
   cur[parts[parts.length - 1]] = value;
