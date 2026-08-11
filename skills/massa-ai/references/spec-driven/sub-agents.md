@@ -190,6 +190,7 @@ Judge the tier by the work in front of the role, not by the role's title:
 | Verifier | Adversarial reasoning: designs mutations, re-derives coverage, judges outcome precision | `deep` (always — per the Rules of thumb below) |
 | Specify / Tasks authoring | Structured but judgment-heavy | `standard` / `deep` |
 | Read-only specialist (audit-specialist, context-curator, furps-analyst, investigator, mobile-specialist, navigator, requirements-analyst, reviewer) | No write access — findings, investigation, or review quality is the entire deliverable, with no implementation pass downstream to catch a missed nuance | `deep` (always — per the Rules of thumb below) |
+| Scoped writer (designer, documentation-agent, judge, test-engineer) | `permission: write`, narrowed by the charter's own Restrictions to one file class — UI-layer / doc / the agent's own report / test files — each with a disjoint write set. Not read-only, so the deep-tier rule below does **not** reach them | per the work, not per the permission |
 
 **Rules of thumb:**
 
