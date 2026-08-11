@@ -42,6 +42,7 @@ describe("HOST_CAPABILITIES shape", () => {
     "extraManagedRoots",
     "sessionStartStdoutDelivered",
     "handoffInjectionPoint",
+    "toolGating",
   ];
 
   test.each(HOSTS)("%s declares every HostCapabilities field", (host) => {
@@ -103,6 +104,7 @@ describe("per-host expected capability values", () => {
     expect(c.hookBinaryDelivery).toBe("source");
     expect(c.extraManagedRoots).toEqual([]);
     expect(c.handoffInjectionPoint).toBeNull();
+    expect(c.toolGating).toBe("denylist");
   });
 
   test("codex: toml, frontmatter-name identity, frontmatter (top-comment) ownership, real-copy hook delivery", () => {
@@ -115,6 +117,7 @@ describe("per-host expected capability values", () => {
     expect(c.extraManagedRoots).toEqual([]);
     expect(c.sessionStartStdoutDelivered).toBe(true);
     expect(c.handoffInjectionPoint).toBe("session-start");
+    expect(c.toolGating).toBe("sandbox");
   });
 
   test("cursor: md, frontmatter-name identity, filename-scoped ownership, real-copy hook delivery", () => {
@@ -126,6 +129,7 @@ describe("per-host expected capability values", () => {
     expect(c.extraManagedRoots).toEqual([]);
     expect(c.sessionStartStdoutDelivered).toBe(true);
     expect(c.handoffInjectionPoint).toBe("session-start");
+    expect(c.toolGating).toBe("none");
   });
 
   test("opencode: md, filename identity (no name key), body-scoped ownership, forwards unknown frontmatter, no hook binary, extra 'lib'+'command' roots", () => {
@@ -140,6 +144,14 @@ describe("per-host expected capability values", () => {
     // generated, no hand-authored siblings on this host.
     expect(c.extraManagedRoots).toEqual(["lib", "command"]);
     expect(c.handoffInjectionPoint).toBeNull();
+    expect(c.toolGating).toBe("permission-map");
+  });
+
+  test("toolGating: claude alone gates by denylist; the other three hosts inherit with no allowlist to maintain", () => {
+    expect(capabilitiesFor("claude").toolGating).toBe("denylist");
+    for (const host of HOSTS.filter((h) => h !== "claude")) {
+      expect(capabilitiesFor(host).toolGating).not.toBe("denylist");
+    }
   });
 
   test("only opencode forwards unknown frontmatter keys (the sole reason its ownershipMarker is body, not frontmatter)", () => {
@@ -189,6 +201,7 @@ describe("fixture 5th host — driven through emitAll's hosts seam (T12)", () =>
     extraManagedRoots: ["lib"],
     sessionStartStdoutDelivered: null,
     handoffInjectionPoint: null,
+    toolGating: "none",
   };
 
   /** Real hosts resolve through the real table; the fixture host resolves to

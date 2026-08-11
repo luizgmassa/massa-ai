@@ -112,6 +112,7 @@ describe("generate-skill-artifacts emitAll — prune-before-emit (T1, UGB-04)", 
       extraManagedRoots: [],
       sessionStartStdoutDelivered: null,
       handoffInjectionPoint: null,
+      toolGating: "none",
     };
     const withHookLookup: CapsLookup = (host) =>
       host === FIXTURE_HOST ? withHookCaps : capabilitiesFor(host as Host);
