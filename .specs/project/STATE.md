@@ -1,6 +1,46 @@
 # massa-ai Spec State
 
-## Current — Admin Portal config + installer defaults (**GATES GREEN 2026-08-10** — 7 commits; push/PR next, DO NOT MERGE)
+## Current — Designer sub-agent (18th specialist) + ADR/refactor Plan Challenge Gate (**VALIDATED 2026-08-11** — 11 commits, gates green; unpushed, DO NOT MERGE without an independent verification pass)
+
+- projectId `massa-ai` · workflowSessionId `spec-designer-agent` · workflow **spec-driven**
+  · persona pin `context-skill-harness-engineer-architect` · branch `feat/designer-agent`
+  from `origin/main` @ `f8427283`, worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-designer-agent`. Range `f8427283..e51d3297`.
+- Artifacts: `.specs/features/designer-agent/{spec,design,tasks,validation}.md`.
+- Two deliverables. (1) `adr.md` and `refactor.md` were both named in the Plan
+  Challenge Policy's full-gate set and ran no gate; both now do, and a new sensor
+  **parses** that workflow list out of `skills/AGENTS.md` instead of hardcoding it —
+  it found `refactor.md` itself on its first run. (2) A new `designer` charter, tier
+  `standard`, `permission: write` narrowed to the UI layer, dispatched from 7
+  screen-capable workflows under a new **Screen Implementation Exception** (the third
+  standing exception, beside Plan Challenge and Independent Verification). That
+  dispatch is mandatory once the task touches a screen and does not fire otherwise.
+- Parity: 18 charters, 72 agent files (was 68), 396 variants (was 374), all 4 hosts.
+  The admin portal needed no code change — it enumerates `skills/agents/` at request
+  time — confirmed by executing that loader, not by reading it.
+- Gates 2026-08-11: lint 0 · type-check 6/6 · `generate:artifacts --check` no drift ·
+  `test:scripts` **1777 pass / 0 fail** · `test:plugins` **135 pass / 0 fail** ·
+  opencode `agents-install` 7/0.
+- Duplication ceiling 483 → 498, raised with the content-hash differential its own
+  comment demands: base 478, branch 498, +20; 5 new duplicated runs, 0 removed, all 5
+  the designer dispatch template. A JSON set-diff reports 43 of 43 blocks "new" — the
+  records embed absolute paths — so hash attribution is mandatory for this gate.
+- **Independence NOT satisfied.** The `verification-agent` dispatch was skipped
+  (platform policy forbade spawning subagents this session); the fresh-eyes fallback
+  was run by the author. Recorded in `validation.md`, not papered over. An independent
+  verification pass is the highest-value next action on this branch.
+- Accepted risk: `mobile-figma-audit` is the first findings-only workflow to dispatch a
+  write-permitted charter (spec A8). The packet says `read-only` and charter
+  Restrictions win on conflict, but no host enforces it. The same property already
+  holds for `test-engineer` and `documentation-agent`.
+- Provisioning: this worktree needed `bun install` + `bun run build` + `bunx prisma
+  generate` before `test:scripts` could go green. Four of the first full run's ten
+  failures were that, not code.
+- Tooling finding worth keeping: this git build's ERE engine does not honour `\b`, so
+  a `git grep -E` word-boundary sweep returns 0 matches on a file BRE reports 9 in.
+  Use `-P`. Two sweeps returned a false clean before that was caught.
+
+## Previous — Admin Portal config + installer defaults (**GATES GREEN 2026-08-10** — 7 commits; push/PR next, DO NOT MERGE)
 
 - projectId `massa-ai` · workflowSessionId `debug-admin-portal-config-installer-defaults` ·
   workflow **debug** · branch `fix/admin-portal-config-installer-defaults` from
