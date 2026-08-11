@@ -85,6 +85,8 @@ Use `references/context-firewall.md` when raw output is verbose. Feedback should
 
 When a subagent is used, the main agent reports only the role, scope, permission mode, current task, and status. Do not expose raw subagent prompts or internal deliberation.
 
+The `Agent Started` line's model/effort component has one canonical definition — `references/agent-orchestration.md`'s Model/Effort Announcement — not restated here.
+
 Examples:
 
 ```md
