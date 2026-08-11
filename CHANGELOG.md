@@ -57,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Its own population check fails if the sentence is reworded into an empty or
   partial parse, so it cannot pass vacuously.
 
+## [1.49.0] - 2026-08-11
+
 ### Changed
 
 - **The Web UI's 3832-line `app.js` is now eighteen modules, one per tab.**
