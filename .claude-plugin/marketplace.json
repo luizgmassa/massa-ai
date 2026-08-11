@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "massa-ai",
-      "description": "Semantic code search, memory, symbol graph, and context compression. 17 subagent specialists + 6 slash commands.",
+      "description": "Semantic code search, memory, symbol graph, and context compression. 18 subagent specialists + 6 slash commands.",
       "source": "./apps/claude-plugin",
       "category": "productivity"
     }
