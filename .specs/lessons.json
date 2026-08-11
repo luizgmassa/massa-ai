@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 24,
+  "next_id": 26,
   "lessons": [
     {
       "id": "L-001",
@@ -509,6 +509,44 @@
       ],
       "created": "2026-08-07T19:10:07Z",
       "last_seen": "2026-08-07T19:10:07Z",
+      "confidence": 0.53
+    },
+    {
+      "id": "L-024",
+      "key": "gate_fail::a file s coverage percentage can hide a low coverage region app js read 92 22 while startapp inside it was 74 07 so any split separating them failed the per file floor map lcov da records onto planned module spans before choosing a split",
+      "text": "A file's coverage percentage can hide a low-coverage region: app.js read 92.22% while startApp inside it was 74.07%, so any split separating them failed the per-file floor. Map lcov DA records onto planned module spans before choosing a split.",
+      "signal": "gate_fail",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "web-ui-app-js-split"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        ".specs/refactors/web-ui-app-js-split/SENSOR.md"
+      ],
+      "created": "2026-08-11T02:40:44Z",
+      "last_seen": "2026-08-11T02:40:44Z",
+      "confidence": 0.53
+    },
+    {
+      "id": "L-025",
+      "key": "gate_fail::codeql js prototype pollution utility does not read set has as a sanitizer two correct guards were flagged before literal comparisons at each write cleared it match the analyzer s documented pattern not an equivalent one",
+      "text": "CodeQL js/prototype-pollution-utility does not read Set.has() as a sanitizer; two correct guards were flagged before literal === comparisons at each write cleared it. Match the analyzer's documented pattern, not an equivalent one.",
+      "signal": "gate_fail",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "web-ui-app-js-split"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "apps/web-ui/src/static/views/config.js"
+      ],
+      "created": "2026-08-11T02:40:44Z",
+      "last_seen": "2026-08-11T02:40:44Z",
       "confidence": 0.53
     }
   ],
