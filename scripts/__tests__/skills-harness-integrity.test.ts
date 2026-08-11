@@ -415,6 +415,32 @@ describe("router table matches the workflow and reference trees", () => {
 // ── 6. Charter <-> artifact permission (P2) ────────────────────────────────
 
 describe("charter permission matches the shipped artifact", () => {
+  /**
+   * Whether the Claude artifact's key grants Write/Edit, under the
+   * three-way policy STI-01 introduced (.specs/features/
+   * subagent-tool-inheritance/design.md Component 1/2): `disallowedTools:`
+   * (denylist) blocks write when it names Write/Edit; a narrow `tools:`
+   * allowlist (only `navigator` today) grants write only if it names
+   * Write/Edit; and neither key present means the charter inherits the full
+   * pool, Write/Edit included. The prior version of this check read only the
+   * `tools:` line, which is why it read every write charter as read-only the
+   * moment STI-01 stopped emitting that key for them — a sanctioned change,
+   * not a regression, mirroring the CLA-02/03 rewrite in
+   * subagent-parity.test.ts (S3).
+   */
+  function claudeGrantsWrite(artifact: string): boolean {
+    const lines = artifact.split(/\r?\n/);
+    const disallowedLine = lines.find((l) => l.startsWith("disallowedTools:"));
+    if (disallowedLine) {
+      return !(disallowedLine.includes("Write") || disallowedLine.includes("Edit"));
+    }
+    const toolsLine = lines.find((l) => l.startsWith("tools:"));
+    if (toolsLine) {
+      return toolsLine.includes("Write") || toolsLine.includes("Edit");
+    }
+    return true; // neither key: inherits the full pool
+  }
+
   test("metadata.permission agrees with Write/Edit in the Claude artifact", async () => {
     const names = await charterNames();
     const mismatches: string[] = [];
@@ -429,9 +455,7 @@ describe("charter permission matches the shipped artifact", () => {
       const artifact = await read(
         path.join(REPO_ROOT, "apps/claude-plugin/agents", `massa-ai-${name}.md`),
       );
-      const toolsLine =
-        artifact.split(/\r?\n/).find((l) => l.startsWith("tools:")) ?? "";
-      const grantsWrite = toolsLine.includes("Write") || toolsLine.includes("Edit");
+      const grantsWrite = claudeGrantsWrite(artifact);
 
       if (declaredWrite !== grantsWrite) {
         mismatches.push(
@@ -461,16 +485,46 @@ describe("charter permission matches the shipped artifact", () => {
     expect(mismatches).toEqual([]);
   });
 
-  test("every charter forbids recursive subagent spawning", async () => {
+  // STI-04 / S5 — the blanket "never spawn subagents" prohibition is retired
+  // (.specs/features/subagent-tool-inheritance/spec.md); this replaces the
+  // superseded assertion above that required the phrase's presence. The
+  // prohibition is swept as a class — a spawn verb followed (within a couple
+  // of words) by a "sub-...agent(s)" noun — rather than the literal charter
+  // phrase, because a literal-phrase sweep missed a paraphrase
+  // (`skills/massa-ai/references/spec-driven/sub-agents.md:70`, "It does NOT
+  // spawn further sub-agents.") that only a class sweep caught. See
+  // .specs/features/subagent-tool-inheritance/design.md Verification Design,
+  // sensor S5.
+  const SPAWN_PROHIBITION_CLASS =
+    /\bspawn(?:s|ing|ed)?\s+(?:\w+\s+){0,2}(?:sub-?){1,3}agents?\b/i;
+
+  const ROUTER_PERSONA_CLAUSE =
+    "Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.";
+
+  test("no charter contains a spawn prohibition of any shape (S5)", async () => {
     const names = await charterNames();
+    expect(names.length).toBeGreaterThanOrEqual(17); // guard the guard
+    const offenders: string[] = [];
     for (const name of names) {
       const charter = await read(
         path.join(SKILLS_DIR, "agents", name, "SKILL.md"),
       );
-      expect(charter, `charter ${name} lacks the no-recursion restriction`).toContain(
-        "Never spawn subagents",
-      );
+      if (SPAWN_PROHIBITION_CLASS.test(charter)) offenders.push(name);
     }
+    expect(offenders).toEqual([]);
+  });
+
+  test("all 18 charters retain the router/persona self-routing clause (S5)", async () => {
+    const names = await charterNames();
+    expect(names.length).toBe(18);
+    const withClause = new Set<string>();
+    for (const name of names) {
+      const charter = await read(
+        path.join(SKILLS_DIR, "agents", name, "SKILL.md"),
+      );
+      if (charter.includes(ROUTER_PERSONA_CLAUSE)) withClause.add(name);
+    }
+    expect(withClause.size).toBe(18);
   });
 });
 
@@ -632,14 +686,22 @@ describe("persona / sub-agent boundary", () => {
   });
 
   // PAB-06/AC1, AC3, AC4
+  //
+  // STI-04 (.specs/features/subagent-tool-inheritance/) moved this clause
+  // from mid-sentence ("Never spawn subagents, never load the...") to the
+  // start of the Restrictions bullet, and design.md's Component 3 edit table
+  // mandates recapitalizing it into its own sentence ("Never load the...").
+  // `bansRouter` is matched case-insensitively on the leading word only for
+  // that reason -- the rest of the phrase, and the separate prompt-read ban
+  // below, are still matched at exact case.
   test("every charter's Restrictions section forbids self-routing and self-reading a persona", async () => {
     const names = await charterNames();
     const missing: string[] = [];
     for (const name of names) {
       const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
       const section = restrictionsSection(charter, name);
-      const bansRouter = section.includes(
-        "never load the `massa-ai` or `persona-router` routers",
+      const bansRouter = /never load the `massa-ai` or `persona-router` routers/i.test(
+        section,
       );
       const bansPromptRead = section.includes("never open a `personas/` prompt file");
       if (!bansRouter || !bansPromptRead) missing.push(name);

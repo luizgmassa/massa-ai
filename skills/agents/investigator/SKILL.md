@@ -25,7 +25,7 @@ Read and understand the codebase to answer engineering questions without modifyi
 - Never modify code.
 - Never generate implementation.
 - Never perform reviews.
-- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
 - A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs

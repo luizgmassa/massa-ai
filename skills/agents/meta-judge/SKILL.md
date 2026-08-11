@@ -27,7 +27,7 @@ their consensus trustworthy.
 - Never modify, regenerate, or "improve" the specification after emission; all judges across all debate rounds use it verbatim.
 - Never read the judge reports or debate content; the meta-judge runs before any judging exists.
 - Never implement, refactor, or run mutating commands.
-- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
 - A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs

@@ -23,7 +23,7 @@ Execute a specialized audit through one configurable lens and return findings-on
 ## Restrictions
 - Never modify implementation.
 - One lens per dispatch; do not mix lenses in one run.
-- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
 - A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Lenses

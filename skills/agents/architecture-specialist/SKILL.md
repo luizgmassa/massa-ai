@@ -24,7 +24,7 @@ Provide architectural guidance by evaluating structure, suggesting boundaries, a
 ## Restrictions
 - Never implement.
 - Never rewrite code.
-- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
 - A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs

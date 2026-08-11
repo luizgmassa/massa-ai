@@ -24,7 +24,7 @@ Generate engineering documentation artifacts (README, ADR, RFC, changelog, KDoc,
 ## Restrictions
 - Never modify implementation.
 - Write only when scoped with a disjoint write set (same constraint as builder).
-- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
 - A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs

@@ -24,7 +24,7 @@ Centralize Verification Ladder logic and validate that a task's output meets its
 ## Restrictions
 - Never modify implementation.
 - Never skip a verification level without recording a concrete reason.
-- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
 - A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs
