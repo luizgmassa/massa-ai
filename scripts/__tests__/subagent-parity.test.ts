@@ -362,20 +362,77 @@ describe("subagent parity — Claude model + effort pin (CLA-10)", () => {
   });
 });
 
-describe("subagent parity — Claude permission boundary (CLA-02/CLA-03)", () => {
-  test("read-only agents lack Write/Edit; write agents include them", async () => {
-    for (const name of SPECIALIST_NAMES) {
-      const raw = await readAgentMd("claude-plugin", name);
-      const fm = parseMdFrontmatter(raw);
-      const tools = fm.tools ?? "";
-      if (WRITE_AGENTS.has(name)) {
-        expect(tools).toContain("Write");
-        expect(tools).toContain("Edit");
+// S3 (design.md Verification Design table): emitted Claude artifacts carry no `tools:`
+// except navigator, and read-only files carry the exact denylist. Rewritten in place
+// (Reuse Plan) rather than replaced, because the pre-change shape — `(fm.tools ?? "")`
+// checked for absence of "Write"/"Edit" substrings — passes VACUOUSLY for every
+// read-only agent once `tools` is gone entirely (design.md Risks table). The
+// replacement asserts PRESENCE of the expected gating line for each class, not only
+// absence of a substring, and covers every one of the 18 agents plus every
+// agent-profiles/<profile> variant (STI-01.5), not a sample.
+describe("subagent parity — Claude permission boundary (CLA-02/CLA-03, STI-01/STI-02)", () => {
+  // The sole deliberately-narrowed charter (AGENT_TOOLS_OVERRIDE in the generator).
+  // Hardcoded here rather than imported — that constant is intentionally unexported —
+  // so mutation S3 (adding a second override entry) exercises the shipped bytes this
+  // sensor actually reads, not a re-derivation of the generator's own table.
+  const ALLOWLISTED: ReadonlySet<SpecialistName> = new Set(["navigator"]);
+  const NAVIGATOR_TOOLS_LINE = 'tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]';
+  const DENYLIST_LINE = "disallowedTools: Write, Edit, NotebookEdit";
+
+  /** Asserts the exact gating shape for one Claude agent's raw file bytes. */
+  function assertGating(raw: string, name: SpecialistName, where: string): void {
+    const fm = parseMdFrontmatter(raw);
+    try {
+      if (ALLOWLISTED.has(name)) {
+        expect(raw).toContain(NAVIGATOR_TOOLS_LINE);
+        expect(fm.disallowedTools).toBeUndefined();
+      } else if (WRITE_AGENTS.has(name)) {
+        expect(fm.tools).toBeUndefined();
+        expect(fm.disallowedTools).toBeUndefined();
       } else {
-        expect(tools).not.toContain("Write");
-        expect(tools).not.toContain("Edit");
+        expect(raw).toContain(DENYLIST_LINE);
+        expect(fm.tools).toBeUndefined();
+      }
+    } catch (err) {
+      throw new Error(`${where}: ${(err as Error).message}`);
+    }
+  }
+
+  test("active apps/claude-plugin/agents/: only navigator carries tools:, read-only agents carry the exact disallowedTools line, write agents carry neither key", async () => {
+    for (const name of SPECIALIST_NAMES) {
+      assertGating(await readAgentMd("claude-plugin", name), name, `apps/claude-plugin/agents/massa-ai-${name}.md`);
+    }
+  });
+
+  test("every apps/claude-plugin/agent-profiles/<profile>/ variant satisfies the same gating contract for all 18 agents (STI-01.5)", async () => {
+    const profiles = profilesSupporting(REGISTRY, "claude");
+    // Population printed beside the verdict (CONTRIBUTING.md Measurement discipline #4) —
+    // a silently-empty profile list would make the loop below pass vacuously.
+    expect(profiles.length).toBeGreaterThan(0);
+    let checked = 0;
+    for (const profile of profiles) {
+      const dir = path.join(REPO_ROOT, `apps/claude-plugin/agent-profiles/${profile}`);
+      for (const name of SPECIALIST_NAMES) {
+        const raw = await fs.readFile(path.join(dir, `massa-ai-${name}.md`), "utf8");
+        assertGating(raw, name, `apps/claude-plugin/agent-profiles/${profile}/massa-ai-${name}.md`);
+        checked++;
       }
     }
+    expect(checked).toBe(profiles.length * SPECIALIST_NAMES.length);
+  });
+
+  // STI-02 Independent Test: "diff massa-ai-navigator.md against its pre-change bytes —
+  // the frontmatter must be unchanged." Pins the exact three gating-relevant lines rather
+  // than a full-file byte compare, since model/effort pins are governed by a separate
+  // registry-driven contract (the CLA-10 group) and are expected to change independently.
+  test("massa-ai-navigator.md is byte-identical to its recorded pre-change frontmatter (STI-02 Independent Test)", async () => {
+    const raw = await readAgentMd("claude-plugin", "navigator");
+    const fmBlock = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(raw)![1]!;
+    const lines = fmBlock.split(/\r?\n/);
+    expect(lines[0]).toBe("name: massa-ai-navigator");
+    expect(lines[1]).toMatch(/^description: /);
+    expect(lines[2]).toBe(NAVIGATOR_TOOLS_LINE);
+    expect(fmBlock).not.toContain("disallowedTools");
   });
 
   test("no Claude agent sets hooks/mcpServers/permissionMode (CLA-04)", async () => {
@@ -385,6 +442,52 @@ describe("subagent parity — Claude permission boundary (CLA-02/CLA-03)", () =>
       expect(fm.hooks).toBeUndefined();
       expect(fm.mcpServers).toBeUndefined();
       expect(fm.permissionMode).toBeUndefined();
+    }
+  });
+});
+
+// S4 (design.md Verification Design table): no host emits an MCP-blocking construct.
+// STI-03 claims Cursor, Codex, and OpenCode are unaffected by the Claude-only fix; this
+// group is the permanent guard for that claim surviving a future emitter change — the
+// one-time byte-diff (M1, validation.md) proves the claim once, this sensor keeps it true.
+// Every failure names the host and the exact construct, per STI-03.5.
+describe("subagent parity — no host emits an MCP-blocking construct (STI-03.5)", () => {
+  test("Cursor: no agent file carries a tools key — Cursor has no tool-allowlist mechanism at all", async () => {
+    for (const name of SPECIALIST_NAMES) {
+      const fm = parseMdFrontmatter(await readAgentMd("cursor-plugin", name));
+      if (fm.tools !== undefined) {
+        throw new Error(
+          `MCP-blocking construct on cursor: massa-ai-${name}.md carries "tools: ${fm.tools}", ` +
+            `which Cursor has no MCP concept for and could be mistaken for a scoping mechanism.`,
+        );
+      }
+    }
+  });
+
+  test("Codex: no agent TOML sets mcp_servers — an explicit list would stop inheriting every server the parent session configures", async () => {
+    for (const name of SPECIALIST_NAMES) {
+      const parsed = toml.parse(await readAgentToml(name)) as Record<string, unknown>;
+      if (parsed.mcp_servers !== undefined) {
+        throw new Error(
+          `MCP-blocking construct on codex: massa-ai-${name}.toml sets mcp_servers = ` +
+            `${JSON.stringify(parsed.mcp_servers)}, which restricts MCP inheritance from the parent session.`,
+        );
+      }
+    }
+  });
+
+  test("OpenCode: no agent's permission map denies any mcp__* (or similarly-named) pattern", async () => {
+    for (const name of SPECIALIST_NAMES) {
+      const raw = await readAgentMd("opencode-plugin", name);
+      const fm = parseMdFrontmatter(raw);
+      const perm = fm.permission ?? "";
+      const mcpDeny = /"?[\w*]*mcp[\w*]*"?\s*:\s*"?deny"?/i.exec(perm);
+      if (mcpDeny) {
+        throw new Error(
+          `MCP-blocking construct on opencode: massa-ai-${name}.md permission map denies an MCP ` +
+            `pattern ("${mcpDeny[0]}"), which would deny every tool from a matching MCP server.`,
+        );
+      }
     }
   });
 });
@@ -822,14 +925,32 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
     expect(unexpected).toEqual([]);
   });
 
-  test("Claude and Codex key sets are UNCHANGED from the baseline", async () => {
+  test("Codex key sets are UNCHANGED from the baseline", async () => {
     for (const name of BASELINE_NAMES) {
-      const claudeFm = parseMdFrontmatter(await readAgentMd("claude-plugin", name));
-      expect(Object.keys(claudeFm)).toEqual(BASELINE.agents[name]!.claude!.keys);
       const codexKeys = [
         ...(await readAgentToml(name)).matchAll(/^([a-z_]+)\s*=/gm),
       ].map((m) => m[1]);
       expect(codexKeys).toEqual(BASELINE.agents[name]!.codex!.keys);
+    }
+  });
+
+  // STI-01: Claude's key SET changing is the sanctioned point of this feature, not drift —
+  // every frozen baseline entry's `tools` key becomes `disallowedTools` in the same slot for
+  // a read-only agent, or disappears entirely for a write agent (inherit). navigator is the
+  // one AGENT_TOOLS_OVERRIDE member and keeps its `tools` key unchanged (STI-02). This
+  // asserts exactly that substitution rather than relaxing the check to "still has some
+  // keys" — a key added or removed outside that one substitution is still a real regression.
+  test("Claude key sets reflect exactly the STI-01 sanctioned change from the baseline (tools -> disallowedTools for read-only agents, tools removed for write agents, navigator unchanged)", async () => {
+    for (const name of BASELINE_NAMES) {
+      const claudeFm = parseMdFrontmatter(await readAgentMd("claude-plugin", name));
+      const baselineKeys = BASELINE.agents[name]!.claude!.keys;
+      const expectedKeys =
+        name === "navigator"
+          ? baselineKeys
+          : WRITE_AGENTS.has(name)
+            ? baselineKeys.filter((k) => k !== "tools")
+            : baselineKeys.map((k) => (k === "tools" ? "disallowedTools" : k));
+      expect(Object.keys(claudeFm)).toEqual(expectedKeys);
     }
   });
 
