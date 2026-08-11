@@ -1,7 +1,7 @@
 /**
  * generate-subagent-artifacts.ts — unit tests for the emitter + parser layer.
  *
- * The generator is the single source of truth for the 17 specialist agent files
+ * The generator is the single source of truth for the 18 specialist agent files
  * across 4 hosts. We test the pure emitters + YAML/TOML helpers directly, drive
  * the real charter loader against the repo charters, and exercise the drift-gate
  * (runCheck) + diffHost edge cases in-process so the CLI shell isn't the only
@@ -346,17 +346,17 @@ describe("loadCharter / loadAllCharters (repo charters)", () => {
     ).rejects.toThrow(/missing description/);
   });
 
-  test("loadAllCharters loads exactly the 17 specialists", async () => {
+  test("loadAllCharters loads exactly the 18 specialists", async () => {
     const all = await loadAllCharters();
-    expect(all.length).toBe(17);
-    expect(new Set(all.map((c) => c.name)).size).toBe(17);
+    expect(all.length).toBe(18);
+    expect(new Set(all.map((c) => c.name)).size).toBe(18);
   });
 });
 
 // ── emitAll + drift gate ────────────────────────────────────────────────────
 
 describe("emitAll + diffHost", () => {
-  test("emitAll writes 17 files per host (68 total) into a temp tree", async () => {
+  test("emitAll writes 18 files per host (72 total) into a temp tree", async () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
     try {
       const dirs: Record<Host, string> = {
@@ -369,7 +369,7 @@ describe("emitAll + diffHost", () => {
       for (const host of ["claude", "codex", "cursor", "opencode"] as Host[]) {
         const ext = host === "codex" ? "toml" : "md";
         const files = (await fs.readdir(dirs[host])).filter((f) => f.endsWith(`.${ext}`));
-        expect(files.length).toBe(17);
+        expect(files.length).toBe(18);
       }
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
@@ -582,7 +582,7 @@ describe("agentTiers stale-name warn (design D-2, plan-critic blocking finding #
       expect(staleWarnCalls.length).toBe(1);
       // The emission itself still succeeded — a stale overlay name must not brick the build.
       const claudeOut = await fs.readdir(dirs.claude);
-      expect(claudeOut.length).toBe(17);
+      expect(claudeOut.length).toBe(18);
     } finally {
       warnSpy.mockRestore();
       await fs.rm(tmp, { recursive: true, force: true });
