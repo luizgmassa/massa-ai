@@ -336,6 +336,24 @@ Codex and Cursor each ship a real, generated copy at `hooks/massa-ai-hook` (not 
 symlink — `npm pack` silently drops symlink entries, so a symlinked hook binary would
 have shipped absent from every published tarball). OpenCode uses in-process handlers.
 
+**Sub-agent tool gating diverges by host — only Claude needed a fix.** Claude's `tools:`
+field is an allowlist, so a generated sub-agent that carried one could reach no MCP tool
+the parent session had active: Claude's own docs state an allowlisted subagent "can't edit
+files, write files, or use any MCP tools." `emitClaude` therefore stopped emitting `tools:`
+for ordinary charters and gates them with `disallowedTools: Write, Edit, NotebookEdit`
+instead — a denylist, which Claude documents as leaving the rest of the pool, MCP included,
+intact ("keeps Bash, MCP tools, and the rest of its pool"). Write charters get neither key.
+`navigator` is the deliberate allowlist exception (`AGENT_TOOLS_OVERRIDE`): it keeps
+`tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]` on purpose, so it stays
+index-first instead of widening to every MCP server on the machine. The other three hosts
+have no allowlist to maintain: Cursor inherits all tools including MCP with no `tools` key
+at all (permission is `readonly: true`, a different mechanism); Codex has no `tools` key at
+any layer and gates via `sandbox_mode`; OpenCode's `tools` key is deprecated in favor of a
+`permission` wildcard map, and the emitter writes only `edit`/`bash` keys, denying no MCP
+pattern. The per-host mechanism and its verbatim citation live in
+`scripts/lib/host-capabilities.ts`'s `toolGating` field; the full evidence is in
+`.specs/features/subagent-tool-inheritance/spec.md`.
+
 **`skills/model-profiles.json` is the only hand-authored place that names a model or an
 effort level for any agent on any host.** Resolution is `charter metadata.model_tier` +
 host + profile → `{model, effort}`, done at build time by `scripts/lib/model-profiles.ts`

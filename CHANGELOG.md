@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every Claude sub-agent except `navigator` could reach no MCP tool the parent session
+  had active.** Claude's `tools:` field is an allowlist; the generator emitted one for
+  every specialist, and Claude's own docs are explicit that an allowlisted subagent "can't
+  edit files, write files, or use any MCP tools." `designer`'s charter mandates reading
+  Figma through MCP and `context-curator`'s mandates calling `recall` — both were
+  structurally impossible on Claude no matter how the dispatch was worded. `emitClaude` now
+  emits no `tools:` key for ordinary charters: read-only charters get
+  `disallowedTools: Write, Edit, NotebookEdit` (Claude documents that denylist as leaving
+  "Bash, MCP tools, and the rest of its pool" intact), write charters get neither key.
+  `navigator` keeps its deliberate `tools:` allowlist byte-identical, so it stays
+  index-first. Cursor, Codex, and OpenCode were measured already inheriting MCP and are
+  unchanged; a new per-host sensor fails if a future emitter change introduces an
+  MCP-blocking construct on any of them. Ships across all four host plugin bundles.
+
+### Changed
+
+- **The "Never spawn subagents" blanket prohibition is retired** from all 18
+  `skills/agents/*/SKILL.md` charters and the 4 shared-reference lines that repeated it, so
+  a sub-agent that now inherits Claude's `Agent` tool is no longer simultaneously told never
+  to use it. Nesting is already on by default on Claude to a depth of 3
+  (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`); this only removes the prohibition, it adds no
+  instruction to nest. The other three hosts' nesting capability was not measured, and this
+  change claims nothing about them. The sequential-execution rule for spec-driven batch
+  workers is preserved, restated separately from the sentence that used to carry it.
+
+### Added
+
+- **Every massa-ai roster dispatch now announces the sub-agent's model and effort**, read
+  from the installed agent file for the active host rather than recomputed from the
+  registry, so a profile mismatch or an unexpected `inherit` is visible at dispatch time
+  rather than discovered from behavior. Applies with no exemption to all 18 specialists,
+  the three standing dispatch exceptions (`plan-critic`, `verification-agent`, `designer`),
+  and spec-driven batch workers. An unreadable or missing installed file announces the
+  model and effort as unknown, names the attempted path, and the dispatch proceeds rather
+  than blocking.
+
 ## [1.50.0] - 2026-08-11
 
 ### Added
