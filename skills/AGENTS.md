@@ -291,7 +291,7 @@ Thumbs.db
 
 # Sub-Agent Registry
 
-Single registry for the 17 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
+Single registry for the 18 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
 
 **Dispatch names are prefixed.** A charter at `skills/agents/<role>/SKILL.md` is registered by every host as `massa-ai-<role>`. Dispatch `massa-ai-investigator`, not `investigator`; the bare name is the registry key only. See `skills/massa-ai/references/agent-orchestration.md` -> Name Resolution for the convention and for the fallback when a named agent is unavailable.
 
@@ -336,6 +336,7 @@ would drift, and did.
 | navigator | Navigate an indexed codebase index-first | read-only | "where is X", "who calls Y" against a fresh massa-ai index | `skills/agents/navigator/SKILL.md` |
 | meta-judge | Author the evaluation specification YAML a debate panel scores against (once per evaluation) | read-only | `judge-with-debate` opens an evaluation | `skills/agents/meta-judge/SKILL.md` |
 | judge | Score an artifact against the evaluation specification with quoted evidence; debate to consensus | read-only (report-write, own file only) | `judge-with-debate` dispatches the 3-judge panel or a debate round | `skills/agents/judge/SKILL.md` |
+| designer | Verify and implement user-facing screens against their design source | read-only (UI-layer write when scoped) | A task creates or modifies a screen — standing exception to the dispatch triggers | `skills/agents/designer/SKILL.md` |
 
 ## Mapping — New Agents ↔ Existing Roles
 
@@ -360,6 +361,7 @@ The massa-ai skill defines the roles in `skills/massa-ai/references/agent-orches
 | navigator | — | Pre-existing Claude/Cursor index-first agent, now charter-governed and shipped to all four hosts. |
 | meta-judge | — | New capability (evaluation-specification author for debate panels). |
 | judge | — | New capability (debate-panel evaluator; quoted-evidence scoring, append-only debate rounds). |
+| designer | — | New capability (screen implementation and design-source conformance; UI-layer scoped writer). |
 
 ## How to Add an Agent
 
@@ -382,4 +384,4 @@ All agents integrate these concepts (documented per-agent in each charter):
 - **References**: agents point to the relevant massa-ai reference files by name.
 - **Lessons**: agents surface reusable failures for lesson distillation.
 
-<!-- validator anchors: 17 agents | mapping table -->
+<!-- validator anchors: 18 agents | mapping table -->
