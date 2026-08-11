@@ -83,6 +83,19 @@ For all other roles, preserve the normal delegation gates above.
 
 The Independent Verification Mandate in `references/verification-ladder.md` is a second standing policy exception, parallel to the Plan Challenge one: when a `*-fix` workflow closes a finding, or a light workflow (`debug`, `feature`, `general`, `refactor`) completes Standard+ work, always attempt the `massa-ai-verification-agent` dispatch when subagent tooling is available and platform policy permits spawning — it does not need to satisfy the ordinary dispatch triggers (file count, module count, explicit user delegation). Base packet-quality requirements still apply, and the mandate's own tier gates, security-fix unconditional rule, and fresh-eyes fallback live in that ladder section, not here.
 
+## Screen Implementation Exception (any workflow that can produce a screen)
+
+A third standing policy exception, parallel to the two above: **when a task creates or modifies a user-facing screen, always attempt the `massa-ai-designer` dispatch** while subagent tooling is available and platform policy permits spawning. Once that condition holds the dispatch is not subject to the ordinary dispatch triggers — not file count, not module count, not explicit user delegation.
+
+The condition is the whole gate. On a task with no screen surface the dispatch does not fire at all, which is why the seven dispatching workflows can carry it without firing it on every task. "Creates or modifies a user-facing screen" means a change to a screen, view, page, component, layout, style, theme, or design-token file, or any change whose acceptance criteria describe what a user sees.
+
+Two shape rules follow from the roles involved:
+
+- **Read-only inside findings-only workflows.** An audit workflow passes `permissions: read-only` in the packet. The agent's charter permits writes only when explicitly scoped, and charter Restrictions win over the packet on conflict, so the read-only packet is the narrower of the two and governs.
+- **Disjoint from the implementer.** When a screen task also dispatches an implementer, the UI layer belongs to one agent and everything else to the other. Overlapping write sets are a consolidation signal under Cognitive Locality, not a parallel dispatch.
+
+Base packet-quality requirements still apply, and the no-agent fallback below applies unchanged: run the scope locally against the same output contract and report the skipped delegation in the Evidence Gate.
+
 ## Name Resolution
 
 Charters live at `skills/agents/<role>/SKILL.md`. Hosts register every charter
