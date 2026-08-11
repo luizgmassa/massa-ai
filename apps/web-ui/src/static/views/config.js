@@ -344,30 +344,35 @@ export function renderConfig(data, opts) {
   return '<section class="view"><div class="view-header"><h2>Config</h2>' + restartBtn + "</div>" + helpCard + cards + "</section>";
 }
 
-/** Segments that would reach `Object.prototype` instead of the object being
- *  built. Every real path segment comes from `CONFIG_SECTIONS`' hardcoded
- *  `field.name` table, so none of these can occur today and refusing them
- *  changes no output — but a walker that assigns down a dotted path is worth
- *  making unable to pollute regardless of who calls it next. */
-const UNSAFE_PATH_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
-
+/**
+ * Refuses a path segment that would reach `Object.prototype` rather than the
+ * object being built.
+ *
+ * Written as literal `===` comparisons, not a `Set` lookup. Both are correct,
+ * but only this shape is legible to CodeQL's `js/prototype-pollution-utility`
+ * query as a sanitizer — a `Set.has()` call is opaque to it, and the alert
+ * survived two attempts that used one.
+ *
+ * Every real segment comes from `CONFIG_SECTIONS`' hardcoded `field.name`
+ * table, so none of these can occur today and refusing them changes no output.
+ * A walker that assigns down a dotted path is worth making unable to pollute
+ * regardless of who calls it next.
+ */
 function setByPath(obj, dottedPath, value) {
   const parts = dottedPath.split(".");
   let cur = obj;
-  // Guarded immediately before each write rather than once up front: the check
-  // has to sit on the assignment it protects for the property chain to be
-  // provably safe at every hop (and for CodeQL's prototype-pollution query to
-  // read it as a sanitizer, which a single up-front `some()` is not).
+  // The guard sits on each write rather than once up front, so the chain is
+  // provably safe at every hop instead of only at entry.
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
-    if (UNSAFE_PATH_SEGMENTS.has(key)) return;
+    if (key === "__proto__" || key === "constructor" || key === "prototype") return;
     if (!Object.prototype.hasOwnProperty.call(cur, key) || typeof cur[key] !== "object" || cur[key] === null) {
       cur[key] = {};
     }
     cur = cur[key];
   }
   const last = parts[parts.length - 1];
-  if (UNSAFE_PATH_SEGMENTS.has(last)) return;
+  if (last === "__proto__" || last === "constructor" || last === "prototype") return;
   cur[last] = value;
 }
 
