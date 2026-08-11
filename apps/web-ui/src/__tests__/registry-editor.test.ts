@@ -717,6 +717,14 @@ describe("Models catalog inline-form button-row grouping (T11, APUX-09, P2-F AC4
 
 const APP_JS_SOURCE = fs.readFileSync(path.join(import.meta.dir, "..", "static", "app.js"), "utf8");
 
+/** The Memory tab moved to its own module when app.js was split. This sensor's
+ *  control case reads it from there; the assertion itself is unchanged, only
+ *  the file the source is read from. */
+const MEMORY_VIEW_SOURCE = fs.readFileSync(
+  path.join(import.meta.dir, "..", "static", "views", "memory.js"),
+  "utf8",
+);
+
 /** Extracts the full source text of every top-level `function name(...)  { ... }`
  *  declaration (optionally `export`/`async`) whose name matches `namePattern`,
  *  using a small brace-depth lexer that ignores braces inside string/template
@@ -799,7 +807,7 @@ describe("no-prompt/no-alert structural sensor — Models tab (T7, P2-D AC6)", (
   it("the Memory tab's unrelated prompt() (out of scope for this sensor) still exists in the file", () => {
     // Proves the sensor is scoped to specific function spans, not a whole-file
     // scan that would trivially also "pass" a repo with no prompt() anywhere.
-    expect(APP_JS_SOURCE).toContain('prompt("Edit memory content:", "")');
+    expect(MEMORY_VIEW_SOURCE).toContain('prompt("Edit memory content:", "")');
   });
 });
 

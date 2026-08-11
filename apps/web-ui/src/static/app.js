@@ -11,302 +11,67 @@
  * path blocklist.
  */
 
-// ── Constants ──────────────────────────────────────────────────────────────
-
 import { renderDashboard, fetchDashboardData } from "./dashboard.js";
-import { escapeHtml, truncate, errorBlock, renderGuideText } from "./lib/html.js";
+import { escapeHtml, errorBlock, renderGuideText } from "./lib/html.js";
 import { markdownToHtml } from "./lib/markdown.js";
 import { initTheme, toggleTheme } from "./lib/theme.js";
 import { readInjectedApiKey, isWriteModeEnabled, createApiClient } from "./lib/api-client.js";
 import { showBanner } from "./lib/banner.js";
+import {
+  renderProjects,
+  handleProjectIndexProgress,
+  handleIndexStatusEvent,
+  handleProjectIndex,
+  handleProjectReset,
+  clearIndexPoll,
+  startIndexPoll,
+} from "./views/projects.js";
+import {
+  MEMORY_TYPES,
+  MEMORY_LEVELS,
+  renderMemoryBrowser,
+  handleMemoryDeleteProjectOpen,
+  handleMemoryDeleteProjectCancel,
+  handleMemoryDeleteProject,
+  handleMemoryEdit,
+  handleMemoryDelete,
+  handleMemoryCreate,
+} from "./views/memory.js";
+import { renderHandoffs, handleHandoffCreate, handleHandoffAction } from "./views/handoffs.js";
+import { renderProposals, handleProposalAction } from "./views/proposals.js";
+import {
+  CHECKPOINTS_LIST_BODY,
+  renderCheckpoints,
+  handleCheckpointCreate,
+  handleCheckpointDelete,
+} from "./views/checkpoints.js";
 
-export { escapeHtml, markdownToHtml, initTheme, toggleTheme, isWriteModeEnabled, showBanner };
-
-export const MEMORY_TYPES = ["critical", "conversation", "code", "decision", "pattern"];
-
-export const MEMORY_LEVELS = [
-  { value: 1, label: "1 — Project" },
-  { value: 2, label: "2 — User" },
-  { value: 3, label: "3 — Session" },
-];
-
-/**
- * Base request body for the checkpoints view.
- *
- * `format: "json"` is load-bearing. POST /api/v1/checkpoints/list defaults to
- * `format: "toon"`, whose `data` is a formatted *string*, not an object — the
- * renderer cannot read rows out of it and the view silently shows the empty
- * state no matter how many checkpoints exist.
- *
- * Exported so route-contract.test.ts posts the exact body the UI posts, which
- * is what keeps this bound to the real route response.
- */
-export const CHECKPOINTS_LIST_BODY = { limit: 50, format: "json" };
+export {
+  escapeHtml,
+  markdownToHtml,
+  initTheme,
+  toggleTheme,
+  isWriteModeEnabled,
+  showBanner,
+  MEMORY_TYPES,
+  MEMORY_LEVELS,
+  CHECKPOINTS_LIST_BODY,
+  renderProjects,
+  renderMemoryBrowser,
+  renderHandoffs,
+  renderProposals,
+  renderCheckpoints,
+  handleProjectIndexProgress,
+  handleIndexStatusEvent,
+  handleMemoryDeleteProjectOpen,
+  handleMemoryDeleteProjectCancel,
+  handleMemoryDeleteProject,
+};
 
 // ── View renderers (pure: ({ data, state }) => htmlString) ─────────────────
 
-export function renderProjects(data, opts) {
-  const projects = (data && data.projects) || [];
-  const writeMode = isWriteModeEnabled();
-  const indexJobId = opts && opts.indexJobId;
-  const indexJobStatus = opts && opts.indexJobStatus;
-  const indexJobPhase = opts && opts.indexJobPhase;
-  const indexJobFileCount = opts && opts.indexJobFileCount;
 
-  const indexProgress = indexJobId
-    ? '<div class="index-progress"><span>Index job: ' + escapeHtml(indexJobId) + '</span>' +
-      '<span class="badge">' + escapeHtml(indexJobStatus || "pending") + '</span>' +
-      (indexJobPhase ? '<span>phase: ' + escapeHtml(indexJobPhase) + '</span>' : "") +
-      (indexJobFileCount != null ? '<span>' + escapeHtml(String(indexJobFileCount)) + ' files</span>' : "") +
-      '</div>'
-    : "";
 
-  const indexForm = writeMode
-    ? '<div class="create-form form-grid">' +
-      "<h3>Index Project</h3>" +
-      '<div class="form-field"><label>Project Path</label><input type="text" data-create="projectPath" data-form="project-index" /></div>' +
-      '<div class="form-field"><label>Project ID (optional)</label><input type="text" data-create="projectId" data-form="project-index" /></div>' +
-      '<div class="form-field"><label><input type="checkbox" data-create="forceReindex" data-form="project-index" /> Force Reindex</label></div>' +
-      '<div class="form-field"><label><input type="checkbox" data-create="warmCache" data-form="project-index" /> Warm Cache</label></div>' +
-      '<button type="button" class="btn btn-primary" data-action="project-index">Index</button>' +
-      "</div>"
-    : "";
-
-  if (projects.length === 0 && !writeMode) {
-    return '<section class="view"><h2>Projects</h2>' + indexProgress + '<p class="empty">No indexed projects.</p></section>';
-  }
-
-  const actionCol = writeMode ? "<th>Actions</th>" : "";
-  const body =
-    '<table class="grid"><thead><tr><th>Project</th><th>Files</th>' + actionCol + '</tr></thead><tbody>' +
-    projects
-      .map((p) => {
-        const id = escapeHtml(p.projectId || p.id || "");
-        const count = p.documentCount ?? p.docCount ?? "";
-        const actions = writeMode
-          ? '<td class="actions-cell">' +
-            '<button type="button" class="btn-delete" data-action="project-reset" data-project="' + id + '">Delete</button>' +
-            "</td>"
-          : "";
-        return (
-          "<tr>" +
-          "<td>" +
-          escapeHtml(id) +
-          "</td>" +
-          "<td>" +
-          (count !== "" ? escapeHtml(String(count)) : "") +
-          "</td>" +
-          actions +
-          "</tr>"
-        );
-      })
-      .join("") +
-    "</tbody></table>";
-
-  return (
-    '<section class="view"><h2>Projects</h2>' +
-    indexProgress +
-    body +
-    indexForm +
-    '<details class="help-card"><summary>About this tab</summary>' +
-    '<div class="help-card-body">' +
-    '<h4>What Indexing Does</h4>' +
-    '<p>Indexing reads a project\'s source files and stores them as searchable vectors, keyword entries, and code symbols, so massa-ai\'s memory and search tools can find relevant code and context. Re-index after large changes to keep that view current.</p>' +
-    '<h4>Index Project</h4>' +
-    '<dl>' +
-    '<dt>Project Path</dt><dd>Absolute path to the project directory to index. Must be a git repository or a directory with source files.</dd>' +
-    '<dt>Project ID (optional)</dt><dd>Unique identifier for the project. Defaults to the directory basename. Used to scope all indexed data (memories, search, symbols).</dd>' +
-    '<dt>Force Reindex</dt><dd>When checked, re-indexes all files even if they have not changed since the last index. Use after changing embedding models or when the index is corrupted.</dd>' +
-    '<dt>Warm Cache</dt><dd>When checked, pre-warms the search cache after indexing. Speeds up the first search query but adds time to the indexing process.</dd>' +
-    '</dl>' +
-    '<h4>What Delete Removes</h4>' +
-    '<p>Delete removes a project\'s indexed vectors, keyword entries, symbols, and memories, irreversibly. The project\'s files on disk are untouched — only massa-ai\'s record of it disappears from this list.</p>' +
-    '<h4>Embedding Dimension Note</h4>' +
-    '<p>If a project is missing from the list, the current embedding model\'s dimension may not match the dimension used when the project was indexed. Check the Embedding section in Config for the correct dimensions value, or reindex the project.</p>' +
-    '</div>' +
-    '</details>' +
-    "</section>"
-  );
-}
-
-/** Renders the bulk-delete control for the Memory tab (design "1. Memory bulk
- *  delete (MBD)", spec P1-Bulk ACs 1-4). Gated on write mode + a selected
- *  project (MBD-01); the inline confirmation form appears only when
- *  `state.memoryBulkForm` is open (MBD-02) — shape `null | { error?: string }`,
- *  mirroring `state.registryForm`'s open/closed convention. The confirm value
- *  is read from `[data-bulk="confirm-id"]` at submit time (T2), never from
- *  `btn.dataset` — the fake-DOM harness's synthetic clicks carry an empty
- *  dataset. */
-function renderMemoryBulkDelete(state) {
-  const writeMode = isWriteModeEnabled();
-  if (!writeMode) return "";
-  const project = state.project;
-  if (!project) {
-    return '<p class="muted">Select a project to enable bulk delete.</p>';
-  }
-  const trigger =
-    '<button type="button" class="btn btn-danger" data-action="memory-delete-project">Delete all memories for ' +
-    escapeHtml(project) +
-    "</button>";
-  const formState = state.memoryBulkForm;
-  let form = "";
-  if (formState) {
-    const errorLine = formState.error
-      ? '<p class="form-error">' + escapeHtml(formState.error) + "</p>"
-      : "";
-    // Pre-mortem #6: `deleteByProject` deletes on the CANONICAL project id with
-    // no `deleted_at` predicate, while this tab's list filters
-    // `deleted_at IS NULL` and matches the id literally. The reported count can
-    // therefore legitimately exceed the rows on screen — saying so here makes
-    // that a specified outcome instead of something that reads as a bug.
-    const scopeNote =
-      '<p class="muted bulk-delete-scope">Permanently deletes every memory for ' +
-      escapeHtml(project) +
-      ", including already-deleted rows still held as tombstones — so the reported " +
-      "count may exceed the rows listed above. Vectors, keyword rows and the symbol " +
-      "graph are left untouched. This cannot be undone.</p>";
-    form =
-      '<div class="bulk-delete-inline-form form-field">' +
-      errorLine +
-      scopeNote +
-      "<label>Retype &quot;" +
-      escapeHtml(project) +
-      '&quot; to confirm<input type="text" data-bulk="confirm-id" /></label>' +
-      '<div class="button-row">' +
-      '<button type="button" class="btn btn-danger" data-action="memory-delete-project-confirm">Confirm Delete</button>' +
-      '<button type="button" class="btn btn-secondary" data-action="memory-delete-project-cancel">Cancel</button>' +
-      "</div></div>";
-  }
-  return '<div class="bulk-delete">' + trigger + form + "</div>";
-}
-
-export function renderMemoryBrowser(data, state) {
-  state = state || {};
-  if (!data || data.success === false) {
-    return errorBlock(data);
-  }
-  const payload = data.data || data;
-  const memories = (payload && payload.memories) || [];
-  const total = (payload && payload.total) || 0;
-  const limit = (payload && payload.limit) || 50;
-  const offset = (payload && payload.offset) || 0;
-  const f = state.filters || {};
-  const writeMode = isWriteModeEnabled();
-
-  const typeOpts = MEMORY_TYPES.map(
-    (t) =>
-      '<option value="' +
-      t +
-      '"' +
-      (f.type === t ? " selected" : "") +
-      ">" +
-      t +
-      "</option>",
-  ).join("");
-  const levelOpts = MEMORY_LEVELS.map(
-    (l) =>
-      '<option value="' +
-      l.value +
-      '"' +
-      (String(f.level) === String(l.value) ? " selected" : "") +
-      ">" +
-      l.label +
-      "</option>",
-  ).join("");
-
-  const filterBar =
-    '<div class="filters">' +
-    '<label>type <select data-filter="type"><option value="">(any)</option>' +
-    typeOpts +
-    "</select></label>" +
-    '<label>level <select data-filter="level"><option value="">(any)</option>' +
-    levelOpts +
-    "</select></label>" +
-    '<label>min importance <input type="number" min="0" max="1" step="0.1" data-filter="minImportance" value="' +
-    escapeHtml(f.minImportance != null ? String(f.minImportance) : "") +
-    '"/></label>' +
-    '<button type="button" data-action="memory-refresh">apply</button>' +
-    "</div>";
-
-  let body;
-  if (memories.length === 0) {
-    body = '<p class="empty">No memories match these filters.</p>';
-  } else {
-    const actionCol = writeMode ? "<th>actions</th>" : "";
-    body =
-      '<table class="grid"><thead><tr><th>type</th><th>level</th><th>imp.</th><th>content</th>' + actionCol + '</tr></thead><tbody>' +
-      memories
-        .map((m) => {
-          const content = truncate(m.content || "", 200);
-          const id = escapeHtml(m.id || "");
-          const actions = writeMode
-            ? '<td class="actions-cell">' +
-              '<button type="button" class="btn-edit" data-action="memory-edit" data-id="' + id + '">edit</button> ' +
-              '<button type="button" class="btn-delete" data-action="memory-delete" data-id="' + id + '">delete</button>' +
-              "</td>"
-            : "";
-          return (
-            "<tr>" +
-            "<td>" +
-            escapeHtml(m.type || "") +
-            "</td>" +
-            "<td>" +
-            escapeHtml(String(m.level ?? "")) +
-            "</td>" +
-            "<td>" +
-            escapeHtml(String(m.importance ?? "")) +
-            "</td>" +
-            '<td class="content-cell">' +
-            markdownToHtml(content) +
-            "</td>" +
-            actions +
-            "</tr>"
-          );
-        })
-        .join("") +
-      "</tbody></table>";
-  }
-
-  const pager =
-    '<div class="pager muted">' +
-    escapeHtml(String(offset + 1)) +
-    "–" +
-    escapeHtml(String(Math.min(offset + limit, total))) +
-    " of " +
-    escapeHtml(String(total)) +
-    ' <button type="button" data-action="memory-prev"' +
-    (offset === 0 ? " disabled" : "") +
-    ">prev</button>" +
-    '<button type="button" data-action="memory-next"' +
-    (offset + limit >= total ? " disabled" : "") +
-    ">next</button></div>";
-
-  const createForm = writeMode
-    ? '<div class="create-form">' +
-      "<h3>Create Memory</h3>" +
-      '<div class="form-field"><label>content</label><textarea data-create="content" data-form="memory-create"></textarea></div>' +
-      '<div class="form-field"><label>type</label><select data-create="type" data-form="memory-create">' +
-      MEMORY_TYPES.map((t) => '<option value="' + t + '">' + t + "</option>").join("") +
-      "</select></div>" +
-      '<div class="form-field"><label>importance (0-1)</label><input type="number" min="0" max="1" step="0.1" data-create="importance" data-form="memory-create" value="0.5" /></div>' +
-      '<div class="form-field"><label>tags (comma-separated)</label><input type="text" data-create="tags" data-form="memory-create" /></div>' +
-      '<div class="form-field"><label>projectId</label><input type="text" data-create="projectId" data-form="memory-create" /></div>' +
-      '<button type="button" data-action="memory-create">Create</button>' +
-      "</div>"
-    : "";
-
-  const bulkDelete = renderMemoryBulkDelete(state);
-
-  return (
-    '<section class="view"><h2>Memory</h2>' +
-    filterBar +
-    bulkDelete +
-    body +
-    pager +
-    createForm +
-    "</section>"
-  );
-}
 
 export function renderSearch(data, state) {
   state = state || {};
@@ -350,197 +115,8 @@ export function renderSearch(data, state) {
   return '<section class="view"><h2>Search</h2>' + input + body + "</section>";
 }
 
-export function renderHandoffs(data, state) {
-  state = state || {};
-  const project = state.project || "";
-  const writeMode = isWriteModeEnabled();
-  if (!project) {
-    return (
-      '<section class="view"><h2>Handoffs</h2>' +
-      '<p class="muted">Select a project to list pending handoffs.</p></section>'
-    );
-  }
-  if (!data || data.success === false) {
-    return '<section class="view"><h2>Handoffs</h2>' + errorBlock(data) + "</section>";
-  }
-  const payload = data.data || data;
-  const pending = (payload && payload.pending) || [];
 
-  const createForm = writeMode
-    ? '<div class="create-form">' +
-      "<h3>Create Handoff</h3>" +
-      '<div class="form-field"><label>projectId</label><input type="text" data-create="projectId" data-form="handoff-create" value="' + escapeHtml(project) + '" /></div>' +
-      '<div class="form-field"><label>summary</label><input type="text" data-create="summary" data-form="handoff-create" /></div>' +
-      '<div class="form-field"><label>targetAgent (optional)</label><input type="text" data-create="targetAgent" data-form="handoff-create" /></div>' +
-      '<div class="form-field"><label>openQuestions (comma-separated)</label><input type="text" data-create="openQuestions" data-form="handoff-create" /></div>' +
-      '<div class="form-field"><label>nextSteps (comma-separated)</label><input type="text" data-create="nextSteps" data-form="handoff-create" /></div>' +
-      '<div class="form-field"><label>files (comma-separated)</label><input type="text" data-create="files" data-form="handoff-create" /></div>' +
-      '<button type="button" data-action="handoff-create">Create</button>' +
-      "</div>"
-    : "";
 
-  if (pending.length === 0 && !writeMode) {
-    return '<section class="view"><h2>Handoffs</h2><p class="empty">No pending handoffs.</p></section>';
-  }
-  const rows = pending
-    .map((h) => {
-      const id = escapeHtml(h.id || "");
-      const actions = writeMode
-        ? '<div class="actions-cell">' +
-          '<button type="button" class="btn-approve" data-action="handoff-accept" data-id="' + id + '">accept</button> ' +
-          '<button type="button" class="btn-delete" data-action="handoff-cancel" data-id="' + id + '">cancel</button>' +
-          "</div>"
-        : "";
-      return (
-        '<div class="card">' +
-        "<div><strong>" +
-        escapeHtml(h.targetAgent || "(any agent)") +
-        "</strong> <span class=\"muted\">" +
-        escapeHtml(h.status || "") +
-        "</span></div>" +
-        '<div class="card-body">' +
-        markdownToHtml(h.summary || "(no summary)") +
-        "</div>" +
-        "<div class=\"muted\">" +
-        escapeHtml(h.id || "") +
-        "</div>" +
-        actions +
-        "</div>"
-      );
-    })
-    .join("");
-  return '<section class="view"><h2>Handoffs</h2>' + rows + createForm + "</section>";
-}
-
-export function renderProposals(data, state) {
-  state = state || {};
-  const project = state.project || "";
-  if (!project) {
-    return (
-      '<section class="view"><h2>Proposals</h2>' +
-      '<p class="muted">Select a project to list pending auto-improvement proposals.</p></section>'
-    );
-  }
-  if (!data || data.success === false) {
-    return '<section class="view"><h2>Proposals</h2>' + errorBlock(data) + "</section>";
-  }
-  const payload = data.data || data;
-  // The route returns `pending` (see apps/tools-api/src/routes/proposals.ts);
-  // `proposals` is accepted only as a legacy alias.
-  const proposals = (payload && (payload.pending || payload.proposals)) || [];
-  if (proposals.length === 0) {
-    return '<section class="view"><h2>Proposals</h2><p class="empty">No pending proposals.</p></section>';
-  }
-  const writeMode = isWriteModeEnabled();
-  const rows = proposals
-    .map((p) => {
-      const id = escapeHtml(p.id || "");
-      const actions = writeMode
-        ? '<div class="actions-cell">' +
-          '<button type="button" class="btn-approve" data-action="proposal-approve" data-id="' + id + '">approve</button> ' +
-          '<button type="button" class="btn-reject" data-action="proposal-reject" data-id="' + id + '">reject</button>' +
-          "</div>"
-        : "";
-      return (
-        '<div class="card">' +
-        "<div><strong>" +
-        escapeHtml(p.type || "proposal") +
-        "</strong> <span class=\"muted\">" +
-        escapeHtml(p.status || "") +
-        "</span></div>" +
-        '<div class="card-body">' +
-        markdownToHtml(p.description || p.summary || "(no description)") +
-        "</div>" +
-        "<div class=\"muted\">" +
-        escapeHtml(p.id || "") +
-        "</div>" +
-        actions +
-        "</div>"
-      );
-    })
-    .join("");
-  return '<section class="view"><h2>Proposals</h2>' + rows + "</section>";
-}
-
-export function renderCheckpoints(data) {
-  const writeMode = isWriteModeEnabled();
-  if (!data || data.success === false) {
-    return '<section class="view"><h2>Checkpoints</h2>' + errorBlock(data) + "</section>";
-  }
-  const rows = extractCheckpointRows(data);
-  if (rows === null) {
-    return (
-      '<section class="view"><h2>Checkpoints</h2>' +
-      errorBlock({
-        error:
-          'Unreadable checkpoints response: expected JSON rows. The list route ' +
-          'returns a TOON string unless the request sends format:"json".',
-      }) +
-      "</section>"
-    );
-  }
-
-  const createForm = writeMode
-    ? '<div class="create-form form-grid">' +
-      "<h3>Create Checkpoint</h3>" +
-      '<div class="form-field"><label>Task ID</label><input type="text" data-create="taskId" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>Description</label><input type="text" data-create="description" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>Status</label><select data-create="status" data-form="checkpoint-create"><option>pending</option><option>in_progress</option><option>completed</option><option>failed</option><option>paused</option></select></div>' +
-      '<div class="form-field"><label>Progress Percent</label><input type="number" min="0" max="100" data-create="progressPercent" data-form="checkpoint-create" value="0" /></div>' +
-      '<div class="form-field"><label>Current Step</label><input type="text" data-create="currentStep" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>Total Steps</label><input type="number" data-create="totalSteps" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>Completed Steps</label><input type="number" data-create="completedSteps" data-form="checkpoint-create" /></div>' +
-      '<div class="form-field"><label>Checkpoint Type</label><select data-create="checkpointType" data-form="checkpoint-create"><option>manual</option><option>milestone</option></select></div>' +
-      '<button type="button" class="btn btn-primary" data-action="checkpoint-create">Create</button>' +
-      "</div>"
-    : "";
-
-  if (rows.length === 0 && !writeMode) {
-    return '<section class="view"><h2>Checkpoints</h2><p class="empty">No checkpoints.</p></section>';
-  }
-  const actionCol = writeMode ? "<th>Actions</th>" : "";
-  const body =
-    '<table class="grid"><thead><tr><th>Task</th><th>Type</th><th>Status</th><th>Description</th>' + actionCol + '</tr></thead><tbody>' +
-    rows
-      .map((c) => {
-        const id = escapeHtml(c.id || c.checkpointId || "");
-        const actions = writeMode
-          ? '<td class="actions-cell">' +
-            '<button type="button" class="btn-edit" data-action="checkpoint-edit" data-id="' + id + '" data-task="' + escapeHtml(c.taskId || "") + '" data-status="' + escapeHtml(c.status || "") + '" data-type="' + escapeHtml(c.type || c.checkpointType || "") + '" data-description="' + escapeHtml(c.description || "") + '" data-progress="' + escapeHtml(String(c.progressPercent ?? "")) + '" data-step="' + escapeHtml(c.currentStep || "") + '" data-total="' + escapeHtml(String(c.totalSteps ?? "")) + '" data-completed="' + escapeHtml(String(c.completedSteps ?? "")) + '" data-checkpoint-type="' + escapeHtml(c.checkpointType || c.type || "") + '">edit</button> ' +
-            '<button type="button" class="btn-delete" data-action="checkpoint-delete" data-id="' + id + '" data-task="' + escapeHtml(c.taskId || "") + '">delete</button>' +
-            "</td>"
-          : "";
-        return (
-          "<tr>" +
-          "<td>" +
-          escapeHtml(c.taskId || "") +
-          "</td>" +
-          "<td>" +
-          escapeHtml(c.type || c.checkpointType || "") +
-          "</td>" +
-          "<td>" +
-          escapeHtml(c.status || "") +
-          "</td>" +
-          '<td class="content-cell">' +
-          escapeHtml(c.description || "") +
-          "</td>" +
-          actions +
-          "</tr>"
-        );
-      })
-      .join("") +
-    "</tbody></table>";
-  const helpCard =
-    '<details class="help-card"><summary>About this tab</summary>' +
-    '<div class="help-card-body">' +
-    '<h4>What A Checkpoint Is</h4>' +
-    '<p>A checkpoint is a saved snapshot of an in-progress task — its status, current step, and progress percentage — so work can resume exactly where it left off, even across a session restart.</p>' +
-    '<h4>Create And Edit</h4>' +
-    '<p>Use the form below to create a checkpoint for a task you are tracking. Each row\'s <strong>edit</strong> button reopens that checkpoint\'s fields for updating status, progress, and step; <strong>delete</strong> removes it.</p>' +
-    '</div>' +
-    '</details>';
-  return '<section class="view"><h2>Checkpoints</h2>' + body + createForm + helpCard + "</section>";
-}
 
 /** Converts a `datetime-local` input's value (no timezone, no seconds — e.g.
  *  "2026-08-10T10:00") into the ISO-8601 UTC string `GET /api/v1/logs`
@@ -1593,22 +1169,6 @@ function extractSearchResults(data) {
   return [];
 }
 
-/**
- * Normalize the ListCheckpointsTool response shape into a flat row list.
- *
- * Returns `null` — not `[]` — when the payload carries no recognizable row
- * container. A TOON-formatted response (`format` omitted, so the route falls
- * back to its "toon" default) puts a *string* here; collapsing that to `[]`
- * renders "No checkpoints" and hides the real failure.
- */
-function extractCheckpointRows(data) {
-  const payload = data && (data.data || data);
-  if (Array.isArray(payload && payload.checkpoints)) return payload.checkpoints;
-  if (Array.isArray(payload && payload.data)) return payload.data;
-  if (Array.isArray(payload)) return payload;
-  if (payload && typeof payload === "object") return [];
-  return null;
-}
 
 // ── Admin portal enhancement handlers (exported, context-injected) ──────────
 // These are module-level pure-ish functions taking a ctx { api, root, state,
@@ -1765,77 +1325,8 @@ export async function handleConfigReveal(ctx, targetId, section, field) {
   }
 }
 
-/** Opens the inline bulk-delete confirmation form (MBD-04): T1's
- *  `renderMemoryBulkDelete` renders the retype-to-confirm form only while
- *  `state.memoryBulkForm` is truthy. */
-export function handleMemoryDeleteProjectOpen(ctx) {
-  ctx.state.memoryBulkForm = { error: null };
-  ctx.render();
-}
 
-/** Closes the inline bulk-delete confirmation form without issuing any
- *  request (MBD-04). */
-export function handleMemoryDeleteProjectCancel(ctx) {
-  ctx.state.memoryBulkForm = null;
-  ctx.render();
-}
 
-/** Bulk-delete confirm handler (design "1. Memory bulk delete (MBD)",
- *  MBD-03..06). The typed confirmation value is read from
- *  `[data-bulk="confirm-id"]` — NEVER from `btn.dataset` — because the
- *  fake-DOM harness's synthetic `startApp` clicks fire every registered
- *  `data-action` handler against a generic child whose dataset carries none
- *  of this form's keys. Reading through the DOM lookup means a genuinely
- *  absent/mismatched value fails the exact-match guard instead of reading a
- *  stale or empty dataset property as a false confirmation.
- *
- *  The in-flight guard lives on `ctx.state`, never module scope —
- *  `handleServerRestart`'s recorded precedent (a module-level flag latched by
- *  one harness's never-resolving request would disable the handler for every
- *  later caller in the same process). */
-export async function handleMemoryDeleteProject(ctx) {
-  const state = ctx.state || (ctx.state = {});
-  if (state.memoryBulkDeleteInFlight) return;
-
-  const input = ctx.root && ctx.root.querySelector ? ctx.root.querySelector('[data-bulk="confirm-id"]') : null;
-  if (!input) return;
-
-  const typed = input.value;
-  const project = state.project;
-  if (typed !== project) {
-    state.memoryBulkForm = { error: "Project id does not match." };
-    ctx.render();
-    return;
-  }
-
-  state.memoryBulkDeleteInFlight = true;
-  try {
-    const res = await ctx.api.request("/api/v1/project/reset", {
-      method: "POST",
-      body: { projectId: project, clearVectors: false, clearSymbols: false, clearMemories: true },
-    });
-    if (res && res.success === false) {
-      const errors = Array.isArray(res.errors) ? res.errors : [];
-      const message = errors.length > 0 ? errors.join("; ") : (res.error || "Bulk delete failed.");
-      state.memoryBulkForm = { error: message };
-      showBanner(ctx.root, "error", "Bulk delete failed: " + message);
-      ctx.render();
-      return;
-    }
-    const data = (res && res.data) || {};
-    const deleted = data.memoriesDeleted != null ? data.memoriesDeleted : 0;
-    state.memoryBulkForm = null;
-    showBanner(ctx.root, "success", "Deleted " + String(deleted) + " memories for " + project + ".");
-    ctx.render();
-  } catch (e) {
-    const message = String((e && e.message) || e);
-    state.memoryBulkForm = { error: message };
-    showBanner(ctx.root, "error", "Bulk delete failed: " + message);
-    ctx.render();
-  } finally {
-    state.memoryBulkDeleteInFlight = false;
-  }
-}
 
 // ── Profiles tab switcher + switch handler (Component 2) ─────────────────────
 
@@ -2221,31 +1712,7 @@ export function handleRegistryRestore(ctx, profile) {
   ctx.render();
 }
 
-export async function handleProjectIndexProgress(ctx, jobId) {
-  ctx.state.indexJobId = jobId;
-  ctx.state.indexJobStatus = "pending";
-  ctx.state.indexJobPhase = null;
-  ctx.state.indexJobFileCount = null;
-  ctx.render();
-}
 
-/** SSE index_status event handler — exported so tests exercise the real
- *  matching logic, not a copy. Returns true if the event matched and updated
- *  state, false if ignored (jobId mismatch or no tracked job). */
-export function handleIndexStatusEvent(ctx, payload) {
-  if (!payload || !ctx.state.indexJobId) return false;
-  if (payload.jobId !== ctx.state.indexJobId) return false;
-  ctx.state.indexJobStatus = payload.status || ctx.state.indexJobStatus;
-  ctx.state.indexJobPhase = payload.phase || ctx.state.indexJobPhase;
-  ctx.state.indexJobFileCount = payload.fileCount != null ? payload.fileCount : ctx.state.indexJobFileCount;
-  if (ctx.state.indexJobStatus === "completed" || ctx.state.indexJobStatus === "failed") {
-    if (ctx.state.indexPollInterval) {
-      clearInterval(ctx.state.indexPollInterval);
-      ctx.state.indexPollInterval = null;
-    }
-  }
-  return true;
-}
 
 export async function handleRegistryClearOverlay(ctx) {
   if (!confirm("Discard all your overrides? This deletes your saved changes and reverts every tool to the built-in defaults.")) return;
@@ -2708,7 +2175,7 @@ function startApp(opts) {
   async function render() {
     setNavActive();
     // F4 fold: clear index poll interval when navigating away from projects
-    if (state.view !== "projects") clearIndexPoll();
+    if (state.view !== "projects") clearIndexPoll({ state });
     // T15 (LOG-14/15 teardown): abort any in-flight Logs live-tail stream
     // when navigating away from the logs view — mirrors clearIndexPoll()'s
     // discipline above.
@@ -2875,7 +2342,7 @@ function startApp(opts) {
       btn.addEventListener("click", () => {
         const id = btn.dataset.id;
         if (!id) return;
-        handleMemoryEdit(id);
+        handleMemoryEdit(ctx, id);
       });
     });
     root.querySelectorAll('[data-action="memory-delete"]').forEach((btn) => {
@@ -2883,7 +2350,7 @@ function startApp(opts) {
         const id = btn.dataset.id;
         if (!id) return;
         if (confirm("Delete this memory? This cannot be undone.")) {
-          handleMemoryDelete(id);
+          handleMemoryDelete(ctx, id);
         }
       });
     });
@@ -2892,14 +2359,14 @@ function startApp(opts) {
       btn.addEventListener("click", () => {
         const id = btn.dataset.id;
         if (!id) return;
-        handleProposalAction(id, "approve");
+        handleProposalAction(ctx, id, "approve");
       });
     });
     root.querySelectorAll('[data-action="proposal-reject"]').forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.id;
         if (!id) return;
-        handleProposalAction(id, "reject");
+        handleProposalAction(ctx, id, "reject");
       });
     });
     // search
@@ -2914,17 +2381,17 @@ function startApp(opts) {
     });
     // write mode: memory create
     root.querySelector('[data-action="memory-create"]')?.addEventListener("click", () => {
-      handleMemoryCreate();
+      handleMemoryCreate(ctx);
     });
     // write mode: handoff create/accept/cancel
     root.querySelector('[data-action="handoff-create"]')?.addEventListener("click", () => {
-      handleHandoffCreate();
+      handleHandoffCreate(ctx);
     });
     root.querySelectorAll('[data-action="handoff-accept"]').forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.id;
         if (!id) return;
-        handleHandoffAction(id, "accept");
+        handleHandoffAction(ctx, id, "accept");
       });
     });
     root.querySelectorAll('[data-action="handoff-cancel"]').forEach((btn) => {
@@ -2932,13 +2399,13 @@ function startApp(opts) {
         const id = btn.dataset.id;
         if (!id) return;
         if (confirm("Cancel handoff " + id + "? This cannot be undone.")) {
-          handleHandoffAction(id, "cancel");
+          handleHandoffAction(ctx, id, "cancel");
         }
       });
     });
     // write mode: checkpoint create/edit/delete
     root.querySelector('[data-action="checkpoint-create"]')?.addEventListener("click", () => {
-      handleCheckpointCreate();
+      handleCheckpointCreate(ctx);
     });
     root.querySelectorAll('[data-action="checkpoint-edit"]').forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -2974,20 +2441,20 @@ function startApp(opts) {
         const task = btn.dataset.task || "";
         if (!id) return;
         if (confirm("Delete checkpoint " + id + " (task: " + task + ")? This cannot be undone.")) {
-          handleCheckpointDelete(id);
+          handleCheckpointDelete(ctx, id);
         }
       });
     });
     // write mode: project index/reset
     root.querySelector('[data-action="project-index"]')?.addEventListener("click", () => {
-      handleProjectIndex();
+      handleProjectIndex(ctx);
     });
     root.querySelectorAll('[data-action="project-reset"]').forEach((btn) => {
       btn.addEventListener("click", () => {
         const project = btn.dataset.project;
         if (!project) return;
         if (confirm("Delete project " + project + "? This removes its indexed vectors, symbols and memories permanently. This cannot be undone.")) {
-          handleProjectReset(project);
+          handleProjectReset(ctx, project);
         }
       });
     });
@@ -3148,167 +2615,6 @@ function startApp(opts) {
     });
   }
 
-  function collectFormData(formName) {
-    const data = {};
-    root.querySelectorAll('[data-form="' + formName + '"]').forEach((el) => {
-      const key = el.dataset.create;
-      if (!key) return;
-      if (el.type === "checkbox") data[key] = el.checked;
-      else if (el.type === "number") data[key] = el.value === "" ? undefined : Number(el.value);
-      else data[key] = el.value;
-    });
-    return data;
-  }
-
-  async function handleMemoryEdit(id) {
-    const newContent = prompt("Edit memory content:", "");
-    if (newContent === null) return;
-    try {
-      await api.request("/api/v1/memory/" + encodeURIComponent(id), {
-        method: "PUT",
-        body: { content: newContent },
-      });
-      render();
-    } catch (e) {
-      alert("Edit failed: " + String(e.message || e));
-    }
-  }
-
-  async function handleMemoryDelete(id) {
-    try {
-      await api.request("/api/v1/memory/" + encodeURIComponent(id), {
-        method: "DELETE",
-      });
-      render();
-    } catch (e) {
-      alert("Delete failed: " + String(e.message || e));
-    }
-  }
-
-  async function handleProposalAction(id, action) {
-    try {
-      await api.request("/api/v1/proposal/" + action, {
-        method: "POST",
-        body: { id },
-      });
-      render();
-    } catch (e) {
-      alert(action + " failed: " + String(e.message || e));
-    }
-  }
-
-  async function handleMemoryCreate() {
-    const data = collectFormData("memory-create");
-    if (!data.content) { alert("Content is required."); return; }
-    if (data.importance !== undefined && (data.importance < 0 || data.importance > 1)) {
-      alert("Importance must be between 0 and 1.");
-      return;
-    }
-    const body = {
-      content: data.content,
-      type: data.type || "conversation",
-      importance: data.importance !== undefined ? data.importance : 0.5,
-    };
-    if (data.tags) body.tags = String(data.tags).split(",").map((s) => s.trim()).filter(Boolean);
-    if (data.projectId) body.projectId = data.projectId;
-    try {
-      await api.request("/api/v1/memory/store", { method: "POST", body });
-      render();
-    } catch (e) {
-      alert("Create failed: " + String(e.message || e));
-    }
-  }
-
-  async function handleHandoffCreate() {
-    const data = collectFormData("handoff-create");
-    if (!data.projectId) { alert("Project ID is required."); return; }
-    if (!data.summary) { alert("Summary is required."); return; }
-    const body = { projectId: data.projectId, summary: data.summary };
-    if (data.targetAgent) body.targetAgent = data.targetAgent;
-    if (data.openQuestions) body.openQuestions = String(data.openQuestions).split(",").map((s) => s.trim()).filter(Boolean);
-    if (data.nextSteps) body.nextSteps = String(data.nextSteps).split(",").map((s) => s.trim()).filter(Boolean);
-    if (data.files) body.files = String(data.files).split(",").map((s) => s.trim()).filter(Boolean);
-    try {
-      await api.request("/api/v1/handoff/begin", { method: "POST", body });
-      render();
-    } catch (e) {
-      alert("Create failed: " + String(e.message || e));
-    }
-  }
-
-  async function handleHandoffAction(id, action) {
-    try {
-      await api.request("/api/v1/handoff/" + action, { method: "POST", body: { id } });
-      render();
-    } catch (e) {
-      alert(action + " failed: " + String(e.message || e));
-    }
-  }
-
-  async function handleCheckpointCreate() {
-    const data = collectFormData("checkpoint-create");
-    if (!data.taskId) { alert("Task ID is required."); return; }
-    if (!data.description) { alert("Description is required."); return; }
-    const body = {
-      taskId: data.taskId,
-      description: data.description,
-      status: data.status || "pending",
-      checkpointType: data.checkpointType || "manual",
-    };
-    if (data.progressPercent !== undefined) body.progressPercent = data.progressPercent;
-    if (data.currentStep) body.currentStep = data.currentStep;
-    if (data.totalSteps !== undefined) body.totalSteps = data.totalSteps;
-    if (data.completedSteps !== undefined) body.completedSteps = data.completedSteps;
-    try {
-      await api.request("/api/v1/checkpoints/create", { method: "POST", body });
-      render();
-    } catch (e) {
-      alert("Create failed: " + String(e.message || e));
-    }
-  }
-
-  async function handleCheckpointDelete(id) {
-    try {
-      await api.request("/api/v1/checkpoints/delete", { method: "POST", body: { id } });
-      render();
-    } catch (e) {
-      alert("Delete failed: " + String(e.message || e));
-    }
-  }
-
-  async function handleProjectIndex() {
-    const data = collectFormData("project-index");
-    if (!data.projectPath) { alert("Project path is required."); return; }
-    const body = { projectPath: data.projectPath };
-    if (data.projectId) body.projectId = data.projectId;
-    if (data.forceReindex) body.forceReindex = true;
-    if (data.warmCache) body.warmCache = true;
-    try {
-      const res = await api.request("/api/v1/project/index", { method: "POST", body });
-      if (res && res.data && res.data.jobId) {
-        state.indexJobId = res.data.jobId;
-        state.indexJobStatus = "pending";
-        render();
-      } else {
-        render();
-      }
-    } catch (e) {
-      alert("Index failed: " + String(e.message || e));
-    }
-  }
-
-  async function handleProjectReset(project) {
-    try {
-      await api.request("/api/v1/project/reset", {
-        method: "POST",
-        body: { projectId: project, clearVectors: true, clearSymbols: true, clearMemories: true },
-      });
-      render();
-    } catch (e) {
-      alert("Reset failed: " + String(e.message || e));
-    }
-  }
-
   // global controls
   themeToggle?.addEventListener("click", () => toggleTheme(doc));
   projectSelect?.addEventListener("change", () => {
@@ -3341,7 +2647,7 @@ function startApp(opts) {
   if (typeof window !== "undefined") {
     window.addEventListener("beforeunload", (ev) => {
       // F4 fold: clear index poll on unload
-      clearIndexPoll();
+      clearIndexPoll({ state });
       if (state.registryDirty) {
         ev.preventDefault();
         ev.returnValue = "You have unsaved registry changes. Leave anyway?";
@@ -3352,42 +2658,6 @@ function startApp(opts) {
 
   // SSE: subscribe to /api/v1/events for real-time updates (Wave 7 T10)
   // T8: extend to track index_status for the tracked jobId (PRG-02) + poll fallback (PRG-03).
-  function clearIndexPoll() {
-    if (state.indexPollInterval) {
-      clearInterval(state.indexPollInterval);
-      state.indexPollInterval = null;
-    }
-  }
-
-  function startIndexPoll(jobId) {
-    clearIndexPoll();
-    let polls = 0;
-    const MAX_POLLS = 150; // 5 min at 2s interval
-    state.indexPollInterval = setInterval(async () => {
-      polls++;
-      if (polls > MAX_POLLS) {
-        state.indexJobStatus = "unknown";
-        clearIndexPoll();
-        if (state.view === "projects") render();
-        return;
-      }
-      try {
-        const res = await api.request("/api/v1/project/index/status/" + encodeURIComponent(jobId));
-        if (res && res.data) {
-          state.indexJobStatus = res.data.status || state.indexJobStatus;
-          state.indexJobPhase = res.data.phase || state.indexJobPhase;
-          state.indexJobFileCount = res.data.fileCount != null ? res.data.fileCount : state.indexJobFileCount;
-          if (state.indexJobStatus === "completed" || state.indexJobStatus === "failed") {
-            clearIndexPoll();
-            if (state.view === "projects") render();
-          }
-        }
-      } catch {
-        // network error — keep polling until cap
-      }
-    }, 2000);
-  }
-
   if (typeof EventSource !== "undefined") {
     try {
       const sseBase = opts.base || "";
@@ -3415,7 +2685,7 @@ function startApp(opts) {
       es.onerror = () => {
         // PRG-03: start polling fallback when SSE errors + a job is tracked
         if (state.indexJobId && state.indexJobStatus !== "completed" && state.indexJobStatus !== "failed" && !state.indexPollInterval) {
-          startIndexPoll(state.indexJobId);
+          startIndexPoll({ api, root, state, render, doc }, state.indexJobId);
         }
       };
     } catch {
