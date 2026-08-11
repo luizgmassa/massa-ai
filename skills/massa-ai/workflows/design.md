@@ -28,6 +28,19 @@ Not for Flutter, React Native, web UI, generic Figma exploration, variable-only 
 6. Persist only durable token/component mappings, approved deviations, source-set ownership rules, asset-pipeline rules, or reusable render recipes after Importance Calibration. Use `workflow:design` and required project/session/entity/memory tags.
 7. Complete `references/evidence-gate.md`. Model visual judgment alone cannot satisfy completion.
 
+**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
+
+> **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
+> - trigger: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched
+> - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
+> - permissions: write, scoped to UI-layer files only with a disjoint write set
+> - inputs: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
+> - sensors: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
+> - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
+> - firewall: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
+> - memory: suggest-only; the main agent persists durable screen and design-token conventions
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
 ## Examples
 
 User asks: "Implement this Figma checkout screen in the app's SwiftUI module."

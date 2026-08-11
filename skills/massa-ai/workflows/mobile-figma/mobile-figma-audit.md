@@ -58,6 +58,19 @@ Do not edit code. Route direct design implementation to `design`. Not for Flutte
 16. Persist only durable token/component mappings, source-set ownership rules, approved accessibility/platform deviations, asset-pipeline rules, or reusable render recipes after Importance Calibration. Use `workflow:mobile-figma-audit` and required tags. Never persist screenshots, hierarchy dumps, raw logs, device IDs, or user data.
 17. Complete `references/evidence-gate.md`. A model visual impression cannot satisfy the gate.
 
+**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
+
+> **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
+> - trigger: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched
+> - scope: the screens, views, components, layouts, styles, and design tokens under audit — never the whole repository, and no edits
+> - permissions: read-only — this workflow is findings-only; the charter permits writes only when explicitly scoped, and its Restrictions win over the packet, so read-only governs
+> - inputs: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
+> - sensors: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
+> - output: per-element conformance table (element, expected, actual, verdict, severity) feeding `MFM-*` findings; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
+> - firewall: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
+> - memory: suggest-only; the main agent persists durable screen and design-token conventions
+> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
+
 ## Examples
 
 User asks: "Compare the LoginScreen Compose preview and modified files against this Figma node."
