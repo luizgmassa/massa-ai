@@ -1,4 +1,186 @@
-# Handoff — designer-agent (VALIDATED 2026-08-11 — 11 commits, gates green; unpushed, push/PR = user decision)
+# Handoff — subagent-tool-inheritance (VALIDATED 2026-08-11 — 12 commits, 4 batch workers plus an independent verification pass; every gate green; unpushed, push/PR = user decision)
+
+Session `spec-subagent-tool-inheritance` · workflow **spec-driven** · persona pin
+`context-skill-harness-engineer-architect` · branch `fix/subagent-tool-inheritance`
+from `origin/main` @ `c32b8a22`, worktree
+`/Users/luizmassa/Projects/massa-ai-wt-subagent-tool-inheritance`. Range
+`c32b8a22..<this commit>` (12 commits: 1 spec+design + 9 task commits across 4
+sequential batch workers + 1 out-of-scope test repair + this close-out. Sections below
+marked "written by Batch Worker 4" predate the verification pass; the Gates, Next Step
+and Blockers sections have been updated to the final state).
+
+## Objective
+
+Claude sub-agents (all but `navigator`) could reach no MCP tool the parent session had
+active, because `emitClaude` emitted a `tools:` allowlist that excludes MCP tools by
+omission — `designer`'s charter mandates reading Figma through MCP and
+`context-curator`'s mandates calling `recall`, both structurally impossible on Claude.
+Folded in: retiring the "Never spawn subagents" blanket prohibition (18 charters + 4
+reference lines), and a dispatch-time model/effort announcement contract. Contract:
+`.specs/features/subagent-tool-inheritance/{spec,design,tasks}.md`.
+
+## State
+
+10 commits: `f5dc2637` spec+design → `5dd7c006` T1 `claudeToolPolicyFor`/`emitClaude` →
+`5f3f8ba3` T2 `subagent-parity.test.ts` rewrite + per-host MCP-blocking sensor →
+`de57344e` T3 retire the spawn prohibition from 18 charters → `b9a79e07` T4 retire it
+from 4 shared reference lines → `fad0bc82` T5 dispatch announcement contract →
+`e162b4ba` T6 guard sensors S8/S9 → `4f82e1d3` T7 `toolGating` capability field →
+`43580e32` T8 CLAUDE.md + CHANGELOG → this commit T9 close-out.
+
+## Completed
+
+- T1/T2 (STI-01/02/03): `claudeToolPolicyFor` replaces `toolsFor`; `emitClaude` emits
+  `disallowedTools: Write, Edit, NotebookEdit` for read-only charters, neither key for
+  write charters, `navigator`'s allowlist unchanged. Cursor/Codex/OpenCode untouched; a
+  new sensor fails on a future MCP-blocking construct on those hosts.
+- T3/T4 (STI-04): nesting prohibition removed from 18 charters + 4 reference lines (the
+  true count — the spec's first sweep undercounted at 3); the sequential-execution rule
+  for batch workers restated separately from the sentence that carried it.
+- T5/T6 (STI-05): every massa-ai roster dispatch announces model/effort read from the
+  installed agent file; S8/S9 guard the contract and its path table against drift.
+- T7 (STI-15): `scripts/lib/host-capabilities.ts` gained `toolGating`
+  (`"denylist" | "none" | "sandbox" | "permission-map"`), one value per host with the
+  verbatim documentation citation that established it — documentation-bearing only, no
+  emitter reads it. Updated the two fixture-host `HostCapabilities` literals the new
+  required field obliges.
+- T8 (STI-15): `CLAUDE.md`'s agent-harness section states the per-host tool-gating
+  contract (Claude denylist so MCP inherits, `navigator` the deliberate allowlist
+  exception, the other three hosts have no allowlist to maintain). `CHANGELOG.md`
+  gained `### Fixed` / `### Changed` / `### Added` under `[Unreleased]` — `Added`'s
+  presence carries a **minor** bump per CONTRIBUTING's table, and this does change
+  generated plugin artifacts across all four host bundles (a public compatibility
+  surface), matching that judgment.
+- T9 (this commit): `.specs/project/STATE.md` and `.specs/HANDOFF.md` rotated (prior
+  Current/top section renamed to Previous, then the new section prepended — section
+  counts 49→50 and 6→7 respectively, verified, not just asserted);
+  `.specs/project/FEATURES.json` gained a `subagent-tool-inheritance` entry with all
+  four phase flags `true`.
+
+## A real regression the T9 build gate found, outside this batch's write set — FIXED by `c6495d73`
+
+**Resolved.** `bun run test:plugins` is now **135 pass / 0 fail**. Before fixing, the
+class was enumerated across all four plugin suites rather than only the named instance:
+exactly 1 offender. The `allowed-tools:` hits in the Codex and Cursor manifest tests
+are slash-command frontmatter, not agent tool gating. The repair mirrors T2's rewrite —
+both halves assert the **presence** of the expected gating key, so neither can pass on
+an empty line, which is how the original passed vacuously for read-only agents while
+failing outright for write agents. Mutation-proved: reverting `emitClaude`'s denylist
+branch to the old allowlist reddens it with `Expected: "disallowedTools: Write, Edit,
+NotebookEdit"` / `Received: null`.
+
+The original finding, kept because the *why* is the reusable part:
+
+`bun run test:plugins` → **134 pass / 1 fail**. The failure is
+`apps/claude-plugin/__tests__/install.test.ts` → "CLA-02: read-only agents lack
+Write/Edit; write agents include them". It asserts the **pre-fix allowlist contract**
+against the real installed bundle (`tools:` line must contain `Write`/`Edit` for the 5
+write agents) — after T1's change, write agents carry no `tools:` line at all, so the
+assertion reddens. This is the identical vacuous-then-broken shape `design.md`'s Risks
+table already named and closed for `scripts/__tests__/subagent-parity.test.ts` (T2's
+scope, S3), but `apps/claude-plugin/__tests__/install.test.ts` is a **separate file**
+none of T1-T8 touched (`git log` confirms zero commits on this branch touch it). It
+stayed invisible through T1-T8 because none of those tasks' gates ran `test:plugins` —
+per `tasks.md`'s Gate Check Commands table, only the **build** gate does, and T9 is the
+first task that runs it.
+
+**Not fixed here.** This batch's capability packet scoped writes to
+`scripts/lib/host-capabilities.ts`, `CLAUDE.md`, `CHANGELOG.md`, and the three
+`.specs/` state artifacts only — `apps/claude-plugin/__tests__/install.test.ts` is
+outside that write set, and the Builder charter forbids writing outside the assigned
+set. Reported here rather than silently patched or the test weakened. The fix is
+mechanical and the same shape T2 already applied: rewrite the assertion to check for
+the presence of the exact `disallowedTools: Write, Edit, NotebookEdit` line (read-only)
+and the absence of any `tools:`/`disallowedTools:` line (write agents), instead of
+substring-matching an empty `tools:` line.
+
+## STI-14 — NOT RUN (recorded as a skipped sensor, not as passed)
+
+The live-host MCP behavioral check (a dispatched sub-agent successfully calling a real
+MCP tool) has **not been run**. It requires a host session with an MCP server active
+and a real dispatch, which is not reachable from this batch-worker worktree. **Do not
+read this feature as behaviorally verified.** The `disallowedTools`-honoured-on-plugin-
+sub-agents assumption (`spec.md` § Assumptions & Open Questions) stays evidence-grade
+**B**: two independent prose supports (the plugin field-restriction is a closed
+three-field enumeration that excludes `disallowedTools`; the nesting section cites
+`disallowedTools` as a working sub-agent control with no plugin caveat), neither a
+behavioral observation. STI-14 is the only thing that closes it to grade A. Per
+`design.md`'s Risks table: if `disallowedTools` turns out ignored for plugin
+sub-agents, read-only agents silently gain `Write`/`Edit`, and this feature is
+**Blocked**, not shipped with a caveat.
+
+## Gates (measured 2026-08-11, this worktree)
+
+| Gate | Result |
+| --- | --- |
+| `bun run lint` | 0 errors |
+| `bun run type-check` | 6/6 tasks successful |
+| `XDG_CONFIG_HOME=$(mktemp -d) bun scripts/generate-subagent-artifacts.ts --check` | no drift |
+| `bun run test:scripts` | **1804 pass / 0 fail** (80 TS files; baseline at HEAD 1803/0, +1 new `toolGating` test from T7) |
+| `bun run test:plugins` | **135 pass / 0 fail** after `c6495d73` |
+
+Per-task counts: after T7, `test:scripts` 1804/0 (baseline 1803/0). After T8,
+`test:scripts` 1804/0 (docs-only, no test delta).
+
+Shell-suite count correction: `CLAUDE.md` says `test:scripts` covers 21 shell suites;
+the verifier measured **29**. A stale figure inherited from the docs, not a regression
+from this feature. Not fixed here, to keep the diff scoped.
+
+## Independent verification — PASS
+
+`massa-ai-verification-agent`, author ≠ verifier, report at
+`.specs/features/subagent-tool-inheritance/validation.md`.
+
+It re-derived every count instead of trusting the author's: **0** spawn prohibitions
+across charters, references, and all **72** generated host files — a population the
+author never swept; **18/18** retained router/persona clauses; **108/108** generated
+Claude files carrying the correct gating key for their class (18 agents × 6
+directories). Every sweep was run in two grep dialects, because this repo's git build
+silently drops `\b` under `-E` and has previously returned a false clean.
+
+Discrimination sensor: **6/6 mutations killed, 0 survived**, across the inherit branch,
+the denylist branch, the navigator allowlist, the charter clause (×2), and the
+reference sequential-execution rule. Each was mutated in place and restored by text
+edit — never `git checkout` — with a porcelain-clean check after every restore.
+
+Three gaps were raised and all three are closed on this commit:
+
+1. These state artifacts were stale, still reporting the 134/1 regression.
+2. STI-03.1 demanded byte-identical artifacts, which STI-04's charter-body edits make
+   structurally unachievable — the spec contradicted its own design and the design was
+   right. Amended to "the emitters carry zero diff lines", now measured: `emitCursor`
+   **0**, `emitCodex` **0**, `emitOpenCode` **0**.
+3. S5 and S6 named the offending file but not the line, which STI-04.5 requires. Both
+   now emit `path:line: <matching line>`, mutation-proved RED before being trusted.
+
+## Next Step
+
+1. **Run STI-14** — the only thing that closes the one open assumption. Dispatch any
+   massa-ai sub-agent from a host session with an MCP server active and confirm it can
+   call that server's tool. Note the check is behavioural: the generated file will
+   contain **no** MCP tool names, because the fix works by removing the allowlist.
+2. Push and open a PR — the user's decision, not taken unattended.
+3. Optional follow-up: correct `CLAUDE.md`'s 21-vs-29 shell-suite count.
+
+## Blockers
+
+- None blocking. STI-14 remains **open, not failed**: it needs a live host session with
+  an active MCP server, which is not reachable from this worktree. Until it runs, the
+  `disallowedTools`-honoured-on-plugin-sub-agents assumption stays evidence-grade **B**
+  — supported by a closed three-field enumeration of what plugin sub-agents ignore, and
+  by a documentation line citing `disallowedTools` as a sub-agent control with no
+  plugin caveat, but not by an observation.
+
+## Uncommitted Files
+
+- None at T9 commit time (all staged + committed).
+
+## Branch
+
+`fix/subagent-tool-inheritance`, 10 commits ahead of `origin/main` @ `c32b8a22`.
+Unpushed.
+
+## Previous handoff — designer-agent (VALIDATED 2026-08-11 — 11 commits, gates green; unpushed, push/PR = user decision)
 
 Session `spec-designer-agent` · workflow **spec-driven** · persona pin
 `context-skill-harness-engineer-architect` · branch `feat/designer-agent` from

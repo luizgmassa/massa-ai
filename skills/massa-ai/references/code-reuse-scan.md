@@ -42,8 +42,7 @@ implementation code is planned or written:
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 Dispatch one subagent per coherent target area; dispatch more than one only
-when the areas are independent enough to scope separately. The subagent
-never spawns further subagents.
+when the areas are independent enough to scope separately.
 
 ## Reuse-Map Output Contract
 

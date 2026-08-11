@@ -1,6 +1,83 @@
 # massa-ai Spec State
 
-## Current — Designer sub-agent (18th specialist) + ADR/refactor Plan Challenge Gate (**VALIDATED 2026-08-11** — 11 commits, gates green; unpushed, DO NOT MERGE without an independent verification pass)
+## Current — Sub-agent tool inheritance (**VALIDATED 2026-08-11** — 12 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
+
+- projectId `massa-ai` · workflowSessionId `spec-subagent-tool-inheritance` · workflow
+  **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch
+  `fix/subagent-tool-inheritance` from `origin/main` @ `c32b8a22`, worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-subagent-tool-inheritance`. Range
+  `c32b8a22..<this commit>` (12 commits: 1 spec+design + 9 task commits + 1 out-of-scope
+  test repair + this close-out, 4 batch workers).
+- Artifacts: `.specs/features/subagent-tool-inheritance/{spec,design,tasks,validation}.md`.
+- Fixes STI-01/02/03: 17 of 18 Claude sub-agent charters emitted a `tools:` allowlist
+  that excludes every MCP tool by omission. `emitClaude` now emits `disallowedTools:
+  Write, Edit, NotebookEdit` for read-only charters and neither key for write charters;
+  `navigator` keeps its allowlist byte-identical. Cursor/Codex/OpenCode measured
+  unaffected, guarded by a new per-host MCP-blocking-construct sensor.
+- STI-04: the "Never spawn subagents" prohibition retired from 18 charters + 4 shared
+  reference lines (the true count — the spec's first sweep undercounted at 3).
+- STI-05: every massa-ai roster dispatch now announces model/effort read from the
+  installed agent file, guarded by S8/S9 against drift from `resolveHostLayout`.
+- STI-15 (this batch, T7/T8): `scripts/lib/host-capabilities.ts` gained a `toolGating`
+  field, one value per host with its verbatim documentation citation
+  (`"denylist" | "none" | "sandbox" | "permission-map"`), documentation-bearing only.
+  `CLAUDE.md`'s agent-harness section and `CHANGELOG.md` (`### Fixed`/`### Changed`/
+  `### Added` under `[Unreleased]` → minor bump) record the contract.
+- **T9's build gate found a real regression outside that batch's write set — since
+  fixed by `c6495d73`, `test:plugins` now 135 pass / 0 fail.** The batch worker
+  reported it rather than patching outside its packet, which is the correct behaviour;
+  the miss was in the task plan, which put `test:plugins` only in the final build gate
+  even though it is a separate runner from `test:scripts`. The class was then
+  enumerated across all four plugin suites before fixing: exactly 1 offender (the
+  `allowed-tools:` hits in the Codex/Cursor manifest tests are slash-command
+  frontmatter, not agent tool gating). Original finding, kept for the record —
+  `bun run test:plugins` → **134 pass / 1 fail**:
+  `apps/claude-plugin/__tests__/install.test.ts` "CLA-02: read-only agents lack
+  Write/Edit; write agents include them" asserts the pre-fix allowlist contract against
+  the real installed bundle (`tools:` line contains `Write`/`Edit` for write agents) —
+  the same vacuous-then-broken shape `design.md`'s Risks table already named and closed
+  for `scripts/__tests__/subagent-parity.test.ts` (T2's scope), but this is a **separate
+  file** T2 never touched. It was invisible through T1-T8 because none of those tasks'
+  gates ran `test:plugins` — only T9's build gate does. Left unfixed: this capability
+  packet's write set is `scripts/lib/host-capabilities.ts`, `CLAUDE.md`,
+  `CHANGELOG.md`, and the three `.specs/` state artifacts only; fixing a plugin test
+  file is out of scope for this batch and reported rather than silently patched.
+- Other gates measured 2026-08-11: `bun run lint` 0 errors ·
+  `bun run type-check` 6/6 · `XDG_CONFIG_HOME=$(mktemp -d) bun
+  scripts/generate-subagent-artifacts.ts --check` no drift ·
+  `bun run test:scripts` **1804 pass / 0 fail** across 80 TS files + 21 shell suites
+  (baseline at HEAD was 1803/0; +1 new `toolGating` assertion test from T7).
+- STI-14 (live-host MCP dispatch check) **not run** — no MCP-active host session is
+  reachable from this batch-worker worktree. Recorded as a skipped sensor, not a pass.
+  The `disallowedTools`-honoured-on-plugin-sub-agents assumption stays evidence-grade
+  **B**; STI-14 is the only thing that closes it to A. See `.specs/HANDOFF.md`.
+- **Independent verification PASS** (`massa-ai-verification-agent`, author ≠ verifier),
+  written to `validation.md`. It re-derived every count rather than trusting the
+  author: 0 spawn prohibitions across charters, references, **and all 72 generated
+  host files** (a population the author never swept), 18/18 retained clauses, and
+  **108/108** generated Claude files carrying the correct gating key for their class
+  (18 agents × 6 directories) — each sweep run in two grep dialects, because this
+  repo's git build silently drops `\b` under `-E`. Discrimination sensor: **6/6
+  mutations killed, 0 survived**, every one restored by text edit with a
+  porcelain-clean check after each.
+- Three verification gaps, all closed on this commit: (1) these state artifacts were
+  stale, still reporting the 134/1 regression `c6495d73` had already fixed; (2)
+  STI-03.1 demanded byte-identical artifacts, which STI-04's charter-body edits make
+  structurally unachievable — the spec contradicted its own design, and the design was
+  right; amended to "emitters carry zero diff lines", now measured at `emitCursor` 0 /
+  `emitCodex` 0 / `emitOpenCode` 0; (3) S5 and S6 named the offending file but not the
+  line, which STI-04.5 requires — both now report `path:line: <matching line>`,
+  mutation-proved RED before being trusted.
+- Final gates 2026-08-11: `lint` 0 errors · `type-check` 6/6 ·
+  `generate-subagent-artifacts.ts --check` no drift (scratch `XDG_CONFIG_HOME`) ·
+  `test:scripts` **1804 pass / 0 fail** across 80 TS files · `test:plugins`
+  **135 pass / 0 fail**.
+- Doc correction the verifier found: `CLAUDE.md` states `test:scripts` covers 21 shell
+  suites; the measured count is **29**. Not a regression from this feature — a stale
+  figure this feature's own `tasks.md` inherited and repeated. Left unfixed to keep the
+  diff scoped; worth a follow-up.
+
+## Previous — Designer sub-agent (18th specialist) + ADR/refactor Plan Challenge Gate (**VALIDATED 2026-08-11** — 11 commits, gates green; unpushed, DO NOT MERGE without an independent verification pass)
 
 - projectId `massa-ai` · workflowSessionId `spec-designer-agent` · workflow **spec-driven**
   · persona pin `context-skill-harness-engineer-architect` · branch `feat/designer-agent`

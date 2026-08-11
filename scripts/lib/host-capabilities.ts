@@ -79,6 +79,27 @@ export interface HostCapabilities {
    * file installed once, not through a session-lifecycle hook at all.
    */
   handoffInjectionPoint: "session-start" | "user-prompt-submit" | null;
+  /**
+   * How this host gates which tools — including MCP tools inherited from the
+   * parent session — a dispatched sub-agent can call. Documentation-bearing
+   * only (STI-15 / TASK-007): no emitter reads this field, and it drives no
+   * generation decision. The fix lives entirely in
+   * `scripts/generate-subagent-artifacts.ts`'s `claudeToolPolicyFor`, because
+   * Claude was the only host with an inheritance defect.
+   *
+   * Claude is `"denylist"` because its generator emitted a `tools:`
+   * ALLOWLIST, and Claude's own docs state an allowlisted subagent "can't
+   * edit files, write files, or use any MCP tools" — omission excludes MCP by
+   * construction. The fix moved ordinary charters to `disallowedTools`, which
+   * Claude documents as leaving MCP intact: "The subagent keeps Bash, MCP
+   * tools, and the rest of its pool." The other three hosts never had an
+   * allowlist to maintain: each already inherits every tool, MCP included,
+   * through a mechanism that is not a tool gate at all — see each host's
+   * per-value citation below and
+   * `.specs/features/subagent-tool-inheritance/spec.md` § Evidence for the
+   * full verbatim citations this field condenses.
+   */
+  toolGating: "denylist" | "none" | "sandbox" | "permission-map";
 }
 
 /**
@@ -104,6 +125,12 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // skills/massa-ai/personas/README.md "Automatic Routing": "Claude Code and
     // OpenCode receive it through their managed instruction files."
     handoffInjectionPoint: null,
+    // Claude docs, `tools` field: "Inherits every tool available to subagents
+    // if omitted." Allowlist example: "The subagent can't edit files, write
+    // files, or use any MCP tools." `disallowedTools` example: "The subagent
+    // keeps Bash, MCP tools, and the rest of its pool." — the only host that
+    // needed a fix (spec.md § Evidence, Claude row).
+    toolGating: "denylist",
   },
   codex: {
     artifactExtension: "toml",
@@ -121,6 +148,11 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // Kimi/Grok discard case the ai-memory evidence documents.
     sessionStartStdoutDelivered: true,
     handoffInjectionPoint: "session-start",
+    // Codex docs (per spec.md § Evidence): "session settings, such as
+    // sandbox_mode, mcp_servers, and skills... inherit from the parent when
+    // the custom agent file omits them." No `tools` key exists at any layer;
+    // the permission mechanism is `sandbox_mode`, not a tool gate.
+    toolGating: "sandbox",
   },
   cursor: {
     artifactExtension: "md",
@@ -135,6 +167,11 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // Same README citation as codex.
     sessionStartStdoutDelivered: true,
     handoffInjectionPoint: "session-start",
+    // Cursor docs, "Can I use MCP tools in subagents?": "Yes. Subagents
+    // inherit all tools from the parent, including MCP tools from configured
+    // servers." No allowlist exists at all; the separate permission
+    // mechanism is `readonly: true`, not a tool gate.
+    toolGating: "none",
   },
   opencode: {
     artifactExtension: "md",
@@ -159,6 +196,13 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     sessionStartStdoutDelivered: null,
     // Same README citation as claude.
     handoffInjectionPoint: null,
+    // OpenCode docs (per spec.md § Evidence): `tools` is deprecated in favour
+    // of the `permission` map; patterns are "matched as wildcard patterns
+    // against the underlying tool name, so the same syntax works for
+    // built-ins, custom tools, and MCP tools" — e.g. `"mymcp_*": "deny"`
+    // denies every tool from an MCP server. The emitter writes only `edit`
+    // and `bash` keys, so no MCP pattern is denied.
+    toolGating: "permission-map",
   },
 };
 

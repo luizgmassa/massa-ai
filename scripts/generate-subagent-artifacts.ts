@@ -116,23 +116,49 @@ const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
 // The emitters below own only HOST SYNTAX: which key name a host uses, and how it
 // spells "inherit". They never know what a profile is.
 
-// ── Permission -> tools mapping (spec permission mapping) ───────────────────
+// ── Permission -> tool-gating mapping (STI-01/STI-02) ────────────────────────
 // Navigator precedent (apps/claude-plugin/agents/massa-ai-navigator.md) uses
-// JSON-array tools with capital "Glob"; match that convention for all Claude/Cursor agents.
-const READ_ONLY_TOOLS = ["Read", "Grep", "Glob", "Bash"];
-const WRITE_TOOLS = [...READ_ONLY_TOOLS, "Write", "Edit"];
+// JSON-array tools with capital "Glob"; match that convention for the one
+// remaining allowlisted agent.
 
-// Charters whose tool set is not the default read-only/write set. The navigator
-// is index-first: it reaches the massa-ai MCP surface and needs only `pwd` from
-// the shell (charter metadata.tools: mcp-index).
+// Charters whose tool set is not the default inherit/denylist policy. The
+// navigator is index-first: it reaches the massa-ai MCP surface and needs
+// only `pwd` from the shell (charter metadata.tools: mcp-index). This is the
+// only entry point that can still narrow a Claude sub-agent to an allowlist —
+// every other charter is gated by claudeToolPolicyFor below.
 const AGENT_TOOLS_OVERRIDE: Partial<Record<SpecialistName, readonly string[]>> = {
   navigator: ["mcp__massa-ai__*", "Read", "Grep", "Glob", "Bash(pwd)"],
 };
 
-export function toolsFor(name: SpecialistName): readonly string[] {
+// The three write-capable built-ins in Claude's documented sub-agent pool
+// (design.md Tech Decisions "Denylist contents"). `Bash` is excluded because it
+// was already granted to read-only agents under the old allowlist — this change
+// does not narrow it further.
+const READ_ONLY_DISALLOWED = ["Write", "Edit", "NotebookEdit"];
+
+export type ClaudeToolPolicy =
+  | { readonly kind: "allowlist"; readonly tools: readonly string[] }
+  | { readonly kind: "denylist"; readonly disallowed: readonly string[] }
+  | { readonly kind: "inherit" };
+
+/**
+ * Decides which of Claude's two tool-gating mechanisms a charter uses
+ * (STI-01/STI-02). An `AGENT_TOOLS_OVERRIDE` entry keeps the deliberate narrow
+ * allowlist (navigator). A `WRITE_AGENTS` member inherits every tool the
+ * parent session has active, including MCP — Claude documents no cross-server
+ * MCP wildcard for `tools`, so an allowlist can never be dynamic, and
+ * `disallowedTools` (not `tools`) is the only mechanism that inherits.
+ * Everything else — including a future charter whose frontmatter permission
+ * value is unrecognized, which `loadCharter` already coerces to `read-only` —
+ * gets the read-only denylist: fail safe, not fail open (STI-01.6). Gating on
+ * `WRITE_AGENTS` rather than `Charter.permission` keeps this consistent with
+ * `emitCursor`/`emitCodex`/`emitOpenCode`, which already gate on that set.
+ */
+export function claudeToolPolicyFor(name: SpecialistName): ClaudeToolPolicy {
   const override = AGENT_TOOLS_OVERRIDE[name];
-  if (override) return override;
-  return WRITE_AGENTS.has(name) ? WRITE_TOOLS : READ_ONLY_TOOLS;
+  if (override) return { kind: "allowlist", tools: override };
+  if (WRITE_AGENTS.has(name)) return { kind: "inherit" };
+  return { kind: "denylist", disallowed: READ_ONLY_DISALLOWED };
 }
 
 // OpenCode bash permission (spec OPC-07 / design.md plan-critic F4).
@@ -279,21 +305,28 @@ export async function loadAllCharters(): Promise<Charter[]> {
 
 /**
  * Claude Code. Documented plugin-agent fields include name, description, model, effort,
- * tools. `model` accepts an alias, a full id, or `inherit` (which is also the default).
+ * tools, disallowedTools. `model` accepts an alias, a full id, or `inherit` (which is also
+ * the default).
  * https://code.claude.com/docs/en/sub-agents.md
  *
  * CLA-04: omit hooks/mcpServers/permissionMode — rejected on plugin-shipped agents.
+ *
+ * STI-01/STI-02: the gating key is decided by claudeToolPolicyFor and stays in the slot
+ * `tools` used to occupy — allowlist emits `tools:` (JSON array, unchanged for navigator),
+ * denylist emits `disallowedTools:` (comma-separated, the form Claude's own docs use for
+ * that field), and inherit emits neither key so the sub-agent gets every tool the parent
+ * session has active, including any MCP server.
  */
 export function emitClaude(c: Charter, m: Resolved): string {
   const agentName = `massa-ai-${c.name}`;
-  const toolsJson = JSON.stringify(toolsFor(c.name));
-  const lines = [
-    "---",
-    `name: ${agentName}`,
-    `description: ${c.description}`,
-    `tools: ${toolsJson}`,
-    `model: ${m.model ?? "inherit"}`,
-  ];
+  const policy = claudeToolPolicyFor(c.name);
+  const lines = ["---", `name: ${agentName}`, `description: ${c.description}`];
+  if (policy.kind === "allowlist") {
+    lines.push(`tools: ${JSON.stringify(policy.tools)}`);
+  } else if (policy.kind === "denylist") {
+    lines.push(`disallowedTools: ${policy.disallowed.join(", ")}`);
+  }
+  lines.push(`model: ${m.model ?? "inherit"}`);
   if (m.effort !== null) lines.push(`effort: ${m.effort}`);
   lines.push("---", "");
   return lines.join("\n") + c.body + "\n";

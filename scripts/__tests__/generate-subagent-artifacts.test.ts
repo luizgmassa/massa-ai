@@ -16,6 +16,7 @@ import {
   parseFrontmatter,
   parseSimpleYaml,
   unquoteScalar,
+  claudeToolPolicyFor,
   emitClaude,
   emitCursor,
   emitCodex,
@@ -106,22 +107,107 @@ function resolved(model: string | null, effort: string | null): Resolved {
   return { model, effort };
 }
 
+// S1 (design.md Verification Design table): claudeToolPolicyFor returns the right kind
+// per class. Mutation-proved against "flip the WRITE_AGENTS branch to return denylist" —
+// see the T1 commit message for the observed-RED record.
+describe("claudeToolPolicyFor (STI-01/STI-02)", () => {
+  test("an AGENT_TOOLS_OVERRIDE member (navigator) returns an allowlist carrying its override tools", () => {
+    expect(claudeToolPolicyFor("navigator")).toEqual({
+      kind: "allowlist",
+      tools: ["mcp__massa-ai__*", "Read", "Grep", "Glob", "Bash(pwd)"],
+    });
+  });
+
+  test("every WRITE_AGENTS member with no override returns inherit", () => {
+    for (const name of ["builder", "test-engineer", "documentation-agent", "judge", "designer"] as const) {
+      expect(claudeToolPolicyFor(name)).toEqual({ kind: "inherit" });
+    }
+  });
+
+  test("a charter with neither an override nor WRITE_AGENTS membership (investigator) returns the read-only denylist", () => {
+    expect(claudeToolPolicyFor("investigator")).toEqual({
+      kind: "denylist",
+      disallowed: ["Write", "Edit", "NotebookEdit"],
+    });
+  });
+
+  // STI-01.6: claudeToolPolicyFor is keyed on SpecialistName / WRITE_AGENTS membership,
+  // never on Charter.permission (design.md Tech Decisions "Gate on WRITE_AGENTS, not
+  // Charter.permission") — so a charter whose frontmatter declares an unrecognized
+  // permission value still resolves to the denylist, exactly like an ordinary read-only
+  // charter, as long as its name is outside WRITE_AGENTS. loadCharter already coerces any
+  // unrecognized metadata.permission to "read-only" (existing, unchanged behavior); this
+  // test proves the coercion and the tool policy agree end-to-end rather than trusting two
+  // separate reads of the same fact.
+  test("a charter with an unrecognized metadata.permission value coerces to read-only, and its tool policy is still the denylist", async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-charter-"));
+    try {
+      const raw = await fs.readFile(
+        path.join(REPO_ROOT, "skills/agents/investigator/SKILL.md"),
+        "utf8"
+      );
+      const mutated = raw.replace(/^ {2}permission:.*$/m, "  permission: some-unrecognized-value");
+      expect(mutated).not.toBe(raw); // the harness itself must actually mutate the fixture
+      await fs.mkdir(path.join(tmp, "investigator"), { recursive: true });
+      await fs.writeFile(path.join(tmp, "investigator", "SKILL.md"), mutated);
+      const c = await loadCharter("investigator", tmp);
+      expect(c.permission).toBe("read-only"); // loadCharter's existing fail-safe coercion
+      expect(claudeToolPolicyFor(c.name)).toEqual({
+        kind: "denylist",
+        disallowed: ["Write", "Edit", "NotebookEdit"],
+      });
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+// S2 (design.md Verification Design table): emitClaude output per class, including key
+// order. Mutation-proved against "re-add tools: to the denylist branch" — see the T1
+// commit message for the observed-RED record.
 describe("emitClaude", () => {
-  test("read-only agent gets Read/Grep/Glob/Bash only, model + effort from the resolver", () => {
+  /** The frontmatter key names in the order they appear, ignoring the --- fences. */
+  function keyOrder(out: string): string[] {
+    const fm = /^---\n([\s\S]*?)\n---\n/.exec(out)![1]!;
+    return fm
+      .split("\n")
+      .map((l) => /^([A-Za-z]+):/.exec(l)?.[1])
+      .filter((k): k is string => Boolean(k));
+  }
+
+  test("read-only agent (investigator, no override) gets the denylist, never an allowlist", () => {
     const out = emitClaude(charter({ name: "investigator" }), resolved("haiku", "high"));
     expect(out).toContain("name: massa-ai-investigator");
-    expect(out).toContain('"Read","Grep","Glob","Bash"');
-    expect(out).not.toContain("Write");
+    expect(out).toContain("disallowedTools: Write, Edit, NotebookEdit");
+    expect(out).not.toContain("tools:");
     expect(out).toContain("model: haiku");
     expect(out).toContain("effort: high");
     expect(out.endsWith("Do the thing.\n")).toBe(true);
   });
 
-  test("write agent (builder) gets Write + Edit", () => {
+  test("write agent (builder) gets neither tools: nor disallowedTools:", () => {
     const out = emitClaude(charter({ name: "builder" }), resolved("sonnet", "high"));
-    expect(out).toContain('"Write"');
-    expect(out).toContain('"Edit"');
+    expect(out).not.toContain("tools:");
+    expect(out).not.toContain("disallowedTools:");
     expect(out).toContain("model: sonnet");
+  });
+
+  test("an AGENT_TOOLS_OVERRIDE member (navigator) keeps its allowlist and emits no disallowedTools", () => {
+    const out = emitClaude(charter({ name: "navigator" }), resolved("opus", "high"));
+    expect(out).toContain('tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]');
+    expect(out).not.toContain("disallowedTools:");
+  });
+
+  test("key order is name, description, <gate>, model, effort for all three classes", () => {
+    expect(keyOrder(emitClaude(charter({ name: "investigator" }), resolved("haiku", "high")))).toEqual([
+      "name", "description", "disallowedTools", "model", "effort",
+    ]);
+    expect(keyOrder(emitClaude(charter({ name: "builder" }), resolved("sonnet", "high")))).toEqual([
+      "name", "description", "model", "effort",
+    ]);
+    expect(keyOrder(emitClaude(charter({ name: "navigator" }), resolved("opus", "high")))).toEqual([
+      "name", "description", "tools", "model", "effort",
+    ]);
   });
 
   test("the emitter renders whatever the resolver returns — it holds no model table", () => {

@@ -65,7 +65,6 @@ never in parallel**. For each slice, in the recorded order:
 
 Sequential dispatch is a hard rule, not a tuning choice: it respects Figma MCP
 session/rate limits, and it is what lets slice N+1 reuse what slice N learned.
-Retrieval subagents never spawn further subagents.
 
 WHERE Figma ingestion is enabled per `references/figma-wiring.md`, populate
 each completed slice's Number, Figma node id(s), Category, Explanation, and

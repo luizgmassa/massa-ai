@@ -29,6 +29,7 @@
 import { describe, test, expect } from "bun:test";
 import { promises as fs } from "fs";
 import path from "path";
+import { resolveHostLayout } from "../../packages/shared/src/profile-switch/hosts";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const SKILL_DIR = path.join(REPO_ROOT, "skills", "massa-ai");
@@ -805,5 +806,206 @@ describe("designer dispatch: exactly 7 workflows, one wording", () => {
     // Guard the guard: 7 files must have been read, not 0.
     expect([...seen.values()].flat().length).toBe(SCREEN_WORKFLOWS.length);
     expect([...seen.keys()].length, `divergent trigger wording: ${JSON.stringify([...seen.entries()], null, 1)}`).toBe(1);
+  });
+});
+
+// ── 13. Nesting prohibition retirement (STI-04 / S6, S7) ──────────────────
+//
+// .specs/features/subagent-tool-inheritance/spec.md STI-04. The blanket
+// "never spawn subagents" direction is retired from every reference that
+// carried it in different words. Swept as a class -- a spawn verb followed
+// (within a couple of words) by a "sub-...agent(s)" noun -- rather than any
+// one literal phrase, because a literal-phrase sweep for the charter wording
+// missed `references/spec-driven/sub-agents.md:70` ("It does NOT spawn
+// further sub-agents."), caught only by re-enumerating the class. See
+// design.md Verification Design, sensors S6 and S7.
+
+describe("nesting prohibition retirement: references carry no spawn prohibition", () => {
+  const SPAWN_PROHIBITION_CLASS =
+    /\bspawn(?:s|ing|ed)?\s+(?:\w+\s+){0,2}(?:sub-?){1,3}agents?\b/i;
+
+  /** Every .md file under skills/massa-ai/references/, recursively. */
+  async function referenceMarkdownFiles(): Promise<string[]> {
+    const out: string[] = [];
+    async function walk(dir: string): Promise<void> {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) await walk(full);
+        else if (entry.name.endsWith(".md")) out.push(full);
+      }
+    }
+    await walk(REFERENCES_DIR);
+    return out.sort();
+  }
+
+  test("no file under references/ contains a spawn prohibition of any shape (S6)", async () => {
+    const files = await referenceMarkdownFiles();
+    expect(files.length).toBeGreaterThan(20); // guard the guard
+    // STI-04.5 requires the failure to name the file AND the line. Reporting the
+    // file alone leaves a reader grepping a 500-line reference for a paraphrase the
+    // class pattern matched but they cannot see, so the offender is reported as
+    // `path:line: <the matching line>`.
+    const offenders: string[] = [];
+    for (const file of files) {
+      const rel = path.relative(REPO_ROOT, file);
+      const lines = (await fs.readFile(file, "utf8")).split(/\r?\n/);
+      lines.forEach((line, i) => {
+        if (SPAWN_PROHIBITION_CLASS.test(line)) {
+          offenders.push(`${rel}:${i + 1}: ${line.trim()}`);
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("spec-driven/sub-agents.md still states the batch-worker sequential-execution rule (S7)", async () => {
+    const body = await readReference("spec-driven/sub-agents.md");
+    expect(body).toContain(
+      "Execution is strictly sequential within and across batches — there is no intra-phase or intra-batch parallelism.",
+    );
+    // The rule now lives under a retitled heading, not the retired "No
+    // nesting:" label -- both directions are asserted so a heading revert
+    // without dropping the sentence still fails here.
+    expect(body).toContain("**Sequential execution:**");
+    expect(body).not.toContain("**No nesting:**");
+  });
+});
+
+// ── 14. Dispatch announcement contract (STI-05 / S8, S9) ──────────────────
+//
+// .specs/features/subagent-tool-inheritance/spec.md STI-05, design.md
+// Component 4 (Approach A). S8 guards the "exactly one canonical location"
+// property: a second announcement shape defined in another reference or
+// inside a workflow's own dispatch block could tell the orchestrator two
+// different things while both looked green. S9 guards the per-host
+// installed-agent path table in agent-orchestration.md against drift from
+// the real resolver -- re-implementing resolveHostLayout's path arithmetic
+// here would let the test and the doc rot together while both stayed green,
+// which is exactly what Approach A's mitigation exists to prevent, so this
+// group imports and calls the real function rather than re-deriving paths.
+
+describe("dispatch announcement contract: single canonical shape (S8)", () => {
+  /**
+   * Substrings that together identify "a rule telling the orchestrator how
+   * to announce a sub-agent's model/effort" -- specific enough not to
+   * collide with unrelated mentions of "model" or "effort" elsewhere in the
+   * harness (Model Diversity Fallback, model_tier resolution, etc).
+   */
+  const ANNOUNCEMENT_MARKERS = ["effort: inherit", "model: inherit"] as const;
+
+  /** Every .md file under skills/massa-ai/references/, recursively. */
+  async function referenceMarkdownFiles(): Promise<string[]> {
+    const out: string[] = [];
+    async function walk(dir: string): Promise<void> {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) await walk(full);
+        else if (entry.name.endsWith(".md")) out.push(full);
+      }
+    }
+    await walk(REFERENCES_DIR);
+    return out.sort();
+  }
+
+  test("agent-orchestration.md carries the announcement contract", async () => {
+    const body = await readReference("agent-orchestration.md");
+    for (const marker of ANNOUNCEMENT_MARKERS) {
+      expect(body).toContain(marker);
+    }
+  });
+
+  test("no other reference file defines a competing announcement shape (S8)", async () => {
+    const files = await referenceMarkdownFiles();
+    expect(files.length).toBeGreaterThan(20); // guard the guard
+    const canonical = path.join(REFERENCES_DIR, "agent-orchestration.md");
+    const offenders: string[] = [];
+    for (const file of files) {
+      if (file === canonical) continue;
+      const body = await fs.readFile(file, "utf8");
+      for (const marker of ANNOUNCEMENT_MARKERS) {
+        if (body.includes(marker)) {
+          offenders.push(`${path.relative(REPO_ROOT, file)}: ${marker}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("no workflow dispatch block defines a competing announcement shape (S8)", async () => {
+    const offenders: string[] = [];
+    for (const rel of await listWorkflows()) {
+      const body = await readWorkflow(rel);
+      for (const marker of ANNOUNCEMENT_MARKERS) {
+        if (body.includes(marker)) offenders.push(`${rel}: ${marker}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("dispatch announcement contract: per-host path table matches resolveHostLayout (S9)", () => {
+  // Fixed, non-environmental home so the assertion is machine-independent --
+  // never os.homedir(), which would make this sensor pass or fail depending
+  // on who runs it.
+  const TARGET_HOME = "/home/tester";
+
+  test("claude file route: the doc's ~/.claude/agents literal equals the resolver's home-relative path", async () => {
+    const layout = resolveHostLayout("claude", { targetHome: TARGET_HOME });
+    expect(layout.route).toBe("files");
+    if (layout.route !== "files") throw new Error("expected files route");
+    const relative = `~/${path.relative(TARGET_HOME, layout.activeDir).split(path.sep).join("/")}`;
+    expect(relative).toBe("~/.claude/agents");
+    const body = await readReference("agent-orchestration.md");
+    expect(body).toContain(relative);
+    expect(body).toContain(layout.activeGlob);
+    expect(layout.activeGlob).toBe("massa-ai-*.md");
+  });
+
+  test("claude marketplace route: the doc's <marketplaceRoot>/agents pattern equals the resolver's suffix", async () => {
+    const marketRoot = "/market/massa-ai/9.9.9";
+    const layout = resolveHostLayout("claude", {
+      targetHome: TARGET_HOME,
+      marketplaceRoot: { claude: marketRoot },
+    });
+    expect(layout.route).toBe("files");
+    if (layout.route !== "files") throw new Error("expected files route");
+    const suffix = path.relative(marketRoot, layout.activeDir).split(path.sep).join("/");
+    expect(suffix).toBe("agents");
+    const body = await readReference("agent-orchestration.md");
+    expect(body).toContain("<marketplaceRoot>/agents");
+  });
+
+  test("codex: the doc's ~/.codex/agents literal equals the resolver's home-relative path", async () => {
+    const layout = resolveHostLayout("codex", { targetHome: TARGET_HOME });
+    expect(layout.route).toBe("files");
+    if (layout.route !== "files") throw new Error("expected files route");
+    const relative = `~/${path.relative(TARGET_HOME, layout.activeDir).split(path.sep).join("/")}`;
+    expect(relative).toBe("~/.codex/agents");
+    const body = await readReference("agent-orchestration.md");
+    expect(body).toContain(relative);
+    expect(layout.activeGlob).toBe("massa-ai-*.toml");
+    expect(body).toContain(layout.activeGlob);
+  });
+
+  test("opencode: the doc's ~/.config/opencode/agents literal equals the resolver's home-relative path", async () => {
+    const layout = resolveHostLayout("opencode", { targetHome: TARGET_HOME });
+    expect(layout.route).toBe("files");
+    if (layout.route !== "files") throw new Error("expected files route");
+    const relative = `~/${path.relative(TARGET_HOME, layout.activeDir).split(path.sep).join("/")}`;
+    expect(relative).toBe("~/.config/opencode/agents");
+    const body = await readReference("agent-orchestration.md");
+    expect(body).toContain(relative);
+    expect(layout.activeGlob).toBe("massa-ai-*.md");
+    expect(body).toContain(layout.activeGlob);
+  });
+
+  test("cursor: resolveHostLayout returns route skip, and the doc names no cursor installed-agent path", async () => {
+    const layout = resolveHostLayout("cursor", { targetHome: TARGET_HOME });
+    expect(layout.route).toBe("skip");
+    const body = await readReference("agent-orchestration.md");
+    expect(body).toContain("route `skip`");
+    // Negative control: a mutation that invents a resolvable cursor path
+    // must fail here.
+    expect(body).not.toMatch(/~\/\.cursor\/agents/);
   });
 });

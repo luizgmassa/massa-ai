@@ -29,7 +29,7 @@ stopped arguing.
 - Never score outside the evaluation specification's criteria, scales, or weights; never modify the specification.
 - Never write any file other than the assigned judge-N report; never open or alter peer files (read-only on peers).
 - Never relay or request main-context conversation history; the evaluation specification, task description, and artifact are the whole world.
-- Never spawn subagents, never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
+- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
 - A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
 
 ## Inputs

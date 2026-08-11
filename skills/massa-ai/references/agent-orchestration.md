@@ -231,7 +231,7 @@ Use `references/conversation-feedback.md` when subagent lifecycle visibility wou
 
 Use these labels for delegated work:
 
-- `Agent Started` when a role is launched with scope and permission mode.
+- `Agent Started` when a role is launched: name the agent, its model, and its effort (see Model/Effort Announcement below), with scope and permission mode.
 - `Agent Running` when waiting on a long-running role or reporting its current bounded task.
 - `Agent Done` when the role returns usable evidence, findings, implementation, or verification.
 - `Agent Blocked` when the role cannot complete its assigned scope.
@@ -244,6 +244,49 @@ Example:
 🤖 [Agent Started] Verifier is checking the docs-only change set. Scope: massa-ai references and README.
 🤖 [Agent Done] Verifier found no stale references. Skipped checks: none.
 ```
+
+### Model/Effort Announcement
+
+Every dispatch of any of the 18 massa-ai roster specialists names the agent, its model,
+and its effort in the `Agent Started` line above, inside that line's existing 1-2 line
+budget. No exemption: this covers the three standing dispatch exceptions
+(`plan-critic`, `verification-agent`, `designer`) and spec-driven batch workers exactly
+like every other dispatch.
+
+- **Source**: the *installed* agent file for the active host — never
+  `skills/model-profiles.json`. The installed file reports what the host will actually
+  load, including any local profile-switch overlay the registry cannot see.
+- **Read once per session**, for all 18 agents, and cache the result — not once per
+  dispatch.
+- Absent `effort` in the installed file announces `effort: inherit`. Absent `model`, or
+  `model: inherit`, announces `model: inherit`.
+- A missing or unreadable installed file announces `model/effort unknown`, names the
+  exact attempted path, and the dispatch proceeds — the read never blocks a dispatch.
+
+```md
+🤖 [Agent Started] Investigator — model opus, effort high. Scope: the four emitters.
+🤖 [Agent Started] Designer — model/effort unknown (no installed agent file at
+   ~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents/massa-ai-designer.md). Dispatching anyway.
+```
+
+That second line is a measured case, not a hypothetical: on a machine with plugin
+bundle `1.48.0` installed, `massa-ai-designer.md` is absent because `designer` shipped
+in `1.50.0` — a live instance of the degraded path above.
+
+Per-host installed-agent path, matching `resolveHostLayout` in
+`packages/shared/src/profile-switch/hosts.ts` — a sensor executes that resolver against
+this table so the two cannot drift silently:
+
+| Host | Installed agents directory | Glob | Model / effort keys |
+| --- | --- | --- | --- |
+| Claude — marketplace route | `<marketplaceRoot>/agents` — a *versioned* bundle root, e.g. `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents` | `massa-ai-*.md` | `model:` / `effort:` |
+| Claude — file route | `~/.claude/agents` | `massa-ai-*.md` | `model:` / `effort:` |
+| Codex | `~/.codex/agents` | `massa-ai-*.toml` | `model` / `model_reasoning_effort` |
+| OpenCode | `~/.config/opencode/agents` | `massa-ai-*.md` | `model:` / `reasoningEffort:` |
+| Cursor | no lookup — `resolveHostLayout` returns route `skip` | — | announce `model: inherit, effort: inherit` for every agent; Cursor publishes no resolvable model IDs |
+
+Claude's active route (`marketplace` vs `file`) comes from `install-state.json`'s
+per-platform `installRoute` field, never guessed from directory presence.
 
 ## Plan-Critic Contract
 
