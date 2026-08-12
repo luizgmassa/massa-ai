@@ -16,7 +16,7 @@ import { buildStaticDirCandidates } from "./web-ui.js";
 
 // apps/tools-api/src/routes -> repo root
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
-const STATIC_DIR = path.join(REPO_ROOT, "apps/web-ui/src/static");
+const STATIC_DIR = path.join(REPO_ROOT, "apps/web-ui/dist/static");
 
 async function firstExisting(candidates: string[]): Promise<string | null> {
   for (const dir of candidates) {
