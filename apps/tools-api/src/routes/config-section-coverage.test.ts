@@ -26,8 +26,11 @@ import path from "node:path";
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
 /** `CONFIG_SECTIONS` moved out of app.js into the Config tab's own module when
  *  the web UI bundle was split; app.js is now a barrel and carries no section
- *  table. Only the path changed — the regex and the assertions are unchanged. */
-const CONFIG_VIEW_JS = path.join(REPO_ROOT, "apps/web-ui/src/static/views/config.js");
+ *  table. Only the path changed — the regex and the assertions are unchanged.
+ *  T23 moved `CONFIG_SECTIONS` again, out of `config.js` and into its own
+ *  `config-sections.js` module — step 1 of 2, see tasks.md Execution Log D5;
+ *  T24 renames this file to `.ts` and repoints here a second time. */
+const CONFIG_VIEW_JS = path.join(REPO_ROOT, "apps/web-ui/src/static/views/config-sections.js");
 
 /** The `key:` of every entry in the portal's Config-tab section table. */
 function portalSectionKeys(): string[] {

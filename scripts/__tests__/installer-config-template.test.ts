@@ -27,8 +27,10 @@ const LIB = path.join(REPO_ROOT, "scripts/lib/installer-api-key.sh");
 /** `CONFIG_SECTIONS` moved out of app.js into the Config tab's own module when
  *  the web UI bundle was split; app.js is now a barrel and carries no section
  *  table. Only the path changed — the population and the assertion below are
- *  the same. */
-const CONFIG_VIEW_JS = path.join(REPO_ROOT, "apps/web-ui/src/static/views/config.js");
+ *  the same. T23 moved `CONFIG_SECTIONS` again, out of `config.js` and into
+ *  its own `config-sections.js` module — step 1 of 2, see tasks.md Execution
+ *  Log D5; T24 renames this file to `.ts` and repoints here a second time. */
+const CONFIG_VIEW_JS = path.join(REPO_ROOT, "apps/web-ui/src/static/views/config-sections.js");
 
 interface WrittenConfig {
   embedding: { model: string; dimensions: number };
