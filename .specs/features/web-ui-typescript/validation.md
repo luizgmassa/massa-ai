@@ -10,6 +10,16 @@ confirmed empty afterwards; HEAD unchanged throughout.
 **Verdict: fit to open as a Pull Request.** Two documentation defects were found and
 have since been fixed (below). No code defect survived verification.
 
+> **Amended at Phase 17 close-out (`99bbb1cc`).** Everything below was measured at
+> `630d0260` and is preserved as written. Phases 15-16 then landed four defect repairs
+> that this pass could not have caught — all four reproduce on `origin/main`, and three
+> of them were found by an operator running the served bundle rather than by any gate.
+> Exactly one claim is affected: **claim 2**, amended in place in § 2 with the measured
+> scope of the change. Claims 1 and 3-7 are unaffected. This verification pass therefore
+> covers WUT-01..WUT-16 only; WUT-17..WUT-19 rest on the Phase 15-17 evidence recorded in
+> `tasks.md`'s Execution Log and `spec.md`'s traceability notes, and have **not** had an
+> independent author≠verifier pass of their own.
+
 ---
 
 ## Claim verdicts
@@ -17,7 +27,7 @@ have since been fixed (below). No code defect survived verification.
 | # | Claim | Verdict |
 | --- | --- | --- |
 | 1 | All 22 modules converted, none left behind | **CONFIRMED** |
-| 2 | Behaviour unchanged (golden fixture) | **CONFIRMED** |
+| 2 | Behaviour unchanged (golden fixture) | **CONFIRMED at `630d0260`** → **SUPERSEDED at `99bbb1cc`** (see § 2) |
 | 3 | `MassaAiConfig` coupling is real, not decorative | **CONFIRMED** (with a recorded caveat) |
 | 4 | Frozen public surface intact | **CONFIRMED** |
 | 5 | All gates pass at the claimed figures | **CONFIRMED** |
