@@ -31,23 +31,152 @@ import { PROFILES_TAB_STORAGE_KEY, renderProfilesView } from "./views/profiles.j
 import { renderModelRegistry } from "./views/registry.js";
 import { initRegistryOverlay, mergeRegistryForDisplay } from "./views/registry-state.js";
 
-export function startApp(opts) {
+/** Per-endpoint response envelope shapes, extracted from each renderer's own
+ *  (mostly unexported) parameter type via `Parameters<typeof fn>[n]` rather
+ *  than re-declared here — this is the same idiom already used for `root`
+ *  typing elsewhere (e.g. `ProfileSwitchCtx.root: Parameters<typeof
+ *  showBanner>[0]` in `views/profiles.ts`), so each shape can never drift from
+ *  the function that actually consumes it. */
+type ProjectListResult = { data?: Parameters<typeof renderProjects>[0] } | null | undefined;
+type MemoryListResult = Parameters<typeof renderMemoryBrowser>[0];
+type SearchApiResult = Parameters<typeof renderSearch>[0];
+type HandoffsApiResult = Parameters<typeof renderHandoffs>[0];
+type ProposalsApiResult = Parameters<typeof renderProposals>[0];
+type CheckpointsApiResult = Parameters<typeof renderCheckpoints>[0];
+type LogsApiResult = Parameters<typeof renderLogs>[0];
+type ConfigApiResult = { success?: boolean; data?: Parameters<typeof renderConfig>[0]; error?: unknown } | null | undefined;
+type ProfilesApiResult = { data?: Parameters<typeof renderProfilesView>[0] } | null | undefined;
+type RegistryOfProfilesApiResult = { success?: boolean; data?: Parameters<typeof renderProfilesView>[1]; error?: unknown } | null | undefined;
+type ModelRegistryApiResult = { data?: Parameters<typeof renderModelRegistry>[0] } | null | undefined;
+
+/** View names the hash router recognizes; anything else falls back to "projects". */
+const KNOWN_VIEWS = [
+  "projects",
+  "memory",
+  "search",
+  "handoffs",
+  "proposals",
+  "checkpoints",
+  "dashboard",
+  "logs",
+  "config",
+  "profiles",
+  "model-registry",
+] as const;
+type ViewName = (typeof KNOWN_VIEWS)[number];
+
+interface AppMemoryFilters {
+  type: string;
+  level: string;
+  minImportance: string;
+  [key: string]: string;
+}
+
+interface AppLogEntry {
+  ts?: string;
+  level?: string;
+  message?: string;
+  meta?: unknown;
+}
+
+/**
+ * The one app-wide state object every view reads and mutates through its own
+ * ctx. Kept as a single flat shape (matching the pre-conversion object
+ * literal) rather than one interface per tab, because every view already
+ * receives the SAME object — splitting it here would just be a second,
+ * divergent copy of the per-view `*State` interfaces those modules already
+ * declare for themselves. `registryOverlay`/`registryServerData` reuse
+ * `mergeRegistryForDisplay`'s own (unexported) parameter/return types for the
+ * same reason.
+ */
+interface AppState {
+  view: ViewName;
+  project: string;
+  memoryFilters: AppMemoryFilters;
+  memoryOffset: number;
+  memoryBulkForm?: { error?: string | null } | null;
+  searchQuery: string;
+  profilesTab: string;
+  // `null` is excluded (unlike `mergeRegistryForDisplay`'s own overlay
+  // parameter, which accepts it): `initRegistryOverlay`'s ctx.state field
+  // type does not, and every read site in registry-state.ts treats
+  // null/undefined identically via a truthy check, so dropping null here is
+  // behaviour-neutral — RegistryOverlay|undefined is still assignable
+  // wherever RegistryOverlay|null|undefined is expected.
+  registryOverlay?: Exclude<Parameters<typeof mergeRegistryForDisplay>[1], null>;
+  registryDirty: boolean;
+  registryLoaded: boolean;
+  registryForm: { kind?: string } | null;
+  registryServerData?: Exclude<Parameters<typeof mergeRegistryForDisplay>[0], null>;
+  regenerating: boolean;
+  indexJobId: string | null;
+  indexJobStatus: string | null;
+  indexJobPhase: string | null;
+  indexJobFileCount: number | null;
+  indexPollInterval: ReturnType<typeof setInterval> | null;
+  // Logs tab (design § 3f, LOG-13): from/to/level/q filters, the Live
+  // toggle, the streamed-entry accumulator, and the live stream's
+  // AbortController — the last two are populated by T15's handlers, not by
+  // this render path.
+  logsFrom: string;
+  logsTo: string;
+  logsLevel: string;
+  logsQuery: string;
+  logsLive?: boolean;
+  logsEntries: AppLogEntry[];
+  logsStreamAbort: AbortController | null;
+  [key: string]: unknown;
+}
+
+/**
+ * Structural DOM element shape, not a real DOM type — production passes a
+ * real `Element` (`doc.getElementById("app")`), the fake-DOM test harness in
+ * `start-app-dispatch.test.ts` passes a plain object. Mirrors
+ * `wire-view-handlers.ts`'s own `WireElement`: `root` is threaded, unmodified,
+ * into every `views/*.ts` handler's own — differently shaped but structurally
+ * compatible — `*Ctx.root` parameter, exactly like `wireViewHandlers` itself
+ * already does for the click/change wiring it owns.
+ */
+interface AppRootElement {
+  dataset: Record<string, string>;
+  type: string;
+  checked?: boolean;
+  value: string;
+  remove?: () => void;
+  innerHTML: string;
+  textContent?: string;
+  addEventListener: (type: string, listener: (ev?: unknown) => void) => void;
+  closest?: (selectors: string) => AppRootElement | null;
+  querySelectorAll: (selectors: string) => AppRootElement[];
+  querySelector: (selectors: string) => AppRootElement | null;
+  insertBefore?: (node: unknown, ref: unknown) => unknown;
+  firstChild?: unknown;
+  children?: unknown[];
+}
+
+interface AppStartOpts {
+  document?: Document | null;
+  base?: string;
+}
+
+export function startApp(opts?: AppStartOpts): void {
   opts = opts || {};
-  const doc = opts.document || (typeof document !== "undefined" ? document : null);
-  if (!doc) return;
-  const root = doc.getElementById("app");
-  const projectSelect = doc.getElementById("project-select");
-  const themeToggle = doc.getElementById("theme-toggle");
+  const maybeDoc = opts.document || (typeof document !== "undefined" ? document : null);
+  if (!maybeDoc) return;
+  const doc: Document = maybeDoc;
+  const root = doc.getElementById("app") as unknown as AppRootElement;
+  const projectSelect = doc.getElementById("project-select") as HTMLSelectElement;
+  const themeToggle = doc.getElementById("theme-toggle")!;
   const api = createApiClient({ base: opts.base });
 
-  const state = {
+  const state: AppState = {
     view: "projects",
     project: "",
     memoryFilters: { type: "", level: "", minImportance: "" },
     memoryOffset: 0,
     searchQuery: "",
     profilesTab: "switch",
-    registryOverlay: null,
+    registryOverlay: undefined,
     registryDirty: false,
     registryLoaded: false,
     registryForm: null,
@@ -57,10 +186,6 @@ export function startApp(opts) {
     indexJobPhase: null,
     indexJobFileCount: null,
     indexPollInterval: null,
-    // Logs tab (design § 3f, LOG-13): from/to/level/q filters, the Live
-    // toggle, the streamed-entry accumulator, and the live stream's
-    // AbortController — the last two are populated by T15's handlers, not by
-    // this render path.
     logsFrom: "",
     logsTo: "",
     logsLevel: "",
@@ -80,25 +205,33 @@ export function startApp(opts) {
 
   initTheme(doc);
 
-  function setNavActive() {
+  // The one ctx object every view handler below takes — built once so every
+  // call site shares the same live `root`/`state`/`api`/`render` bindings
+  // instead of re-allocating an equivalent literal per call (the
+  // pre-conversion source built an equivalent `{ api, root, state, render,
+  // doc }` object ad hoc at each of these call sites; `doc` is dropped here —
+  // none of the functions this `ctx` is passed to reads it, and carrying a
+  // real `Document` collides with `LogsCtx`'s structural `doc` shape via
+  // `Document.body.appendChild`'s generic signature).
+  const ctx = { api, root, state, render };
+
+  function setNavActive(): void {
     doc.querySelectorAll(".nav a").forEach((a) => {
       a.classList.toggle("active", a.getAttribute("href") === "#" + hashFor(state.view));
     });
   }
-  function hashFor(view) {
+  function hashFor(view: string): string {
     return "/" + view;
   }
-  function viewFromHash(h) {
+  function viewFromHash(h: string | null | undefined): ViewName {
     const name = (h || "").replace(/^#\/?/, "");
-    return ["projects", "memory", "search", "handoffs", "proposals", "checkpoints", "dashboard", "logs", "config", "profiles", "model-registry"].includes(name)
-      ? name
-      : "projects";
+    return (KNOWN_VIEWS as readonly string[]).includes(name) ? (name as ViewName) : "projects";
   }
 
-  async function refreshProjectsForSelect() {
+  async function refreshProjectsForSelect(): Promise<void> {
     try {
-      const data = await api.request("/api/v1/project/list");
-      const projects = ((data && data.data) || {}).projects || [];
+      const res = (await api.request("/api/v1/project/list")) as ProjectListResult;
+      const projects = ((res && res.data) || { projects: [] }).projects || [];
       projectSelect.innerHTML =
         '<option value="">(select)</option>' +
         projects
@@ -110,18 +243,18 @@ export function startApp(opts) {
     } catch {}
   }
 
-  async function render() {
+  async function render(): Promise<void> {
     setNavActive();
     // F4 fold: clear index poll interval when navigating away from projects
-    if (state.view !== "projects") clearIndexPoll({ state });
+    if (state.view !== "projects") clearIndexPoll(ctx);
     // T15 (LOG-14/15 teardown): abort any in-flight Logs live-tail stream
     // when navigating away from the logs view — mirrors clearIndexPoll()'s
     // discipline above.
-    if (state.view !== "logs") stopLogsLiveStream({ state });
+    if (state.view !== "logs") stopLogsLiveStream(ctx);
     try {
       if (state.view === "projects") {
-        const data = await api.request("/api/v1/project/list");
-        root.innerHTML = renderProjects((data && data.data) || { projects: [] }, {
+        const res = (await api.request("/api/v1/project/list")) as ProjectListResult;
+        root.innerHTML = renderProjects((res && res.data) || { projects: [] }, {
           indexJobId: state.indexJobId,
           indexJobStatus: state.indexJobStatus,
           indexJobPhase: state.indexJobPhase,
@@ -133,7 +266,7 @@ export function startApp(opts) {
           // but keep it visible until then
         }
       } else if (state.view === "memory") {
-        const body = {
+        const body: Record<string, unknown> = {
           limit: 50,
           offset: state.memoryOffset,
         };
@@ -142,42 +275,42 @@ export function startApp(opts) {
         if (state.memoryFilters.minImportance !== "")
           body.minImportance = Number(state.memoryFilters.minImportance);
         if (state.project) body.projectId = state.project;
-        const data = await api.request("/api/v1/memory/list", { method: "POST", body });
+        const data = (await api.request("/api/v1/memory/list", { method: "POST", body })) as MemoryListResult;
         root.innerHTML = renderMemoryBrowser(data, {
           filters: state.memoryFilters,
           project: state.project,
           memoryBulkForm: state.memoryBulkForm,
         });
       } else if (state.view === "search") {
-        let data = null;
+        let data: SearchApiResult = null;
         if (state.searchQuery.trim()) {
-          const body = { query: state.searchQuery, format: "json", limit: 20 };
+          const body: Record<string, unknown> = { query: state.searchQuery, format: "json", limit: 20 };
           if (state.project) body.projectId = state.project;
-          data = await api.request("/api/v1/memory/search", { method: "POST", body });
+          data = (await api.request("/api/v1/memory/search", { method: "POST", body })) as SearchApiResult;
         }
         root.innerHTML = renderSearch(data, { query: state.searchQuery });
       } else if (state.view === "handoffs") {
-        let data = null;
+        let data: HandoffsApiResult = null;
         if (state.project) {
-          data = await api.request("/api/v1/handoff/list", {
+          data = (await api.request("/api/v1/handoff/list", {
             method: "POST",
             body: { projectId: state.project },
-          });
+          })) as HandoffsApiResult;
         }
         root.innerHTML = renderHandoffs(data, { project: state.project });
       } else if (state.view === "proposals") {
-        let data = null;
+        let data: ProposalsApiResult = null;
         if (state.project) {
-          data = await api.request("/api/v1/proposal/list", {
+          data = (await api.request("/api/v1/proposal/list", {
             method: "POST",
             body: { projectId: state.project },
-          });
+          })) as ProposalsApiResult;
         }
         root.innerHTML = renderProposals(data, { project: state.project });
       } else if (state.view === "checkpoints") {
-        const body = { ...CHECKPOINTS_LIST_BODY };
+        const body: Record<string, unknown> = { ...CHECKPOINTS_LIST_BODY };
         if (state.project) body.projectId = state.project;
-        const data = await api.request("/api/v1/checkpoints/list", { method: "POST", body });
+        const data = (await api.request("/api/v1/checkpoints/list", { method: "POST", body })) as CheckpointsApiResult;
         root.innerHTML = renderCheckpoints(data);
       } else if (state.view === "dashboard") {
         const data = await fetchDashboardData(api);
@@ -191,7 +324,7 @@ export function startApp(opts) {
         if (state.logsLevel) params.set("level", state.logsLevel);
         if (state.logsQuery) params.set("q", state.logsQuery);
         const qs = params.toString();
-        const data = await api.request("/api/v1/logs" + (qs ? "?" + qs : ""));
+        const data = (await api.request("/api/v1/logs" + (qs ? "?" + qs : ""))) as LogsApiResult;
         // Seed Live from the stored preference only when this session has not
         // decided yet, so a toggle made in this page always outranks it.
         if (state.logsLive === undefined) {
@@ -201,43 +334,49 @@ export function startApp(opts) {
         root.innerHTML = renderLogs(data, state);
         // Resume the tail after the markup exists — `appendLogsLiveEntry`
         // needs the tbody it patches into to be on screen already.
-        if (state.logsLive) runLogsLiveStream({ api, root, state, render });
+        if (state.logsLive) runLogsLiveStream(ctx);
       } else if (state.view === "config") {
-        const data = await api.request("/api/v1/config");
+        const data = (await api.request("/api/v1/config")) as ConfigApiResult;
         if (data && data.success === false) {
           root.innerHTML = '<section class="view"><h2>Config</h2>' + errorBlock(data) + "</section>";
         } else {
           root.innerHTML = renderConfig((data && data.data) || { config: {}, restartNeededSections: [] }, { writeMode: isWriteModeEnabled() });
         }
       } else if (state.view === "profiles") {
-        const profilesRes = await api.request("/api/v1/profiles");
-        const registryRes = await api.request("/api/v1/model-registry");
-        const registryData = (registryRes && registryRes.success !== false && registryRes.data) || { registry: {}, source: {}, _error: registryRes && registryRes.error };
-        const ctxObj = { api, root, state, render, doc };
-        initRegistryOverlay(ctxObj, registryData.registry, registryData.source);
+        const profilesRes = (await api.request("/api/v1/profiles")) as ProfilesApiResult;
+        const registryRes = (await api.request("/api/v1/model-registry")) as RegistryOfProfilesApiResult;
+        const registryData =
+          (registryRes && registryRes.success !== false && registryRes.data) ||
+          { registry: {}, source: {}, _error: registryRes && registryRes.error };
+        initRegistryOverlay(ctx, registryData.registry, registryData.source);
         // Cached so handleRegistryDuplicateProfile/handleRegistryDeleteProfile (Component 3,
         // triggered from wireViewHandlers' own `ctx`, not ctxObj) can read the same display
         // registry this render used, instead of only the raw overlay (APCR-11.5).
         state.registryServerData = registryData;
-        const displayData = mergeRegistryForDisplay(registryData, state.registryOverlay);
+        // `mergeRegistryForDisplay`'s own return type (`RegistryServerData`,
+        // registry-state.ts) and `renderProfilesView`'s expected
+        // `RegistryPayload` (registry.ts) are two independently declared
+        // shapes that differ only in `agents`' element type — both already
+        // converted, neither owned by this task. The cast is the contained
+        // fix; the runtime value is the same server-fetched object either way.
+        const displayData = mergeRegistryForDisplay(registryData, state.registryOverlay) as unknown as Parameters<typeof renderProfilesView>[1];
         root.innerHTML = renderProfilesView(
           (profilesRes && profilesRes.data) || { hosts: [] },
           displayData,
           { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled(), unsaved: state.registryDirty, registryForm: state.registryForm },
         );
       } else if (state.view === "model-registry") {
-        const data = await api.request("/api/v1/model-registry");
-        const ctxObj = { api, root, state, render, doc };
+        const data = (await api.request("/api/v1/model-registry")) as ModelRegistryApiResult;
         const regData = (data && data.data) || { registry: {}, source: {} };
-        initRegistryOverlay(ctxObj, regData.registry, regData.source);
+        initRegistryOverlay(ctx, regData.registry, regData.source);
         state.registryServerData = regData;
-        const displayData = mergeRegistryForDisplay(regData, state.registryOverlay);
+        const displayData = mergeRegistryForDisplay(regData, state.registryOverlay) as unknown as Parameters<typeof renderModelRegistry>[0];
         root.innerHTML = renderModelRegistry(displayData, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty, registryForm: state.registryForm });
       }
     } catch (e) {
-      root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String(e.message || e)) + "</div>";
+      root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String((e as { message?: unknown }).message || e)) + "</div>";
     }
-    wireViewHandlers({ api, root, state, render, doc });
+    wireViewHandlers(ctx);
   }
 
 
@@ -273,7 +412,7 @@ export function startApp(opts) {
   if (typeof window !== "undefined") {
     window.addEventListener("beforeunload", (ev) => {
       // F4 fold: clear index poll on unload
-      clearIndexPoll({ state });
+      clearIndexPoll(ctx);
       if (state.registryDirty) {
         ev.preventDefault();
         ev.returnValue = "You have unsaved registry changes. Leave anyway?";
@@ -294,8 +433,7 @@ export function startApp(opts) {
           // PRG-02: update index progress when jobId matches
           if (data && (data.type === "index_status" || data.event === "index_status")) {
             const payload = data.payload || data;
-            const ctxObj = { api, root, state, render, doc };
-            if (handleIndexStatusEvent(ctxObj, payload)) {
+            if (handleIndexStatusEvent(ctx, payload)) {
               if (state.view === "projects") render();
             }
             return; // handled; don't double-render
@@ -311,7 +449,7 @@ export function startApp(opts) {
       es.onerror = () => {
         // PRG-03: start polling fallback when SSE errors + a job is tracked
         if (state.indexJobId && state.indexJobStatus !== "completed" && state.indexJobStatus !== "failed" && !state.indexPollInterval) {
-          startIndexPoll({ api, root, state, render, doc }, state.indexJobId);
+          startIndexPoll(ctx, state.indexJobId);
         }
       };
     } catch {
