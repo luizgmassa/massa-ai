@@ -1,9 +1,17 @@
 /**
  * The static bundle's import graph must be resolvable by a browser.
  *
- * `src/static/` is shipped verbatim — there is no bundler, no import map and no
- * build step. The browser resolves every specifier itself against `/ui/`, and
- * `apps/tools-api/src/routes/web-ui.ts` serves whatever file it finds there.
+ * `apps/web-ui` now has a build step: `tsc -p tsconfig.build.json` emits every
+ * TypeScript module under `src/static/` to its `.js` counterpart under
+ * `dist/static/`, and the not-yet-converted plain-JavaScript modules under
+ * `src/static/` are copied through transitionally (retired in Phase 13).
+ * There is still no bundler and no import map — the browser
+ * resolves every specifier itself against `/ui/`, and
+ * `apps/tools-api/src/routes/web-ui.ts` serves whatever it finds in
+ * `dist/static/`, not the hand-written sources. This guard therefore reads
+ * the emitted bytes: a source-side scan cannot see what `tsc` actually wrote,
+ * and `import type` specifiers (erased at emit) would otherwise force a bare
+ * exemption that blinds the guard permanently.
  *
  * The failure this guards is quiet and specific. That route falls back to
  * `index.html` for any unresolved non-traversal path (`web-ui.ts`, the SPA
@@ -24,11 +32,11 @@
  * notices.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeAll } from "bun:test";
 import fs from "fs";
 import path from "path";
 
-const STATIC_DIR = path.resolve(import.meta.dir, "..", "static");
+const STATIC_DIR = path.resolve(import.meta.dir, "..", "..", "dist", "static");
 
 function listJsFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -38,7 +46,29 @@ function listJsFiles(dir: string): string[] {
   });
 }
 
-const FILES = listJsFiles(STATIC_DIR);
+// Populated by the beforeAll sentinel below. A plain top-level
+// `listJsFiles(STATIC_DIR)` call would throw a raw ENOENT before any hook
+// runs, defeating the sentinel — module top-level code executes before
+// beforeAll. Every `it` body below runs after beforeAll, so the closure sees
+// the populated array.
+let FILES: string[] = [];
+
+/**
+ * Fails loudly, naming the missing artifact and the fix, instead of letting
+ * every assertion below fail vacuously against a zero-file scan (WUT-05).
+ * Why: `dist/static/` is untracked build output — a fresh checkout, or one
+ *      where the build has not run yet, has none until it does.
+ * Impacts: WUT-05; every describe block below.
+ * Test: bun test apps/web-ui/src/__tests__/static-module-graph.test.ts
+ */
+beforeAll(() => {
+  if (!fs.existsSync(STATIC_DIR)) {
+    throw new Error(
+      `Emitted bundle missing at ${STATIC_DIR} — run 'bun run --filter @massa-ai/web-ui build' first.`,
+    );
+  }
+  FILES = listJsFiles(STATIC_DIR);
+});
 
 /**
  * Static `import ... from "x"` / `export ... from "x"` specifiers.
