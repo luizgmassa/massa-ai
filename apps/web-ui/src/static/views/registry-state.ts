@@ -15,7 +15,14 @@
 
 import { showBanner } from "../lib/banner.js";
 import { REGISTRY_HOSTS } from "./registry.js";
-import type { RegistryCell, RegistryProfile, RegistrySchema, RegistrySource, RegistryFormState } from "./registry.js";
+import type {
+  RegistryCell,
+  RegistryProfile,
+  RegistrySchema,
+  RegistrySource,
+  RegistryFormState,
+  RegistryOverlayOverrideBreakdown,
+} from "./registry.js";
 
 // F2 fold: registryLoaded guard prevents re-init on every render. beforeunload
 // guard when dirty (added in startApp).
@@ -48,9 +55,26 @@ interface RegistryServerData {
   registry?: RegistrySchema;
   source?: RegistrySource;
   overlayOverrideCount?: number;
+  overlayOverrideBreakdown?: RegistryOverlayOverrideBreakdown;
   agents?: unknown[];
   agentsError?: string | null;
 }
+
+/** Server-computed fields that `mergeRegistryForDisplay`'s rebuild branch (below) must carry
+ *  through from `serverData` unchanged — every key of `RegistryServerData` except `registry`,
+ *  which is the one field the branch legitimately rebuilds via merge (T46, WUT-17). This is
+ *  the class-level guard the docblock's prose warning failed to be: `overlayOverrideCount` and
+ *  `agents`/`agentsError` were named in prose and `overlayOverrideBreakdown` was still dropped,
+ *  so the population here is typed against `RegistryServerData` itself rather than re-typed by
+ *  hand — `_PassthroughKeysComplete` below fails `bun run type-check` if a field is ever added
+ *  to the interface and not added to this list, and the reverse (a stray key not on the
+ *  interface) is caught by the `readonly PassthroughKey[]` annotation on the export itself. */
+type PassthroughKey = Exclude<keyof RegistryServerData, "registry">;
+const PASSTHROUGH_KEYS_LITERAL = ["source", "overlayOverrideCount", "overlayOverrideBreakdown", "agents", "agentsError"] as const;
+type _PassthroughKeysComplete = PassthroughKey extends (typeof PASSTHROUGH_KEYS_LITERAL)[number] ? true : false;
+const _passthroughKeysComplete: _PassthroughKeysComplete = true;
+void _passthroughKeysComplete;
+export const SERVER_COMPUTED_PASSTHROUGH_KEYS: readonly PassthroughKey[] = PASSTHROUGH_KEYS_LITERAL;
 
 interface RegistryState {
   registryLoaded?: boolean;
@@ -171,16 +195,21 @@ export function mergeRegistryForDisplay(serverData: RegistryServerData | null | 
       merged.profiles[key] = mergeProfileForDisplay(merged.profiles[key], val);
     }
   }
-  // overlayOverrideCount (APCR-01.10) is server-computed from the saved overlay, not the
-  // in-memory display merge — carry it through unchanged so the count stays visible while
+  // overlayOverrideCount (APCR-01.10) and overlayOverrideBreakdown (WUT-17, T46) are
+  // server-computed from the saved overlay, not the in-memory display merge — carry both
+  // through unchanged so the count and its named categories stay visible while
   // add/duplicate/delete/edit are shown pre-save. `agents`/`agentsError` (T6, design D-4.3)
   // are likewise server-computed (charter-derived) and must survive this rebuild branch, or
   // the Per-Agent Tier Overrides table loses its row source the instant any other field is
-  // edited in the same session.
+  // edited in the same session. This must-survive list is exactly
+  // `SERVER_COMPUTED_PASSTHROUGH_KEYS` above — that constant, not this comment, is what a
+  // test enforces, because `overlayOverrideBreakdown` was named nowhere near here and was
+  // still the field the rebuild branch dropped.
   return {
     registry: merged,
     source: (serverData && serverData.source) || {},
     overlayOverrideCount: (serverData && serverData.overlayOverrideCount) || 0,
+    overlayOverrideBreakdown: serverData ? serverData.overlayOverrideBreakdown : undefined,
     agents: (serverData && serverData.agents) || [],
     agentsError: serverData && serverData.agentsError,
   };

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import fs from "fs";
 import path from "path";
+import { SERVER_COMPUTED_PASSTHROUGH_KEYS } from "../static/views/registry-state.js";
 
 // ── admin-handlers.test.ts ──────────────────────────────────────────────────
 // Tests the admin-portal-enhancement handlers: showBanner, config save/reveal,
@@ -841,6 +842,57 @@ describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
     const server = { registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} }, source: {} };
     const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
     expect(mergeRegistryForDisplay(server, overlay).overlayOverrideCount).toBe(0);
+  });
+
+  it("carries overlayOverrideBreakdown through the display merge (WUT-17, T46)", () => {
+    // T46: the rebuild branch (overlay.profiles present, e.g. an initialized overlay — which
+    // initRegistryOverlay always produces, APCR-01) previously listed overlayOverrideCount,
+    // agents and agentsError as survivors and left overlayOverrideBreakdown off the list — the
+    // exact field WUT-17 added to the server payload. The count line then names its categories
+    // on first paint and reverts to the unnamed sentence on every render after.
+    const breakdown = { hostDefaults: 1, workflowTiers: 0, agentTiers: 2, tiers: 0, profiles: 1 };
+    const server = {
+      registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
+      source: {},
+      overlayOverrideCount: 4,
+      overlayOverrideBreakdown: breakdown,
+    };
+    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    expect(mergeRegistryForDisplay(server, overlay).overlayOverrideBreakdown).toEqual(breakdown);
+  });
+
+  it("class-level guard: every server-computed passthrough key survives the rebuild branch (T46)", () => {
+    // Driven by the enumerated, type-checked SERVER_COMPUTED_PASSTHROUGH_KEYS (registry-state.ts)
+    // rather than one assertion per field — a field named in RegistryServerData and forgotten in
+    // mergeRegistryForDisplay's return object fails `bun run type-check` (the list is typed
+    // `Exclude<keyof RegistryServerData, "registry">`, checked complete against the interface at
+    // compile time) as well as this runtime pass, instead of degrading silently in the browser
+    // the way overlayOverrideBreakdown did. `registry` is deliberately excluded: the rebuild
+    // branch legitimately transforms it via merge rather than passing it through.
+    expect(SERVER_COMPUTED_PASSTHROUGH_KEYS.length).toBe(5);
+    expect((SERVER_COMPUTED_PASSTHROUGH_KEYS as readonly string[]).slice().sort()).toEqual(
+      ["agents", "agentsError", "overlayOverrideBreakdown", "overlayOverrideCount", "source"].sort(),
+    );
+
+    const sentinels: Record<string, unknown> = {
+      source: { overlay: { profiles: {} }, tombstoned: ["sentinel-source"] },
+      overlayOverrideCount: 7,
+      overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 1, agentTiers: 1, tiers: 1, profiles: 3 },
+      agents: [{ name: "sentinel-agent", charterTier: "deep" }],
+      agentsError: "sentinel-agents-error",
+    };
+    const server: Record<string, unknown> = {
+      registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
+      ...sentinels,
+    };
+    // overlay.profiles non-empty forces the rebuild branch (the early return only fires when
+    // overlay or overlay.profiles is falsy — unreachable once initRegistryOverlay has run).
+    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    const result = mergeRegistryForDisplay(server, overlay) as Record<string, unknown>;
+
+    for (const key of SERVER_COMPUTED_PASSTHROUGH_KEYS) {
+      expect(result[key]).toEqual(sentinels[key]);
+    }
   });
 
   // ── Profiles merge as a DELTA, per host and per tier ──────────────────────
