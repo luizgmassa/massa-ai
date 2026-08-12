@@ -274,32 +274,91 @@ function appendLogsLiveEntry(ctx: LogsCtx, entry: LogEntry): void {
   }
 }
 
-/** Opens the `/api/v1/logs/stream` live tail and appends every frame it
- *  emits (LOG-14). No-op whenever `ctx.state.logsLive` is false — this is
- *  the load-bearing guard: the fake-DOM harness's synthetic `startApp`
- *  dispatch fires every wired `data-action`/`change` handler against a
- *  generic child, and `handleLogsLiveToggle` reading that child's `checked`
- *  (always falsy there) already keeps `logsLive` off in that case, but this
- *  second, independent check means a caller can never open a real,
- *  never-resolving fetch by invoking this function directly with `logsLive`
- *  unset either. LOG-15: any stream failure that is not our own teardown
- *  abort turns Live off, banners the error, and leaves every already
- *  rendered/appended row exactly where it was — this function never calls
- *  `ctx.render()`. */
-export async function runLogsLiveStream(ctx: LogsCtx): Promise<void> {
-  const state = ctx.state || (ctx.state = {});
-  if (!state.logsLive) return;
-  if (state.logsStreamInFlight) return; // in-flight guard, ctx.state-scoped
-  state.logsStreamInFlight = true;
-  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-  state.logsStreamAbort = controller;
+/** T47: gap between the server's clean, scheduled close of the live tail
+ *  (`SSE_MAX_DURATION_MS_DEFAULT`, `apps/tools-api/src/routes/logs.ts:348`,
+ *  10 minutes) and our reconnect attempt. Not zero, so a burst of
+ *  simultaneously-opened tabs recycling at the same 10-minute mark does not
+ *  all re-request in the same instant. Injectable via
+ *  `opts.reconnectDelayMs` — the seam this file already uses on
+ *  `handleServerRestart` in `views/config.ts` (`opts?: { pollIntervalMs,
+ *  maxAttempts }`), not a module-level `_set*ForTesting` setter: a setter
+ *  would add a new symbol to `app.js`'s frozen `public-surface.test.ts`
+ *  export list, which this task must not edit. */
+const LOGS_RECONNECT_DELAY_MS_DEFAULT = 2000;
+
+/** T47: bound on consecutive reconnect attempts after a clean server close
+ *  before giving up, banners LOG-15's error, and turns Live off. A close
+ *  that repeats immediately, over and over, is not the 10-minute schedule —
+ *  it is something broken (auth expired mid-session, the route removed, the
+ *  server down) — and with no bound at all a broken endpoint would hot-loop
+ *  `fetch` forever. 5 reconnects (6 connections total, capped at 2s apart
+ *  = 10s of retries) is enough to ride out a single bad close without
+ *  looking like a hang. Injectable via `opts.maxReconnectAttempts` for the
+ *  same reason as the delay — tests set it to 0 to keep their original
+ *  single-shot semantics, or to a small number to observe the give-up path
+ *  without waiting out the real bound. */
+const LOGS_RECONNECT_ATTEMPTS_MAX_DEFAULT = 5;
+
+/** Resolves after `ms`, or immediately if `signal` is already aborted or
+ *  becomes aborted while waiting — so a reconnect delay in progress when
+ *  `stopLogsLiveStream` fires does not sit out the rest of the wait before
+ *  noticing Live went off. `ms <= 0` resolves synchronously (tests pass 0
+ *  to avoid any real wait). */
+function delayLogsReconnect(ms: number, signal?: AbortSignal | null): Promise<void> {
+  if (!ms || ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    if (signal && signal.aborted) {
+      resolve();
+      return;
+    }
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = typeof setTimeout !== "undefined" ? setTimeout(finish, ms) : null;
+    if (signal && typeof signal.addEventListener === "function") {
+      signal.addEventListener(
+        "abort",
+        () => {
+          if (timer !== null && typeof clearTimeout !== "undefined") clearTimeout(timer);
+          finish();
+        },
+        { once: true },
+      );
+    }
+  });
+}
+
+/** One fetch + read loop over `/api/v1/logs/stream`. Returns `true` only
+ *  when the loop ended because the server closed the stream cleanly while
+ *  `state.logsLive` was still true — the one case `runLogsLiveStream`
+ *  should reconnect for. Every other exit (a non-200, a thrown error that
+ *  is not our own abort, our own abort, or `state.logsLive` having gone
+ *  false mid-wait) returns `false`; a non-200 or a genuine thrown error
+ *  also banners and turns Live off here, exactly as the pre-T47 single-shot
+ *  version did. */
+async function connectLogsStreamOnce(
+  ctx: LogsCtx,
+  state: LogsStreamState,
+  controller: AbortController | null,
+): Promise<boolean> {
   try {
     const headers = ctx.api && ctx.api.authHeaders ? ctx.api.authHeaders() : {};
     const res = await fetch("/api/v1/logs/stream", {
       headers,
       signal: controller ? controller.signal : undefined,
     });
-    if (!res || !res.body || !res.body.getReader) {
+    if (!res || res.ok === false) {
+      // T47: a non-200 (e.g. a 401 with a short JSON body and no `\n\n`)
+      // used to fall through into the read loop, find no frame boundary,
+      // see `done`, and return exactly as if the stream had been healthy
+      // and idle. Fail loudly instead, and never reconnect a status that
+      // will not fix itself on retry.
+      throw new Error("stream request failed" + (res ? " with status " + res.status : ""));
+    }
+    if (!res.body || !res.body.getReader) {
       throw new Error("stream unavailable");
     }
     const reader = res.body.getReader();
@@ -307,7 +366,7 @@ export async function runLogsLiveStream(ctx: LogsCtx): Promise<void> {
     let buffer = "";
     while (state.logsLive) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) return true; // clean close — server-scheduled, or otherwise
       buffer += decoder.decode(value, { stream: true });
       let idx: number;
       while ((idx = buffer.indexOf("\n\n")) >= 0) {
@@ -324,6 +383,10 @@ export async function runLogsLiveStream(ctx: LogsCtx): Promise<void> {
         appendLogsLiveEntry(ctx, entry);
       }
     }
+    // `state.logsLive` went false while waiting on `reader.read()` — Live
+    // was toggled off or we navigated away. Treat like our own abort: no
+    // banner, no reconnect.
+    return false;
   } catch (e) {
     const aborted = !!(controller && controller.signal && controller.signal.aborted);
     if (!aborted) {
@@ -331,6 +394,68 @@ export async function runLogsLiveStream(ctx: LogsCtx): Promise<void> {
       // abort) turns Live off and banners the error, keeping prior rows.
       state.logsLive = false;
       showBanner(ctx.root, "error", "Live log stream failed: " + String((e as { message?: unknown })?.message || e));
+    }
+    return false;
+  }
+}
+
+/** Opens the `/api/v1/logs/stream` live tail and appends every frame it
+ *  emits (LOG-14). No-op whenever `ctx.state.logsLive` is false — this is
+ *  the load-bearing guard: the fake-DOM harness's synthetic `startApp`
+ *  dispatch fires every wired `data-action`/`change` handler against a
+ *  generic child, and `handleLogsLiveToggle` reading that child's `checked`
+ *  (always falsy there) already keeps `logsLive` off in that case, but this
+ *  second, independent check means a caller can never open a real,
+ *  never-resolving fetch by invoking this function directly with `logsLive`
+ *  unset either. LOG-15: any stream failure that is not our own teardown
+ *  abort turns Live off, banners the error, and leaves every already
+ *  rendered/appended row exactly where it was — this function never calls
+ *  `ctx.render()`.
+ *
+ *  T47: the server closes every SSE after
+ *  `SSE_MAX_DURATION_MS_DEFAULT` (10 minutes) by design, and a clean close
+ *  used to leave `logsLive` true with nothing running until a manual
+ *  refresh. This now reconnects after such a close — see
+ *  `connectLogsStreamOnce` for exactly which exits count as "clean" — up to
+ *  `opts.maxReconnectAttempts` times (default
+ *  `LOGS_RECONNECT_ATTEMPTS_MAX_DEFAULT`), waiting
+ *  `opts.reconnectDelayMs` (default `LOGS_RECONNECT_DELAY_MS_DEFAULT`)
+ *  between attempts. The in-flight guard (`state.logsStreamInFlight`) and
+ *  the single `AbortController` (`state.logsStreamAbort`) are held for the
+ *  whole reconnect loop, not just the first connection, so a second call
+ *  while a reconnect is pending still no-ops, and `stopLogsLiveStream`
+ *  aborts whichever phase — an in-flight read or a pending reconnect delay
+ *  — is currently running. */
+export async function runLogsLiveStream(
+  ctx: LogsCtx,
+  opts?: { reconnectDelayMs?: number; maxReconnectAttempts?: number },
+): Promise<void> {
+  const state = ctx.state || (ctx.state = {});
+  if (!state.logsLive) return;
+  if (state.logsStreamInFlight) return; // in-flight guard, ctx.state-scoped, held across reconnects
+  state.logsStreamInFlight = true;
+  const reconnectDelayMs =
+    opts && opts.reconnectDelayMs !== undefined ? opts.reconnectDelayMs : LOGS_RECONNECT_DELAY_MS_DEFAULT;
+  const maxReconnectAttempts =
+    opts && opts.maxReconnectAttempts !== undefined ? opts.maxReconnectAttempts : LOGS_RECONNECT_ATTEMPTS_MAX_DEFAULT;
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  state.logsStreamAbort = controller;
+  try {
+    for (let attempt = 0; ; attempt++) {
+      const cleanClose = await connectLogsStreamOnce(ctx, state, controller);
+      if (!cleanClose) return; // our own abort, Live toggled off, or a genuine failure already banner'd
+      if (!state.logsLive) return; // toggled off between the read loop ending and here
+      if (attempt >= maxReconnectAttempts) {
+        state.logsLive = false;
+        showBanner(
+          ctx.root,
+          "error",
+          "Live log stream closed " + (attempt + 1) + " times in a row; giving up. Toggle Live to retry.",
+        );
+        return;
+      }
+      await delayLogsReconnect(reconnectDelayMs, controller ? controller.signal : null);
+      if (!state.logsLive) return; // toggled off during the reconnect delay
     }
   } finally {
     state.logsStreamInFlight = false;

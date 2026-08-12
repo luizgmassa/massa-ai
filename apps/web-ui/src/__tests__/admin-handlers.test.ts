@@ -56,7 +56,7 @@ const {
   handleMemoryDeleteProjectCancel: (ctx: any) => void;
   handleMemoryDeleteProject: (ctx: any) => Promise<void>;
   stopLogsLiveStream: (ctx: any) => void;
-  runLogsLiveStream: (ctx: any) => Promise<void>;
+  runLogsLiveStream: (ctx: any, opts?: { reconnectDelayMs?: number; maxReconnectAttempts?: number }) => Promise<void>;
   handleLogsLiveToggle: (ctx: any) => void;
   handleLogsExport: (ctx: any) => Promise<void>;
   handleProfileSwitch: (ctx: any, profile: string, host: string) => Promise<void>;
@@ -2152,7 +2152,9 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
       state: { logsLive: true },
       api: { request, authHeaders: () => ({ "x-api-key": "k" }) },
     });
-    await runLogsLiveStream(ctx);
+    // T47: a clean close now reconnects by default; this test asserts the
+    // single-connection append behaviour, so it disables the reconnect.
+    await runLogsLiveStream(ctx, { maxReconnectAttempts: 0 });
     expect(ctx.state.logsEntries.map((e: any) => e.message)).toEqual(["first", "second"]);
     // no range query (GET /api/v1/logs) was reissued to render these
     expect(request).not.toHaveBeenCalled();
@@ -2189,7 +2191,9 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
       },
     };
 
-    await runLogsLiveStream(ctx);
+    // T47: disable the default reconnect — this test asserts single-connection
+    // append/patch behaviour only.
+    await runLogsLiveStream(ctx, { maxReconnectAttempts: 0 });
 
     expect(tbody.innerHTML).toContain("live one");
     expect(dom.emptyNote).toBeNull(); // the stale "no entries" note was removed
@@ -2203,7 +2207,10 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
       state: { logsLive: true },
       api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "secret-key" }) },
     });
-    await runLogsLiveStream(ctx);
+    // T47: disable the default reconnect — one clean connection is enough
+    // to assert the auth header, and a real reconnect delay would blow the
+    // per-test timeout.
+    await runLogsLiveStream(ctx, { maxReconnectAttempts: 0 });
     expect(fetchMock).toHaveBeenCalled();
     const fetchArg = (fetchMock.mock.calls[0] as any[])[1] as any;
     expect(fetchArg.headers["x-api-key"]).toBe("secret-key");
@@ -2257,6 +2264,64 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     } finally {
       (globalThis as any).AbortController = origAC;
     }
+  });
+
+  it("reconnects after a clean server close while Live is still on — the exact measured scenario (T47)", async () => {
+    // Measured against a scratch SSE server that sends one frame then
+    // closes: pre-T47, `runLogsLiveStream` returned after exactly 1 fetch
+    // call with `state.logsLive` still true and nothing running. The server
+    // closes every stream after 10 minutes by design
+    // (SSE_MAX_DURATION_MS_DEFAULT) — this asserts a second connection
+    // happens instead of the tail silently going dead.
+    const firstChunks = [
+      'data: {"seq":1,"ts":"2026-08-09T00:00:00.000Z","level":"info","message":"before close"}\n\n',
+    ];
+    let calls = 0;
+    const fetchMock = mock(async () => {
+      calls += 1;
+      // First connection: one frame, then a clean close. Second connection:
+      // closes immediately with nothing to read — proves the reconnect
+      // happened without depending on a third connection ever occurring.
+      return calls === 1 ? makeSseResponse(firstChunks) : makeSseResponse([]);
+    });
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    // reconnectDelayMs: 0 keeps this deterministic and instant (no real
+    // sleep — the injectable seam under test). maxReconnectAttempts: 1
+    // means the second close exhausts the bound, so the promise resolves
+    // on its own without a third connection — this also exercises the
+    // hot-loop give-up path in the same assertion.
+    await runLogsLiveStream(ctx, { reconnectDelayMs: 0, maxReconnectAttempts: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(2); // the reconnect: a second connection happened
+    expect(ctx.state.logsEntries.map((e: any) => e.message)).toEqual(["before close"]);
+    expect(ctx.state.logsLive).toBe(false); // bound exhausted — gives up rather than looping forever
+    expect(ctx.root.children[0].textContent).toContain("giving up");
+  });
+
+  it("a non-200 (401) banners, turns Live off, and does not reconnect — a bad status will not fix itself on retry (T47)", async () => {
+    // Measured: a keyless request to /api/v1/logs/stream returns 401, 68
+    // bytes, application/json. Pre-T47 there was no `res.ok` check: the
+    // frame loop found no `\n\n`, `done` arrived, and the function returned
+    // exactly as if the stream had been healthy and idle.
+    const fetchMock = mock(async () => ({
+      ok: false,
+      status: 401,
+      headers: new Map([["content-type", "application/json"]]),
+      body: null,
+    }));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({}) },
+    });
+    await runLogsLiveStream(ctx);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // no reconnect after a non-200
+    expect(ctx.state.logsLive).toBe(false);
+    expect(ctx.root.children[0].textContent).toContain("Live log stream failed");
+    expect(ctx.root.children[0].textContent).toContain("401");
   });
 });
 
