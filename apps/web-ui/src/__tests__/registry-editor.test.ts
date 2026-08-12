@@ -732,7 +732,7 @@ const MODELS_TAB_SOURCE = [
  *  it from there; the assertion itself is unchanged, only the file the source
  *  is read from. */
 const MEMORY_VIEW_SOURCE = fs.readFileSync(
-  path.join(import.meta.dir, "..", "static", "views", "memory.js"),
+  path.join(import.meta.dir, "..", "static", "views", "memory.ts"),
   "utf8",
 );
 

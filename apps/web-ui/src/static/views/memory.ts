@@ -9,13 +9,31 @@ import { isWriteModeEnabled } from "../lib/api-client.js";
 import { showBanner } from "../lib/banner.js";
 import { collectFormData } from "../lib/forms.js";
 
-export const MEMORY_TYPES = ["critical", "conversation", "code", "decision", "pattern"];
+export const MEMORY_TYPES = ["critical", "conversation", "code", "decision", "pattern"] as const;
 
 export const MEMORY_LEVELS = [
   { value: 1, label: "1 — Project" },
   { value: 2, label: "2 — User" },
   { value: 3, label: "3 — Session" },
-];
+] as const;
+
+interface MemoryBulkFormState {
+  error?: string | null;
+}
+
+interface MemoryFilters {
+  type?: string;
+  level?: number | string;
+  minImportance?: number | string | null;
+}
+
+interface MemoryViewState {
+  project?: string | null;
+  filters?: MemoryFilters;
+  memoryBulkForm?: MemoryBulkFormState | null;
+  memoryBulkDeleteInFlight?: boolean;
+  [key: string]: unknown;
+}
 
 /** Renders the bulk-delete control for the Memory tab (design "1. Memory bulk
  *  delete (MBD)", spec P1-Bulk ACs 1-4). Gated on write mode + a selected
@@ -25,7 +43,7 @@ export const MEMORY_LEVELS = [
  *  is read from `[data-bulk="confirm-id"]` at submit time (T2), never from
  *  `btn.dataset` — the fake-DOM harness's synthetic clicks carry an empty
  *  dataset. */
-export function renderMemoryBulkDelete(state) {
+export function renderMemoryBulkDelete(state: MemoryViewState): string {
   const writeMode = isWriteModeEnabled();
   if (!writeMode) return "";
   const project = state.project;
@@ -67,7 +85,32 @@ export function renderMemoryBulkDelete(state) {
   }
   return '<div class="bulk-delete">' + trigger + form + "</div>";
 }
-export function renderMemoryBrowser(data, state) {
+
+interface MemoryRow {
+  id?: string;
+  type?: string;
+  level?: number | string;
+  importance?: number | string;
+  content?: string;
+}
+
+interface MemoryListPayload {
+  memories?: MemoryRow[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+}
+
+interface MemoryListResponse extends MemoryListPayload {
+  success?: boolean;
+  data?: MemoryListPayload;
+  error?: unknown;
+}
+
+export function renderMemoryBrowser(
+  data: MemoryListResponse | null | undefined,
+  state?: MemoryViewState | null,
+): string {
   state = state || {};
   if (!data || data.success === false) {
     return errorBlock(data);
@@ -115,7 +158,7 @@ export function renderMemoryBrowser(data, state) {
     '<button type="button" data-action="memory-refresh">apply</button>' +
     "</div>";
 
-  let body;
+  let body: string;
   if (memories.length === 0) {
     body = '<p class="empty">No memories match these filters.</p>';
   } else {
@@ -194,19 +237,54 @@ export function renderMemoryBrowser(data, state) {
     "</section>"
   );
 }
+
+/** Structurally identical to `collectFormData`'s own (unexported) `FormDataRoot`
+ *  parameter type, so `ctx.root` can be passed through without a cast — plus
+ *  the `querySelector` the bulk-delete confirm flow reads the typed value
+ *  through. */
+interface MemoryFormRoot {
+  querySelectorAll(selectors: string): {
+    forEach(
+      cb: (el: {
+        dataset: { create?: string; [key: string]: string | undefined };
+        type: string;
+        checked?: boolean;
+        value: string;
+        remove?: () => void;
+      }) => void,
+    ): void;
+  };
+  querySelector?: (selectors: string) => { value?: string } | null;
+}
+
+interface MemoryCtx {
+  root: MemoryFormRoot;
+  state: MemoryViewState;
+  api: { request: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown> };
+  render: () => void;
+}
+
 /** Opens the inline bulk-delete confirmation form (MBD-04): T1's
  *  `renderMemoryBulkDelete` renders the retype-to-confirm form only while
  *  `state.memoryBulkForm` is truthy. */
-export function handleMemoryDeleteProjectOpen(ctx) {
+export function handleMemoryDeleteProjectOpen(ctx: MemoryCtx): void {
   ctx.state.memoryBulkForm = { error: null };
   ctx.render();
 }
 /** Closes the inline bulk-delete confirmation form without issuing any
  *  request (MBD-04). */
-export function handleMemoryDeleteProjectCancel(ctx) {
+export function handleMemoryDeleteProjectCancel(ctx: MemoryCtx): void {
   ctx.state.memoryBulkForm = null;
   ctx.render();
 }
+
+interface MemoryBulkDeleteResponse {
+  success?: boolean;
+  errors?: unknown[];
+  error?: string;
+  data?: { memoriesDeleted?: number };
+}
+
 /** Bulk-delete confirm handler (design "1. Memory bulk delete (MBD)",
  *  MBD-03..06). The typed confirmation value is read from
  *  `[data-bulk="confirm-id"]` — NEVER from `btn.dataset` — because the
@@ -220,7 +298,7 @@ export function handleMemoryDeleteProjectCancel(ctx) {
  *  `handleServerRestart`'s recorded precedent (a module-level flag latched by
  *  one harness's never-resolving request would disable the handler for every
  *  later caller in the same process). */
-export async function handleMemoryDeleteProject(ctx) {
+export async function handleMemoryDeleteProject(ctx: MemoryCtx): Promise<void> {
   const state = ctx.state || (ctx.state = {});
   if (state.memoryBulkDeleteInFlight) return;
 
@@ -237,10 +315,10 @@ export async function handleMemoryDeleteProject(ctx) {
 
   state.memoryBulkDeleteInFlight = true;
   try {
-    const res = await ctx.api.request("/api/v1/project/reset", {
+    const res = (await ctx.api.request("/api/v1/project/reset", {
       method: "POST",
       body: { projectId: project, clearVectors: false, clearSymbols: false, clearMemories: true },
-    });
+    })) as MemoryBulkDeleteResponse | null | undefined;
     if (res && res.success === false) {
       const errors = Array.isArray(res.errors) ? res.errors : [];
       const message = errors.length > 0 ? errors.join("; ") : (res.error || "Bulk delete failed.");
@@ -255,7 +333,7 @@ export async function handleMemoryDeleteProject(ctx) {
     showBanner(ctx.root, "success", "Deleted " + String(deleted) + " memories for " + project + ".");
     ctx.render();
   } catch (e) {
-    const message = String((e && e.message) || e);
+    const message = String((e as { message?: unknown })?.message || e);
     state.memoryBulkForm = { error: message };
     showBanner(ctx.root, "error", "Bulk delete failed: " + message);
     ctx.render();
@@ -268,7 +346,7 @@ export async function handleMemoryDeleteProject(ctx) {
  *  scoped to the Models catalog (P2-D), and registry-editor.test.ts asserts this
  *  literal survives precisely to prove that sensor is span-scoped rather than a
  *  whole-file scan. */
-export async function handleMemoryEdit(ctx, id) {
+export async function handleMemoryEdit(ctx: MemoryCtx, id: string): Promise<void> {
   const newContent = prompt("Edit memory content:", "");
   if (newContent === null) return;
   try {
@@ -278,35 +356,36 @@ export async function handleMemoryEdit(ctx, id) {
     });
     ctx.render();
   } catch (e) {
-    alert("Edit failed: " + String(e.message || e));
+    alert("Edit failed: " + String((e as { message?: unknown }).message || e));
   }
 }
 
 /** Single-memory delete. The confirm() lives at the wiring site. */
-export async function handleMemoryDelete(ctx, id) {
+export async function handleMemoryDelete(ctx: MemoryCtx, id: string): Promise<void> {
   try {
     await ctx.api.request("/api/v1/memory/" + encodeURIComponent(id), {
       method: "DELETE",
     });
     ctx.render();
   } catch (e) {
-    alert("Delete failed: " + String(e.message || e));
+    alert("Delete failed: " + String((e as { message?: unknown }).message || e));
   }
 }
 
 /** Submits the Create Memory form. Importance is range-checked client-side so
  *  an out-of-range value is refused before it reaches the route. */
-export async function handleMemoryCreate(ctx) {
+export async function handleMemoryCreate(ctx: MemoryCtx): Promise<void> {
   const data = collectFormData(ctx.root, "memory-create");
   if (!data.content) { alert("Content is required."); return; }
-  if (data.importance !== undefined && (data.importance < 0 || data.importance > 1)) {
+  const importance = data.importance as number | undefined;
+  if (importance !== undefined && (importance < 0 || importance > 1)) {
     alert("Importance must be between 0 and 1.");
     return;
   }
-  const body = {
+  const body: Record<string, unknown> = {
     content: data.content,
     type: data.type || "conversation",
-    importance: data.importance !== undefined ? data.importance : 0.5,
+    importance: importance !== undefined ? importance : 0.5,
   };
   if (data.tags) body.tags = String(data.tags).split(",").map((s) => s.trim()).filter(Boolean);
   if (data.projectId) body.projectId = data.projectId;
@@ -314,6 +393,6 @@ export async function handleMemoryCreate(ctx) {
     await ctx.api.request("/api/v1/memory/store", { method: "POST", body });
     ctx.render();
   } catch (e) {
-    alert("Create failed: " + String(e.message || e));
+    alert("Create failed: " + String((e as { message?: unknown }).message || e));
   }
 }
