@@ -97,6 +97,17 @@ const REGISTRY_DETAIL = {
 
 const OVERLAY_PATH = path.join(configDir("massa-ai"), "model-profiles.json");
 
+// WUT-17: mirrors scripts/lib/model-profiles.ts's zeroBreakdown() shape — this route reaches
+// the lib only through the dynamic-require profilesLib() above, so the zero fallback below
+// (matching the existing `?? 0` pattern for overlayOverrideCount) cannot import the type.
+const ZERO_OVERLAY_OVERRIDE_BREAKDOWN = {
+  hostDefaults: 0,
+  workflowTiers: 0,
+  agentTiers: 0,
+  tiers: 0,
+  profiles: 0,
+} as const;
+
 export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry" })
   .get(
     "/",
@@ -116,6 +127,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
           registry: result.registry,
           source: result.source,
           overlayOverrideCount: result.overlayOverrideCount ?? 0,
+          overlayOverrideBreakdown: result.overlayOverrideBreakdown ?? ZERO_OVERLAY_OVERRIDE_BREAKDOWN,
           ...(result.overlayError ? { overlayError: result.overlayError } : {}),
           agents,
           ...(agentsError ? { agentsError } : {}),
@@ -127,7 +139,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         ...REGISTRY_DETAIL,
         summary: "Get effective registry (builtin + overlay) with source attribution",
         description:
-          "Returns the merged registry (builtin + overlay), source attribution (builtin, overlay, tombstoned), overlayOverrideCount (APCR-01.10 — count of overlay entries surviving normalization, so an operator can see how much of the registry their overlay is overriding), overlayError if the overlay is corrupted, and agents (design D-3, APUX-03 — {name, charterTier} for every charter under skills/agents/, best-effort with agentsError on failure) (200 status, never fails).",
+          "Returns the merged registry (builtin + overlay), source attribution (builtin, overlay, tombstoned), overlayOverrideCount (APCR-01.10 — count of overlay entries surviving normalization, so an operator can see how much of the registry their overlay is overriding), overlayOverrideBreakdown (WUT-17 — the same count broken down per category: hostDefaults, workflowTiers, agentTiers, tiers, profiles), overlayError if the overlay is corrupted, and agents (design D-3, APUX-03 — {name, charterTier} for every charter under skills/agents/, best-effort with agentsError on failure) (200 status, never fails).",
       },
     },
   )
@@ -180,6 +192,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
           registry: result.registry,
           source: result.source,
           overlayOverrideCount: result.overlayOverrideCount ?? 0,
+          overlayOverrideBreakdown: result.overlayOverrideBreakdown ?? ZERO_OVERLAY_OVERRIDE_BREAKDOWN,
         },
       };
     },
@@ -189,7 +202,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         ...REGISTRY_DETAIL,
         summary: "Write overlay (full-replace, validated, atomic)",
         description:
-          "Accepts the full overlay object. Validates the merged result (builtin + overlay) via validateRegistry(). On success, writes atomically to ~/.config/massa-ai/model-profiles.json and returns the updated effective registry, including overlayOverrideCount (APCR-01.10). On failure, returns 400 with all violations.",
+          "Accepts the full overlay object. Validates the merged result (builtin + overlay) via validateRegistry(). On success, writes atomically to ~/.config/massa-ai/model-profiles.json and returns the updated effective registry, including overlayOverrideCount (APCR-01.10) and overlayOverrideBreakdown (WUT-17, per-category). On failure, returns 400 with all violations.",
       },
     },
   )

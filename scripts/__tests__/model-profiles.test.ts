@@ -1127,6 +1127,87 @@ describe("model-profiles: agentTiers — normalize + count (APUX-01 AC3, P1-A AC
   });
 });
 
+// ── WUT-17: normalize `tiers` and publish the per-category breakdown ───────
+// Before this fix, `normalizeOverlay` had no `tiers` branch and `countOverlayEntries` charged
+// an unconditional `if (overlay.tiers) n += 1`, so a saved overlay whose only key was a
+// builtin-equal `tiers` array reported `overlayOverrideCount: 1` with nothing to show for it —
+// the exact case the reporting operator hit on a live server.
+describe("model-profiles: tiers normalization + overlayOverrideBreakdown (WUT-17)", () => {
+  function scratchOverlayPath(): string {
+    const tmpDir = path.join(
+      require("os").tmpdir(),
+      `massa-ai-overlay-tiers-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    return path.join(tmpDir, "model-profiles.json");
+  }
+
+  function writeOverlay(overlayPath: string, data: unknown): void {
+    const fs = require("fs");
+    fs.mkdirSync(path.dirname(overlayPath), { recursive: true });
+    fs.writeFileSync(overlayPath, JSON.stringify(data, null, 2));
+  }
+
+  function zeroBreakdown() {
+    return { hostDefaults: 0, workflowTiers: 0, agentTiers: 0, tiers: 0, profiles: 0 };
+  }
+
+  function sumBreakdown(b: Record<string, number>): number {
+    return Object.values(b).reduce((a, x) => a + x, 0);
+  }
+
+  test("pins the exact reported case: overlay {tiers: <builtin-equal>} and all other maps empty ⇒ count 0 (kills the unconditional `if (overlay.tiers) n += 1` regression)", () => {
+    const overlayPath = scratchOverlayPath();
+    const builtin = loadRegistry(REGISTRY_PATH);
+    writeOverlay(overlayPath, { tiers: [...builtin.tiers] });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.overlayError).toBeUndefined();
+    // normalizeOverlay drops the byte-identical tiers key entirely.
+    expect(result.source.overlay?.tiers).toBeUndefined();
+    expect(result.overlayOverrideCount).toBe(0);
+    expect(result.overlayOverrideBreakdown).toEqual(zeroBreakdown());
+  });
+
+  test("a tiers overlay that genuinely differs (reordered, same set — stays merge-valid) survives normalization and is counted", () => {
+    const overlayPath = scratchOverlayPath();
+    const builtin = loadRegistry(REGISTRY_PATH);
+    expect(builtin.tiers).toEqual(["light", "standard", "deep"]);
+    const reordered = ["standard", "light", "deep"];
+    writeOverlay(overlayPath, { tiers: reordered });
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.overlayError).toBeUndefined();
+    expect(result.source.overlay?.tiers).toEqual(reordered);
+    expect(result.overlayOverrideCount).toBe(1);
+    expect(result.overlayOverrideBreakdown).toEqual({ ...zeroBreakdown(), tiers: 1 });
+    expect(sumBreakdown(result.overlayOverrideBreakdown)).toBe(result.overlayOverrideCount);
+  });
+
+  // The breakdown's values sum to overlayOverrideCount by construction (countOverlayEntries
+  // computes `total` as the sum of its own `breakdown` fields, never a second independent
+  // tally) — these four cases exercise that invariant across every category the Done-when
+  // names: builtin-equal tiers, a genuinely differing tiers, an agentTiers tombstone, and a
+  // profile edit.
+  test.each([
+    ["builtin-equal tiers", { tiers: ["light", "standard", "deep"] }, 0],
+    ["differing tiers", { tiers: ["standard", "light", "deep"] }, 1],
+    // The shipped builtin's agentTiers is {} (design D-1), so a whole-agent tombstone against
+    // it is necessarily a no-op that drops to 0 — the same real-registry constraint the
+    // existing "no-op whole-agent tombstone" test above already documents. The invariant this
+    // test asserts (sum(breakdown) === overlayOverrideCount) holds identically either way.
+    ["an agentTiers tombstone (whole-agent, real builtin's agentTiers is {} so it is a no-op)", { agentTiers: { ghost: null } }, 0],
+    ["a profile edit", { profiles: { balanced: { description: "operator override" } } }, 1],
+  ])("breakdown sums to overlayOverrideCount: %s", (_label, overlay, expectedCount) => {
+    const overlayPath = scratchOverlayPath();
+    writeOverlay(overlayPath, overlay);
+
+    const result = loadEffectiveRegistry({ overlayPath });
+    expect(result.overlayError).toBeUndefined();
+    expect(result.overlayOverrideCount).toBe(expectedCount);
+    expect(sumBreakdown(result.overlayOverrideBreakdown)).toBe(result.overlayOverrideCount);
+  });
+});
+
 // ── F3 sensor: generate-subagent-artifacts read-path split (T14) ──────────
 
 describe("generate-subagent-artifacts read-path split (F3 sensor — T14)", () => {
