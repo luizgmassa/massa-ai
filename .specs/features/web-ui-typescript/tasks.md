@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: **Complete** — all 14 Phases / 40 Tasks executed, then independently verified (see `## Execution Log` and `validation.md`). **22 of 22** modules converted, 0 `.js` left under `src/static`; the denominator was 21 until T23 created `views/config-sections`. Final gates: `build` 0, `type-check` 0 (forced, non-cached), `lint` 0, web-ui 703/0, tools-api 57/0, serving 15/0, installer 31/0. Ten deviations recorded, D1-D10.
+**Status**: **In Progress — Phase 15 (5 Tasks) open.** Phases 1-14 / 40 Tasks are executed and independently verified (see `## Execution Log` and `validation.md`); Phase 15 repairs three defects the operator found by running the served bundle, all of which reproduce on `origin/main`. Phase 15 deliberately ends this branch's behaviour-preserving property in the scoped way T45 records. Pre-Phase-15 state: **22 of 22** modules converted, 0 `.js` left under `src/static`; the denominator was 21 until T23 created `views/config-sections`. Final gates: `build` 0, `type-check` 0 (forced, non-cached), `lint` 0, web-ui 703/0, tools-api 57/0, serving 15/0, installer 31/0. Ten deviations recorded, D1-D10.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 40
@@ -1073,6 +1073,175 @@ Phases run sequentially; tasks within a phase run in order.
 **Tests**: none
 **Gate**: build
 **Commit**: `docs(specs): close out the web-ui TypeScript conversion`
+
+---
+
+### Phase 15: Model Catalog override truth
+
+Phases 15-17 were added after close-out. The operator ran the converted bundle
+against a live server and found three defects. **All three reproduce on
+`origin/main`** — see `spec.md` § "P1: The three defects found by operating the
+served UI are fixed" for the evidence — so these phases deliberately retire the
+branch's behaviour-preserving property, in the enumerated way T45 records. The
+orchestrator recommended a separate branch; the user chose to fold them in.
+
+**3 Phases = 5 Tasks.** One defect per task, split across phases to hold the
+3-task cap: Phase 15 is the override count (server then UI), Phase 16 the Config
+and Logs defects, Phase 17 the close-out that cannot precede them.
+
+#### T41: Normalize `tiers` and publish the override breakdown
+
+**Task ID**: TASK-041
+**What**: Stop counting a builtin-equal `tiers` array as an override, and return a per-category breakdown alongside the count so the UI never has to re-derive the counting rule.
+**Where**: `scripts/lib/model-profiles.ts`, `apps/tools-api/src/routes/model-registry.ts`
+**Depends on**: T40
+**Reuses**: `normalizeFlatMap`'s existing byte-equality rule; the 5 result-construction sites that already carry `overlayOverrideCount`
+**Requirement**: WUT-17
+**Non-goals**: do not change what `countOverlayEntries` charges for `agentTiers` (design D-1: a whole-agent tombstone is 1, otherwise one per surviving host leaf). Do not touch the UI — that is T42.
+**Tools**: MCP: NONE · Skill: NONE
+
+> Measured before the fix, against the reporting operator's live server:
+> `overlayOverrideCount: 1`, `source.overlay: {"tiers":["light","standard","deep"]}`,
+> builtin `tiers: ["light","standard","deep"]` — byte-identical.
+> `normalizeOverlay` has branches for `hostDefaults`, `workflowTiers`,
+> `agentTiers`, `profiles` and **none** for `tiers`; `countOverlayEntries:819`
+> is an unconditional `if (overlay.tiers) n += 1`.
+
+**Done when**:
+- [ ] `normalizeOverlay` gains a `tiers` branch dropping the key when `JSON.stringify` -equal to the builtin's `tiers`
+- [ ] `countOverlayEntries` also returns a per-category breakdown; every one of the 5 result-construction sites carrying `overlayOverrideCount` carries it too (count them in the file, do not trust this figure)
+- [ ] The route's GET **and** PUT responses both carry the new field — `validation.md` records that `overlayOverrideCount` had to be added to both, and one was missed the first time
+- [ ] A test asserts the breakdown's values **sum** to `overlayOverrideCount`, over at least: builtin-equal tiers, differing tiers, an `agentTiers` tombstone, and a profile edit
+- [ ] A test pins the exact reported case: overlay `{tiers: <builtin-equal>}` and all other maps empty ⇒ count `0`
+- [ ] Population printed beside the verdict — state how many overlay keys `normalizeOverlay` now handles and that it equals the number of keys `countOverlayEntries` charges for
+
+**Tests**: `scripts/__tests__/model-profiles.test.ts`, `apps/tools-api/src/routes/model-registry.test.ts`
+**Gate**: `bun test scripts/__tests__/model-profiles.test.ts apps/tools-api/src/routes/model-registry.test.ts` green, then `bun run type-check`
+**Commit**: `fix(model-profiles): stop counting a builtin-equal tiers overlay as an override`
+
+#### T42: Mark non-profile overrides in the Model Catalog
+
+**Task ID**: TASK-042
+**What**: Make every counted override visible where it is edited, and name the categories in the count line.
+**Where**: `apps/web-ui/src/static/views/registry.ts`, `apps/web-ui/src/static/styles.css` if a class is needed
+**Depends on**: T41
+**Reuses**: the existing `<span class="badge overlay-badge">override</span>` markup at `registry.ts:302`, unchanged in shape
+**Requirement**: WUT-17
+**Non-goals**: do **not** recompute the count in browser code — render the breakdown T41 returns. Do not restyle the existing profile-column badge.
+**Tools**: MCP: NONE · Skill: NONE
+
+> Today the only `override` marker is on profile **column headers**, keyed on
+> `source.overlay.profiles`. An override in `hostDefaults`, `workflowTiers`,
+> `agentTiers` or `tiers` is counted and then rendered nowhere, which is the
+> exact contradiction reported: "1 custom override" with no column saying so.
+
+**Done when**:
+- [ ] `hostDefaults` rows, `workflowTiers` rows and `agentTiers` cells present in the corresponding `source.overlay.*` map carry the same `overlay-badge`
+- [ ] The count line names the categories from the server breakdown, e.g. `You have 3 custom overrides of the built-in defaults: 1 in Default Profile per Tool, 2 in Per-Agent Tier Overrides.`
+- [ ] A test asserts the invariant directly: for a payload with a non-zero count, the rendered HTML contains at least one `overlay-badge` **or** a named category — a count with neither is the reported bug and must fail
+- [ ] Golden regenerated with `MASSA_AI_WRITE_GOLDEN=1`; the fixture diff touches **only** `renderModelRegistry/*` keys. Name the changed keys in the commit body and confirm the count against the 13 that exist today
+- [ ] `renderConfig/*` (2) and `renderLogs/*` (7) unchanged in the same diff
+
+**Tests**: `apps/web-ui/src/__tests__/registry-editor.test.ts`, `apps/web-ui/src/__tests__/admin-handlers.test.ts`, `apps/web-ui/src/__tests__/render-golden.test.ts`
+**Gate**: `bun test apps/web-ui/src/__tests__/` green, then `bun run type-check`
+**Commit**: `fix(web-ui): mark non-profile overlay overrides in the Model Catalog`
+
+### Phase 16: Config defaults and the Logs Live preference
+
+#### T43: Show config defaults, and stop Save from clobbering them
+
+**Task ID**: TASK-043
+**What**: Send the defaults to the Config tab, display them as inherited, and make a Save write what was displayed.
+**Where**: `apps/tools-api/src/routes/config.ts`, `apps/web-ui/src/static/views/config.ts`, `apps/web-ui/src/static/styles.css` if a class is needed
+**Depends on**: T42
+**Reuses**: `defaultMassaAiConfig`, already exported from `@massa-ai/shared` (`packages/shared/src/index.ts:38`); `maskSensitive`; the existing dotted-path walk at `config.ts:42-53`
+**Requirement**: WUT-18
+**Non-goals**: do **not** change what `config` holds in the GET response, and do **not** compute `restartNeededSections` from the defaults — its contract is "the subset of [database, embedding, llm, security] **present in the config**", which every default would satisfy vacuously. Add a field; do not repurpose one. Do not touch `savePartialConfig`'s merge semantics.
+**Tools**: MCP: NONE · Skill: NONE
+
+> Two measurements bound this task. Against the operator's live server, **27 of
+> 104** declared fields resolve to nothing, and **23 of those 27 are Synapse**
+> (23 of its 24) — the section looked uniquely broken but the mechanism is
+> generic: `GET /api/v1/config/` returns `loadConfig()`, the persisted file, and
+> that file holds only `synapse: {"enabled": true}`. Against
+> `defaultMassaAiConfig` the same sweep leaves **5 of 104**, all genuinely
+> default-less: `embedding.apiKey`, `compression.prompt`, `logging.file`,
+> `security.apiKey`, `security.allowedExtensions`.
+>
+> The danger is on save, not on read. `buildConfigSectionBody` maps an empty
+> number to `undefined` and omits it (`config.ts:206`), but line 208 is
+> `val = raw === true || raw === "true" || raw === "on"`, so an unchecked box
+> yields `false` — never `undefined`. Simulated against the live payload, one
+> Save of the Synapse tab PUTs `enabled: false` for `inhibition.diversityPenalty`,
+> `inhibition.temporalInhibition`, `inhibition.confidenceGate`, `scoring.attention`,
+> `metacognition` and `buffer`; four of those default `true`
+> (`packages/shared/src/config/index.ts:1020, 1026, 1031, 1053`). Because
+> `savePartialConfig` merges by top-level replacement for every section but
+> `scheduler` (`config-writer.ts:432, 440` — a hazard that section was already
+> bitten by), showing partial values makes Save lossy by construction.
+
+**Done when**:
+- [ ] GET adds `defaults` to `data`, masked with the same `maskSensitive`; `config` and `restartNeededSections` are byte-unchanged for a given file
+- [ ] `renderConfig` displays the persisted value when present and the default otherwise, marking inherited fields visibly (muted class plus a `title`), so "inherited" and "explicitly set" stay distinguishable
+- [ ] A test measures the unresolved-field count against a fixture with only `synapse.enabled` persisted and asserts it is **5**, naming the 5 — not merely "fewer than before"
+- [ ] A test simulates a Synapse Save from the rendered form and asserts the PUT body contains **no** `false` for the six booleans listed above, and that `metacognition.enabled` is `true`
+- [ ] Golden regenerated; the diff touches **only** the 2 `renderConfig/*` keys
+- [ ] `apps/tools-api/src/routes/config-section-coverage.test.ts` still green — it is the mapped-type coupling guard and must not be weakened to accommodate a new field
+
+**Tests**: `apps/tools-api/src/routes/config.test.ts`, `apps/web-ui/src/__tests__/config-forms.test.ts`, `apps/web-ui/src/__tests__/render-golden.test.ts`
+**Gate**: `bun test apps/web-ui/src/__tests__/ apps/tools-api/src/routes/config.test.ts apps/tools-api/src/routes/config-section-coverage.test.ts` green, then `bun run type-check`
+**Commit**: `fix(config): show defaults in the Config tab and stop Save clobbering them`
+
+#### T44: Honour the stored Logs Live preference
+
+**Task ID**: TASK-044
+**What**: Seed `logsLive` from the stored preference so the toggle survives a reload.
+**Where**: `apps/web-ui/src/static/start-app.ts`
+**Depends on**: T43
+**Reuses**: `readLogsLivePreference`, already imported at `start-app.ts:25`
+**Requirement**: WUT-19
+**Non-goals**: do **not** change the stream's semantics. It emits only newly buffered entries — no backfill, no heartbeat — which is why an idle server shows an empty Live table; that is correct and already disclosed in the view. Verified working server-side: held open 20 s with generated traffic, 651 bytes of real SSE frames delivered.
+**Tools**: MCP: NONE · Skill: NONE
+
+> `start-app.ts:195` seeds `logsLive: false`. `start-app.ts:337` then reads the
+> stored preference only `if (state.logsLive === undefined)` — which it never
+> is. `writeLogsLivePreference` (`views/logs.ts:351`) has therefore written a
+> key nothing has ever read. `main` is identical: `start-app.js:68`, `:197`.
+
+**Done when**:
+- [ ] The seed reads the stored preference; the dead `=== undefined` branch is removed rather than left beside the fix
+- [ ] A toggle made in the page still outranks the stored value — the property the removed branch's comment claimed to protect
+- [ ] A test fails against the pre-fix seed: with the preference stored `true`, a fresh start renders the checkbox **checked**. Observe that red before the fix lands
+- [ ] `readLogsLivePreference`'s no-`localStorage` path still yields a working toggle for the page's life
+- [ ] `renderLogs/*` golden entries (7) byte-unchanged — this task changes startup state, not the renderer
+
+**Tests**: `apps/web-ui/src/__tests__/start-app-dispatch.test.ts`
+**Gate**: `bun test apps/web-ui/src/__tests__/` green, then `bun run type-check`
+**Commit**: `fix(web-ui): honour the stored Logs Live preference on reload`
+
+### Phase 17: Phase 15-16 close-out
+
+#### T45: Record the scoped end of behaviour preservation
+
+**Task ID**: TASK-045
+**What**: Write the CHANGELOG entries and amend the artifacts that claim this branch changes no behaviour.
+**Where**: `CHANGELOG.md`, `.specs/features/web-ui-typescript/{tasks,validation}.md`, `.specs/project/STATE.md`
+**Depends on**: T44
+**Reuses**: the existing Execution Log and Deviations conventions
+**Requirement**: WUT-17, WUT-18, WUT-19
+**Non-goals**: do not delete `validation.md`'s claim 2 — amend it. The verifier's finding that `render-golden.json` had **0** modifications was true when made, and the record of it having become false is the point.
+**Tools**: MCP: NONE · Skill: NONE
+**Done when**:
+- [ ] `CHANGELOG.md` `[Unreleased]` gains three `Fixed` entries per `CONTRIBUTING.md` § CHANGELOG authoring — the CI merge gate requires the file to change
+- [ ] `validation.md` claim 2 amended: behaviour is unchanged **except** the golden keys Phase 15 changed, listed exactly, with the count of unchanged keys beside them (85 total today)
+- [ ] Execution Log gains Phase 15 and deviations D11-D13, each recording that the defect reproduces on `origin/main` and was found by operating the UI, not by a gate
+- [ ] `tasks.md` top-of-file `**Status**` line updated — it currently reads `Complete`, and shipping Phase 15 under it would repeat the stale-status defect the verifier already caught once on this file
+- [ ] `spec.md` traceability rows for WUT-17..19 moved `Pending` → `Verified` only if the evidence exists; otherwise left `Pending` and said so
+- [ ] `bun skills/massa-ai/scripts/check_specs_delivered.ts web-ui-typescript --root .` exits 0, and the **parsed task population** is reported, not just the exit code
+
+**Tests**: none
+**Gate**: `bun run build`, `bun run lint`, `bun run type-check`
+**Commit**: `docs(specs): record the Phase 15 defect repair and its behaviour change`
 
 ---
 

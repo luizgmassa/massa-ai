@@ -196,6 +196,42 @@ that the documentation does not contradict the repository.
 
 ---
 
+### P1: The three defects found by operating the served UI are fixed
+
+**User Story**: As the operator who ran the converted bundle against a real
+server, I want the Model Catalog's override count, the Config tab's empty
+fields, and the Logs tab's Live toggle to behave, so that the UI does not
+report state that is false and cannot destroy configuration on Save.
+
+These three were **found by browsing the served bundle, not by any gate**, and
+all three reproduce identically on `origin/main` — the conversion neither caused
+nor could have caught them (`git rev-list --count origin/main..HEAD` is 0 for
+every server-side file involved, and `main`'s `registry.js:228-231,245` and
+`start-app.js:68,197` carry byte-equivalent logic). They are folded into this
+branch by explicit user decision, which retires the branch's
+behaviour-preserving property in a scoped, enumerated way — see `validation.md`.
+
+**Acceptance Criteria**:
+
+1. WHEN a saved overlay's `tiers` array is JSON-equal to the builtin's THEN `normalizeOverlay` SHALL drop it, so `overlayOverrideCount` counts 0 rather than 1. <!-- event-driven -->
+2. The `tiers` key SHALL be normalized against the builtin by the same rule already applied to `hostDefaults`, `workflowTiers`, `agentTiers` and `profiles` — it is today the only overlay key with no normalization branch. <!-- ubiquitous -->
+3. WHEN a surviving override lives outside `overlay.profiles` THEN the Model Catalog SHALL mark it where it is edited, so a non-zero count is never reported with nothing on screen carrying an `override` marker. <!-- event-driven -->
+4. The per-category breakdown the UI renders SHALL be server-computed and SHALL sum to `overlayOverrideCount`, so the counting rule is not duplicated in browser code where it can drift. <!-- ubiquitous -->
+5. WHEN a config field has no persisted value THEN the Config tab SHALL display the default that is actually in force and SHALL mark the field as inherited rather than rendering it blank. <!-- event-driven -->
+6. WHEN a config section is saved THEN no field that was merely unset SHALL be persisted as `false`. `savePartialConfig` merges by **top-level replacement** for every section but `scheduler` (`config-writer.ts:432,440`), so a partially-populated form is lossy by construction: measured against the reporting operator's own config, one Save of the Synapse tab would have written `enabled: false` over six defaulted booleans, four of which default `true`. <!-- event-driven -->
+7. WHEN the Logs tab renders THEN the stored Live preference SHALL be honoured. `start-app` seeds `logsLive: false` and then reads the preference only `if (state.logsLive === undefined)`, so `writeLogsLivePreference` has never once been read back. <!-- event-driven -->
+8. The `renderLogs/*` golden entries SHALL remain byte-identical, since WUT-19 changes startup state and not the renderer. <!-- ubiquitous -->
+9. WHEN a golden fixture entry changes THEN the change SHALL be limited to the entry keys the task names in advance, proving the behaviour change is the intended one and not collateral. <!-- event-driven -->
+
+**Independent Test**: against a live server, `overlayOverrideCount` is 0 for an
+overlay whose only key is a builtin-equal `tiers`; the Config tab's unresolved
+field count drops from 27/104 to 5/104 (the 5 being genuinely default-less —
+two API keys, `compression.prompt`, `logging.file`, `security.allowedExtensions`);
+a simulated Synapse save contains no `enabled: false`; and reloading `/ui` with
+Live previously on renders the checkbox checked.
+
+---
+
 ## Edge Cases
 
 - IF `bun run test:coverage` or a direct `bun test apps/web-ui/src/__tests__/` runs on a clean tree with no `dist/static/` THEN the module-graph guard SHALL fail with the named build command (WUT-04). Neither command is turbo-mediated — root `test:coverage` is `bun scripts/check-coverage.ts`, a raw script spawning bare `bun test` at `cwd: apps/web-ui`.
@@ -252,10 +288,13 @@ AC2), which are manual observations recorded as such.
 | WUT-14 | P2: consumers repointed | Execute | Verified |
 | WUT-15 | P2: consumers repointed | Execute | Verified |
 | WUT-16 | P3: stale claims | Execute | Verified |
+| WUT-17 | P1: reported defects | Execute | Pending |
+| WUT-18 | P1: reported defects | Execute | Pending |
+| WUT-19 | P1: reported defects | Execute | Pending |
 
 **ID format:** `WUT-NN`. **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
 
-**Coverage:** 16 total, 16 mapped to tasks, 0 unmapped ✅. Every ID is cited by at least one task in `tasks.md` (verified: `grep -oE 'WUT-[0-9]+' tasks.md | sort -u` returns WUT-01..WUT-16 with no gaps and no phantom ids), and all 16 were re-measured against the tree by an independent verification pass — see `validation.md`.
+**Coverage:** 19 total, 19 mapped to tasks, 0 unmapped ✅. Every ID is cited by at least one task in `tasks.md` (verified: `grep -oE 'WUT-[0-9]+' tasks.md | sort -u` returns WUT-01..WUT-19 with no gaps and no phantom ids). WUT-01..WUT-16 were re-measured against the tree by an independent verification pass — see `validation.md`. WUT-17..WUT-19 are the Phase 15 defect repair: WUT-17 is the overlay override count and its markers (P1 criteria 1-4), WUT-18 the Config tab's defaults and the lossy save (criteria 5-6), WUT-19 the Logs Live preference (criteria 7-8); criterion 9 binds all three.
 
 ---
 
