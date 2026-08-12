@@ -17,19 +17,19 @@
     },
     "apps/claude-plugin": {
       "name": "@massa-ai/claude-plugin",
-      "version": "1.8.0",
+      "version": "1.51.0",
     },
     "apps/codex-plugin": {
       "name": "@massa-ai/codex-plugin",
-      "version": "1.8.0",
+      "version": "1.51.0",
     },
     "apps/cursor-plugin": {
       "name": "@massa-ai/cursor-plugin",
-      "version": "1.8.0",
+      "version": "1.51.0",
     },
     "apps/mcp-client": {
       "name": "@massa-ai/mcp-client",
-      "version": "1.8.0",
+      "version": "1.51.0",
       "bin": {
         "massa-ai": "dist/index.js",
         "massa-ai-config": "dist/config-cli.js",
@@ -47,7 +47,7 @@
     },
     "apps/opencode-plugin": {
       "name": "@massa-ai/opencode-plugin",
-      "version": "1.8.0",
+      "version": "1.51.0",
       "bin": {
         "massa-ai-config": "dist/config-cli.js",
       },
@@ -64,7 +64,7 @@
     },
     "apps/tools-api": {
       "name": "@massa-ai/tools-api",
-      "version": "1.8.0",
+      "version": "1.51.0",
       "bin": {
         "massa-ai-api": "dist/index.js",
       },
@@ -83,14 +83,17 @@
     },
     "apps/web-ui": {
       "name": "@massa-ai/web-ui",
-      "version": "1.8.0",
+      "version": "1.51.0",
+      "dependencies": {
+        "@massa-ai/shared": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "^1.3.9",
       },
     },
     "packages/core": {
       "name": "@massa-ai/core",
-      "version": "1.8.0",
+      "version": "1.51.0",
       "dependencies": {
         "@ai-sdk/cohere": "^3.0.17",
         "@ai-sdk/google": "^3.0.19",
@@ -151,7 +154,7 @@
     },
     "packages/shared": {
       "name": "@massa-ai/shared",
-      "version": "1.8.0",
+      "version": "1.51.0",
       "dependencies": {
         "dotenv": "^17.2.4",
       },
