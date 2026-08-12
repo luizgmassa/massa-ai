@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-10 of 14 in flight; **20 of 22** modules converted (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`; 2 remain — `start-app.js` and `app.js`. T38 (D7) is open and the branch is red until it lands.
+**Status**: In Progress — Batches 1-10 of 14 in flight; **20 of 22** modules converted (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`; 2 remain — `start-app.js` and `app.js`. T38 (D7) landed; branch green.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 38
@@ -805,7 +805,8 @@ Phases run sequentially; tasks within a phase run in order.
 - [ ] `.ts` replaces `.js`; every re-export preserved
 - [ ] `public-surface.test.ts` passes with `git diff` on that file **empty**
 - [ ] `dist/static/app.js` emitted and reachable from the module-graph walk
-- [ ] `curl -sf localhost:3333/ui/app.js` → 200 against a running `dev:api`
+- [ ] **`bun test apps/tools-api/src/__tests__/web-ui-serve.test.ts apps/tools-api/src/__tests__/web-ui-key-http.test.ts` → 15 pass, 0 fail.** This supersedes the original `curl -sf localhost:3333/ui/app.js` bullet: `web-ui-serve.test.ts:54` already is that check — *"GET /ui/app.js returns 200 + javascript content-type"* — as a real HTTP fetch against a listening server, which is the only form that catches Elysia's bare-string content-type override. It is automated and permanent where the curl was neither. `/ui/app.js` is auth-exempt (`isPublicPath` matches `startsWith("/ui/")`, measured), so no key is involved either way. A manual `curl` against a running `dev:api` remains available to the user as an eyeball check, alongside T7's two deferred browser bullets
+- [ ] **Gate extended for this task**: these two suites are absent from the feature's `full` gate list, which is how a phase that changes the served bytes could go green without ever asserting them. They are reached by the repo-wide `bun run test`, so this is a gate-scope gap, not a coverage gap (D8)
 
 **Tests**: unit
 **Gate**: full
@@ -1661,7 +1662,7 @@ other; quote whichever one the claim is actually about.
 | --- | --- | --- |
 | T26 | `efbf661c` | `dashboard.js` → `.ts` (222 → 305 source). 1 file. **No repoint needed** — see below |
 | T27 | `4a1cac48` | `wire-view-handlers.js` → `.ts` (363 → 428 source) + `app-renderers.test.ts:1649` fs-path repoint. 2 files |
-| T38 | *pending* | D7 remediation, dispatched after this entry |
+| T38 | `000f9a84` | D7 remediation — scanner population 2 → 22, mutant repaired, file-count assertion added. 1 file |
 
 Orchestrator-verified: build exit 0; web-ui **700 pass / 0 fail**; `render-golden.json`
 still `27195c2e…` with **0 commits touching it across the branch**; `dist/static`
@@ -1727,6 +1728,24 @@ breaking, because it sat under a different heading. **Two files, the same glob, 
 correct and one not; the inventory that would have paired them had six members and
 listed five.**
 
+**T38 — complete, `000f9a84`.** Population **2 → 22**, verified by the scanner's own new
+output line: `[web-ui-readonly] scanned 22 files under …/apps/web-ui/src/static`. One
+file changed, +45 / −7; the 7 removed lines are the function signature, the `.js`
+filter, the mutant literal and a comment — **no assertion deleted**. The six tools-api
+suites go 55/1 → **57 pass / 0 fail** (56 pre-existing plus the new
+`readBundleSource scans a non-trivial population` test); web-ui 700/0; installer
+scanner 31/0; golden unchanged.
+
+The mutant repair was verified the same way the defect was found — by evaluating the
+literal in isolation with `APP_JS` simulated as `""`. Before: `contains target? false`.
+After: **`true`**. The escapes were removed rather than doubled, which also makes the
+mutant match how the marker actually appears in real source (`memory.ts` and
+`wire-view-handlers.ts` both hold it unescaped, since they build HTML inside
+single-quoted strings). The deliberate red for the population assertion:
+`expect(APP_JS_FILE_COUNT).toBeGreaterThanOrEqual(22)` → `Received: 0` against an empty
+scratch directory. `static-module-graph.test.ts` was not touched — its only branch
+commit is `bce9bb91` (T6), which is the intended `dist/static` repoint.
+
 *Consequences recorded, not just the fix.* T38 (new, Phase 10) restores the population
 to 22, repairs the mutant's escaping, and adds the file-count assertion that would have
 caught this in Batch 3. Both repairs must be one task: fixing the population alone
@@ -1735,6 +1754,24 @@ scanners to six. And **T30 was rewritten from a repoint task to a verification t
 both its bullets were falsified before it ran, one by T26's `require` measurement and
 one because `STATIC_DIR` is a directory path that was always correct, the defect being
 the extension filter on the line below it.
+
+**D8 — the feature's `full` gate never runs the two suites that assert the served
+bytes.** Found during the Phase 11 pre-dispatch review, while checking whether T29's
+`curl -sf localhost:3333/ui/app.js` bullet was executable. It is — `isPublicPath`
+matches `startsWith("/ui/")`, so no key is needed — but it is also **already a test**:
+`web-ui-serve.test.ts:54`, *"GET /ui/app.js returns 200 + javascript content-type"*, a
+real HTTP fetch against a listening server. That is the only form that catches Elysia's
+bare-string content-type override, which `CLAUDE.md` calls out explicitly and which
+in-process tests cannot see.
+
+Neither `web-ui-serve.test.ts` nor `web-ui-key-http.test.ts` appears in the `full`
+gate's six-suite list. A feature whose entire subject is *what bytes get served* has
+been gating on six suites that never make an HTTP request for them. Both are reached by
+the repo-wide `bun run test`, so nothing shipped unverified — this is a gate-scope gap,
+not a coverage gap, and the distinction is the reason it stayed invisible: the suites
+were green the whole time, just never at the moment a task claimed done. Measured now:
+**15 pass / 0 fail** across the two. T29's bullet is rewritten to run them and the curl
+is retired into the same deferred-to-user bucket as T7's browser checks.
 
 ---
 
