@@ -9,7 +9,10 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: **Complete — Phases 1-17 / 46 Tasks executed** (40 original + 6 in Phases
+**Status**: **In Progress — Phase 18 (2 Tasks) open**, reopened after the operator
+re-tested and found the Logs live tail still dead: T44 fixed the checkbox, but the
+tail has no reconnect and the server closes every stream after 10 minutes. Prior
+state: **Phases 1-17 / 46 Tasks executed** (40 original + 6 in Phases
 15-17: T41, T42, T46, T43, T44, T45). Phases 1-14 (T1-T40) were
 independently verified (see `## Execution Log` and `validation.md`'s original claims 1,
 3-7); Phases 15-16 (T41, T42, T46, T43, T44) repair three defects the operator found by
@@ -1314,6 +1317,99 @@ Phase 17 the close-out that cannot precede them.
 **Tests**: none
 **Gate**: `bun run build`, `bun run lint`, `bun run type-check`
 **Commit**: `docs(specs): record the Phase 15 defect repair and its behaviour change`
+
+---
+
+### Phase 18: Make the live tail survive being closed
+
+Opened after the operator re-tested Phase 16's fix: "The checkbox is fine now,
+but the live logs are still not working. New logs don't auto-appear into the
+page, only after a refresh." T44 fixed the checkbox, which was the reported
+half — the tail itself was never the same defect.
+
+Diagnosis, measured rather than reasoned:
+
+- The **client stream code works**. Running the emitted
+  `dist/static/views/logs.js`'s `runLogsLiveStream` against the live server with
+  a real key appended **4 of 4** entries with correct row markup.
+- The **server tails the shared file sink**, not the ring buffer: `startSinkTail`
+  needs `logging.file`, and while the *persisted* config leaves it unset, the
+  runtime `Config` resolves it to
+  `~/.config/massa-ai/data/logs/massa-ai.log`. So the live tail is
+  cross-process after all.
+- The server **closes every stream after 10 minutes** by design
+  (`SSE_MAX_DURATION_MS_DEFAULT`, `apps/tools-api/src/routes/logs.ts:348`,
+  `controller.close()` at ~`:578`), and the client has **no reconnect**.
+  Reproduced against a scratch SSE server that sends one frame then closes:
+  1 row appended, `state.logsLive` still `true`, `logsStreamInFlight` `false`,
+  no banner. **Live is checked and dead, and only a refresh revives it — for
+  another 10 minutes.** Every dev-server restart does the same, sooner.
+
+A third finding, to record rather than fix here: the Config tab renders
+`logging.file` blank while the runtime resolves a real path, because T43's
+defaults come from the static `defaultMassaAiConfig` and the runtime `Config`
+class derives some values that the static object leaves undefined. The two
+default sources disagree; the Config tab believes the static one.
+
+#### T47: Reconnect the live tail, and stop swallowing a non-200
+
+**Task ID**: TASK-047
+**What**: Make `runLogsLiveStream` survive the server's scheduled close, and fail loudly instead of silently when the response is not a stream.
+**Where**: `apps/web-ui/src/static/views/logs.ts`
+**Depends on**: T45
+**Reuses**: the existing abort controller, the `logsStreamInFlight` guard, and LOG-15's existing error banner
+**Requirement**: WUT-19
+**Non-goals**: do not change the server. 10 minutes is a deliberate bound and heartbeats already exist. Do not add backfill — a reconnect must not re-issue the range query or replay entries the operator already has.
+**Tools**: MCP: NONE · Skill: NONE
+
+> Two distinct silent failures live in one function. A **clean close** (`done`)
+> exits the read loop, runs `finally`, and leaves `logsLive` true with nothing
+> running. A **non-200** never gets an `res.ok` check: a 401 returns a 68-byte
+> JSON body with no `\n\n`, so the frame loop finds nothing, `done` arrives, and
+> the function returns exactly as if the stream had been healthy and idle.
+> Measured both.
+
+**Done when**:
+- [ ] A clean end reconnects while Live is still on and the stream was not aborted by us
+- [ ] Reconnection cannot hot-loop: a stream that closes immediately, repeatedly, must give up after a bounded number of attempts and surface the LOG-15 banner rather than retrying forever. State the bound and the delay you chose
+- [ ] The delay is injectable, so tests do not sleep in real time. Name the seam
+- [ ] `res.ok` is checked; a non-200 banners and turns Live off, and does **not** reconnect — a 401 will not fix itself on retry
+- [ ] Toggling Live off, or navigating away, still stops the tail promptly and does not trigger a reconnect — `stopLogsLiveStream`'s abort must be distinguishable from a server close
+- [ ] A test reproduces the exact measured scenario: a stream that delivers one frame then closes, with Live still on, results in a **second** connection. Observe it red first
+- [ ] A test covers the 401 path asserting the banner and `logsLive === false`, red first
+- [ ] `render-golden.json` unchanged — 86 entries, 0 byte-changed. This task touches no renderer
+
+**Tests**: `apps/web-ui/src/__tests__/logs-live.test.ts` (new file, or the existing suite that already covers `runLogsLiveStream` if one does — check before creating)
+**Gate**: `bun run --filter @massa-ai/web-ui build`, then `bun test apps/web-ui/src/__tests__/`, then `bun run type-check`
+**Commit**: `fix(web-ui): reconnect the live log tail and surface a failed stream`
+
+#### T48: Correct the live-tail scope disclosure
+
+**Task ID**: TASK-048
+**What**: Stop telling the operator that Live is scoped to one process, now that the server tails the shared sink.
+**Where**: `apps/web-ui/src/static/views/logs.ts`, `apps/tools-api/src/routes/logs.ts`
+**Depends on**: T47
+**Reuses**: the existing `liveScopeDisclosure` string and the route's Swagger `description`
+**Requirement**: WUT-19
+**Non-goals**: do not delete the disclosure — the fallback it describes is still reachable. Make it conditional in wording, not absent.
+**Tools**: MCP: NONE · Skill: NONE
+
+> `logs.ts` (web-ui, ~`:119`) tells the operator "Live shows only this server
+> process's entries", and the route's Swagger description (~`:610`) says the
+> same. Both predate `startSinkTail`. The server now tails the shared file when
+> `logging.file` resolves — which it does on a default install — and falls back
+> to the ring buffer only when no sink file is readable. The text describes the
+> fallback as though it were the rule.
+
+**Done when**:
+- [ ] Both texts describe the actual behaviour: the shared sink normally, this process only when no sink file is readable
+- [ ] Golden regenerated; the diff touches **only** `renderLogs/*` keys. Name them and their count (7 exist today) — this is the one task in Phases 15-18 that legitimately changes that family
+- [ ] `renderConfig/*` (2) and `renderModelRegistry/*` (14) byte-identical in the same diff
+- [ ] The Execution Log records the `logging.file` finding from this phase's preamble: the Config tab shows it blank because `defaultMassaAiConfig` leaves it undefined while the runtime `Config` derives a real path, so the two default sources disagree
+
+**Tests**: `apps/web-ui/src/__tests__/render-golden.test.ts`
+**Gate**: `bun run --filter @massa-ai/web-ui build`, then `bun test apps/web-ui/src/__tests__/`, then `bun run type-check`
+**Commit**: `docs(web-ui): correct the live-tail scope disclosure`
 
 ---
 
