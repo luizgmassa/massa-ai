@@ -1345,7 +1345,7 @@
       "phases": {
         "specify": true,
         "design": true,
-        "tasks": false,
+        "tasks": true,
         "execute": false
       },
       "branch": "spec/web-ui-typescript",
@@ -1353,7 +1353,7 @@
       "depends_on": [],
       "spec": ".specs/features/web-ui-typescript/spec.md",
       "design": ".specs/features/web-ui-typescript/design.md",
-      "tasks": null,
+      "tasks": ".specs/features/web-ui-typescript/tasks.md",
       "validation": null,
       "notes": "Specify complete 2026-08-11: 16 requirement IDs (WUT-01..16), 33 EARS acceptance criteria, validate_spec 0 errors 0 warnings. Shape A (build step, emit to apps/web-ui/dist/static) chosen by the user after a Plan Challenge falsified the technical case against Shape C (JSDoc + checkJs) — PLAN.md retains the full cost table. Baselines frozen in CHARACTERIZATION.md at 6227b4ac: 700/56/31 tests across 22 files, render-golden.json sha256 27195c2e. Design and Tasks pending."
     }
