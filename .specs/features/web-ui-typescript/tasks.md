@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) landed; branch green. Phases 12-14 remain.
+**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) landed. Phases 12 complete; 13-14 remain.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 39
@@ -2009,6 +2009,74 @@ module) were also corrected to `views/config-sections.ts` while in the file.
 own error-handling paths under a mocked spawn — confirmed by their repeated
 `[deterministic] Running 142 deterministic test files...` preamble and the
 bracketing PASS run at the same file count; not a real failure.
+
+**Orchestrator verification of Batch 12.** Re-measured independently: build exit 0;
+`apps/web-ui/src/__tests__/` **703 pass / 0 fail** (700 + T31's 3 new tests); the six
+tools-api suites **57/0**; installer scanner **31/0**; serving suites **15/0**;
+`bun run test:scripts` **exit 0**, TypeScript portion **1804 pass / 0 fail across 80
+files** in 40.8 s. `render-golden.json` unchanged; `public-surface.test.ts` still at
+**0 commits** across the branch. T30's evidence re-confirmed directly: all three
+specifiers still literally read `require(".../app.js")`, `src/static/app.js` is absent
+from disk, and `src/static` holds **0** `.js` files.
+
+**The D7 population guard was observed firing by the orchestrator, and the first
+attempt to observe it was invalid.** Pointing `STATIC_DIR` at an empty directory
+produced `0 pass / 1 fail` — but that is the module-scope
+`readFileSync(STATIC_DIR/index.html)` throwing ENOENT before any test runs, not the
+assertion. Isolated correctly by redirecting **only** the `readBundleSource` argument,
+leaving `index.html` resolvable:
+
+```
+[web-ui-readonly] scanned 0 files under …/apps/web-ui/src/static
+Expected: >= 22
+Received: 0        → 4 pass, 1 fail
+```
+
+Control: `scanned 22 files`, 5 pass / 0 fail, tree clean. This is the same confounding
+the worker reported honestly for `wire-view-handlers.ts` (a literally empty file
+cascades into an unrelated `SyntaxError` first) — **emptying a scanner's subject
+frequently breaks something upstream of the assertion under test, and the resulting
+red proves nothing.** Shrink to a valid stub, or redirect only the read being tested.
+
+That run also produced the clearest possible argument for T31's existence: with the
+corpus emptied, **exactly one** of the suite's assertions failed. The
+`not.toContain("FORBIDDEN_MUTATING_PATHS")` check passed vacuously on an empty string,
+and the repaired mutant assertion passed because T38 made it self-satisfying. The
+population count is the only thing standing between this suite and vacuous green.
+
+**Threshold headroom differs sharply between the pre-existing guards and the new
+ones, and the difference should not be read as uniform coverage.** Measured tolerance
+before each assertion fires:
+
+| Assertion | Threshold | Actual | Shrink tolerated |
+| --- | --- | --- | --- |
+| `APP_JS_FILE_COUNT >= 22` | 22 | 22 | **0%** |
+| section keys `>= 16` (both scanners) | 16 | 16 | **0%** |
+| `FILES.length >= 15` | 15 | 22 | 32% |
+| `INDEX_HTML.length > 1000` | 1000 | 2133 | 53% |
+| `MEMORY_VIEW_SOURCE.length > 5000` | 5000 | 14850 | 66% |
+| `MODELS_TAB_SOURCE.length > 20000` | 20000 | 66110 | 69% |
+| `WIRE_VIEW_HANDLERS_SOURCE.length > 5000` | 5000 | 19514 | 74% |
+
+Accepted rather than tightened: a byte-length threshold on a source file must tolerate
+ordinary editing, where a file count or a parsed-key count is a discrete, stable fact
+that can sit at zero tolerance. All four new thresholds comfortably catch the failure
+shape they exist for — a path that stops resolving or points at a stub, both of which
+land near zero. They would *not* catch a slow 50% erosion, which is precisely how D7
+actually happened (21 → 2 over eight commits, passing through 14, 7, 5, 4, 3). Worth
+knowing before quoting "all six guarded" as though the six were equivalent.
+
+**A `grep -c` on the shell-suite output returned 25 "failed" lines; every one is
+`0 failed` or a test name.** The matches are result lines (`install-agents CLI: 48
+passed, 0 failed`) and deliberately-named cases (`✓ codex failed install → non-zero
+exit`). Filtering for a *nonzero* leading count returns nothing. Sixth instance of this
+class on this feature.
+
+**Observed doc drift, not attributable to this feature.** `CLAUDE.md` documents
+`test:scripts` as "1230 TS tests across 55 files + 21 shell suites"; measured here it
+is **1804 across 80 files**. This branch added no `scripts/` tests, so the gap predates
+it. `CLAUDE.md` is already in T35's write set — worth correcting there, flagged rather
+than folded in silently.
 
 ---
 
