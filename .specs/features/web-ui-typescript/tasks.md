@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) landed. Phases 12-13 done except T40 (D10), which is open — `bun run type-check` exits 2 and the branch cannot pass CI until it lands. Phase 14 remains.
+**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) and T40 (D10) landed; `bun run type-check` exits 0. Phases 1-13 complete. Phase 14 (T34-T36) remains.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 40
@@ -2187,6 +2187,61 @@ T26 and first surfaced at T32, six phases later. This is the same shape as D8 �
 ladder that omits one of its own subjects — and the sharper version of it: **the check
 CI runs first is the check this feature ran least.** To be recorded in `lessons.json`
 at close-out.
+
+**T40 — complete, `0ee8ef23`.** `bun run type-check` goes **exit 2 → exit 0**, verified
+by the orchestrator on a **forced, non-cached** turbo run (`--force`, 6 successful / 6
+total, zero `error TS` lines) — a cached green here would be a replay of the broken
+state's sibling, not a measurement. `bun run build` 0, `bun run lint` 0, web-ui
+**703/0**, tools-api **57/0**, serving **15/0**, installer **31/0**, golden unchanged,
+`dist/static` = 22 `.js` / 0 `.ts` / 1 `.html` / 1 `.css`.
+
+Both halves fixed as diagnosed, and the shape is worth keeping: **the producer type
+tightened while the consumer type loosened.** `DashboardData`'s four members became
+required (`fetchDashboardData` assigns all four in one unconditional return literal),
+and the two `unknown` reads narrowed in the test via local fixture interfaces —
+`(data.hookQueue.data as HookQueueFixtureData).pendingCount` — with no `any`, no
+`@ts-expect-error`, and `DashboardSectionResult.data` left as `unknown`.
+
+*One consequence the task did not anticipate, handled correctly.* Making the members
+required broke `renderDashboard({})` at `dashboard.test.ts:257` with a new `TS2345`.
+The worker fixed it in `dashboard.ts` by loosening **`renderDashboard`'s parameter** to
+`Partial<DashboardData>` rather than editing the test. Verified sound: the body guards
+**all four** members with `|| { error: "no data" }` (lines 298-301), so `Partial` is an
+honest description of what it tolerates, and `fetchDashboardData` still returns the
+strict type. A function that accepts more inputs than its producer emits is not a
+weakening.
+
+**Batch 1's two deferred "pre-existing" claims — both closed.**
+
+`apps/tools-api/src/routes/logs.test.ts` (claimed turbo concurrency): **47 pass / 0
+fail** at branch HEAD. Nothing to explain; the claim is retired.
+
+`packages/core/src/__tests__/scheduler-store-pg.test.ts` (claimed DB contamination):
+**5 pass / 1 fail** at branch HEAD — and the label was directionally right but wrong
+about the mechanism. The failure is `Expected 0, Received 5` with
+`PgScheduledJobStore hydrated {"rows":5}`, and the five rows are **not test residue**:
+they are `scheduled-checkpoint-purge`, `scheduled-decay-sweep`, `scheduled-auto-improve`,
+`scheduled-memory-consolidation` and `scheduled-observation-bridge` — the application's
+own defaults from `services/scheduler/scheduler-defaults.ts`, sitting in the
+developer's live local database. **No migration seeds them** (grepped), so a fresh CI
+`pgvector` service has an empty table and the test passes there. Same class as the
+config-file trap `CLAUDE.md` already documents, one layer down: the suite reads the
+developer's own database rather than the developer's own `~/.config`.
+
+Not ours, and provably so: **`git rev-list --count 6227b4ac..HEAD -- packages/` is 0** —
+this branch touches no file under `packages/`, so it cannot have caused a
+`packages/core` failure. Left unfixed as out of scope, but worth reporting upstream:
+the test already carries an M35 seam built for exactly this
+(`installScheduledFilterSeam` filters `id.startsWith("scheduled-")` on the `storeB`
+instance), and it is **not filtering** — a latent defect in the seam itself, on `main`.
+
+*Measurement note.* Two of these counts were first taken with
+`git log --oneline … | wc -l`, which returned **1** against an empty result set in one
+invocation while returning **0** in others. Re-taken with `git rev-list --count` and
+cross-checked with `git diff --name-only … | grep -c .`, both agreeing on 0 for every
+path checked — including `render-golden.json` and `public-surface.test.ts`, whose
+"0 commits across the branch" claims appear throughout this log and are confirmed
+correct. Prefer `rev-list --count` for any count that will be quoted.
 
 ---
 
