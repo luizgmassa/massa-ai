@@ -28,13 +28,78 @@ import { REGISTRY_HOSTS } from "./registry.js";
 // delta, and mergeRegistryForDisplay (below) is what makes add/duplicate/
 // delete/edit visible before save without requiring a full-registry seed.
 
-export function initRegistryOverlay(ctx, registry, source) {
+/** {model, effort} cell, shared by the overlay delta and the server's own
+ *  registry — optional properties ONLY (`model?: string | null`, never
+ *  `model: string | undefined`): ABSENT means inherit, PRESENT (even `null`)
+ *  is an explicit override/tombstone, and a `| undefined` union would invite
+ *  writing the key with value `undefined`, which the merge misreads as an
+ *  override rather than "not present". */
+interface RegistryCell { model?: string | null; effort?: string | null }
+
+type RegistryHostsMap = Record<string, Record<string, RegistryCell>>;
+
+interface RegistryProfile {
+  description?: string;
+  hosts?: RegistryHostsMap;
+}
+
+/** `_delete: true` tombstones a builtin profile or removes an operator-added
+ *  one; absent means "not deleted" (never written as `_delete: false`). */
+interface RegistryOverlayProfile extends RegistryProfile { _delete?: boolean }
+
+interface RegistryOverlay {
+  profiles?: Record<string, RegistryOverlayProfile>;
+  hostDefaults?: Record<string, string>;
+  // present + null = tombstone; absent = inherit (both maps below).
+  workflowTiers?: Record<string, string | null>;
+  agentTiers?: Record<string, Record<string, string> | null>;
+  tiers?: string[];
+}
+
+interface RegistrySchema {
+  profiles?: Record<string, RegistryProfile>;
+  hostDefaults?: Record<string, string>;
+  workflowTiers?: Record<string, string>;
+  agentTiers?: Record<string, Record<string, string>>;
+  tiers?: string[];
+}
+
+interface RegistrySource { overlay?: RegistryOverlay | null; tombstoned?: string[] }
+
+interface RegistryServerData {
+  registry?: RegistrySchema;
+  source?: RegistrySource;
+  overlayOverrideCount?: number;
+  agents?: unknown[];
+  agentsError?: string | null;
+}
+
+interface RegistryFormState { kind: string; error?: string | null }
+
+interface RegistryState {
+  registryLoaded?: boolean;
+  registryOverlay?: RegistryOverlay;
+  registryDirty?: boolean;
+  registryForm?: RegistryFormState | null;
+  registryServerData?: RegistryServerData;
+  regenerating?: boolean;
+  [key: string]: unknown;
+}
+
+interface RegistryStateCtx { state: RegistryState; render: () => void }
+
+interface RegistryApiCtx extends RegistryStateCtx {
+  api: { request: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown>; authHeaders?: () => Record<string, string> };
+  root: Parameters<typeof showBanner>[0];
+}
+
+export function initRegistryOverlay(ctx: RegistryStateCtx, registry: RegistrySchema | null | undefined, source: RegistrySource | null | undefined): void {
   if (ctx.state.registryLoaded) return;
   const reg = registry || {};
   const src = source || {};
   const overlayData = src.overlay || null;
 
-  const seed = overlayData ? JSON.parse(JSON.stringify(overlayData)) : {};
+  const seed: RegistryOverlay = overlayData ? JSON.parse(JSON.stringify(overlayData)) : {};
 
   ctx.state.registryOverlay = {
     profiles: seed.profiles || {},
@@ -51,8 +116,8 @@ export function initRegistryOverlay(ctx, registry, source) {
  *  never a truthiness fallback (an empty-but-present overlay object must not
  *  blank the server's map, APCR-11.4). A `null` overlay value tombstones the
  *  key (design D-1). */
-function mergeFlatMapForDisplay(serverMap, overlayMap) {
-  const merged = { ...serverMap };
+function mergeFlatMapForDisplay<T>(serverMap: Record<string, T> | undefined, overlayMap: Record<string, T | null> | undefined): Record<string, T> {
+  const merged = { ...serverMap } as Record<string, T>;
   for (const [key, value] of Object.entries(overlayMap || {})) {
     if (value === null) delete merged[key];
     else merged[key] = value;
@@ -66,8 +131,11 @@ function mergeFlatMapForDisplay(serverMap, overlayMap) {
  *  identical). `overlay[agent] === null` deletes the whole agent entry; otherwise the
  *  agent's host map is merged against the base via `mergeFlatMapForDisplay` itself, so a
  *  host-level `null` tombstones just that key and an absent host key inherits. */
-function mergeAgentTiersForDisplay(base, overlay) {
-  const result = {};
+function mergeAgentTiersForDisplay(
+  base: Record<string, Record<string, string>> | undefined,
+  overlay: Record<string, Record<string, string> | null> | undefined,
+): Record<string, Record<string, string>> {
+  const result: Record<string, Record<string, string>> = {};
   for (const [agent, hostMap] of Object.entries(base || {})) {
     result[agent] = { ...hostMap };
   }
@@ -90,11 +158,11 @@ function mergeAgentTiersForDisplay(base, overlay) {
  *  overlay for an operator who edited only one host is `{hosts: {opencode: {...}}}`, and
  *  assigning that over the server's profile erases claude/codex/cursor from the display —
  *  their cells render as "—" and become uneditable. */
-function mergeProfileForDisplay(baseProfile, overlayProfile) {
+function mergeProfileForDisplay(baseProfile: RegistryProfile | null | undefined, overlayProfile: RegistryOverlayProfile): RegistryProfile {
   const { _delete: _unusedDelete, ...rest } = overlayProfile;
   void _unusedDelete;
   if (!baseProfile) return rest;
-  const mergedHosts = { ...baseProfile.hosts };
+  const mergedHosts: RegistryHostsMap = { ...baseProfile.hosts };
   if (rest.hosts) {
     for (const [host, tierMap] of Object.entries(rest.hosts)) {
       const baseTierMap = mergedHosts[host];
@@ -110,10 +178,10 @@ function mergeProfileForDisplay(baseProfile, overlayProfile) {
 /** Build the display registry = server registry merged with in-memory overlay.
  *  This makes add/duplicate/delete/restore visible immediately (before save),
  *  instead of requiring a save+reload cycle. The renderer reads from this. */
-export function mergeRegistryForDisplay(serverData, overlay) {
+export function mergeRegistryForDisplay(serverData: RegistryServerData | null | undefined, overlay: RegistryOverlay | null | undefined): RegistryServerData {
   const base = (serverData && serverData.registry) || {};
   if (!overlay || !overlay.profiles) return serverData || { registry: {}, source: {} };
-  const merged = JSON.parse(JSON.stringify(base));
+  const merged: RegistrySchema = JSON.parse(JSON.stringify(base));
   merged.tiers = (overlay.tiers && overlay.tiers.length > 0) ? overlay.tiers : (merged.tiers || ["light", "standard", "deep"]);
   merged.hostDefaults = mergeFlatMapForDisplay(merged.hostDefaults, overlay.hostDefaults);
   merged.workflowTiers = mergeFlatMapForDisplay(merged.workflowTiers, overlay.workflowTiers);
@@ -142,7 +210,7 @@ export function mergeRegistryForDisplay(serverData, overlay) {
   };
 }
 
-export function handleRegistryCellEdit(ctx, profile, host, tier, field, value) {
+export function handleRegistryCellEdit(ctx: RegistryStateCtx, profile: string, host: string, tier: string, field: "model" | "effort", value: string | null): void {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
   // Create-on-demand for the first edit of a profile the overlay has never touched. Leave
@@ -152,13 +220,13 @@ export function handleRegistryCellEdit(ctx, profile, host, tier, field, value) {
   // description with its own name on the very first cell edit.
   if (!ctx.state.registryOverlay.profiles[profile]) ctx.state.registryOverlay.profiles[profile] = { hosts: {} };
   if (!ctx.state.registryOverlay.profiles[profile].hosts) ctx.state.registryOverlay.profiles[profile].hosts = {};
-  if (!ctx.state.registryOverlay.profiles[profile].hosts[host]) ctx.state.registryOverlay.profiles[profile].hosts[host] = {};
-  if (!ctx.state.registryOverlay.profiles[profile].hosts[host][tier]) ctx.state.registryOverlay.profiles[profile].hosts[host][tier] = { model: null, effort: null };
-  ctx.state.registryOverlay.profiles[profile].hosts[host][tier][field] = value || null;
+  if (!ctx.state.registryOverlay.profiles[profile].hosts![host]) ctx.state.registryOverlay.profiles[profile].hosts![host] = {};
+  if (!ctx.state.registryOverlay.profiles[profile].hosts![host][tier]) ctx.state.registryOverlay.profiles[profile].hosts![host][tier] = { model: null, effort: null };
+  ctx.state.registryOverlay.profiles[profile].hosts![host][tier][field] = value || null;
   ctx.state.registryDirty = true;
 }
 
-export function handleRegistryHostDefaultEdit(ctx, host, value) {
+export function handleRegistryHostDefaultEdit(ctx: RegistryStateCtx, host: string, value: string): void {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {} };
   if (!ctx.state.registryOverlay.hostDefaults) ctx.state.registryOverlay.hostDefaults = {};
   ctx.state.registryOverlay.hostDefaults[host] = value;
@@ -171,7 +239,7 @@ export function handleRegistryHostDefaultEdit(ctx, host, value) {
  *  `{}`, so there is nothing to tombstone; an absent key already inherits the charter tier.
  *  An emptied agent object is pruned so a fully-reset agent leaves no residue in the saved
  *  overlay. */
-export function handleRegistryAgentTierEdit(ctx, agent, host, value) {
+export function handleRegistryAgentTierEdit(ctx: RegistryStateCtx, agent: string, host: string, value: string): void {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.agentTiers) ctx.state.registryOverlay.agentTiers = {};
   if (value === "") {
@@ -182,12 +250,12 @@ export function handleRegistryAgentTierEdit(ctx, agent, host, value) {
     }
   } else {
     if (!ctx.state.registryOverlay.agentTiers[agent]) ctx.state.registryOverlay.agentTiers[agent] = {};
-    ctx.state.registryOverlay.agentTiers[agent][host] = value;
+    ctx.state.registryOverlay.agentTiers[agent]![host] = value;
   }
   ctx.state.registryDirty = true;
 }
 
-export function handleRegistryWorkflowTierEdit(ctx, workflow, value) {
+export function handleRegistryWorkflowTierEdit(ctx: RegistryStateCtx, workflow: string, value: string): void {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, workflowTiers: {} };
   if (!ctx.state.registryOverlay.workflowTiers) ctx.state.registryOverlay.workflowTiers = {};
   ctx.state.registryOverlay.workflowTiers[workflow] = value;
@@ -199,7 +267,7 @@ export function handleRegistryWorkflowTierEdit(ctx, workflow, value) {
  *  trigger switches forms. Replaces the old direct prompt()-driven handlers
  *  as the click target for Add Workflow Override / Add Profile / Duplicate
  *  Profile / Delete Profile. */
-export function handleRegistryFormToggle(ctx, kind) {
+export function handleRegistryFormToggle(ctx: RegistryStateCtx, kind: string): void {
   if (ctx.state.registryForm && ctx.state.registryForm.kind === kind) {
     ctx.state.registryForm = null;
   } else {
@@ -209,12 +277,12 @@ export function handleRegistryFormToggle(ctx, kind) {
 }
 
 /** Closes the currently open inline registry form without applying it. */
-export function handleRegistryFormCancel(ctx) {
+export function handleRegistryFormCancel(ctx: RegistryStateCtx): void {
   ctx.state.registryForm = null;
   ctx.render();
 }
 
-export function handleRegistryWorkflowTierAdd(ctx, workflow, tier) {
+export function handleRegistryWorkflowTierAdd(ctx: RegistryStateCtx, workflow: string, tier: string): void {
   const existing = (ctx.state.registryOverlay && ctx.state.registryOverlay.workflowTiers) || {};
   if (!workflow || !workflow.trim()) return;
   const wf = workflow.trim();
@@ -238,7 +306,7 @@ export function handleRegistryWorkflowTierAdd(ctx, workflow, tier) {
   ctx.render();
 }
 
-export function handleRegistryWorkflowTierRemove(ctx, workflow) {
+export function handleRegistryWorkflowTierRemove(ctx: RegistryStateCtx, workflow: string): void {
   if (!ctx.state.registryOverlay) return;
   if (!ctx.state.registryOverlay.workflowTiers) return;
   // A `null` tombstone (design D-1), not a deleted key: under the server's deep merge, an
@@ -249,7 +317,7 @@ export function handleRegistryWorkflowTierRemove(ctx, workflow) {
   ctx.render();
 }
 
-export function handleRegistryAddProfile(ctx, name, description) {
+export function handleRegistryAddProfile(ctx: RegistryStateCtx, name: string, description?: string | null): void {
   if (!name || !name.trim()) return;
   const trimmed = name.trim();
   if (ctx.state.registryOverlay && ctx.state.registryOverlay.profiles && ctx.state.registryOverlay.profiles[trimmed]) {
@@ -260,11 +328,12 @@ export function handleRegistryAddProfile(ctx, name, description) {
   const desc = (description && description.trim()) || trimmed;
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   const tiers = ctx.state.registryOverlay.tiers || ["light", "standard", "deep"];
-  const hosts = {};
+  const hosts: RegistryHostsMap = {};
   for (const h of REGISTRY_HOSTS) {
     hosts[h] = {};
     for (const t of tiers) hosts[h][t] = { model: null, effort: null };
   }
+  if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
   ctx.state.registryOverlay.profiles[trimmed] = { description: desc, hosts };
   ctx.state.registryDirty = true;
   ctx.state.registryForm = null;
@@ -278,7 +347,7 @@ export function handleRegistryAddProfile(ctx, name, description) {
 // made both pickers report "no profiles available" even though every builtin profile is
 // selectable (APCR-11.5). mergeRegistryForDisplay already drops `_delete`-tombstoned
 // profiles from its result, so no separate filter is needed here.
-export function handleRegistryDuplicateProfile(ctx, sourceName, newName) {
+export function handleRegistryDuplicateProfile(ctx: RegistryStateCtx, sourceName: string, newName: string): void {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
   const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
@@ -297,7 +366,7 @@ export function handleRegistryDuplicateProfile(ctx, sourceName, newName) {
     ctx.render();
     return;
   }
-  const copy = JSON.parse(JSON.stringify(available[src]));
+  const copy: RegistryOverlayProfile = JSON.parse(JSON.stringify(available[src]));
   delete copy._delete;
   ctx.state.registryOverlay.profiles[trimmedNew] = copy;
   ctx.state.registryDirty = true;
@@ -305,7 +374,7 @@ export function handleRegistryDuplicateProfile(ctx, sourceName, newName) {
   ctx.render();
 }
 
-export function handleRegistryDeleteProfile(ctx, name) {
+export function handleRegistryDeleteProfile(ctx: RegistryStateCtx, name: string): void {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.profiles) ctx.state.registryOverlay.profiles = {};
   const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
@@ -331,7 +400,7 @@ export function handleRegistryDeleteProfile(ctx, name) {
   ctx.render();
 }
 
-export function handleRegistryRestore(ctx, profile) {
+export function handleRegistryRestore(ctx: RegistryStateCtx, profile: string): void {
   if (!ctx.state.registryOverlay || !ctx.state.registryOverlay.profiles) return;
   const p = ctx.state.registryOverlay.profiles[profile];
   if (!p) return;
@@ -340,12 +409,10 @@ export function handleRegistryRestore(ctx, profile) {
   ctx.render();
 }
 
-
-
-export async function handleRegistryClearOverlay(ctx) {
+export async function handleRegistryClearOverlay(ctx: RegistryApiCtx): Promise<void> {
   if (!confirm("Discard all your overrides? This deletes your saved changes and reverts every tool to the built-in defaults.")) return;
   try {
-    const res = await ctx.api.request("/api/v1/model-registry/overlay", { method: "DELETE" });
+    const res = (await ctx.api.request("/api/v1/model-registry/overlay", { method: "DELETE" })) as { success?: boolean; error?: string } | null | undefined;
     if (res && res.success === false) {
       showBanner(ctx.root, "error", "Clear failed: " + (res.error || "unknown"));
       return;
@@ -355,7 +422,7 @@ export async function handleRegistryClearOverlay(ctx) {
     ctx.state.registryDirty = false;
     ctx.render();
   } catch (e) {
-    showBanner(ctx.root, "error", "Clear failed: " + String((e && e.message) || e));
+    showBanner(ctx.root, "error", "Clear failed: " + String((e && (e as { message?: unknown }).message) || e));
   }
 }
 
@@ -376,12 +443,23 @@ export async function handleRegistryClearOverlay(ctx) {
 
 const RESTART_SENTENCE = "Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) to pick up the changes.";
 
-export async function runRegenerateStream(ctx) {
+interface RegenerateStreamEvent {
+  type?: string;
+  status?: string;
+  host?: string;
+  profile?: string;
+  unsupported?: string;
+  error?: string;
+  failed?: string;
+  exitCode?: number | null;
+}
+
+export async function runRegenerateStream(ctx: RegistryApiCtx): Promise<{ ok: boolean; reason?: string }> {
   if (ctx.state.regenerating) return { ok: false, reason: undefined };
   ctx.state.regenerating = true;
   ctx.render();
   let ok = false;
-  let reason;
+  let reason: string | undefined;
 
   try {
     const headers = (ctx.api && ctx.api.authHeaders) ? ctx.api.authHeaders() : {};
@@ -393,8 +471,8 @@ export async function runRegenerateStream(ctx) {
     const decoder = new TextDecoder();
     let buffer = "";
     let gotDone = false;
-    const installResults = { switched: [], skipped: [], unsupported: [], failed: [] };
-    const variantSyncResults = { synced: [], failed: [] };
+    const installResults: { switched: string[]; skipped: string[]; unsupported: string[]; failed: string[] } = { switched: [], skipped: [], unsupported: [], failed: [] };
+    const variantSyncResults: { synced: string[]; failed: string[] } = { synced: [], failed: [] };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -407,7 +485,7 @@ export async function runRegenerateStream(ctx) {
         buffer = buffer.slice(idx + 2);
         const line = frame.trim();
         if (!line.startsWith("data:")) continue;
-        let event;
+        let event: RegenerateStreamEvent;
         try { event = JSON.parse(line.slice(5).trim()); } catch { continue; }
         if (event.type === "line") {
           // append to log panel — in a real browser this updates the DOM.
@@ -418,8 +496,8 @@ export async function runRegenerateStream(ctx) {
           // in the success bucket. "unsupported" is its own class, never
           // folded into "skipped" (APCR-06.7).
           if (event.status === "switched") installResults.switched.push(event.host + " → " + event.profile);
-          else if (event.status === "skipped") installResults.skipped.push(event.host);
-          else if (event.status === "unsupported") installResults.unsupported.push(event.unsupported || event.host);
+          else if (event.status === "skipped") installResults.skipped.push(event.host as string);
+          else if (event.status === "unsupported") installResults.unsupported.push((event.unsupported || event.host) as string);
           else if (event.status === "failed") installResults.failed.push(event.host + ": " + (event.error || event.failed || "unknown"));
         } else if (event.type === "variant-sync") {
           // Bridge-step frames (T3), emitted before the "install" frames —
@@ -428,7 +506,7 @@ export async function runRegenerateStream(ctx) {
           // routine case (no source checkout, Cursor, or no variant tree
           // installed yet) and stays silent, matching how a "skipped"
           // install host needs no banner line on its own.
-          if (event.status === "synced") variantSyncResults.synced.push(event.host);
+          if (event.status === "synced") variantSyncResults.synced.push(event.host as string);
           else if (event.status === "failed") variantSyncResults.failed.push(event.host + ": " + (event.error || "unknown"));
         } else if (event.type === "done") {
           gotDone = true;
@@ -470,7 +548,7 @@ export async function runRegenerateStream(ctx) {
     }
   } catch (e) {
     ok = false;
-    reason = "Regeneration failed: " + String((e && e.message) || e);
+    reason = "Regeneration failed: " + String((e && (e as { message?: unknown }).message) || e);
     showBanner(ctx.root, "error", reason);
   } finally {
     ctx.state.regenerating = false;
@@ -479,21 +557,27 @@ export async function runRegenerateStream(ctx) {
   return { ok, reason };
 }
 
+interface RegistrySaveResponse {
+  success?: boolean;
+  details?: string[];
+  error?: string;
+}
+
 /** Unified Save & Apply (design D-4.5, APUX-13, P1-C AC1-AC5). One confirm
  *  covering both steps: PUT the in-memory overlay, and — only on a successful
  *  save — run the existing regenerate-and-install stream (no second confirm).
  *  Replaces the separate "Save Overlay" + "Regenerate Artifacts" buttons. */
-export async function handleRegistrySaveAndApply(ctx) {
+export async function handleRegistrySaveAndApply(ctx: RegistryApiCtx): Promise<void> {
   if (!confirm("Save changes and apply them to your installed agents? This overwrites installed variant directories, and you will need to restart your CLI sessions afterward.")) return;
   try {
-    const res = await ctx.api.request("/api/v1/model-registry", { method: "PUT", body: ctx.state.registryOverlay });
+    const res = (await ctx.api.request("/api/v1/model-registry", { method: "PUT", body: ctx.state.registryOverlay })) as RegistrySaveResponse | null | undefined;
     if (res && res.success === false) {
       const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
       showBanner(ctx.root, "error", "Save failed: " + details);
       return;
     }
   } catch (e) {
-    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
+    showBanner(ctx.root, "error", "Save failed: " + String((e && (e as { message?: unknown }).message) || e));
     return;
   }
   // Reset the loaded/dirty guards so the next render re-inits from the newly

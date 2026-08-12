@@ -724,7 +724,7 @@ describe("Models catalog inline-form button-row grouping (T11, APUX-09, P2-F AC4
  *  during the split). */
 const MODELS_TAB_SOURCE = [
   fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "registry.ts"), "utf8"),
-  fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "registry-state.js"), "utf8"),
+  fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "registry-state.ts"), "utf8"),
   fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "profiles.ts"), "utf8"),
 ].join("\n");
 
