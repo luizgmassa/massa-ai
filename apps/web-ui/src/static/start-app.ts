@@ -192,7 +192,16 @@ export function startApp(opts?: AppStartOpts): void {
     logsTo: "",
     logsLevel: "",
     logsQuery: "",
-    logsLive: false,
+    // Seeded once from the stored preference (T44/WUT-19): the pre-fix code
+    // seeded `false` unconditionally and then guarded a re-read behind
+    // `state.logsLive === undefined`, a condition that literal `false` can
+    // never satisfy, so `writeLogsLivePreference` had never once been read
+    // back. Reading it here, exactly once, keeps the same "a toggle made in
+    // this page always outranks the stored value" property the removed
+    // per-render guard protected — after this seed, `state.logsLive` is
+    // always a concrete boolean, never `undefined` again, so no later render
+    // re-reads storage over an in-session choice.
+    logsLive: readLogsLivePreference() ?? false,
     logsEntries: [],
     logsStreamAbort: null,
   };
@@ -332,12 +341,6 @@ export function startApp(opts?: AppStartOpts): void {
         if (state.logsQuery) params.set("q", state.logsQuery);
         const qs = params.toString();
         const data = (await api.request("/api/v1/logs" + (qs ? "?" + qs : ""))) as LogsApiResult;
-        // Seed Live from the stored preference only when this session has not
-        // decided yet, so a toggle made in this page always outranks it.
-        if (state.logsLive === undefined) {
-          const stored = readLogsLivePreference();
-          if (stored !== undefined) state.logsLive = stored;
-        }
         root.innerHTML = renderLogs(data, state);
         // Resume the tail after the markup exists — `appendLogsLiveEntry`
         // needs the tbody it patches into to be on screen already.

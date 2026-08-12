@@ -281,6 +281,79 @@ describe("profiles sub-tab preference", () => {
   });
 });
 
+// ── Logs Live preference (T44/WUT-19) ──────────────────────────────────────
+//
+// `writeLogsLivePreference` persisted a key that nothing ever read back:
+// `start-app.ts` seeded `logsLive: false` unconditionally and then guarded
+// the one storage read behind `state.logsLive === undefined`, a condition a
+// literal `false` seed can never satisfy. This regressed the reload
+// experience of Live tail — every refresh silently discarded the toggle.
+
+describe("Logs Live preference", () => {
+  it("seeds Live from the stored preference — checked on a fresh start (fails against the pre-fix seed)", async () => {
+    stubLocation();
+    stub("localStorage", {
+      getItem: (k: string) => (k === "massa-ai-logs-live" ? "true" : null),
+      setItem: () => {},
+    });
+    recordFetch();
+    const { doc, byId, navigateTo } = makeDom();
+    startApp({ document: doc, base: "" });
+    await flush();
+    await navigateTo("logs");
+    expect(byId.app.innerHTML).toContain('data-action="logs-live-toggle" checked');
+  });
+
+  it("seeds Live off when nothing is stored", async () => {
+    stubLocation();
+    stub("localStorage", { getItem: () => null, setItem: () => {} });
+    recordFetch();
+    const { doc, byId, navigateTo } = makeDom();
+    startApp({ document: doc, base: "" });
+    await flush();
+    await navigateTo("logs");
+    expect(byId.app.innerHTML).not.toContain('data-action="logs-live-toggle" checked');
+  });
+
+  it("a toggle made in the page outranks the stored value on a later render", async () => {
+    stubLocation();
+    stub("localStorage", {
+      getItem: (k: string) => (k === "massa-ai-logs-live" ? "true" : null),
+      setItem: () => {},
+    });
+    // The stream endpoint needs its own well-behaved fake so the isolated
+    // subject here is the deliberate toggle below, not an unrelated
+    // stream-failure auto-reset (LOG-15) racing the same `state.logsLive`.
+    stub("fetch", async (url: string) => {
+      if (String(url).includes("/api/v1/logs/stream")) {
+        return {
+          headers: { get: () => "text/event-stream" },
+          body: { getReader: () => ({ read: async () => ({ done: true, value: undefined }) }) },
+        };
+      }
+      return { headers: { get: () => "application/json" }, json: async () => ({ success: true, data: {} }) };
+    });
+    const { doc, byId, navigateTo } = makeDom();
+    startApp({ document: doc, base: "" });
+    await flush();
+    await navigateTo("logs");
+    expect(byId.app.innerHTML).toContain('data-action="logs-live-toggle" checked');
+
+    // Flip Live off in this session — `handleLogsLiveToggle` reads the real
+    // checkbox's `.checked` (false by default in this harness), so firing
+    // its wired `change` listener is a genuine in-session "off" choice.
+    const toggleEl = byId.app.querySelector();
+    for (const cb of toggleEl._handlers.change ?? []) cb();
+    await flush();
+
+    // Re-render the same view: the in-session "off" choice must survive —
+    // the stub still reports "true" stored, and nothing may re-seed from it.
+    await navigateTo("projects");
+    await navigateTo("logs");
+    expect(byId.app.innerHTML).not.toContain('data-action="logs-live-toggle" checked');
+  });
+});
+
 // ── Lifecycle bindings ──────────────────────────────────────────────────────
 
 describe("hash routing", () => {
