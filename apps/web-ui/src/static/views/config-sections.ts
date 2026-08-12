@@ -3,15 +3,43 @@
  * per field: input type, coercion on save, and Field guide text. Split out of
  * `config.js` so the section table has its own module boundary; `config.js`
  * imports it and re-exports `CONFIG_SECTIONS` for compatibility.
+ *
+ * `ConfigSectionKey` couples every section's `key` to a real key of the
+ * server's `MassaAiConfig` — a section whose `key` does not name a real
+ * config field fails `bun run type-check`, and a `MassaAiConfig` key added
+ * with no matching section here fails it too (WUT-12). The import below is
+ * `import type` only: `MassaAiConfig` erases at emit (verbatimModuleSyntax),
+ * so the emitted `dist/static/views/config-sections.js` carries no reference
+ * to the shared config package and no runtime coupling — the browser never
+ * loads the server config module.
  */
 
-export const CONFIG_SECTIONS = [
-  {
+import type { MassaAiConfig } from "@massa-ai/shared";
+
+type ConfigSectionKey = keyof MassaAiConfig;
+
+interface ConfigField {
+  name: string;
+  type: "text" | "enum" | "number" | "boolean" | "string[]" | "json";
+  label: string;
+  sensitive?: boolean;
+  enum?: string[];
+  guide: string;
+}
+
+interface ConfigSection {
+  key: ConfigSectionKey;
+  label: string;
+  fields: ConfigField[];
+}
+
+const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: K } } = {
+  database: {
     key: "database",
     label: "Database",
     fields: [{ name: "url", type: "text", label: "Database URL", sensitive: true, guide: "PostgreSQL connection string (e.g., `postgresql://user:pass@host:5432/db`). Changing this requires a server restart." }],
   },
-  {
+  embedding: {
     key: "embedding",
     label: "Embedding",
     fields: [
@@ -22,7 +50,7 @@ export const CONFIG_SECTIONS = [
       { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 2560 for `qwen3-embedding:4b`)." },
     ],
   },
-  {
+  compression: {
     key: "compression",
     label: "Compression",
     fields: [
@@ -32,12 +60,12 @@ export const CONFIG_SECTIONS = [
       { name: "prompt", type: "text", label: "Prompt (optional)", guide: "Custom LLM prompt for compression. When empty, uses the built-in default." },
     ],
   },
-  {
+  impact: {
     key: "impact",
     label: "Impact Analysis",
     fields: [{ name: "bfsCteEnabled", type: "boolean", label: "BFS CTE Enabled", guide: "When checked, impact analysis uses a PostgreSQL recursive CTE for BFS traversal. Faster on large graphs but requires PostgreSQL 17+." }],
   },
-  {
+  capturePolicy: {
     key: "capturePolicy",
     label: "Capture Policy",
     fields: [
@@ -50,7 +78,7 @@ export const CONFIG_SECTIONS = [
       { name: "rules", type: "json", label: "Rules (JSON)", guide: "Capture rules as JSON array of {pattern, disposition: Keep|Drop|MetadataOnly}. When absent, the built-in `DEFAULT_POLICY` applies." },
     ],
   },
-  {
+  cache: {
     key: "cache",
     label: "Cache",
     fields: [
@@ -60,12 +88,12 @@ export const CONFIG_SECTIONS = [
       { name: "defaultTTLSeconds", type: "number", label: "Default TTL (s)", guide: "Default time-to-live for cache entries in seconds." },
     ],
   },
-  {
+  dataDir: {
     key: "dataDir",
     label: "Data Directory",
     fields: [{ name: "dataDir", type: "text", label: "Data Directory", guide: "Base directory for massa-ai data files (checkpoints, exports, etc.)." }],
   },
-  {
+  logging: {
     key: "logging",
     label: "Logging",
     fields: [
@@ -74,7 +102,7 @@ export const CONFIG_SECTIONS = [
       { name: "file", type: "text", label: "Log File (optional)", guide: "Path to a log file. When empty, logs go to stdout only." },
     ],
   },
-  {
+  search: {
     key: "search",
     label: "Search",
     fields: [
@@ -87,7 +115,7 @@ export const CONFIG_SECTIONS = [
       { name: "rerank.rerankWindow", type: "number", label: "Rerank Window", guide: "Number of top results to consider for reranking." },
     ],
   },
-  {
+  llm: {
     key: "llm",
     label: "LLM",
     fields: [
@@ -102,7 +130,7 @@ export const CONFIG_SECTIONS = [
       { name: "disableThink", type: "boolean", label: "Disable Think", guide: "When checked, disables thinking/reasoning mode in models that support it (faster, cheaper)." },
     ],
   },
-  {
+  memory: {
     key: "memory",
     label: "Memory",
     fields: [
@@ -126,7 +154,7 @@ export const CONFIG_SECTIONS = [
       { name: "autoImportance.enabled", type: "boolean", label: "Auto Importance Enabled", guide: "When checked, automatically scores memory importance based on access patterns." },
     ],
   },
-  {
+  hooks: {
     key: "hooks",
     label: "Hooks",
     fields: [
@@ -139,7 +167,7 @@ export const CONFIG_SECTIONS = [
       { name: "bridge.maxWindow", type: "number", label: "Bridge Max Window", guide: "Maximum number of observations to consider per bridge run." },
     ],
   },
-  {
+  synapse: {
     key: "synapse",
     label: "Synapse",
     fields: [
@@ -169,12 +197,12 @@ export const CONFIG_SECTIONS = [
       { name: "buffer.matchThreshold", type: "number", label: "Buffer Match Threshold", guide: "Similarity threshold for a buffer hit." },
     ],
   },
-  {
+  handoffs: {
     key: "handoffs",
     label: "Handoffs",
     fields: [{ name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables cross-session handoffs (structured summaries left for a later agent to discover)." }],
   },
-  {
+  security: {
     key: "security",
     label: "Security",
     fields: [
@@ -183,10 +211,7 @@ export const CONFIG_SECTIONS = [
       { name: "allowedExtensions", type: "string[]", label: "Allowed Extensions", guide: "Comma-separated list of file extensions allowed for indexing." },
     ],
   },
-  {
-    // SCH-08. Job kinds mirror packages/shared/src/config/massa-ai-config.ts's
-    // SCHEDULER_JOB_KINDS; app.js is plain browser JS with no build-time
-    // import of @massa-ai/shared, so the five kinds are listed literally here.
+  scheduler: {
     key: "scheduler",
     label: "Scheduler",
     fields: [
@@ -205,4 +230,13 @@ export const CONFIG_SECTIONS = [
       { name: "jobs.checkpoint-purge.intervalMs", type: "number", label: "Checkpoint Purge Interval (ms)", guide: "Interval between checkpoint-purge runs, in milliseconds. Minimum `60000`." },
     ],
   },
-];
+};
+
+/**
+ * The mapped type above is the compile-time coupling (WUT-12): TypeScript
+ * requires exactly one property per key of MassaAiConfig, so adding a
+ * MassaAiConfig field with no matching entry here, or deleting an entry,
+ * both fail `bun run type-check` with a missing/excess-property diagnostic
+ * rather than shipping a Config tab silently missing a section.
+ */
+export const CONFIG_SECTIONS: ConfigSection[] = Object.values(CONFIG_SECTIONS_BY_KEY);
