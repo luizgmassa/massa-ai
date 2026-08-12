@@ -9,6 +9,7 @@
     "allowJs": true,
     "checkJs": false,
     "noEmit": true,
+    "verbatimModuleSyntax": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
