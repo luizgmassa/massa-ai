@@ -177,6 +177,22 @@ const REGISTRY = {
   ],
 };
 
+// T42 (WUT-17 AC3/AC4): a dedicated fixture, not a mutation of REGISTRY above — REGISTRY
+// also feeds `renderProfilesView/*`, and the task's own scoping requirement is that a
+// golden diff touch only `renderModelRegistry/*` keys. Exercises all three non-profile
+// overlay categories (hostDefaults, workflowTiers, agentTiers) plus a server-computed
+// breakdown, so the count line names its categories and every corresponding row/cell
+// carries the badge.
+const REGISTRY_NON_PROFILE_OVERLAY = {
+  ...REGISTRY,
+  source: {
+    overlay: { hostDefaults: { cursor: "cheap" }, workflowTiers: { "spec-driven": "deep" }, agentTiers: { builder: { opencode: "deep" } } },
+    tombstoned: ["legacy"],
+  },
+  overlayOverrideCount: 3,
+  overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 1, agentTiers: 1, tiers: 0, profiles: 0 },
+};
+
 type Case = { name: string; run: () => unknown };
 
 const CASES: Case[] = [];
@@ -247,6 +263,9 @@ add("renderModelRegistry/overlayError", () =>
 add("renderModelRegistry/noAgents", () => mod.renderModelRegistry({ ...REGISTRY, agents: [] }, { writeMode: true }));
 add("renderModelRegistry/agentsError", () =>
   mod.renderModelRegistry({ ...REGISTRY, agentsError: "charter read failed" }, { writeMode: true }),
+);
+add("renderModelRegistry/nonProfileOverlay", () =>
+  mod.renderModelRegistry(REGISTRY_NON_PROFILE_OVERLAY, { writeMode: true }),
 );
 
 // Pure helpers — string in, string/JSON out.

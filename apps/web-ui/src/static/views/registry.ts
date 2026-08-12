@@ -31,6 +31,21 @@ const UI_HOST_EFFORT_ENUM: Record<RegistryHost, string[]> = {
  *  raw lowercase host id; only this label is user-facing. */
 const REGISTRY_HOST_LABELS: Record<RegistryHost, string> = { claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" };
 
+/** Section names for the five categories `OverlayOverrideBreakdown`
+ *  (scripts/lib/model-profiles.ts, WUT-17) counts. Order matches the page's
+ *  top-to-bottom layout: the profile grid, then Default Profile per Tool, Per-
+ *  Workflow Tier Overrides, Per-Agent Tier Overrides, then `tiers` — the
+ *  capability-tier list itself, which has no row or cell of its own on this
+ *  tab to badge, so it is only ever named in the count line below. */
+const OVERLAY_CATEGORY_ORDER = ["profiles", "hostDefaults", "workflowTiers", "agentTiers", "tiers"] as const;
+const OVERLAY_CATEGORY_LABELS: Record<(typeof OVERLAY_CATEGORY_ORDER)[number], string> = {
+  profiles: "Model Catalog profiles",
+  hostDefaults: "Default Profile per Tool",
+  workflowTiers: "Per-Workflow Tier Overrides",
+  agentTiers: "Per-Agent Tier Overrides",
+  tiers: "Capability Tiers",
+};
+
 /** Capitalizes the first letter of a raw tier id ("light" -> "Light") for the
  *  Tier column and per-agent tier dropdown labels (design D-4.1, D-4.3). */
 function capitalizeLabel(s: string | null | undefined): string {
@@ -217,8 +232,27 @@ export interface RegistrySchema {
 }
 
 export interface RegistrySource {
-  overlay?: { profiles?: Record<string, unknown> } | null;
+  overlay?: {
+    profiles?: Record<string, unknown>;
+    hostDefaults?: Record<string, unknown>;
+    workflowTiers?: Record<string, unknown>;
+    /** Two-level delta (design D-1): `agentTiers[agent] === null` tombstones the whole
+     *  agent entry; `agentTiers[agent][host]` present tombstones/overrides one host key. */
+    agentTiers?: Record<string, Record<string, unknown> | null>;
+  } | null;
   tombstoned?: string[];
+}
+
+/** Frontend mirror of `OverlayOverrideBreakdown` (scripts/lib/model-profiles.ts) — the
+ *  per-category count of overlay entries surviving normalization (WUT-17). Render-only:
+ *  these numbers are server-computed and already sum to `overlayOverrideCount` by
+ *  construction, so this file must never recompute them. */
+export interface RegistryOverlayOverrideBreakdown {
+  hostDefaults: number;
+  workflowTiers: number;
+  agentTiers: number;
+  tiers: number;
+  profiles: number;
 }
 
 interface RegistryAgent {
@@ -232,6 +266,7 @@ export interface RegistryPayload {
   overlayError?: string;
   _error?: unknown;
   overlayOverrideCount?: number;
+  overlayOverrideBreakdown?: RegistryOverlayOverrideBreakdown;
   agents?: RegistryAgent[];
   agentsError?: string;
 }
@@ -264,6 +299,12 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
   const hostDefaults = registry.hostDefaults || {};
   const workflowTiers = registry.workflowTiers || {};
   const overlayProfiles = (source.overlay && source.overlay.profiles) || {};
+  // WUT-17: raw saved-overlay presence per non-profile category, mirroring `overlayProfiles`
+  // above — the same "present in source.overlay.* means override" rule the profile-column
+  // badge already applies, now extended to the sections that had no marker at all.
+  const overlayHostDefaults = (source.overlay && source.overlay.hostDefaults) || {};
+  const overlayWorkflowTiers = (source.overlay && source.overlay.workflowTiers) || {};
+  const overlayAgentTiers = (source.overlay && source.overlay.agentTiers) || {};
   const tombstoned = source.tombstoned || [];
 
   if (profileNames.length === 0 && !overlayError && !payload._error) {
@@ -283,9 +324,20 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
   // count visible. A compact, honest line — nothing rendered when there is nothing to
   // override, so an operator with no overlay sees no noise.
   const overlayOverrideCount = typeof payload.overlayOverrideCount === "number" ? payload.overlayOverrideCount : 0;
+  // WUT-17 AC3/AC4: name which categories the count is made of, from the server-computed
+  // breakdown T41 returns — never recomputed here (task Non-goal). Absent breakdown (an
+  // older payload shape, or a caller that only ever set overlayOverrideCount) falls back to
+  // the un-named count line exactly as before.
+  const overlayBreakdown = payload.overlayOverrideBreakdown;
+  const overlayCategoryParts = overlayBreakdown
+    ? OVERLAY_CATEGORY_ORDER.filter((key) => overlayBreakdown[key] > 0).map(
+        (key) => overlayBreakdown[key] + " in " + OVERLAY_CATEGORY_LABELS[key],
+      )
+    : [];
   const overlayOverrideLine = overlayOverrideCount > 0
     ? '<p class="registry-override-count muted">You have ' + overlayOverrideCount +
-      " custom override" + (overlayOverrideCount === 1 ? "" : "s") + " of the built-in defaults.</p>"
+      " custom override" + (overlayOverrideCount === 1 ? "" : "s") + " of the built-in defaults" +
+      (overlayCategoryParts.length > 0 ? ": " + overlayCategoryParts.join(", ") : "") + ".</p>"
     : "";
 
   // Build rows = {host, tier} pairs
@@ -360,8 +412,10 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
       const sel = p === current ? " selected" : "";
       return '<option value="' + escapeHtml(p) + '"' + sel + ">" + escapeHtml(p) + "</option>";
     }).join("");
+    const isOverlay = Object.prototype.hasOwnProperty.call(overlayHostDefaults, host);
+    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">override</span>' : "";
     return (
-      '<div class="config-field"><label>' + escapeHtml(host) + "</label>" +
+      '<div class="config-field"><label>' + escapeHtml(host) + overlayMark + "</label>" +
       '<select data-action="registry-hostDefault" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + opts2 + "</select></div>"
     );
   }).join("");
@@ -377,8 +431,10 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
     const rmBtn = writeMode
       ? ' <button type="button" class="btn-delete" data-action="registry-workflowTier-remove" data-workflow="' + escapeHtml(wf) + '" style="padding:0.1rem 0.4rem;font-size:0.75rem;">Remove</button>'
       : "";
+    const isOverlay = Object.prototype.hasOwnProperty.call(overlayWorkflowTiers, wf);
+    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">override</span>' : "";
     return (
-      '<div class="config-field"><label>' + escapeHtml(wf) + "</label>" +
+      '<div class="config-field"><label>' + escapeHtml(wf) + overlayMark + "</label>" +
       '<select data-action="registry-workflowTier" data-workflow="' + escapeHtml(wf) + '"' + (writeMode ? "" : " disabled") + ">" + tierOpts + "</select>" + rmBtn + "</div>"
     );
   }).join("");
@@ -408,9 +464,16 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
     const agentHeaderCells = REGISTRY_HOSTS.map((h) => "<th>" + escapeHtml(REGISTRY_HOST_LABELS[h]) + "</th>").join("");
     const agentBodyRows = agents.map((agent) => {
       const perHost = agentTiersDisplay[agent.name] || {};
+      const overlayAgentEntry = overlayAgentTiers[agent.name];
       const cells = REGISTRY_HOSTS.map((host) => {
         const effective = perHost[host] || "";
         const overriddenClass = effective ? ' class="overridden"' : "";
+        // A `null` entry tombstones the whole agent (every host counts as overridden);
+        // otherwise a host-level override only marks the host key it actually names.
+        const isOverlayCell =
+          overlayAgentEntry !== undefined &&
+          (overlayAgentEntry === null || Object.prototype.hasOwnProperty.call(overlayAgentEntry, host));
+        const overlayMark = isOverlayCell ? ' <span class="badge overlay-badge">override</span>' : "";
         const options =
           '<option value="">(default: ' + escapeHtml(agent.charterTier) + ")</option>" +
           tiers.map((t) => {
@@ -418,7 +481,7 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
             return '<option value="' + escapeHtml(t) + '"' + sel + ">" + escapeHtml(capitalizeLabel(t)) + "</option>";
           }).join("");
         return (
-          "<td" + overriddenClass + '><select data-action="registry-agentTier" data-agent="' + escapeHtml(agent.name) + '" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + options + "</select></td>"
+          "<td" + overriddenClass + '><select data-action="registry-agentTier" data-agent="' + escapeHtml(agent.name) + '" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + options + "</select>" + overlayMark + "</td>"
         );
       }).join("");
       return "<tr><th>" + escapeHtml(agent.name) + "</th>" + cells + "</tr>";

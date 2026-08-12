@@ -985,6 +985,30 @@ describe("renderModelRegistry — overlay override count display (APCR-01.10)", 
     const html = renderModelRegistry(minimalRegistry, { writeMode: false });
     expect(html).not.toContain("registry-override-count");
   });
+
+  it("never reports a non-zero count with nothing on screen carrying an override marker (WUT-17 AC3 — the reported bug)", () => {
+    // Reproduces the exact defect: the only surviving override lives in hostDefaults, not
+    // overlay.profiles, so the old renderer (profile-column badge only) showed "1 custom
+    // override" with zero badges and zero category names anywhere on the tab.
+    const html = renderModelRegistry(
+      {
+        ...minimalRegistry,
+        registry: { ...minimalRegistry.registry, hostDefaults: { claude: "p" } },
+        source: { overlay: { hostDefaults: { claude: "p" } }, tombstoned: [] },
+        overlayOverrideCount: 1,
+        overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 0, agentTiers: 0, tiers: 0, profiles: 0 },
+      },
+      { writeMode: false },
+    );
+    // "Default Profile per Tool" is also the section's static <h3>, present on every
+    // render regardless of this fix — anchoring on the count line's own text (not the
+    // whole page) is what keeps this discriminating rather than vacuously true.
+    const overrideLineMatch = html.match(/<p class="registry-override-count muted">([^<]*)<\/p>/);
+    const overrideLineText = overrideLineMatch ? overrideLineMatch[1] : "";
+    const hasOverlayBadge = html.includes("overlay-badge");
+    const hasNamedCategoryInLine = overrideLineText.includes("Default Profile per Tool");
+    expect(hasOverlayBadge || hasNamedCategoryInLine).toBe(true);
+  });
 });
 
 describe("renderModelRegistry — help guide explains Default Profile per Tool vs. the actually-installed profile (T9 nomenclature)", () => {

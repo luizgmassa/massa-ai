@@ -40,6 +40,8 @@ const SAMPLE_REGISTRY = {
     overlay: {
       profiles: { work: { description: "Custom work profile", hosts: {} } },
       hostDefaults: { codex: "work" },
+      workflowTiers: { search: "standard" },
+      agentTiers: { builder: { opencode: "deep" } },
     },
     tombstoned: ["old-profile"],
   },
@@ -204,6 +206,59 @@ describe("renderModelRegistry — overlay attribution (REG-02)", () => {
   it("adds overlay-sourced class to overlay cells", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("overlay-sourced");
+  });
+});
+
+describe("renderModelRegistry — non-profile overlay markers (WUT-17 AC3)", () => {
+  it("marks the hostDefaults row that has a saved overlay entry, and only that row", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const codexIdx = html.indexOf("<label>codex");
+    const codexEnd = html.indexOf("</label>", codexIdx);
+    expect(html.slice(codexIdx, codexEnd)).toContain("overlay-badge");
+
+    const claudeIdx = html.indexOf("<label>claude");
+    const claudeEnd = html.indexOf("</label>", claudeIdx);
+    expect(html.slice(claudeIdx, claudeEnd)).not.toContain("overlay-badge");
+  });
+
+  it("marks the workflowTiers row that has a saved overlay entry, and only that row", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const searchIdx = html.indexOf("<label>search");
+    const searchEnd = html.indexOf("</label>", searchIdx);
+    expect(html.slice(searchIdx, searchEnd)).toContain("overlay-badge");
+
+    const indexIdx = html.indexOf("<label>index");
+    const indexEnd = html.indexOf("</label>", indexIdx);
+    expect(html.slice(indexIdx, indexEnd)).not.toContain("overlay-badge");
+  });
+
+  it("marks only the agentTiers cell that has a saved overlay entry (builder/opencode), not its siblings", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+
+    // builder/opencode: overlay.agentTiers.builder.opencode is set — must carry the badge.
+    const opencodeIdx = html.indexOf('data-agent="builder" data-host="opencode"');
+    const opencodeEnd = html.indexOf("</td>", opencodeIdx);
+    expect(html.slice(opencodeIdx, opencodeEnd)).toContain("overlay-badge");
+
+    // builder/claude: same agent, a host the overlay never names — must not.
+    const claudeIdx = html.indexOf('data-agent="builder" data-host="claude"');
+    const claudeEnd = html.indexOf("</td>", claudeIdx);
+    expect(html.slice(claudeIdx, claudeEnd)).not.toContain("overlay-badge");
+
+    // reviewer has no overlay.agentTiers entry at all — no cell in its row carries the badge.
+    const reviewerRowIdx = html.indexOf('data-agent="reviewer" data-host="claude"');
+    const reviewerRowEnd = html.indexOf("</tr>", reviewerRowIdx);
+    expect(html.slice(reviewerRowIdx, reviewerRowEnd)).not.toContain("overlay-badge");
+  });
+
+  it("names the non-zero breakdown categories in the count line, in page order (WUT-17 AC4)", () => {
+    const html = renderModelRegistry(
+      { ...SAMPLE_REGISTRY, overlayOverrideCount: 3, overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 0, agentTiers: 2, tiers: 0, profiles: 0 } },
+      { writeMode: true },
+    );
+    expect(html).toContain(
+      "You have 3 custom overrides of the built-in defaults: 1 in Default Profile per Tool, 2 in Per-Agent Tier Overrides.",
+    );
   });
 });
 
