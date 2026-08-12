@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-3 of 14 complete (see `## Execution Log`)
+**Status**: In Progress — Batches 1-4 of 14 complete; 6 of 21 modules converted (see `## Execution Log`)
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 36
@@ -1162,6 +1162,34 @@ served URLs rather than source files.
 The first sweep for this inventory required the literal `static` on the same line
 and therefore missed `app-renderers.test.ts:1649`, which reaches the directory
 through a `STATIC_DIR` variable. The table above is from the corrected sweep.
+
+### Batch 4 — Phase 4 (remaining lib leaves) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T10 | `4080be24` | `lib/theme.js` → `.ts` |
+| T11 | `d008f865` | `lib/api-client.js` → `.ts` |
+| T12 | `bb46e38f` | `lib/markdown.js` → `.ts`, CDN globals typed |
+
+`SPEC_DEVIATION: none`, and it held under check. Orchestrator-verified: `lib/` is
+now **6/6 TypeScript with 0 `.js`**; `dist/static` 21 `.js` / 0 `.ts`; web-ui
+700/0; `index.html` still `60cb0dae…`; `api-key-header.test.ts` and
+`write-mode.test.ts` show an empty diff **against the `6227b4ac` baseline**, not
+merely against the previous commit. Conversion progress: **6 of 21**.
+
+CDN typing landed as designed — `interface MarkedLike { parse(markdown: string): string }`
+and `interface DomPurifyLike { sanitize(html: string): string }`, applied by cast at
+the two `globalThis` reads, with the `if (markedLib && purifyLib)` fallback guard
+preserved. No `declare global`, no bare import, no `any`, no `.d.ts` (repo still
+ships zero). XSS ordering intact: `markedLib.parse(text)` then
+`purifyLib.sanitize(rawHtml)`.
+
+**Orchestrator note — a false positive worth recording.** `grep -c 'declare global'`
+over `markdown.ts` returns **1**, which reads as a violation of the design
+constraint. The match is inside the module's own docblock, explaining why
+`declare global` was rejected. The count was the naive measurement; the matched
+line was the answer. Any future audit of this file's forbidden constructs must read
+the line, not the count.
 
 ---
 
