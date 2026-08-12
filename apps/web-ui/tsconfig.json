@@ -6,8 +6,6 @@
     "lib": ["ES2022", "DOM"],
     "strict": true,
     "skipLibCheck": true,
-    "allowJs": true,
-    "checkJs": false,
     "noEmit": true,
     "verbatimModuleSyntax": true,
     "noUnusedLocals": false,
