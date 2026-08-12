@@ -13,25 +13,27 @@ import { isWriteModeEnabled } from "../lib/api-client.js";
 
 // ── Model-registry editor (T12 — REG-01..18 UI side) ────────────────────────
 
+export const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"] as const;
+
+type RegistryHost = (typeof REGISTRY_HOSTS)[number];
+
 /** Frontend copy of HOST_EFFORT_ENUM (scripts/lib/model-profiles.ts:71).
  *  Kept in sync manually; the frontend cannot import from scripts/lib. */
-const UI_HOST_EFFORT_ENUM = {
+const UI_HOST_EFFORT_ENUM: Record<RegistryHost, string[]> = {
   claude: ["low", "medium", "high", "xhigh", "max"],
   codex: ["minimal", "low", "medium", "high", "xhigh"],
   cursor: [],
   opencode: ["low", "medium", "high", "max"],
 };
 
-export const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"];
-
 /** Display labels for the Tool column (design D-4.1). Not a simple capitalize —
  *  "opencode" -> "OpenCode" needs its own casing. `data-*` attributes keep the
  *  raw lowercase host id; only this label is user-facing. */
-const REGISTRY_HOST_LABELS = { claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" };
+const REGISTRY_HOST_LABELS: Record<RegistryHost, string> = { claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" };
 
 /** Capitalizes the first letter of a raw tier id ("light" -> "Light") for the
  *  Tier column and per-agent tier dropdown labels (design D-4.1, D-4.3). */
-function capitalizeLabel(s) {
+function capitalizeLabel(s: string | null | undefined): string {
   if (!s) return "";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -50,7 +52,7 @@ const REGISTRY_MODEL_HINT = "e.g. sonnet · gpt-5.6-terra · glm-5.2";
  *   splitModelId("m")     -> { provider: "", model: "m" }
  *   splitModelId(null)    -> { provider: "", model: "" }
  */
-export function splitModelId(model) {
+export function splitModelId(model: string | null | undefined): { provider: string; model: string } {
   if (!model) return { provider: "", model: "" };
   const idx = model.indexOf("/");
   if (idx === -1) return { provider: "", model };
@@ -66,7 +68,7 @@ export function splitModelId(model) {
  *   joinModelId("", "m")    -> "m"
  *   joinModelId("", "")     -> null
  */
-export function joinModelId(provider, model) {
+export function joinModelId(provider: string | null | undefined, model: string | null | undefined): string | null {
   const p = (provider || "").trim();
   const m = (model || "").trim();
   if (!p && !m) return null;
@@ -96,16 +98,21 @@ const WORKFLOW_STEMS = [
 // form's markup under its trigger button row; wireViewHandlers reads the
 // rendered field values on submit and dispatches to the same-named handler.
 
+interface RegistryFormState {
+  kind?: string;
+  error?: string | null;
+}
+
 /** Renders the inline `.form-error` line when the current form carries a
  *  validation error (duplicate name, unknown workflow, etc.) — replaces
  *  `alert()` for these flows. */
-function renderRegistryFormError(formState) {
+function renderRegistryFormError(formState: RegistryFormState | null | undefined): string {
   return formState && formState.error
     ? '<p class="form-error">' + escapeHtml(formState.error) + "</p>"
     : "";
 }
 
-function renderAddWorkflowForm(formState, existingWorkflows, tiers) {
+function renderAddWorkflowForm(formState: RegistryFormState | null | undefined, existingWorkflows: string[], tiers: string[]): string {
   const available = WORKFLOW_STEMS.filter((s) => !existingWorkflows.includes(s));
   if (available.length === 0) {
     return (
@@ -129,7 +136,7 @@ function renderAddWorkflowForm(formState, existingWorkflows, tiers) {
   );
 }
 
-function renderDuplicateProfileForm(formState, profileNames) {
+function renderDuplicateProfileForm(formState: RegistryFormState | null | undefined, profileNames: string[]): string {
   if (profileNames.length === 0) {
     return (
       '<div class="registry-inline-form">' +
@@ -151,7 +158,7 @@ function renderDuplicateProfileForm(formState, profileNames) {
   );
 }
 
-function renderDeleteProfileForm(formState, profileNames) {
+function renderDeleteProfileForm(formState: RegistryFormState | null | undefined, profileNames: string[]): string {
   if (profileNames.length === 0) {
     return (
       '<div class="registry-inline-form">' +
@@ -172,7 +179,7 @@ function renderDeleteProfileForm(formState, profileNames) {
   );
 }
 
-function renderAddProfileForm(formState) {
+function renderAddProfileForm(formState: RegistryFormState | null | undefined): string {
   return (
     '<div class="registry-inline-form form-field">' +
     renderRegistryFormError(formState) +
@@ -185,6 +192,50 @@ function renderAddProfileForm(formState) {
   );
 }
 
+interface RegistryCell {
+  model?: string | null;
+  effort?: string | null;
+}
+
+interface RegistryProfile {
+  description?: string;
+  hosts?: Partial<Record<RegistryHost, Record<string, RegistryCell>>>;
+}
+
+interface RegistrySchema {
+  profiles?: Record<string, RegistryProfile>;
+  tiers?: string[];
+  hostDefaults?: Partial<Record<RegistryHost, string>>;
+  workflowTiers?: Record<string, string>;
+  agentTiers?: Record<string, Partial<Record<RegistryHost, string>>>;
+}
+
+interface RegistrySource {
+  overlay?: { profiles?: Record<string, unknown> } | null;
+  tombstoned?: string[];
+}
+
+interface RegistryAgent {
+  name: string;
+  charterTier: string;
+}
+
+interface RegistryPayload {
+  registry?: RegistrySchema;
+  source?: RegistrySource;
+  overlayError?: string;
+  _error?: unknown;
+  overlayOverrideCount?: number;
+  agents?: RegistryAgent[];
+  agentsError?: string;
+}
+
+interface RegistryRenderOpts {
+  writeMode?: boolean;
+  unsaved?: unknown;
+  registryForm?: unknown;
+}
+
 /**
  * Model-registry editor renderer. Renders a grid (rows = {host, tier} pairs,
  * columns = profiles, cells = {model, effort}). Marks overlay-sourced cells.
@@ -192,14 +243,14 @@ function renderAddProfileForm(formState) {
  * profile flows, hostDefaults + workflowTiers editable, regenerate +
  * clear-overlay + save-overlay buttons.
  */
-export function renderModelRegistry(data, opts) {
-  const payload = data || {};
+export function renderModelRegistry(data: unknown, opts?: RegistryRenderOpts | null): string {
+  const payload = (data || {}) as RegistryPayload;
   const registry = payload.registry || {};
   const source = payload.source || {};
   const overlayError = payload.overlayError;
   const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
   const unsaved = opts && opts.unsaved ? ' <span class="badge" style="background:rgba(245,158,11,0.15);color:#92400e;">unsaved changes</span>' : "";
-  const registryFormState = (opts && opts.registryForm) || null;
+  const registryFormState = ((opts && opts.registryForm) || null) as RegistryFormState | null;
 
   const profiles = registry.profiles || {};
   const profileNames = Object.keys(profiles);
@@ -232,7 +283,7 @@ export function renderModelRegistry(data, opts) {
     : "";
 
   // Build rows = {host, tier} pairs
-  const rows = [];
+  const rows: { host: RegistryHost; tier: string }[] = [];
   for (const host of REGISTRY_HOSTS) {
     for (const tier of tiers) {
       rows.push({ host, tier });
@@ -260,7 +311,7 @@ export function renderModelRegistry(data, opts) {
       const isOverlay = Object.prototype.hasOwnProperty.call(overlayProfiles, profileName);
       const overlayClass = isOverlay ? " overlay-sourced" : "";
       const effortOptions = UI_HOST_EFFORT_ENUM[row.host];
-      let effortInput;
+      let effortInput: string;
       if (effortOptions && effortOptions.length > 0) {
         const opts2 = effortOptions.map((e) => {
           const sel = e === effort ? " selected" : "";
@@ -338,7 +389,7 @@ export function renderModelRegistry(data, opts) {
   const agents = payload.agents || [];
   const agentsError = payload.agentsError;
   const agentTiersDisplay = registry.agentTiers || {};
-  let agentTierSection;
+  let agentTierSection: string;
   if (agentsError) {
     agentTierSection =
       '<div class="registry-agentTiers"><h3>Per-Agent Tier Overrides</h3>' +
