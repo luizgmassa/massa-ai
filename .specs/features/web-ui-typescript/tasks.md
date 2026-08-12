@@ -1400,6 +1400,68 @@ into the other** — untyped JavaScript today, a hard compile error at T28, wher
 cheapest repair in that seat is another cast. User decision: fix now, before Batch 9,
 rather than at T28 or as recorded debt.
 
+### Batch 8b — T37 (D6 remediation) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T37 | `f2371c62` | 5 interfaces defined once in `registry.ts`; `renderModelRegistry` and `renderProfilesView` narrowed; 4 non-null assertions → narrowing locals. 3 files, +33 / −45 |
+
+Orchestrator-verified independently of the worker's report: build exit 0; web-ui
+**700 pass / 0 fail**, 1663 `expect()` calls, 15 files; `render-golden.json` still
+`27195c2e…` with **0 commits touching it across the branch**; `dist/static` **21
+`.js` / 0 `.ts`** from a `rm -rf apps/web-ui/dist` rebuild; `grep -c '^interface
+Registry' registry-state.ts` **12 → 7**; the perl sweep prints nothing across
+**1290 lines** of the three files; **0** `??` or `|| ""` on any `+` line.
+
+**Discrimination sensor re-observed by the orchestrator, not accepted from the
+worker.** The worker's probe was an in-file edit to `profiles.ts`; the orchestrator's
+was a throwaway `views/__t37probe.ts` calling
+`renderModelRegistry({ registry: { tiers: 42 } })`, so the red could not depend on
+anything else the worker had touched:
+
+```
+apps/web-ui/src/static/views/__t37probe.ts(2,56): error TS2322: Type 'number' is not assignable to type 'string[]'.
+```
+
+Control with the probe removed: exit 0, `git status --porcelain` empty. Under the
+old `data: unknown` that line compiles, so this is the evidence the narrowing is
+real — the 700-test suite was green both before and after and proves nothing here.
+
+**Unrequested type change, reviewed and accepted.** Consolidation had to pick one
+shape where the two files disagreed, and the worker chose `Record<string, X>` over
+registry.ts's original `Partial<Record<RegistryHost, X>>` for `RegistryProfile.hosts`,
+`RegistrySchema.hostDefaults` and `RegistrySchema.agentTiers` — a widening it was not
+asked to make. Accepted on review, for a reason worth keeping: the widening lands
+**only on wire-shape types**, and exhaustiveness survives where it actually bites.
+`UI_HOST_EFFORT_ENUM: Record<RegistryHost, string[]>` and `REGISTRY_HOST_LABELS:
+Record<RegistryHost, string>` are still keyed by the 4-member union, so adding a
+fifth host still fails to compile until both are updated. The overlay is
+user-editable JSON on disk and never guaranteed a 4-key domain, so
+`Partial<Record<RegistryHost, …>>` was claiming a constraint the wire does not
+enforce. Narrowing the DOM-sourced `host: string` at the boundary is the real repair
+and is behaviour-adjacent — out of scope here.
+
+**Residual, deliberately not fixed.** `RegistryRenderOpts.registryForm` and
+`ProfilesViewOpts.registryForm` are still `unknown`, with an
+`as RegistryFormState | null` cast at `registry.ts:259`. Same class of escape as the
+one T37 removed, also introduced by T21, but outside T37's named contract. It is now
+a one-line fix on each side because `RegistryFormState` is exported — worth folding
+into a later task rather than widening this one after the fact.
+
+**Third false positive of the comment class** (after Batch 4's `declare global` and
+Batch 7's `EventSource`). `grep '_delete: false'` over the views returns 1 and
+`grep '| undefined'` over `registry.ts` returns 2 — all three are docblocks stating
+the rule they appear to violate ("never written as `_delete: false`"; "a
+`| undefined` union would invite…"). Every `| undefined` outside a comment is a
+function parameter or a local, never an interface property, so delta semantics hold.
+
+**Emit grew while source shrank — a second datapoint for the standing note above.**
+`registry-state.ts` source went 598 → 579 (−19), but
+`dist/static/views/registry-state.js` went 549 → **554** (+5), because narrowing
+locals are runtime code where the erased assertions were not. The two surfaces now
+move in opposite directions on the same edit. Cap margin on the measured surface: 46
+lines.
+
 ---
 
 ## Artifact-Store Evidence
