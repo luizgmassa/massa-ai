@@ -8,12 +8,30 @@ import { isWriteModeEnabled } from "../lib/api-client.js";
 import { showBanner } from "../lib/banner.js";
 import { renderModelRegistry } from "./registry.js";
 
+interface HostProfileState {
+  host?: string;
+  installed?: boolean;
+  skipped?: boolean;
+  skipReason?: string;
+  activeProfile?: string;
+  availableProfiles?: string[];
+  bundleVersion?: string;
+}
+
+interface ProfilesResponse {
+  hosts?: HostProfileState[];
+}
+
+interface ProfilesRenderOpts {
+  writeMode?: boolean;
+}
+
 /**
  * Profiles view renderer. Reads GET /api/v1/profiles → { hosts: HostProfileState[] }.
  * Renders profile cards grouped by host with active marked, plus a Switch button
  * per profile calling POST /api/v1/profiles/switch when write mode is on.
  */
-export function renderProfiles(data, opts) {
+export function renderProfiles(data: ProfilesResponse | null | undefined, opts?: ProfilesRenderOpts | null): string {
   const payload = data || {};
   const hosts = payload.hosts || [];
   const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
@@ -95,7 +113,18 @@ export function renderProfiles(data, opts) {
 
 export const PROFILES_TAB_STORAGE_KEY = "massa-ai-profiles-tab";
 
-export function renderProfilesView(profilesData, registryData, opts) {
+interface ProfilesViewOpts {
+  profilesTab?: string;
+  writeMode?: boolean;
+  unsaved?: unknown;
+  registryForm?: unknown;
+}
+
+export function renderProfilesView(
+  profilesData: ProfilesResponse | null | undefined,
+  registryData: unknown,
+  opts?: ProfilesViewOpts | null,
+): string {
   opts = opts || {};
   const tab = opts.profilesTab || "switch";
   const writeMode = opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
@@ -106,7 +135,7 @@ export function renderProfilesView(profilesData, registryData, opts) {
     '<button type="button" class="tab' + (tab === "registry" ? " active" : "") + '" data-action="profiles-tab" data-tab="registry">Model Catalog</button>' +
     "</div>";
 
-  let body;
+  let body: string;
   if (tab === "registry") {
     body = renderModelRegistry(registryData, { writeMode, unsaved: opts.unsaved, registryForm: opts.registryForm });
   } else {
@@ -116,7 +145,17 @@ export function renderProfilesView(profilesData, registryData, opts) {
   return '<section class="view"><h2>Profiles</h2>' + switcher + body + "</section>";
 }
 
-export function handleProfilesTabSwitch(ctx, tab) {
+interface ProfilesTabState {
+  profilesTab?: string;
+  [key: string]: unknown;
+}
+
+interface ProfilesTabCtx {
+  state: ProfilesTabState;
+  render: () => void;
+}
+
+export function handleProfilesTabSwitch(ctx: ProfilesTabCtx, tab: string): void {
   ctx.state.profilesTab = tab;
   try {
     if (typeof localStorage !== "undefined") localStorage.setItem(PROFILES_TAB_STORAGE_KEY, tab);
@@ -126,12 +165,27 @@ export function handleProfilesTabSwitch(ctx, tab) {
   ctx.render();
 }
 
-export async function handleProfileSwitch(ctx, profile, host) {
+interface ProfileSwitchResponse {
+  success?: boolean;
+  error?: { code?: string; message?: string };
+  data?: { switched?: string[]; skipped?: string[]; failed?: { host?: string; reason?: string }[] };
+}
+
+interface ProfileSwitchCtx {
+  root: Parameters<typeof showBanner>[0];
+  api: { request: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown> };
+  render: () => void;
+}
+
+export async function handleProfileSwitch(ctx: ProfileSwitchCtx, profile: string, host?: string): Promise<void> {
   if (!confirm("Switch " + host + " to profile " + profile + "? Replaces installed agent files. Session restart required.")) return;
-  const body = { profile };
+  const body: Record<string, unknown> = { profile };
   if (host) body.host = host;
   try {
-    const res = await ctx.api.request("/api/v1/profiles/switch", { method: "POST", body });
+    const res = (await ctx.api.request("/api/v1/profiles/switch", { method: "POST", body })) as
+      | ProfileSwitchResponse
+      | null
+      | undefined;
     if (res && res.success === false) {
       const errInfo = res.error || {};
       const code = (errInfo && errInfo.code) || "error";
@@ -146,6 +200,6 @@ export async function handleProfileSwitch(ctx, profile, host) {
     showBanner(ctx.root, "success", "Switched: " + switched + " | Skipped: " + skipped + " | Failed: " + failed);
     ctx.render();
   } catch (e) {
-    showBanner(ctx.root, "error", "Switch failed: " + String((e && e.message) || e));
+    showBanner(ctx.root, "error", "Switch failed: " + String((e && (e as { message?: unknown }).message) || e));
   }
 }

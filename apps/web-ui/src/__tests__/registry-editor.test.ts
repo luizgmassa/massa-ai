@@ -725,7 +725,7 @@ describe("Models catalog inline-form button-row grouping (T11, APUX-09, P2-F AC4
 const MODELS_TAB_SOURCE = [
   fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "registry.js"), "utf8"),
   fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "registry-state.js"), "utf8"),
-  fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "profiles.js"), "utf8"),
+  fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "profiles.ts"), "utf8"),
 ].join("\n");
 
 /** The Memory tab moved to its own module too. This sensor's control case reads
