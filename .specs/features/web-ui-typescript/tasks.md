@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: Draft
+**Status**: In Progress — Batch 1 of 14 complete (see `## Execution Log`)
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 36
@@ -985,6 +985,65 @@ Asked and answered — **none selected**. Every task is a local file edit verifi
 a local command; no task's correctness or verification changes with tool choice.
 `mcp__massa-ai__*` search tools remain available for navigation, but no task
 depends on one.
+
+---
+
+## Execution Log
+
+Orchestrator-maintained. One row per completed task; deviations recorded with
+their resolution.
+
+### Batch 1 — Phase 1 (build configuration) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T1 | `bb0f8e74` | `tsconfig.build.json`, 12 lines |
+| T2 | `7f092b56` | `verbatimModuleSyntax` on `tsconfig.json`, 1 line |
+| T3 | `e4425912` | build/dev scripts + `@massa-ai/shared` dep; `bun.lock` +12/−9 |
+| T3 fix | `bed47a42` | transitional copy narrowed to `.js`, 1 line |
+
+Tests: `bun test apps/web-ui/src/__tests__/` 700 pass / 0 fail throughout.
+Build verified from clean: 21 `.js` + `index.html` + `styles.css` in `dist/static/`.
+
+**Deviation D1 — T3 copied everything, not `.js` (found by orchestrator, fixed).**
+The committed script ended `cp -r src/static/. dist/static/`. Invisible at Phase 1
+because `src/static/` held only `.js`/`.html`/`.css`, so every gate was legitimately
+green; it would have copied TypeScript sources into the served directory from T4
+onward, where the `.js`-only module-graph guard could never see them. Proven by
+dropping a scratch `.ts` into `src/static/`, building, and observing it in
+`dist/static/`. Fixed in `bed47a42` and re-proven absent, with the probe still
+compiling to `.js` so the filter does not suppress real emit.
+
+**Deviation D2 — "pre-existing failure" labels were partly wrong (measured, no code change).**
+The worker reported four classes of environment-caused failures outside its write set.
+Verified independently:
+
+| Claimed | Measured |
+| --- | --- |
+| `apps/opencode-plugin/__tests__/install.test.ts` | **Confirmed pre-existing** — 8 fail on clean `main` @ `6227b4ac` |
+| `scripts/tests/test-plugin-auto-install.sh`, 18 failures | **Contradicted** — 201/0 green on `main` *and* 201/0 green in the worktree at `bed47a42`. Session residue inside the worker, not a repository state |
+| `packages/core/.../scheduler-store-pg.test.ts` DB contamination | Not yet verified — check before the final gate |
+| `apps/tools-api/src/routes/logs.test.ts` under turbo concurrency | Not yet verified — check before the final gate |
+
+Consequence for later batches: gate levels are chosen to avoid installer suites for
+batches that do not touch them, and no worker's "pre-existing" label is accepted
+without running the named suite at both the baseline commit and the worker's own HEAD.
+
+**Deviation D3 — T4's `Gate: coverage` is not runnable as written (correction below).**
+`bun run test:coverage` is `bun scripts/check-coverage.ts`, which requires the
+dedicated database contract (`MASSA_AI_DEDICATED=1` plus
+`127.0.0.1:5433/massa_ai_test`) and `RUN_POSTGRES_TESTS=1`; without them ten-plus
+core suites skip and the gate reports phantom below-floor files rather than the
+truth. T4's actual claim is narrower — that `lib/html.ts` is measured ≥90% and no
+`dist/` file enters the population. That is provable with a package-scoped run:
+
+```
+cd apps/web-ui && bun test --coverage --coverage-reporter=lcov --coverage-dir=coverage
+```
+
+then reading the lcov for the `lib/html.ts` record and for any `SF:` path containing
+`/dist/`. T4's gate is amended to that scoped form; the full `test:coverage` gate
+runs once at close-out (T36) where the dedicated database is set up deliberately.
 
 ---
 
