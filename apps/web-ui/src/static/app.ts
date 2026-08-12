@@ -205,7 +205,7 @@ const MASSA_AI_UI = {
   CHECKPOINTS_LIST_BODY,
 };
 if (typeof globalThis !== "undefined") {
-  globalThis.MASSA_AI_UI = MASSA_AI_UI;
+  (globalThis as unknown as { MASSA_AI_UI: typeof MASSA_AI_UI }).MASSA_AI_UI = MASSA_AI_UI;
 }
 
 // Auto-start in a browser environment.
