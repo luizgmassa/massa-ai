@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-5 of 14 complete; 9 of 21 modules converted (see `## Execution Log`)
+**Status**: In Progress — Batches 1-6 of 14 complete; 12 of 21 modules converted (see `## Execution Log`)
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 36
@@ -1218,6 +1218,32 @@ One duplication accepted knowingly: `handoffs.ts`'s `HandoffCtx.root` is
 structurally identical to `lib/forms.ts`'s unexported `FormDataRoot`. Matching
 structurally avoided widening `forms.ts`'s public surface for a single consumer;
 revisit only if a third appears.
+
+### Batch 6 — Phase 6 (small views B) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T16 | `1aad4526` | `views/checkpoints.js` → `.ts` |
+| T17 | `41844867` | `views/profiles.js` → `.ts` **+ `registry-editor.test.ts:728` repoint, same commit** |
+| T18 | `53abf42b` | `views/projects.js` → `.ts`, job-progress state machine preserved |
+
+`SPEC_DEVIATION: none`. Orchestrator-verified: `render-golden.json` still
+`27195c2e…`; web-ui 700/0; `dist/static` 21 `.js` / 0 `.ts`; `route-contract.test.ts`
+diff empty. **12 of 21 modules converted.**
+
+The D5 repoint landed as intended — T17's diff shows
+`"views", "profiles.js"` → `"views", "profiles.ts"` on line 728, atomically with
+the module it follows. Without the bullet added after Batch 3, this task would have
+failed on an unexplained ENOENT.
+
+Defaults check: the `??` operators in `checkpoints.ts` and `projects.ts` appear in
+neither the added nor the removed side of their diffs — they are untouched context,
+so they were pre-existing rather than introduced by annotation. Stronger evidence
+than "none added": they were never edited at all.
+
+`route-contract.test.ts` needed no repoint because it reaches
+`renderCheckpoints`/`CHECKPOINTS_LIST_BODY` through the `app.js` barrel re-export
+rather than a direct path — a module specifier, which auto-resolves.
 
 ---
 
