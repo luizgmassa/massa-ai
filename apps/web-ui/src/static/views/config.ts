@@ -16,6 +16,17 @@ import { CONFIG_SECTIONS } from "./config-sections.js";
 // section schema from this module rather than from config-sections.js.
 export { CONFIG_SECTIONS };
 
+// Derived from the value import rather than re-declared: stays exactly in
+// sync with config-sections.ts's own `ConfigSection`/`ConfigField` shapes
+// with no second copy of those interfaces to drift.
+type ConfigSectionEntry = (typeof CONFIG_SECTIONS)[number];
+type ConfigFieldEntry = ConfigSectionEntry["fields"][number];
+
+interface ConfigResponse {
+  config?: Record<string, unknown>;
+  restartNeededSections?: string[];
+}
+
 // ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
 
 /**
@@ -28,25 +39,25 @@ export { CONFIG_SECTIONS };
 
 const SENSITIVE_FIELDS = new Set(["database.url", "embedding.apiKey", "llm.apiKey", "security.apiKey"]);
 
-function getConfigFieldValue(config, sectionKey, fieldName) {
+function getConfigFieldValue(config: Record<string, unknown>, sectionKey: string, fieldName: string): unknown {
   if (sectionKey === "dataDir") return config[sectionKey] || "";
   const section = config[sectionKey];
   if (!section) return undefined;
   const parts = fieldName.split(".");
-  let val = section;
+  let val: unknown = section;
   for (const p of parts) {
-    val = val && typeof val === "object" ? val[p] : undefined;
+    val = val && typeof val === "object" ? (val as Record<string, unknown>)[p] : undefined;
   }
   return val;
 }
 
-function renderConfigField(sectionKey, field, value) {
+function renderConfigField(sectionKey: string, field: ConfigFieldEntry, value: unknown): string {
   const fieldId = "config-" + sectionKey + "-" + field.name.replace(/\./g, "-");
   const inputName = "config-" + sectionKey + "-" + field.name;
   const isSensitive = field.sensitive || SENSITIVE_FIELDS.has(sectionKey + "." + field.name);
   const displayValue = value === undefined || value === null ? "" : String(value);
 
-  let inputHtml;
+  let inputHtml: string;
   if (field.type === "boolean") {
     const checked = value === true ? " checked" : "";
     inputHtml = '<input type="checkbox" id="' + fieldId + '" name="' + inputName + '"' + checked + ' data-section="' + sectionKey + '" data-field="' + field.name + '" data-type="boolean" />';
@@ -86,7 +97,7 @@ function renderConfigField(sectionKey, field, value) {
   );
 }
 
-export function renderConfig(data, opts) {
+export function renderConfig(data: ConfigResponse | null | undefined, opts?: { writeMode?: boolean }): string {
   const payload = data || {};
   const config = payload.config || {};
   const restart = payload.restartNeededSections || [];
@@ -161,9 +172,9 @@ export function renderConfig(data, opts) {
  * A walker that assigns down a dotted path is worth making unable to pollute
  * regardless of who calls it next.
  */
-function setByPath(obj, dottedPath, value) {
+function setByPath(obj: Record<string, unknown>, dottedPath: string, value: unknown): void {
   const parts = dottedPath.split(".");
-  let cur = obj;
+  let cur: Record<string, unknown> = obj;
   // The guard sits on each write rather than once up front, so the chain is
   // provably safe at every hop instead of only at entry.
   for (let i = 0; i < parts.length - 1; i++) {
@@ -172,14 +183,14 @@ function setByPath(obj, dottedPath, value) {
     if (!Object.prototype.hasOwnProperty.call(cur, key) || typeof cur[key] !== "object" || cur[key] === null) {
       cur[key] = {};
     }
-    cur = cur[key];
+    cur = cur[key] as Record<string, unknown>;
   }
   const last = parts[parts.length - 1];
   if (last === "__proto__" || last === "constructor" || last === "prototype") return;
   cur[last] = value;
 }
 
-export function buildConfigSectionBody(sectionKey, fieldValues) {
+export function buildConfigSectionBody(sectionKey: string, fieldValues: Record<string, unknown>): Record<string, unknown> {
   const sectionDef = CONFIG_SECTIONS.find((s) => s.key === sectionKey);
   if (!sectionDef) return {};
 
@@ -187,10 +198,10 @@ export function buildConfigSectionBody(sectionKey, fieldValues) {
     return { dataDir: fieldValues.dataDir || "" };
   }
 
-  const nested = {};
+  const nested: Record<string, unknown> = {};
   for (const field of sectionDef.fields) {
     const raw = fieldValues[field.name];
-    let val = raw;
+    let val: unknown = raw;
     if (field.type === "number") {
       val = raw === "" || raw === undefined ? undefined : Number(raw);
     } else if (field.type === "boolean") {
@@ -214,7 +225,7 @@ export function buildConfigSectionBody(sectionKey, fieldValues) {
           // rejected by the server with a message about the wrong thing, or —
           // worse — accepted as a string where a structure was meant.
           throw new Error(
-            'Field "' + field.label + '" is not valid JSON: ' + ((e && e.message) || String(e)),
+            'Field "' + field.label + '" is not valid JSON: ' + ((e && (e as Error).message) || String(e)),
           );
         }
       }
@@ -224,9 +235,25 @@ export function buildConfigSectionBody(sectionKey, fieldValues) {
   return { [sectionKey]: nested };
 }
 
+/** The subset of an input element `collectConfigSectionFields` reads —
+ *  structurally the same shape `lib/forms.ts`'s `collectFormData` uses, plus
+ *  `remove?` so the same root also satisfies `showBanner`'s element shape
+ *  when its own `querySelectorAll(".success, .error")` call runs against it. */
+interface ConfigFieldElement {
+  dataset?: { field?: string; [key: string]: string | undefined };
+  type?: string;
+  checked?: boolean;
+  value?: string;
+  remove?: () => void;
+}
+
+interface ConfigFormRoot {
+  querySelectorAll(selectors: string): { forEach(cb: (el: ConfigFieldElement) => void): void };
+}
+
 /** Collect field values for a config section from the rendered DOM. */
-export function collectConfigSectionFields(root, section) {
-  const fieldValues = {};
+export function collectConfigSectionFields(root: ConfigFormRoot, section: string): Record<string, unknown> {
+  const fieldValues: Record<string, unknown> = {};
   const els = root.querySelectorAll('[data-section="' + section + '"]');
   els.forEach((el) => {
     const field = el.dataset && el.dataset.field;
@@ -237,7 +264,46 @@ export function collectConfigSectionFields(root, section) {
   return fieldValues;
 }
 
-export async function handleConfigSave(ctx, section) {
+interface ConfigSaveResponse {
+  success?: boolean;
+  details?: string[];
+  error?: string;
+  data?: { changedRestartSections?: string[] };
+}
+
+interface RestartResponse {
+  success?: boolean;
+  mode?: string;
+  reason?: string;
+  error?: string;
+}
+
+interface ConfigApi {
+  request: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown>;
+}
+
+/** The subset of a `getElementById` target `handleConfigReveal` mutates —
+ *  structural, not `HTMLInputElement`, so the fake-DOM test harness still
+ *  satisfies it. */
+interface ConfigRevealElement {
+  type: string;
+  dataset: { revealed?: string; [key: string]: string | undefined };
+  value: string;
+}
+
+interface ConfigDocument {
+  getElementById?: (id: string) => ConfigRevealElement | null;
+}
+
+interface ConfigCtx {
+  root: ConfigFormRoot;
+  api: ConfigApi;
+  render: () => void;
+  state?: { serverRestartInFlight?: boolean; [key: string]: unknown };
+  doc?: ConfigDocument | null;
+}
+
+export async function handleConfigSave(ctx: ConfigCtx, section: string): Promise<void> {
   const sectionDef = CONFIG_SECTIONS.find((s) => s.key === section);
   const label = sectionDef ? sectionDef.label : section;
   if (!confirm("Save " + label + " config? A backup will be created.")) return;
@@ -245,15 +311,15 @@ export async function handleConfigSave(ctx, section) {
   // Built outside the request try/catch, and a `json` field throws on
   // unparseable text — so it needs its own guard, or a typo in the Rules box
   // would reject as an unhandled error with no banner at all.
-  let body;
+  let body: Record<string, unknown>;
   try {
     body = buildConfigSectionBody(section, fieldValues);
   } catch (e) {
-    showBanner(ctx.root, "error", "Save failed: " + ((e && e.message) || String(e)));
+    showBanner(ctx.root, "error", "Save failed: " + ((e && (e as Error).message) || String(e)));
     return;
   }
   try {
-    const res = await ctx.api.request("/api/v1/config", { method: "PUT", body });
+    const res = (await ctx.api.request("/api/v1/config", { method: "PUT", body })) as ConfigSaveResponse | null;
     if (res && res.success === false) {
       const details = res.details ? res.details.join("; ") : (res.error || "Save failed.");
       showBanner(ctx.root, "error", "Save failed: " + details);
@@ -276,13 +342,16 @@ export async function handleConfigSave(ctx, section) {
     }
     ctx.render();
   } catch (e) {
-    showBanner(ctx.root, "error", "Save failed: " + String((e && e.message) || e));
+    showBanner(ctx.root, "error", "Save failed: " + String((e && (e as Error).message) || e));
   }
 }
 
 /** Restart the API server (APR-04): confirm, POST, then poll /health until
  *  the replacement answers. Poll knobs are injectable for tests. */
-export async function handleServerRestart(ctx, opts) {
+export async function handleServerRestart(
+  ctx: ConfigCtx,
+  opts?: { pollIntervalMs?: number; maxAttempts?: number },
+): Promise<void> {
   opts = opts || {};
   const pollIntervalMs = opts.pollIntervalMs !== undefined ? opts.pollIntervalMs : 1000;
   const maxAttempts = opts.maxAttempts !== undefined ? opts.maxAttempts : 30;
@@ -291,7 +360,7 @@ export async function handleServerRestart(ctx, opts) {
   // a module-level flag latched by one harness's never-resolving request
   // would silently disable the handler for every later caller in the same
   // process. Server-side arm/consume is already one-shot.
-  const state = ctx.state || (ctx.state = {});
+  const state: NonNullable<ConfigCtx["state"]> = ctx.state || (ctx.state = {});
   if (state.serverRestartInFlight) return;
   if (!confirm("Restart the massa-ai API server? In-flight requests will be dropped.")) return;
   state.serverRestartInFlight = true;
@@ -302,12 +371,12 @@ export async function handleServerRestart(ctx, opts) {
   }
 }
 
-async function runServerRestart(ctx, pollIntervalMs, maxAttempts) {
-  let res;
+async function runServerRestart(ctx: ConfigCtx, pollIntervalMs: number, maxAttempts: number): Promise<void> {
+  let res: RestartResponse | null;
   try {
-    res = await ctx.api.request("/api/v1/system/restart", { method: "POST", body: {} });
+    res = (await ctx.api.request("/api/v1/system/restart", { method: "POST", body: {} })) as RestartResponse | null;
   } catch (e) {
-    showBanner(ctx.root, "error", "Restart request failed: " + String((e && e.message) || e));
+    showBanner(ctx.root, "error", "Restart request failed: " + String((e && (e as Error).message) || e));
     return;
   }
   if (!res || res.success === false) {
@@ -344,7 +413,7 @@ async function runServerRestart(ctx, pollIntervalMs, maxAttempts) {
   );
 }
 
-export async function handleConfigReveal(ctx, targetId, section, field) {
+export async function handleConfigReveal(ctx: ConfigCtx, targetId: string, section?: string, field?: string): Promise<void> {
   const el = ctx.doc && ctx.doc.getElementById ? ctx.doc.getElementById(targetId) : null;
   if (!el) return;
   if (el.type === "text" && el.dataset.revealed === "true") {
@@ -363,7 +432,9 @@ export async function handleConfigReveal(ctx, targetId, section, field) {
     return;
   }
   try {
-    const res = await ctx.api.request("/api/v1/config/reveal?section=" + encodeURIComponent(section) + "&field=" + encodeURIComponent(field));
+    const res = (await ctx.api.request(
+      "/api/v1/config/reveal?section=" + encodeURIComponent(section) + "&field=" + encodeURIComponent(field),
+    )) as { success?: boolean; data?: { value?: string } } | null;
     if (res && res.success !== false && res.data) {
       el.value = res.data.value || "";
       el.type = "text";
