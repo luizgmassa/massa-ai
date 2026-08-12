@@ -116,6 +116,15 @@ is `private: true` and is not published, so there is no npm packaging surface.
 
 ## Verification recipe
 
+**Build first, turbo-mediated — the guard now reads `dist/static` (T6), so the
+bare `bun test` commands below fail on a clean tree with no prior build.**
+`bun run build` (root, turbo-mediated) or the narrower
+`bun run --filter @massa-ai/web-ui build` before re-running any of the three
+baselines; `test:coverage` and this document's baseline commands are the two
+sites design.md's Risks row 1 names as **not** turbo-mediated on their own —
+`beforeAll` in `static-module-graph.test.ts` throws naming the build command
+when `dist/static` is absent, so the failure mode is loud, not silent (D3/D9).
+
 Re-run all three command baselines and compare literally against the table above.
 A pass is 700 / 56 / 31 with 0 fail. Additionally:
 

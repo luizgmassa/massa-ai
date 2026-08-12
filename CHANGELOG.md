@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`apps/web-ui`'s browser bundle is now real TypeScript, not zero-build JavaScript.**
+  All 22 `src/static/` modules (`app.js`, `dashboard.js`, `start-app.js`,
+  `wire-view-handlers.js`, every `lib/`/`views/` leaf) are converted to strict-mode
+  `.ts`, compiled by `tsc -p apps/web-ui/tsconfig.build.json` into
+  `apps/web-ui/dist/static/`, and served from there by the Tools API
+  (`apps/tools-api/src/routes/web-ui.ts`) instead of the raw `src/` tree — the
+  Dockerfile and CI image were already building it, only a stale comment claimed
+  otherwise. The config tab's section schema is now typed against `@massa-ai/shared`'s
+  `MassaAiConfig` (`keyof MassaAiConfig` drives `ConfigSectionKey`), so an added or
+  removed config key is a compile-time error instead of a silent UI gap. `bun run
+  dev:api` now also runs the web-ui's `tsc --watch`, and devtools opens the `.ts`
+  source via source maps. No renderer behaviour, exported surface, or golden-fixture
+  output changed — `render-golden.json` and `public-surface.test.ts`'s frozen export
+  lists are unmodified.
+
 ## [1.51.0] - 2026-08-11
 
 ### Fixed

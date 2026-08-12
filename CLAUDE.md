@@ -475,8 +475,9 @@ opencode}-plugin`, all publishing to npm and GitHub Packages) — each still shi
 `bun run build` first: it installs a real copy of `dist/index.js` (a symlink went dead
 whenever the gitignored `dist/` vanished, and OpenCode skips an unresolvable local
 plugin with no log line) and refuses to run without it; the
-other three have no build step at all — their entire publishable surface is static
-source (`agents/`, `hooks/`, `skills/`, `install.sh`, `README.md`, the dotdir manifest).
+other three require no compilation pass before publishing — their entire publishable
+surface is static source (`agents/`, `hooks/`, `skills/`, `install.sh`, `README.md`,
+the dotdir manifest).
 None of the three new `package.json` files declares a `test` script, deliberately: `apps/*`
 is a turbo-discovered glob, so a declared `test` script would make turbo's `test` task
 run the same `__tests__/` directory the root `bun run test:plugins` script already runs,

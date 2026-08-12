@@ -2243,11 +2243,12 @@ path checked — including `render-golden.json` and `public-surface.test.ts`, wh
 "0 commits across the branch" claims appear throughout this log and are confirmed
 correct. Prefer `rev-list --count` for any count that will be quoted.
 
-### Batch 14 — Phase 14 (close-out) — T34 complete
+### Batch 14 — Phase 14 (close-out) — T34/T35 complete
 
 | Task | Commit | Result |
 | --- | --- | --- |
-| T34 | this commit | measured only, no allowlist change (recorded below) |
+| T34 | `75b94042` | measured only, no allowlist change (recorded below) |
+| T35 | this commit | 6 files: `Dockerfile`, `.github/workflows/ci.yml`, `apps/web-ui/src/index.ts`, `CLAUDE.md`, `.specs/.../CHARACTERIZATION.md`, `CHANGELOG.md` |
 
 **T34 — measured, zero hits, `security-allowlist.txt` untouched.**
 `bun scripts/check-security-allowlist.ts` run against the branch HEAD tree
@@ -2277,6 +2278,58 @@ allowlisted baseline and every printed hit line is under `apps/tools-api/`,
 by grepping the tool's own hit output for `apps/web-ui` (zero matches). Exit
 code 0. No allowlist edit: zero is recorded as zero, nothing pre-emptively
 allowlisted, no hit to triage.
+
+**T35 — stale no-build-step claims corrected, CHANGELOG entry added.**
+`git grep -n 'no build step' -- Dockerfile .github docs apps/web-ui CLAUDE.md`:
+**2 → 0.** Both prior hits were comments, not `COPY` lines — `Dockerfile:38-39`
+(reworded to describe the real `tsc` build and that the served bytes are
+`dist/static`, not `src/static`) and `.github/workflows/ci.yml:360`-361 (same
+correction, describing the smoke check's actual target). No `COPY` line in the
+Dockerfile was touched, per the task's non-goal — `bun run build` at `:50`
+already runs after `COPY apps/web-ui` at `:42`, and `api` already copies the
+built tree via the whole-directory copy at `:62`.
+
+One incidental third hit surfaced by the same literal string, unrelated to
+web-ui: `CLAUDE.md:478` describes the *other three* plugin dirs (claude/codex/cursor)
+as having "no build step at all" — true, and about a different subject, but the
+task's Done-when is a literal grep with no subject filter, so it was reworded
+("require no compilation pass before publishing") without changing its meaning.
+
+`apps/web-ui/src/index.ts`'s docblock no longer claims the static set is
+"intentionally NOT type-checked" — T33 (already landed) removed `allowJs`/
+`checkJs`, so every file under `src/static/` has been real, strict-mode-checked
+TypeScript since before this task; the docblock was simply never updated to say
+so.
+
+`docs/ONBOARDING.md:102` was inspected and left unchanged: it labels
+`apps/web-ui` a "static dashboard," which is still an accurate description (it
+is still mostly static HTML/CSS/assets) and asserts nothing about a build step.
+The file is explicitly a generated, frozen knowledge-graph snapshot
+(`ONBOARDING.md:3-4`, commit `17ee7083`) whose own convention (line 83-85) is to
+leave stale counts alone rather than hand-patch them outside a real
+architecture-layer change, "so that no row silently mixes two trees" — the
+"9" file count for Auxiliary App Surfaces was left under that same convention,
+since it contains no false claim to correct.
+
+`CHARACTERIZATION.md`'s canonical baseline is restated as the turbo-mediated
+form (design Risks row 1): a new paragraph at the top of "Verification recipe"
+states that `dist/static` (T6) means the bare `bun test` baselines in the table
+above fail on a clean, unbuilt tree, and names `bun run build` /
+`bun run --filter @massa-ai/web-ui build` as the required prefix — the same
+build-first form the Gate Check Commands table already uses for `quick`/`full`.
+The frozen baseline figures themselves (700/56/31, the pre-conversion subject
+table, the "1 → 22" pre-conversion allowlist estimate) are intentionally left
+as the commit-`6227b4ac` snapshot they document — this file's own stated
+purpose — and are not rewritten to the terminal state.
+
+`CHANGELOG.md` gains one `### Added` entry under `[Unreleased]` (minor bump per
+`CONTRIBUTING.md` § CHANGELOG authoring), describing the conversion's
+user/developer-visible shape: `apps/web-ui` is now real TypeScript built by
+`tsc` and served from `dist/static`, the config schema is typed against
+`MassaAiConfig`, and no renderer behaviour or exported surface changed. Before
+this task, `git rev-list --count 6227b4ac..HEAD -- CHANGELOG.md` was **0** —
+zero commits on this branch had touched it, which is what would have failed
+the CI merge gate on PR open.
 
 ---
 
