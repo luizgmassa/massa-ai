@@ -7,7 +7,30 @@ import { markdownToHtml } from "../lib/markdown.js";
 import { isWriteModeEnabled } from "../lib/api-client.js";
 import { collectFormData } from "../lib/forms.js";
 
-export function renderHandoffs(data, state) {
+interface HandoffsState {
+  project?: string;
+}
+
+interface Handoff {
+  id?: string;
+  targetAgent?: string;
+  status?: string;
+  summary?: string;
+}
+
+interface HandoffsPayload {
+  pending?: Handoff[];
+}
+
+interface HandoffsResponse {
+  success?: boolean;
+  data?: HandoffsPayload;
+}
+
+export function renderHandoffs(
+  data: HandoffsResponse | null | undefined,
+  state?: HandoffsState | null,
+): string {
   state = state || {};
   const project = state.project || "";
   const writeMode = isWriteModeEnabled();
@@ -20,7 +43,7 @@ export function renderHandoffs(data, state) {
   if (!data || data.success === false) {
     return '<section class="view"><h2>Handoffs</h2>' + errorBlock(data) + "</section>";
   }
-  const payload = data.data || data;
+  const payload = data.data || (data as unknown as HandoffsPayload);
   const pending = (payload && payload.pending) || [];
 
   const createForm = writeMode
@@ -69,13 +92,29 @@ export function renderHandoffs(data, state) {
   return '<section class="view"><h2>Handoffs</h2>' + rows + createForm + "</section>";
 }
 
+/** Structurally identical to `collectFormData`'s own (unexported) `FormDataRoot`
+ *  parameter type, so `ctx.root` can be passed through without a cast. */
+interface HandoffFormRoot {
+  querySelectorAll(selectors: string): {
+    forEach(
+      cb: (el: { dataset: { create?: string; [key: string]: string | undefined }; type: string; checked?: boolean; value: string }) => void,
+    ): void;
+  };
+}
+
+interface HandoffCtx {
+  root: HandoffFormRoot;
+  api: { request: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown> };
+  render: () => void;
+}
+
 /** Submits the Create Handoff form. projectId and summary are the route's two
  *  required fields; the three list fields are comma-split and blank-filtered. */
-export async function handleHandoffCreate(ctx) {
+export async function handleHandoffCreate(ctx: HandoffCtx): Promise<void> {
   const data = collectFormData(ctx.root, "handoff-create");
   if (!data.projectId) { alert("Project ID is required."); return; }
   if (!data.summary) { alert("Summary is required."); return; }
-  const body = { projectId: data.projectId, summary: data.summary };
+  const body: Record<string, unknown> = { projectId: data.projectId, summary: data.summary };
   if (data.targetAgent) body.targetAgent = data.targetAgent;
   if (data.openQuestions) body.openQuestions = String(data.openQuestions).split(",").map((s) => s.trim()).filter(Boolean);
   if (data.nextSteps) body.nextSteps = String(data.nextSteps).split(",").map((s) => s.trim()).filter(Boolean);
@@ -84,16 +123,16 @@ export async function handleHandoffCreate(ctx) {
     await ctx.api.request("/api/v1/handoff/begin", { method: "POST", body });
     ctx.render();
   } catch (e) {
-    alert("Create failed: " + String(e.message || e));
+    alert("Create failed: " + String((e as { message?: unknown }).message || e));
   }
 }
 
 /** accept | cancel — the action is the path segment. */
-export async function handleHandoffAction(ctx, id, action) {
+export async function handleHandoffAction(ctx: HandoffCtx, id: string, action: string): Promise<void> {
   try {
     await ctx.api.request("/api/v1/handoff/" + action, { method: "POST", body: { id } });
     ctx.render();
   } catch (e) {
-    alert(action + " failed: " + String(e.message || e));
+    alert(action + " failed: " + String((e as { message?: unknown }).message || e));
   }
 }
