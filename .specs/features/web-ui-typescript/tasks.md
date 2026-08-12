@@ -600,7 +600,7 @@ Phases run sequentially; tasks within a phase run in order.
 **Done when**:
 - [ ] `config-sections.js` holds `CONFIG_SECTIONS`; `config.js` imports via `./config-sections.js` and re-exports for compatibility
 - [ ] Both files ≤600 lines
-- [ ] `config-section-coverage.test.ts:30` and `installer-config-template.test.ts:31` repointed
+- [ ] `config-section-coverage.test.ts:30` and `installer-config-template.test.ts:31` repointed from `views/config.js` to `views/config-sections.js` — **step 1 of 2; T24 renames this file again** (D5 table)
 - [ ] **Each repointed suite asserts a non-zero parsed population before asserting content** (WUT-14 AC2)
 - [ ] Scratch: point each scanner at an empty file → each fails; both reds observed, both reverted
 - [ ] `render-golden.json` sha256 unchanged
@@ -613,14 +613,26 @@ Phases run sequentially; tasks within a phase run in order.
 
 **Task ID**: TASK-024
 **What**: Convert the schema module and type its section keys against the real server config type. **This is the feature's stated payoff.**
-**Where**: `apps/web-ui/src/static/views/config-sections.ts`
+**Where**: `apps/web-ui/src/static/views/config-sections.ts`, plus the two external scanners repointed a second time (below)
 **Depends on**: T23
 **Reuses**: `@massa-ai/shared` `MassaAiConfig`; the dependency edge declared in T3
 **Requirement**: WUT-11, WUT-12
 **Non-goals**: no runtime change; the emitted `.js` must carry no `@massa-ai/shared` reference.
 **Tools**: MCP: NONE · Skill: NONE
+
+> **Second D5 repoint, found during Batch 9 pre-dispatch review.** The D5 inventory
+> assigned `config-section-coverage.test.ts:30` and `installer-config-template.test.ts:31`
+> to T23 and stopped there, because it was built when both pointed at `views/config.js`.
+> T23 moves them to `views/config-sections.js`; **this task renames that file again**, so
+> both need a second repoint here or they throw ENOENT. The failure is loud rather than
+> vacuous — plain `fs.readFileSync` on a missing path throws — but it belongs to the task
+> that causes it. Rename each `CONFIG_VIEW_JS` const to `CONFIG_SECTIONS_SRC` while
+> repointing; after this task the name is wrong twice over.
+
 **Done when**:
 - [ ] `import type { MassaAiConfig } from "@massa-ai/shared"` and `type ConfigSectionKey = keyof MassaAiConfig`
+- [ ] `config-section-coverage.test.ts:30` and `installer-config-template.test.ts:31` repointed from `views/config-sections.js` to `views/config-sections.ts` — **step 2 of 2**, same commit as the rename
+- [ ] Both scanners still report a **non-zero** section-key population (the assertion T23 added); print the count, not just the pass
 - [ ] `ConfigSection`/`ConfigField` interfaces defined; `CONFIG_SECTIONS: ConfigSection[]`
 - [ ] `grep -c 'massa-ai/shared' dist/static/views/config-sections.js` → **0** (WUT-11 AC3)
 - [ ] Module-graph guard green — no bare specifier reached the emit
@@ -944,7 +956,8 @@ Execution is strictly sequential — no intra-phase parallelism.
 | Task | Scope | Status |
 | --- | --- | --- |
 | T1, T2, T3, T7, T32, T33 | 1 config file each | ✅ Granular |
-| T4, T8-T22, T24-T29 | 1 module each | ✅ Granular |
+| T4, T8-T22, T25-T29 | 1 module each | ✅ Granular |
+| T24 | 3 files — the module plus the second hop of both scanner repoints | ⚠️ Cohesive, **deliberate**: the rename and the repoints must be one commit or the scanners ENOENT between them |
 | T5 | 1 route plus its co-located suite | ✅ Granular (test co-location) |
 | T6 | 1 test file | ✅ Granular |
 | T23 | 4 files — schema split plus 2 external scanner repoints | ⚠️ Cohesive, **deliberate**: splitting opens a window where the scanners pass vacuously on zero matches |
@@ -1010,10 +1023,10 @@ All 37 match. No dependency points to a later phase — every cross-phase edge (
 | Task | Code Layer Created/Modified | Matrix Requires | Task Says | Status |
 | --- | --- | --- | --- | --- |
 | T1, T2, T3, T7, T32, T33 | Build config | none | none | ✅ OK |
-| T4, T8-T22, T24-T29, T37 | Browser module | unit | unit | ✅ OK |
+| T4, T8-T22, T25-T29, T37 | Browser module | unit | unit | ✅ OK |
 | T5 | Serving route | integration | integration | ✅ OK |
 | T6 | Guard / sensor test | unit | unit | ✅ OK |
-| T23 | Browser module + cross-package text scanner | unit (highest of the two) | unit | ✅ OK |
+| T23, T24 | Browser module + cross-package text scanner | unit (highest of the two) | unit | ✅ OK |
 | T30, T31 | Cross-package text scanner | unit | unit | ✅ OK |
 | T34 | none (measurement) | none | none | ✅ OK |
 | T35, T36 | Docs / registry | none | none | ✅ OK |
@@ -1199,8 +1212,10 @@ a `src/static` source, and the task that must repoint it:
 | `apps/web-ui/src/__tests__/registry-editor.test.ts:735` | `views/memory.js` | T19 |
 | `apps/web-ui/src/__tests__/registry-editor.test.ts:726` | `views/registry.js` | T21 |
 | `apps/web-ui/src/__tests__/registry-editor.test.ts:727` | `views/registry-state.js` | T22 |
-| `apps/tools-api/src/routes/config-section-coverage.test.ts:30` | `views/config.js` | T23 |
-| `scripts/__tests__/installer-config-template.test.ts:31` | `views/config.js` | T23 |
+| `apps/tools-api/src/routes/config-section-coverage.test.ts:30` | `views/config.js` → `views/config-sections.js` | T23 (step 1 of 2) |
+| `scripts/__tests__/installer-config-template.test.ts:31` | `views/config.js` → `views/config-sections.js` | T23 (step 1 of 2) |
+| `apps/tools-api/src/routes/config-section-coverage.test.ts:30` | `views/config-sections.js` → `.ts` | **T24 (step 2 of 2)** |
+| `scripts/__tests__/installer-config-template.test.ts:31` | `views/config-sections.js` → `.ts` | **T24 (step 2 of 2)** |
 | `apps/web-ui/src/__tests__/app-renderers.test.ts:1649` | `wire-view-handlers.js` (`STATIC_DIR` = `src/static`) | T27 |
 
 Verified *not* affected: `static-module-graph.test.ts` (its `STATIC_DIR` is
@@ -1211,6 +1226,22 @@ served URLs rather than source files.
 The first sweep for this inventory required the literal `static` on the same line
 and therefore missed `app-renderers.test.ts:1649`, which reaches the directory
 through a `STATIC_DIR` variable. The table above is from the corrected sweep.
+
+**Amended at Batch 9 pre-dispatch — a repoint can need two steps, and the sweep only
+sees the first.** The inventory was built by sweeping the tree for filesystem-literal
+`.js` reads, so each row records the path *as it stood when the sweep ran* and the one
+task that changes it next. That is correct for a single rename and wrong for a path
+that moves twice. The two config scanners move twice: T23 relocates them from
+`views/config.js` to `views/config-sections.js` (the keys leave `config.js`), and T24
+renames that file to `.ts`. Only the first hop was assigned. Both rows are now split
+into step 1 and step 2, and the two-hop shape is the thing to look for — **a
+"conversion" task preceded by a "pure move" task always produces one.** T23 → T24 is
+the only such pair in this plan; every other conversion moves its target once.
+
+The second hop fails loudly (`fs.readFileSync` throws ENOENT on a missing path), not
+vacuously, so it would not have shipped silently. It would have surfaced as an
+unexplained ENOENT inside T24 with no bullet explaining it — which is exactly how T17's
+missing repoint presented before D5 was written.
 
 ### Batch 4 — Phase 4 (remaining lib leaves) — Complete
 
