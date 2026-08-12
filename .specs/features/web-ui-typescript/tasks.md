@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batch 1 of 14 complete (see `## Execution Log`)
+**Status**: In Progress — Batches 1-2 of 14 complete (see `## Execution Log`)
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 36
@@ -1044,6 +1044,61 @@ cd apps/web-ui && bun test --coverage --coverage-reporter=lcov --coverage-dir=co
 then reading the lcov for the `lib/html.ts` record and for any `SF:` path containing
 `/dist/`. T4's gate is amended to that scoped form; the full `test:coverage` gate
 runs once at close-out (T36) where the dedicated database is set up deliberately.
+
+### Batch 2 — Phase 2 (serve from dist) — Complete
+
+Committed in **reordered** form, T6 → T5 → T4, for the reason in D4 below.
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T6 | `bce9bb91` | guard rewritten onto `dist/static`, `beforeAll` sentinel added |
+| T5 | `5379f8da` | `buildStaticDirCandidates` + docblock repointed; `web-ui-static-dir.test.ts` `STATIC_DIR` repointed |
+| T4 | `65392f2f` | `lib/html.js` → `lib/html.ts` |
+
+Measured at the reordered HEAD, by the orchestrator, after `rm -rf dist && build`:
+`dist/static` = 21 `.js`, 0 `.ts`; web-ui 700/0; the six tools-api web-ui suites
+56/0; `installer-config-template` 31/0 — 787 total, matching the frozen baseline.
+`lib/html.ts` measured 100% (26/26 lines) with **0** `/dist/` paths in the lcov.
+Live: `GET /ui/app.js` → 200 `text/javascript; charset=utf-8`; `GET /ui` → `<!DOCTYPE html>`.
+
+Guard integrity: 7 assertions before, 7 after; `git diff` over the file changes
+**zero** `it(` or `expect(` lines — only the docblock, `STATIC_DIR`, and the
+sentinel/lazy-`FILES` mechanism. Thresholds unchanged, no exemption added.
+`.js.map` files were already excluded by `listJsFiles`'s `endsWith(".js")` filter
+(`"foo.js.map".endsWith(".js")` is `false`), so source-map handling is unchanged
+behaviour rather than a new decision.
+
+Discrimination sensor: 3 mutations, 3 killed, 0 survived — bare specifier injected
+into a scratch `app.js`; a module padded to 648 lines; `dist/static` removed. The
+orchestrator independently re-ran the third and observed the sentinel's own error
+text. `git status --porcelain` matched the pre-sensor baseline after cleanup.
+
+**Deviation D4 — T4 could not be green in isolation; a planning defect, fixed by reordering.**
+`tasks.md` gave T4 the `Done when` bullet "700 pass, 0 fail". That was unreachable
+as authored: at T4 the guard still scanned `src/static`, and converting
+`lib/html.js` to `.ts` leaves `app.js` importing `./lib/html.js`, which no longer
+exists there — so assertion 4 ("every specifier resolves to a file that exists")
+fails. Measured directly from the original commit: `src/static/lib/html.js` absent,
+`app.js` still referencing it, guard `STATIC_DIR` still `src/static`.
+
+The worker's mitigation was to implement all three tasks before committing any, so
+no red state was ever observable outside its session — honest, and it disclosed the
+gap rather than hiding it. But it still produced a commit that is red when isolated,
+which the Execution Contract forbids.
+
+Resolution: the three commits are **file-disjoint** (`lib/html.ts` /
+`web-ui.ts`+`web-ui-static-dir.test.ts` / `static-module-graph.test.ts`), so they
+were reordered to T6 → T5 → T4 by cherry-pick onto `533df648`, with the resulting
+tree verified **byte-identical** to the pre-reorder state (`git diff` empty against
+a backup tag, since deleted). In that order every commit is green: T6 points the
+guard at `dist/static`, which at that point is populated entirely by the
+transitional copy from an all-`.js` source tree; T5 touches only tools-api; T4 then
+converts a module whose emitted output the guard already reads.
+
+**This defect is unique to the first conversion.** From T8 onward the guard reads
+`dist/static`, where `tsc` emits each converted module as the transitional copy
+stops matching it — so every later single-module task is independently green as
+authored, and no further reordering is needed.
 
 ---
 
