@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) is open — two handlers silently no-op until it lands.
+**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) landed; branch green. Phases 12-14 remain.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 39
@@ -1829,7 +1829,7 @@ is retired into the same deferred-to-user bucket as T7's browser checks.
 | --- | --- | --- |
 | T28 | `4d0a1fd1` | `start-app.js` → `.ts` (323 → 461 source, 356 emitted) + `AppState`, `AppRootElement`, one shared `ctx`. **Introduced D9** |
 | T29 | `df4918fb` | `app.js` → `.ts` (220 source unchanged, 116 emitted). The barrel; one cast at the `globalThis.MASSA_AI_UI` assignment |
-| T39 | *pending* | D9 remediation, dispatched after this entry |
+| T39 | `7a2ea525` | D9 remediation — `doc` restored and made **required** on `WireViewHandlersCtx`. 4 files, +35 / −9 |
 
 **Every module is now TypeScript: 0 `.js` remain under `src/static`, 22 of 22
 converted.** Orchestrator-verified: build exit 0; web-ui **700 pass / 0 fail**;
@@ -1880,6 +1880,42 @@ test. Restoring the value without tightening the type would leave the identical 
 available to the next edit, which is why both are one task. T28's consolidation itself
 is kept — it is a real simplification, and reverting it to fix a one-member omission
 would discard the improvement along with the defect.
+
+**T39 — complete, `7a2ea525`.** `doc` is back on start-app's shared ctx and
+`WireViewHandlersCtx.doc: ConfigDocument & LogsDoc` is now a **required** member. All
+four gates green and matching their known-good numbers exactly: **700/0**, **57/0**,
+**31/0**, **15/0**; golden unchanged; `public-surface.test.ts` still at **0 commits**
+across the branch.
+
+The guard was re-observed by the orchestrator rather than accepted on report —
+re-applying T28's exact edit now fails to compile:
+
+```
+start-app.ts(386,22): error TS2345: … Property 'doc' is missing in type '{ api: …; root: AppRootElement; state: AppState; render: () => Promise<void>; }' but required in type 'WireViewHandlersCtx'.
+```
+
+Control green after restoring, tree clean. **The specific mistake that caused D9 is now
+a compile error** — the only kind of guard that could have stopped it, since the suite
+was green throughout.
+
+*Two scope notes, both accepted.* The worker touched 4 files rather than the 2 named;
+the extra two are one `export` keyword each on the already-existing `ConfigDocument`
+and `LogsDoc` interfaces, verified by diff to be export-only with no shape change. That
+is the right call — the alternative is re-declaring driftable copies of both shapes in
+`wire-view-handlers.ts`. And the `Document` collision was reconciled by casting once at
+the ctx boundary (`doc as unknown as ConfigDocument & LogsDoc`) rather than widening
+either structural type, so `ConfigDocument.getElementById`'s narrow return and
+`LogsDoc.body.appendChild`'s shape keep their precision for every other caller.
+
+**Orchestrator measurement defect, recorded because T31 inherits it.** A first attempt
+to answer "which of the six scanners already assert their population" counted
+`toBeGreaterThan|sanity|population` per file and produced 15, 11, 3, 7, 4, 4 — numbers
+that credit index-ordering assertions
+(`expect(configIdx).toBeGreaterThan(dashboardIdx)`) and rendered-output counts
+(`expect(buttons.length).toBeGreaterThan(0)`) as though they guarded a source-text
+scan. They do not. **The assertion T31 is looking for is one on the size of the text the
+scanner read from disk**, not on anything derived from rendered HTML. A keyword sweep
+cannot separate them; each of the six has to be read.
 
 ---
 
