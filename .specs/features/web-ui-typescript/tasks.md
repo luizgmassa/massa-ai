@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) and T40 (D10) landed; `bun run type-check` exits 0. Phases 1-13 complete. Phase 14 (T34-T36) remains.
+**Status**: **Complete** — all 14 Phases / 40 Tasks executed, then independently verified (see `## Execution Log` and `validation.md`). **22 of 22** modules converted, 0 `.js` left under `src/static`; the denominator was 21 until T23 created `views/config-sections`. Final gates: `build` 0, `type-check` 0 (forced, non-cached), `lint` 0, web-ui 703/0, tools-api 57/0, serving 15/0, installer 31/0. Ten deviations recorded, D1-D10.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 40

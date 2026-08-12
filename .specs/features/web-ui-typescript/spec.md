@@ -236,26 +236,26 @@ AC2), which are manual observations recorded as such.
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| WUT-01 | P1: browser bundle | Design | Pending |
-| WUT-02 | P1: browser bundle | Design | Pending |
-| WUT-03 | P1: browser bundle | Design | Pending |
-| WUT-04 | P1: browser bundle | Design | Pending |
-| WUT-05 | P1: TypeScript under strict | Design | Pending |
-| WUT-06 | P1: TypeScript under strict | Design | Pending |
-| WUT-07 | P1: TypeScript under strict | Design | Pending |
-| WUT-08 | P1: behaviour unchanged | Design | Pending |
-| WUT-09 | P1: behaviour unchanged | Design | Pending |
-| WUT-10 | P1: behaviour unchanged | Design | Pending |
-| WUT-11 | P2: server-contract coupling | Design | Pending |
-| WUT-12 | P2: server-contract coupling | Design | Pending |
-| WUT-13 | P2: dev loop | Design | Pending |
-| WUT-14 | P2: consumers repointed | Design | Pending |
-| WUT-15 | P2: consumers repointed | Design | Pending |
-| WUT-16 | P3: stale claims | Design | Pending |
+| WUT-01 | P1: browser bundle | Execute | Verified |
+| WUT-02 | P1: browser bundle | Execute | Verified |
+| WUT-03 | P1: browser bundle | Execute | Verified |
+| WUT-04 | P1: browser bundle | Execute | Verified |
+| WUT-05 | P1: TypeScript under strict | Execute | Verified |
+| WUT-06 | P1: TypeScript under strict | Execute | Verified |
+| WUT-07 | P1: TypeScript under strict | Execute | Verified |
+| WUT-08 | P1: behaviour unchanged | Execute | Verified |
+| WUT-09 | P1: behaviour unchanged | Execute | Verified |
+| WUT-10 | P1: behaviour unchanged | Execute | Verified |
+| WUT-11 | P2: server-contract coupling | Execute | Verified |
+| WUT-12 | P2: server-contract coupling | Execute | Verified |
+| WUT-13 | P2: dev loop | Execute | Verified |
+| WUT-14 | P2: consumers repointed | Execute | Verified |
+| WUT-15 | P2: consumers repointed | Execute | Verified |
+| WUT-16 | P3: stale claims | Execute | Verified |
 
 **ID format:** `WUT-NN`. **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
 
-**Coverage:** 16 total, 0 mapped to tasks (Tasks phase pending), 16 unmapped ⚠️ — expected at this phase.
+**Coverage:** 16 total, 16 mapped to tasks, 0 unmapped ✅. Every ID is cited by at least one task in `tasks.md` (verified: `grep -oE 'WUT-[0-9]+' tasks.md | sort -u` returns WUT-01..WUT-16 with no gaps and no phantom ids), and all 16 were re-measured against the tree by an independent verification pass — see `validation.md`.
 
 ---
 
