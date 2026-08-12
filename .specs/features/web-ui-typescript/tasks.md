@@ -2243,6 +2243,41 @@ path checked — including `render-golden.json` and `public-surface.test.ts`, wh
 "0 commits across the branch" claims appear throughout this log and are confirmed
 correct. Prefer `rev-list --count` for any count that will be quoted.
 
+### Batch 14 — Phase 14 (close-out) — T34 complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T34 | this commit | measured only, no allowlist change (recorded below) |
+
+**T34 — measured, zero hits, `security-allowlist.txt` untouched.**
+`bun scripts/check-security-allowlist.ts` run against the branch HEAD tree
+(clean, no uncommitted files). The scanner's own population filter
+(`trackedPopulationFiles`: `git ls-files`, prefix-restricted to
+`apps/web-ui/src/`, `.ts` only, minus `__tests__/`, `*.test.ts`, `/generated/`)
+was isolated and re-run standalone to get the web-ui-only figure the repo-wide
+`PASS — 0 violation(s)` line does not itself print:
+
+```
+web-ui population: 23 tracked .ts files
+per-class hit counts over the web-ui population:
+  child-process:   0
+  bun-spawn:       0
+  raw-sql-unsafe:  0
+  dynamic-eval:    0
+```
+
+Population went **1 → 23** — `index.ts` alone before this feature, now
+`index.ts` plus the 22 converted `src/static/**/*.ts` modules (design.md's Risk
+row estimated "1 → 22", counting only the `static/` subtree; the scanner's
+actual root is all of `apps/web-ui/src/`, so the correct before/after is
+1 → 23). The full-repo run's per-class totals (`child-process: 17`,
+`bun-spawn: 1`, `raw-sql-unsafe: 1`, `dynamic-eval: 0`) are unchanged from the
+allowlisted baseline and every printed hit line is under `apps/tools-api/`,
+`packages/core/`, or `packages/shared/` — none under `apps/web-ui/`, confirmed
+by grepping the tool's own hit output for `apps/web-ui` (zero matches). Exit
+code 0. No allowlist edit: zero is recorded as zero, nothing pre-emptively
+allowlisted, no hit to triage.
+
 ---
 
 ## Artifact-Store Evidence
