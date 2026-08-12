@@ -28,7 +28,9 @@ import { handleHandoffCreate, handleHandoffAction } from "./views/handoffs.js";
 import { handleProposalAction } from "./views/proposals.js";
 import { handleCheckpointCreate, handleCheckpointDelete } from "./views/checkpoints.js";
 import { handleLogsLiveToggle, handleLogsExport } from "./views/logs.js";
+import type { LogsDoc } from "./views/logs.js";
 import { handleConfigSave, handleConfigReveal, handleServerRestart } from "./views/config.js";
+import type { ConfigDocument } from "./views/config.js";
 import { handleProfilesTabSwitch, handleProfileSwitch } from "./views/profiles.js";
 import { joinModelId } from "./views/registry.js";
 import {
@@ -101,11 +103,22 @@ interface WireViewHandlersState {
   [key: string]: unknown;
 }
 
+/** Required, not optional (T39): this ctx is forwarded wholesale to every
+ *  handler below, including `handleConfigReveal` and `handleLogsExport`,
+ *  which read `ctx.doc` themselves rather than being destructured here — a
+ *  declared type limited to what THIS function reads let T28 drop the
+ *  member from the built ctx with no compile error. The intersection
+ *  reuses `ConfigDocument`/`LogsDoc` unmodified (D9): a real `Document`
+ *  cannot satisfy either return-type-strict shape directly (the collision
+ *  this task must not resolve by dropping the value), so the producer casts
+ *  once at the ctx-construction boundary (`start-app.ts`) instead of this
+ *  type being widened. */
 interface WireViewHandlersCtx {
   root: WireElement;
   state: WireViewHandlersState;
   api: WireViewHandlersApi;
   render: () => void;
+  doc: ConfigDocument & LogsDoc;
 }
 
 export function wireViewHandlers(ctx: WireViewHandlersCtx): void {

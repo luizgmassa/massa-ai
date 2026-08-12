@@ -216,7 +216,10 @@ interface LogsAnchorElement {
   click?: () => void;
 }
 
-interface LogsDoc {
+// Exported so `wire-view-handlers.ts` can type `WireViewHandlersCtx.doc`
+// against this same structural shape (T39) rather than re-declaring an
+// equivalent, driftable copy.
+export interface LogsDoc {
   createElement?: (tag: string) => LogsAnchorElement | null;
   body?: {
     appendChild?: (node: unknown) => unknown;

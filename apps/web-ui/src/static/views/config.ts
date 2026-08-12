@@ -291,7 +291,10 @@ interface ConfigRevealElement {
   value: string;
 }
 
-interface ConfigDocument {
+// Exported so `wire-view-handlers.ts` can type `WireViewHandlersCtx.doc`
+// against this same structural shape (T39) rather than re-declaring an
+// equivalent, driftable copy.
+export interface ConfigDocument {
   getElementById?: (id: string) => ConfigRevealElement | null;
 }
 

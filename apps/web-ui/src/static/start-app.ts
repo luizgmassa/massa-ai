@@ -26,7 +26,9 @@ import {
   runLogsLiveStream,
   stopLogsLiveStream,
 } from "./views/logs.js";
+import type { LogsDoc } from "./views/logs.js";
 import { renderConfig } from "./views/config.js";
+import type { ConfigDocument } from "./views/config.js";
 import { PROFILES_TAB_STORAGE_KEY, renderProfilesView } from "./views/profiles.js";
 import { renderModelRegistry } from "./views/registry.js";
 import { initRegistryOverlay, mergeRegistryForDisplay } from "./views/registry-state.js";
@@ -206,14 +208,19 @@ export function startApp(opts?: AppStartOpts): void {
   initTheme(doc);
 
   // The one ctx object every view handler below takes — built once so every
-  // call site shares the same live `root`/`state`/`api`/`render` bindings
-  // instead of re-allocating an equivalent literal per call (the
+  // call site shares the same live `root`/`state`/`api`/`render`/`doc`
+  // bindings instead of re-allocating an equivalent literal per call (the
   // pre-conversion source built an equivalent `{ api, root, state, render,
-  // doc }` object ad hoc at each of these call sites; `doc` is dropped here —
-  // none of the functions this `ctx` is passed to reads it, and carrying a
-  // real `Document` collides with `LogsCtx`'s structural `doc` shape via
-  // `Document.body.appendChild`'s generic signature).
-  const ctx = { api, root, state, render };
+  // doc }` object ad hoc at each of these call sites). `doc` (T39, D9):
+  // `handleConfigReveal` and `handleLogsExport` both read it — dropping it
+  // silently no-ops the Config tab's secret-reveal button and the Logs
+  // export. The real `Document` cannot satisfy `ConfigDocument`/`LogsDoc`
+  // directly under structural typing (`Document.body.appendChild`'s
+  // generic signature is what T28 collided on), so the two structural
+  // types are reused unmodified and the real value is cast to their
+  // intersection once, here, at the boundary — never widened, never
+  // dropped again.
+  const ctx = { api, root, state, render, doc: doc as unknown as ConfigDocument & LogsDoc };
 
   function setNavActive(): void {
     doc.querySelectorAll(".nav a").forEach((a) => {
