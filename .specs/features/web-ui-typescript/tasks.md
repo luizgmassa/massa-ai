@@ -9,14 +9,14 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-9 of 14 complete; **18 of 22** modules converted (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`; 4 remain — `dashboard.js`, `wire-view-handlers.js`, `start-app.js`, `app.js`.
+**Status**: In Progress — Batches 1-10 of 14 in flight; **20 of 22** modules converted (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`; 2 remain — `start-app.js` and `app.js`. T38 (D7) is open and the branch is red until it lands.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
-**3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 37
+**3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 38
 Tasks**. The extra tasks versus `PLAN.md`'s 31 are `config-sections` becoming its
 own module (T23/T24) plus one-file-per-task granularity across the 21 conversions.
-T37 was added mid-execution as Batch 8 remediation (Execution Log D6); it sits in
-Phase 8 despite its number.
+T37 and T38 were added mid-execution as remediation (Execution Log D6 and D7); they
+sit in Phases 8 and 10 respectively, despite their numbers.
 
 ---
 
@@ -87,7 +87,7 @@ Phases run sequentially; tasks within a phase run in order.
 | 7 | Large views | T19 → T20 |
 | 8 | Registry pair | T21 → T22 → T37 |
 | 9 | Config split and coupling | T23 → T24 → T25 |
-| 10 | Shell renderers | T26 → T27 |
+| 10 | Shell renderers | T26 → T27 → T38 |
 | 11 | Shell entry | T28 → T29 |
 | 12 | Cross-package consumers | T30 → T31 |
 | 13 | Retire the transitional path | T32 → T33 |
@@ -701,10 +701,15 @@ Phases run sequentially; tasks within a phase run in order.
 > literals and comments — **not** those inside type annotations. An inline object type
 > in the signature (`function wireViewHandlers(ctx: { state: AppState })`) opens a
 > brace the lexer counts and closes early, and the `confirm()` assertion then fails on
-> a truncated span for a reason that looks nothing like its cause. Use a **named
-> interface** for every parameter type in this module. The same lexer already survived
-> `registry.ts`/`registry-state.ts` in Batch 8 — because those signatures used named
-> interfaces too, not because it is immune.
+> a truncated span. Use a **named interface** for every parameter type in this module.
+> The same lexer already survived `registry.ts`/`registry-state.ts` in Batch 8 —
+> because those signatures used named interfaces too, not because it is immune.
+>
+> *Corrected after Batch 10:* an earlier draft of this note said the failure would
+> "point nowhere near its cause". It would not. `app-renderers.test.ts:1703` is a
+> named sanity test — "finds the `wireViewHandlers` function span (sensor sanity — a
+> null/tiny span proves nothing)" — asserting `length > 500`, so a truncated span
+> fails loudly and self-describingly. The hazard is real; the diagnosis cost is not.
 
 **Done when**:
 - [ ] `.ts` replaces `.js`; the `data-action`/`data-filter` dispatch map typed
@@ -714,6 +719,56 @@ Phases run sequentially; tasks within a phase run in order.
 **Tests**: unit
 **Gate**: quick
 **Commit**: `refactor(web-ui): convert wire-view-handlers to TypeScript`
+
+#### T38: Re-arm the write-gating source scanner
+
+**Task ID**: TASK-038
+**What**: Restore `web-ui-readonly.test.ts`'s source population, which this feature narrowed from 21 files to 2, and repair the discrimination sensor that narrowing exposed as broken.
+**Where**: `apps/tools-api/src/__tests__/web-ui-readonly.test.ts`
+**Depends on**: T27
+**Reuses**: the non-zero-population idiom already in `config-section-coverage.test.ts` and `installer-config-template.test.ts`
+**Requirement**: WUT-14
+**Non-goals**: no production code changes; no assertion removed; `static-module-graph.test.ts` is **correct as written** and must not be touched — its `STATIC_DIR` is `dist/static`, where `.js` is the right extension.
+**Tools**: MCP: NONE · Skill: NONE
+
+> **Why this was invisible.** `readBundleSource` (line 39) recursively globs
+> `e.name.endsWith(".js")` over **`src/static`**. Every conversion in this feature
+> removed one file from its population: **21 → 2**, measured per commit. Its two
+> assertions hid the decay in opposite ways. `expect(APP_JS).not.toContain(
+> "FORBIDDEN_MUTATING_PATHS")` is a `not.toContain`, which gets *more* likely to pass
+> as the population empties and could never have reddened. The other is a positive
+> `toContain` that survived only while some remaining `.js` file happened to hold the
+> marker — T27 removed the last one, which is the only reason any of this surfaced.
+
+> **The sensor it exposed has never worked.** The mutant at line 100 is built as
+> `'… data-action=\\"memory-edit\\" …'`, so at runtime it contains
+> `data-action=\"memory-edit"` — with backslashes — while the assertion looks for
+> `data-action="memory-edit"` without them. Measured: the mutant string does **not**
+> contain its own assertion target. Every pass came from `APP_JS`, not from the
+> mutant. Fixing the population alone turns this tautology green again and re-hides
+> it permanently, which is why both repairs are one task.
+
+> **Inventory correction, and the reason it matters.** `CHARACTERIZATION.md` lines
+> 79-83 enumerate **five** source-text scanners and T31 is scoped to those five. This
+> file is listed separately at line 89, under module-`require` sites, so its
+> `readBundleSource` glob — structurally identical to `static-module-graph.test.ts`'s
+> — was never classified as a scanner and never got a population assertion. The D5
+> note even records "verified *not* affected: `static-module-graph.test.ts`", which
+> checked the one that was fine while the one that was breaking sat under a different
+> heading. The real population is **six**.
+
+**Done when**:
+- [ ] `readBundleSource` reads `.ts` as well as `.js`; measured population goes 2 → **22** files
+- [ ] A non-zero-population assertion guards it — assert the **file count** it read, not just that the string is non-empty, and print the count
+- [ ] The mutant's escaping is fixed so `expect(mutant).toContain('data-action="memory-edit"')` is satisfied **by the mutant itself**. Prove it: with `APP_JS` replaced by `""` in scratch, the assertion still passes; before the fix it fails. Both observed, reverted by hand
+- [ ] Scratch: point `readBundleSource` at an empty directory → the population assertion fails. Red observed and reverted
+- [ ] `expect(APP_JS).not.toContain("FORBIDDEN_MUTATING_PATHS")` still passes against the restored 22-file population (measured: that literal appears in **0** files under `src/static`) — it is now meaningful rather than vacuous
+- [ ] No assertion deleted or weakened; `git diff` shows only the glob, the mutant literal, and added assertions
+- [ ] The six tools-api web-ui suites → **56 pass, 0 fail**
+
+**Tests**: unit
+**Gate**: full
+**Commit**: `test(tools-api): re-arm the write-gating source scanner`
 
 ### Phase 11: Shell entry
 
@@ -761,20 +816,28 @@ Phases run sequentially; tasks within a phase run in order.
 #### T30: Repoint the remaining tools-api module requires
 
 **Task ID**: TASK-030
-**What**: Repoint the three `require("../../../web-ui/src/static/app.js")` sites left after T26.
+**What**: Confirm the three `require("../../../web-ui/src/static/app.js")` sites need **no** repoint after T29, and record the evidence. Rewritten from a repoint task — see below.
 **Where**: `apps/tools-api/src/__tests__/web-ui-readonly.test.ts`, `apps/tools-api/src/__tests__/web-ui-render.test.ts`, `apps/tools-api/src/__tests__/web-ui-views.test.ts`
 **Depends on**: T29
 **Reuses**: existing suites, assertions untouched
 **Requirement**: WUT-14
-**Non-goals**: path repoint only — no assertion body changes.
+**Non-goals**: change nothing that passes. This task's deliverable is evidence, not a diff.
 **Tools**: MCP: NONE · Skill: NONE
 
-> **Granularity note**: three files (`web-ui-readonly`, `web-ui-render`, `web-ui-views`), one mechanical change, one cohesive unit. Splitting leaves the repo red between commits.
+> **Both of this task's original bullets were falsified before it ran.** It directed
+> repointing three `require` paths, but **T26 measured** that `createRequire`'s
+> `require()` resolves `.js` → `.ts` exactly like `import`, even crossing the
+> tools-api → web-ui package boundary: `dashboard.js` was gone from disk, the
+> specifier still said `.js`, and the suite was 13/0. And it directed repointing
+> `STATIC_DIR` at `web-ui-readonly.test.ts:27` — but that constant is a **directory**
+> path and is correct as written. The actual defect was one line below it, the `.js`
+> extension filter inside `readBundleSource`, and **T38 fixed that**. What remains
+> here is verification.
 
 **Done when**:
-- [ ] All three `require` paths resolve to `app.ts`; `STATIC_DIR` in `web-ui-readonly.test.ts:27` repointed
+- [ ] After T29, all three `require(".../app.js")` sites resolve with **no edit** — prove it the way T26 did: `src/static/app.js` absent from disk, the specifier still reading `.js`, suites green
+- [ ] `git diff` on all three files is **empty**; if any edit turns out to be needed, record which and why the T26 measurement did not generalise
 - [ ] 56 tests across the 6 tools-api web-ui suites pass, 0 fail
-- [ ] `git diff` shows no assertion body changed
 
 **Tests**: unit
 **Gate**: full
@@ -783,16 +846,17 @@ Phases run sequentially; tasks within a phase run in order.
 #### T31: Prove every text-scanning suite still discriminates
 
 **Task ID**: TASK-031
-**What**: Add a non-zero population assertion to each of the five source-text scanners and observe each red.
-**Where**: `apps/web-ui/src/__tests__/app-renderers.test.ts` plus `registry-editor.test.ts`, verifying the three repointed in T23/T26
+**What**: Add a non-zero population assertion to each of the **six** source-text scanners and observe each red.
+**Where**: `apps/web-ui/src/__tests__/app-renderers.test.ts` plus `registry-editor.test.ts`, verifying the four already carrying one (`config-section-coverage`, `installer-config-template`, `static-module-graph`, and `web-ui-readonly` from T38)
 **Depends on**: T30
 **Reuses**: lesson L-001 (`scope:test-strength`) — a missing-population path with no discriminating test
 **Requirement**: WUT-14
 **Non-goals**: no content assertions added or removed.
 **Tools**: MCP: NONE · Skill: NONE
 **Done when**:
-- [ ] Each of the 5 scanners asserts a non-zero parsed population before content assertions
-- [ ] Scratch: point each scanner at an empty file → each fails. 5 reds observed and recorded, all reverted
+- [ ] Each of the **6** scanners asserts a non-zero parsed population before content assertions
+- [ ] Scratch: point each scanner at an empty file → each fails. **6** reds observed and recorded, all reverted
+- [ ] The enumeration in `CHARACTERIZATION.md` lines 79-83 is corrected from five to six — `web-ui-readonly.test.ts`'s `readBundleSource` was filed under module-`require` sites at line 89 and so escaped both this task's original scope and any population guard (D7)
 - [ ] `bun run test:scripts` green
 
 **Tests**: unit
@@ -924,7 +988,7 @@ P6:  T16 ──→ T17 ──→ T18
 P7:  T19 ──→ T20
 P8:  T21 ──→ T22 ──→ T37
 P9:  T23 ──→ T24 ──→ T25
-P10: T26 ──→ T27
+P10: T26 ──→ T27 ──→ T38
 P11: T28 ──→ T29
 P12: T30 ──→ T31
 P13: T32 ──→ T33
@@ -979,6 +1043,7 @@ Execution is strictly sequential — no intra-phase parallelism.
 | T35 | 7 doc/config sites, one class of stale claim | ⚠️ Cohesive |
 | T36 | 3 `.specs` files, the workflow's own close-out contract | ⚠️ Cohesive |
 | T37 | 3 modules — one type definition and its two consumers | ⚠️ Cohesive, **deliberate**: a type moved in one commit and imported in another leaves the tree uncompilable between them |
+| T38 | 1 test file | ✅ Granular |
 
 No ❌. Six ⚠️ rows, each with a stated reason why splitting would be worse.
 
@@ -1025,8 +1090,9 @@ No ❌. Six ⚠️ rows, each with a stated reason why splitting would be worse.
 | T35 | T34 | T34 → T35 | ✅ Match |
 | T36 | T35 | T35 → T36 | ✅ Match |
 | T37 | T22 | T22 → T37 | ✅ Match |
+| T38 | T27 | T27 → T38 | ✅ Match |
 
-All 37 match. No dependency points to a later phase — every cross-phase edge (T3→T4, T3→T7, T4→T8, T4→T9, T9→T10, T12→T13, T15→T16, T18→T19, T20→T21, T22→T23, T25→T26, T27→T28, T29→T30, T31→T32, T33→T34) points backward.
+All 38 match. No dependency points to a later phase — every cross-phase edge (T3→T4, T3→T7, T4→T8, T4→T9, T9→T10, T12→T13, T15→T16, T18→T19, T20→T21, T22→T23, T25→T26, T27→T28, T29→T30, T31→T32, T33→T34) points backward.
 
 ---
 
@@ -1039,7 +1105,7 @@ All 37 match. No dependency points to a later phase — every cross-phase edge (
 | T5 | Serving route | integration | integration | ✅ OK |
 | T6 | Guard / sensor test | unit | unit | ✅ OK |
 | T23, T24 | Browser module + cross-package text scanner | unit (highest of the two) | unit | ✅ OK |
-| T30, T31 | Cross-package text scanner | unit | unit | ✅ OK |
+| T30, T31, T38 | Cross-package text scanner | unit | unit | ✅ OK |
 | T34 | none (measurement) | none | none | ✅ OK |
 | T35, T36 | Docs / registry | none | none | ✅ OK |
 
@@ -1588,6 +1654,87 @@ has already recorded once.
 source went 375 → 446 (+71 of annotation) while its emit went 375 → **362** (−13). On
 `registry-state` last batch, source shrank and emit grew. Neither surface predicts the
 other; quote whichever one the claim is actually about.
+
+### Batch 10 — Phase 10 (shell renderers) — T26/T27 complete, T38 added
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T26 | `efbf661c` | `dashboard.js` → `.ts` (222 → 305 source). 1 file. **No repoint needed** — see below |
+| T27 | `4a1cac48` | `wire-view-handlers.js` → `.ts` (363 → 428 source) + `app-renderers.test.ts:1649` fs-path repoint. 2 files |
+| T38 | *pending* | D7 remediation, dispatched after this entry |
+
+Orchestrator-verified: build exit 0; web-ui **700 pass / 0 fail**; `render-golden.json`
+still `27195c2e…` with **0 commits touching it across the branch**; `dist/static`
+**22 `.js` / 0 `.ts`** from a clean rebuild; **20 of 22 modules converted**, only
+`start-app.js` and `app.js` left. Emitted counts: `dashboard.js` 215, `wire-view-handlers.js`
+367; largest emitted module is still `registry-state.js` at 554 against the 600 cap.
+
+**D5's `require` row is now measured, not reasoned — and it holds.** T26's bullet had
+directed a repoint of `dashboard-views.test.ts:12`; the pre-dispatch review flagged it
+as a module specifier that D5's table says to leave alone, while noting D5 had only
+*observed* `import` and `await import` and had reasoned the `require` row in. The
+measurement is a clean triangle: `src/static/dashboard.js` is **absent from disk**,
+the test line still literally reads
+`require("../../../web-ui/src/static/dashboard.js")`, and the suite is **13 pass / 0
+fail**. `createRequire`'s `require()` resolves `.js` → `.ts`, across a package
+boundary, into another package's raw source tree. No repoint was made or needed.
+
+**T27's brace-lexer hazard did not fire, because the worker was told not to trigger
+it.** Zero inline object-type parameters across 428 lines of `wire-view-handlers.ts`;
+the span sensor reports 2 pass / 0 fail. Note the sensor was already self-guarding —
+`app-renderers.test.ts:1703-1705` asserts `length > 500` under the name "sensor
+sanity — a null/tiny span proves nothing" — so the failure mode would have been loud.
+The pre-dispatch note has been corrected on that point.
+
+**D7 — a write-gating source scanner in `tools-api` has been going blind since Batch 3,
+and only surfaced now by accident.** `web-ui-readonly.test.ts:39`'s `readBundleSource`
+recursively globs `e.name.endsWith(".js")` over **`src/static`**. Every conversion in
+this feature removed one file from its population. Measured per commit:
+
+| commit | `.js` under `src/static` | files holding `data-action="memory-edit"` |
+| --- | --- | --- |
+| `6227b4ac` (base) | 21 | 2 |
+| `fcdd78ec` | 14 | 2 |
+| `cd93763f` (B7) | 7 | 1 |
+| `fa8a4c0a` (B8) | 5 | 1 |
+| `235ad1b4` (B9) | 4 | 1 |
+| `efbf661c` (T26) | 3 | 1 |
+| `4a1cac48` (T27) | **2** | **0** |
+
+Its two `APP_JS` assertions hid the decay in opposite directions.
+`expect(APP_JS).not.toContain("FORBIDDEN_MUTATING_PATHS")` is a **`not.toContain`** —
+it becomes *more* likely to pass as the population empties, and could never have
+reddened. The other is a positive `toContain` that survived only while some remaining
+`.js` file still held the marker. T27 removed the last one. **A guard that had been
+degrading for eight commits announced itself only because an unrelated accident ran
+out.**
+
+*The sensor it exposed has never worked.* The mutant at line 100 is built with
+`\\"` escapes, so at runtime it contains `data-action=\"memory-edit\"` while the
+assertion looks for `data-action="memory-edit"`. Measured in isolation: the mutant
+string does **not** contain its own assertion target. Every pass it ever recorded came
+from `APP_JS`. The "discrimination sensor" has never discriminated — a defect that
+predates this branch.
+
+*Why nobody guarded it.* `CHARACTERIZATION.md` lines 79-83 enumerate **five**
+source-text scanners, and T31 is scoped to exactly those five. This file appears
+instead at line 89, under module-`require` sites — so its `readBundleSource` glob,
+structurally identical to `static-module-graph.test.ts`'s, was never classified as a
+scanner. The D5 note records "verified *not* affected: `static-module-graph.test.ts`
+(its `STATIC_DIR` is `dist/static`, where `.js` is the correct extension)" — the
+verification checked the sibling that was fine, and never reached the one that was
+breaking, because it sat under a different heading. **Two files, the same glob, one
+correct and one not; the inventory that would have paired them had six members and
+listed five.**
+
+*Consequences recorded, not just the fix.* T38 (new, Phase 10) restores the population
+to 22, repairs the mutant's escaping, and adds the file-count assertion that would have
+caught this in Batch 3. Both repairs must be one task: fixing the population alone
+makes the tautology green again and re-hides it permanently. T31's scope goes from five
+scanners to six. And **T30 was rewritten from a repoint task to a verification task** —
+both its bullets were falsified before it ran, one by T26's `require` measurement and
+one because `STATIC_DIR` is a directory path that was always correct, the defect being
+the extension filter on the line below it.
 
 ---
 
