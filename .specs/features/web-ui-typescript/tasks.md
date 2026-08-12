@@ -2243,12 +2243,13 @@ path checked — including `render-golden.json` and `public-surface.test.ts`, wh
 "0 commits across the branch" claims appear throughout this log and are confirmed
 correct. Prefer `rev-list --count` for any count that will be quoted.
 
-### Batch 14 — Phase 14 (close-out) — T34/T35 complete
+### Batch 14 — Phase 14 (close-out) — T34/T35/T36 complete, feature EXECUTE COMPLETE
 
 | Task | Commit | Result |
 | --- | --- | --- |
 | T34 | `75b94042` | measured only, no allowlist change (recorded below) |
-| T35 | this commit | 6 files: `Dockerfile`, `.github/workflows/ci.yml`, `apps/web-ui/src/index.ts`, `CLAUDE.md`, `.specs/.../CHARACTERIZATION.md`, `CHANGELOG.md` |
+| T35 | `e1f26a02` | 6 files: `Dockerfile`, `.github/workflows/ci.yml`, `apps/web-ui/src/index.ts`, `CLAUDE.md`, `.specs/.../CHARACTERIZATION.md`, `CHANGELOG.md` |
+| T36 | this commit | `.specs/project/STATE.md` (AD-021), `.specs/HANDOFF.md` (rotated), `.specs/project/FEATURES.json` (`web-ui-typescript` → complete/execute:true), this file (Execution Log) |
 
 **T34 — measured, zero hits, `security-allowlist.txt` untouched.**
 `bun scripts/check-security-allowlist.ts` run against the branch HEAD tree
@@ -2330,6 +2331,52 @@ user/developer-visible shape: `apps/web-ui` is now real TypeScript built by
 this task, `git rev-list --count 6227b4ac..HEAD -- CHANGELOG.md` was **0** —
 zero commits on this branch had touched it, which is what would have failed
 the CI merge gate on PR open.
+
+**T36 — specs closed out. Feature status: EXECUTE COMPLETE, no independent
+verification pass run.**
+
+`STATE.md`'s `## Decisions` gained **AD-021**, in the L4005 table (the one that
+already carries AD-001..AD-006 plus AD-016..AD-020, per its own placement-note
+comment — this file has two `## Decisions` headings, a pre-existing rotation
+defect this feature does not repair). AD-021 extends AD-016's "consumers chain
+the generation" contract from `apps/*-plugin` to every untracked generated
+root, naming `apps/web-ui/dist/` as the second instance and
+`static-module-graph.test.ts`'s `beforeAll` sentinel as the enforcement pattern
+for a consumer that cannot chain the build command itself (a bare `bun test`
+invocation, unlike AD-016's npm/turbo-script consumers). Highest existing AD
+re-checked at append time, per instruction, not assumed:
+`git show HEAD:.specs/project/STATE.md | grep -oE 'AD-0[0-9][0-9]' | sort -u | wc -l`
+→ **20** distinct ids, highest `AD-020` — matching design time, so `AD-021` was
+free (AD-014's own history records a pre-assigned number being taken once
+before, which is why this re-check is not skipped).
+
+`HANDOFF.md` rotated in the required order — rename first, then prepend, then
+count: the prior top section (`# Handoff — subagent-tool-inheritance`, an H1,
+this file's convention for marking "current") was renamed to
+`## Previous handoff — subagent-tool-inheritance` *before* the new
+`# Handoff — web-ui-typescript` section was prepended above it. Distinct
+session blocks — 1 H1-marked current + `git grep -c '^## Previous'` — went
+**12 → 13** (11 `## Previous` headers pre-rotation + the file's implicit
+H1-marked current = 12 sessions; after rotation, 12 `## Previous` headers + the
+new H1-marked current = 13). Measured both before and after the edit, not
+asserted.
+
+`FEATURES.json`'s `web-ui-typescript` entry: `status` → `"complete"`,
+`phases.execute` → `true`, `notes` rewritten for the close-out (14 phases, 40
+tasks, 62 commits, the T37-T40 remediation waves, the T34-T36 close-out
+figures). `validation` is left `null` — no `validation.md` exists for this
+feature (no independent `massa-ai-verification-agent` pass was run), and
+several other `"complete"`/`execute: true` entries in this same registry
+already carry `validation: null` for the identical reason, so this is not a
+new pattern. Recorded as the honest state rather than a path that would imply
+a report that does not exist.
+
+`bun skills/massa-ai/scripts/check_specs_delivered.ts web-ui-typescript --root .`
+cannot pass until this commit lands — the script's first check is
+`git status --porcelain -- .specs/` being empty, which by construction is
+false while these edits are staged-but-uncommitted. Run and its full output
+reported after this commit, in the builder's final response, not fabricated
+here ahead of the measurement.
 
 ---
 

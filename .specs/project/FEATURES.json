@@ -1339,14 +1339,14 @@
     {
       "id": "web-ui-typescript",
       "slug": "web-ui-typescript",
-      "title": "Web UI TypeScript conversion — 21 browser modules to .ts with a dist/static build seam, emitted-output module-graph guard, and compile-time coupling to the shared config contract",
-      "status": "in_progress",
+      "title": "Web UI TypeScript conversion — 22 browser modules to .ts with a dist/static build seam, emitted-output module-graph guard, and compile-time coupling to the shared config contract",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
         "design": true,
         "tasks": true,
-        "execute": false
+        "execute": true
       },
       "branch": "spec/web-ui-typescript",
       "created": "2026-08-11",
@@ -1355,7 +1355,7 @@
       "design": ".specs/features/web-ui-typescript/design.md",
       "tasks": ".specs/features/web-ui-typescript/tasks.md",
       "validation": null,
-      "notes": "Specify complete 2026-08-11: 16 requirement IDs (WUT-01..16), 33 EARS acceptance criteria, validate_spec 0 errors 0 warnings. Shape A (build step, emit to apps/web-ui/dist/static) chosen by the user after a Plan Challenge falsified the technical case against Shape C (JSDoc + checkJs) — PLAN.md retains the full cost table. Baselines frozen in CHARACTERIZATION.md at 6227b4ac: 700/56/31 tests across 22 files, render-golden.json sha256 27195c2e. Design and Tasks pending."
+      "notes": "Execute complete 2026-08-12: 14 phases, 40 tasks (T1-T40), 62 commits from origin/main @ 6227b4ac. 22 of 22 modules converted (the config-sections split at T23/T24 moved the denominator from 21 to 22), 0 .js left under src/static, served from dist/static (T5/T6). Config tab section schema coupled to @massa-ai/shared's MassaAiConfig (T24). Two mid-execution remediation waves: T37-T39 (registry type consolidation, write-gating scanner re-arm, restoring a dropped doc context member) and T40 (a dashboard.test.ts type regression that kept type-check red from T26 through T33, invisible for six phases because only 9 of 40 tasks ran it). Close-out (T34-T36): security-allowlist population measured 1 -> 23 tracked .ts files with zero hits across all four classes; stale no-build-step claims corrected in Dockerfile/ci.yml/index.ts/CLAUDE.md; CHANGELOG [Unreleased] entry added (CI merge gate requires it); STATE.md gained AD-021. render-golden.json sha256 unchanged (27195c2e...). Final gates: build 0, type-check 0 (forced), lint 0, web-ui 703/0. No independent massa-ai-verification-agent pass was run for this feature -- validation left null rather than pointing at a validation.md that does not exist. Push/PR = user decision, not taken unattended."
     }
   ],
   "active_feature": "web-ui-typescript"
