@@ -9,14 +9,14 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-10 of 14 in flight; **20 of 22** modules converted (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`; 2 remain — `start-app.js` and `app.js`. T38 (D7) landed; branch green.
+**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) is open — two handlers silently no-op until it lands.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
-**3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 38
+**3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 39
 Tasks**. The extra tasks versus `PLAN.md`'s 31 are `config-sections` becoming its
 own module (T23/T24) plus one-file-per-task granularity across the 21 conversions.
-T37 and T38 were added mid-execution as remediation (Execution Log D6 and D7); they
-sit in Phases 8 and 10 respectively, despite their numbers.
+T37, T38 and T39 were added mid-execution as remediation (Execution Log D6, D7, D9);
+they sit in Phases 8, 10 and 11 respectively, despite their numbers.
 
 ---
 
@@ -88,7 +88,7 @@ Phases run sequentially; tasks within a phase run in order.
 | 8 | Registry pair | T21 → T22 → T37 |
 | 9 | Config split and coupling | T23 → T24 → T25 |
 | 10 | Shell renderers | T26 → T27 → T38 |
-| 11 | Shell entry | T28 → T29 |
+| 11 | Shell entry | T28 → T29 → T39 |
 | 12 | Cross-package consumers | T30 → T31 |
 | 13 | Retire the transitional path | T32 → T33 |
 | 14 | Close-out | T34 → T35 → T36 |
@@ -812,6 +812,54 @@ Phases run sequentially; tasks within a phase run in order.
 **Gate**: full
 **Commit**: `refactor(web-ui): convert app barrel to TypeScript`
 
+#### T39: Restore the `doc` the ctx conversion dropped
+
+**Task ID**: TASK-039
+**What**: Put `doc` back on the shared context object T28 removed, and make the type **require** it so it cannot be dropped again silently.
+**Where**: `apps/web-ui/src/static/start-app.ts`, `apps/web-ui/src/static/wire-view-handlers.ts`
+**Depends on**: T29
+**Reuses**: the existing `ConfigDocument` and `LogsDoc` structural document types
+**Requirement**: WUT-07, WUT-08
+**Non-goals**: **do not revert T28's ctx consolidation** — one shared `ctx` replacing five ad hoc literals is an improvement and stays. Only the dropped member is the defect. No renderer changes, no behaviour change beyond restoring what was lost.
+**Tools**: MCP: NONE · Skill: NONE
+
+> **Two user-facing features are silently broken right now.** T28 replaced five
+> `{ api, root, state, render, doc }` literals with one `{ api, root, state, render }`,
+> dropping `doc`. Its stated reason was a *type* collision — a real `Document` against
+> `LogsDoc`'s structural shape via `Document.body.appendChild`'s generic signature — so
+> a type error was resolved by deleting a runtime value. Both consumers guard with
+> `&&`, so neither throws:
+>
+> - `config.ts:417` `handleConfigReveal` → `ctx.doc && ctx.doc.getElementById ? … : null`, then `if (!el) return`. **The Config tab's secret-reveal button does nothing.**
+> - `logs.ts:419` `handleLogsExport` → `doc && doc.createElement ? … : null`, then `if (a)`. **The Logs export never creates its download anchor.**
+>
+> Measured by calling `handleConfigReveal` with each ctx shape: `getElementById` calls
+> **1** with `doc`, **0** without.
+
+> **Why every gate stayed green, and what that demands of the fix.**
+> `WireViewHandlersCtx` (`wire-view-handlers.ts:104`) declares only
+> `root`/`state`/`api`/`render` — written during T27 from what `wireViewHandlers`
+> *destructures*, while the function **forwards `ctx` wholesale** to both handlers
+> above. `ConfigCtx.doc` and `LogsCtx.doc` are then both `doc?:`. So the declared
+> contract never mentioned the member, the downstream types made it optional, and
+> dropping it was invisible to the compiler. The suite missed it because
+> `admin-handlers.test.ts` calls `handleConfigReveal(ctx, …)` with **its own** ctx — a
+> method test, not a call-site test. One conversion wrote the type that made the
+> removal undetectable; the next conversion used it.
+
+**Done when**:
+- [ ] `doc` restored on start-app's shared `ctx`; T28's consolidation otherwise untouched
+- [ ] `WireViewHandlersCtx` declares `doc` as a **required** member — the durable guard, and what turns a future drop into a compile error instead of a silent no-op
+- [ ] Every other consumer of the shared ctx audited for `doc` reads (`handleIndexStatusEvent`, `startIndexPoll`, `runLogsLiveStream`, and everything `wireViewHandlers` forwards to) — report the enumerated list **and its size**, not "checked"
+- [ ] The `Document`-vs-structural-doc collision resolved by **widening the structural type or casting at the boundary**, never by dropping the value. State which and why
+- [ ] Measured proof the break is closed: `handleConfigReveal`, called with the ctx `startApp` actually builds, reaches `getElementById` — **1** call, not 0
+- [ ] **Discrimination sensor**: in scratch, remove `doc` from start-app's ctx again → `bun run --filter @massa-ai/web-ui build` red. Red observed and recorded, reverted by hand. If it stays green the required-member guard did not take
+- [ ] `render-golden.json` sha256 unchanged; `bun test apps/web-ui/src/__tests__/` → 700 pass, 0 fail
+
+**Tests**: unit
+**Gate**: full
+**Commit**: `fix(web-ui): restore the doc dropped from the shared app context`
+
 ### Phase 12: Cross-package consumers
 
 #### T30: Repoint the remaining tools-api module requires
@@ -990,7 +1038,7 @@ P7:  T19 ──→ T20
 P8:  T21 ──→ T22 ──→ T37
 P9:  T23 ──→ T24 ──→ T25
 P10: T26 ──→ T27 ──→ T38
-P11: T28 ──→ T29
+P11: T28 ──→ T29 ──→ T39
 P12: T30 ──→ T31
 P13: T32 ──→ T33
 P14: T34 ──→ T35 ──→ T36
@@ -1045,6 +1093,7 @@ Execution is strictly sequential — no intra-phase parallelism.
 | T36 | 3 `.specs` files, the workflow's own close-out contract | ⚠️ Cohesive |
 | T37 | 3 modules — one type definition and its two consumers | ⚠️ Cohesive, **deliberate**: a type moved in one commit and imported in another leaves the tree uncompilable between them |
 | T38 | 1 test file | ✅ Granular |
+| T39 | 2 modules — the ctx producer and the type that must require it | ⚠️ Cohesive, **deliberate**: restoring the value without tightening the type leaves the same drop possible next time |
 
 No ❌. Six ⚠️ rows, each with a stated reason why splitting would be worse.
 
@@ -1092,8 +1141,9 @@ No ❌. Six ⚠️ rows, each with a stated reason why splitting would be worse.
 | T36 | T35 | T35 → T36 | ✅ Match |
 | T37 | T22 | T22 → T37 | ✅ Match |
 | T38 | T27 | T27 → T38 | ✅ Match |
+| T39 | T29 | T29 → T39 | ✅ Match |
 
-All 38 match. No dependency points to a later phase — every cross-phase edge (T3→T4, T3→T7, T4→T8, T4→T9, T9→T10, T12→T13, T15→T16, T18→T19, T20→T21, T22→T23, T25→T26, T27→T28, T29→T30, T31→T32, T33→T34) points backward.
+All 39 match. No dependency points to a later phase — every cross-phase edge (T3→T4, T3→T7, T4→T8, T4→T9, T9→T10, T12→T13, T15→T16, T18→T19, T20→T21, T22→T23, T25→T26, T27→T28, T29→T30, T31→T32, T33→T34) points backward.
 
 ---
 
@@ -1102,7 +1152,7 @@ All 38 match. No dependency points to a later phase — every cross-phase edge (
 | Task | Code Layer Created/Modified | Matrix Requires | Task Says | Status |
 | --- | --- | --- | --- | --- |
 | T1, T2, T3, T7, T32, T33 | Build config | none | none | ✅ OK |
-| T4, T8-T22, T25-T29, T37 | Browser module | unit | unit | ✅ OK |
+| T4, T8-T22, T25-T29, T37, T39 | Browser module | unit | unit | ✅ OK |
 | T5 | Serving route | integration | integration | ✅ OK |
 | T6 | Guard / sensor test | unit | unit | ✅ OK |
 | T23, T24 | Browser module + cross-package text scanner | unit (highest of the two) | unit | ✅ OK |
@@ -1772,6 +1822,64 @@ not a coverage gap, and the distinction is the reason it stayed invisible: the s
 were green the whole time, just never at the moment a task claimed done. Measured now:
 **15 pass / 0 fail** across the two. T29's bullet is rewritten to run them and the curl
 is retired into the same deferred-to-user bucket as T7's browser checks.
+
+### Batch 11 — Phase 11 (shell entry) — T28/T29 complete, T39 added
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T28 | `4d0a1fd1` | `start-app.js` → `.ts` (323 → 461 source, 356 emitted) + `AppState`, `AppRootElement`, one shared `ctx`. **Introduced D9** |
+| T29 | `df4918fb` | `app.js` → `.ts` (220 source unchanged, 116 emitted). The barrel; one cast at the `globalThis.MASSA_AI_UI` assignment |
+| T39 | *pending* | D9 remediation, dispatched after this entry |
+
+**Every module is now TypeScript: 0 `.js` remain under `src/static`, 22 of 22
+converted.** Orchestrator-verified: build exit 0; web-ui **700 pass / 0 fail**;
+`dist/static` **22 `.js` / 0 `.ts`** from a clean rebuild; the two serving suites
+**15 pass / 0 fail**; `render-golden.json` still `27195c2e…` with **0 commits touching
+it across the branch**; `public-surface.test.ts` also **0 commits across the branch** —
+the frozen export lists were never edited, the property T29 most needed.
+
+T29's discrimination sensor fired correctly: deleting `markdownToHtml` from the named
+re-export block turned `public-surface.test.ts` red on three separate assertions — the
+frozen-set check, the "undefined re-export hole" check, and the shared-identity check —
+then green again on restore. The barrel is genuinely guarded.
+
+**D9 — T28 fixed a type error by deleting a runtime value, and silently broke two
+user-facing features.** The task was a conversion; the worker additionally consolidated
+five ad hoc `{ api, root, state, render, doc }` literals into one shared
+`{ api, root, state, render }` and **dropped `doc`**, reporting that "nothing it's
+passed to reads it". Two things read it:
+
+- `views/config.ts:417` — `handleConfigReveal`: `ctx.doc && ctx.doc.getElementById ? … : null`, then `if (!el) return`. **The Config tab's secret-reveal button does nothing.**
+- `views/logs.ts:419` — `handleLogsExport`: `doc && doc.createElement ? … : null`, then `if (a)`. **The Logs export never builds its download anchor.**
+
+Both are reached from `wire-view-handlers.ts:295` and `:308`, which receive
+`start-app.ts:379`'s ctx verbatim. Measured by invoking `handleConfigReveal` with each
+ctx shape: `getElementById` calls **1** with `doc`, **0** without. Not a theoretical
+gap — the handler does not reach the document.
+
+*The stated reason was a type collision*: a real `Document` against `LogsDoc`'s
+structural shape, via `Document.body.appendChild`'s generic signature. The repair
+chosen was to delete the value rather than reconcile the type.
+
+*Why nothing caught it, which is the part worth keeping.* `WireViewHandlersCtx`
+(`wire-view-handlers.ts:104`) declares exactly `root`/`state`/`api`/`render` — authored
+during **T27** from what `wireViewHandlers` *destructures in its own body*, while the
+function forwards `ctx` wholesale to handlers that read more than that. `ConfigCtx.doc`
+and `LogsCtx.doc` are both `doc?:`, inherited from the `&&` guards the original
+JavaScript used. So the declared parameter type never mentioned the member and the
+downstream types made it optional: the compiler had nothing to object to. The suite
+missed it because `admin-handlers.test.ts` calls `handleConfigReveal(ctx, …)` with
+**its own** ctx — a method test, not a call-site test. **One conversion wrote the type
+that made the removal undetectable; the next conversion used it.** And the `&&` guards,
+which exist to make the handlers defensive, are exactly what turned a missing member
+into a silent no-op instead of a crash.
+
+*Recorded consequence.* T39 restores `doc` and makes it **required** on
+`WireViewHandlersCtx`, so the guard against a repeat is a compile error rather than a
+test. Restoring the value without tightening the type would leave the identical drop
+available to the next edit, which is why both are one task. T28's consolidation itself
+is kept — it is a real simplification, and reverting it to fix a one-member omission
+would discard the improvement along with the defect.
 
 ---
 
