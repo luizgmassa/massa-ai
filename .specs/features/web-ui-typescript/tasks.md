@@ -925,10 +925,11 @@ Phases run sequentially; tasks within a phase run in order.
 **Non-goals**: the `index.html` + `styles.css` copy line is permanent — do not remove it.
 **Tools**: MCP: NONE · Skill: NONE
 **Done when**:
-- [ ] The transitional `.js` copy line deleted, a one-line diff
-- [ ] **`git ls-files 'apps/web-ui/src/static/**/*.js'` returns zero rows** — the terminal-state proof
-- [ ] `bun run --filter @massa-ai/web-ui build` still produces a complete `dist/static/`
-- [ ] Module-graph guard green; `curl -sf localhost:3333/ui/app.js` → 200
+- [ ] The transitional `.js` copy line deleted, a one-line diff. It is the `find src/static -name '*.js' -exec …` clause; the `cp src/static/index.html src/static/styles.css dist/static/` clause is permanent and stays
+- [ ] **`git ls-files 'apps/web-ui/src/static/*.js'` returns zero rows** — the terminal-state proof. Note the pathspec: git's `*` **crosses `/`**, so the single-star form is the recursive one. Measured against the `.ts` population, `src/static/*.ts` returns **22** while `src/static/**/*.ts` returns **18** — the `**/` form requires an intermediate directory and silently misses the four top-level modules. This bullet originally specified `**/*.js`, which would have reported zero even with a top-level `.js` present
+- [ ] **Positive control, mandatory**: the same pathspec at `6227b4ac` returns **21**. Zero is the correct answer but is indistinguishable from a pathspec that never matched anything — quote both numbers or the proof is not one
+- [ ] `bun run --filter @massa-ai/web-ui build` still produces a complete `dist/static/` — **22 `.js`, 0 `.ts`**
+- [ ] Module-graph guard green, and **`bun test apps/tools-api/src/__tests__/web-ui-serve.test.ts apps/tools-api/src/__tests__/web-ui-key-http.test.ts` → 15 pass, 0 fail**. This replaces the original `curl -sf localhost:3333/ui/app.js` bullet for the reason recorded under D8: `web-ui-serve.test.ts:54` already performs that exact request as a real HTTP fetch against a listening server, automated and permanent
 
 **Tests**: none
 **Gate**: build
@@ -945,8 +946,9 @@ Phases run sequentially; tasks within a phase run in order.
 **Non-goals**: `verbatimModuleSyntax` from T2 stays.
 **Tools**: MCP: NONE · Skill: NONE
 **Done when**:
-- [ ] Neither `allowJs` nor `checkJs` present
-- [ ] `bun run type-check` exits 0 and covers all 21 modules under `strict`
+- [ ] Neither `allowJs` nor `checkJs` present. Both live in `apps/web-ui/tsconfig.json` only (lines 9-10); `tsconfig.build.json` has neither. `verbatimModuleSyntax` appears in **both** files and stays in both
+- [ ] `bun run type-check` exits 0 and covers all **22** modules under `strict` — the count was 21 until T23 created `views/config-sections`
+- [ ] **Positive control for the removal**: `git ls-files 'apps/web-ui/src/*.js'` returns **0**, so nothing under `apps/web-ui/src` still depends on `allowJs`. Quote the number — a green type-check after removing a flag that was already inert proves nothing about the flag
 
 **Tests**: none
 **Gate**: build
