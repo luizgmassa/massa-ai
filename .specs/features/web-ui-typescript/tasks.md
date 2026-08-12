@@ -1085,9 +1085,10 @@ served UI are fixed" for the evidence — so these phases deliberately retire th
 branch's behaviour-preserving property, in the enumerated way T45 records. The
 orchestrator recommended a separate branch; the user chose to fold them in.
 
-**3 Phases = 5 Tasks.** One defect per task, split across phases to hold the
-3-task cap: Phase 15 is the override count (server then UI), Phase 16 the Config
-and Logs defects, Phase 17 the close-out that cannot precede them.
+**3 Phases = 6 Tasks.** One defect per task, split across phases to hold the
+3-task cap: Phase 15 is the override count (server, then UI, then the display
+merge T42 found dropping the new field), Phase 16 the Config and Logs defects,
+Phase 17 the close-out that cannot precede them.
 
 #### T41: Normalize `tiers` and publish the override breakdown
 
@@ -1145,6 +1146,46 @@ and Logs defects, Phase 17 the close-out that cannot precede them.
 **Tests**: `apps/web-ui/src/__tests__/registry-editor.test.ts`, `apps/web-ui/src/__tests__/admin-handlers.test.ts`, `apps/web-ui/src/__tests__/render-golden.test.ts`
 **Gate**: `bun test apps/web-ui/src/__tests__/` green, then `bun run type-check`
 **Commit**: `fix(web-ui): mark non-profile overlay overrides in the Model Catalog`
+
+#### T46: Carry the breakdown through the display merge
+
+**Task ID**: TASK-046
+**What**: Stop `mergeRegistryForDisplay` dropping the server-computed breakdown, and make the next dropped field fail loudly instead of degrading silently.
+**Where**: `apps/web-ui/src/static/views/registry-state.ts`
+**Depends on**: T42
+**Reuses**: the existing passthrough list in the same return object
+**Requirement**: WUT-17
+**Non-goals**: do not change the merge's profile/tier/hostDefaults semantics. Do not recompute the breakdown in browser code — carry the server's value.
+**Tools**: MCP: NONE · Skill: NONE
+
+> Found by T42's builder and independently confirmed. `mergeRegistryForDisplay`
+> returns `registry`, `source`, `overlayOverrideCount`, `agents`, `agentsError`
+> — and not `overlayOverrideBreakdown`. Its early return
+> (`if (!overlay || !overlay.profiles) return serverData`) would have preserved
+> the field, but `initRegistryOverlay` seeds `profiles: seed.profiles || {}`,
+> always truthy, so once the overlay is initialized the rebuild branch is taken
+> on every render of the Model Catalog and Profiles tabs. Effect: the count line
+> names its categories on first paint and silently reverts to the unnamed
+> sentence for the rest of the session. The badges are unaffected — they key on
+> `source`, which the branch does carry.
+>
+> The docblock immediately above that return already explains this exact hazard
+> for `overlayOverrideCount` and `agents`/`agentsError`. A prose warning did not
+> stop the next field from being dropped, which is why this task adds a
+> mechanical guard rather than a fourth sentence.
+
+**Done when**:
+- [ ] The rebuild branch carries `overlayOverrideBreakdown` through
+- [ ] A test fails against the pre-fix merge: a `serverData` carrying a non-zero breakdown, merged with an initialized overlay, still has the breakdown. Observe that red
+- [ ] A **class-level** guard, not an instance one: assert that every server-computed passthrough key survives the merge, driven by an enumerated list, so the next field added to the payload and forgotten here fails rather than degrading. Name the population the guard covers
+- [ ] The docblock's list of must-survive fields updated to match what the code now carries
+- [ ] `render-golden.json` unchanged — 86 entries, 0 byte-changed. This task touches state plumbing, not a renderer
+
+**Tests**: `apps/web-ui/src/__tests__/admin-handlers.test.ts`
+**Gate**: `bun run --filter @massa-ai/web-ui build` then `bun test apps/web-ui/src/__tests__/` green, then `bun run type-check`
+**Commit**: `fix(web-ui): carry the overlay override breakdown through the display merge`
+
+---
 
 ### Phase 16: Config defaults and the Logs Live preference
 
