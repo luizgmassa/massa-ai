@@ -288,13 +288,13 @@ AC2), which are manual observations recorded as such.
 | WUT-14 | P2: consumers repointed | Execute | Verified |
 | WUT-15 | P2: consumers repointed | Execute | Verified |
 | WUT-16 | P3: stale claims | Execute | Verified |
-| WUT-17 | P1: reported defects | Execute | Pending |
-| WUT-18 | P1: reported defects | Execute | Pending |
-| WUT-19 | P1: reported defects | Execute | Pending |
+| WUT-17 | P1: reported defects | Execute | Verified |
+| WUT-18 | P1: reported defects | Execute | Verified |
+| WUT-19 | P1: reported defects | Execute | Verified |
 
 **ID format:** `WUT-NN`. **Status values:** Pending → In Design → In Tasks → Implementing → Verified.
 
-**Coverage:** 19 total, 19 mapped to tasks, 0 unmapped ✅. Every ID is cited by at least one task in `tasks.md` (verified: `grep -oE 'WUT-[0-9]+' tasks.md | sort -u` returns WUT-01..WUT-19 with no gaps and no phantom ids). WUT-01..WUT-16 were re-measured against the tree by an independent verification pass — see `validation.md`. WUT-17..WUT-19 are the Phase 15 defect repair: WUT-17 is the overlay override count and its markers (P1 criteria 1-4), WUT-18 the Config tab's defaults and the lossy save (criteria 5-6), WUT-19 the Logs Live preference (criteria 7-8); criterion 9 binds all three.
+**Coverage:** 19 total, 19 mapped to tasks, 0 unmapped ✅. Every ID is cited by at least one task in `tasks.md` (verified: `grep -oE 'WUT-[0-9]+' tasks.md | sort -u` returns WUT-01..WUT-19 with no gaps and no phantom ids). WUT-01..WUT-16 were re-measured against the tree by an independent verification pass — see `validation.md`. WUT-17..WUT-19 are the Phase 15-16 defect repair: WUT-17 is the overlay override count and its markers (P1 criteria 1-4), WUT-18 the Config tab's defaults and the lossy save (criteria 5-6), WUT-19 the Logs Live preference (criteria 7-8); criterion 9 binds all three. All three moved to **Verified** at Phase 17 close-out (T45): WUT-17 by `overlayOverrideCount` measured `1 → 0` live plus the golden's new `renderModelRegistry/nonProfileOverlay` entry (AC1-3) and the compile-time completeness guard T46 added over the server-computed breakdown (AC4); WUT-18 by the Config tab's unresolved-field count measured `27/104 → 4/104` against the live server plus the golden's 2 changed `renderConfig/*` entries, and `data.config`/`data.restartNeededSections` measured byte-identical before/after (AC5-6); WUT-19 by the `renderLogs/*` golden family measured unchanged (7 entries, 0 byte-changed, AC8) and `start-app-dispatch.test.ts`'s pinned pre-fix-red case for a fresh start rendering the stored-`true` preference checked (AC7). Criterion 9 (golden changes limited to keys named in advance) holds exactly: 1 added key named by T42, 2 changed keys named by T43, 0 collateral changes.
 
 ---
 

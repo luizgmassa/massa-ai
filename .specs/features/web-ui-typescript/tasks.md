@@ -9,7 +9,22 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: **In Progress — Phase 15 (5 Tasks) open.** Phases 1-14 / 40 Tasks are executed and independently verified (see `## Execution Log` and `validation.md`); Phase 15 repairs three defects the operator found by running the served bundle, all of which reproduce on `origin/main`. Phase 15 deliberately ends this branch's behaviour-preserving property in the scoped way T45 records. Pre-Phase-15 state: **22 of 22** modules converted, 0 `.js` left under `src/static`; the denominator was 21 until T23 created `views/config-sections`. Final gates: `build` 0, `type-check` 0 (forced, non-cached), `lint` 0, web-ui 703/0, tools-api 57/0, serving 15/0, installer 31/0. Ten deviations recorded, D1-D10.
+**Status**: **Complete — Phases 1-17 / 46 Tasks executed** (40 original + 6 in Phases
+15-17: T41, T42, T46, T43, T44, T45). Phases 1-14 (T1-T40) were
+independently verified (see `## Execution Log` and `validation.md`'s original claims 1,
+3-7); Phases 15-16 (T41, T42, T46, T43, T44) repair three defects the operator found by
+running the served bundle — all three reproduced on `origin/main` — and Phase 17 (T45)
+records the branch's
+behaviour-preserving property ending in the scoped way `validation.md` claim 2 now
+documents: 3 of 86 golden entries changed on purpose, named in advance by the task that
+changed them. Terminal state: **22 of 22** modules converted, 0 `.js` left under
+`src/static`; the denominator was 21 until T23 created `views/config-sections`. Final
+gates at `HEAD` (`99bbb1cc`, 72 commits ahead of `origin/main` @ `6227b4ac`, 0 behind):
+`build` 0, `type-check` 0 (forced, non-cached), `lint` 0, web-ui **721/0** (15 files),
+`config.test.ts`+`config-section-coverage.test.ts` **18/0**, `model-registry.test.ts`
+**25/0**, `web-ui-serve.test.ts`+`web-ui-key-http.test.ts` **15/0**,
+`web-ui-readonly.test.ts`+`web-ui-render.test.ts`+`web-ui-views.test.ts` **33/0**,
+`scripts/__tests__/model-profiles.test.ts` **77/0**. Fifteen deviations recorded, D1-D15.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 40
@@ -2598,6 +2613,86 @@ cannot pass until this commit lands — the script's first check is
 false while these edits are staged-but-uncommitted. Run and its full output
 reported after this commit, in the builder's final response, not fabricated
 here ahead of the measurement.
+
+### Batch 15 — Phases 15-17 (Model Catalog override truth, Config defaults, Logs Live, close-out) — Complete
+
+Added after close-out, by explicit user decision, to repair three defects the operator
+found by operating the served bundle rather than by any gate. All three reproduce
+byte-for-byte on `origin/main` — see `spec.md` § "P1: The three defects found by
+operating the served UI are fixed". This phase group deliberately retires the branch's
+behaviour-preserving property in the scoped way recorded below and in `validation.md`
+claim 2.
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T41 | `fd20060b` | `normalizeOverlay` gains a `tiers` branch; `countOverlayEntries` returns a per-category breakdown carried by all 5 result-construction sites and both GET/PUT responses |
+| T42 | `21ba72d1` | `hostDefaults`/`workflowTiers`/`agentTiers` overlay overrides now carry `overlay-badge`; count line names categories from the server breakdown; golden gains `renderModelRegistry/nonProfileOverlay` |
+| T46 | `44901beb` | `mergeRegistryForDisplay`'s rebuild branch carries `overlayOverrideBreakdown` through; class-level completeness guard added (D12) |
+| T43 | `531898c5` | GET `/api/v1/config` adds masked `defaults`; `renderConfig` displays the default and marks it inherited when unset; a Save no longer sends `false` for an unrendered boolean; golden `renderConfig/read` + `renderConfig/write` regenerated |
+| T44 | `99bbb1cc` | `start-app.ts`'s `logsLive` seed reads the stored preference; the dead `=== undefined` branch removed; `renderLogs/*` golden byte-unchanged |
+| T45 | this commit | CHANGELOG `[Unreleased]` `### Fixed` (3 entries), `validation.md` claim 2 amended, this Execution Log entry, `tasks.md` Status line, `spec.md` WUT-17..19 traceability |
+
+Orchestrator-measured at `HEAD` (`99bbb1cc`, 72 commits ahead of `origin/main` @
+`6227b4ac`, 0 behind — confirmed after a fetch): 64 files changed, +7127/−1031.
+`bun run build --force` exit 0 (6/6, 0 cached); `bun run type-check --force` exit 0
+(6/6, 0 cached); `bun run lint` exit 0; `bun test apps/web-ui/src/__tests__/` **721
+pass / 0 fail** (15 files); `config.test.ts`+`config-section-coverage.test.ts` **18/0**;
+`model-registry.test.ts` **25/0**; `web-ui-serve.test.ts`+`web-ui-key-http.test.ts`
+**15/0**; `web-ui-readonly.test.ts`+`web-ui-render.test.ts`+`web-ui-views.test.ts`
+**33/0**; `scripts/__tests__/model-profiles.test.ts` **77/0**. `render-golden.json`:
+**86** entries (was 85 at Phase 14 close-out), **83 of 85** pre-existing entries
+byte-identical, **1 added** (`renderModelRegistry/nonProfileOverlay`), **2 changed**
+(`renderConfig/read`, `renderConfig/write`), **0 removed** — exactly the keys T42 and
+T43 named in advance. Live before/after, same server, same on-disk overlay and config:
+`overlayOverrideCount` **1 → 0** and `source.overlay` normalizes to `null` (overlay file
+unchanged on disk); Config tab unresolved fields **27 of 104 → 4 of 104** (resolved
+against `config` then `defaults`) — the remaining 4 are genuinely default-less
+(`embedding.apiKey`, `compression.prompt`, `logging.file`,
+`security.allowedExtensions`; `security.apiKey` now resolves because it is persisted
+and masked, one better than spec.md's Independent Test's predicted 5); `data.config`
+and `data.restartNeededSections` byte-identical before and after T43, so the
+additive-field non-goal held; the Synapse tab's `metacognition.enabled` now renders
+checked and `scoring.attention.enabled` correctly renders unchecked (its own default is
+`false`).
+
+**D11 — `tiers` was the only overlay key with no normalization branch, and the only
+`override` marker lived on profile column headers.** A `tiers` array byte-identical to
+the builtin survived normalization and was charged 1 by `countOverlayEntries`; any
+non-profile override was counted and shown nowhere. Fixed by T41 (server) and T42 (UI).
+Reproduces on `origin/main`.
+
+**D12 — `mergeRegistryForDisplay` dropped the new `overlayOverrideBreakdown` from its
+rebuild branch, unavoidable because `initRegistryOverlay` seeds `profiles: seed.profiles
+|| {}` (always truthy).** Effect: the count line named its categories on first paint and
+silently reverted to the unnamed sentence for the rest of the session. Found by T42's
+builder, not by a gate — the docblock above the same return had already warned in prose
+about this exact hazard for three earlier fields, and did not prevent the fourth. Fixed
+by T46 with a compile-time completeness guard; orchestrator-verified by mutation: adding
+a field to `RegistryServerData` produces `error TS2322` at `registry-state.ts:76`, exit
+2.
+
+**D13 — `GET /api/v1/config` returns only the persisted file, and an unchecked checkbox
+coerces to `false` rather than `undefined` while `savePartialConfig` replaces a section
+wholesale.** Unset fields rendered blank; one Save of the Synapse tab would have written
+`enabled: false` over five true-by-default booleans (see the note below — the number
+handed down was wrong). Fixed by T43. Reproduces on `origin/main`.
+
+**D14 — `start-app` seeded `logsLive: false` and read the stored preference only when it
+was `undefined`, which it never was.** `writeLogsLivePreference` wrote a key nothing
+ever read. Fixed by T44. Reproduces on `origin/main` (`start-app.js:68`, `:197`).
+
+**D15 (process, not code) — the orchestrator's first Gate wording for T43 co-ran the
+web-ui and tools-api suites in one `bun test` process**, producing 3 false failures in
+`config.test.ts`'s "over a real socket" describe (`res.status` arriving `undefined`
+because `app-renderers.test.ts` assigns `globalThis.fetch`, leaking across files in a
+shared process). Measured: web-ui alone 718/0, tools-api pair alone 18/0, co-run 733/3,
+and 718 + 18 = 736 = the co-run total. CI never sees it because `apps/tools-api`'s
+`test` script forks per file. Corrected in commit `6769cc99`; no code was at fault.
+
+**Correction to a handed-down figure.** T43's packet stated four Synapse booleans
+default `true`; the real count is six of seven — `buffer.enabled` was missed and
+`scoring.attention.enabled` is the single `false` default. The T43 worker measured
+rather than accepted the number, and its test asserts the correct invariant.
 
 ---
 

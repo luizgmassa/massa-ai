@@ -31,14 +31,44 @@ have since been fixed (below). No code defect survived verification.
 `.ts`, 1 `index.html`, 1 `styles.css`** (plus 22 `.js.map`, not claimed and not
 contradicting).
 
-### 2 — Behaviour unchanged
+### 2 — Behaviour unchanged, except the golden keys Phase 15 changed on purpose
 
-`render-golden.json` hashes to
-`27195c2e9975ae28481d7fd6d8d778232f3df07e0556253a2dfbc05ffb77af30`, an exact match.
-Independently of the hash, its modification count on this branch is **0** — the file's
-only ever-touching commit `b21c818d` is an ancestor of `6227b4ac`, confirmed with
-`git merge-base --is-ancestor`. Hash-match and never-modified are different claims;
-both hold.
+**This claim held at the time it was made and has since become false, in the scoped way
+Phase 15 (T41-T44) intended.** At this verification pass's own subject commit
+(`630d0260`), `render-golden.json` hashed to
+`27195c2e9975ae28481d7fd6d8d778232f3df07e0556253a2dfbc05ffb77af30`, an exact match, and
+its modification count on the branch to that point was **0** — the file's only
+ever-touching commit `b21c818d` was an ancestor of `6227b4ac`, confirmed with
+`git merge-base --is-ancestor`. Hash-match and never-modified were different claims, and
+both held, for Phases 1-14.
+
+Phases 15-16 repair three defects the operator found by operating the served bundle, all
+three reproducing byte-for-byte on `origin/main` (see `spec.md` § "P1: The three defects
+found by operating the served UI are fixed"), and the fixes are behaviour changes by
+design — that is what a defect repair is. As of `HEAD` (`99bbb1cc`), against
+`origin/main` @ `6227b4ac`:
+
+- **86** golden entries, up from **85**. **83 of the 85** pre-existing entries are
+  byte-identical to their `origin/main` value; **2 changed** and **1 was added**; **0**
+  were removed.
+- **Added** — `renderModelRegistry/nonProfileOverlay` (T42: a non-profile overlay
+  override is now marked with an `overlay-badge` where it is edited, the exact scenario
+  the reported defect had nothing on screen for).
+- **Changed** — `renderConfig/read`, `renderConfig/write` (T43: the Config tab now
+  displays the server-supplied default for an unresolved field and marks it inherited,
+  and a saved section no longer coerces an un-rendered default to `false`).
+- **Unchanged within their families** — `renderModelRegistry/*` is **13 → 14** entries
+  with **0** of the original 13 byte-changed (only the new entry was added);
+  `renderConfig/*` is unchanged in count at **2**, both changed as above;
+  `renderLogs/*` is unchanged at **7** entries, **0** byte-changed — T44 (the Logs Live
+  preference fix) changes startup state, not the renderer, so its golden family is
+  untouched, matching spec.md AC8.
+
+Every changed or added key belongs to the task that named it in advance (T42 named
+`nonProfileOverlay`; T43 named the 2 `renderConfig/*` keys), so the change is the
+intended one and not collateral — spec.md AC9. The branch's behaviour-preserving
+property, true through Phase 14, is retired for exactly these 3 of 86 keys by explicit
+user decision (Phase 15's own framing note), not by accident.
 
 ### 3 — The coupling is real, and the caveat is worth more than the confirmation
 

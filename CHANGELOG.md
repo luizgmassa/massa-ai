@@ -24,6 +24,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output changed — `render-golden.json` and `public-surface.test.ts`'s frozen export
   lists are unmodified.
 
+### Fixed
+
+- **The Model Catalog reported a phantom override with no marker anywhere on screen.**
+  `normalizeOverlay` had a normalization branch for every overlay key except `tiers`,
+  so a saved `tiers` array byte-identical to the builtin still charged `overlayOverrideCount`
+  1, and the only `override` badge lived on profile column headers — nothing rendered for
+  a `hostDefaults`/`workflowTiers`/`agentTiers`/`tiers` override. `tiers` is now normalized
+  by the same equality rule as the other keys, the server returns a per-category breakdown
+  that sums to the count, the Model Catalog marks every counted override where it is edited
+  and names the categories in the count line, and the breakdown now survives the display
+  merge that previously dropped it silently after first paint. Reproduces on `origin/main`.
+- **The Config tab rendered unset fields blank instead of showing the default in force, and
+  saving a partially-populated form could silently persist `false` over a `true` default.**
+  `GET /api/v1/config` returns only the persisted file, so an unresolved field showed
+  nothing rather than the default that actually governs the setting; on top of that, an
+  unchecked checkbox coerces to `false` rather than `undefined`, and `savePartialConfig`
+  replaces most sections wholesale, so one Save of a form with un-rendered defaults could
+  overwrite booleans that default `true`. The Config tab now receives and displays the
+  server's defaults, marks inherited fields, and a saved section no longer clobbers a field
+  that was never shown as anything but its default. Reproduces on `origin/main`.
+- **The Logs tab's Live toggle never remembered its stored preference across a reload.**
+  `start-app` seeded `logsLive: false` and only consulted the stored preference when the
+  state was `undefined`, which it never was, so the preference `writeLogsLivePreference`
+  wrote was never read back. The seed now reads the stored preference; an in-page toggle
+  still outranks it. Reproduces on `origin/main`.
+
 ## [1.51.0] - 2026-08-11
 
 ### Fixed
