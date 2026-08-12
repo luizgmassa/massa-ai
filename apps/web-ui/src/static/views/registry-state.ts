@@ -15,6 +15,7 @@
 
 import { showBanner } from "../lib/banner.js";
 import { REGISTRY_HOSTS } from "./registry.js";
+import type { RegistryCell, RegistryProfile, RegistrySchema, RegistrySource, RegistryFormState } from "./registry.js";
 
 // F2 fold: registryLoaded guard prevents re-init on every render. beforeunload
 // guard when dirty (added in startApp).
@@ -28,20 +29,7 @@ import { REGISTRY_HOSTS } from "./registry.js";
 // delta, and mergeRegistryForDisplay (below) is what makes add/duplicate/
 // delete/edit visible before save without requiring a full-registry seed.
 
-/** {model, effort} cell, shared by the overlay delta and the server's own
- *  registry — optional properties ONLY (`model?: string | null`, never
- *  `model: string | undefined`): ABSENT means inherit, PRESENT (even `null`)
- *  is an explicit override/tombstone, and a `| undefined` union would invite
- *  writing the key with value `undefined`, which the merge misreads as an
- *  override rather than "not present". */
-interface RegistryCell { model?: string | null; effort?: string | null }
-
 type RegistryHostsMap = Record<string, Record<string, RegistryCell>>;
-
-interface RegistryProfile {
-  description?: string;
-  hosts?: RegistryHostsMap;
-}
 
 /** `_delete: true` tombstones a builtin profile or removes an operator-added
  *  one; absent means "not deleted" (never written as `_delete: false`). */
@@ -56,16 +44,6 @@ interface RegistryOverlay {
   tiers?: string[];
 }
 
-interface RegistrySchema {
-  profiles?: Record<string, RegistryProfile>;
-  hostDefaults?: Record<string, string>;
-  workflowTiers?: Record<string, string>;
-  agentTiers?: Record<string, Record<string, string>>;
-  tiers?: string[];
-}
-
-interface RegistrySource { overlay?: RegistryOverlay | null; tombstoned?: string[] }
-
 interface RegistryServerData {
   registry?: RegistrySchema;
   source?: RegistrySource;
@@ -73,8 +51,6 @@ interface RegistryServerData {
   agents?: unknown[];
   agentsError?: string | null;
 }
-
-interface RegistryFormState { kind: string; error?: string | null }
 
 interface RegistryState {
   registryLoaded?: boolean;
@@ -219,10 +195,13 @@ export function handleRegistryCellEdit(ctx: RegistryStateCtx, profile: string, h
   // `undefined` (APCR-11.6) - stamping the key here would overwrite a builtin profile's real
   // description with its own name on the very first cell edit.
   if (!ctx.state.registryOverlay.profiles[profile]) ctx.state.registryOverlay.profiles[profile] = { hosts: {} };
-  if (!ctx.state.registryOverlay.profiles[profile].hosts) ctx.state.registryOverlay.profiles[profile].hosts = {};
-  if (!ctx.state.registryOverlay.profiles[profile].hosts![host]) ctx.state.registryOverlay.profiles[profile].hosts![host] = {};
-  if (!ctx.state.registryOverlay.profiles[profile].hosts![host][tier]) ctx.state.registryOverlay.profiles[profile].hosts![host][tier] = { model: null, effort: null };
-  ctx.state.registryOverlay.profiles[profile].hosts![host][tier][field] = value || null;
+  const overlayProfile = ctx.state.registryOverlay.profiles[profile];
+  if (!overlayProfile.hosts) overlayProfile.hosts = {};
+  const hosts = overlayProfile.hosts;
+  if (!hosts[host]) hosts[host] = {};
+  const hostMap = hosts[host];
+  if (!hostMap[tier]) hostMap[tier] = { model: null, effort: null };
+  hostMap[tier][field] = value || null;
   ctx.state.registryDirty = true;
 }
 
@@ -242,15 +221,17 @@ export function handleRegistryHostDefaultEdit(ctx: RegistryStateCtx, host: strin
 export function handleRegistryAgentTierEdit(ctx: RegistryStateCtx, agent: string, host: string, value: string): void {
   if (!ctx.state.registryOverlay) ctx.state.registryOverlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: {}, tiers: ["light", "standard", "deep"] };
   if (!ctx.state.registryOverlay.agentTiers) ctx.state.registryOverlay.agentTiers = {};
+  const agentTiers = ctx.state.registryOverlay.agentTiers;
   if (value === "") {
-    const agentEntry = ctx.state.registryOverlay.agentTiers[agent];
+    const agentEntry = agentTiers[agent];
     if (agentEntry) {
       delete agentEntry[host];
-      if (Object.keys(agentEntry).length === 0) delete ctx.state.registryOverlay.agentTiers[agent];
+      if (Object.keys(agentEntry).length === 0) delete agentTiers[agent];
     }
   } else {
-    if (!ctx.state.registryOverlay.agentTiers[agent]) ctx.state.registryOverlay.agentTiers[agent] = {};
-    ctx.state.registryOverlay.agentTiers[agent]![host] = value;
+    if (!agentTiers[agent]) agentTiers[agent] = {};
+    const agentEntry = agentTiers[agent];
+    agentEntry[host] = value;
   }
   ctx.state.registryDirty = true;
 }

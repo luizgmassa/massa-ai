@@ -7,6 +7,7 @@ import { escapeHtml } from "../lib/html.js";
 import { isWriteModeEnabled } from "../lib/api-client.js";
 import { showBanner } from "../lib/banner.js";
 import { renderModelRegistry } from "./registry.js";
+import type { RegistryPayload } from "./registry.js";
 
 interface HostProfileState {
   host?: string;
@@ -122,7 +123,7 @@ interface ProfilesViewOpts {
 
 export function renderProfilesView(
   profilesData: ProfilesResponse | null | undefined,
-  registryData: unknown,
+  registryData: RegistryPayload | null | undefined,
   opts?: ProfilesViewOpts | null,
 ): string {
   opts = opts || {};

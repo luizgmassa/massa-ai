@@ -98,7 +98,7 @@ const WORKFLOW_STEMS = [
 // form's markup under its trigger button row; wireViewHandlers reads the
 // rendered field values on submit and dispatches to the same-named handler.
 
-interface RegistryFormState {
+export interface RegistryFormState {
   kind?: string;
   error?: string | null;
 }
@@ -192,25 +192,31 @@ function renderAddProfileForm(formState: RegistryFormState | null | undefined): 
   );
 }
 
-interface RegistryCell {
+/** {model, effort} cell, shared by the overlay delta and the server's own
+ *  registry — optional properties ONLY (`model?: string | null`, never
+ *  `model: string | undefined`): ABSENT means inherit, PRESENT (even `null`)
+ *  is an explicit override/tombstone, and a `| undefined` union would invite
+ *  writing the key with value `undefined`, which the merge misreads as an
+ *  override rather than "not present". */
+export interface RegistryCell {
   model?: string | null;
   effort?: string | null;
 }
 
-interface RegistryProfile {
+export interface RegistryProfile {
   description?: string;
-  hosts?: Partial<Record<RegistryHost, Record<string, RegistryCell>>>;
+  hosts?: Record<string, Record<string, RegistryCell>>;
 }
 
-interface RegistrySchema {
+export interface RegistrySchema {
   profiles?: Record<string, RegistryProfile>;
   tiers?: string[];
-  hostDefaults?: Partial<Record<RegistryHost, string>>;
+  hostDefaults?: Record<string, string>;
   workflowTiers?: Record<string, string>;
-  agentTiers?: Record<string, Partial<Record<RegistryHost, string>>>;
+  agentTiers?: Record<string, Record<string, string>>;
 }
 
-interface RegistrySource {
+export interface RegistrySource {
   overlay?: { profiles?: Record<string, unknown> } | null;
   tombstoned?: string[];
 }
@@ -220,7 +226,7 @@ interface RegistryAgent {
   charterTier: string;
 }
 
-interface RegistryPayload {
+export interface RegistryPayload {
   registry?: RegistrySchema;
   source?: RegistrySource;
   overlayError?: string;
@@ -243,8 +249,8 @@ interface RegistryRenderOpts {
  * profile flows, hostDefaults + workflowTiers editable, regenerate +
  * clear-overlay + save-overlay buttons.
  */
-export function renderModelRegistry(data: unknown, opts?: RegistryRenderOpts | null): string {
-  const payload = (data || {}) as RegistryPayload;
+export function renderModelRegistry(data: RegistryPayload | null | undefined, opts?: RegistryRenderOpts | null): string {
+  const payload: RegistryPayload = data || {};
   const registry = payload.registry || {};
   const source = payload.source || {};
   const overlayError = payload.overlayError;
