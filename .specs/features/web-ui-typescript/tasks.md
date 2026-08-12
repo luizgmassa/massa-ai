@@ -1917,7 +1917,7 @@ scan. They do not. **The assertion T31 is looking for is one on the size of the 
 scanner read from disk**, not on anything derived from rendered HTML. A keyword sweep
 cannot separate them; each of the six has to be read.
 
-### Batch 12 — Phase 12 (cross-package consumers) — T30 complete
+### Batch 12 — Phase 12 (cross-package consumers) — T30/T31 complete
 
 **T30 — no repoint needed; verification-only, evidence recorded here rather than
 in a diff.** Both of the task's original bullets were falsified before it ran (see
@@ -1952,6 +1952,63 @@ sha256 unchanged at `27195c2e…`.
 
 **Conclusion: the T26 measurement generalises.** No edit was needed on any of the
 three files; the task's deliverable is this evidence entry, not a code change.
+
+**T31 — `857652d2`'s successor.** Reads each of the six source-text scanners
+individually rather than trusting the earlier keyword-sweep counts (15, 11, 3,
+7, 4, 4) recorded above under Batch 11, which credited derived-data assertions
+(index-ordering, rendered-HTML-length checks) as though they guarded a disk
+read. True state, measured by reading each file:
+
+| Scanner | Reads | Population assertion |
+| --- | --- | --- |
+| `static-module-graph.test.ts` | every `.js` under `dist/static` | **Already real.** `expect(FILES.length).toBeGreaterThanOrEqual(15)` (line 91), plus the `beforeAll` sentinel that throws on a missing `dist/static`. Verified by both: `rm -rf dist/static` → sentinel throws naming the build command; a re-created but *empty* `dist/static` → the population assertion itself fails (`Expected: >= 15, Received: 0`). The sentinel and the population assertion are two different guards catching two different failure shapes — confirmed non-equivalent, both needed, both already present |
+| `web-ui-readonly.test.ts` | every `.js`+`.ts` under `src/static` (`readBundleSource`) | **Already real**, added by T38. `expect(APP_JS_FILE_COUNT).toBeGreaterThanOrEqual(22)`. Re-verified red on a scratch empty `views/config-sections.ts`-adjacent probe is unnecessary here — T38's own scratch run already proved it against `rm -rf` of the scanned tree; not re-run a second time in this task, since T31's scope is *finding* which scanners lack the guard, and this one does not |
+| `config-section-coverage.test.ts` | `views/config-sections.ts` | **Already real.** `expect(keys.length).toBeGreaterThanOrEqual(16)`. Re-verified: pointed at `config-sections.ts` emptied to `export const CONFIG_SECTIONS = [];` → `Expected: >= 16, Received: 0` |
+| `installer-config-template.test.ts` | `views/config-sections.ts` | **Already real.** `expect(sections.length).toBeGreaterThanOrEqual(16)`. Re-verified against the same emptied file → `Expected: >= 16, Received: 0` |
+| `app-renderers.test.ts` | `index.html`, `wire-view-handlers.ts` | **Added.** Neither raw disk read had a size assertion — the file's only existing size check (`wireViewHandlersSpan.length > 500`, line ~1718) is on the *extracted function span*, derived data, not the whole-file read. Added `expect(INDEX_HTML.length).toBeGreaterThan(1000)` and `expect(WIRE_VIEW_HANDLERS_SOURCE.length).toBeGreaterThan(5000)` |
+| `registry-editor.test.ts` | `registry.ts`, `registry-state.ts`, `profiles.ts` (joined `MODELS_TAB_SOURCE`), `memory.ts` (`MEMORY_VIEW_SOURCE`) | **Added.** The file's existing `expect(targetSpans.length).toBeGreaterThanOrEqual(6)` (line 805) counts *extracted function spans*, derived data, not the raw joined source. Added `expect(MODELS_TAB_SOURCE.length).toBeGreaterThan(20000)` and `expect(MEMORY_VIEW_SOURCE.length).toBeGreaterThan(5000)` |
+
+Four of six already carried a real guard; two (`app-renderers.test.ts`,
+`registry-editor.test.ts`) did not and got one each covering both of their
+respective source-text reads — four new assertions total, `apps/web-ui/src/__tests__/`
+now **703 pass, 0 fail** (700 + 3 new `it`s; `registry-editor.test.ts`'s two new
+assertions share one `it`).
+
+**Six reds, all observed in scratch and reverted by hand from a `/tmp/t31-backups/`
+copy (never `git checkout`), tree confirmed clean after each (`git diff --stat`
+empty):**
+
+1. `index.html` → `printf '' > index.html`: `expect(INDEX_HTML.length).toBeGreaterThan(1000)` → `Expected: > 1000, Received: 0`.
+2. `wire-view-handlers.ts` → shrunk to a 37-byte valid stub (a literal empty file cascades into an unrelated `SyntaxError: Export named 'wireViewHandlers' not found`, from the same file's `await import("../static/app.js")` at module scope — a real but confounded red; the stub isolates the assertion itself): `Expected: > 5000, Received: 37`.
+3. `registry.ts`/`registry-state.ts`/`profiles.ts` → all three replaced with minimal valid stubs preserving every export `app.js`'s barrel and each other require (so the module graph still imports cleanly): `MODELS_TAB_SOURCE` `Expected: > 20000, Received: 3251`.
+4. `memory.ts` → replaced with a minimal valid stub, same reasoning: `MEMORY_VIEW_SOURCE` `Expected: > 5000, Received: 740`.
+5. `dist/static` → moved aside entirely: `beforeAll` sentinel throws `Emitted bundle missing at … — run 'bun run --filter @massa-ai/web-ui build' first.` Re-created as an *empty* directory (sentinel now passes, existence check only): `expect(FILES.length).toBeGreaterThanOrEqual(15)` → `Expected: >= 15, Received: 0`.
+6. `views/config-sections.ts` → replaced with `export const CONFIG_SECTIONS = [];`: both `config-section-coverage.test.ts` and `installer-config-template.test.ts` → `Expected: >= 16, Received: 0` (proven independently against the same emptied file, since both scanners read it).
+
+**CHARACTERIZATION.md correction (D7 closed).** Lines 79-83 enumerated **five**
+source-text scanners; `web-ui-readonly.test.ts` was filed only in the
+module-imports table (it does `require("app.js")`), which is exactly why its own
+`readBundleSource` source-text scan escaped this task's original scope until T38
+added the population guard by hand. The source-text table now lists all **six**,
+and the module-imports table's `web-ui-readonly.test.ts` row is annotated
+"(also a source-text scanner, above)" so the dual nature is visible from either
+table. The two `views/config.js` citations (stale since T23/T24 renamed the
+module) were also corrected to `views/config-sections.ts` while in the file.
+
+**Gate:** `bun run --filter @massa-ai/web-ui build` exit 0; `apps/web-ui/src/__tests__/`
+**703 pass, 0 fail**; six tools-api web-ui suites **57 pass, 0 fail**;
+`installer-config-template.test.ts` **31 pass, 0 fail**; `web-ui-serve`+`web-ui-key-http`
+**15 pass, 0 fail**; `render-golden.json` sha256 unchanged at `27195c2e…`.
+`bun run test:scripts`: TypeScript suites **1804 pass, 0 fail across 80 files**
+(39.77s); every named shell suite block **0 failed** (`install-agents CLI` 48,
+`install-agents JSON writers` 66, `MCP single writer` 57,
+`plugin-auto-install` 201, `install-skills CLI` 42, and 20+ more blocks, all
+0 failed). The `[deterministic] FAIL (exit 2)` / `SIGNAL SIGTERM` /
+`ERROR: spawn ENOENT` lines inside that run are `run-deterministic.test.ts` and
+`run-deterministic-coverage.test.ts` exercising the deterministic-gate script's
+own error-handling paths under a mocked spawn — confirmed by their repeated
+`[deterministic] Running 142 deterministic test files...` preamble and the
+bracketing PASS run at the same file count; not a real failure.
 
 ---
 

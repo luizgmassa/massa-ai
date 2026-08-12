@@ -72,21 +72,26 @@ fixture during the refactor is the primary signal that behaviour moved.
 
 ## Cross-package consumers (the blast radius)
 
-Read as **source text**, asserting on file contents — these break on a rename:
+Read as **source text**, asserting on file contents — these break on a rename.
+**Six**, not five: `web-ui-readonly.test.ts` was originally filed only under the
+module-imports table below (it also `require()`s `app.js`), which is exactly why
+its own `readBundleSource` source-text scan escaped both T31's original scope
+and any population guard until T38/T31 (WUT-14, D7) — see tasks.md Execution Log.
 
 | Consumer | Line | Reads |
 |---|---|---|
-| `apps/web-ui/src/__tests__/app-renderers.test.ts` | 1649 | `wire-view-handlers.js` |
-| `apps/web-ui/src/__tests__/registry-editor.test.ts` | 726-734 | `registry.js`, `registry-state.js`, `profiles.js`, memory view |
-| `apps/web-ui/src/__tests__/static-module-graph.test.ts` | 31-40 | every `.js` under `static/` |
-| `apps/tools-api/src/routes/config-section-coverage.test.ts` | 30 | `views/config.js` |
-| `scripts/__tests__/installer-config-template.test.ts` | 31 | `views/config.js` |
+| `apps/web-ui/src/__tests__/app-renderers.test.ts` | 1649 | `wire-view-handlers.ts` |
+| `apps/web-ui/src/__tests__/registry-editor.test.ts` | 726-734 | `registry.ts`, `registry-state.ts`, `profiles.ts`, memory view |
+| `apps/web-ui/src/__tests__/static-module-graph.test.ts` | 31-40 | every `.js` under `dist/static/` |
+| `apps/tools-api/src/__tests__/web-ui-readonly.test.ts` | 49-68 | every `.js`+`.ts` under `src/static` (`readBundleSource`) |
+| `apps/tools-api/src/routes/config-section-coverage.test.ts` | 30 | `views/config-sections.ts` |
+| `scripts/__tests__/installer-config-template.test.ts` | 31 | `views/config-sections.ts` |
 
 Imported as **modules** by explicit `.js` path:
 
 | Consumer | Line | Imports |
 |---|---|---|
-| `apps/tools-api/src/__tests__/web-ui-readonly.test.ts` | 21, 27 | `app.js`, `STATIC_DIR` |
+| `apps/tools-api/src/__tests__/web-ui-readonly.test.ts` | 21, 27 | `app.js`, `STATIC_DIR` (also a source-text scanner, above) |
 | `apps/tools-api/src/__tests__/web-ui-render.test.ts` | 13 | `app.js` |
 | `apps/tools-api/src/__tests__/web-ui-views.test.ts` | 14 | `app.js` |
 | `apps/tools-api/src/__tests__/dashboard-views.test.ts` | 12 | `dashboard.js` |

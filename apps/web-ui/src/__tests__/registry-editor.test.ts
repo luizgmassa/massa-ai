@@ -794,6 +794,21 @@ function extractFunctionSpans(source: string, namePattern: RegExp): { name: stri
 describe("no-prompt/no-alert structural sensor — Models tab (T7, P2-D AC6)", () => {
   const targetSpans = extractFunctionSpans(MODELS_TAB_SOURCE, /^(handleRegistry\w+|renderModelRegistry|renderProfilesView)$/);
 
+  // T31 (WUT-14): population sensor on the raw disk reads MODELS_TAB_SOURCE
+  // and MEMORY_VIEW_SOURCE are built from, distinct from the span-count
+  // sanity check below (which counts *extracted* function spans, derived
+  // data). If any of the three joined files, or the memory view, silently
+  // shrank on disk, this catches it directly. Measured at authoring time:
+  // MODELS_TAB_SOURCE 65921 bytes (registry.ts + registry-state.ts +
+  // profiles.ts joined), MEMORY_VIEW_SOURCE 14824 bytes.
+  it("reads a non-trivial Models-tab and Memory-tab source population from disk", () => {
+    console.log(
+      `[registry-editor] MODELS_TAB_SOURCE: ${MODELS_TAB_SOURCE.length} bytes, MEMORY_VIEW_SOURCE: ${MEMORY_VIEW_SOURCE.length} bytes`,
+    );
+    expect(MODELS_TAB_SOURCE.length).toBeGreaterThan(20000);
+    expect(MEMORY_VIEW_SOURCE.length).toBeGreaterThan(5000);
+  });
+
   it("finds at least the known Models-tab handler + renderer functions (sensor sanity — a 0-span result proves nothing)", () => {
     const names = targetSpans.map((s) => s.name);
     expect(names).toContain("renderModelRegistry");

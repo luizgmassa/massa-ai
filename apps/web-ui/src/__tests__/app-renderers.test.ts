@@ -26,6 +26,19 @@ const {
 const STATIC_DIR = path.resolve(import.meta.dir, "../static");
 const INDEX_HTML = fs.readFileSync(path.join(STATIC_DIR, "index.html"), "utf8");
 
+// T31 (WUT-14): population sensor for the INDEX_HTML source-text read above.
+// Every content assertion on INDEX_HTML below (nav markup, "Admin portal"
+// copy, etc.) is a `toContain`/`not.toContain` against this string — none of
+// them can distinguish a healthy read from one that silently shrank to near
+// nothing, since a `not.toContain` only gets *more* likely to pass as its
+// input empties. Measured at authoring time: 2128 bytes.
+describe("index.html source-text population sensor (T31, WUT-14)", () => {
+  it("read a non-trivial file from disk, not an empty or truncated one", () => {
+    console.log(`[app-renderers] index.html source read: ${INDEX_HTML.length} bytes`);
+    expect(INDEX_HTML.length).toBeGreaterThan(1000);
+  });
+});
+
 describe("markdown fallback renderer edge cases", () => {
   it("transitions from ordered list to unordered list", () => {
     const html = markdownToHtml("1. first\n2. second\n- bullet\n- bullet2");
@@ -1699,6 +1712,17 @@ function extractFunctionSpan(source: string, name: string): string | null {
 
 describe("Projects Delete confirm text — wireViewHandlers source-span sensor (T10, APUX-08, P2-E AC1)", () => {
   const wireViewHandlersSpan = extractFunctionSpan(WIRE_VIEW_HANDLERS_SOURCE, "wireViewHandlers");
+
+  // T31 (WUT-14): population sensor on the raw disk read, distinct from the
+  // span-length sanity check below. That check asserts on the *extracted*
+  // function span (derived data); this asserts on the whole file
+  // `wire-view-handlers.ts` was read into, so a scanner reading a shrunk or
+  // truncated file is caught even before span extraction runs. Measured at
+  // authoring time: 19486 bytes.
+  it("read a non-trivial wire-view-handlers.ts source from disk", () => {
+    console.log(`[app-renderers] wire-view-handlers.ts source read: ${WIRE_VIEW_HANDLERS_SOURCE.length} bytes`);
+    expect(WIRE_VIEW_HANDLERS_SOURCE.length).toBeGreaterThan(5000);
+  });
 
   it("finds the wireViewHandlers function span (sensor sanity — a null/tiny span proves nothing)", () => {
     expect(wireViewHandlersSpan).not.toBeNull();
