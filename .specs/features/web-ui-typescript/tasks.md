@@ -1230,7 +1230,18 @@ Phase 17 the close-out that cannot precede them.
 - [ ] `apps/tools-api/src/routes/config-section-coverage.test.ts` still green — it is the mapped-type coupling guard and must not be weakened to accommodate a new field
 
 **Tests**: `apps/tools-api/src/routes/config.test.ts`, `apps/web-ui/src/__tests__/config-forms.test.ts`, `apps/web-ui/src/__tests__/render-golden.test.ts`
-**Gate**: `bun test apps/web-ui/src/__tests__/ apps/tools-api/src/routes/config.test.ts apps/tools-api/src/routes/config-section-coverage.test.ts` green, then `bun run type-check`
+**Gate**: `bun test apps/web-ui/src/__tests__/` **and**, as a separate process, `bun test apps/tools-api/src/routes/config.test.ts apps/tools-api/src/routes/config-section-coverage.test.ts`, then `bun run type-check`
+
+> **Do not co-run the web-ui and tools-api suites in one `bun test` invocation.**
+> The orchestrator's first wording did, and it produced 3 false failures in
+> `config.test.ts`'s "over a real socket" describe — `res.status` arriving
+> `undefined` because `app-renderers.test.ts` assigns `globalThis.fetch` and the
+> stub leaks across files in a shared process. Measured: web-ui alone 718/0,
+> the tools-api pair alone 18/0, co-run 733/3, and 718 + 18 = 736 = the co-run
+> total, so the 3 are purely the co-run. CI never sees it because
+> `apps/tools-api`'s `test` script is `bun scripts/run-tests-isolated.ts`, which
+> forks. This is the failure mode `CLAUDE.md` § "Running tests" warns about.
+
 **Commit**: `fix(config): show defaults in the Config tab and stop Save clobbering them`
 
 #### T44: Honour the stored Logs Live preference
