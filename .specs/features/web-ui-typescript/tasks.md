@@ -1230,8 +1230,13 @@ Phase 17 the close-out that cannot precede them.
 > yields `false` — never `undefined`. Simulated against the live payload, one
 > Save of the Synapse tab PUTs `enabled: false` for `inhibition.diversityPenalty`,
 > `inhibition.temporalInhibition`, `inhibition.confidenceGate`, `scoring.attention`,
-> `metacognition` and `buffer`; four of those default `true`
-> (`packages/shared/src/config/index.ts:1020, 1026, 1031, 1053`). Because
+> `metacognition` and `buffer`; **five** of those default `true`
+> (`packages/shared/src/config/index.ts:1020, 1026, 1031, 1053, 1064`). This
+> clause originally said four, citing only the first four lines — `buffer.enabled`
+> was missed, and `scoring.attention.enabled` is the one of the six that
+> genuinely defaults `false`. T43's builder measured rather than accepting the
+> handed-down figure and its test encodes five; see the Execution Log's
+> "Correction to a handed-down figure". Because
 > `savePartialConfig` merges by top-level replacement for every section but
 > `scheduler` (`config-writer.ts:432, 440` — a hazard that section was already
 > bitten by), showing partial values makes Save lossy by construction.
