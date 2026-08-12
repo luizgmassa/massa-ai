@@ -347,6 +347,21 @@ pre code {
   width: auto;
   margin: 0;
 }
+/* WUT-18 (T43): a field showing the shipped default rather than a value from
+ * config.json — muted label + input text, so "inherited" and "explicitly
+ * set" stay visually distinguishable without touching the input's own
+ * data-section/data-field/data-type attributes. */
+.config-field-inherited > label {
+  color: var(--fg-muted);
+}
+.config-field-inherited input[type="text"],
+.config-field-inherited input[type="number"],
+.config-field-inherited input[type="password"],
+.config-field-inherited select,
+.config-field-inherited textarea {
+  color: var(--fg-muted);
+  font-style: italic;
+}
 .config-info-note {
   background: var(--bg-code);
   border: 1px solid var(--border);

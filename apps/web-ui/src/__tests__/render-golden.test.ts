@@ -138,6 +138,15 @@ const CONFIG = {
     // capturePolicy deliberately absent — exercises the "not configured" note
     // and the `json` field's undefined-renders-empty branch.
   },
+  // T43 (WUT-18 AC5): a deliberately small default set, not the full ~104-field
+  // defaultMassaAiConfig blob — enough to exercise the inherited-field marking
+  // across text/number/boolean field types (embedding.baseURL not persisted
+  // above; the whole llm section absent above) without a golden diff too large
+  // to review by eye.
+  defaults: {
+    embedding: { baseURL: "http://localhost:11434" },
+    llm: { enabled: false, baseUrl: "http://localhost:11434/v1", model: "qwen2.5:7b-instruct" },
+  },
   restartNeededSections: ["database", "security"],
 };
 

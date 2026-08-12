@@ -1,4 +1,7 @@
 import { describe, it, expect } from "bun:test";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
@@ -10,6 +13,25 @@ const { renderConfig, buildConfigSectionBody, collectConfigSectionFields } = {
   buildConfigSectionBody: (sectionKey: string, fieldValues: Record<string, unknown>) => Record<string, unknown>;
   collectConfigSectionFields: (root: unknown, section: string) => Record<string, unknown>;
 };
+
+// `CONFIG_SECTIONS` and `resolveConfigFieldValue` (WUT-18/T43) are not on the
+// app.js barrel or MASSA_AI_UI (the browser has no need to call either
+// directly) — import straight from the view module, same pattern
+// admin-handlers.test.ts and view-handlers.test.ts already use.
+import { CONFIG_SECTIONS, resolveConfigFieldValue } from "../static/views/config.js";
+
+// `@massa-ai/shared`'s `config/index.ts` runs `loadConfigSafe()` at module
+// scope as a side effect of the whole module loading (line ~632), which
+// reads the developer's real `~/.config/massa-ai/config.json` — even though
+// `defaultMassaAiConfig` itself is a pure literal untouched by that read.
+// Scratch the config dir first, per CLAUDE.md "Running tests", so this
+// suite's use of the real defaults never depends on what the developer
+// happens to have configured.
+const priorXdgConfigHome = process.env.XDG_CONFIG_HOME;
+process.env.XDG_CONFIG_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "massa-cfg-forms-"));
+const { defaultMassaAiConfig } = await import("@massa-ai/shared");
+if (priorXdgConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+else process.env.XDG_CONFIG_HOME = priorXdgConfigHome;
 
 // ── Minimal fake-DOM element/root for collectConfigSectionFields (T7, SCH-08) ─
 // Mirrors admin-handlers.test.ts's makeInput/makeRoot shape: querySelectorAll
@@ -502,5 +524,151 @@ describe("renderConfig — field guide machine tokens render in <code> (T12, APU
   it("does not turn the surrounding prose into <code>", () => {
     expect(html).toContain("PostgreSQL connection string (e.g.,");
     expect(html).toContain("Changing this requires a server restart.");
+  });
+});
+
+// ── T43 (WUT-18 AC5): defaults fill in for a field the persisted file omits ──
+
+describe("renderConfig — inherited defaults are shown and marked (WUT-18 T43, AC5)", () => {
+  it("displays the shipped default and marks the field inherited when config omits it", () => {
+    const html = renderConfig(
+      { config: { embedding: { provider: "ollama" } }, restartNeededSections: [], defaults: { embedding: { baseURL: "http://localhost:11434" } } },
+      { writeMode: true },
+    );
+    const idx = html.indexOf('data-field="baseURL"');
+    expect(idx).toBeGreaterThan(-1);
+    const wrapperStart = html.lastIndexOf('<div class="config-field', idx);
+    const wrapperEnd = html.indexOf("</div>", idx);
+    const wrapper = html.slice(wrapperStart, wrapperEnd);
+    expect(wrapper).toContain("config-field-inherited");
+    expect(wrapper).toContain('title="Inherited from the built-in default');
+    expect(wrapper).toContain('value="http://localhost:11434"');
+  });
+
+  it("does not mark a field inherited when the persisted value is present, even with a matching default", () => {
+    const html = renderConfig(
+      { config: { embedding: { baseURL: "http://custom:1234" } }, restartNeededSections: [], defaults: { embedding: { baseURL: "http://localhost:11434" } } },
+      { writeMode: true },
+    );
+    const idx = html.indexOf('data-field="baseURL"');
+    const wrapperStart = html.lastIndexOf('<div class="config-field', idx);
+    const wrapperEnd = html.indexOf("</div>", idx);
+    const wrapper = html.slice(wrapperStart, wrapperEnd);
+    expect(wrapper).not.toContain("config-field-inherited");
+    expect(wrapper).toContain('value="http://custom:1234"');
+  });
+
+  it("renders exactly as before when no `defaults` payload is supplied (backward compatible)", () => {
+    const html = renderConfig({ config: { embedding: { provider: "ollama" } }, restartNeededSections: [] }, { writeMode: true });
+    expect(html).not.toContain("config-field-inherited");
+    const idx = html.indexOf('data-field="baseURL"');
+    const wrapperStart = html.lastIndexOf('<div class="config-field', idx);
+    const wrapperEnd = html.indexOf("</div>", idx);
+    expect(html.slice(wrapperStart, wrapperEnd)).toContain('value=""');
+  });
+});
+
+describe("resolveConfigFieldValue — the unresolved-field sweep (WUT-18 T43, AC5)", () => {
+  /** Every declared `{section.key}.{field.name}` across the Config tab's 16
+   *  sections — the same population `config-section-coverage.test.ts` sizes
+   *  at the section level; this sweep is the field-level version. */
+  function declaredFieldPaths(): string[] {
+    const paths: string[] = [];
+    for (const section of CONFIG_SECTIONS as { key: string; fields: { name: string }[] }[]) {
+      for (const field of section.fields) paths.push(section.key + "." + field.name);
+    }
+    return paths;
+  }
+
+  it("the declared population is 104 fields across 16 sections", () => {
+    expect(CONFIG_SECTIONS.length).toBe(16);
+    expect(declaredFieldPaths().length).toBe(104);
+  });
+
+  it("measures the unresolved-field count against a fixture with only synapse.enabled persisted: 5 of 104, named", () => {
+    const persisted: Record<string, unknown> = { synapse: { enabled: true } };
+    const defaults = defaultMassaAiConfig as unknown as Record<string, unknown>;
+    const unresolved: string[] = [];
+    for (const section of CONFIG_SECTIONS as { key: string; fields: { name: string }[] }[]) {
+      for (const field of section.fields) {
+        const resolved = resolveConfigFieldValue(persisted, defaults, section.key, field.name);
+        if (resolved.value === undefined) unresolved.push(section.key + "." + field.name);
+      }
+    }
+    expect(unresolved.sort()).toEqual([
+      "compression.prompt",
+      "embedding.apiKey",
+      "logging.file",
+      "security.allowedExtensions",
+      "security.apiKey",
+    ]);
+    expect(unresolved.length).toBe(5);
+  });
+});
+
+// ── T43 (WUT-18 AC6): Save must not clobber an inherited-true default ───────
+
+describe("renderConfig + Save — Synapse Save does not clobber inherited defaults (WUT-18 T43, AC6)", () => {
+  // The six booleans the pre-fix bug (config.ts:208's unchecked-box → `false`
+  // coercion, combined with savePartialConfig's top-level-replacement merge)
+  // could clobber. Measured against `defaultMassaAiConfig.synapse`:
+  // diversityPenalty/temporalInhibition/confidenceGate/metacognition/buffer
+  // default `true`; `scoring.attention` alone defaults `false`
+  // (massa-ai-config.ts's literal, and index.ts:1038's
+  // `SYNAPSE_ATTENTION_ENABLED === "true"` — both false with no env override).
+  // A Save that resubmits the displayed effective value therefore correctly
+  // writes `false` for `scoring.attention.enabled` — that is its own default,
+  // not a clobber — while the other five must never come back `false`.
+  const TRUE_BY_DEFAULT = [
+    "inhibition.diversityPenalty.enabled",
+    "inhibition.temporalInhibition.enabled",
+    "inhibition.confidenceGate.enabled",
+    "metacognition.enabled",
+    "buffer.enabled",
+  ];
+  const ATTENTION_FIELD = "scoring.attention.enabled";
+
+  function checkboxTag(html: string, fieldName: string): string {
+    const idx = html.indexOf('data-field="' + fieldName + '"');
+    expect(idx).toBeGreaterThan(-1);
+    const tagStart = html.lastIndexOf("<input", idx);
+    const tagEnd = html.indexOf("/>", idx);
+    return html.slice(tagStart, tagEnd);
+  }
+
+  function renderSynapseWithOnlyEnabledPersisted(): string {
+    return renderConfig(
+      {
+        config: { synapse: { enabled: true } },
+        restartNeededSections: [],
+        defaults: { synapse: (defaultMassaAiConfig as any).synapse },
+      },
+      { writeMode: true },
+    );
+  }
+
+  it("renders the five true-by-default booleans checked, and attention unchecked, when only synapse.enabled is persisted", () => {
+    const html = renderSynapseWithOnlyEnabledPersisted();
+    for (const field of TRUE_BY_DEFAULT) {
+      expect(checkboxTag(html, field)).toContain(" checked");
+    }
+    expect(checkboxTag(html, ATTENTION_FIELD)).not.toContain(" checked");
+  });
+
+  it("a Save built from that rendered state writes no false for the five true-by-default booleans, metacognition.enabled is true, and attention correctly stays its own false default", () => {
+    const html = renderSynapseWithOnlyEnabledPersisted();
+    const fields = [...TRUE_BY_DEFAULT, ATTENTION_FIELD];
+    const elements = fields.map((field) => makeFieldEl("synapse", field, "checkbox", "", checkboxTag(html, field).includes(" checked")));
+    elements.push(makeFieldEl("synapse", "enabled", "checkbox", "", true));
+    const root = makeSectionRoot(elements);
+    const fieldValues = collectConfigSectionFields(root, "synapse");
+    const body = buildConfigSectionBody("synapse", fieldValues) as { synapse: Record<string, any> };
+
+    const get = (dotted: string) => dotted.split(".").reduce((o: any, k: string) => o?.[k], body.synapse);
+    for (const field of TRUE_BY_DEFAULT) {
+      expect(get(field)).not.toBe(false);
+    }
+    expect(get("metacognition.enabled")).toBe(true);
+    expect(get(ATTENTION_FIELD)).toBe(false);
   });
 });

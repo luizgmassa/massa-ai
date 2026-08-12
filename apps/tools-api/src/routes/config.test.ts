@@ -66,6 +66,23 @@ describe("GET /api/v1/config", () => {
     expect(res.json.data.restartNeededSections).toEqual(["llm"]);
   });
 
+  test("adds a masked `defaults` alongside config, leaving config/restartNeededSections unchanged (WUT-18 T43)", async () => {
+    const testConfig = { logging: { level: "info", enableMetrics: false } };
+    loadConfig.mockImplementationOnce(() => testConfig);
+    restartNeededSections.mockImplementationOnce(() => []);
+    // maskSensitive is called twice per request now — once for `config`,
+    // once for `defaults` — so both calls must be asserted, not just the
+    // first via mockImplementationOnce. `beforeEach` already cleared it.
+    const res = await get("/api/v1/config");
+    expect(res.status).toBe(200);
+    expect(res.json.data.config).toEqual(testConfig);
+    expect(res.json.data.restartNeededSections).toEqual([]);
+    expect(res.json.data.defaults).toEqual(defaultMassaAiConfig);
+    expect(maskSensitive.mock.calls.length).toBe(2);
+    expect(maskSensitive.mock.calls[0][0]).toBe(testConfig);
+    expect(maskSensitive.mock.calls[1][0]).toBe(defaultMassaAiConfig);
+  });
+
   test("masks all four sensitive fields", async () => {
     const testConfig = {
       security: { apiKey: "sec-key" },

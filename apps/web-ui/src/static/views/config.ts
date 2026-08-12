@@ -25,6 +25,11 @@ type ConfigFieldEntry = ConfigSectionEntry["fields"][number];
 interface ConfigResponse {
   config?: Record<string, unknown>;
   restartNeededSections?: string[];
+  // WUT-18 (T43): the shipped default config, masked the same way as
+  // `config`. Optional — every existing caller that omits it (every
+  // pre-T43 test fixture) keeps rendering exactly as before: a field with no
+  // persisted value and no `defaults` to fall back to still renders blank.
+  defaults?: Record<string, unknown>;
 }
 
 // ── Admin portal view stubs (renderers land in T10-T12) ────────────────────
@@ -51,7 +56,35 @@ function getConfigFieldValue(config: Record<string, unknown>, sectionKey: string
   return val;
 }
 
-function renderConfigField(sectionKey: string, field: ConfigFieldEntry, value: unknown): string {
+export interface ResolvedConfigField {
+  value: unknown;
+  /** True only when a real shipped default filled a gap the persisted file
+   *  left open. The 5 fields with no shipped default (`embedding.apiKey`,
+   *  `compression.prompt`, `logging.file`, `security.apiKey`,
+   *  `security.allowedExtensions`) still resolve `value: undefined` here and
+   *  render blank, exactly as before T43. */
+  inherited: boolean;
+}
+
+/**
+ * A field's effective display value (WUT-18 AC5): the persisted value from
+ * `config` when present, the shipped default from `defaults` otherwise. Reuses
+ * `getConfigFieldValue`'s dotted-path walk for both trees rather than a second
+ * copy of it, so `config` and `defaults` are read identically.
+ */
+export function resolveConfigFieldValue(
+  config: Record<string, unknown>,
+  defaults: Record<string, unknown> | undefined,
+  sectionKey: string,
+  fieldName: string,
+): ResolvedConfigField {
+  const persisted = getConfigFieldValue(config, sectionKey, fieldName);
+  if (persisted !== undefined) return { value: persisted, inherited: false };
+  const defaultValue = defaults ? getConfigFieldValue(defaults, sectionKey, fieldName) : undefined;
+  return { value: defaultValue, inherited: defaultValue !== undefined };
+}
+
+function renderConfigField(sectionKey: string, field: ConfigFieldEntry, value: unknown, inherited: boolean): string {
   const fieldId = "config-" + sectionKey + "-" + field.name.replace(/\./g, "-");
   const inputName = "config-" + sectionKey + "-" + field.name;
   const isSensitive = field.sensitive || SENSITIVE_FIELDS.has(sectionKey + "." + field.name);
@@ -89,8 +122,15 @@ function renderConfigField(sectionKey: string, field: ConfigFieldEntry, value: u
     revealBtn = ' <button type="button" class="reveal-btn" data-action="config-reveal" data-target="' + fieldId + '" data-section="' + sectionKey + '" data-field="' + field.name + '">reveal</button>';
   }
 
+  // WUT-18 (T43): "inherited" and "explicitly set" stay visually distinguishable
+  // — a muted class on the wrapper plus a `title` tooltip, never on the input's
+  // own `data-section`/`data-field`/`data-type` attributes `collectConfigSectionFields`
+  // and the guard tests key on.
+  const wrapperClass = inherited ? "config-field config-field-inherited" : "config-field";
+  const wrapperTitle = inherited ? ' title="Inherited from the built-in default — not set in config.json"' : "";
+
   return (
-    '<div class="config-field">' +
+    '<div class="' + wrapperClass + '"' + wrapperTitle + ">" +
     '<label for="' + fieldId + '">' + escapeHtml(field.label) + "</label>" +
     inputHtml + revealBtn +
     "</div>"
@@ -100,6 +140,7 @@ function renderConfigField(sectionKey: string, field: ConfigFieldEntry, value: u
 export function renderConfig(data: ConfigResponse | null | undefined, opts?: { writeMode?: boolean }): string {
   const payload = data || {};
   const config = payload.config || {};
+  const defaults = payload.defaults || {};
   const restart = payload.restartNeededSections || [];
   const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
   const restartSet = new Set(restart);
@@ -112,8 +153,8 @@ export function renderConfig(data: ConfigResponse | null | undefined, opts?: { w
       ? '<div class="config-info-note">Not configured &mdash; using built-in defaults (DEFAULT_POLICY from the capture-policy pure module)</div>'
       : "";
     const fieldsHtml = section.fields.map((field) => {
-      const value = getConfigFieldValue(config, section.key, field.name);
-      return renderConfigField(section.key, field, value);
+      const resolved = resolveConfigFieldValue(config, defaults, section.key, field.name);
+      return renderConfigField(section.key, field, resolved.value, resolved.inherited);
     }).join("");
     const saveBtn = writeMode
       ? '<button type="button" class="save-btn btn-primary" data-action="config-save" data-section="' + section.key + '">Save</button>'
