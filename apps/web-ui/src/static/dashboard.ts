@@ -25,10 +25,10 @@ interface DashboardSectionResult {
 }
 
 interface DashboardData {
-  scheduler?: DashboardSectionResult;
-  hookQueue?: DashboardSectionResult;
-  synapse?: DashboardSectionResult;
-  metrics?: DashboardSectionResult;
+  scheduler: DashboardSectionResult;
+  hookQueue: DashboardSectionResult;
+  synapse: DashboardSectionResult;
+  metrics: DashboardSectionResult;
 }
 
 /**
@@ -291,7 +291,7 @@ const DASHBOARD_HELP_CARD =
  * Top-level dashboard renderer. Takes the fetched data object and returns
  * an HTML string with all sections. Pure function (no DOM, no fetch).
  */
-export function renderDashboard(data: DashboardData | null | undefined): string {
+export function renderDashboard(data: Partial<DashboardData> | null | undefined): string {
   if (!data) return '<div class="error">Dashboard data unavailable</div>';
   return [
     '<div class="dashboard">',
