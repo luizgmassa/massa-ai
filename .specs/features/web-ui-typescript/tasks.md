@@ -9,14 +9,14 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) landed. Phases 12 complete; 13-14 remain.
+**Status**: In Progress — Batches 1-11 of 14 in flight; **22 of 22** modules converted, 0 `.js` left under `src/static` (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`. T39 (D9) landed. Phases 12-13 done except T40 (D10), which is open — `bun run type-check` exits 2 and the branch cannot pass CI until it lands. Phase 14 remains.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
-**3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 39
+**3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 40
 Tasks**. The extra tasks versus `PLAN.md`'s 31 are `config-sections` becoming its
 own module (T23/T24) plus one-file-per-task granularity across the 21 conversions.
-T37, T38 and T39 were added mid-execution as remediation (Execution Log D6, D7, D9);
-they sit in Phases 8, 10 and 11 respectively, despite their numbers.
+T37, T38, T39 and T40 were added mid-execution as remediation (Execution Log D6, D7,
+D9, D10); they sit in Phases 8, 10, 11 and 13 respectively, despite their numbers.
 
 ---
 
@@ -90,7 +90,7 @@ Phases run sequentially; tasks within a phase run in order.
 | 10 | Shell renderers | T26 → T27 → T38 |
 | 11 | Shell entry | T28 → T29 → T39 |
 | 12 | Cross-package consumers | T30 → T31 |
-| 13 | Retire the transitional path | T32 → T33 |
+| 13 | Retire the transitional path | T32 → T33 → T40 |
 | 14 | Close-out | T34 → T35 → T36 |
 
 ---
@@ -954,6 +954,61 @@ Phases run sequentially; tasks within a phase run in order.
 **Gate**: build
 **Commit**: `build(web-ui): drop allowJs and checkJs`
 
+#### T40: Make `type-check` green again
+
+**Task ID**: TASK-040
+**What**: Fix the 12 `tsc` errors this feature introduced in `dashboard.test.ts` — 10 by correcting an over-optional type, 2 by narrowing an genuinely-`unknown` value at the only site that knows its shape.
+**Where**: `apps/web-ui/src/static/dashboard.ts`, `apps/web-ui/src/__tests__/dashboard.test.ts`
+**Depends on**: T33
+**Reuses**: `DashboardData` / `DashboardSectionResult` as authored in T26
+**Requirement**: WUT-09, WUT-14
+**Non-goals**: do not silence with `@ts-expect-error`, do not add `any`, do not loosen `strict`. Do not touch `tsconfig.json` — T33 just finished with it and the flags it removed are unrelated.
+**Tools**: MCP: NONE · Skill: NONE
+
+> **This is a CI-blocking failure, and it is ours.** `ci.yml`'s **first** step is
+> `type-check`, so the branch cannot merge as it stands. `bun run type-check` exits
+> **2** with 12 errors, all in `apps/web-ui/src/__tests__/dashboard.test.ts`, which has
+> **0 commits on this branch** — the test is unchanged; what changed is the type it
+> checks against. Introduced by **T26** (`efbf661c`), which converted `dashboard.js`
+> and gave `fetchDashboardData` a real return type where the JavaScript had inferred a
+> looser one.
+
+> **Two different defects, and they need different fixes.**
+> **10 × TS18048** — `'data.scheduler' is possibly 'undefined'` and siblings. The cause
+> is `DashboardData` declaring all four members optional (`scheduler?`, `hookQueue?`,
+> `synapse?`, `metrics?`) while `fetchDashboardData` provably assigns **all four,
+> unconditionally, in a single return literal** built from `Promise.allSettled` +
+> `unwrap`. There is no path that omits one. The type is simply wrong; making the four
+> members **required** is a strengthening that matches the implementation and clears
+> all ten without touching a test.
+> **2 × TS18046** — `'data.hookQueue.data' is of type 'unknown'` at lines 26 and 28.
+> This one is correct and must stay: `unwrap` returns `result.value`, which is
+> genuinely `unknown` because the API response is untyped. Narrow it **in the test**,
+> which is the only place that knows the fixture's shape. Do not weaken
+> `DashboardSectionResult.data` to `any` to make it go away.
+
+> **Why no gate caught it for ten phases.** `bun run type-check` runs only in the
+> **build** gate, and only **9 of 40** tasks use that gate — T1, T2, T3, T7, T32, T33,
+> T34, T35, T36. Between T7 (Phase 3) and T32 (Phase 13), **24 consecutive tasks across
+> 10 phases never type-checked**, while the `quick` and `full` gates they did run
+> exercise `bun test` and the emitted bundle only. A regression landed at T26 and first
+> became visible at T32, six phases later. Record this in `lessons.json` at close-out:
+> a gate ladder must include whatever CI runs *first*, or its cheapest failure is also
+> its latest-discovered.
+
+**Done when**:
+- [ ] `DashboardData`'s four members are **required**, not optional; state in the commit why that is sound (single unconditional return literal)
+- [ ] The 2 `TS18046` sites narrowed in `dashboard.test.ts` with an explicit type assertion naming the shape the fixture supplies — no `any`, no `@ts-expect-error`
+- [ ] **`bun run type-check` exits 0** — quote the exit code, and the before value of **2** beside it
+- [ ] `bun run build` and `bun run lint` exit 0
+- [ ] `bun test apps/web-ui/src/__tests__/` → 703 pass, 0 fail; `dashboard.test.ts` assertions unchanged in meaning
+- [ ] **Discrimination sensor**: in scratch, restore one member to optional (`scheduler?`) → `bun run type-check` red on `TS18048` again. Red observed and recorded, reverted by hand. A green type-check after a fix that was already green proves nothing
+- [ ] `render-golden.json` sha256 unchanged
+
+**Tests**: unit
+**Gate**: build
+**Commit**: `fix(web-ui): correct the dashboard result type and narrow its test`
+
 ### Phase 14: Close-out
 
 #### T34: Measure the security-allowlist population change
@@ -1042,7 +1097,7 @@ P9:  T23 ──→ T24 ──→ T25
 P10: T26 ──→ T27 ──→ T38
 P11: T28 ──→ T29 ──→ T39
 P12: T30 ──→ T31
-P13: T32 ──→ T33
+P13: T32 ──→ T33 ──→ T40
 P14: T34 ──→ T35 ──→ T36
 ```
 
@@ -1096,6 +1151,7 @@ Execution is strictly sequential — no intra-phase parallelism.
 | T37 | 3 modules — one type definition and its two consumers | ⚠️ Cohesive, **deliberate**: a type moved in one commit and imported in another leaves the tree uncompilable between them |
 | T38 | 1 test file | ✅ Granular |
 | T39 | 2 modules — the ctx producer and the type that must require it | ⚠️ Cohesive, **deliberate**: restoring the value without tightening the type leaves the same drop possible next time |
+| T40 | 1 module + 1 test — two error classes with one root commit | ⚠️ Cohesive, **deliberate**: the type fix and the test narrowing must land together or `type-check` stays red between commits |
 
 No ❌. Six ⚠️ rows, each with a stated reason why splitting would be worse.
 
@@ -1144,8 +1200,9 @@ No ❌. Six ⚠️ rows, each with a stated reason why splitting would be worse.
 | T37 | T22 | T22 → T37 | ✅ Match |
 | T38 | T27 | T27 → T38 | ✅ Match |
 | T39 | T29 | T29 → T39 | ✅ Match |
+| T40 | T33 | T33 → T40 | ✅ Match |
 
-All 39 match. No dependency points to a later phase — every cross-phase edge (T3→T4, T3→T7, T4→T8, T4→T9, T9→T10, T12→T13, T15→T16, T18→T19, T20→T21, T22→T23, T25→T26, T27→T28, T29→T30, T31→T32, T33→T34) points backward.
+All 40 match. No dependency points to a later phase — every cross-phase edge (T3→T4, T3→T7, T4→T8, T4→T9, T9→T10, T12→T13, T15→T16, T18→T19, T20→T21, T22→T23, T25→T26, T27→T28, T29→T30, T31→T32, T33→T34) points backward.
 
 ---
 
@@ -1154,7 +1211,7 @@ All 39 match. No dependency points to a later phase — every cross-phase edge (
 | Task | Code Layer Created/Modified | Matrix Requires | Task Says | Status |
 | --- | --- | --- | --- | --- |
 | T1, T2, T3, T7, T32, T33 | Build config | none | none | ✅ OK |
-| T4, T8-T22, T25-T29, T37, T39 | Browser module | unit | unit | ✅ OK |
+| T4, T8-T22, T25-T29, T37, T39, T40 | Browser module | unit | unit | ✅ OK |
 | T5 | Serving route | integration | integration | ✅ OK |
 | T6 | Guard / sensor test | unit | unit | ✅ OK |
 | T23, T24 | Browser module + cross-package text scanner | unit (highest of the two) | unit | ✅ OK |
@@ -2079,6 +2136,57 @@ class on this feature.
 is **1804 across 80 files**. This branch added no `scripts/` tests, so the gap predates
 it. `CLAUDE.md` is already in T35's write set — worth correcting there, flagged rather
 than folded in silently.
+
+### Batch 13 — Phase 13 (retire the transitional path) — T32/T33 complete, T40 added
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T32 | `1a4d7a49` | transitional `find src/static -name '*.js' …` copy clause deleted. 1 file, +1 / −1 |
+| T33 | `eca0f8c0` | `allowJs` / `checkJs` removed from `tsconfig.json`. 1 file, −2 |
+| T40 | *pending* | D10 remediation, dispatched after this entry |
+
+Orchestrator-verified: the terminal-state proof holds with its control —
+`git ls-files 'apps/web-ui/src/static/*.js'` returns **0** at HEAD against **21** at
+`6227b4ac`. Clean rebuild produces `dist/static` with **22 `.js`, 0 `.ts`,
+`index.html` present, `styles.css` present** — the permanent copy clause survived, so
+the right one was deleted. `bun run build` exit 0, `bun run lint` exit 0.
+`render-golden.json` unchanged.
+
+**D10 — the branch cannot pass CI, and has not been able to since T26.**
+`bun run type-check` exits **2** with 12 errors, all in
+`apps/web-ui/src/__tests__/dashboard.test.ts`. `ci.yml`'s **first** step is
+`type-check`, so this is merge-blocking, not cosmetic.
+
+The worker reported it as a pre-existing failure, having measured it at its own
+starting commit (`dc20c1e5`) and at its HEAD — identical both times, which is true and
+is not the question. `dashboard.test.ts` has **0 commits on this branch**
+(`git rev-list --count` over `6227b4ac..HEAD`): the test never changed. What changed is
+the type it checks against, at **T26** (`efbf661c`), which converted `dashboard.js` and
+gave `fetchDashboardData` a declared return type where the JavaScript had inferred a
+looser one. *Pre-existing relative to the worker's own branch point* and *pre-existing
+relative to `main`* are different claims, and only the second one would put this out of
+scope.
+
+*Two defects, not one — the split matters because they need opposite fixes.*
+**10 × TS18048** are `DashboardData` declaring `scheduler?`/`hookQueue?`/`synapse?`/
+`metrics?` optional while `fetchDashboardData` assigns all four unconditionally in a
+single return literal. No path omits any of them; the optional markers are simply
+wrong, and making them required clears all ten while *strengthening* the type.
+**2 × TS18046** (`'data.hookQueue.data' is of type 'unknown'`, lines 26 and 28) are
+**correct** — `unwrap` returns `result.value`, genuinely `unknown` because the API
+response is untyped. That one narrows in the test, the only place that knows the
+fixture's shape. Fixing both by loosening `DashboardSectionResult.data` to `any` would
+have made the symptom vanish and thrown away the accurate half.
+
+*Why ten phases of gates missed a compile error.* `bun run type-check` runs **only** in
+the `build` gate, and only **9 of 40** tasks carry it — T1, T2, T3, T7, T32, T33, T34,
+T35, T36. Between T7 (Phase 3) and T32 (Phase 13), **24 consecutive tasks across 10
+phases never type-checked**; `quick` and `full` exercise `bun test` and the emitted
+bundle, neither of which sees a `tsc` error in a test file. The regression landed at
+T26 and first surfaced at T32, six phases later. This is the same shape as D8 — a gate
+ladder that omits one of its own subjects — and the sharper version of it: **the check
+CI runs first is the check this feature ran least.** To be recorded in `lessons.json`
+at close-out.
 
 ---
 
