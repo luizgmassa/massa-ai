@@ -9,12 +9,14 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-7 of 14 complete; 14 of 21 modules converted (see `## Execution Log`)
+**Status**: In Progress — Batches 1-8 of 14 complete; 16 of 21 modules converted (see `## Execution Log`)
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
-**3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 36
+**3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 37
 Tasks**. The extra tasks versus `PLAN.md`'s 31 are `config-sections` becoming its
 own module (T23/T24) plus one-file-per-task granularity across the 21 conversions.
+T37 was added mid-execution as Batch 8 remediation (Execution Log D6); it sits in
+Phase 8 despite its number.
 
 ---
 
@@ -83,7 +85,7 @@ Phases run sequentially; tasks within a phase run in order.
 | 5 | Small views A | T13 → T14 → T15 |
 | 6 | Small views B | T16 → T17 → T18 |
 | 7 | Large views | T19 → T20 |
-| 8 | Registry pair | T21 → T22 |
+| 8 | Registry pair | T21 → T22 → T37 |
 | 9 | Config split and coupling | T23 → T24 → T25 |
 | 10 | Shell renderers | T26 → T27 |
 | 11 | Shell entry | T28 → T29 |
@@ -535,6 +537,51 @@ Phases run sequentially; tasks within a phase run in order.
 **Gate**: quick
 **Commit**: `refactor(web-ui): convert views/registry-state to TypeScript`
 
+#### T37: Consolidate the duplicated registry types
+
+**Task ID**: TASK-037
+**What**: Define the five duplicated-and-divergent registry interfaces once, narrow the `data: unknown` parameter T21 widened, and replace T22's four non-null assertions with narrowing locals.
+**Where**: `apps/web-ui/src/static/views/registry.ts`, `apps/web-ui/src/static/views/registry-state.ts`, `apps/web-ui/src/static/views/profiles.ts`
+**Depends on**: T22
+**Reuses**: the `RegistryPayload` / `RegistryHost` shapes already defined in `registry.ts`
+**Requirement**: WUT-07, WUT-08
+**Non-goals**: no renderer or state-machine behaviour change; `start-app.js` and `app.js` are still JavaScript and are not edited here (T28/T29 own them).
+**Tools**: MCP: NONE · Skill: NONE
+
+> **Out-of-sequence number, deliberate.** Added after T36 was already numbered, as
+> Batch 8 remediation (Execution Log D6). A `T22a` heading would parse as **zero**
+> tasks — `validate_tasks.ts`'s `TASK_RE = /^#{2,4}\s+([A-Z]*T\d+)\s*:/i` requires
+> the digits to be followed by optional whitespace then `:`. Renumbering T23–T36
+> would invalidate every cross-reference in this file and the Execution Log.
+
+> **Types live in `registry.ts`, not a new `registry-types.ts`.** A types-only
+> module emits an empty `.js` into `dist/static/` that nothing imports — every
+> `import type` erases at emit — so `static-module-graph.test.ts`'s "every shipped
+> module is reachable from app.js" check reddens on a new orphan.
+> `registry-state.ts:17` and `profiles.ts:9` already **value**-import from
+> `./registry.js`, so those edges survive emit and the graph stays connected.
+
+> **Three files because narrowing stops dead otherwise.** `profiles.ts:124` also
+> declares `registryData: unknown` and forwards it straight to
+> `renderModelRegistry`. Narrowing only the callee turns that forward into a
+> compile error whose cheapest repair is a cast — reinstating the escape one level
+> up. Its own callers are still untyped JavaScript, so widening risk is nil.
+
+**Done when**:
+- [ ] `RegistryCell`, `RegistryProfile`, `RegistrySchema`, `RegistrySource`, `RegistryFormState` are defined **once**, in `registry.ts`, and exported
+- [ ] `registry-state.ts` imports them via `import type { … } from "./registry.js"`; `grep -c '^interface Registry' registry-state.ts` drops by 5
+- [ ] `renderModelRegistry(data: RegistryPayload | null | undefined, …)` — no `unknown` in the signature and no `as RegistryPayload` in the body
+- [ ] `renderProfilesView`'s `registryData` narrowed to the same type
+- [ ] Zero non-null assertions in all three files: `perl -ne 'print "$.: $_" if /[\w\)\]]!(?=[.\[])/' <file>` prints nothing for each. **A `!\.`-anchored grep returns 0 while four exist** — and `grep -cE '[A-Za-z0-9_)\]]!(\.|\[)'` returns 1, because POSIX ERE reads `\]` inside a bracket expression as literal. Use the perl form (D6)
+- [ ] Delta semantics preserved: optional properties only, never `| undefined`; no `_delete: false`, no key written with value `undefined`
+- [ ] `render-golden.json` sha256 still `27195c2e9975ae28481d7fd6d8d778232f3df07e0556253a2dfbc05ffb77af30`
+- [ ] `bun test apps/web-ui/src/__tests__/` → 700 pass, 0 fail
+- [ ] **Discrimination sensor for the narrowing**: in scratch, add `renderModelRegistry({ registry: { tiers: 42 } })` to a `.ts` caller → `bun run --filter @massa-ai/web-ui build` red on the `tiers` type. Under the old `data: unknown` the same line is green. Red observed and recorded, then reverted
+
+**Tests**: unit
+**Gate**: quick
+**Commit**: `refactor(web-ui): consolidate the duplicated registry types`
+
 ### Phase 9: Config split and coupling
 
 #### T23: Split the config schema out, still JavaScript
@@ -851,7 +898,7 @@ P4:  T10 ──→ T11 ──→ T12
 P5:  T13 ──→ T14 ──→ T15
 P6:  T16 ──→ T17 ──→ T18
 P7:  T19 ──→ T20
-P8:  T21 ──→ T22
+P8:  T21 ──→ T22 ──→ T37
 P9:  T23 ──→ T24 ──→ T25
 P10: T26 ──→ T27
 P11: T28 ──→ T29
@@ -906,8 +953,9 @@ Execution is strictly sequential — no intra-phase parallelism.
 | T34 | 0-1 files; the measurement is the deliverable | ✅ Granular |
 | T35 | 7 doc/config sites, one class of stale claim | ⚠️ Cohesive |
 | T36 | 3 `.specs` files, the workflow's own close-out contract | ⚠️ Cohesive |
+| T37 | 3 modules — one type definition and its two consumers | ⚠️ Cohesive, **deliberate**: a type moved in one commit and imported in another leaves the tree uncompilable between them |
 
-No ❌. Five ⚠️ rows, each with a stated reason why splitting would be worse.
+No ❌. Six ⚠️ rows, each with a stated reason why splitting would be worse.
 
 ---
 
@@ -951,8 +999,9 @@ No ❌. Five ⚠️ rows, each with a stated reason why splitting would be worse
 | T34 | T33 | T33 → T34 | ✅ Match |
 | T35 | T34 | T34 → T35 | ✅ Match |
 | T36 | T35 | T35 → T36 | ✅ Match |
+| T37 | T22 | T22 → T37 | ✅ Match |
 
-All 36 match. No dependency points to a later phase — every cross-phase edge (T3→T4, T3→T7, T4→T8, T4→T9, T9→T10, T12→T13, T15→T16, T18→T19, T20→T21, T22→T23, T25→T26, T27→T28, T29→T30, T31→T32, T33→T34) points backward.
+All 37 match. No dependency points to a later phase — every cross-phase edge (T3→T4, T3→T7, T4→T8, T4→T9, T9→T10, T12→T13, T15→T16, T18→T19, T20→T21, T22→T23, T25→T26, T27→T28, T29→T30, T31→T32, T33→T34) points backward.
 
 ---
 
@@ -961,7 +1010,7 @@ All 36 match. No dependency points to a later phase — every cross-phase edge (
 | Task | Code Layer Created/Modified | Matrix Requires | Task Says | Status |
 | --- | --- | --- | --- | --- |
 | T1, T2, T3, T7, T32, T33 | Build config | none | none | ✅ OK |
-| T4, T8-T22, T24-T29 | Browser module | unit | unit | ✅ OK |
+| T4, T8-T22, T24-T29, T37 | Browser module | unit | unit | ✅ OK |
 | T5 | Serving route | integration | integration | ✅ OK |
 | T6 | Guard / sensor test | unit | unit | ✅ OK |
 | T23 | Browser module + cross-package text scanner | unit (highest of the two) | unit | ✅ OK |
@@ -1278,6 +1327,78 @@ overlap against `showBanner`'s `BannerRoot` fails TypeScript's weak-type check
 `Parameters<typeof showBanner>[0] & {…}` intersection already established in
 `profiles.ts`, and in `memory.ts` by giving the two interfaces one shared member. No
 new pattern was introduced.
+
+### Batch 8 — Phase 8 (registry pair) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T21 | `812d4913` | `views/registry.js` → `.ts` (448 → 499 lines) **+ `registry-editor.test.ts:723` repoint, same commit** |
+| T22 | `fa8a4c0a` | `views/registry-state.js` → `.ts` (514 → 598 lines) **+ `registry-editor.test.ts:724` repoint, same commit** |
+
+`SPEC_DEVIATION: D6` (below). Orchestrator-verified: `render-golden.json` still
+`27195c2e…`, and **0 commits touched it across the whole branch** (`6227b4ac..HEAD`
+→ 0) — stronger than a matching hash, which a compensating edit could also produce;
+web-ui **700 pass / 0 fail**, 1663 `expect()` calls, 15 files; `dist/static` **21
+`.js` / 0 `.ts`** from a `rm -rf apps/web-ui/dist` rebuild. **16 of 21 modules
+converted.**
+
+Both D5 repoints landed as their own commits with the correct owner each: T21 moved
+line 723 `registry.js` → `.ts`, T22 moved line 724 `registry-state.js` → `.ts`. The
+`registry-editor.test.ts:723-725` source-read array is now fully `.ts` for the
+registry trio.
+
+**D6 — the worker's compaction report did not survive the diff, and neither did the
+cap premise that followed from it.** Three separate corrections, recorded because
+each has a reusable shape.
+
+*The four non-null assertions exist; two independent regex sweeps were wrong.*
+`registry-state.ts` lines 223, 224, 225 (`…profiles[profile].hosts![host]…`) and 253
+(`…agentTiers[agent]![host]`), all added by `fa8a4c0a`. The sweeps returned zero
+because **every one is `!` before `[`, never before `.`** — `grep -c '!\.'` → `0`.
+A second dialect trap sits behind the obvious repair:
+`grep -cE '[A-Za-z0-9_)\]]!(\.|\[)'` returns **1**, not 4, because POSIX ERE reads
+`\]` inside a bracket expression as a literal backslash-plus-close. Only
+`perl -ne 'print "$.: $_" if /[\w\)\]]!(?=[.\[])/'` returns all four. All four are
+runtime-safe — line 222 assigns `hosts = {}` and line 252 assigns
+`agentTiers[agent] = {}` immediately before — so TypeScript's inability to narrow is
+about the repeated deep index access, not about the value.
+
+*Nothing was compacted; the file grew.* 514 → 598 for `registry-state`, 448 → 499 for
+`registry`. The `-` side of hunk `@@ -152,13 +220,13 @@` shows the pre-existing
+JavaScript already carried the deep chains, so no narrowing locals were removed. The
+worker chose `!` **instead of** introducing locals and reported that choice as a
+replacement.
+
+*The 600-line cap never measured 598.* `static-module-graph.test.ts:39` sets
+`STATIC_DIR` to **`dist/static`** — the cap reads emitted bytes, where types erase.
+`dist/static/views/registry-state.js` is **549**, a 51-line margin, not 2. The
+emit-side subject is a recorded, user-selected design decision (`design.md` → Tech
+Decisions, "Module-graph guard subject | Emitted `dist/static/*.js` only |
+User-selected"), so the gate did not shape this code and **no split is warranted**.
+The file nearest the cap is `dist/static/views/config.js` at **572**, still
+unconverted, and T23/T25 already budget its split.
+
+> **Standing note for the rest of this feature.** The cap's own comment cites a
+> *source*-side authoring rule ("a file over ~600 lines must be flagged for
+> splitting") while enforcing on the *emit* surface. Pre-conversion those were the
+> same bytes; they now diverge by 49 lines on this file alone and will keep
+> diverging as annotation density grows. Source-side growth is ungated from here on.
+> Quote the emitted number when citing the cap, and the source number when citing
+> authoring burden — they are different measurements and this feature created the
+> gap.
+
+**D6 remediation — T37 added.** The `data: unknown` widening on
+`renderModelRegistry` (T21) is a real type-safety regression in a public signature,
+and its root cause is duplication, not the signature: `registry.ts` and
+`registry-state.ts` each define their own `RegistryCell`, `RegistryProfile`,
+`RegistrySchema`, `RegistrySource`, `RegistryFormState` — five names with divergent
+shapes (`Partial<Record<RegistryHost,…>>` against `Record<string,…>`).
+`mergeRegistryForDisplay` returns registry-state's `RegistryServerData`;
+`renderModelRegistry` wants registry.ts's `RegistryPayload`; they are structurally
+incompatible and `unknown` was the escape. **`start-app.js:235` passes one straight
+into the other** — untyped JavaScript today, a hard compile error at T28, where the
+cheapest repair in that seat is another cast. User decision: fix now, before Batch 9,
+rather than at T28 or as recorded debt.
 
 ---
 
