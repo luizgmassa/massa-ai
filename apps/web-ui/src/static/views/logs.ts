@@ -16,7 +16,7 @@ import { showBanner } from "../lib/banner.js";
  *  expects, interpreting it in the browser's local timezone. Returns
  *  `undefined` for an empty or unparseable value so the caller can omit the
  *  query param entirely rather than send an invalid range. */
-export function logsDatetimeLocalToIso(value) {
+export function logsDatetimeLocalToIso(value?: string | null): string | undefined {
   if (!value) return undefined;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
@@ -31,7 +31,14 @@ export function logsDatetimeLocalToIso(value) {
  *  `handleLogsExport`, defined near `runLogsLiveStream`. */
 const LOGS_LEVEL_OPTIONS = ["debug", "info", "warn", "error", "raw"];
 
-function renderLogEntryRow(entry) {
+interface LogEntry {
+  ts?: string;
+  level?: string;
+  message?: string;
+  meta?: unknown;
+}
+
+function renderLogEntryRow(entry: LogEntry | null | undefined): string {
   const meta = entry && entry.meta ? " " + escapeHtml(JSON.stringify(entry.meta)) : "";
   return (
     "<tr>" +
@@ -44,7 +51,28 @@ function renderLogEntryRow(entry) {
   );
 }
 
-export function renderLogs(data, state) {
+interface LogsListPayload {
+  entries?: LogEntry[];
+  total?: number;
+  source?: string;
+  truncated?: boolean;
+}
+
+interface LogsResponse extends LogsListPayload {
+  success?: boolean;
+  data?: LogsListPayload;
+  error?: unknown;
+}
+
+interface LogsRenderState {
+  logsLevel?: string;
+  logsFrom?: string;
+  logsTo?: string;
+  logsQuery?: string;
+  logsLive?: boolean;
+}
+
+export function renderLogs(data: LogsResponse | null | undefined, state?: LogsRenderState | null): string {
   state = state || {};
   if (!data || data.success === false) {
     return '<section class="view"><h2>Logs</h2>' + errorBlock(data) + "</section>";
@@ -58,7 +86,7 @@ export function renderLogs(data, state) {
   const levelOpts =
     '<option value=""' + (state.logsLevel ? "" : " selected") + ">(any)</option>" +
     LOGS_LEVEL_OPTIONS.map(
-      (l) => '<option value="' + l + '"' + (state.logsLevel === l ? " selected" : "") + ">" + l + "</option>",
+      (l) => '<option value="' + l + '"' + (state!.logsLevel === l ? " selected" : "") + ">" + l + "</option>",
     ).join("");
 
   const filterBar =
@@ -113,7 +141,7 @@ export function renderLogs(data, state) {
   // The empty message is a sibling of the table so the append path can remove
   // just it.
   const wantsLiveShell = entries.length === 0 && !!state.logsLive;
-  let body;
+  let body: string;
   if (entries.length === 0) {
     body = '<p class="empty logs-empty">No log entries match this range.</p>';
   } else {
@@ -150,13 +178,66 @@ export function renderLogs(data, state) {
 // browser history. So this mirrors `runRegenerateStream`'s own fetch +
 // ReadableStream + hand-rolled `data:` frame parsing above.
 
+interface LogsQueryElement {
+  innerHTML: string;
+  checked?: boolean;
+  remove?: () => void;
+}
+
+/** Intersected with `showBanner`'s own root parameter type (rather than a
+ *  freestanding interface) so `ctx.root` can be passed to both
+ *  `root.querySelector(...)` here and `showBanner(ctx.root, ...)` below
+ *  without a cast — mirroring `ProfileSwitchCtx`'s `Parameters<typeof
+ *  showBanner>[0]` convention in `views/profiles.ts`. */
+type LogsQueryRoot = Parameters<typeof showBanner>[0] & {
+  querySelector?: (selectors: string) => LogsQueryElement | null;
+};
+
+interface LogsStreamState {
+  logsLive?: boolean;
+  logsStreamAbort?: AbortController | null;
+  logsStreamInFlight?: boolean;
+  logsEntries?: LogEntry[];
+  logsFrom?: string;
+  logsTo?: string;
+  logsLevel?: string;
+  logsQuery?: string;
+  [key: string]: unknown;
+}
+
+interface LogsApi {
+  request?: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown>;
+  authHeaders?: () => Record<string, string>;
+}
+
+interface LogsAnchorElement {
+  href?: string;
+  download?: string;
+  click?: () => void;
+}
+
+interface LogsDoc {
+  createElement?: (tag: string) => LogsAnchorElement | null;
+  body?: {
+    appendChild?: (node: unknown) => unknown;
+    removeChild?: (node: unknown) => unknown;
+  };
+}
+
+interface LogsCtx {
+  state?: LogsStreamState;
+  root: LogsQueryRoot;
+  api?: LogsApi;
+  doc?: LogsDoc;
+}
+
 /** Aborts any in-flight Logs live-tail stream (LOG-14/15 teardown). Called
  *  both when the Live toggle switches off and from `render()`'s
  *  navigate-away guard — mirroring `clearIndexPoll()`'s discipline for the
  *  projects index poll. Exported so both call sites and tests share the
  *  exact same teardown, never a re-implemented copy. */
-export function stopLogsLiveStream(ctx) {
-  const state = (ctx && ctx.state) || (ctx && (ctx.state = {})) || {};
+export function stopLogsLiveStream(ctx?: LogsCtx | null): void {
+  const state: LogsStreamState = (ctx && ctx.state) || (ctx && (ctx.state = {})) || {};
   if (state.logsStreamAbort && typeof state.logsStreamAbort.abort === "function") {
     state.logsStreamAbort.abort();
   }
@@ -173,7 +254,7 @@ export function stopLogsLiveStream(ctx) {
  *  empty-state markup into a table shell here would itself be a local
  *  re-render of the whole view, which is more than "append" and is not
  *  covered by an independent test. */
-function appendLogsLiveEntry(ctx, entry) {
+function appendLogsLiveEntry(ctx: LogsCtx, entry: LogEntry): void {
   const state = ctx.state || (ctx.state = {});
   state.logsEntries = state.logsEntries || [];
   state.logsEntries.push(entry);
@@ -185,7 +266,7 @@ function appendLogsLiveEntry(ctx, entry) {
     // the moment a live row lands beneath it. Removing it here rather than
     // re-rendering keeps this path what LOG-14 requires: an append, with no
     // range query re-issued.
-    const emptyNote = root.querySelector ? root.querySelector(".logs-empty") : null;
+    const emptyNote = root && root.querySelector ? root.querySelector(".logs-empty") : null;
     if (emptyNote && emptyNote.remove) emptyNote.remove();
   }
 }
@@ -202,7 +283,7 @@ function appendLogsLiveEntry(ctx, entry) {
  *  abort turns Live off, banners the error, and leaves every already
  *  rendered/appended row exactly where it was — this function never calls
  *  `ctx.render()`. */
-export async function runLogsLiveStream(ctx) {
+export async function runLogsLiveStream(ctx: LogsCtx): Promise<void> {
   const state = ctx.state || (ctx.state = {});
   if (!state.logsLive) return;
   if (state.logsStreamInFlight) return; // in-flight guard, ctx.state-scoped
@@ -225,13 +306,13 @@ export async function runLogsLiveStream(ctx) {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      let idx;
+      let idx: number;
       while ((idx = buffer.indexOf("\n\n")) >= 0) {
         const frame = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 2);
         const line = frame.trim();
         if (!line.startsWith("data:")) continue; // heartbeat `:` comments and blanks
-        let entry;
+        let entry: LogEntry;
         try {
           entry = JSON.parse(line.slice(5).trim());
         } catch {
@@ -246,7 +327,7 @@ export async function runLogsLiveStream(ctx) {
       // LOG-15: a genuine failure (never our own navigate-away/toggle-off
       // abort) turns Live off and banners the error, keeping prior rows.
       state.logsLive = false;
-      showBanner(ctx.root, "error", "Live log stream failed: " + String((e && e.message) || e));
+      showBanner(ctx.root, "error", "Live log stream failed: " + String((e as { message?: unknown })?.message || e));
     }
   } finally {
     state.logsStreamInFlight = false;
@@ -259,7 +340,7 @@ export async function runLogsLiveStream(ctx) {
  *  matching this file's established rule (`handleMemoryDeleteProject`'s
  *  precedent) that a synthetic harness event must resolve through the real
  *  DOM lookup rather than being trusted at face value. */
-export function handleLogsLiveToggle(ctx) {
+export function handleLogsLiveToggle(ctx: LogsCtx): void {
   const state = ctx.state || (ctx.state = {});
   const el = ctx.root && ctx.root.querySelector ? ctx.root.querySelector('[data-action="logs-live-toggle"]') : null;
   const checked = !!(el && el.checked);
@@ -280,7 +361,7 @@ export function handleLogsLiveToggle(ctx) {
  *  in the fake-DOM test harness). */
 const LOGS_LIVE_STORAGE_KEY = "massa-ai-logs-live";
 
-function writeLogsLivePreference(value) {
+function writeLogsLivePreference(value: boolean): void {
   try {
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(LOGS_LIVE_STORAGE_KEY, value ? "true" : "false");
@@ -293,7 +374,7 @@ function writeLogsLivePreference(value) {
 /** The stored preference, or `undefined` when nothing was ever stored — the
  *  caller must be able to tell "explicitly off" from "never chosen", so an
  *  absent key can keep the off-by-default behaviour without recording it. */
-export function readLogsLivePreference() {
+export function readLogsLivePreference(): boolean | undefined {
   try {
     if (typeof localStorage === "undefined") return undefined;
     const raw = localStorage.getItem(LOGS_LIVE_STORAGE_KEY);
@@ -307,7 +388,7 @@ export function readLogsLivePreference() {
 /** Export handler (design § 3f "Export"). A normal `fetch` carrying the
  *  `x-api-key` header, then an object-URL anchor click — a plain `<a href>`
  *  would send no header and 401. */
-export async function handleLogsExport(ctx) {
+export async function handleLogsExport(ctx: LogsCtx): Promise<void> {
   const state = ctx.state || (ctx.state = {});
   const params = new URLSearchParams();
   const fromIso = logsDatetimeLocalToIso(state.logsFrom);
@@ -340,12 +421,12 @@ export async function handleLogsExport(ctx) {
     if (a) {
       a.href = url;
       a.download = filename;
-      if (doc.body && doc.body.appendChild) doc.body.appendChild(a);
+      if (doc && doc.body && doc.body.appendChild) doc.body.appendChild(a);
       if (typeof a.click === "function") a.click();
-      if (doc.body && doc.body.removeChild) doc.body.removeChild(a);
+      if (doc && doc.body && doc.body.removeChild) doc.body.removeChild(a);
     }
     if (typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(url);
   } catch (e) {
-    showBanner(ctx.root, "error", "Export failed: " + String((e && e.message) || e));
+    showBanner(ctx.root, "error", "Export failed: " + String((e as { message?: unknown })?.message || e));
   }
 }
