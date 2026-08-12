@@ -8,12 +8,23 @@
  * dependency between two modules that always ship together.
  */
 
+/** The subset of a meta element `readInjectedApiKey` reads. Structural, not
+ *  `Element`, so a hostile or partial fake still satisfies the type. */
+interface ApiKeyMetaElement {
+  getAttribute?: (attr: string) => string | null;
+}
+
+/** The subset of a document root `readInjectedApiKey` needs. */
+interface ApiKeyDocument {
+  querySelector?: (selectors: string) => ApiKeyMetaElement | null;
+}
+
 // Every /api/v1/* route now requires a key (SEC-01). The dashboard has no
 // login: the server stamps the key into this page's <head> when the request
 // came from a caller it trusts, and we read it back here. When the tag is
 // absent the caller was untrusted, requests go out without the header, and the
 // server answers 401 — the server-rendered banner already explains why.
-export function readInjectedApiKey(doc) {
+export function readInjectedApiKey(doc?: ApiKeyDocument | null): string | null {
   try {
     if (!doc || typeof doc.querySelector !== "function") return null;
     const el = doc.querySelector('meta[name="massa-ai-api-key"]');
@@ -35,15 +46,17 @@ export function readInjectedApiKey(doc) {
  * trusted-caller default so an operator can force write-mode off even when the
  * tag is present.
  */
-export function isWriteModeEnabled() {
-  if (typeof globalThis !== "undefined" && globalThis.MASSA_AI_WEB_WRITE_MODE === false) return false;
+export function isWriteModeEnabled(): boolean {
+  const forcedFlag = (globalThis as typeof globalThis & { MASSA_AI_WEB_WRITE_MODE?: boolean })
+    .MASSA_AI_WEB_WRITE_MODE;
+  if (typeof globalThis !== "undefined" && forcedFlag === false) return false;
   try {
     if (localStorage.getItem("massa-ai-write-mode") === "false") return false;
   } catch {
     // localStorage unavailable (test/Node without DOM) — fall through
   }
   if (readInjectedApiKey(typeof document !== "undefined" ? document : null)) return true;
-  if (typeof globalThis !== "undefined" && globalThis.MASSA_AI_WEB_WRITE_MODE === true) return true;
+  if (typeof globalThis !== "undefined" && forcedFlag === true) return true;
   try {
     return localStorage.getItem("massa-ai-write-mode") === "true";
   } catch {
@@ -51,18 +64,33 @@ export function isWriteModeEnabled() {
   }
 }
 
-export function createApiClient(opts) {
+interface ApiClientOptions {
+  base?: string;
+  fetch?: typeof fetch;
+  document?: ApiKeyDocument | null;
+  apiKey?: string | null;
+}
+
+interface ApiRequestInit {
+  method?: string;
+  body?: unknown;
+}
+
+export function createApiClient(opts?: ApiClientOptions): {
+  request: (path: string, init?: ApiRequestInit) => Promise<unknown>;
+  authHeaders: () => Record<string, string>;
+} {
   opts = opts || {};
   const base = opts.base != null ? opts.base : "";
   const fetchImpl = opts.fetch || (typeof fetch !== "undefined" ? fetch : null);
   const doc = opts.document || (typeof document !== "undefined" ? document : null);
   // opts.apiKey is the explicit seam tests use; otherwise read the meta tag.
   const apiKey = opts.apiKey !== undefined ? opts.apiKey : readInjectedApiKey(doc);
-  async function request(path, init) {
+  async function request(path: string, init?: ApiRequestInit): Promise<unknown> {
     init = init || {};
     if (!fetchImpl) throw new Error("fetch unavailable");
     const url = base + path;
-    const headers = {};
+    const headers: Record<string, string> = {};
     if (init.body) headers["content-type"] = "application/json";
     if (apiKey) headers["x-api-key"] = apiKey;
     const res = await fetchImpl(url, {
@@ -76,5 +104,8 @@ export function createApiClient(opts) {
     }
     return await res.text();
   }
-  return { request, authHeaders: () => (apiKey ? { "x-api-key": apiKey } : {}) };
+  return {
+    request,
+    authHeaders: (): Record<string, string> => (apiKey ? { "x-api-key": apiKey } : {}),
+  };
 }
