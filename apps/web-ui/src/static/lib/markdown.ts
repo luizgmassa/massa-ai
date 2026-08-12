@@ -9,6 +9,23 @@
 import { escapeHtml } from "./html.js";
 
 /**
+ * `marked` and `DOMPurify` arrive as `<script>` tags from a CDN
+ * (`index.html`), not as npm imports — there is no `@types/marked` or
+ * `@types/dompurify` in play here, and the repo ships zero `.d.ts` files
+ * (see `packages/core/src/services/web/html-to-md.ts:18-26` for the same
+ * minimal-shape-plus-cast convention on a different untyped surface). These
+ * interfaces cover only the two methods this module actually calls; a
+ * `declare global` would type the globals as unconditionally present and
+ * defeat the load-bearing `if (markedLib && purifyLib)` fallback guard below.
+ */
+interface MarkedLike {
+  parse(markdown: string): string;
+}
+interface DomPurifyLike {
+  sanitize(html: string): string;
+}
+
+/**
  * Render markdown to safe HTML using marked + DOMPurify.
  * Falls back to the built-in minimal renderer when the CDN libraries are not
  * loaded (e.g., in test environments without a DOM).
@@ -17,14 +34,14 @@ import { escapeHtml } from "./html.js";
  * DOMPurify.sanitize() strips XSS vectors (scripts, event handlers, etc.).
  * F4 mitigation: stored markdown cannot inject scripts.
  */
-export function markdownToHtml(md) {
+export function markdownToHtml(md: unknown): string {
   if (!md) return "";
   const text = String(md);
 
   // Use marked + DOMPurify when available (browser with CDN scripts loaded)
   if (typeof globalThis !== "undefined") {
-    const markedLib = globalThis.marked;
-    const purifyLib = globalThis.DOMPurify;
+    const markedLib = (globalThis as { marked?: MarkedLike }).marked;
+    const purifyLib = (globalThis as { DOMPurify?: DomPurifyLike }).DOMPurify;
     if (markedLib && purifyLib) {
       try {
         const rawHtml = markedLib.parse(text);
@@ -45,13 +62,13 @@ export function markdownToHtml(md) {
  * available (tests, non-browser). Supported: headings, bold, italic, inline
  * code, fenced code blocks, lists, links, paragraphs.
  */
-function _minimalMarkdownToHtml(md) {
+function _minimalMarkdownToHtml(md: unknown): string {
   const lines = String(md).replace(/\r\n?/g, "\n").split("\n");
-  const out = [];
+  const out: string[] = [];
   let i = 0;
   let inUl = false;
   let inOl = false;
-  let para = [];
+  let para: string[] = [];
 
   const flushLists = () => {
     if (inUl) {
@@ -70,9 +87,9 @@ function _minimalMarkdownToHtml(md) {
     }
   };
 
-  function inline(text) {
+  function inline(text: string): string {
     let t = escapeHtml(text);
-    const codeStash = [];
+    const codeStash: string[] = [];
     t = t.replace(/`([^`]+)`/g, (_m, c) => {
       codeStash.push(c);
       return "@@MASSA_AICODE" + (codeStash.length - 1) + "@@";
@@ -96,7 +113,7 @@ function _minimalMarkdownToHtml(md) {
       flushPara();
       flushLists();
       const lang = fence[1] || "";
-      const codeLines = [];
+      const codeLines: string[] = [];
       i++;
       while (i < lines.length && !/^```\s*$/.test(lines[i])) {
         codeLines.push(lines[i]);
