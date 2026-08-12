@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-4 of 14 complete; 6 of 21 modules converted (see `## Execution Log`)
+**Status**: In Progress — Batches 1-5 of 14 complete; 9 of 21 modules converted (see `## Execution Log`)
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 36
@@ -1190,6 +1190,34 @@ constraint. The match is inside the module's own docblock, explaining why
 `declare global` was rejected. The count was the naive measurement; the matched
 line was the answer. Any future audit of this file's forbidden constructs must read
 the line, not the count.
+
+### Batch 5 — Phase 5 (small views A) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T13 | `fcdd78ec` | `views/search.js` → `.ts` (+27/−6) |
+| T14 | `693b8603` | `views/proposals.js` → `.ts` (+34/−4) |
+| T15 | `dc71b938` | `views/handoffs.js` → `.ts` (+46/−7) |
+
+`SPEC_DEVIATION: none`. Orchestrator-verified: `render-golden.json` still
+`27195c2e…` after all three; web-ui 700/0; `dist/static` 21 `.js` / 0 `.ts`; zero
+import specifiers rewritten. **9 of 21 modules converted.**
+
+The behaviour-preservation check here was a diff scan for silently-added defaults
+(`??`, `|| ""`) — the failure mode where a type annotation turns a genuinely
+`undefined` field into a rendered empty string and moves the golden fixture. Zero
+found, over diff populations of 27/34/46 insertions, so the clean result is a real
+measurement rather than a vacuous scan of an empty rename diff.
+
+State parameters were typed narrowly against what each renderer actually reads
+(`{ api: { request }, render }` for `handleProposalAction`) rather than an invented
+full app-state interface — deliberate, so T28's `AppState` work is not
+pre-constrained by three renderers' guesses.
+
+One duplication accepted knowingly: `handoffs.ts`'s `HandoffCtx.root` is
+structurally identical to `lib/forms.ts`'s unexported `FormDataRoot`. Matching
+structurally avoided widening `forms.ts`'s public surface for a single consumer;
+revisit only if a third appears.
 
 ---
 
