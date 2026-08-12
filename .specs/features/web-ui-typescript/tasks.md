@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-2 of 14 complete (see `## Execution Log`)
+**Status**: In Progress — Batches 1-3 of 14 complete (see `## Execution Log`)
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 36
@@ -425,10 +425,11 @@ Phases run sequentially; tasks within a phase run in order.
 **Depends on**: T16
 **Reuses**: existing module body
 **Requirement**: WUT-07, WUT-08
-**Non-goals**: it imports `renderModelRegistry` from `./registry.js`, still JavaScript at this point — keep the `.js` specifier, which stays correct after T21 emits.
+**Non-goals**: it imports `renderModelRegistry` from `./registry.js`, still JavaScript at this point — keep the `.js` specifier. Module specifiers resolve `.js` → `.ts` automatically (see Execution Log D5); do not rewrite them.
 **Tools**: MCP: NONE · Skill: NONE
 **Done when**:
 - [ ] `.ts` replaces `.js`, exports preserved
+- [ ] `registry-editor.test.ts:728` **`fs.readFileSync` path** repointed from `views/profiles.js` to `.ts` — a filesystem path, not a module specifier, so it does not auto-resolve and will throw ENOENT otherwise (Execution Log D5)
 - [ ] `bun test apps/web-ui/src/__tests__/` → 700 pass, 0 fail
 
 **Tests**: unit
@@ -1099,6 +1100,68 @@ converts a module whose emitted output the guard already reads.
 `dist/static`, where `tsc` emits each converted module as the transitional copy
 stops matching it — so every later single-module task is independently green as
 authored, and no further reordering is needed.
+
+### Batch 3 — Phase 3 (dev loop and leaf modules) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T7 | `32e42f6a` | root `dev:api` → `turbo run dev --filter @massa-ai/tools-api... --filter @massa-ai/web-ui` |
+| T8 | `b0f7fbb5` | `lib/forms.js` → `lib/forms.ts` |
+| T9 | `dc2f327a` | `lib/banner.js` → `lib/banner.ts` |
+
+web-ui 700/0 after each task and after a clean rebuild. `dist/static` 21 `.js` / 0
+`.ts` throughout. `npx turbo run dev --dry-run=json` lists
+`@massa-ai/web-ui#dev → bunx tsc -p tsconfig.build.json --watch` beside
+`@massa-ai/tools-api#dev`. `apps/tools-api/package.json` verified untouched across
+the whole batch — the install-breaking dependency edge (ASM-04) was avoided.
+
+Watch re-emit measured: with `tsc --watch` running, touching `src/static/lib/html.ts`
+advanced `dist/static/lib/html.js` mtime by ~8 s with "Found 0 errors" in the watch
+log. Emitted `.js` carries `//# sourceMappingURL=html.js.map`; the map carries
+`sourcesContent` (1 entry, source `../../../src/static/lib/html.ts`).
+
+**Two `Done when` bullets are deferred to the user, not done** — T7's "start
+`dev:api`, edit a `.ts` literal, save, refresh, observe the change" and "devtools
+opens the `.ts` source". No automated executor has a browser. Authoring those as
+task acceptance criteria was an orchestrator error; the scriptable half above is
+the closest available evidence and is what was actually measured.
+
+**Deviation D5 — module specifiers auto-resolve `.js` → `.ts`; filesystem paths do not.**
+T8's `Done when` said to repoint `view-handlers.test.ts:23`'s
+`import … from "../static/lib/forms.js"`. Measured: no repoint is needed or was
+made. With `src/static/lib/forms.js` **absent**, that literal `.js` specifier still
+resolves to `forms.ts` under `moduleResolution: bundler` at type-check and under
+Bun's resolver at runtime — `git diff` on the file is empty and the suite is 700/0.
+The same holds for every `await import("../static/app.js")` in the package.
+
+The distinction that matters, and that several task bullets conflated:
+
+| Form | Resolves `.js` → `.ts`? | Action on conversion |
+| --- | --- | --- |
+| `import … from "./x.js"`, `await import("./x.js")`, `require("./x.js")` | **Yes** | none — leave the specifier alone |
+| `fs.readFileSync(path.join(…, "x.js"))` | **No** | must be repointed, or it throws ENOENT |
+
+Full measured inventory of the second kind — every filesystem-literal `.js` read of
+a `src/static` source, and the task that must repoint it:
+
+| Reference | Target | Repointed by |
+| --- | --- | --- |
+| `apps/web-ui/src/__tests__/registry-editor.test.ts:728` | `views/profiles.js` | **T17** — bullet was missing, added |
+| `apps/web-ui/src/__tests__/registry-editor.test.ts:735` | `views/memory.js` | T19 |
+| `apps/web-ui/src/__tests__/registry-editor.test.ts:726` | `views/registry.js` | T21 |
+| `apps/web-ui/src/__tests__/registry-editor.test.ts:727` | `views/registry-state.js` | T22 |
+| `apps/tools-api/src/routes/config-section-coverage.test.ts:30` | `views/config.js` | T23 |
+| `scripts/__tests__/installer-config-template.test.ts:31` | `views/config.js` | T23 |
+| `apps/web-ui/src/__tests__/app-renderers.test.ts:1649` | `wire-view-handlers.js` (`STATIC_DIR` = `src/static`) | T27 |
+
+Verified *not* affected: `static-module-graph.test.ts` (its `STATIC_DIR` is
+`dist/static`, where `.js` is the correct extension), and the `app.js` string
+assertions in `web-ui-serve.test.ts` / `web-ui-errors.test.ts`, which describe
+served URLs rather than source files.
+
+The first sweep for this inventory required the literal `static` on the same line
+and therefore missed `app-renderers.test.ts:1649`, which reaches the directory
+through a `STATIC_DIR` variable. The table above is from the corrected sweep.
 
 ---
 
