@@ -1917,6 +1917,42 @@ scan. They do not. **The assertion T31 is looking for is one on the size of the 
 scanner read from disk**, not on anything derived from rendered HTML. A keyword sweep
 cannot separate them; each of the six has to be read.
 
+### Batch 12 — Phase 12 (cross-package consumers) — T30 complete
+
+**T30 — no repoint needed; verification-only, evidence recorded here rather than
+in a diff.** Both of the task's original bullets were falsified before it ran (see
+the task block quote): T26 already measured that `createRequire`'s `require()`
+resolves `.js` → `.ts` across the tools-api → web-ui package boundary, and
+`web-ui-readonly.test.ts`'s real defect (the `.js`-only extension filter inside
+`readBundleSource`) was fixed by T38, not by repointing `STATIC_DIR`.
+
+Re-measured directly rather than trusted:
+
+- The three specifiers, unchanged, still read the `.js` extension literally:
+  `web-ui-readonly.test.ts:21`, `web-ui-render.test.ts:13`,
+  `web-ui-views.test.ts:14` — all three
+  `require("../../../web-ui/src/static/app.js")`.
+- `apps/web-ui/src/static/app.js` is **absent from disk**; `find apps/web-ui/src/static
+  -name '*.js'` returns **0** files (22 `.ts`, 0 `.js`).
+- `git diff --stat` on all three files is **empty** — zero lines, confirmed after
+  the full gate run below, no edit made.
+
+Gate (full, plus the two serve/key-http suites the feature's `full` label omits):
+
+| Suite | Result |
+| --- | --- |
+| `bun run --filter @massa-ai/web-ui build` | exit 0 |
+| `bun test apps/web-ui/src/__tests__/` | **700 pass, 0 fail**, 15 files |
+| six tools-api web-ui suites (`web-ui-readonly`, `web-ui-render`, `web-ui-views`, `dashboard-views`, `web-ui-static-dir`, `config-section-coverage`) | **57 pass, 0 fail**, 6 files |
+| `bun test scripts/__tests__/installer-config-template.test.ts` | **31 pass, 0 fail** |
+| `bun test apps/tools-api/src/__tests__/web-ui-serve.test.ts apps/tools-api/src/__tests__/web-ui-key-http.test.ts` | **15 pass, 0 fail** |
+
+All five numbers match the branch's known-green baselines exactly. `render-golden.json`
+sha256 unchanged at `27195c2e…`.
+
+**Conclusion: the T26 measurement generalises.** No edit was needed on any of the
+three files; the task's deliverable is this evidence entry, not a code change.
+
 ---
 
 ## Artifact-Store Evidence
