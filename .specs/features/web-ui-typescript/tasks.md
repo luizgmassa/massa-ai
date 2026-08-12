@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-6 of 14 complete; 12 of 21 modules converted (see `## Execution Log`)
+**Status**: In Progress — Batches 1-7 of 14 complete; 14 of 21 modules converted (see `## Execution Log`)
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 36
@@ -1244,6 +1244,40 @@ than "none added": they were never edited at all.
 `route-contract.test.ts` needed no repoint because it reaches
 `renderCheckpoints`/`CHECKPOINTS_LIST_BODY` through the `app.js` barrel re-export
 rather than a direct path — a module specifier, which auto-resolves.
+
+### Batch 7 — Phase 7 (large views) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T19 | `fd6b395d` | `views/memory.js` → `.ts` (398 lines) **+ `registry-editor.test.ts` memory read repoint, same commit** |
+| T20 | `cd93763f` | `views/logs.js` → `.ts` (432 lines) |
+
+`SPEC_DEVIATION: none`. Orchestrator-verified: `render-golden.json` still
+`27195c2e…`; web-ui 700/0; `dist/static` 21 `.js` / 0 `.ts`; both files well under
+the 600-line cap. **14 of 21 modules converted.**
+
+Defaults were **position-checked**, not count-checked: zero `??` or `|| ""` on any
+added line in either diff. The worker reported count parity (2→2, 7→7), which is
+weaker — equal counts are consistent with one removed and a different one added.
+
+`logs.ts` constraints held: the live tail is still `fetch` + `getReader()`
+(lines 295, 302), and the `"explicitly off" from "never chosen"` comment survives at
+line 375, keeping the module-graph guard's comment-stripping exercised.
+
+**Orchestrator note — second false positive of the same shape.** `grep -c 'EventSource'`
+over `logs.ts` returns **2**, which reads as a violation of the "do not introduce
+EventSource" constraint. Both matches are comments at lines 4 and 175 explaining why
+`EventSource` is unusable here (it cannot set `x-api-key`, and a query-string key
+would leak into access logs). There is no `new EventSource`. This is the same trap as
+Batch 4's `declare global` count. **For this feature, a forbidden-construct check must
+read the matched line; the count alone is not evidence.**
+
+Typing note for later batches: a freestanding interface with zero property-name
+overlap against `showBanner`'s `BannerRoot` fails TypeScript's weak-type check
+(`has no properties in common`) even when every member is optional. Resolved with the
+`Parameters<typeof showBanner>[0] & {…}` intersection already established in
+`profiles.ts`, and in `memory.ts` by giving the two interfaces one shared member. No
+new pattern was introduced.
 
 ---
 
