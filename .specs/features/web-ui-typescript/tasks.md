@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: **In Progress — Phase 18 (2 Tasks) open**, reopened after the operator
+**Status**: **In Progress — Phase 18 (3 Tasks) open**, reopened after the operator
 re-tested and found the Logs live tail still dead: T44 fixed the checkbox, but the
 tail has no reconnect and the server closes every stream after 10 minutes. Prior
 state: **Phases 1-17 / 46 Tasks executed** (40 original + 6 in Phases
@@ -1410,6 +1410,42 @@ default sources disagree; the Config tab believes the static one.
 **Tests**: `apps/web-ui/src/__tests__/render-golden.test.ts`
 **Gate**: `bun run --filter @massa-ai/web-ui build`, then `bun test apps/web-ui/src/__tests__/`, then `bun run type-check`
 **Commit**: `docs(web-ui): correct the live-tail scope disclosure`
+
+#### T49: Count only rapid closes against the reconnect bound
+
+**Task ID**: TASK-049
+**What**: Stop the reconnect bound from treating the server's scheduled 10-minute close as a failure.
+**Where**: `apps/web-ui/src/static/views/logs.ts`
+**Depends on**: T48
+**Reuses**: T47's `opts` seam and its existing give-up banner
+**Requirement**: WUT-19
+**Non-goals**: do not remove the bound — a hot-loop guard is still required. Do not change the server's 10-minute schedule.
+**Tools**: MCP: NONE · Skill: NONE
+
+> T47's loop is `for (let attempt = 0; ; attempt++)` with a give-up at
+> `attempt >= maxReconnectAttempts` (default 5), and **the counter never
+> resets**. Measured against a scratch server that closes after one frame:
+> 6 connections, 6 rows, then `logsLive` false and the banner — correct for a
+> broken server. But the same accounting applies to a **healthy** one: the
+> server closes on a 10-minute schedule by design, so after roughly an hour the
+> tail gives up permanently and tells the operator "Live log stream closed 6
+> times in a row; giving up", when nothing failed. T47's own comment states the
+> intent — "a close repeating immediately, over and over, is not the server's
+> 10-minute schedule" — but the code cannot tell the two apart, because it never
+> measures how long a connection lasted.
+
+**Done when**:
+- [ ] A connection that lasted longer than a stated threshold resets the consecutive-close count, so the bound means *consecutive rapid* closes
+- [ ] The threshold is well below the server's 10-minute schedule and well above a hot-loop; state the value and why. Note that **delivering a frame is not the signal** — the measured hot-loop case delivered one frame per connection in about 100 ms
+- [ ] The clock is injectable through the existing `opts` seam, so no test sleeps in real time and none depends on wall-clock
+- [ ] A test proves the healthy case: N scheduled-length closes in a row, N greater than the bound, keeps the tail alive and `logsLive` true. Observe it red against T47's counter
+- [ ] The hot-loop case still gives up at the bound — re-assert it, do not assume T47's test still covers it once the counter resets
+- [ ] The give-up banner's wording matches what it now means (consecutive rapid closes), not "closed N times in a row"
+- [ ] `render-golden.json` unchanged — 86 entries, 0 byte-changed
+
+**Tests**: `apps/web-ui/src/__tests__/admin-handlers.test.ts`
+**Gate**: `bun run --filter @massa-ai/web-ui build`, then `bun test apps/web-ui/src/__tests__/`, then `bun run type-check`
+**Commit**: `fix(web-ui): count only rapid closes against the live-tail reconnect bound`
 
 ---
 
