@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: In Progress — Batches 1-8 of 14 complete; 16 of 21 modules converted (see `## Execution Log`)
+**Status**: In Progress — Batches 1-9 of 14 complete; **18 of 22** modules converted (see `## Execution Log`). The denominator was 21 until T23 created `views/config-sections`; 4 remain — `dashboard.js`, `wire-view-handlers.js`, `start-app.js`, `app.js`.
 
 **Sizing note:** `PLAN.md` proposed 7 phases. The Tasks contract caps a phase at
 **3 tasks (ideal 2)**, so those 7 semantic groups re-split into **14 Phases = 37
@@ -1492,6 +1492,90 @@ function parameter or a local, never an interface property, so delta semantics h
 locals are runtime code where the erased assertions were not. The two surfaces now
 move in opposite directions on the same edit. Cap margin on the measured surface: 46
 lines.
+
+### Batch 9 — Phase 9 (config split and coupling) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T23 | `abd82b6f` | `CONFIG_SECTIONS` moved verbatim into `views/config-sections.js`; both external scanners repointed (step 1 of 2). 4 files, +222 / −206 |
+| T24 | `b24ea124` | `config-sections.js` → `.ts`, coupled to `MassaAiConfig`; both scanners repointed (step 2 of 2), `CONFIG_VIEW_JS` → `CONFIG_SECTIONS_SRC`. 3 files |
+| T25 | `235ad1b4` | `views/config.js` → `.ts` (375 → 446 source). 1 file |
+
+`SPEC_DEVIATION: none`. Orchestrator-verified independently: build exit 0; web-ui
+**700 pass / 0 fail**; the six tools-api web-ui suites **56 pass / 0 fail**; the
+installer scanner **31 pass / 0 fail**; `render-golden.json` still `27195c2e…` with
+**0 commits touching it across the branch**; `dist/static` **22 `.js` / 0 `.ts`** from
+a `rm -rf apps/web-ui/dist` rebuild. **18 of 22 modules converted** — the denominator
+moved from 21 because T23 created a module; `dashboard.js`, `wire-view-handlers.js`,
+`start-app.js` and `app.js` remain.
+
+**The split did exactly what it was budgeted for.** `dist/static/views/config.js` was
+the largest emitted module in the bundle at **572** against the 600 cap. It is now
+**362**, with `config-sections.js` at 221 beside it. The largest emitted module is now
+`registry-state.js` at 554. No cap pressure remains anywhere in the bundle, and T25's
+"the cap is not to be raised" never had to be tested.
+
+**The coupling is stronger than the task asked for, and the difference is the whole
+point.** T24's bullet specified `ConfigSection`/`ConfigField` interfaces with
+`CONFIG_SECTIONS: ConfigSection[]`, where each element carries `key: ConfigSectionKey`.
+That form catches a **wrong** key and is blind to a **missing** one — the array would
+happily hold 15 sections. What shipped instead is a mapped type,
+
+```ts
+const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: K } } = { … };
+export const CONFIG_SECTIONS: ConfigSection[] = Object.values(CONFIG_SECTIONS_BY_KEY);
+```
+
+so the array every consumer and both scanners read is **derived** from an exhaustive
+map rather than being a second literal that could drift from it. Both failure
+directions are now compile errors.
+
+**Key sets verified by membership, not by count.** `MassaAiConfig` has **16**
+top-level keys across a 168-line interface; `CONFIG_SECTIONS_BY_KEY` has **16**; the
+scanners' own regex parses **16**. Sorted, the three lists are identical — `cache
+capturePolicy compression dataDir database embedding handoffs hooks impact llm logging
+memory scheduler search security synapse`. Three matching counts would not have
+established that.
+
+**Both sensor directions re-observed by the orchestrator, not accepted from the
+worker.** Reverted by `cp` from a scratch backup in both cases, never `git checkout`;
+`git status --porcelain` empty afterwards.
+
+*Direction 1 — a config key with no section* (added `probeOnlyKey?` to
+`MassaAiConfig`):
+
+```
+config-sections.ts(36,7): error TS2741: Property 'probeOnlyKey' is missing in type '{ database: … }' but required in type '{ probeOnlyKey: ConfigSection & { key: "probeOnlyKey"; }; … }'.
+```
+
+*Direction 2 — a section key that is not a config key* (renamed `scheduler` →
+`schedulerX`):
+
+```
+config-sections.ts(214,3): error TS2561: Object literal may only specify known properties, but 'schedulerX' does not exist in type '{ … }'. Did you mean to write 'scheduler'?
+```
+
+**`import type` erasure holds.** `import type { MassaAiConfig } from "@massa-ai/shared"`
+is present at `config-sections.ts:17`; `grep -c 'massa-ai/shared'` over the emitted
+`dist/static/views/config-sections.js` returns **0 across 221 lines** — the denominator
+matters, since a zero-byte emit would also return 0. A sweep of all of `dist/static/`
+for any bare specifier returns nothing.
+
+**Worker finding worth keeping.** Verifying the *revert* of direction 1 requires the
+turbo-mediated `bun run type-check`, not a bare `tsc` — `@massa-ai/shared` resolves
+through its built `dist/`, which a bare `tsc` run does not rebuild after the source is
+restored. A bare run would report a stale red on a clean tree.
+
+**Orchestrator measurement defect, caught before it was quoted.** The first count of
+`MassaAiConfig`'s keys used `grep -A40` and returned **6**, which read as a direct
+contradiction of the scanners' 16 and nearly became a reported finding. The interface
+is 168 body lines. The window was the population — the same truncation trap this log
+has already recorded once.
+
+**Third emit-versus-source datapoint, and the direction flipped again.** `config`
+source went 375 → 446 (+71 of annotation) while its emit went 375 → **362** (−13). On
+`registry-state` last batch, source shrank and emit grew. Neither surface predicts the
+other; quote whichever one the claim is actually about.
 
 ---
 
