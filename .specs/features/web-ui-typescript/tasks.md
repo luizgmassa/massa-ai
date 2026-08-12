@@ -677,7 +677,7 @@ Phases run sequentially; tasks within a phase run in order.
 **Tools**: MCP: NONE · Skill: NONE
 **Done when**:
 - [ ] `.ts` replaces `.js`; `fetchDashboardData` and its unwrap shape typed
-- [ ] `apps/tools-api/src/__tests__/dashboard-views.test.ts:12` `require` repointed
+- [ ] `apps/tools-api/src/__tests__/dashboard-views.test.ts:12` — **measure, do not assume.** It is `require("../../../web-ui/src/static/dashboard.js")` via `createRequire`, a **module specifier**, and D5's table says those auto-resolve `.js` → `.ts`. But D5 measured `import` and `await import`; the `require` row was reasoned into the table, not observed, and this one also crosses a package boundary into another package's raw source. Rename the module first, run the suite, and repoint **only if** it fails. Record which outcome was measured either way
 - [ ] `dashboard.test.ts` passes unmodified
 
 **Tests**: unit
@@ -694,6 +694,18 @@ Phases run sequentially; tasks within a phase run in order.
 **Requirement**: WUT-07, WUT-08, WUT-14
 **Non-goals**: rebinding-from-scratch after each render is deliberate — do not introduce listener tracking.
 **Tools**: MCP: NONE · Skill: NONE
+
+> **The sensor reading this module is a brace-depth lexer, and annotations can feed
+> it braces.** `app-renderers.test.ts` extracts `wireViewHandlers`' own source span by
+> counting braces from the declaration, skipping only those inside string/template
+> literals and comments — **not** those inside type annotations. An inline object type
+> in the signature (`function wireViewHandlers(ctx: { state: AppState })`) opens a
+> brace the lexer counts and closes early, and the `confirm()` assertion then fails on
+> a truncated span for a reason that looks nothing like its cause. Use a **named
+> interface** for every parameter type in this module. The same lexer already survived
+> `registry.ts`/`registry-state.ts` in Batch 8 — because those signatures used named
+> interfaces too, not because it is immune.
+
 **Done when**:
 - [ ] `.ts` replaces `.js`; the `data-action`/`data-filter` dispatch map typed
 - [ ] `app-renderers.test.ts:1649` source read repointed to `.ts`
