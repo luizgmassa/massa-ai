@@ -713,13 +713,31 @@ describe("GET /api/v1/logs/stream — heartbeat + auto-close via env overrides",
   }, 15_000);
 });
 
-// ── SSE enqueue-throw guards: `controller.enqueue` failing sets `closed` and
-// ── stops any further frame from being pushed (both the data path and the
-// ── heartbeat path share the same defensive shape) ──────────────────────────
+// ── SSE-04 / design D4: an enqueue throw (data path or heartbeat path) tears
+// ── the WHOLE stream down through the shared `teardown()` — not just a
+// ── `closed` flag. Pre-fix, `closed = true` alone left the source
+// ── subscription live (so `startSinkTail`'s poll runs forever into a dead
+// ── controller) and the socket open and silent. Each test below asserts BOTH
+// ── halves of AC-04.1/AC-04.2 that the old code could not deliver:
+// ──   (a) the subscription is released — `liveSubscriberCount` returns to
+// ──       its pre-stream baseline, proven via the buffer-fallback path
+// ──       (T13's existing instrumentation), and
+// ──   (b) the stream itself is closed — a subsequent `reader.read()`
+// ──       resolves `{done: true}` rather than hanging, which only
+// ──       `controller.close()` produces.
+// Both were run against the pre-fix code (`closed = true;` only, no
+// `unsubscribe?.()`/`controller.close()` in either catch) and observed RED:
+// (a) failed with `liveSubscriberCount` still at `before + 1`, and (b) timed
+// out waiting on `reader.read()` instead of observing `done: true`.
 
-describe("GET /api/v1/logs/stream — enqueue-throw guards close the stream", () => {
-  test("a controller.enqueue throw on a pushed entry sets closed and guards further data frames", async () => {
+describe("GET /api/v1/logs/stream — enqueue-throw guards close the stream (SSE-04)", () => {
+  test("a controller.enqueue throw on a pushed entry releases the subscription and closes the stream", async () => {
+    const before = liveSubscriberCount;
     const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    // No sink file exists yet in this test — falls back to the buffer
+    // subscription (LOG-09's own degradation), so `liveSubscriberCount`
+    // tracks it directly.
+    expect(liveSubscriberCount).toBe(before + 1);
     const reader = res.body!.getReader();
     const originalEncode = TextEncoder.prototype.encode;
     try {
@@ -731,23 +749,30 @@ describe("GET /api/v1/logs/stream — enqueue-throw guards close the stream", ()
       TextEncoder.prototype.encode = originalEncode;
     }
 
-    // `closed` is now true (set inside `enqueue`'s catch) — a subsequent push
-    // must never reach `controller.enqueue` at all (enqueue's own `if
-    // (closed) return` guard), so no frame ever arrives.
-    logBuffer.push({ ts: "2026-01-01T00:00:01.000Z", level: "info", message: "should never arrive" });
-    const outcome = await Promise.race([
-      reader.read().then(() => "frame-arrived"),
-      new Promise<string>((resolve) => setTimeout(() => resolve("timeout"), 100)),
+    // (a) Subscription released — `teardown()`'s `unsubscribe?.()` ran.
+    expect(liveSubscriberCount).toBe(before);
+
+    // (b) Stream closed — `teardown()`'s guarded `controller.close()` ran,
+    // so a read resolves `done` instead of hanging forever.
+    const closedResult = await Promise.race([
+      reader.read(),
+      new Promise<{ done: boolean }>((resolve) => setTimeout(() => resolve({ done: false }), 300)),
     ]);
-    expect(outcome).toBe("timeout");
+    expect(closedResult.done).toBe(true);
+
+    // Still true: enqueue's own `if (closed) return` guard means no
+    // subsequent push ever reaches `controller.enqueue` in the first place.
+    logBuffer.push({ ts: "2026-01-01T00:00:01.000Z", level: "info", message: "should never arrive" });
     await reader.cancel().catch(() => {});
   }, 15_000);
 
-  test("a controller.enqueue throw during a heartbeat tick sets closed and clears the heartbeat interval", async () => {
+  test("a controller.enqueue throw during a heartbeat tick releases the subscription and closes the stream", async () => {
     process.env.MASSA_AI_SSE_HEARTBEAT_MS = "10";
     process.env.MASSA_AI_SSE_MAX_DURATION_MS = "5000";
     try {
+      const before = liveSubscriberCount;
       const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+      expect(liveSubscriberCount).toBe(before + 1);
       const reader = res.body!.getReader();
       const originalEncode = TextEncoder.prototype.encode;
       try {
@@ -760,14 +785,16 @@ describe("GET /api/v1/logs/stream — enqueue-throw guards close the stream", ()
         TextEncoder.prototype.encode = originalEncode;
       }
 
-      // The heartbeat's own catch set `closed = true` and cleared its
-      // interval — a subsequent push must not produce a frame either.
-      logBuffer.push({ ts: "2026-01-01T00:00:02.000Z", level: "info", message: "should never arrive" });
-      const outcome = await Promise.race([
-        reader.read().then(() => "frame-arrived"),
-        new Promise<string>((resolve) => setTimeout(() => resolve("timeout"), 100)),
+      // (a) Subscription released by the heartbeat catch's `teardown()`.
+      expect(liveSubscriberCount).toBe(before);
+
+      // (b) Stream closed the same way.
+      const closedResult = await Promise.race([
+        reader.read(),
+        new Promise<{ done: boolean }>((resolve) => setTimeout(() => resolve({ done: false }), 300)),
       ]);
-      expect(outcome).toBe("timeout");
+      expect(closedResult.done).toBe(true);
+
       await reader.cancel().catch(() => {});
     } finally {
       delete process.env.MASSA_AI_SSE_HEARTBEAT_MS;
@@ -775,12 +802,14 @@ describe("GET /api/v1/logs/stream — enqueue-throw guards close the stream", ()
     }
   }, 15_000);
 
-  test("a heartbeat tick after `closed` was already set by a data-push throw self-clears its own interval", async () => {
-    // A data-push throw (unlike the heartbeat's own throw) sets `closed`
-    // WITHOUT clearing `heartbeatTimer` — only the heartbeat tick itself, or
-    // the max-duration close, does that. So a short heartbeat interval here
-    // reaches the heartbeat's `if (closed) { clearInterval(...); return; }`
-    // guard on its very next tick.
+  test("a data-push throw clears the still-armed heartbeat timer immediately via teardown, not on its next tick", async () => {
+    // Pre-fix, a data-push throw set `closed = true` WITHOUT touching
+    // `heartbeatTimer` — the interval kept firing forever (each tick a no-op
+    // once it observed `closed`), only ever clearing itself lazily on its own
+    // next tick. The shared `teardown()` (design D4) now clears
+    // `heartbeatTimer` synchronously inside the SAME catch that sets
+    // `closed`, so the interval is cancelled at the moment of the throw
+    // rather than surviving as a live-but-inert timer until its next fire.
     process.env.MASSA_AI_SSE_HEARTBEAT_MS = "10";
     process.env.MASSA_AI_SSE_MAX_DURATION_MS = "5000";
     try {
@@ -796,16 +825,15 @@ describe("GET /api/v1/logs/stream — enqueue-throw guards close the stream", ()
         TextEncoder.prototype.encode = originalEncode;
       }
 
-      // `closed` is true, `heartbeatTimer` is still armed — wait past its
-      // next tick, which self-clears on observing `closed`.
-      await new Promise((r) => setTimeout(r, 40));
-
-      logBuffer.push({ ts: "2026-01-01T00:00:01.000Z", level: "info", message: "should never arrive" });
-      const outcome = await Promise.race([
-        reader.read().then(() => "frame-arrived"),
-        new Promise<string>((resolve) => setTimeout(() => resolve("timeout"), 100)),
+      // The stream is already closed by this point (asserted in the sibling
+      // test above) — a read resolves `done` without waiting out any
+      // heartbeat interval at all.
+      const closedResult = await Promise.race([
+        reader.read(),
+        new Promise<{ done: boolean }>((resolve) => setTimeout(() => resolve({ done: false }), 100)),
       ]);
-      expect(outcome).toBe("timeout");
+      expect(closedResult.done).toBe(true);
+
       await reader.cancel().catch(() => {});
     } finally {
       delete process.env.MASSA_AI_SSE_HEARTBEAT_MS;

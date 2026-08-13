@@ -88,6 +88,109 @@ describe("GET /api/v1/events cancel teardown", () => {
   });
 });
 
+// ── SSE-04 / design D4: an enqueue throw (data path or heartbeat path) tears
+// ── the WHOLE stream down through the shared `teardown()` — not just a
+// ── `closed` flag. Pre-fix, `closed = true` alone left all 6 event
+// ── subscriptions live and the socket open and silent. Mirrors the same
+// ── assertions added to `logs.test.ts` for the sibling route. Each test
+// ── asserts BOTH halves of AC-04.1/AC-04.2:
+// ──   (a) every subscription is released — the summed `EventEmitter`
+// ──       listener count across the 6 subscribed events returns to its
+// ──       pre-stream baseline, and
+// ──   (b) the stream itself is closed — a subsequent `reader.read()`
+// ──       resolves `{done: true}` rather than hanging, which only
+// ──       `controller.close()` produces.
+// Both were run against the pre-fix code (`closed = true;` only, no
+// `unsubscribers.forEach(u => u())`/`controller.close()` in either catch) and
+// observed RED: (a) failed with the listener count still at `before + 6`,
+// and (b) timed out waiting on `reader.read()` instead of observing
+// `done: true`.
+
+describe("GET /api/v1/events — enqueue-throw guards close the stream (SSE-04)", () => {
+  const SUBSCRIBED_EVENTS = [
+    "indexing:started",
+    "indexing:progress",
+    "indexing:file",
+    "indexing:completed",
+    "indexing:failed",
+    "workspace:updated",
+  ] as const;
+
+  function totalListeners(): number {
+    return SUBSCRIBED_EVENTS.reduce((sum, e) => sum + eventBus.listenerCount(e), 0);
+  }
+
+  test("a controller.enqueue throw on a published event releases every subscription and closes the stream", async () => {
+    const before = totalListeners();
+    const reader = await openStream("");
+    expect(totalListeners()).toBe(before + SUBSCRIBED_EVENTS.length);
+
+    // Drain the initial "connected" frame `start()` enqueues synchronously
+    // (before the encode mock below is installed) so the later assertion on
+    // `reader.read()` unambiguously reflects the throw's own teardown rather
+    // than a frame already queued before it.
+    const first = await reader.read();
+    expect(first.done).toBe(false);
+
+    const originalEncode = TextEncoder.prototype.encode;
+    try {
+      (TextEncoder.prototype as any).encode = function (): never {
+        throw new Error("simulated encode failure");
+      };
+      eventBus.publish("indexing:started", { projectId: "p1", projectPath: "/x" } as never);
+    } finally {
+      TextEncoder.prototype.encode = originalEncode;
+    }
+
+    // (a) All 6 event subscriptions released — teardown()'s
+    // `unsubscribers.forEach(u => u())` ran.
+    expect(totalListeners()).toBe(before);
+
+    // (b) Stream closed — teardown()'s guarded `controller.close()` ran, so
+    // a read resolves `done` instead of hanging forever.
+    const closedResult = await Promise.race([
+      reader.read(),
+      new Promise<{ done: boolean }>((resolve) => setTimeout(() => resolve({ done: false }), 300)),
+    ]);
+    expect(closedResult.done).toBe(true);
+
+    await reader.cancel().catch(() => {});
+  }, 15_000);
+
+  test("a controller.enqueue throw during a heartbeat tick releases every subscription and closes the stream", async () => {
+    const before = totalListeners();
+    const reader = await openStream("");
+    expect(totalListeners()).toBe(before + SUBSCRIBED_EVENTS.length);
+
+    // Drain the initial "connected" frame first, same reason as above.
+    const first = await reader.read();
+    expect(first.done).toBe(false);
+
+    const originalEncode = TextEncoder.prototype.encode;
+    try {
+      (TextEncoder.prototype as any).encode = function (): never {
+        throw new Error("simulated encode failure");
+      };
+      // Module-level MASSA_AI_SSE_HEARTBEAT_MS="30" (top of this file) — 40ms
+      // lets >=1 heartbeat tick fire and throw, well inside the module-level
+      // MASSA_AI_SSE_MAX_DURATION_MS="90" auto-close window.
+      await wait(40);
+    } finally {
+      TextEncoder.prototype.encode = originalEncode;
+    }
+
+    expect(totalListeners()).toBe(before);
+
+    const closedResult = await Promise.race([
+      reader.read(),
+      new Promise<{ done: boolean }>((resolve) => setTimeout(() => resolve({ done: false }), 300)),
+    ]);
+    expect(closedResult.done).toBe(true);
+
+    await reader.cancel().catch(() => {});
+  }, 15_000);
+});
+
 // ── GET /api/v1/events — per-request idle-window override (T2b, spec ───────
 // ── SSE-07, AC-07.1..AC-07.4) ────────────────────────────────────────────────
 

@@ -50,12 +50,41 @@ export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
         // case.
         applySseRequestTimeout(request);
 
+        /**
+         * Single teardown path for every way this stream ends once `start`
+         * has run: a throwing enqueue (the data path below, or the
+         * heartbeat tick further down) and the MAX_DURATION_MS auto-close.
+         * Before SSE-04 the enqueue/heartbeat throw paths only set
+         * `closed = true` (the heartbeat also cleared its own interval) —
+         * the event subscriptions and the stream itself were left open
+         * forever (design D4, mirroring the matching leak in `logs.ts`).
+         * `cancel` (below) has no access to `controller` — it stays its own
+         * minimal teardown — but everything reachable from inside `start`
+         * routes through here. Idempotent: `closed`,
+         * `clearInterval`/`clearTimeout`, and the guarded `close()` are all
+         * safe to invoke more than once.
+         */
+        const teardown = () => {
+          closed = true;
+          unsubscribers.forEach((u) => u());
+          if (heartbeatTimer) clearInterval(heartbeatTimer);
+          if (closeTimer) clearTimeout(closeTimer);
+          try {
+            controller.close();
+          } catch {
+            // already closed
+          }
+        };
+
         const enqueue = (data: unknown) => {
           if (closed) return;
           try {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
           } catch {
-            closed = true;
+            // The client is gone — close the stream and release the event
+            // subscriptions now instead of leaving both open (SSE-04,
+            // design D4).
+            teardown();
           }
         };
 
@@ -89,22 +118,14 @@ export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
           try {
             controller.enqueue(encoder.encode(`: heartbeat\n\n`));
           } catch {
-            closed = true;
-            clearInterval(heartbeatTimer);
+            // Same leak as the data path above (SSE-04) — route through the
+            // shared teardown instead of only flipping `closed`.
+            teardown();
           }
         }, HEARTBEAT_MS);
 
         // Auto-close after MAX_DURATION_MS
-        closeTimer = setTimeout(() => {
-          closed = true;
-          unsubscribers.forEach((u) => u());
-          clearInterval(heartbeatTimer);
-          try {
-            controller.close();
-          } catch {
-            // already closed
-          }
-        }, MAX_DURATION_MS);
+        closeTimer = setTimeout(teardown, MAX_DURATION_MS);
 
         // Send initial connected event
         enqueue({

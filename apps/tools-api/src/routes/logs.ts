@@ -533,12 +533,42 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
           // what covers that case.
           applySseRequestTimeout(request);
 
+          /**
+           * Single teardown path for every way this stream ends once `start`
+           * has run: a throwing enqueue (the data path below, or the
+           * heartbeat tick further down) and the MAX_DURATION_MS auto-close.
+           * Before SSE-04 the enqueue/heartbeat throw paths only set
+           * `closed = true` (the heartbeat also cleared its own interval) —
+           * the source subscription and the stream itself were left open
+           * forever, so `startSinkTail`'s 1s poll kept stat-ing and reading
+           * the sink into a dead controller for the life of the process
+           * (design D4). `cancel` (below) has no access to `controller` —
+           * it stays its own minimal teardown — but everything reachable
+           * from inside `start` routes through here. Idempotent: `closed`,
+           * `clearInterval`/`clearTimeout`, and the guarded `close()` are
+           * all safe to invoke more than once.
+           */
+          const teardown = () => {
+            closed = true;
+            unsubscribe?.();
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            if (closeTimer) clearTimeout(closeTimer);
+            try {
+              controller.close();
+            } catch {
+              // already closed
+            }
+          };
+
           const enqueue = (data: unknown) => {
             if (closed) return;
             try {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
             } catch {
-              closed = true;
+              // The client is gone — close the stream and release the
+              // source subscription now instead of leaving both open
+              // (SSE-04, design D4).
+              teardown();
             }
           };
 
@@ -572,21 +602,13 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
             try {
               controller.enqueue(encoder.encode(`: heartbeat\n\n`));
             } catch {
-              closed = true;
-              clearInterval(heartbeatTimer);
+              // Same leak as the data path above (SSE-04) — route through
+              // the shared teardown instead of only flipping `closed`.
+              teardown();
             }
           }, HEARTBEAT_MS);
 
-          closeTimer = setTimeout(() => {
-            closed = true;
-            unsubscribe?.();
-            clearInterval(heartbeatTimer);
-            try {
-              controller.close();
-            } catch {
-              // already closed
-            }
-          }, MAX_DURATION_MS);
+          closeTimer = setTimeout(teardown, MAX_DURATION_MS);
         },
         // Cleanup on stream cancel (client disconnected). `cancel` is the
         // only reliable teardown seam: ReadableStream ignores a function
