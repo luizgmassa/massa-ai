@@ -151,10 +151,26 @@ present:
   for every remote-source user. It is left unchanged because changing it on
   inference is precisely the error that produced the stale diagnosis this
   feature had to correct, not because it is known safe. MDS-05 owns closing it.
-- **AC-01.3** Every failure mode resolves to `null`, never a throw: absent or
-  unparseable `known_marketplaces.json`, missing `installLocation`, absent or
-  unparseable `.claude-plugin/marketplace.json`, no plugin entry matching the
-  name, or a composed path that does not exist on disk.
+- **AC-01.3** **AMENDED after implementation — the original wording was wrong
+  and a pre-existing test caught it.** Two outcomes must be distinguished, and
+  the first draft collapsed them:
+  - *The branch does not apply* — `known_marketplaces.json` absent, unparseable,
+    or naming no directory source for this marketplace. Fall through to the
+    cache path (AC-01.2), i.e. every install without a marketplace registry
+    keeps working exactly as before.
+  - *The branch applies but fails* — a directory source IS named, and then
+    `installLocation` is missing, `.claude-plugin/marketplace.json` is absent or
+    unparseable, no plugin entry matches the name, the composed path escapes
+    `installLocation` (AC-01.6), or it does not exist on disk. Resolve `null`,
+    never a throw, and never a silent demotion to the cache — demoting a named
+    directory source is exactly the two-trees bug this feature fixes.
+
+  The original listed "absent or unparseable `known_marketplaces.json`" under
+  the second class. That made the entire pre-existing cache path unreachable for
+  any install with no marketplace registry. `variant-sync.test.ts`'s T18 — which
+  stages only `installed_plugins.json` — measured **12/0 on `main` and 11/1 on
+  this branch** until the resolver fell through instead. The requirement was
+  wrong, not the test; the test's own amended assertion records that.
 - **AC-01.6** The composed path must resolve to a descendant of
   `installLocation`. `plugins[i].source` is manifest-supplied relative data, and
   this is the first code path that turns manifest content into a live **write**

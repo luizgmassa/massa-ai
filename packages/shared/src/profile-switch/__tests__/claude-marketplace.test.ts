@@ -332,7 +332,19 @@ describe("resolveClaudeMarketplaceRoot — directory source (MDS-01 D1, AC-01.1,
 });
 
 describe("resolveClaudeMarketplaceRoot — AC-01.3 failure modes (directory source, never falls back to cache)", () => {
-  test("(1) absent known_marketplaces.json resolves null, even with a separately valid, resolvable cache record", () => {
+  // AMENDED, and the amendment is the point: this test previously asserted
+  // `toBeNull()`, encoding spec AC-01.3's original claim that an absent
+  // `known_marketplaces.json` refuses outright. That requirement was wrong.
+  // Absence means this branch cannot determine the marketplace KIND — the
+  // "does not apply" case — not that a directory source exists and is broken.
+  // Refusing there makes the entire pre-existing cache path unreachable for
+  // any install with no marketplace registry, which is a regression, not a
+  // guard: `variant-sync.test.ts`'s T18 stages only `installed_plugins.json`
+  // and went 12/0 on `main` to 11/1 on this branch until the resolver returned
+  // `undefined` here instead. The narrower guard the spec actually wanted —
+  // never silently demoting a *named* directory source to the cache — is
+  // unaffected and still asserted by the cases below.
+  test("(1) absent known_marketplaces.json falls through to the cache record, preserving pre-feature behavior", () => {
     const home = makeHome();
     const cachePath = makeInstallDir(home, "1.0.0");
     writeRegistry(home, {
@@ -343,7 +355,7 @@ describe("resolveClaudeMarketplaceRoot — AC-01.3 failure modes (directory sour
     });
     // No known_marketplaces.json staged at all.
 
-    expect(resolveClaudeMarketplaceRoot({ targetHome: home })).toBeNull();
+    expect(resolveClaudeMarketplaceRoot({ targetHome: home })).toBe(cachePath);
   });
 
   test("(1) unparseable known_marketplaces.json resolves null, never throws", () => {

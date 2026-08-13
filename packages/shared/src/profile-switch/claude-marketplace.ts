@@ -125,11 +125,18 @@ function isContainedPath(root: string, candidate: string): boolean {
  *    cache branch, because a directory-source install with a broken
  *    manifest is a broken install, not evidence it must be the other kind.
  *
- * AC-01.3 also covers `known_marketplaces.json` itself being absent or
- * unparseable: that resolves `null` directly, even if `installed_plugins.
- * json` separately holds an otherwise-valid record. This registry is the
- * only source of truth for *which* kind of marketplace this is; losing it
- * must not silently default to "must be the cache kind."
+ * An absent or unparseable `known_marketplaces.json` is `undefined`, NOT
+ * `null` — it means this branch cannot determine the source kind, which is
+ * the "does not apply" case, not the "applies and is broken" case. The
+ * spec's AC-01.3 originally listed it as a `null` failure mode; that was
+ * wrong, and `variant-sync.test.ts`'s T18 caught it as a real regression:
+ * that suite stages only `installed_plugins.json`, and `null` here made the
+ * entire pre-existing cache path unreachable for any install without a
+ * marketplace registry. `main` measured 12/0 on that suite and this branch
+ * 11/1 until this line returned `undefined`. Refusing on the *absence* of a
+ * registry breaks every non-marketplace install to guard a case that only
+ * exists once a directory source is actually named — which line 148 below
+ * already handles.
  */
 function resolveDirectorySourceRoot(targetHome: string, pluginKey: string): string | null | undefined {
   const split = splitPluginKey(pluginKey);
@@ -141,7 +148,7 @@ function resolveDirectorySourceRoot(targetHome: string, pluginKey: string): stri
   try {
     known = JSON.parse(fs.readFileSync(knownMarketplacesPath, "utf8")) as KnownMarketplacesFile;
   } catch {
-    return null; // AC-01.3: absent or unparseable known_marketplaces.json.
+    return undefined; // Cannot determine the kind — fall through (AC-01.2), see docblock.
   }
 
   const entry = known?.[marketplaceName];
