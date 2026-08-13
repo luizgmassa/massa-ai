@@ -50,6 +50,7 @@ import { logsRoutes } from "./routes/logs.js";
 import { setSseRequestTimeoutSource, type SseRequestTimeoutSource } from "./routes/sse-keepalive.js";
 import { setServerStopper, setJobsStopper, gracefulShutdown } from "./lifecycle.js";
 import { authMiddleware } from "./middleware/auth.js";
+import { writeModeMiddleware } from "./middleware/write-mode.js";
 import { errorHandler } from "./middleware/error.js";
 import { getHealthChecker, searchSessionHook, coRetrievalHook } from "@massa-ai/core";
 import { installProjectIdentityGuardsFromPool } from "@massa-ai/core";
@@ -131,6 +132,11 @@ const app = new Elysia({ adapter: node() })
   )
   .use(errorHandler)
   .use(authMiddleware)
+  // HPC-03 (T2): registered immediately after authMiddleware, using the same
+  // `.onBeforeHandle({ as: "global" })` form, so it gates every route plugin
+  // `.use()`d below — see write-mode.ts's module docblock for the decision
+  // rule (design.md §D1).
+  .use(writeModeMiddleware)
   .use(searchRoutes)
   .use(memoryRoutes)
   .use(checkpointRoutes)
