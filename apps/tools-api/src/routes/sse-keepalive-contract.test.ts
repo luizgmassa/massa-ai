@@ -233,3 +233,85 @@ describe("SSE-03 regression sensor", () => {
     }
   });
 });
+
+/**
+ * SSE-07 AC-07.1 — the production wiring in `index.ts`, which no behavioral
+ * test reaches.
+ *
+ * The independent verification pass found this as the feature's single
+ * coverage gap, and a scratch mutation confirmed it was a SURVIVING mutant,
+ * not a theoretical one: deleting `setSseRequestTimeoutSource(bunServer)` from
+ * `index.ts` left every suite green — `logs` 51/0, `events` 8/0,
+ * `sse-keepalive` 14/0, `sse-keepalive-contract` 2/0. Production would have
+ * silently fallen back to Bun's 10 s default window on every SSE request while
+ * the whole suite reported success.
+ *
+ * No behavioral test can close this. Every suite here constructs its own
+ * Elysia app; none imports `index.ts`, because importing it boots the real
+ * server — PostgreSQL pool, Prisma client, scheduler, port bind. So this is a
+ * SOURCE-LEVEL wiring sensor, and it is worth being explicit about what that
+ * does and does not prove: it proves the call site exists, is inside the
+ * `app.listen` callback, and is fed from the handle traversal rather than a
+ * literal `undefined`. It does NOT prove the traversal still finds a real
+ * server on a future Bun or adapter version — `sse-idle-survival.test.ts`'s
+ * real-HTTP hold is what would catch that, and it exercises the accessor
+ * directly rather than through `index.ts`.
+ *
+ * The alternative — accepting a documented gap — was rejected: a gap closed by
+ * a one-time hand check is indistinguishable from an unguarded one the moment
+ * the checker moves on.
+ */
+describe("SSE-07 production wiring (AC-07.1)", () => {
+  const INDEX_PATH = path.join(ROUTES_DIR, "..", "index.ts");
+
+  /** Strips block comments and whole-line `//` comments before scanning.
+   *  Load-bearing, not tidiness: `index.ts`'s own docblock explains the
+   *  degrading case using the literal text `setSseRequestTimeoutSource(undefined)`,
+   *  and the first draft of this sensor captured `undefined` from that COMMENT
+   *  as the argument name and then failed against correct code. Comments are
+   *  source to a text scanner. Only whole-line `//` comments are stripped, so a
+   *  `//` inside a URL or string literal cannot silently truncate real code. */
+  function stripComments(src: string): string {
+    return src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n")
+      .filter((line) => !/^\s*\/\//.test(line))
+      .join("\n");
+  }
+
+  test("index.ts registers the native Bun server inside the listen callback", () => {
+    const source = stripComments(fs.readFileSync(INDEX_PATH, "utf8"));
+
+    expect(
+      /import\s*\{[^}]*\bsetSseRequestTimeoutSource\b[^}]*\}\s*from\s*["'].*sse-keepalive\.js["']/s.test(source),
+      `index.ts must import setSseRequestTimeoutSource from routes/sse-keepalive.js (AC-07.1).`,
+    ).toBe(true);
+
+    // Scope to the listen callback: a call anywhere else in the module would
+    // run at import time, before a server handle exists, and register nothing.
+    const listenIdx = source.indexOf("app.listen(");
+    expect(listenIdx, `index.ts must call app.listen( — the wiring is scoped to its callback.`).toBeGreaterThan(-1);
+    const callbackRegion = source.slice(listenIdx, source.indexOf("\n    } catch", listenIdx));
+
+    const callMatch = callbackRegion.match(/setSseRequestTimeoutSource\(\s*([A-Za-z_$][\w$]*)\s*\)/);
+    expect(
+      callMatch,
+      `index.ts must call setSseRequestTimeoutSource(<identifier>) INSIDE the app.listen callback ` +
+        `(AC-07.1). Deleting this call is a mutation every other suite in this feature survives — ` +
+        `every SSE request would silently fall back to Bun's 10s default window.`,
+    ).not.toBeNull();
+
+    // The argument must trace to the listen handle's `bun.server` traversal.
+    // Passing a literal `undefined` would satisfy the call-site check above
+    // while registering nothing — AC-07.3's degradation is a runtime state,
+    // never a hardcoded one.
+    const argName = callMatch![1] as string;
+    const bindingRe = new RegExp(`const\\s+${argName}\\s*=[^;]*\\bbun\\b[^;]*\\?\\.\\s*server`, "s");
+    expect(
+      bindingRe.test(callbackRegion),
+      `setSseRequestTimeoutSource is called with "${argName}", but "${argName}" is not bound from the ` +
+        `listen handle's \`bun?.server\` traversal in the same callback (AC-07.1/AC-07.3). Registering a ` +
+        `hardcoded undefined would pass a call-site check while silently disabling the override.`,
+    ).toBe(true);
+  });
+});
