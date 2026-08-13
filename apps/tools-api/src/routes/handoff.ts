@@ -1,14 +1,22 @@
 /**
- * Handoff Routes (Phase 6 — cross-session handoffs, G2).
+ * Handoff Routes (Phase 6 — cross-session handoffs, G2; T7 — portal CRUD).
  *
- * POST /api/v1/handoff/begin  - Begin a handoff (open row + dual-write memory)
- * POST /api/v1/handoff/accept - Accept an open handoff (open→accepted + event)
- * POST /api/v1/handoff/cancel - Cancel an open handoff (open→expired)
- * POST /api/v1/handoff/list   - List pending (open) handoffs
+ * POST   /api/v1/handoff/begin  - Begin a handoff (open row + dual-write memory)
+ * POST   /api/v1/handoff/accept - Accept an open handoff (open→accepted + event)
+ * POST   /api/v1/handoff/cancel - Cancel an open handoff (open→expired)
+ * POST   /api/v1/handoff/list   - List pending (open) handoffs
+ * PATCH  /api/v1/handoff/:id    - Edit targetAgent/summary/openQuestions/nextSteps/files
+ * DELETE /api/v1/handoff/:id    - Hard-delete a handoff row
  *
  * Returns 423 when handoffs is disabled via config and 400 on missing required
  * fields. Canonical store failures flow to the global sanitized error envelope;
  * domain rejections surface as {ok:false, reason}.
+ *
+ * PATCH/DELETE (T7, HPC-01) use explicit status codes (400/404/200) rather
+ * than the 200-carrying-{success:false} shape the other four routes above
+ * use — AC-01.6/AC-01.7 specifically require a real 404, not a 200 body.
+ * `projectId` scoping for PATCH/DELETE is a query parameter, never a body
+ * field: AC-01.2 requires the PATCH body to reject `projectId` by name.
  */
 
 import { getHandoffService, SearchServiceError } from "@massa-ai/core";
@@ -37,6 +45,24 @@ export function rethrowCanonicalHandoffError(error: unknown): void {
 const EVENT_DETAIL = {
   tags: ["handoffs"],
 };
+
+/**
+ * AC-01.2: allowlist, not denylist. Any body key outside this list —
+ * including `status`, `acceptedAt`, `id`, `projectId`, `createdAt`,
+ * `sourceSessionId`, and any field added to the model later — is rejected
+ * by name. `status`/`acceptedAt` stay exclusively `setStatus`'s (AC-01.3).
+ */
+const HANDOFF_PATCH_ALLOWED_FIELDS = [
+  "targetAgent",
+  "summary",
+  "openQuestions",
+  "nextSteps",
+  "files",
+] as const;
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
 
 export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
   .post(
@@ -208,6 +234,152 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
         summary: "List pending (open) handoffs",
         description:
           "Lists open handoffs for a project, optionally filtered by target agent, ordered oldest-first.",
+      },
+    },
+  )
+  .patch(
+    "/:id",
+    async ({ params, query, body, set }) => {
+      if (handoffsDisabled()) {
+        set.status = 423;
+        return { status: 423, error: "handoffs disabled" };
+      }
+
+      const raw = (body ?? {}) as Record<string, unknown>;
+      const keys = Object.keys(raw);
+      const rejected = keys.filter(
+        (k) => !(HANDOFF_PATCH_ALLOWED_FIELDS as readonly string[]).includes(k),
+      );
+      if (rejected.length > 0) {
+        set.status = 400;
+        return { status: 400, error: `field not allowed: ${rejected.join(", ")}` };
+      }
+
+      const patch: {
+        targetAgent?: string | null;
+        summary?: string;
+        openQuestions?: string[];
+        nextSteps?: string[];
+        files?: string[];
+      } = {};
+
+      if ("targetAgent" in raw) {
+        const v = raw.targetAgent;
+        if (v !== null && typeof v !== "string") {
+          set.status = 400;
+          return { status: 400, error: "targetAgent must be a string or null" };
+        }
+        patch.targetAgent = v as string | null;
+      }
+      if ("summary" in raw) {
+        if (typeof raw.summary !== "string") {
+          set.status = 400;
+          return { status: 400, error: "summary must be a string" };
+        }
+        patch.summary = raw.summary;
+      }
+      if ("openQuestions" in raw) {
+        if (!isStringArray(raw.openQuestions)) {
+          set.status = 400;
+          return { status: 400, error: "openQuestions must be an array of strings" };
+        }
+        patch.openQuestions = raw.openQuestions;
+      }
+      if ("nextSteps" in raw) {
+        if (!isStringArray(raw.nextSteps)) {
+          set.status = 400;
+          return { status: 400, error: "nextSteps must be an array of strings" };
+        }
+        patch.nextSteps = raw.nextSteps;
+      }
+      if ("files" in raw) {
+        if (!isStringArray(raw.files)) {
+          set.status = 400;
+          return { status: 400, error: "files must be an array of strings" };
+        }
+        patch.files = raw.files;
+      }
+
+      if (Object.keys(patch).length === 0) {
+        set.status = 400;
+        return { status: 400, error: "no editable field provided" };
+      }
+
+      try {
+        const result = await service().update({
+          id: params.id,
+          projectId: query.projectId,
+          patch,
+        });
+        if (!result.ok) {
+          set.status = result.reason === "not-found" || result.reason === "project-mismatch" ? 404 : 400;
+          return { status: set.status, error: result.reason };
+        }
+        set.status = 200;
+        return { success: true, data: result.handoff };
+      } catch (e) {
+        rethrowCanonicalHandoffError(e);
+        const err = e as Error;
+        logger.error("handoff update failed", err);
+        set.status = 500;
+        return { success: false, error: `handoff update failed: ${err.message}` };
+      }
+    },
+    {
+      params: t.Object({ id: t.String({ description: "Handoff id" }) }),
+      query: t.Object({
+        projectId: t.Optional(
+          t.String({ description: "If supplied, must match the row's projectId or the request 404s" }),
+        ),
+      }),
+      body: t.Record(t.String(), t.Unknown(), {
+        description:
+          "Only targetAgent/summary/openQuestions/nextSteps/files are accepted; any other key is a 400 naming it.",
+      }),
+      detail: {
+        ...EVENT_DETAIL,
+        summary: "Edit a handoff (targetAgent/summary/openQuestions/nextSteps/files only)",
+        description:
+          "Allowlist PATCH: status/acceptedAt/id/projectId/createdAt/sourceSessionId and any unknown key are rejected " +
+          "by name with 400. Refreshes the dual-written memory's content when a content-feeding field changes.",
+      },
+    },
+  )
+  .delete(
+    "/:id",
+    async ({ params, query, set }) => {
+      if (handoffsDisabled()) {
+        set.status = 423;
+        return { status: 423, error: "handoffs disabled" };
+      }
+      try {
+        const result = await service().delete({ id: params.id, projectId: query.projectId });
+        if (!result.ok) {
+          set.status = 404;
+          return { status: 404, error: result.reason };
+        }
+        set.status = 200;
+        return { success: true, data: { id: result.id } };
+      } catch (e) {
+        rethrowCanonicalHandoffError(e);
+        const err = e as Error;
+        logger.error("handoff delete failed", err);
+        set.status = 500;
+        return { success: false, error: `handoff delete failed: ${err.message}` };
+      }
+    },
+    {
+      params: t.Object({ id: t.String({ description: "Handoff id" }) }),
+      query: t.Object({
+        projectId: t.Optional(
+          t.String({ description: "If supplied, must match the row's projectId or the request 404s" }),
+        ),
+      }),
+      detail: {
+        ...EVENT_DETAIL,
+        summary: "Hard-delete a handoff",
+        description:
+          "Permitted in any status, including open. The dual-written memory row is left intact (dangling metadata.handoffId is accepted).",
       },
     },
   );
