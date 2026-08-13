@@ -2389,6 +2389,37 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     expect(ctx.state.logsLive).toBe(false);
     expect(ctx.root.children[0].textContent).toContain("giving up");
   });
+
+  it("an exactly-30000ms connection lands on the healthy side of the boundary — resets the streak instead of counting as rapid (T50)", async () => {
+    // Pins `lifetimeMs < LOGS_RECONNECT_HEALTHY_MS_DEFAULT` (30_000, not
+    // exported — hardcoded here, same convention as T49's SCHEDULED_MS
+    // above) against a `<=` mutant. maxReconnectAttempts: 0 means a single
+    // rapid close is enough to give up, so this two-connection sequence
+    // (exactly-boundary, then genuinely rapid) reaches a second fetch call
+    // only under the shipped `<` — the mutant `<=` counts the first,
+    // exactly-boundary connection as rapid and gives up after just one.
+    let clock = 0;
+    const lifetimes = [30_000, 0]; // conn 1: exactly the threshold; conn 2: rapid
+    let call = 0;
+    const now = () => clock;
+    const fetchMock = mock(async () => {
+      clock += lifetimes[call];
+      call += 1;
+      return makeSseResponse([]);
+    });
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    await runLogsLiveStream(ctx, { reconnectDelayMs: 0, maxReconnectAttempts: 0, now });
+    // Exactly 2 connections happened: the first (exactly 30000ms) reset the
+    // streak rather than tripping it, so the run survived to attempt the
+    // second, genuinely-rapid connection before giving up on that one.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(ctx.state.logsLive).toBe(false);
+    expect(ctx.root.children[0].textContent).toContain("giving up");
+  });
 });
 
 describe("stopLogsLiveStream — teardown on toggle-off / navigate-away (T15, LOG-14/15)", () => {

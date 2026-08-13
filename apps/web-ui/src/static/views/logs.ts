@@ -516,7 +516,19 @@ export async function runLogsLiveStream(
  *  via `root.querySelector` — never the event target or a dataset value —
  *  matching this file's established rule (`handleMemoryDeleteProject`'s
  *  precedent) that a synthetic harness event must resolve through the real
- *  DOM lookup rather than being trusted at face value. */
+ *  DOM lookup rather than being trusted at face value.
+ *
+ *  T50: two synchronous invocations of this function in the same JS turn
+ *  (e.g. called twice back-to-back rather than via a real `change` event)
+ *  can leave `state.logsLive === true` with `state.logsStreamInFlight ===
+ *  false` and nothing scheduled — the same silent-death state that existed
+ *  before T47. This is not reachable through real DOM `change` events: two
+ *  genuine toggles always have at least one macrotask boundary between them
+ *  (confirmed with a single `setTimeout(0)`), and `runLogsLiveStream`'s
+ *  in-flight guard only protects a caller that has already started running.
+ *  No guard was added for it — it matters only if this handler is ever
+ *  driven programmatically or from a batching test harness, and an
+ *  unreachable guard cannot be tested. */
 export function handleLogsLiveToggle(ctx: LogsCtx): void {
   const state = ctx.state || (ctx.state = {});
   const el = ctx.root && ctx.root.querySelector ? ctx.root.querySelector('[data-action="logs-live-toggle"]') : null;
