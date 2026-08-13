@@ -12,6 +12,7 @@ import {
   type HandoffRecord,
   type HandoffStatus,
   type HandoffStore,
+  type HandoffUpdatePatch,
 } from "./handoff-contract.js";
 
 interface PgHandoffRow {
@@ -190,6 +191,68 @@ export class PgHandoffStore implements HandoffStore {
     const persisted = toRecord(rows[0]);
     this.mirror.set(id, persisted);
     return structuredClone(persisted);
+  }
+
+  /**
+   * Writes only the five allowlisted columns (AC-01.1). `status` /
+   * `accepted_at` never appear in this SQL — they stay exclusively
+   * `setStatus`'s paired write (AC-01.3). Absent patch fields are re-written
+   * with their current mirror value rather than a partial `SET` list, which
+   * keeps the query static; the effect on the row is identical either way.
+   */
+  async update(id: string, patch: HandoffUpdatePatch): Promise<HandoffRecord | null> {
+    await this.ensureHydrated();
+    const current = this.mirror.get(id);
+    if (!current) return null;
+
+    const merged: HandoffRecord = {
+      ...current,
+      ...(patch.targetAgent !== undefined ? { targetAgent: patch.targetAgent } : {}),
+      ...(patch.summary !== undefined ? { summary: patch.summary } : {}),
+      ...(patch.openQuestions !== undefined ? { openQuestions: patch.openQuestions } : {}),
+      ...(patch.nextSteps !== undefined ? { nextSteps: patch.nextSteps } : {}),
+      ...(patch.files !== undefined ? { files: patch.files } : {}),
+    };
+
+    let rows: PgHandoffRow[];
+    try {
+      rows = await this.getClient().$queryRaw<PgHandoffRow[]>`
+        UPDATE handoffs
+        SET target_agent = ${merged.targetAgent}, summary = ${merged.summary},
+            open_questions_json = ${JSON.stringify(merged.openQuestions ?? [])},
+            next_steps_json = ${JSON.stringify(merged.nextSteps ?? [])},
+            files_json = ${JSON.stringify(merged.files ?? [])}
+        WHERE id = ${id}
+        RETURNING id, project_id, source_session_id, target_agent, summary,
+                  open_questions_json, next_steps_json, files_json, status,
+                  created_at, accepted_at`;
+    } catch (error) {
+      throw searchBackendUnavailable("handoff_store", error);
+    }
+    if (!rows[0]) return null;
+    const persisted = toRecord(rows[0]);
+    this.mirror.set(id, persisted);
+    return structuredClone(persisted);
+  }
+
+  /**
+   * Hard-deletes in any status (AC-01.4). The DB's affected-row count is the
+   * source of truth for whether anything existed; the in-process mirror is
+   * only ever purged *after* that DB write succeeds, and it must be purged
+   * (D3) — omitting `mirror.delete` leaves this store instance serving the
+   * deleted row from memory for the rest of the process.
+   */
+  async delete(id: string): Promise<string | null> {
+    await this.ensureHydrated();
+    let affected: number;
+    try {
+      affected = await this.getClient().$executeRaw`DELETE FROM handoffs WHERE id = ${id}`;
+    } catch (error) {
+      throw searchBackendUnavailable("handoff_store", error);
+    }
+    if (affected === 0) return null;
+    this.mirror.delete(id);
+    return id;
   }
 
   async journalMode(): Promise<string> {
