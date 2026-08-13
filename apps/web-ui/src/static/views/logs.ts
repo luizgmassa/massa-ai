@@ -361,19 +361,40 @@ function delayLogsReconnect(ms: number, signal?: AbortSignal | null): Promise<vo
   });
 }
 
-/** One fetch + read loop over `/api/v1/logs/stream`. Returns `true` only
- *  when the loop ended because the server closed the stream cleanly while
- *  `state.logsLive` was still true — the one case `runLogsLiveStream`
- *  should reconnect for. Every other exit (a non-200, a thrown error that
- *  is not our own abort, our own abort, or `state.logsLive` having gone
- *  false mid-wait) returns `false`; a non-200 or a genuine thrown error
- *  also banners and turns Live off here, exactly as the pre-T47 single-shot
- *  version did. */
+/** The four distinct ways one `/api/v1/logs/stream` connection can end
+ *  (design D5, spec SSE-06). Before SSE-06 `connectLogsStreamOnce` returned
+ *  a plain `boolean`, which collapsed three of these into `false` and made a
+ *  transient thrown network error indistinguishable from a non-200 — both
+ *  turned Live off and bannered immediately, with no retry (the reported
+ *  Logs-tab symptom: the initial burst delivers, then a thrown fetch error
+ *  permanently kills the tail). The string return lets `runLogsLiveStream`
+ *  tell them apart:
+ *    - "clean"     server closed the stream cleanly, `logsLive` still true
+ *                  — reconnect (the existing T47 path).
+ *    - "retryable" a thrown error that is NEITHER our own abort NOR a
+ *                  non-200 — reconnect under the same bounds as "clean"
+ *                  (AC-06.1). This is the behavior that actually changes.
+ *    - "terminal"  a non-200 response — banners and turns Live off HERE,
+ *                  never retried (AC-06.2, preserving T47's rule that a
+ *                  status which will not fix itself is never retried).
+ *    - "aborted"   our own teardown abort, or `state.logsLive` went false
+ *                  mid-wait — silent, no banner, no reconnect (AC-06.3). */
+type LogsStreamExit = "clean" | "retryable" | "terminal" | "aborted";
+
+/** Marks the one thrown error `connectLogsStreamOnce` itself constructs (a
+ *  non-200 response) so its catch block can tell "terminal" apart from every
+ *  other thrown error — a real `fetch` rejection, a `reader.read()` failure,
+ *  etc. — by type rather than by inspecting a message string (design D5). */
+class LogsStreamNonOkError extends Error {}
+
+/** One fetch + read loop over `/api/v1/logs/stream`. See `LogsStreamExit`
+ *  above for what each return value means and how `runLogsLiveStream`
+ *  reacts to it. */
 async function connectLogsStreamOnce(
   ctx: LogsCtx,
   state: LogsStreamState,
   controller: AbortController | null,
-): Promise<boolean> {
+): Promise<LogsStreamExit> {
   try {
     const headers = ctx.api && ctx.api.authHeaders ? ctx.api.authHeaders() : {};
     const res = await fetch("/api/v1/logs/stream", {
@@ -385,8 +406,8 @@ async function connectLogsStreamOnce(
       // used to fall through into the read loop, find no frame boundary,
       // see `done`, and return exactly as if the stream had been healthy
       // and idle. Fail loudly instead, and never reconnect a status that
-      // will not fix itself on retry.
-      throw new Error("stream request failed" + (res ? " with status " + res.status : ""));
+      // will not fix itself on retry (AC-06.2).
+      throw new LogsStreamNonOkError("stream request failed" + (res ? " with status " + res.status : ""));
     }
     if (!res.body || !res.body.getReader) {
       throw new Error("stream unavailable");
@@ -396,7 +417,7 @@ async function connectLogsStreamOnce(
     let buffer = "";
     while (state.logsLive) {
       const { done, value } = await reader.read();
-      if (done) return true; // clean close — server-scheduled, or otherwise
+      if (done) return "clean"; // clean close — server-scheduled, or otherwise
       buffer += decoder.decode(value, { stream: true });
       let idx: number;
       while ((idx = buffer.indexOf("\n\n")) >= 0) {
@@ -415,17 +436,29 @@ async function connectLogsStreamOnce(
     }
     // `state.logsLive` went false while waiting on `reader.read()` — Live
     // was toggled off or we navigated away. Treat like our own abort: no
-    // banner, no reconnect.
-    return false;
+    // banner, no reconnect (AC-06.3).
+    return "aborted";
   } catch (e) {
     const aborted = !!(controller && controller.signal && controller.signal.aborted);
-    if (!aborted) {
-      // LOG-15: a genuine failure (never our own navigate-away/toggle-off
-      // abort) turns Live off and banners the error, keeping prior rows.
+    if (aborted) {
+      // SSE-06 AC-06.3: our own teardown abort — silent, regardless of what
+      // error object `fetch`/`reader.read()` happened to throw for it.
+      return "aborted";
+    }
+    if (e instanceof LogsStreamNonOkError) {
+      // SSE-06 AC-06.2: terminal — banners and turns Live off HERE, exactly
+      // as the pre-T47 single-shot version did, and is never retried.
       state.logsLive = false;
       showBanner(ctx.root, "error", "Live log stream failed: " + String((e as { message?: unknown })?.message || e));
+      return "terminal";
     }
-    return false;
+    // SSE-06 AC-06.1: every other thrown error — a real network failure, a
+    // dropped connection mid-read, etc. — is reconnectable. Unlike the
+    // terminal branch above, this does NOT touch `state.logsLive` or banner
+    // here; `runLogsLiveStream` retries it under the same
+    // `rapidCloseStreak` / `maxReconnectAttempts` bounds as a clean close,
+    // and only its give-up path (AC-06.4) turns Live off and banners.
+    return "retryable";
   }
 }
 
@@ -437,10 +470,12 @@ async function connectLogsStreamOnce(
  *  (always falsy there) already keeps `logsLive` off in that case, but this
  *  second, independent check means a caller can never open a real,
  *  never-resolving fetch by invoking this function directly with `logsLive`
- *  unset either. LOG-15: any stream failure that is not our own teardown
- *  abort turns Live off, banners the error, and leaves every already
- *  rendered/appended row exactly where it was — this function never calls
- *  `ctx.render()`.
+ *  unset either. LOG-15: a *terminal* stream failure (SSE-06's "terminal"
+ *  exit — a non-200 that will not fix itself on retry) turns Live off,
+ *  banners the error, and leaves every already rendered/appended row
+ *  exactly where it was — this function never calls `ctx.render()`. A
+ *  *retryable* failure (SSE-06's "retryable" exit) does neither of those
+ *  immediately; see `connectLogsStreamOnce`'s docblock.
  *
  *  T47: the server closes every SSE after
  *  `SSE_MAX_DURATION_MS_DEFAULT` (10 minutes) by design, and a clean close
@@ -464,7 +499,13 @@ async function connectLogsStreamOnce(
  *  connection's lifetime is now measured via `opts.now` (default
  *  `Date.now`) and only a close shorter than `LOGS_RECONNECT_HEALTHY_MS_DEFAULT`
  *  extends `rapidCloseStreak`; a longer one resets it to 0, so the bound
- *  means consecutive *rapid* closes, not consecutive closes. */
+ *  means consecutive *rapid* closes, not consecutive closes.
+ *
+ *  SSE-06: `connectLogsStreamOnce`'s four-way `LogsStreamExit` (see its own
+ *  docblock) means "reconnect" now covers two exits, not one — `"clean"`
+ *  AND `"retryable"` both fall through to the same reconnect-bounds logic
+ *  below. Only `"terminal"` (already banner'd + `logsLive = false` inside
+ *  `connectLogsStreamOnce`) and `"aborted"` (silent) return immediately. */
 export async function runLogsLiveStream(
   ctx: LogsCtx,
   opts?: { reconnectDelayMs?: number; maxReconnectAttempts?: number; now?: () => number },
@@ -484,8 +525,12 @@ export async function runLogsLiveStream(
     let rapidCloseStreak = 0;
     for (;;) {
       const connectStartMs = now();
-      const cleanClose = await connectLogsStreamOnce(ctx, state, controller);
-      if (!cleanClose) return; // our own abort, Live toggled off, or a genuine failure already banner'd
+      const exit = await connectLogsStreamOnce(ctx, state, controller);
+      // "terminal": already banner'd + `logsLive = false` inside
+      // `connectLogsStreamOnce` (AC-06.2). "aborted": our own teardown
+      // abort, or `logsLive` went false mid-wait — silent (AC-06.3). Both
+      // stop here; "clean" and "retryable" both fall through to reconnect.
+      if (exit !== "clean" && exit !== "retryable") return;
       if (!state.logsLive) return; // toggled off between the read loop ending and here
       const lifetimeMs = now() - connectStartMs;
       // T49: lifetime is the signal, not whether a frame arrived — see
