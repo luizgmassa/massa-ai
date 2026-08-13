@@ -25,6 +25,7 @@
 import { Elysia } from "elysia";
 import fs from "node:fs";
 import { config, logBuffer, sinkFiles, type LogEntry } from "@massa-ai/shared";
+import { resolveHeartbeatMs, resolveMaxDurationMs } from "./sse-keepalive.js";
 
 const LOGS_DETAIL = { tags: ["logs"] };
 
@@ -343,9 +344,9 @@ function renderTxtLine(entry: LogEntry): string {
 }
 
 // ── SSE tail (LOG-05) ───────────────────────────────────────────────────────
-
-const SSE_HEARTBEAT_MS_DEFAULT = 15_000;
-const SSE_MAX_DURATION_MS_DEFAULT = 10 * 60 * 1000; // 10 minutes
+//
+// Heartbeat interval + max-duration default now come from `sse-keepalive.ts`
+// (spec SSE-01, design D1) — this file no longer declares its own literal.
 
 /** How often the live tail checks the sink for appended bytes. A log tail is
  *  not a low-latency channel, and a shorter interval buys nothing but stat
@@ -513,8 +514,8 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
     () => {
       // Read per-request, mirroring events.ts, so an env override is honored
       // even when this module was first imported under the default.
-      const HEARTBEAT_MS = Number(process.env.MASSA_AI_SSE_HEARTBEAT_MS) || SSE_HEARTBEAT_MS_DEFAULT;
-      const MAX_DURATION_MS = Number(process.env.MASSA_AI_SSE_MAX_DURATION_MS) || SSE_MAX_DURATION_MS_DEFAULT;
+      const HEARTBEAT_MS = resolveHeartbeatMs();
+      const MAX_DURATION_MS = resolveMaxDurationMs();
 
       const encoder = new TextEncoder();
       let closed = false;
