@@ -8,7 +8,7 @@ findings — two critical. T2b is new; T1, T2 and T3 gained requirements.
 
 ---
 
-## Phase 1 = 2 Tasks — resolution
+## Phase 1 = 3 Tasks — resolution
 
 ### T1 — directory-source resolution in `claude-marketplace.ts`
 
