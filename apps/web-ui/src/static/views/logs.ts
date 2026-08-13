@@ -110,15 +110,22 @@ export function renderLogs(data: LogsResponse | null | undefined, state?: LogsRe
     '<button type="button" data-action="logs-export">Export</button>' +
     "</div>";
 
-  // Pre-mortem #5: the live region is scoped to THIS server process, while
-  // the file sink is appended by every massa-ai process (including the
-  // stdio MCP server) — a range query may legitimately contain entries Live
-  // never showed. Always shown, not conditional on Live being on, so the
-  // scope difference is disclosed before an operator ever notices it.
+  // Pre-mortem #5, corrected by T48: the server's SSE route (`startSinkTail`)
+  // tails the shared file sink whenever one is readable, mirroring this same
+  // `source` field's own fallback rule — so on a default install Live sees
+  // the same scope as the range query below. The scope gap only reopens in
+  // the fallback the route itself falls back to: no on-disk sink readable,
+  // where Live is limited to this process's own ring-buffer entries, the
+  // same condition `sourceNote` below already reports. Always shown, not
+  // conditional on Live being on, so the scope is disclosed before an
+  // operator ever notices a difference.
   const liveScopeDisclosure =
-    '<p class="muted logs-live-disclosure">Live shows only this server process\'s entries. The file sink is written ' +
-    "by every massa-ai process, including the stdio MCP server, so a range query below may include entries Live " +
-    "never showed.</p>";
+    source === "buffer"
+      ? '<p class="muted logs-live-disclosure">Live is scoped to this server process only — no on-disk sink is ' +
+        "currently readable, so a range query below may include entries from other massa-ai processes, including " +
+        "the stdio MCP server, that Live never showed.</p>"
+      : '<p class="muted logs-live-disclosure">Live tails the shared file sink, written by every massa-ai process ' +
+        "including the stdio MCP server, so it shows the same scope as a range query below.</p>";
 
   const sourceNote =
     source === "buffer"

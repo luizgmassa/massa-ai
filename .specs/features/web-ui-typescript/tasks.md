@@ -2831,6 +2831,45 @@ default `true`; the real count is six of seven — `buffer.enabled` was missed a
 `scoring.attention.enabled` is the single `false` default. The T43 worker measured
 rather than accepted the number, and its test asserts the correct invariant.
 
+### Batch 16 — Phase 18, T48 (correct the live-tail scope disclosure) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T48 | `docs(web-ui): correct the live-tail scope disclosure` | Both `liveScopeDisclosure` (`logs.ts:118-127`) and the `/stream` route's Swagger `description` (`logs.ts:606-611`) now branch on the same `source` field the range query already returns: `source:"file"` (the default-install case, since `startSinkTail` tails the shared sink) says Live shows the same scope as the range query below; `source:"buffer"` (no on-disk sink readable) keeps the original this-process-only wording. Neither text was deleted — the fallback case still discloses the scope gap. |
+
+**The `logging.file` finding, recorded per this phase's preamble.** The Config tab
+renders `logging.file` blank even though the runtime resolves it to a real path
+(measured: `/Users/luizmassa/.config/massa-ai/data/logs/massa-ai.log` on this
+machine). Cause: T43's `defaults` payload is built from the static
+`defaultMassaAiConfig` object (`packages/shared/src/config/index.ts`), which leaves
+`logging.file` undefined, while the runtime `Config` class (read by
+`startSinkTail` and by the range query's own `source` selection) derives a real
+path at startup. The two default sources disagree, and the Config tab — which
+resolves a field against `config` then `defaults` — believes only the static one,
+so it shows blank for a field the server is actually using. Recorded as a finding
+per T48's scope; not fixed here.
+
+**Existing test asserting the old wording.** `app-renderers.test.ts`'s `renderLogs`
+describe had one test, "discloses the live/history process-scope mismatch
+(pre-mortem #5)", asserting `toContain("this server process")` against `baseData`
+(`source: "file"`) — which is now the shared-sink branch and no longer contains that
+phrase. Updated deliberately, not softened: split into two tests, one asserting the
+`source:"file"` branch says "shared file sink" and does **not** say "this server
+process only", the other asserting the `source:"buffer"` branch does say "this
+server process only" — both still assert "stdio MCP server" is named.
+
+**Gate, measured**: `bun run --filter @massa-ai/web-ui build` exit 0;
+`bun test apps/web-ui/src/__tests__/` **724 pass / 0 fail** (15 files, up from 723
+before the two-test split); `bun run type-check` (turbo) **6 successful, 6 total**.
+`render-golden.json`: **86** entries before and after (no key added or removed).
+**6 of 7** `renderLogs/*` keys changed — every key except `renderLogs/error` (whose
+early-return path never renders the disclosure): `renderLogs/read`,
+`renderLogs/read/emptyLive`, `renderLogs/read/emptyStill`, `renderLogs/write`,
+`renderLogs/write/emptyLive`, `renderLogs/write/emptyStill`. `renderConfig/*` (2) and
+`renderModelRegistry/*` (14) byte-identical in the same diff — exactly the scope T48
+named in advance. `apps/tools-api` was not run in the same `bun test` invocation as
+`apps/web-ui` (D15's known cross-file `fetch` contamination).
+
 ---
 
 ## Artifact-Store Evidence

@@ -910,9 +910,24 @@ describe("renderLogs (T14, LOG-13)", () => {
     expect(html).not.toContain("<table");
   });
 
-  it("discloses the live/history process-scope mismatch (pre-mortem #5)", () => {
+  // Pre-mortem #5, corrected by T48: `startSinkTail` now tails the shared
+  // file sink whenever `source` is "file", so the disclosure must say Live
+  // matches the range query's scope rather than claim it is always narrower.
+  // The "this server process only" wording is still correct, but only in the
+  // fallback the route itself falls back to — source:"buffer".
+  it('discloses the shared-sink scope when source is "file"', () => {
     const html = renderLogs(baseData, {});
-    expect(html).toContain("this server process");
+    expect(html).toContain("shared file sink");
+    expect(html).toContain("stdio MCP server");
+    expect(html).not.toContain("this server process only");
+  });
+
+  it('discloses the this-process-only fallback when source is "buffer"', () => {
+    const html = renderLogs(
+      { success: true, data: { entries: [], total: 0, source: "buffer", truncated: false } },
+      {},
+    );
+    expect(html).toContain("this server process only");
     expect(html).toContain("stdio MCP server");
   });
 
