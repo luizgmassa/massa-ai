@@ -1,5 +1,6 @@
 /**
- * SSE streaming regenerate route (Component 4 — REGEN-01..08, MDS-03 T3).
+ * SSE streaming regenerate route (Component 4 — REGEN-01..08, MDS-03
+ * T3/T4).
  *
  *   POST /api/v1/model-registry/regenerate-and-install-stream
  *   POST /api/v1/model-registry/regenerate-stream   (deprecated alias, same behavior)
@@ -20,7 +21,16 @@
  * `done` frame's `error` (AC-03.2) — no later generator runs, and the
  * install phase below never starts.
  *
- * Once every generator has exited 0, this route bridges the freshly
+ * Once every generator has exited 0, this route emits one `skills` SSE
+ * frame per host (`{"type":"skills","host":"...","status":"generated"}`,
+ * AC-03.3) — the skill generator writes straight into
+ * `apps/<host>-plugin/skills/` for all four hosts in one pass, and on the
+ * directory-source Claude route that tree already **is** what the host
+ * reads (design D1/D3 make that a no-op there); whether the other three
+ * hosts' *installed* location is also already reached is unmeasured and
+ * owned by MDS-04 (T5), so this frame only reports that generation
+ * happened, in the same per-host shape as `variant-sync` / `install` below
+ * — it does not invent a new reporting shape. It then bridges the freshly
  * generated `apps/<host>-plugin/agent-profiles/` trees into each host's
  * installed variant root (`syncGeneratedVariants`, see `variant-sync.ts`'s
  * module docblock for why this bridge exists — without it "Regenerate
@@ -50,6 +60,7 @@ import {
   switchProfile,
   reportSucceeded,
   syncGeneratedVariants,
+  HOSTS,
   type Host,
   type HostSwitchStatus,
   type SwitchReport,
@@ -148,6 +159,24 @@ function assertGeneratorBackstop(scripts: GeneratorScript[]): void {
       `generator list ${JSON.stringify(names)} does not contain the known generators ` +
         `${KNOWN_GENERATOR_FILENAMES.join(", ")} — refusing to spawn an implausibly short list`,
     );
+  }
+}
+
+/** Emits one `skills` SSE frame per host once every generator has exited 0
+ *  (T4, AC-03.3). Mirrors the `variant-sync` / `install` per-host frame
+ *  shape rather than inventing a new one. See the module docblock for why
+ *  `status: "generated"` is the honest claim here — reaching each host's
+ *  *installed* location beyond the directory-source Claude route is
+ *  measured separately under MDS-04. */
+function emitSkillsFrames(controller: ReadableStreamDefaultController<Uint8Array>, closedRef: { closed: boolean }): void {
+  for (const host of HOSTS) {
+    if (closedRef.closed) return;
+    try {
+      controller.enqueue(sseFrame({ type: "skills", host, status: "generated" }));
+    } catch {
+      closedRef.closed = true;
+      return;
+    }
   }
 }
 
@@ -295,8 +324,8 @@ function createRegenerateStreamHandler(): () => Response {
         // Spawns generatorScripts[index..] one at a time, in the order
         // `generate:artifacts` defines (AC-03.1). The first non-zero exit
         // stops the chain and names the failing generator (AC-03.2); only
-        // once every generator has exited 0 does the variant-sync/install
-        // phase below run.
+        // once every generator has exited 0 does the skills/variant-sync/
+        // install phase below run.
         const runGenerator = (index: number) => {
           if (closedRef.closed) return;
           if (index >= generatorScripts.length) {
@@ -306,6 +335,7 @@ function createRegenerateStreamHandler(): () => Response {
               closedRef.closed = true;
               return;
             }
+            emitSkillsFrames(controller, closedRef);
             installActiveProfiles(controller, closedRef);
             finish(0);
             return;
@@ -369,7 +399,7 @@ export const modelRegistryStreamRoutes = new Elysia({ prefix: "/api/v1/model-reg
       tags: ["model-registry"],
       summary: "Regenerate skill + subagent artifacts, then auto-install to active dirs (streaming SSE)",
       description:
-        "Spawns every generator named by package.json's `generate:artifacts` script (today `generate-skill-artifacts.ts` then `generate-subagent-artifacts.ts`), one at a time in that order, with child_process.spawn (non-blocking). Pipes stdout/stderr line-by-line as SSE; the first generator to exit non-zero stops the chain and names itself in the terminal `done` frame. Once every generator exits 0, bridges the freshly generated agent-profiles trees into each host's installed variant root (`variant-sync` events per host), then calls switchProfile for every detected host to reinstall the active profile's agents from those synced variant dirs. Emits `install` events per host, then a terminal `done` event with the exit code.",
+        "Spawns every generator named by package.json's `generate:artifacts` script (today `generate-skill-artifacts.ts` then `generate-subagent-artifacts.ts`), one at a time in that order, with child_process.spawn (non-blocking). Pipes stdout/stderr line-by-line as SSE; the first generator to exit non-zero stops the chain and names itself in the terminal `done` frame. Once every generator exits 0, emits one `skills` event per host, bridges the freshly generated agent-profiles trees into each host's installed variant root (`variant-sync` events per host), then calls switchProfile for every detected host to reinstall the active profile's agents from those synced variant dirs. Emits `install` events per host, then a terminal `done` event with the exit code.",
     },
   })
   // Deprecated alias — same behavior, kept for backward compat with older UI.

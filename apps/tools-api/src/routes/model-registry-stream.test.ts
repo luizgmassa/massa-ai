@@ -654,6 +654,39 @@ describe("POST /regenerate-and-install-stream — generator chain derived from g
   });
 });
 
+// ── T4: skills reach each host's location — per-host reporting frame ────────
+// (AC-03.3)
+
+describe("POST /regenerate-and-install-stream — skills frame per host (T4, AC-03.3)", () => {
+  beforeEach(() => {
+    listProfilesMock.mockClear();
+    switchProfileMock.mockClear();
+  });
+
+  test("emits one skills frame per known host, after every generator succeeds and before variant-sync/install", async () => {
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+
+    const skillsEvents = events.filter((e) => e.type === "skills");
+    const firstSyncOrInstallIdx = events.findIndex((e) => e.type === "variant-sync" || e.type === "install");
+
+    expect(skillsEvents.length).toBe(4);
+    expect(skillsEvents.map((e) => e.host).sort()).toEqual(["claude", "codex", "cursor", "opencode"]);
+    expect(skillsEvents.every((e) => e.status === "generated")).toBe(true);
+
+    const lastSkillsIdx = events.map((e, i) => (e.type === "skills" ? i : -1)).filter((i) => i >= 0).pop()!;
+    expect(lastSkillsIdx).toBeLessThan(firstSyncOrInstallIdx);
+  });
+
+  test("no skills frame is emitted when a generator fails", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 1 }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    expect(events.some((e) => e.type === "skills")).toBe(false);
+  });
+});
+
 // ── APCR-09: both routes share one handler — identical frame sequences ──────
 
 describe("POST /regenerate-and-install-stream vs /regenerate-stream — one shared handler (APCR-09)", () => {
