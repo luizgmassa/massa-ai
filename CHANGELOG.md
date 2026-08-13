@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Admin Portal Logs tab's Live toggle delivered a burst of entries, then
+  stopped "after some seconds."** Every idle SSE stream did — the keep-alive
+  heartbeat on `GET /api/v1/logs/stream` was scheduled 15 s apart, longer
+  than Bun's 10 s transport idle window, so the heartbeat could never fire
+  before the socket was already dropped. Both that route and
+  `GET /api/v1/events` now read one shared default (5 000 ms) from a single
+  keep-alive module instead of each declaring its own literal, and every SSE
+  request also widens its own transport window via Bun's per-request
+  `server.timeout(request, seconds)`. `GET /api/v1/events` — the stream that
+  drives the portal's real-time updates — had the identical defect but hid
+  it, because `EventSource` reconnects automatically, so it presented as a
+  silent ~12 s reconnect cycle rather than a visible stop.
+- A throwing `controller.enqueue` on either SSE route's heartbeat now closes
+  the stream and unsubscribes from its source, instead of leaving a closed
+  flag set with the socket still open and the source subscription still
+  polling into a dead controller for the life of the process.
+- A transient mid-stream network error on the Logs tab's live tail is now
+  retried under the existing reconnect bounds instead of permanently turning
+  Live off and banners; a non-200 response still stays terminal.
+
 ## [1.52.0] - 2026-08-13
 
 ### Added
