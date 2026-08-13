@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: **In Progress — Phase 19 (1 Task) open**, closing two of the four findings from Phase 18's independent verification. Prior state: **Phases 1-18 / 49 Tasks executed.** Phase 18 was opened after the
+**Status**: **Complete — Phases 1-19 / 50 Tasks executed.** Phase 19 closed the two code-bearing findings from Phase 18's independent verification (the other two are recorded, deliberately unfixed, in Batch 17). Phase 18 was opened after the
 operator re-tested and found the Logs live tail still dead — T44 had fixed the checkbox,
 but the tail had no reconnect while the server closes every stream after 10 minutes by
 design (D16) — and is now closed by T47/T48/T49. Phases 15-17 remain as described below.
@@ -2984,6 +2984,26 @@ the default reconnect replays the same mock stream). Four findings came back:
 **47 / 0**, run as its own invocation per D15. `render-golden.json` **86** entries with
 only T48's 6 `renderLogs/*` keys changed across the whole phase — T47 and T49 touched
 no renderer and left it byte-identical.
+
+### Batch 18 — Phase 19, T50 (pin the reconnect threshold boundary) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T50 | `276c94a3` `test(web-ui): pin the live-tail reconnect threshold boundary` | A connection lasting **exactly** `LOGS_RECONNECT_HEALTHY_MS_DEFAULT` is now pinned to the **healthy** side (`30000 < 30000` is false, so the streak resets). Pinned by a two-connection sequence under the injected clock — one at exactly 30000 ms, one genuinely rapid, `maxReconnectAttempts: 0` — so the shipped `<` reaches connection 2 while the `<=` mutant gives up at connection 1. The same-tick double-toggle state is now a comment at `handleLogsLiveToggle`; no guard, per T50's Non-goals. |
+
+**The mutant is dead, measured independently.** The verifier's finding was that flipping
+`<` to `<=` left all 159 tests in `admin-handlers.test.ts` green. Re-run by the
+orchestrator after T50 against the **whole** web-ui suite rather than one file:
+**726 pass / 1 fail**, the single failure being T50's boundary test by name. Restored from
+a hand-made file copy — not `git checkout`, which this repo has previously used to destroy
+uncommitted work — and re-verified at **727 / 0** with `git status --porcelain` empty.
+
+**Final gates**, forced non-cached: `bun run build --force` exit 0, 6/6, **0 cached**;
+`bun run type-check --force` exit 0, 6/6, **0 cached**; `bun run lint` exit 0;
+`bun test apps/web-ui/src/__tests__/` **727 / 0** (15 files);
+`bun test apps/tools-api/src/routes/logs.test.ts` **47 / 0**, its own invocation per D15.
+`render-golden.json` unchanged at **86** entries, 0 byte-changed; `public-surface.test.ts`
+unedited and green.
 
 ---
 
