@@ -29,7 +29,27 @@
  * measured, see `restart-e2e.test.ts`'s docblock).
  */
 
-import { describe, expect, test } from "bun:test";
+// Pinned BEFORE the route modules are imported below, and re-pinned per test.
+//
+// This is not defensive boilerplate — it is a fix for a real failure that only
+// the full `bun run test` gate could see. `events.test.ts` sets
+// `MASSA_AI_SSE_MAX_DURATION_MS = "90"` at MODULE level (its lines 9-10) and
+// never restores it, deliberately, so its own 90ms auto-close cases are fast.
+// The isolation runner puts both files in the same "mock-free" group, so in a
+// shared process this suite inherited a 90ms scheduled close and its stream
+// died at 94ms — reported as "the exact pre-fix defect" by its own error
+// message, which was wrong: the transport never dropped anything, the route's
+// own max-duration timer fired. Alone it passed 2/0; in the group it failed
+// 0/2.
+//
+// Deleting rather than assigning is load-bearing: SSE-02 asserts the SHIPPED
+// DEFAULTS survive an idle hold, so pinning a literal here would assert that
+// some chosen value works and quietly stop exercising the default the
+// requirement is about.
+delete process.env.MASSA_AI_SSE_HEARTBEAT_MS;
+delete process.env.MASSA_AI_SSE_MAX_DURATION_MS;
+
+import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { Elysia } from "elysia";
 import { node } from "@elysiajs/node";
 import { logsRoutes } from "./logs.js";
@@ -123,6 +143,24 @@ async function holdIdleStream(url: string, holdMs: number): Promise<HoldResult> 
 }
 
 describe("SSE idle-stream survival over real HTTP (spec SSE-02)", () => {
+  // Re-deleted per test: a sibling's module-level assignment can land after
+  // this module's own top-level code, depending on import order, and the
+  // resolvers read `process.env` per call rather than at import.
+  const priorHeartbeat = process.env.MASSA_AI_SSE_HEARTBEAT_MS;
+  const priorMaxDuration = process.env.MASSA_AI_SSE_MAX_DURATION_MS;
+  beforeEach(() => {
+    delete process.env.MASSA_AI_SSE_HEARTBEAT_MS;
+    delete process.env.MASSA_AI_SSE_MAX_DURATION_MS;
+  });
+  afterAll(() => {
+    // Leave the process as this file found it — a sibling in the same group
+    // may depend on the values it set.
+    if (priorHeartbeat === undefined) delete process.env.MASSA_AI_SSE_HEARTBEAT_MS;
+    else process.env.MASSA_AI_SSE_HEARTBEAT_MS = priorHeartbeat;
+    if (priorMaxDuration === undefined) delete process.env.MASSA_AI_SSE_MAX_DURATION_MS;
+    else process.env.MASSA_AI_SSE_MAX_DURATION_MS = priorMaxDuration;
+  });
+
   test("GET /api/v1/logs/stream survives 30s fully idle with >= 3 heartbeats (AC-02.1, AC-02.3)", async () => {
     const port = 35200 + Math.floor(Math.random() * 300);
     const { stop } = await startServer(port);
