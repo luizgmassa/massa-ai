@@ -52,6 +52,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   state was `undefined`, which it never was, so the preference `writeLogsLivePreference`
   wrote was never read back. The seed now reads the stored preference; an in-page toggle
   still outranks it. Reproduces on `origin/main`.
+- **The Logs tab's live tail went dead every 10 minutes and said nothing.** The stream
+  route closes each connection after `SSE_MAX_DURATION_MS_DEFAULT` by design, and the
+  browser had no reconnect: the read loop simply ended, leaving the Live checkbox
+  checked over a tail that would never deliver another row until the page was
+  refreshed — for another 10 minutes. Any dev-server restart did the same, sooner. The
+  same function also never checked `res.ok`, so a 401 or 500 was indistinguishable from
+  a healthy idle stream: no rows, no error, no banner. The tail now reconnects after a
+  server-side close, counts only *consecutive rapid* closes against its give-up bound
+  so a scheduled close is not mistaken for a failure, and surfaces a non-200 instead of
+  swallowing it. The live-tail scope disclosure was stale in the other direction and is
+  now conditional: the server tails the shared file sink — every massa-ai process,
+  including the stdio MCP server — and only falls back to this process's ring buffer
+  when no sink file is readable. Reproduces on `origin/main`.
 
 ## [1.51.0] - 2026-08-11
 

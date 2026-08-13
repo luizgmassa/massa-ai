@@ -9,10 +9,11 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: **In Progress — Phase 18 (3 Tasks) open**, reopened after the operator
-re-tested and found the Logs live tail still dead: T44 fixed the checkbox, but the
-tail has no reconnect and the server closes every stream after 10 minutes. Prior
-state: **Phases 1-17 / 46 Tasks executed** (40 original + 6 in Phases
+**Status**: **Complete — Phases 1-18 / 49 Tasks executed.** Phase 18 was opened after the
+operator re-tested and found the Logs live tail still dead — T44 had fixed the checkbox,
+but the tail had no reconnect while the server closes every stream after 10 minutes by
+design (D16) — and is now closed by T47/T48/T49. Phases 15-17 remain as described below.
+Prior state: **Phases 1-17 / 46 Tasks executed** (40 original + 6 in Phases
 15-17: T41, T42, T46, T43, T44, T45). Phases 1-14 (T1-T40) were
 independently verified (see `## Execution Log` and `validation.md`'s original claims 1,
 3-7); Phases 15-16 (T41, T42, T46, T43, T44) repair three defects the operator found by
@@ -2869,6 +2870,48 @@ early-return path never renders the disclosure): `renderLogs/read`,
 `renderModelRegistry/*` (14) byte-identical in the same diff — exactly the scope T48
 named in advance. `apps/tools-api` was not run in the same `bun test` invocation as
 `apps/web-ui` (D15's known cross-file `fetch` contamination).
+
+### Batch 17 — Phase 18, T47 + T49 (the live tail's reconnect) — Complete
+
+| Task | Commit | Result |
+| --- | --- | --- |
+| T47 | `d45314d5` `fix(web-ui): reconnect the live log tail and surface a failed stream` | A clean server close now reconnects while Live is on and the abort was not ours; `res.ok` is checked, so a non-200 banners and turns Live off instead of returning as if the stream had been healthy and idle. Bound 5 reconnects, 2 s apart, both injectable through a new `opts` parameter rather than a `_set*ForTesting` export — a new export would have altered `public-surface.test.ts`'s frozen list. |
+| T49 | `4c4dc6d0` `fix(web-ui): count only rapid closes against the live-tail reconnect bound` | The bound now counts *consecutive rapid* closes: a connection outliving `LOGS_RECONNECT_HEALTHY_MS_DEFAULT` (30 s) resets the streak. Clock injected as `opts.now`, default `Date.now`. Banner reworded to "closed too quickly N times in a row". |
+
+**D16 — the live tail died on a schedule, and the fix for it had the same blind spot.**
+T44 fixed the Logs checkbox and the operator re-tested: "the live logs are still not
+working. New logs don't auto-appear into the page, only after a refresh." Three
+measurements separated the causes. The **client read/parse/append path was never
+broken** — running the emitted `dist/static/views/logs.js` against the live server
+appended **4 of 4** entries with correct row markup. The **server's scope was not the
+problem either**: `startSinkTail` tails the shared file sink whenever `logging.file`
+resolves, which it does on a default install. The actual cause: the server closes every
+stream after 10 minutes **by design** (`SSE_MAX_DURATION_MS_DEFAULT`), and the client
+had **no reconnect**. Reproduced against a scratch SSE server sending one frame then
+closing — **1 row appended, `logsLive` still `true`, nothing in flight, no banner**: the
+checkbox stayed checked over a dead tail, and a refresh bought exactly another 10
+minutes. A second silent failure sat in the same function: no `res.ok` check, so a 401
+(measured: **68 bytes**, `application/json`, no `\n\n`) exited the frame loop
+indistinguishably from a healthy idle stream.
+
+T47 fixed both — verified independently at **6 connections** where the pre-fix code
+opened 1. But its counter never reset, so it could not tell 6 *scheduled* closes from 6
+*rapid* ones, and a healthy tail would have given up after roughly an hour with
+"closed 6 times in a row; giving up" when nothing had failed. T47's own comment named
+the distinction ("a close repeating immediately is not the server's 10-minute
+schedule") while the code never measured lifetime — **a fix that reproduced, one level
+up, the same defect class it was written to remove: the UI asserting something false
+about its own state.** T49 closed it. Verified independently by injecting the clock: a
+60 s apparent lifetime reached **9** connections without giving up (pre-T49 it stopped
+at 6), while a 0 ms lifetime still stops at **6**.
+
+**Phase 18 gates, measured after T49** (forced non-cached where turbo would replay):
+`bun run build --force` exit 0, 6/6, **0 cached**; `bun run type-check --force` exit 0,
+6/6, **0 cached**; `bun run lint` exit 0; `bun test apps/web-ui/src/__tests__/`
+**726 pass / 0 fail** (15 files); `bun test apps/tools-api/src/routes/logs.test.ts`
+**47 / 0**, run as its own invocation per D15. `render-golden.json` **86** entries with
+only T48's 6 `renderLogs/*` keys changed across the whole phase — T47 and T49 touched
+no renderer and left it byte-identical.
 
 ---
 
