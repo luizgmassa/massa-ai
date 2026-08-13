@@ -1398,7 +1398,31 @@
       "tasks": ".specs/features/marketplace-directory-source-switching/tasks.md",
       "validation": ".specs/features/marketplace-directory-source-switching/validation.md",
       "notes": "Execute complete 2026-08-13: 3 Phases, 7 tasks, 11 commits from origin/main @ 89909051. Defect A: resolveClaudeMarketplaceRoot returned the version-pinned cache installPath even for a DIRECTORY-source marketplace, where Claude loads live from the source dir -- proven by the plugin cache pinning gitCommitSha f8427283 (the designer feature's base commit) and holding 17 agents while the session advertised 18 including designer, and corroborated by the plan-critic subagent matching its own live frontmatter to the source file's disallowedTools line rather than the cache's tools allowlist. Defect B: the regenerate stream spawned only generate-subagent-artifacts.ts. Pre-mortem gate returned 4 findings, 2 critical, all accepted: AC-01.2 reframed from a correctness claim to an explicitly unmeasured risk (MDS-05); AC-03.5/03.6 added because the anti-regression sensor shared a parser with production and could have certified the regression; AC-02.4 added a runtime tracked-path guard behind the retired codex refusal; AC-01.6 added path containment. AC-01.3 was then AMENDED mid-implementation: it made an absent known_marketplaces.json refuse, which broke the pre-existing cache path for any install with no marketplace registry -- caught by variant-sync.test.ts T18 measuring main 12/0 vs branch 11/1. A Phase 1 worker had reported that as an out-of-scope stale fixture; it was a correct sensor catching a regression from the requirement. Independent verification returned NEEDS FIX on two delivery-bar gaps (a security-allowlist regression from T2b's execFileSync git probes, and T6 not yet run), both since closed; its AC and mutation results were clean at 18/18 and 5/5. T5 measured all four hosts: codex/opencode write where they load (no defect of this class), cursor is never switched, and separately EVERY installed roster is stale at 17 (missing designer) with codex/opencode still carrying the retired massa-ai-handoff-writer -- recorded as two out-of-scope findings, not patched. MDS-05 remains honestly unmeasured: both github-source marketplaces are exactly in sync with their pinned caches, so no divergence exists here to test remote precedence against."
+    },
+    {
+      "id": "portal-handoff-proposal-crud",
+      "slug": "portal-handoff-proposal-crud",
+      "title": "Admin Portal handoff/proposal CRUD, a default-deny server-side write gate, and the portal memory edit/delete dead call path",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "feat/portal-handoff-proposal-crud",
+      "created": "2026-08-13",
+      "depends_on": [
+        "sse-heartbeat-idle-timeout",
+        "marketplace-directory-source-switching"
+      ],
+      "spec": ".specs/features/portal-handoff-proposal-crud/spec.md",
+      "design": ".specs/features/portal-handoff-proposal-crud/design.md",
+      "tasks": ".specs/features/portal-handoff-proposal-crud/tasks.md",
+      "validation": ".specs/features/portal-handoff-proposal-crud/validation.md",
+      "notes": "Execute complete 2026-08-13: 6 Phases, 14 tasks, 9 commits, stacked on dbdceead (PR #107, unmerged). Three deliverables: full CRUD for handoffs and proposals (PATCH over an explicit editable-field allowlist, hard DELETE, manual proposal creation); a default-deny server-side write gate across every non-GET route; and a fix for portal memory edit/delete, which called PUT/DELETE /api/v1/memory/:id -- routes that never existed, so both 404ed before auth was even consulted. Hard delete was measured safe at the storage layer: zero FK constraints on handoffs/proposals in either direction, verified twice (live pg_constraint and all 23 migrations), so a DELETE destroys exactly one row. Two Plan Challenge critics ran on different lenses (red_team on the gate, pre_mortem on everything else) and returned 11 findings, all accepted. Three changed the design materially: POST /api/v1/search/project was classified read-only and WRITES via autoReindex into ensureFreshIndex, which path-and-verb classification is structurally blind to (produced AC-03.3a sanitizers and AC-03.3b per-entry no-write tests); the gate would have failed OPEN because four existing config gates in this tree resolve a throwing read to not-disabled (AC-03.8 inverts it, deliberately against local house style); and PATCH would have left the handoff dual-written memory permanently stale -- active FTS-indexed wrong content, worse than the inert dangling pointer AC-01.5 already accepted (AC-01.8). The route population was wrong twice before it was right: 81/50 from a newline-anchored regex that missed five routes chained onto their own Elysia prefix constructor call, then 86/54, finally 91/59. Four of the five missed routes were non-GET, one of them web/fetch_and_index, and default-deny protected all four anyway -- the argument for D1 as a measurement rather than a prediction. Three separate tests were asserting the dead memory URLs and passing, because a mocked request capture accepts any URL string. Independent verification (an agent that built none of it) re-derived every figure and independently reproduced four mutations rather than trusting the commit messages; no coverage-matrix row was false. Open and recorded, not built: AC-03.3c (analytics and file/read over-blocked pending a trace of the ReadFileService read cache path -- this gates read-only mode being usable), HPC-06 (authMiddleware docblock claims every destructive op audits; measured 1 of 28 route files calls recordOperation), HPC-07 (the four fail-open config gates). test:scripts is 1810/0 only with a scratch XDG_CONFIG_HOME: generate:artifacts reads the local profile overlay while the drift gate --check is builtin-only, so a developer overlay manufactures drift that CI never sees."
     }
   ],
-  "active_feature": "marketplace-directory-source-switching"
+  "active_feature": "portal-handoff-proposal-crud"
 }

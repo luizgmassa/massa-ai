@@ -1,6 +1,58 @@
 # massa-ai Spec State
 
-## Current — Marketplace directory-source switching (**VALIDATED 2026-08-13** — 11 commits, 2 batch workers plus a pre-mortem gate and an independent verification pass; unpushed)
+## Current — Portal handoff/proposal CRUD + default-deny write gate (**VALIDATED 2026-08-13** — 9 commits, 6 Phases / 14 Tasks via batch workers, two Plan Challenge critics and an independent verification pass; unpushed)
+
+- projectId `massa-ai` · workflowSessionId `spec-portal-handoff-proposal-crud` ·
+  workflow **spec-driven** · branch `feat/portal-handoff-proposal-crud` stacked on
+  `dbdceead` (PR #107, **unmerged**), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-portal-crud`. Contract:
+  `.specs/features/portal-handoff-proposal-crud/{spec,design,tasks,validation}.md`.
+- Three deliverables: full CRUD for handoffs and proposals (PATCH over an explicit
+  editable-field allowlist, hard DELETE, manual proposal creation); a **default-deny
+  server-side write gate** across every non-`GET` route; and a fix for portal memory
+  edit/delete, which called `PUT`/`DELETE /api/v1/memory/<id>` — routes that never
+  existed, so both 404ed before auth was even consulted.
+- Hard delete measured safe at the storage layer: **zero FK constraints** on
+  `handoffs`/`proposals` in either direction, verified twice (live `pg_constraint`
+  and all 23 migrations), so a DELETE destroys exactly one row.
+- **Two Plan Challenge critics on different lenses** (`red_team` on the gate,
+  `pre_mortem` on everything else) returned 11 findings, all accepted. Three changed
+  the design materially: `POST /api/v1/search/project` was classified read-only and
+  **writes** via `autoReindex` → `ensureFreshIndex`, which path-and-verb
+  classification is structurally blind to (→ AC-03.3a sanitizers, AC-03.3b per-entry
+  no-write tests); the gate would have **failed open**, because four existing config
+  gates in this tree resolve a throwing read to "not disabled" (AC-03.8 inverts it,
+  deliberately against local house style); and PATCH would have left the handoff's
+  dual-written memory permanently stale — active, FTS-indexed, wrong content, worse
+  than the inert dangling pointer AC-01.5 already accepted (AC-01.8).
+- **The route population was wrong twice before it was right**: 81/50 from a
+  newline-anchored regex that missed five routes chained onto their own
+  `new Elysia({ prefix })` call, then 86/54, finally **91/59**. Four of the five
+  missed routes were non-`GET`, one of them `web/fetch_and_index`, and default-deny
+  protected all four anyway — D1's argument as a measurement, not a prediction.
+- Three separate tests were asserting the dead memory URLs and passing, because a
+  mocked request capture accepts any URL string. The contract sensor now diffs Web UI
+  call literals against the real registered-route population.
+- MCP surface 54 → **59** tools; the count was asserted in 4 tests and stated in 8
+  doc surfaces, two of which a `head -20`-truncated sweep missed.
+- Independent verification (an agent that built none of it) re-derived every figure
+  and **independently reproduced four mutations** rather than trusting commit
+  messages. No coverage-matrix row was false.
+- Gates: write-mode 12/0, classification 34/0, population 8/0, handoff 43/0,
+  proposals 55/0, memory 12/0, handoff-service 40/0, store parity 20/0 (needs
+  `MASSA_AI_DEDICATED=1` + the :5433 URL or it executes none of the 20), web-ui
+  778/0, MCP parity 14/0, plugins 135/0, **test:scripts 1810/0 with a scratch
+  `XDG_CONFIG_HOME`** (a local profile overlay manufactures drift CI never sees),
+  lint clean, type-check 6/6.
+- Open, recorded, not built: **AC-03.3c** (`/api/v1/analytics/` and
+  `/api/v1/file/read` over-blocked pending a trace of `ReadFileService.read`'s cache
+  path — **this gates read-only mode being usable**), **HPC-06** (docblock claims
+  every destructive op audits; measured 1 of 28 route files calls `recordOperation`),
+  **HPC-07** (four fail-open config gates).
+- Next: **#107 merges first**, then take `main` by merge (never rebase) and re-check
+  `[Unreleased]` before relying on the changelog entry.
+
+## Previous — Marketplace directory-source switching (**VALIDATED 2026-08-13** — 11 commits, 2 batch workers plus a pre-mortem gate and an independent verification pass; unpushed)
 
 - projectId `massa-ai` · workflowSessionId `spec-marketplace-directory-source-switching` ·
   workflow **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch
@@ -4085,7 +4137,13 @@ native-runtime-rebaseline complete. Wave 3 follow-up exhausted. Clean up: delete
 
 ---
 
-## Current
+## Previous — multi-language-tree-sitter-breadth (archived; was mislabelled `## Current`)
+
+This section sat below the archive separator still titled `## Current`, so the file
+carried two "Current" headings and a reader looking for present state could land on
+a long-finished feature. Renamed on 2026-08-13 when a close-out asserted the
+heading count and found the duplicate. The invariant is now real: exactly one
+`## Current`, at the top.
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-multi-language`

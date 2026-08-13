@@ -1,4 +1,57 @@
-# Handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
+# Handoff — portal-handoff-proposal-crud (EXECUTE COMPLETE 2026-08-13 — 9 commits; gates green; unpushed)
+
+Session `spec-portal-handoff-proposal-crud` · workflow **spec-driven** · branch
+`feat/portal-handoff-proposal-crud` stacked on `dbdceead` (PR #107, **unmerged**),
+worktree `/Users/luizmassa/Projects/massa-ai-wt-portal-crud`. Contract:
+`.specs/features/portal-handoff-proposal-crud/{spec,design,tasks,validation}.md`.
+
+## Objective
+
+Make handoffs and proposals fully manageable from the Admin Portal, put a real
+server-side write gate behind every mutation, and fix portal memory edit/delete.
+
+## State
+
+**Done and validated.** 6 Phases / 14 Tasks, 9 commits, `e86d0e31 … feed5575`
+plus close-out. Independent verification (an agent that built none of it)
+re-derived every figure and independently reproduced four mutations rather than
+trusting commit messages; no coverage-matrix row was false. Full gate results and
+the persisted AC-04.4 pre-fix RED are in `validation.md`.
+
+## Next step
+
+1. **Merge PR #107 first.** `[Unreleased]` on this branch still carries its
+   entries, so the changelog here is only correct once #107 lands.
+2. Take `main` into this branch by **merge, never rebase** — long spec branches
+   rebase badly in this repo — and re-check `[Unreleased]`.
+3. Push and open the PR for this branch.
+
+## Traps worth carrying forward
+
+- **`handoff-proposal-pg.test.ts` is `describe.skipIf(!DEDICATED_DB)`.** Without
+  `MASSA_AI_DEDICATED=1` and a `127.0.0.1:5433/massa_ai_test` URL it reports a pass
+  having executed **none** of its 20 substantive cases.
+- **`test:scripts` needs a scratch `XDG_CONFIG_HOME` locally.** `generate:artifacts`
+  reads the developer's profile overlay while the drift gate's `--check` is
+  builtin-only, so a local overlay manufactures drift CI never sees. Measured on the
+  same commit: `EXIT=1, 1806/4` plain vs `EXIT=0, 1810/0` scratch.
+- **A background-run wrapper reports its own exit code, not the gate's.** A
+  `test:scripts` run reported "exit code 0" by the harness had `EXIT=1` in its log.
+- **`bun run test:plugins` is a separate runner** `bun run test` never reaches.
+- Read-only mode is **off by default**; turning it on today costs the portal its
+  analytics and file-view panels until AC-03.3c is closed.
+
+## Open, recorded, not built
+
+**AC-03.3c** (`/api/v1/analytics/`, `/api/v1/file/read` over-blocked pending a trace
+of `ReadFileService.read`'s cache path — gates read-only mode being usable),
+**HPC-06** (docblock claims every destructive op audits; measured 1 of 28 route
+files calls `recordOperation`), **HPC-07** (four config gates fail open on a
+throwing read).
+
+---
+
+# Previous handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
 
 Session `spec-marketplace-directory-source-switching` · workflow **spec-driven** ·
 branch `fix/marketplace-directory-source-switching` from `origin/main` @ `89909051`,

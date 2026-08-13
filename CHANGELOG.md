@@ -7,8 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Handoffs and proposals are now fully manageable from the Admin Portal.** Both
+  gain per-row Edit and Delete; proposals additionally gain a create form, which
+  they never had — so a portal with no proposals had no way to produce one. Edit
+  is a `PATCH` restricted to an explicit allowlist of content fields, so a status
+  can only ever change through its own state machine. Delete is a hard delete of
+  exactly one row: `handoffs` and `proposals` carry no foreign keys in either
+  direction, verified against both the live catalog and all 23 migrations, so
+  nothing cascades and nothing is orphaned. Editing a handoff also refreshes the
+  memory row it wrote at creation time, which was previously built once and never
+  updated — so a corrected handoff no longer leaves stale, searchable, wrong
+  content behind it.
+- **A server-side write gate for the REST API.** `MASSA_AI_READ_ONLY_MODE=true`
+  refuses every mutating request with a 403. It is **default-deny**: a route is a
+  write unless it appears in an explicit, source-traced read-only classification,
+  so a route nobody classifies is refused rather than silently exposed. The gate
+  is off by default and changes nothing for existing callers. Until now the only
+  thing called "write mode" lived in the browser and decided which buttons to
+  draw; every mutation in the product, including the three routes that execute
+  arbitrary code, was authorized by the API key alone.
+
+  Default-deny was not a stylistic choice. A keyword-and-verb sweep for
+  "destructive" routes flagged 14 of 50 and missed 9 — among them all three
+  `executor/*` code-execution routes, `profiles/switch`, `checkpoints/restore`,
+  and every `model-registry` regenerate variant. A later correction found the
+  route enumeration itself had been undercounting by five. Every one of those
+  missed routes is protected anyway, because a denylist can only ever contain
+  what its author's enumeration found.
+- **Five MCP tools** — `handoff_update`, `handoff_delete`, `create_proposal`,
+  `update_proposal`, `delete_proposal` — taking the surface from 54 to 59, in both
+  the HTTP and embedded clients.
+
 ### Fixed
 
+- **Admin Portal memory edit and delete did nothing.** Both called
+  `PUT`/`DELETE /api/v1/memory/<id>`, which no route has ever served — the memory
+  routes are five body-keyed `POST`s — so each request 404ed before authentication
+  was even consulted. Three separate tests asserted those dead URLs and passed,
+  because a mocked request capture accepts any URL string. A contract check now
+  diffs every URL the Web UI calls against the routes the server actually
+  registers, so a call to a nonexistent endpoint fails the build instead of the
+  user's click.
 - **The Admin Portal Logs tab's Live toggle delivered a burst of entries, then
   stopped "after some seconds."** Every idle SSE stream did — the keep-alive
   heartbeat on `GET /api/v1/logs/stream` was scheduled 15 s apart, longer
