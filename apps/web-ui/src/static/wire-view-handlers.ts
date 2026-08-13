@@ -25,7 +25,12 @@ import {
   handleMemoryDeleteProject,
 } from "./views/memory.js";
 import { handleHandoffCreate, handleHandoffAction, handleHandoffEdit, handleHandoffDelete } from "./views/handoffs.js";
-import { handleProposalAction } from "./views/proposals.js";
+import {
+  handleProposalAction,
+  handleProposalCreate,
+  handleProposalEdit,
+  handleProposalDelete,
+} from "./views/proposals.js";
 import { handleCheckpointCreate, handleCheckpointDelete } from "./views/checkpoints.js";
 import { handleLogsLiveToggle, handleLogsExport } from "./views/logs.js";
 import type { LogsDoc } from "./views/logs.js";
@@ -174,7 +179,10 @@ export function wireViewHandlers(ctx: WireViewHandlersCtx): void {
       }
     });
   });
-  // write mode: proposal approve/reject
+  // write mode: proposal create/approve/reject/edit/delete
+  root.querySelector('[data-action="proposal-create"]')?.addEventListener("click", () => {
+    handleProposalCreate(ctx);
+  });
   root.querySelectorAll('[data-action="proposal-approve"]').forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
@@ -187,6 +195,27 @@ export function wireViewHandlers(ctx: WireViewHandlersCtx): void {
       const id = btn.dataset.id;
       if (!id) return;
       handleProposalAction(ctx, id, "reject");
+    });
+  });
+  // T13 (HPC-02): edit is not confirm-gated (design.md §D5) — only
+  // irreversible actions are, consistent with proposal-approve/reject and
+  // handoff-edit above.
+  root.querySelectorAll('[data-action="proposal-edit"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      if (!id) return;
+      handleProposalEdit(ctx, id);
+    });
+  });
+  // T13: the confirm() lives here, at the wiring site, per this file's own
+  // docblock — never inside handleProposalDelete.
+  root.querySelectorAll('[data-action="proposal-delete"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      if (!id) return;
+      if (confirm("Delete proposal " + id + "? This cannot be undone.")) {
+        handleProposalDelete(ctx, id);
+      }
     });
   });
   // search

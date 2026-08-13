@@ -334,6 +334,27 @@ describe("T13 create/delete forms render correct fields when trusted", () => {
     expect(html).toContain('data-action="handoff-delete"');
   });
 
+  it("proposal create form fields present when trusted (T13, HPC-02)", () => {
+    trustedOn();
+    const data = { data: { pending: [] } };
+    const html = renderProposals(data, { project: "p" });
+    expect(html).toContain('data-form="proposal-create"');
+    expect(html).toContain('data-create="projectId"');
+    expect(html).toContain('data-create="kind"');
+    expect(html).toContain('data-create="payload"');
+    expect(html).toContain('data-create="rationale"');
+    expect(html).toContain('data-create="targetMemoryId"');
+  });
+
+  it("proposal edit + delete buttons visible when trusted (T13, HPC-02)", () => {
+    trustedOn();
+    const data = { data: { pending: [{ id: "prop-trust", type: "edit", status: "pending", description: "d" }] } };
+    const html = renderProposals(data, { project: "p" });
+    expect(html).toContain('data-action="proposal-edit"');
+    expect(html).toContain('data-action="proposal-delete"');
+    expect(html).toContain('data-id="prop-trust"');
+  });
+
   it("checkpoint create + edit + delete buttons visible when trusted (CHKP-02, CHKP-04, UIC-03)", () => {
     trustedOn();
     const data = { success: true, data: { checkpoints: [{ id: "c-trust", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };

@@ -226,6 +226,29 @@ describe("renderCheckpoints", () => {
   });
 });
 
+// T13 (HPC-02): the user's live `proposals` table measures 0 rows (spec.md's
+// "Measured baseline" table), so this is the state a real operator hits
+// first — not a happy-path fixture with rows already in it.
+describe("renderProposals", () => {
+  it("prompts to select project when none chosen", () => {
+    expect(renderProposals(null, { project: "" })).toContain("Select a project");
+  });
+
+  it("shows error on failed data", () => {
+    expect(renderProposals({ success: false, error: "x" }, { project: "p" })).toContain("x");
+  });
+
+  it("shows empty state with 0 proposals", () => {
+    const html = renderProposals({ data: { pending: [] } }, { project: "p" });
+    expect(html).toContain("No pending proposals");
+    expect(html).not.toContain('data-action="proposal-approve"');
+  });
+
+  it("shows error when data is null with project set", () => {
+    expect(renderProposals(null, { project: "p" })).toContain("Request failed");
+  });
+});
+
 describe("renderProposals response shape", () => {
   // POST /api/v1/proposal/list returns `{ pending, count }` (proposals.ts).
   // Reading only `proposals` here is what made the view permanently empty.
@@ -800,6 +823,89 @@ describe("startApp", () => {
     expect(del).toBeUndefined();
   });
 
+  /**
+   * T13 (HPC-02) — same shared-child fake-DOM click cascade T12 established
+   * for handoffs: `wireViewHandlers` binds every `data-action` selector
+   * against the app root on every render, and this harness's stable fake
+   * child answers every selector, so `proposal-edit`/`proposal-delete`
+   * handlers land in the same `_handlers.click` array as every other
+   * write-mode handler and fire alongside them — a real behavioural proof,
+   * not a source-span fallback. `#/memory`, not `#/proposals`, for the same
+   * reason as T12's handoff test: an unselected-project render for a
+   * project-gated view runs fully synchronously and turns the pre-existing
+   * unconfirmed `memory-delete-project` handler into a synchronous
+   * re-entrant re-wiring loop over this test's own live `_handlers.click`
+   * iteration (measured on T12: multi-GB RSS growth, no completion). The
+   * memory view's own `render()` always hits a real `await
+   * api.request(...)`, which breaks that chain.
+   */
+  it("drives the proposal edit/delete dialog handlers through to their requests (T13)", async () => {
+    const { doc, elements } = makeFakeDom();
+    const dialogs = fakeDialogs("revised rationale");
+    (globalThis as any).location = { hash: "#/memory" };
+    const calls = recordingJsonFetch((url) => {
+      if (url.includes("/memory/list")) {
+        return { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.5, content: "hi" }], total: 1, limit: 50, offset: 0 } };
+      }
+      if (url.includes("/proposal/list")) {
+        return { data: { pending: [{ id: "p1", type: "edit", status: "pending", description: "d" }] } };
+      }
+      if (url.includes("/project/list")) return { data: { projects: [{ projectId: "p1" }] } };
+      return { data: {} };
+    });
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+
+    const child = elements["app"].querySelectorAll("x")[0];
+    for (const h of child._handlers.click ?? []) h();
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(dialogs.prompts).toContain("Edit proposal rationale:");
+    expect(dialogs.confirms.some((m) => m.includes("Delete proposal"))).toBe(true);
+
+    const patch = calls.find((c) => c.method === "PATCH" && c.url.includes("/api/v1/proposal/fake-id"));
+    expect(patch).toBeDefined();
+    expect(patch?.body).toContain("revised rationale");
+    // AC-02.4: the client never sends a rejected field alongside the edit.
+    expect(patch?.body).not.toContain('"kind"');
+
+    const del = calls.find((c) => c.method === "DELETE" && c.url.includes("/api/v1/proposal/fake-id"));
+    expect(del).toBeDefined();
+  });
+
+  /**
+   * Trap #3 from the task brief: "a declined confirm() must issue no
+   * request — assert that explicitly." Twin of T12's handoff-delete decline
+   * test above, for proposal-delete. RED proof recorded manually — see the
+   * task report.
+   */
+  it("a declined proposal-delete confirm issues no DELETE request (T13)", async () => {
+    const { doc, elements } = makeFakeDom();
+    (globalThis as any).prompt = () => null;
+    (globalThis as any).confirm = () => false;
+    (globalThis as any).alert = () => {};
+    (globalThis as any).location = { hash: "#/memory" };
+    const calls = recordingJsonFetch((url) => {
+      if (url.includes("/memory/list")) {
+        return { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.5, content: "hi" }], total: 1, limit: 50, offset: 0 } };
+      }
+      if (url.includes("/proposal/list")) {
+        return { data: { pending: [{ id: "p1", type: "edit", status: "pending", description: "d" }] } };
+      }
+      if (url.includes("/project/list")) return { data: { projects: [{ projectId: "p1" }] } };
+      return { data: {} };
+    });
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+
+    const child = elements["app"].querySelectorAll("x")[0];
+    for (const h of child._handlers.click ?? []) h();
+    await new Promise((r) => setTimeout(r, 80));
+
+    const del = calls.find((c) => c.method === "DELETE" && c.url.includes("/api/v1/proposal/"));
+    expect(del).toBeUndefined();
+  });
+
   it("SSE subscribes to /api/v1/events when EventSource is available", async () => {
     const { doc } = makeFakeDom();
     const sseInstances: any[] = [];
@@ -1355,6 +1461,70 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       const html = renderHandoffs(data, { project: "proj-1" });
       expect(html).not.toContain('data-action="handoff-edit"');
       expect(html).not.toContain('data-action="handoff-delete"');
+    });
+  });
+
+  describe("proposal create (T13, HPC-02)", () => {
+    it("renders create-proposal form when write mode on + project selected", () => {
+      enableWrite();
+      const data = { data: { pending: [] } };
+      const html = renderProposals(data, { project: "proj-1" });
+      expect(html).toContain("Create Proposal");
+      expect(html).toContain('data-action="proposal-create"');
+      expect(html).toContain('data-create="projectId"');
+      expect(html).toContain('data-create="kind"');
+      expect(html).toContain('data-create="payload"');
+      expect(html).toContain('data-create="rationale"');
+      expect(html).toContain('data-create="targetMemoryId"');
+      // AC-02.2: the kind select offers exactly the three accepted kinds.
+      expect(html).toContain('<option value="memory.create">memory.create</option>');
+      expect(html).toContain('<option value="memory.update">memory.update</option>');
+      expect(html).toContain('<option value="memory.tag">memory.tag</option>');
+    });
+
+    it("renders the create form even with 0 proposals (the operator's live state)", () => {
+      enableWrite();
+      const html = renderProposals({ data: { pending: [] } }, { project: "proj-1" });
+      expect(html).toContain('data-action="proposal-create"');
+      expect(html).not.toContain("No pending proposals");
+    });
+
+    it("renders approve + reject buttons on pending proposals when write mode on", () => {
+      enableWrite();
+      const data = { data: { pending: [{ id: "p1", type: "edit", status: "pending", description: "d" }] } };
+      const html = renderProposals(data, { project: "proj-1" });
+      expect(html).toContain('data-action="proposal-approve"');
+      expect(html).toContain('data-action="proposal-reject"');
+      expect(html).toContain('data-id="p1"');
+    });
+
+    it("hides create + approve/reject when write mode off", () => {
+      disableWrite();
+      const data = { data: { pending: [{ id: "p1", type: "edit", status: "pending", description: "d" }] } };
+      const html = renderProposals(data, { project: "proj-1" });
+      expect(html).not.toContain("Create Proposal");
+      expect(html).not.toContain('data-action="proposal-approve"');
+      expect(html).not.toContain('data-action="proposal-reject"');
+    });
+  });
+
+  describe("proposal edit + delete (T13, HPC-02)", () => {
+    it("renders edit + delete buttons on pending proposals when write mode on", () => {
+      enableWrite();
+      const data = { data: { pending: [{ id: "p1", type: "edit", status: "pending", description: "d" }] } };
+      const html = renderProposals(data, { project: "proj-1" });
+      expect(html).toContain('data-action="proposal-edit"');
+      expect(html).toContain('data-action="proposal-delete"');
+      expect(html).toContain('class="btn-edit" data-action="proposal-edit" data-id="p1"');
+      expect(html).toContain('class="btn-delete" data-action="proposal-delete" data-id="p1"');
+    });
+
+    it("hides edit + delete when write mode off", () => {
+      disableWrite();
+      const data = { data: { pending: [{ id: "p1", type: "edit", status: "pending", description: "d" }] } };
+      const html = renderProposals(data, { project: "proj-1" });
+      expect(html).not.toContain('data-action="proposal-edit"');
+      expect(html).not.toContain('data-action="proposal-delete"');
     });
   });
 
