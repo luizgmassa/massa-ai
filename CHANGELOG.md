@@ -24,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exported surface: `public-surface.test.ts`'s frozen export lists are unmodified, and
   `render-golden.json` stayed byte-identical across all 40 conversion tasks. The three
   defect repairs under Fixed below are separate, deliberate behaviour changes that
-  landed on the same branch afterwards; between them they add 1 golden entry and change
-  2, leaving 83 of the original 85 byte-identical.
+  landed on the same branch afterwards; between them they add 1 golden entry
+  (`renderModelRegistry/nonProfileOverlay`) and change 8 — both `renderConfig/*` and
+  six of the seven `renderLogs/*` — leaving 77 of the original 85 byte-identical.
 
 ### Fixed
 

@@ -9,7 +9,7 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 ---
 
 **Design**: `.specs/features/web-ui-typescript/design.md`
-**Status**: **Complete — Phases 1-18 / 49 Tasks executed.** Phase 18 was opened after the
+**Status**: **In Progress — Phase 19 (1 Task) open**, closing two of the four findings from Phase 18's independent verification. Prior state: **Phases 1-18 / 49 Tasks executed.** Phase 18 was opened after the
 operator re-tested and found the Logs live tail still dead — T44 had fixed the checkbox,
 but the tail had no reconnect while the server closes every stream after 10 minutes by
 design (D16) — and is now closed by T47/T48/T49. Phases 15-17 remain as described below.
@@ -1447,6 +1447,42 @@ default sources disagree; the Config tab believes the static one.
 **Tests**: `apps/web-ui/src/__tests__/admin-handlers.test.ts`
 **Gate**: `bun run --filter @massa-ai/web-ui build`, then `bun test apps/web-ui/src/__tests__/`, then `bun run type-check`
 **Commit**: `fix(web-ui): count only rapid closes against the live-tail reconnect bound`
+
+---
+
+### Phase 19: Close the Phase 18 verification findings
+
+Two of the independent pass's four findings need code; the other two are recorded in
+the Execution Log and deliberately not fixed (see Batch 17).
+
+#### T50: Pin the reconnect threshold boundary
+
+**Task ID**: TASK-050
+**What**: Kill the surviving boundary mutant, and mark the one unreachable state the verifier found.
+**Where**: `apps/web-ui/src/static/views/logs.ts`, `apps/web-ui/src/__tests__/admin-handlers.test.ts`
+**Depends on**: T49
+**Reuses**: T49's `opts.now` clock seam and the existing T49 test block
+**Requirement**: WUT-19
+**Non-goals**: do not change the 30 s threshold or the give-up bound — both are recorded decisions. Do not add a guard for the same-tick toggle race; it is unreachable through real DOM events and an unreachable guard cannot be tested.
+**Tools**: MCP: NONE · Skill: NONE
+
+> The verifier mutated `lifetimeMs < LOGS_RECONNECT_HEALTHY_MS_DEFAULT` to `<=` and
+> **all 159 tests in `admin-handlers.test.ts` stayed green** — the exact-30000 ms case
+> is untested, so the boundary is free to drift by one comparison operator with every
+> gate passing. This repo has a standing lesson that an operator is not a policy: read
+> the call position, because `>` after an insert and `>=` before it retain the same
+> count. Here the two differ only at the exact boundary, which is precisely the case
+> nothing exercises.
+
+**Done when**:
+- [ ] A test pins a connection lasting **exactly** `LOGS_RECONNECT_HEALTHY_MS_DEFAULT` and asserts which side of the boundary it falls on, matching the shipped `<`
+- [ ] Re-run the verifier's mutation by hand: flip `<` to `<=`, confirm the new test **fails**, restore. Report the red — a boundary test that passes under both operators has not closed the gap
+- [ ] The same-tick double-toggle state is documented in a comment at `handleLogsLiveToggle` or `runLogsLiveStream`: two synchronous invocations in one JS turn can leave `logsLive: true` with nothing in flight, it is unreachable via real DOM change events (which always have a macrotask boundary between them), and it matters only if this is ever driven programmatically
+- [ ] `render-golden.json` unchanged — 86 entries, 0 byte-changed
+
+**Tests**: `apps/web-ui/src/__tests__/admin-handlers.test.ts`
+**Gate**: `bun run --filter @massa-ai/web-ui build`, then `bun test apps/web-ui/src/__tests__/`, then `bun run type-check`
+**Commit**: `test(web-ui): pin the live-tail reconnect threshold boundary`
 
 ---
 
@@ -2904,6 +2940,42 @@ up, the same defect class it was written to remove: the UI asserting something f
 about its own state.** T49 closed it. Verified independently by injecting the clock: a
 60 s apparent lifetime reached **9** connections without giving up (pre-T49 it stopped
 at 6), while a 0 ms lifetime still stops at **6**.
+
+**Independent verification of Phase 18** (author ≠ verifier, read-only, HEAD `32706d0a`)
+confirmed all seven claims — reconnect, the `res.ok` guard, abort-vs-close distinction,
+T49's rapid-close accounting, T48's conditional disclosure, golden scope, and every gate
+figure — each by mutating the subject and observing the sensor redden, not by reading the
+diff. It also established that T47's three pre-existing tests passing
+`{ maxReconnectAttempts: 0 }` are load-bearing rather than weakened: removing the option
+from all three fails all three (two time out at 5001 ms, the third duplicates entries as
+the default reconnect replays the same mock stream). Four findings came back:
+
+1. **A stale figure in `CHANGELOG.md`, and it was shipping.** The `Added` entry said the
+   repairs "add 1 golden entry and change 2, leaving 83 of the original 85
+   byte-identical". True when written, false once T48 changed six `renderLogs/*` keys.
+   Re-measured against `origin/main`: **1 added, 8 changed, 77 of 85 unchanged.**
+   Corrected, and now naming the key families so the next renderer change cannot leave a
+   bare count quietly wrong. This is the third instance in this feature of a figure that
+   was correct at the moment of writing and was never revisited — the recurring defect
+   here is not arithmetic, it is that a number written in one commit is not re-derived by
+   the commit that invalidates it.
+2. **A surviving mutant at T49's threshold boundary.** Changing `lifetimeMs <
+   LOGS_RECONNECT_HEALTHY_MS_DEFAULT` to `<=` left all 159 tests in
+   `admin-handlers.test.ts` green: the exact-30000 ms case is untested. A real coverage
+   hole in a sensor set written the same day — closed by T50.
+3. **The 30 s threshold is binary, so a 30 s-to-10 min close cadence reconnects forever.**
+   Simulated a server closing every 31 s: **200 consecutive connections, never gave up.**
+   Not a coding error — it is the direct consequence of the threshold choice, and rows do
+   keep arriving — but each reconnect drops the ~2 s gap between close and re-subscribe,
+   so a proxy closing SSE every 31 s silently loses entries and never says so. Recorded,
+   not fixed: any bound tight enough to catch it would also fire on the legitimate
+   10-minute schedule this phase exists to tolerate.
+4. **A same-tick double toggle can strand the tail.** Invoking `handleLogsLiveToggle`
+   twice synchronously in one JS turn leaves `logsLive: true`, `logsStreamInFlight:
+   false`, and nothing scheduled — the exact pre-T47 silent-death state. The verifier
+   confirmed one macrotask boundary settles it, and two genuine DOM change events always
+   have one, so it is unreachable through real interaction. T50 adds the comment; no
+   guard, because the reachable-path cost is zero and an unreachable guard is untestable.
 
 **Phase 18 gates, measured after T49** (forced non-cached where turbo would replay):
 `bun run build --force` exit 0, 6/6, **0 cached**; `bun run type-check --force` exit 0,
