@@ -9,6 +9,19 @@ const {
   renderDashboard,
 } = await import("../static/dashboard.js");
 
+/** Shapes the `api.request` stub below actually supplies, used only to
+ *  narrow `DashboardSectionResult.data` (genuinely `unknown` at the
+ *  `fetchDashboardData` boundary) at the two assertions that reach into it. */
+interface HookQueueFixtureData {
+  pendingCount: number;
+  maxPending: number;
+  saturated: boolean;
+}
+
+interface MetricsFixtureData {
+  system: { uptime: number };
+}
+
 describe("fetchDashboardData", () => {
   it("returns fulfilled data for each section", async () => {
     const api = {
@@ -23,9 +36,9 @@ describe("fetchDashboardData", () => {
     const data = await fetchDashboardData(api);
     expect(data.scheduler.data).toEqual({ running: true, jobs: [] });
     expect(data.scheduler.error).toBeNull();
-    expect(data.hookQueue.data.pendingCount).toBe(1);
+    expect((data.hookQueue.data as HookQueueFixtureData).pendingCount).toBe(1);
     expect(data.synapse.data).toEqual({ data: { sessions: [] } });
-    expect(data.metrics.data.system.uptime).toBe(5);
+    expect((data.metrics.data as MetricsFixtureData).system.uptime).toBe(5);
   });
 
   it("returns error string for rejected sections", async () => {

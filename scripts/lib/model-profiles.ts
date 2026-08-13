@@ -477,6 +477,21 @@ export interface OverlayData {
   readonly tiers?: string[];
 }
 
+/** Per-category breakdown of surviving overlay entries (WUT-17) — one key per top-level
+ *  `OverlayData` key `normalizeOverlay` handles, so the UI never has to re-derive the
+ *  counting rule to say *where* an override lives. Values sum to `overlayOverrideCount`. */
+export interface OverlayOverrideBreakdown {
+  readonly hostDefaults: number;
+  readonly workflowTiers: number;
+  readonly agentTiers: number;
+  readonly tiers: number;
+  readonly profiles: number;
+}
+
+function zeroBreakdown(): OverlayOverrideBreakdown {
+  return { hostDefaults: 0, workflowTiers: 0, agentTiers: 0, tiers: 0, profiles: 0 };
+}
+
 export interface EffectiveRegistryResult {
   readonly registry: Registry;
   readonly source: {
@@ -488,6 +503,9 @@ export interface EffectiveRegistryResult {
    *  registry the operator's overlay is actually overriding, after collapsing entries that
    *  are byte-identical to the current builtin. `0` when there is no overlay. */
   readonly overlayOverrideCount: number;
+  /** WUT-17: the same count, broken down per category, so the UI can mark exactly which
+   *  overlay sections are non-empty rather than re-deriving the counting rule. */
+  readonly overlayOverrideBreakdown: OverlayOverrideBreakdown;
   readonly overlayError?: string;
 }
 
@@ -507,6 +525,7 @@ export function loadEffectiveRegistry(opts?: {
       registry: builtin,
       source: { builtin, overlay: null, tombstoned: [] },
       overlayOverrideCount: 0,
+      overlayOverrideBreakdown: zeroBreakdown(),
     };
   }
 
@@ -520,6 +539,7 @@ export function loadEffectiveRegistry(opts?: {
       registry: builtin,
       source: { builtin, overlay: null, tombstoned: [] },
       overlayOverrideCount: 0,
+      overlayOverrideBreakdown: zeroBreakdown(),
       overlayError: `overlay parse failed: ${(e as Error).message}`,
     };
   }
@@ -530,6 +550,7 @@ export function loadEffectiveRegistry(opts?: {
       registry: builtin,
       source: { builtin, overlay: null, tombstoned: [] },
       overlayOverrideCount: 0,
+      overlayOverrideBreakdown: zeroBreakdown(),
       overlayError: "overlay root is not an object",
     };
   }
@@ -541,6 +562,7 @@ export function loadEffectiveRegistry(opts?: {
   try {
     const validated = validateRegistry(merged);
     const normalizedOverlay = normalizeOverlay(builtin, overlay);
+    const { total, breakdown } = countOverlayEntries(normalizedOverlay);
     return {
       registry: validated,
       source: {
@@ -548,7 +570,8 @@ export function loadEffectiveRegistry(opts?: {
         overlay: normalizedOverlay,
         tombstoned: collectTombstoned(builtin, overlay),
       },
-      overlayOverrideCount: countOverlayEntries(normalizedOverlay),
+      overlayOverrideCount: total,
+      overlayOverrideBreakdown: breakdown,
     };
   } catch (e) {
     console.warn(`[massa-ai] Overlay merge validation failed: ${(e as Error).message}`);
@@ -556,6 +579,7 @@ export function loadEffectiveRegistry(opts?: {
       registry: builtin,
       source: { builtin, overlay: null, tombstoned: [] },
       overlayOverrideCount: 0,
+      overlayOverrideBreakdown: zeroBreakdown(),
       overlayError: `overlay validation failed: ${(e as Error).message}`,
     };
   }
@@ -693,7 +717,7 @@ function mergeProfile(
 function normalizeOverlay(builtin: Registry, overlay: OverlayData): OverlayData {
   const result: { -readonly [K in keyof OverlayData]?: OverlayData[K] } = {};
 
-  if (overlay.tiers) {
+  if (overlay.tiers && JSON.stringify(overlay.tiers) !== JSON.stringify(builtin.tiers)) {
     result.tiers = overlay.tiers;
   }
 
@@ -803,34 +827,45 @@ function normalizeProfile(
   return result;
 }
 
-/** APCR-01.10: count of leaf overlay entries surviving normalization — the size of what the
- *  operator's overlay is actually overriding. */
-function countOverlayEntries(overlay: OverlayData): number {
-  let n = 0;
-  if (overlay.hostDefaults) n += Object.keys(overlay.hostDefaults).length;
-  if (overlay.workflowTiers) n += Object.keys(overlay.workflowTiers).length;
+/** APCR-01.10 / WUT-17: count of leaf overlay entries surviving normalization — the size of
+ *  what the operator's overlay is actually overriding — plus a per-category breakdown so the
+ *  UI can say *where* those overrides live without re-deriving this rule. `total` is always
+ *  the sum of `breakdown`'s five values. */
+function countOverlayEntries(overlay: OverlayData): {
+  total: number;
+  breakdown: OverlayOverrideBreakdown;
+} {
+  const breakdown: { -readonly [K in keyof OverlayOverrideBreakdown]: number } = zeroBreakdown();
+  if (overlay.hostDefaults) breakdown.hostDefaults = Object.keys(overlay.hostDefaults).length;
+  if (overlay.workflowTiers) breakdown.workflowTiers = Object.keys(overlay.workflowTiers).length;
   if (overlay.agentTiers) {
     for (const value of Object.values(overlay.agentTiers)) {
       // A surviving whole-agent tombstone counts as one override (removing that agent's
       // overrides entirely); otherwise count each surviving host-level leaf (design D-1).
-      n += value === null ? 1 : Object.keys(value).length;
+      breakdown.agentTiers += value === null ? 1 : Object.keys(value).length;
     }
   }
-  if (overlay.tiers) n += 1;
+  if (overlay.tiers) breakdown.tiers = 1;
   if (overlay.profiles) {
     for (const val of Object.values(overlay.profiles)) {
       if (!isOverlayProfile(val)) continue;
       if (val._delete === true) {
-        n += 1;
+        breakdown.profiles += 1;
         continue;
       }
-      if (val.description !== undefined) n += 1;
+      if (val.description !== undefined) breakdown.profiles += 1;
       if (val.hosts) {
         for (const tierMap of Object.values(val.hosts)) {
-          n += Object.keys(tierMap).length;
+          breakdown.profiles += Object.keys(tierMap).length;
         }
       }
     }
   }
-  return n;
+  const total =
+    breakdown.hostDefaults +
+    breakdown.workflowTiers +
+    breakdown.agentTiers +
+    breakdown.tiers +
+    breakdown.profiles;
+  return { total, breakdown };
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import fs from "fs";
 import path from "path";
+import { SERVER_COMPUTED_PASSTHROUGH_KEYS } from "../static/views/registry-state.js";
 
 // ── admin-handlers.test.ts ──────────────────────────────────────────────────
 // Tests the admin-portal-enhancement handlers: showBanner, config save/reveal,
@@ -55,7 +56,10 @@ const {
   handleMemoryDeleteProjectCancel: (ctx: any) => void;
   handleMemoryDeleteProject: (ctx: any) => Promise<void>;
   stopLogsLiveStream: (ctx: any) => void;
-  runLogsLiveStream: (ctx: any) => Promise<void>;
+  runLogsLiveStream: (
+    ctx: any,
+    opts?: { reconnectDelayMs?: number; maxReconnectAttempts?: number; now?: () => number },
+  ) => Promise<void>;
   handleLogsLiveToggle: (ctx: any) => void;
   handleLogsExport: (ctx: any) => Promise<void>;
   handleProfileSwitch: (ctx: any, profile: string, host: string) => Promise<void>;
@@ -843,6 +847,57 @@ describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
     expect(mergeRegistryForDisplay(server, overlay).overlayOverrideCount).toBe(0);
   });
 
+  it("carries overlayOverrideBreakdown through the display merge (WUT-17, T46)", () => {
+    // T46: the rebuild branch (overlay.profiles present, e.g. an initialized overlay — which
+    // initRegistryOverlay always produces, APCR-01) previously listed overlayOverrideCount,
+    // agents and agentsError as survivors and left overlayOverrideBreakdown off the list — the
+    // exact field WUT-17 added to the server payload. The count line then names its categories
+    // on first paint and reverts to the unnamed sentence on every render after.
+    const breakdown = { hostDefaults: 1, workflowTiers: 0, agentTiers: 2, tiers: 0, profiles: 1 };
+    const server = {
+      registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
+      source: {},
+      overlayOverrideCount: 4,
+      overlayOverrideBreakdown: breakdown,
+    };
+    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    expect(mergeRegistryForDisplay(server, overlay).overlayOverrideBreakdown).toEqual(breakdown);
+  });
+
+  it("class-level guard: every server-computed passthrough key survives the rebuild branch (T46)", () => {
+    // Driven by the enumerated, type-checked SERVER_COMPUTED_PASSTHROUGH_KEYS (registry-state.ts)
+    // rather than one assertion per field — a field named in RegistryServerData and forgotten in
+    // mergeRegistryForDisplay's return object fails `bun run type-check` (the list is typed
+    // `Exclude<keyof RegistryServerData, "registry">`, checked complete against the interface at
+    // compile time) as well as this runtime pass, instead of degrading silently in the browser
+    // the way overlayOverrideBreakdown did. `registry` is deliberately excluded: the rebuild
+    // branch legitimately transforms it via merge rather than passing it through.
+    expect(SERVER_COMPUTED_PASSTHROUGH_KEYS.length).toBe(5);
+    expect((SERVER_COMPUTED_PASSTHROUGH_KEYS as readonly string[]).slice().sort()).toEqual(
+      ["agents", "agentsError", "overlayOverrideBreakdown", "overlayOverrideCount", "source"].sort(),
+    );
+
+    const sentinels: Record<string, unknown> = {
+      source: { overlay: { profiles: {} }, tombstoned: ["sentinel-source"] },
+      overlayOverrideCount: 7,
+      overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 1, agentTiers: 1, tiers: 1, profiles: 3 },
+      agents: [{ name: "sentinel-agent", charterTier: "deep" }],
+      agentsError: "sentinel-agents-error",
+    };
+    const server: Record<string, unknown> = {
+      registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
+      ...sentinels,
+    };
+    // overlay.profiles non-empty forces the rebuild branch (the early return only fires when
+    // overlay or overlay.profiles is falsy — unreachable once initRegistryOverlay has run).
+    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    const result = mergeRegistryForDisplay(server, overlay) as Record<string, unknown>;
+
+    for (const key of SERVER_COMPUTED_PASSTHROUGH_KEYS) {
+      expect(result[key]).toEqual(sentinels[key]);
+    }
+  });
+
   // ── Profiles merge as a DELTA, per host and per tier ──────────────────────
   // Every case above uses `hosts: {}` on both sides, where whole-object replace and
   // deep merge are indistinguishable. These use a real single-host delta — the shape an
@@ -984,6 +1039,30 @@ describe("renderModelRegistry — overlay override count display (APCR-01.10)", 
   it("renders nothing extra when overlayOverrideCount is absent", () => {
     const html = renderModelRegistry(minimalRegistry, { writeMode: false });
     expect(html).not.toContain("registry-override-count");
+  });
+
+  it("never reports a non-zero count with nothing on screen carrying an override marker (WUT-17 AC3 — the reported bug)", () => {
+    // Reproduces the exact defect: the only surviving override lives in hostDefaults, not
+    // overlay.profiles, so the old renderer (profile-column badge only) showed "1 custom
+    // override" with zero badges and zero category names anywhere on the tab.
+    const html = renderModelRegistry(
+      {
+        ...minimalRegistry,
+        registry: { ...minimalRegistry.registry, hostDefaults: { claude: "p" } },
+        source: { overlay: { hostDefaults: { claude: "p" } }, tombstoned: [] },
+        overlayOverrideCount: 1,
+        overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 0, agentTiers: 0, tiers: 0, profiles: 0 },
+      },
+      { writeMode: false },
+    );
+    // "Default Profile per Tool" is also the section's static <h3>, present on every
+    // render regardless of this fix — anchoring on the count line's own text (not the
+    // whole page) is what keeps this discriminating rather than vacuously true.
+    const overrideLineMatch = html.match(/<p class="registry-override-count muted">([^<]*)<\/p>/);
+    const overrideLineText = overrideLineMatch ? overrideLineMatch[1] : "";
+    const hasOverlayBadge = html.includes("overlay-badge");
+    const hasNamedCategoryInLine = overrideLineText.includes("Default Profile per Tool");
+    expect(hasOverlayBadge || hasNamedCategoryInLine).toBe(true);
   });
 });
 
@@ -2076,7 +2155,9 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
       state: { logsLive: true },
       api: { request, authHeaders: () => ({ "x-api-key": "k" }) },
     });
-    await runLogsLiveStream(ctx);
+    // T47: a clean close now reconnects by default; this test asserts the
+    // single-connection append behaviour, so it disables the reconnect.
+    await runLogsLiveStream(ctx, { maxReconnectAttempts: 0 });
     expect(ctx.state.logsEntries.map((e: any) => e.message)).toEqual(["first", "second"]);
     // no range query (GET /api/v1/logs) was reissued to render these
     expect(request).not.toHaveBeenCalled();
@@ -2113,7 +2194,9 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
       },
     };
 
-    await runLogsLiveStream(ctx);
+    // T47: disable the default reconnect — this test asserts single-connection
+    // append/patch behaviour only.
+    await runLogsLiveStream(ctx, { maxReconnectAttempts: 0 });
 
     expect(tbody.innerHTML).toContain("live one");
     expect(dom.emptyNote).toBeNull(); // the stale "no entries" note was removed
@@ -2127,7 +2210,10 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
       state: { logsLive: true },
       api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "secret-key" }) },
     });
-    await runLogsLiveStream(ctx);
+    // T47: disable the default reconnect — one clean connection is enough
+    // to assert the auth header, and a real reconnect delay would blow the
+    // per-test timeout.
+    await runLogsLiveStream(ctx, { maxReconnectAttempts: 0 });
     expect(fetchMock).toHaveBeenCalled();
     const fetchArg = (fetchMock.mock.calls[0] as any[])[1] as any;
     expect(fetchArg.headers["x-api-key"]).toBe("secret-key");
@@ -2181,6 +2267,158 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     } finally {
       (globalThis as any).AbortController = origAC;
     }
+  });
+
+  it("reconnects after a clean server close while Live is still on — the exact measured scenario (T47)", async () => {
+    // Measured against a scratch SSE server that sends one frame then
+    // closes: pre-T47, `runLogsLiveStream` returned after exactly 1 fetch
+    // call with `state.logsLive` still true and nothing running. The server
+    // closes every stream after 10 minutes by design
+    // (SSE_MAX_DURATION_MS_DEFAULT) — this asserts a second connection
+    // happens instead of the tail silently going dead.
+    const firstChunks = [
+      'data: {"seq":1,"ts":"2026-08-09T00:00:00.000Z","level":"info","message":"before close"}\n\n',
+    ];
+    let calls = 0;
+    const fetchMock = mock(async () => {
+      calls += 1;
+      // First connection: one frame, then a clean close. Second connection:
+      // closes immediately with nothing to read — proves the reconnect
+      // happened without depending on a third connection ever occurring.
+      return calls === 1 ? makeSseResponse(firstChunks) : makeSseResponse([]);
+    });
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    // reconnectDelayMs: 0 keeps this deterministic and instant (no real
+    // sleep — the injectable seam under test). maxReconnectAttempts: 1
+    // means the second close exhausts the bound, so the promise resolves
+    // on its own without a third connection — this also exercises the
+    // hot-loop give-up path in the same assertion.
+    await runLogsLiveStream(ctx, { reconnectDelayMs: 0, maxReconnectAttempts: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(2); // the reconnect: a second connection happened
+    expect(ctx.state.logsEntries.map((e: any) => e.message)).toEqual(["before close"]);
+    expect(ctx.state.logsLive).toBe(false); // bound exhausted — gives up rather than looping forever
+    expect(ctx.root.children[0].textContent).toContain("giving up");
+  });
+
+  it("a non-200 (401) banners, turns Live off, and does not reconnect — a bad status will not fix itself on retry (T47)", async () => {
+    // Measured: a keyless request to /api/v1/logs/stream returns 401, 68
+    // bytes, application/json. Pre-T47 there was no `res.ok` check: the
+    // frame loop found no `\n\n`, `done` arrived, and the function returned
+    // exactly as if the stream had been healthy and idle.
+    const fetchMock = mock(async () => ({
+      ok: false,
+      status: 401,
+      headers: new Map([["content-type", "application/json"]]),
+      body: null,
+    }));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({}) },
+    });
+    await runLogsLiveStream(ctx);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // no reconnect after a non-200
+    expect(ctx.state.logsLive).toBe(false);
+    expect(ctx.root.children[0].textContent).toContain("Live log stream failed");
+    expect(ctx.root.children[0].textContent).toContain("401");
+  });
+
+  it("does not give up after more scheduled-length closes than the bound allows for rapid ones — lifetime resets the streak (T49)", async () => {
+    // T49: T47's counter treated every clean close the same, so the
+    // server's own 10-minute scheduled close (SSE_MAX_DURATION_MS_DEFAULT)
+    // tripped the identical bound as a hot loop — after ~6 scheduled closes
+    // (~an hour on a healthy install) the tail gave up and bannered as
+    // though something had failed. This simulates each connection living a
+    // full scheduled interval via the injected `now` clock (no frames, no
+    // real sleep — "delivering a frame is not the signal") for more cycles
+    // than `maxReconnectAttempts` would tolerate if they counted as rapid,
+    // then ends the run with a genuine fetch failure so the test terminates
+    // deterministically. Observed red against T47's plain attempt counter:
+    // it gave up ("giving up") after exactly `maxReconnectAttempts + 1`
+    // connections instead of continuing past that count.
+    const SCHEDULED_MS = 10 * 60 * 1000; // matches SSE_MAX_DURATION_MS_DEFAULT
+    const maxReconnectAttempts = 3;
+    const scheduledClosesToObserve = maxReconnectAttempts + 3; // more than the old bound would allow
+    let clock = 0;
+    const now = () => clock;
+    let calls = 0;
+    const fetchMock = mock(async () => {
+      calls += 1;
+      if (calls > scheduledClosesToObserve) {
+        throw new Error("stop the run deliberately");
+      }
+      clock += SCHEDULED_MS; // this connection "lived" a full scheduled interval
+      return makeSseResponse([]);
+    });
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    await runLogsLiveStream(ctx, { reconnectDelayMs: 0, maxReconnectAttempts, now });
+    // More connections happened than a plain attempt counter would have
+    // tolerated (maxReconnectAttempts + 1) — proves the scheduled-length
+    // lifetime reset the rapid-close streak on every cycle instead of
+    // accumulating it.
+    expect(calls).toBe(scheduledClosesToObserve + 1); // ran every cycle, then the deliberate failure
+    expect(calls).toBeGreaterThan(maxReconnectAttempts + 1);
+    expect(ctx.state.logsLive).toBe(false); // ended via the genuine failure, not the bound
+    expect(ctx.root.children[0].textContent).toContain("Live log stream failed");
+    expect(ctx.root.children[0].textContent).not.toContain("giving up");
+  });
+
+  it("still gives up after the bound's worth of rapid (sub-threshold) closes, with the lifetime clock wired in (T49)", async () => {
+    // Re-asserts the hot-loop bound under the new lifetime-based counter,
+    // deterministically rather than relying on real-clock test speed: the
+    // injected clock never advances, so every close reads as 0ms — rapid —
+    // on every cycle.
+    let clock = 0;
+    const now = () => clock;
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    await runLogsLiveStream(ctx, { reconnectDelayMs: 0, maxReconnectAttempts: 2, now });
+    expect(fetchMock).toHaveBeenCalledTimes(3); // bound(2) + 1 connections, all rapid
+    expect(ctx.state.logsLive).toBe(false);
+    expect(ctx.root.children[0].textContent).toContain("giving up");
+  });
+
+  it("an exactly-30000ms connection lands on the healthy side of the boundary — resets the streak instead of counting as rapid (T50)", async () => {
+    // Pins `lifetimeMs < LOGS_RECONNECT_HEALTHY_MS_DEFAULT` (30_000, not
+    // exported — hardcoded here, same convention as T49's SCHEDULED_MS
+    // above) against a `<=` mutant. maxReconnectAttempts: 0 means a single
+    // rapid close is enough to give up, so this two-connection sequence
+    // (exactly-boundary, then genuinely rapid) reaches a second fetch call
+    // only under the shipped `<` — the mutant `<=` counts the first,
+    // exactly-boundary connection as rapid and gives up after just one.
+    let clock = 0;
+    const lifetimes = [30_000, 0]; // conn 1: exactly the threshold; conn 2: rapid
+    let call = 0;
+    const now = () => clock;
+    const fetchMock = mock(async () => {
+      clock += lifetimes[call];
+      call += 1;
+      return makeSseResponse([]);
+    });
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    await runLogsLiveStream(ctx, { reconnectDelayMs: 0, maxReconnectAttempts: 0, now });
+    // Exactly 2 connections happened: the first (exactly 30000ms) reset the
+    // streak rather than tripping it, so the run survived to attempt the
+    // second, genuinely-rapid connection before giving up on that one.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(ctx.state.logsLive).toBe(false);
+    expect(ctx.root.children[0].textContent).toContain("giving up");
   });
 });
 

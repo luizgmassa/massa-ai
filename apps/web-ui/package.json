@@ -5,8 +5,13 @@
   "description": "massa-ai read-only memory + search web browser (served via Tools API)",
   "type": "module",
   "scripts": {
+    "build": "rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.build.json && mkdir -p dist/static && cp src/static/index.html src/static/styles.css dist/static/",
+    "dev": "bunx tsc -p tsconfig.build.json --watch",
     "type-check": "tsc --noEmit",
     "test": "bun test"
+  },
+  "dependencies": {
+    "@massa-ai/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.3.9"

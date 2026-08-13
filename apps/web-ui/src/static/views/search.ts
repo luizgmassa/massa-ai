@@ -5,7 +5,24 @@
 import { escapeHtml, errorBlock } from "../lib/html.js";
 import { markdownToHtml } from "../lib/markdown.js";
 
-export function renderSearch(data, state) {
+interface SearchState {
+  query?: string;
+}
+
+interface SearchResultItem {
+  content?: string;
+  text?: string;
+  score?: number | string | null;
+}
+
+interface SearchResponse {
+  success?: boolean;
+  data?: unknown;
+  results?: unknown;
+  memories?: unknown;
+}
+
+export function renderSearch(data: SearchResponse | null | undefined, state?: SearchState | null): string {
   state = state || {};
   const query = (state.query || "").trim();
   const input =
@@ -23,7 +40,7 @@ export function renderSearch(data, state) {
     return '<section class="view"><h2>Search</h2>' + input + errorBlock(data) + "</section>";
   }
   const results = extractSearchResults(data);
-  let body;
+  let body: string;
   if (results.length === 0) {
     body = '<p class="empty">No results for "' + escapeHtml(query) + '".</p>';
   } else {
@@ -48,10 +65,14 @@ export function renderSearch(data, state) {
 }
 
 /** Normalize the SearchMemoriesTool response shape into a flat result list. */
-function extractSearchResults(data) {
+function extractSearchResults(data: SearchResponse): SearchResultItem[] {
   const payload = data && (data.data || data);
-  if (Array.isArray(payload && payload.results)) return payload.results;
-  if (Array.isArray(payload && payload.memories)) return payload.memories;
-  if (Array.isArray(payload)) return payload;
+  if (Array.isArray((payload as { results?: unknown } | undefined)?.results)) {
+    return (payload as { results: SearchResultItem[] }).results;
+  }
+  if (Array.isArray((payload as { memories?: unknown } | undefined)?.memories)) {
+    return (payload as { memories: SearchResultItem[] }).memories;
+  }
+  if (Array.isArray(payload)) return payload as SearchResultItem[];
   return [];
 }

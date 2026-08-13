@@ -14,7 +14,7 @@
     "predev:mcp": "bun scripts/diagnose.ts",
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:api": "turbo run dev --filter @massa-ai/tools-api...",
+    "dev:api": "turbo run dev --filter @massa-ai/tools-api... --filter @massa-ai/web-ui",
     "dev:mcp": "bun run --filter @massa-ai/mcp-client dev",
     "start:api": "bun run --filter @massa-ai/tools-api start",
     "start:mcp": "bun run --filter @massa-ai/mcp-client start",

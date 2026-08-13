@@ -6,7 +6,32 @@ import { escapeHtml, errorBlock } from "../lib/html.js";
 import { markdownToHtml } from "../lib/markdown.js";
 import { isWriteModeEnabled } from "../lib/api-client.js";
 
-export function renderProposals(data, state) {
+interface ProposalsState {
+  project?: string;
+}
+
+interface Proposal {
+  id?: string;
+  type?: string;
+  status?: string;
+  description?: string;
+  summary?: string;
+}
+
+interface ProposalsPayload {
+  pending?: Proposal[];
+  proposals?: Proposal[];
+}
+
+interface ProposalsResponse {
+  success?: boolean;
+  data?: ProposalsPayload;
+}
+
+export function renderProposals(
+  data: ProposalsResponse | null | undefined,
+  state?: ProposalsState | null,
+): string {
   state = state || {};
   const project = state.project || "";
   if (!project) {
@@ -18,7 +43,7 @@ export function renderProposals(data, state) {
   if (!data || data.success === false) {
     return '<section class="view"><h2>Proposals</h2>' + errorBlock(data) + "</section>";
   }
-  const payload = data.data || data;
+  const payload = data.data || (data as unknown as ProposalsPayload);
   // The route returns `pending` (see apps/tools-api/src/routes/proposals.ts);
   // `proposals` is accepted only as a legacy alias.
   const proposals = (payload && (payload.pending || payload.proposals)) || [];
@@ -56,8 +81,13 @@ export function renderProposals(data, state) {
   return '<section class="view"><h2>Proposals</h2>' + rows + "</section>";
 }
 
+interface ProposalCtx {
+  api: { request: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown> };
+  render: () => void;
+}
+
 /** approve | reject — the action is the path segment. */
-export async function handleProposalAction(ctx, id, action) {
+export async function handleProposalAction(ctx: ProposalCtx, id: string, action: string): Promise<void> {
   try {
     await ctx.api.request("/api/v1/proposal/" + action, {
       method: "POST",
@@ -65,6 +95,6 @@ export async function handleProposalAction(ctx, id, action) {
     });
     ctx.render();
   } catch (e) {
-    alert(action + " failed: " + String(e.message || e));
+    alert(action + " failed: " + String((e as { message?: unknown }).message || e));
   }
 }

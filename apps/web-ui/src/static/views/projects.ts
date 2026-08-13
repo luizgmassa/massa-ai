@@ -11,7 +11,25 @@ import { escapeHtml } from "../lib/html.js";
 import { isWriteModeEnabled } from "../lib/api-client.js";
 import { collectFormData } from "../lib/forms.js";
 
-export function renderProjects(data, opts) {
+interface ProjectRow {
+  projectId?: string;
+  id?: string;
+  documentCount?: number;
+  docCount?: number;
+}
+
+interface ProjectsResponse {
+  projects?: ProjectRow[];
+}
+
+interface RenderProjectsOpts {
+  indexJobId?: string | null;
+  indexJobStatus?: string | null;
+  indexJobPhase?: string | null;
+  indexJobFileCount?: number | null;
+}
+
+export function renderProjects(data: ProjectsResponse | null | undefined, opts?: RenderProjectsOpts | null): string {
   const projects = (data && data.projects) || [];
   const writeMode = isWriteModeEnabled();
   const indexJobId = opts && opts.indexJobId;
@@ -94,17 +112,54 @@ export function renderProjects(data, opts) {
     "</section>"
   );
 }
-export async function handleProjectIndexProgress(ctx, jobId) {
+
+/** The subset of an input element `collectFormData` reads, and the DOM root
+ *  shape it needs — structurally identical to `lib/forms.ts`'s own unexported
+ *  parameter types, so `ctx.root` can be passed through without a cast. */
+interface ProjectFormRoot {
+  querySelectorAll(selectors: string): {
+    forEach(
+      cb: (el: { dataset: { create?: string; [key: string]: string | undefined }; type: string; checked?: boolean; value: string }) => void,
+    ): void;
+  };
+}
+
+interface IndexJobState {
+  indexJobId?: string | null;
+  indexJobStatus?: string | null;
+  indexJobPhase?: string | null;
+  indexJobFileCount?: number | null;
+  indexPollInterval?: ReturnType<typeof setInterval> | null;
+  view?: string;
+  [key: string]: unknown;
+}
+
+interface ProjectCtx {
+  root: ProjectFormRoot;
+  state: IndexJobState;
+  api: { request: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown> };
+  render: () => void;
+}
+
+export async function handleProjectIndexProgress(ctx: ProjectCtx, jobId: string): Promise<void> {
   ctx.state.indexJobId = jobId;
   ctx.state.indexJobStatus = "pending";
   ctx.state.indexJobPhase = null;
   ctx.state.indexJobFileCount = null;
   ctx.render();
 }
+
+interface IndexStatusEventPayload {
+  jobId?: string;
+  status?: string;
+  phase?: string;
+  fileCount?: number | null;
+}
+
 /** SSE index_status event handler — exported so tests exercise the real
  *  matching logic, not a copy. Returns true if the event matched and updated
  *  state, false if ignored (jobId mismatch or no tracked job). */
-export function handleIndexStatusEvent(ctx, payload) {
+export function handleIndexStatusEvent(ctx: ProjectCtx, payload: IndexStatusEventPayload | null | undefined): boolean {
   if (!payload || !ctx.state.indexJobId) return false;
   if (payload.jobId !== ctx.state.indexJobId) return false;
   ctx.state.indexJobStatus = payload.status || ctx.state.indexJobStatus;
@@ -121,15 +176,18 @@ export function handleIndexStatusEvent(ctx, payload) {
 
 /** Submits the Index Project form. On a queued job the returned `jobId` becomes
  *  the tracked job, and the progress line appears on the next render. */
-export async function handleProjectIndex(ctx) {
+export async function handleProjectIndex(ctx: ProjectCtx): Promise<void> {
   const data = collectFormData(ctx.root, "project-index");
   if (!data.projectPath) { alert("Project path is required."); return; }
-  const body = { projectPath: data.projectPath };
+  const body: Record<string, unknown> = { projectPath: data.projectPath };
   if (data.projectId) body.projectId = data.projectId;
   if (data.forceReindex) body.forceReindex = true;
   if (data.warmCache) body.warmCache = true;
   try {
-    const res = await ctx.api.request("/api/v1/project/index", { method: "POST", body });
+    const res = (await ctx.api.request("/api/v1/project/index", { method: "POST", body })) as
+      | { data?: { jobId?: string } }
+      | null
+      | undefined;
     if (res && res.data && res.data.jobId) {
       ctx.state.indexJobId = res.data.jobId;
       ctx.state.indexJobStatus = "pending";
@@ -138,13 +196,13 @@ export async function handleProjectIndex(ctx) {
       ctx.render();
     }
   } catch (e) {
-    alert("Index failed: " + String(e.message || e));
+    alert("Index failed: " + String((e as { message?: unknown }).message || e));
   }
 }
 
 /** Full project delete — vectors, symbols and memories. The confirm() lives at
  *  the wiring site, not here, so a direct caller is never silently gated. */
-export async function handleProjectReset(ctx, project) {
+export async function handleProjectReset(ctx: ProjectCtx, project: string): Promise<void> {
   try {
     await ctx.api.request("/api/v1/project/reset", {
       method: "POST",
@@ -152,13 +210,13 @@ export async function handleProjectReset(ctx, project) {
     });
     ctx.render();
   } catch (e) {
-    alert("Reset failed: " + String(e.message || e));
+    alert("Reset failed: " + String((e as { message?: unknown }).message || e));
   }
 }
 
 /** Stops the index-status poll. Safe to call when no poll is running, which is
  *  why every teardown path can call it unconditionally. */
-export function clearIndexPoll(ctx) {
+export function clearIndexPoll(ctx: ProjectCtx): void {
   if (ctx.state.indexPollInterval) {
     clearInterval(ctx.state.indexPollInterval);
     ctx.state.indexPollInterval = null;
@@ -168,7 +226,7 @@ export function clearIndexPoll(ctx) {
 /** PRG-03 polling fallback, started when the SSE stream errors while a job is
  *  still being tracked. Capped at 150 polls (5 min at 2 s) so a job that never
  *  reports a terminal status cannot leave an interval running forever. */
-export function startIndexPoll(ctx, jobId) {
+export function startIndexPoll(ctx: ProjectCtx, jobId: string): void {
   clearIndexPoll(ctx);
   let polls = 0;
   const MAX_POLLS = 150; // 5 min at 2s interval
@@ -181,7 +239,10 @@ export function startIndexPoll(ctx, jobId) {
       return;
     }
     try {
-      const res = await ctx.api.request("/api/v1/project/index/status/" + encodeURIComponent(jobId));
+      const res = (await ctx.api.request("/api/v1/project/index/status/" + encodeURIComponent(jobId))) as
+        | { data?: { status?: string; phase?: string; fileCount?: number | null } }
+        | null
+        | undefined;
       if (res && res.data) {
         ctx.state.indexJobStatus = res.data.status || ctx.state.indexJobStatus;
         ctx.state.indexJobPhase = res.data.phase || ctx.state.indexJobPhase;

@@ -605,9 +605,9 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
     {
       detail: {
         ...LOGS_DETAIL,
-        summary: "SSE tail of newly buffered log entries",
+        summary: "SSE tail of newly appended log entries",
         description:
-          "Server-Sent Events stream emitting `data: <LogEntry JSON>` for every entry subsequently pushed into the in-process ring buffer, plus `: heartbeat` comments. Same heartbeat and max-duration auto-close behavior as GET /api/v1/events. Scoped to this server process — a separate range query over the file sink may contain entries this stream never showed (e.g. from the stdio MCP server).",
+          "Server-Sent Events stream emitting `data: <LogEntry JSON>` for every entry subsequently appended, plus `: heartbeat` comments. Same heartbeat and max-duration auto-close behavior as GET /api/v1/events. Tails the shared file sink when one is readable — matching every massa-ai process, including the stdio MCP server, the same scope as GET /api/v1/logs — and falls back to the in-process ring buffer, scoped to this server process only, when no sink file is readable.",
       },
     },
   );

@@ -28,7 +28,9 @@ import { handleHandoffCreate, handleHandoffAction } from "./views/handoffs.js";
 import { handleProposalAction } from "./views/proposals.js";
 import { handleCheckpointCreate, handleCheckpointDelete } from "./views/checkpoints.js";
 import { handleLogsLiveToggle, handleLogsExport } from "./views/logs.js";
+import type { LogsDoc } from "./views/logs.js";
 import { handleConfigSave, handleConfigReveal, handleServerRestart } from "./views/config.js";
+import type { ConfigDocument } from "./views/config.js";
 import { handleProfilesTabSwitch, handleProfileSwitch } from "./views/profiles.js";
 import { joinModelId } from "./views/registry.js";
 import {
@@ -48,7 +50,78 @@ import {
   handleRegistrySaveAndApply,
 } from "./views/registry-state.js";
 
-export function wireViewHandlers(ctx) {
+/**
+ * Structural DOM element shape, not a real DOM type — production passes a real
+ * `Element`, the fake-DOM test harness passes a plain object (mirrors the
+ * `WireElement`-shaped `Root`/`Element` interfaces already established per-view,
+ * e.g. `views/memory.ts`'s `MemoryFormRoot`, `views/logs.ts`'s `LogsQueryRoot`).
+ *
+ * A single self-referential type is used for both `ctx.root` and every element
+ * `querySelectorAll`/`querySelector`/`closest` returns, because this module (unlike
+ * any single `views/*.ts` file) forwards the same `ctx` into every view module's
+ * own — differently shaped but structurally compatible — `*Ctx.root` parameter.
+ * `dataset` is typed as always-string (not `string | undefined`) so the many
+ * `data-*` reads below that are forwarded straight into a handler's required
+ * `string` parameter (e.g. `handleRegistryCellEdit`'s `profile`/`host`/`tier`)
+ * need no per-call cast — the elements are always matched by the same
+ * `data-*` attribute selector that supplies the value.
+ */
+interface WireElement {
+  dataset: Record<string, string>;
+  type: string;
+  checked?: boolean;
+  value: string;
+  remove?: () => void;
+  innerHTML: string;
+  textContent?: string;
+  addEventListener: (type: string, listener: () => void) => void;
+  closest?: (selectors: string) => WireElement | null;
+  querySelectorAll: (selectors: string) => WireElement[];
+  querySelector: (selectors: string) => WireElement | null;
+  insertBefore?: (node: unknown, ref: unknown) => unknown;
+  firstChild?: unknown;
+  children?: unknown[];
+}
+
+interface WireViewHandlersApi {
+  request: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown>;
+  authHeaders?: () => Record<string, string>;
+}
+
+/** `memoryFilters`/`memoryOffset` are read here without a prior guard (the
+ *  Memory view's own render is what seeds them), so they stay required —
+ *  every other field here is write-only from this module and stays optional. */
+interface WireViewHandlersState {
+  memoryFilters: Record<string, string>;
+  memoryOffset: number;
+  logsFrom?: string;
+  logsTo?: string;
+  logsLevel?: string;
+  logsQuery?: string;
+  searchQuery?: string;
+  registryForm?: { kind?: string } | null;
+  [key: string]: unknown;
+}
+
+/** Required, not optional (T39): this ctx is forwarded wholesale to every
+ *  handler below, including `handleConfigReveal` and `handleLogsExport`,
+ *  which read `ctx.doc` themselves rather than being destructured here — a
+ *  declared type limited to what THIS function reads let T28 drop the
+ *  member from the built ctx with no compile error. The intersection
+ *  reuses `ConfigDocument`/`LogsDoc` unmodified (D9): a real `Document`
+ *  cannot satisfy either return-type-strict shape directly (the collision
+ *  this task must not resolve by dropping the value), so the producer casts
+ *  once at the ctx-construction boundary (`start-app.ts`) instead of this
+ *  type being widened. */
+interface WireViewHandlersCtx {
+  root: WireElement;
+  state: WireViewHandlersState;
+  api: WireViewHandlersApi;
+  render: () => void;
+  doc: ConfigDocument & LogsDoc;
+}
+
+export function wireViewHandlers(ctx: WireViewHandlersCtx): void {
   const { root, state, render } = ctx;
   // memory filters
   root.querySelectorAll("[data-filter]").forEach((el) => {
@@ -166,7 +239,7 @@ export function wireViewHandlers(ctx) {
       const completed = btn.dataset.completed || "";
       const form = root.querySelector('[data-form="checkpoint-create"]');
       if (!form) return;
-      const setField = (name, value) => {
+      const setField = (name: string, value: string) => {
         const el = form.querySelector('[data-create="' + name + '"]');
         if (el) el.value = value;
       };
@@ -331,18 +404,23 @@ export function wireViewHandlers(ctx) {
   root.querySelector('[data-action="registry-form-submit"]')?.addEventListener("click", () => {
     const kind = ctx.state.registryForm && ctx.state.registryForm.kind;
     if (kind === "add-workflow") {
-      const workflow = root.querySelector('[data-action="registry-form-workflow"]')?.value;
-      const tier = root.querySelector('[data-action="registry-form-tier"]')?.value;
+      // Elements matched only by their own trigger button, not this
+      // handler's own selector, so — unlike the `data-*` reads above — the
+      // element itself (and so `.value`) may genuinely be absent; the
+      // downstream handlers already guard `!workflow`/`!tier`/etc., so the
+      // cast preserves the original untyped pass-through exactly.
+      const workflow = root.querySelector('[data-action="registry-form-workflow"]')?.value as string;
+      const tier = root.querySelector('[data-action="registry-form-tier"]')?.value as string;
       handleRegistryWorkflowTierAdd(ctx, workflow, tier);
     } else if (kind === "duplicate-profile") {
-      const source = root.querySelector('[data-action="registry-form-source"]')?.value;
-      const newName = root.querySelector('[data-action="registry-form-new-name"]')?.value;
+      const source = root.querySelector('[data-action="registry-form-source"]')?.value as string;
+      const newName = root.querySelector('[data-action="registry-form-new-name"]')?.value as string;
       handleRegistryDuplicateProfile(ctx, source, newName);
     } else if (kind === "delete-profile") {
-      const profile = root.querySelector('[data-action="registry-form-profile"]')?.value;
+      const profile = root.querySelector('[data-action="registry-form-profile"]')?.value as string;
       handleRegistryDeleteProfile(ctx, profile);
     } else if (kind === "add-profile") {
-      const name = root.querySelector('[data-action="registry-form-name"]')?.value;
+      const name = root.querySelector('[data-action="registry-form-name"]')?.value as string;
       const description = root.querySelector('[data-action="registry-form-description"]')?.value;
       handleRegistryAddProfile(ctx, name, description);
     }

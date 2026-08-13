@@ -7,7 +7,7 @@
  * `escapeHtml` would spread one subject over three files for no read benefit.
  */
 
-export function escapeHtml(s) {
+export function escapeHtml(s: unknown): string {
   if (s === null || s === undefined) return "";
   return String(s)
     .replace(/&/g, "&amp;")
@@ -17,18 +17,22 @@ export function escapeHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
-export function truncate(s, n) {
+export function truncate(s: string, n: number): string {
   if (s.length <= n) return s;
   return s.slice(0, n) + "…";
 }
 
-export function errorBlock(data) {
-  const raw = (data && data.error) || "Request failed.";
-  const msg = typeof raw === "string"
-    ? raw
-    : (raw && typeof raw === "object" && (raw.message || raw.code))
-      ? [raw.code, raw.message].filter(Boolean).join(": ")
-      : JSON.stringify(raw);
+export function errorBlock(data: unknown): string {
+  const raw =
+    (data && typeof data === "object" && "error" in data
+      ? (data as { error?: unknown }).error
+      : undefined) || "Request failed.";
+  const msg =
+    typeof raw === "string"
+      ? raw
+      : raw && typeof raw === "object" && ((raw as { message?: unknown; code?: unknown }).message || (raw as { message?: unknown; code?: unknown }).code)
+        ? [(raw as { code?: unknown }).code, (raw as { message?: unknown }).message].filter(Boolean).join(": ")
+        : JSON.stringify(raw);
   return '<div class="error">' + escapeHtml(msg) + "</div>";
 }
 
@@ -41,7 +45,7 @@ export function errorBlock(data) {
  * every wrapped span is one this function's own caller opted into, not a
  * pattern guess that could over- or under-match prose.
  */
-export function renderGuideText(s) {
+export function renderGuideText(s: unknown): string {
   const escaped = escapeHtml(s);
   return escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
 }

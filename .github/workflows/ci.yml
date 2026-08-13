@@ -357,9 +357,10 @@ jobs:
       - name: Verify Swagger docs
         run: curl -sf http://localhost:3333/swagger | head -1
 
-      # The web UI is static files read from apps/web-ui/src/static at request
-      # time. If that dir is missing from the image, /health and /swagger still
-      # pass while /ui returns 500 — so assert the shell and an asset directly.
+      # The web UI is built by `bun run build` (tsc over apps/web-ui/src/static)
+      # and served from apps/web-ui/dist/static at request time. If that dir is
+      # missing or unbuilt in the image, /health and /swagger still pass while
+      # /ui returns 500 — so assert the shell and an asset directly.
       - name: Verify Web UI is served
         run: |
           CT=$(curl -sf -o /tmp/ui.html -w '%{content_type}' http://localhost:3333/ui) || {

@@ -35,8 +35,10 @@ COPY patches ./patches
 RUN bun install --ignore-scripts
 
 # Copy source code (plugins install separately).
-# apps/web-ui ships no build step — tools-api reads its static/ dir verbatim at
-# request time, so the sources must be present in the image or /ui returns 500.
+# apps/web-ui now has a real build step: `bun run build` below runs tsc over
+# apps/web-ui/src/static (TypeScript) and emits apps/web-ui/dist/static, which
+# tools-api serves at request time. The sources still need to be present here
+# so that build can run; the emitted dist/ is what actually gets requested.
 COPY packages ./packages
 COPY apps/tools-api ./apps/tools-api
 COPY apps/web-ui ./apps/web-ui

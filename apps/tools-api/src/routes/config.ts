@@ -4,6 +4,7 @@ import {
   savePartialConfig,
   maskSensitive,
   restartNeededSections,
+  defaultMassaAiConfig,
 } from "@massa-ai/shared";
 
 const CONFIG_DETAIL = {
@@ -36,10 +37,18 @@ export const configRoutes = new Elysia({ prefix: "/api/v1/config" })
       const config = loadConfig();
       const masked = maskSensitive(config);
       const restart = restartNeededSections(config);
+      // WUT-18 (T43): the shipped defaults, masked the same way — lets the
+      // Config tab show what is actually in force for a field the persisted
+      // file never set, instead of rendering it blank. Computed independently
+      // of `config`/`restart` above; those two stay byte-unchanged for a
+      // given file (non-goal: do not repurpose restartNeededSections here —
+      // its contract is "present in the config", which every default would
+      // satisfy vacuously).
+      const defaults = maskSensitive(defaultMassaAiConfig);
       set.status = 200;
       return {
         success: true as const,
-        data: { config: masked, restartNeededSections: restart },
+        data: { config: masked, restartNeededSections: restart, defaults },
       };
     },
     {
@@ -47,7 +56,7 @@ export const configRoutes = new Elysia({ prefix: "/api/v1/config" })
         ...CONFIG_DETAIL,
         summary: "Get current config with sensitive fields masked",
         description:
-          "Returns the current config.json with security.apiKey, llm.apiKey, embedding.apiKey, and database.url masked to '***'. Includes restartNeededSections — the subset of [database, embedding, llm, security] present in the config.",
+          "Returns the current config.json with security.apiKey, llm.apiKey, embedding.apiKey, and database.url masked to '***'. Includes restartNeededSections — the subset of [database, embedding, llm, security] present in the config — and defaults, the shipped default config (also masked) the Config tab falls back to for any field the persisted file omits.",
       },
     },
   )

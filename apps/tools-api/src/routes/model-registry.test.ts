@@ -185,6 +185,48 @@ describe("GET /api/v1/model-registry", () => {
     expect(res.json.data.overlayOverrideCount).toBe(0);
   });
 
+  // WUT-17: the GET response carries the per-category breakdown alongside the count.
+  test("200 carries overlayOverrideBreakdown from the library result", async () => {
+    loadEffectiveRegistry.mockImplementationOnce(() => ({
+      registry: builtinRegistry,
+      source: {
+        builtin: builtinRegistry,
+        overlay: { agentTiers: { builder: { opencode: "deep" } }, profiles: { balanced: { description: "x" } } },
+        tombstoned: [],
+      },
+      overlayOverrideCount: 2,
+      overlayOverrideBreakdown: { hostDefaults: 0, workflowTiers: 0, agentTiers: 1, tiers: 0, profiles: 1 },
+    }));
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect(res.json.data.overlayOverrideBreakdown).toEqual({
+      hostDefaults: 0,
+      workflowTiers: 0,
+      agentTiers: 1,
+      tiers: 0,
+      profiles: 1,
+    });
+  });
+
+  test("200 with a library result missing overlayOverrideBreakdown falls back to an all-zero shape (defensive, mirrors the existing overlayOverrideCount ?? 0 pattern)", async () => {
+    loadEffectiveRegistry.mockImplementationOnce(() => ({
+      registry: builtinRegistry,
+      source: { builtin: builtinRegistry, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
+    }));
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect(res.json.data.overlayOverrideBreakdown).toEqual({
+      hostDefaults: 0,
+      workflowTiers: 0,
+      agentTiers: 0,
+      tiers: 0,
+      profiles: 0,
+    });
+  });
+
   test("200 on overlay corruption with overlayError surfaced", async () => {
     loadEffectiveRegistry.mockImplementationOnce(() => ({
       registry: builtinRegistry,
@@ -271,6 +313,31 @@ describe("PUT /api/v1/model-registry", () => {
     // APCR-01.10: the write path's response also reports the post-save override count, not
     // just the read path — the operator sees it immediately after Save Overlay.
     expect(res.json.data.overlayOverrideCount).toBe(1);
+  });
+
+  // WUT-17: this is the field the T41 task calls out as "missed the first time" on a past
+  // occurrence of overlayOverrideCount (admin-portal-correctness-repair/validation.md) — the
+  // PUT response must carry it too, not just GET.
+  test("200 carries overlayOverrideBreakdown from the post-save library result", async () => {
+    validateRegistry.mockImplementationOnce(() => builtinRegistry);
+    loadEffectiveRegistry.mockImplementationOnce(() => ({
+      registry: builtinRegistry,
+      source: { builtin: builtinRegistry, overlay: { profiles: {} }, tombstoned: [] },
+      overlayOverrideCount: 1,
+      overlayOverrideBreakdown: { hostDefaults: 0, workflowTiers: 0, agentTiers: 0, tiers: 0, profiles: 1 },
+    }));
+
+    const res = await put("/api/v1/model-registry", {
+      profiles: { balanced: { description: "overlay modified" } },
+    });
+    expect(res.status).toBe(200);
+    expect(res.json.data.overlayOverrideBreakdown).toEqual({
+      hostDefaults: 0,
+      workflowTiers: 0,
+      agentTiers: 0,
+      tiers: 0,
+      profiles: 1,
+    });
   });
 
   test("uses the shared library merge, not a hand-copied twin (APCR-01.7)", async () => {

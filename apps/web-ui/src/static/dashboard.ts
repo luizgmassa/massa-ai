@@ -1,5 +1,5 @@
 /**
- * massa-ai Web UI — dashboard.js (N28 observability).
+ * massa-ai Web UI — dashboard.ts (N28 observability).
  *
  * Read-only dashboard rendering: fetches scheduler status, hook queue,
  * Synapse sessions, and system metrics. Renders sections into HTML.
@@ -12,12 +12,31 @@
 
 // ── Dashboard data fetcher ──────────────────────────────────────────────────
 
+interface DashboardApi {
+  request: (path: string) => Promise<unknown>;
+}
+
+/** Loosely typed section envelope — `data` stays `unknown` here and is
+ *  narrowed inside each section renderer, mirroring `views/proposals.ts`'s
+ *  `payload = data.data || (data as unknown as ProposalsPayload)` convention. */
+interface DashboardSectionResult {
+  data?: unknown;
+  error?: string | null;
+}
+
+interface DashboardData {
+  scheduler: DashboardSectionResult;
+  hookQueue: DashboardSectionResult;
+  synapse: DashboardSectionResult;
+  metrics: DashboardSectionResult;
+}
+
 /**
  * Fetch all dashboard sections in parallel. Each section is independent:
  * if one fails, the others still render. Returns an object with per-section
  * { data, error } pairs.
  */
-export async function fetchDashboardData(api) {
+export async function fetchDashboardData(api: DashboardApi): Promise<DashboardData> {
   const [scheduler, hookQueue, synapse, metrics] = await Promise.allSettled([
     api.request("/api/v1/scheduler/status"),
     api.request("/api/v1/hooks/queue-status"),
@@ -25,7 +44,7 @@ export async function fetchDashboardData(api) {
     api.request("/api/v1/system/metrics"),
   ]);
 
-  function unwrap(result) {
+  function unwrap(result: PromiseSettledResult<unknown>): DashboardSectionResult {
     if (result.status === "fulfilled") return { data: result.value, error: null };
     return { data: null, error: String(result.reason?.message || result.reason || "unavailable") };
   }
@@ -40,7 +59,7 @@ export async function fetchDashboardData(api) {
 
 // ── Section renderers ───────────────────────────────────────────────────────
 
-function escapeHtml(s) {
+function escapeHtml(s: unknown): string {
   if (s === null || s === undefined) return "";
   return String(s)
     .replace(/&/g, "&amp;")
@@ -49,7 +68,7 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
-function fmtTime(ts) {
+function fmtTime(ts: number | string | null | undefined): string {
   if (ts === null || ts === undefined || ts === 0) return "—";
   try {
     return new Date(ts).toLocaleString();
@@ -58,7 +77,7 @@ function fmtTime(ts) {
   }
 }
 
-function fmtBool(b) {
+function fmtBool(b: unknown): string {
   return b ? "Yes" : "No";
 }
 
@@ -68,7 +87,7 @@ function fmtBool(b) {
  * optional unit suffix, and an em-dash for missing/non-numeric values so a
  * raw `undefined`/`NaN` never reaches the DOM.
  */
-function fmtNum(n, suffix = "") {
+function fmtNum(n: number | string | null | undefined, suffix = ""): string {
   if (n === null || n === undefined || n === "") return "—";
   const num = Number(n);
   if (Number.isNaN(num)) return escapeHtml(String(n));
@@ -77,19 +96,37 @@ function fmtNum(n, suffix = "") {
 
 /** Render a single labeled stat card (D-6 `.stat-card` grid). `value` is
  * pre-built HTML (caller is responsible for escaping/wrapping in `<code>`). */
-function statCard(label, value) {
+function statCard(label: string, value: string): string {
   return `<div class="stat-card"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${value}</div></div>`;
 }
 
-function statGrid(cards) {
+function statGrid(cards: string[]): string {
   return `<div class="stat-grid">${cards.join("")}</div>`;
 }
 
-export function renderSchedulerSection(result) {
+interface SchedulerJob {
+  id?: string;
+  name?: string;
+  jobKind?: string;
+  enabled?: boolean;
+  nextRunAt?: number | string | null;
+  lastRunAt?: number | string | null;
+  due?: boolean;
+  currentlyRunning?: boolean;
+}
+
+interface SchedulerData {
+  unavailable?: boolean;
+  running?: boolean;
+  tickIntervalMs?: number | string;
+  jobs?: SchedulerJob[];
+}
+
+export function renderSchedulerSection(result: DashboardSectionResult): string {
   if (result.error) {
     return '<section class="dashboard-section"><h2>Scheduler</h2><p class="muted">unavailable</p></section>';
   }
-  const d = result.data;
+  const d = result.data as SchedulerData | null | undefined;
   if (!d || d.unavailable) {
     return '<section class="dashboard-section"><h2>Scheduler</h2><p class="muted">unavailable</p></section>';
   }
@@ -122,15 +159,27 @@ export function renderSchedulerSection(result) {
   </section>`;
 }
 
-export function renderHookQueueSection(result) {
+interface HookQueueData {
+  unavailable?: boolean;
+  pendingCount?: number;
+  maxPending?: number;
+  saturated?: boolean;
+}
+
+export function renderHookQueueSection(result: DashboardSectionResult): string {
   if (result.error) {
     return '<section class="dashboard-section"><h2>Hook Queue</h2><p class="muted">unavailable</p></section>';
   }
-  const d = result.data;
+  const d = result.data as HookQueueData | null | undefined;
   if (!d || d.unavailable) {
     return '<section class="dashboard-section"><h2>Hook Queue</h2><p class="muted">unavailable</p></section>';
   }
-  const pct = d.maxPending > 0 ? Math.round((d.pendingCount / d.maxPending) * 100) : 0;
+  // Number(...) reproduces the original untyped `>`/`/` implicit coercion of a
+  // possibly-undefined operand exactly (both coerce via ToNumber), so this is
+  // not a behaviour change — just what strict mode requires to type-check it.
+  const maxPending = Number(d.maxPending);
+  const pendingCount = Number(d.pendingCount);
+  const pct = maxPending > 0 ? Math.round((pendingCount / maxPending) * 100) : 0;
   const cards = statGrid([
     statCard("Pending", `${fmtNum(d.pendingCount)} / ${fmtNum(d.maxPending)} (${pct}%)`),
     statCard("Saturated", fmtBool(d.saturated)),
@@ -141,15 +190,33 @@ export function renderHookQueueSection(result) {
   </section>`;
 }
 
-export function renderSynapseSection(result) {
+interface SynapseSession {
+  sessionId?: string;
+  agentId?: string;
+  workspaceId?: string;
+  taskContext?: string;
+  expiresAt?: number | string | null;
+}
+
+interface SynapsePayload {
+  sessions?: SynapseSession[];
+}
+
+interface SynapseData {
+  unavailable?: boolean;
+  data?: SynapsePayload;
+  sessions?: SynapseSession[];
+}
+
+export function renderSynapseSection(result: DashboardSectionResult): string {
   if (result.error) {
     return '<section class="dashboard-section"><h2>Synapse Sessions</h2><p class="muted">unavailable</p></section>';
   }
-  const d = result.data;
+  const d = result.data as SynapseData | null | undefined;
   if (!d || d.unavailable) {
     return '<section class="dashboard-section"><h2>Synapse Sessions</h2><p class="muted">unavailable</p></section>';
   }
-  const sessions = (d.data?.sessions || d.sessions || []);
+  const sessions = d.data?.sessions || d.sessions || [];
   if (!Array.isArray(sessions) || sessions.length === 0) {
     return '<section class="dashboard-section"><h2>Synapse Sessions</h2><p class="muted">No active sessions</p></section>';
   }
@@ -172,11 +239,27 @@ export function renderSynapseSection(result) {
   </section>`;
 }
 
-export function renderMetricsSection(result) {
+interface MetricsMemory {
+  heapUsed?: number | string;
+  heapTotal?: number | string;
+  rss?: number | string;
+}
+
+interface MetricsSystem {
+  uptime?: number | string;
+  databaseSize?: string;
+  memory?: MetricsMemory;
+}
+
+interface MetricsData {
+  system?: MetricsSystem;
+}
+
+export function renderMetricsSection(result: DashboardSectionResult): string {
   if (result.error) {
     return '<section class="dashboard-section"><h2>System Metrics</h2><p class="muted">unavailable</p></section>';
   }
-  const d = result.data;
+  const d = result.data as MetricsData | null | undefined;
   if (!d) {
     return '<section class="dashboard-section"><h2>System Metrics</h2><p class="muted">unavailable</p></section>';
   }
@@ -208,7 +291,7 @@ const DASHBOARD_HELP_CARD =
  * Top-level dashboard renderer. Takes the fetched data object and returns
  * an HTML string with all sections. Pure function (no DOM, no fetch).
  */
-export function renderDashboard(data) {
+export function renderDashboard(data: Partial<DashboardData> | null | undefined): string {
   if (!data) return '<div class="error">Dashboard data unavailable</div>';
   return [
     '<div class="dashboard">',

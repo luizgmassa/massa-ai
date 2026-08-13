@@ -8,10 +8,12 @@
 
 const THEME_STORAGE_KEY = "massa-ai-ui-theme";
 
-export function initTheme(doc, store) {
+type Theme = "light" | "dark";
+
+export function initTheme(doc?: Document | null, store?: Storage | null): Theme {
   doc = doc || (typeof document !== "undefined" ? document : null);
   store = store || (typeof localStorage !== "undefined" ? localStorage : null);
-  let theme = "light";
+  let theme: Theme = "light";
   try {
     if (store) {
       const t = store.getItem(THEME_STORAGE_KEY);
@@ -24,12 +26,12 @@ export function initTheme(doc, store) {
   return theme;
 }
 
-export function toggleTheme(doc, store) {
+export function toggleTheme(doc?: Document | null, store?: Storage | null): Theme {
   doc = doc || (typeof document !== "undefined" ? document : null);
   store = store || (typeof localStorage !== "undefined" ? localStorage : null);
   if (!doc || !doc.documentElement) return "light";
-  const current = doc.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-  const next = current === "dark" ? "light" : "dark";
+  const current: Theme = doc.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  const next: Theme = current === "dark" ? "light" : "dark";
   doc.documentElement.setAttribute("data-theme", next);
   try {
     if (store) store.setItem(THEME_STORAGE_KEY, next);

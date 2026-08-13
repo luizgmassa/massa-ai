@@ -26,9 +26,13 @@ const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const LIB = path.join(REPO_ROOT, "scripts/lib/installer-api-key.sh");
 /** `CONFIG_SECTIONS` moved out of app.js into the Config tab's own module when
  *  the web UI bundle was split; app.js is now a barrel and carries no section
- *  table. Only the path changed — the population and the assertion below are
- *  the same. */
-const CONFIG_VIEW_JS = path.join(REPO_ROOT, "apps/web-ui/src/static/views/config.js");
+ *  table. T23 then moved it again, out of `config.js` and into its own
+ *  `config-sections.js` module (step 1 of 2, see tasks.md Execution Log D5).
+ *  T24 (this commit) converts that module to `.ts` and repoints here a second
+ *  time — step 2 of 2 — renaming this const from `CONFIG_VIEW_JS` since the
+ *  name is now wrong twice over. The population and the assertion below are
+ *  unchanged. */
+const CONFIG_SECTIONS_SRC = path.join(REPO_ROOT, "apps/web-ui/src/static/views/config-sections.ts");
 
 interface WrittenConfig {
   embedding: { model: string; dimensions: number };
@@ -183,7 +187,7 @@ describe("installer config template — section coverage", () => {
     // Population from the portal's own Config module, the artifact being
     // audited — a section added to the portal that the installer never writes
     // fails here.
-    const source = fs.readFileSync(CONFIG_VIEW_JS, "utf8");
+    const source = fs.readFileSync(CONFIG_SECTIONS_SRC, "utf8");
     const sections = [...new Set([...source.matchAll(/^\s*key:\s*"([^"]+)",/gm)].map((m) => m[1]))];
     expect(sections.length).toBeGreaterThanOrEqual(16);
 

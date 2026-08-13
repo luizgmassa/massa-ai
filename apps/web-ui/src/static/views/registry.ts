@@ -13,25 +13,42 @@ import { isWriteModeEnabled } from "../lib/api-client.js";
 
 // ── Model-registry editor (T12 — REG-01..18 UI side) ────────────────────────
 
+export const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"] as const;
+
+type RegistryHost = (typeof REGISTRY_HOSTS)[number];
+
 /** Frontend copy of HOST_EFFORT_ENUM (scripts/lib/model-profiles.ts:71).
  *  Kept in sync manually; the frontend cannot import from scripts/lib. */
-const UI_HOST_EFFORT_ENUM = {
+const UI_HOST_EFFORT_ENUM: Record<RegistryHost, string[]> = {
   claude: ["low", "medium", "high", "xhigh", "max"],
   codex: ["minimal", "low", "medium", "high", "xhigh"],
   cursor: [],
   opencode: ["low", "medium", "high", "max"],
 };
 
-export const REGISTRY_HOSTS = ["claude", "codex", "cursor", "opencode"];
-
 /** Display labels for the Tool column (design D-4.1). Not a simple capitalize —
  *  "opencode" -> "OpenCode" needs its own casing. `data-*` attributes keep the
  *  raw lowercase host id; only this label is user-facing. */
-const REGISTRY_HOST_LABELS = { claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" };
+const REGISTRY_HOST_LABELS: Record<RegistryHost, string> = { claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" };
+
+/** Section names for the five categories `OverlayOverrideBreakdown`
+ *  (scripts/lib/model-profiles.ts, WUT-17) counts. Order matches the page's
+ *  top-to-bottom layout: the profile grid, then Default Profile per Tool, Per-
+ *  Workflow Tier Overrides, Per-Agent Tier Overrides, then `tiers` — the
+ *  capability-tier list itself, which has no row or cell of its own on this
+ *  tab to badge, so it is only ever named in the count line below. */
+const OVERLAY_CATEGORY_ORDER = ["profiles", "hostDefaults", "workflowTiers", "agentTiers", "tiers"] as const;
+const OVERLAY_CATEGORY_LABELS: Record<(typeof OVERLAY_CATEGORY_ORDER)[number], string> = {
+  profiles: "Model Catalog profiles",
+  hostDefaults: "Default Profile per Tool",
+  workflowTiers: "Per-Workflow Tier Overrides",
+  agentTiers: "Per-Agent Tier Overrides",
+  tiers: "Capability Tiers",
+};
 
 /** Capitalizes the first letter of a raw tier id ("light" -> "Light") for the
  *  Tier column and per-agent tier dropdown labels (design D-4.1, D-4.3). */
-function capitalizeLabel(s) {
+function capitalizeLabel(s: string | null | undefined): string {
   if (!s) return "";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -50,7 +67,7 @@ const REGISTRY_MODEL_HINT = "e.g. sonnet · gpt-5.6-terra · glm-5.2";
  *   splitModelId("m")     -> { provider: "", model: "m" }
  *   splitModelId(null)    -> { provider: "", model: "" }
  */
-export function splitModelId(model) {
+export function splitModelId(model: string | null | undefined): { provider: string; model: string } {
   if (!model) return { provider: "", model: "" };
   const idx = model.indexOf("/");
   if (idx === -1) return { provider: "", model };
@@ -66,7 +83,7 @@ export function splitModelId(model) {
  *   joinModelId("", "m")    -> "m"
  *   joinModelId("", "")     -> null
  */
-export function joinModelId(provider, model) {
+export function joinModelId(provider: string | null | undefined, model: string | null | undefined): string | null {
   const p = (provider || "").trim();
   const m = (model || "").trim();
   if (!p && !m) return null;
@@ -96,16 +113,21 @@ const WORKFLOW_STEMS = [
 // form's markup under its trigger button row; wireViewHandlers reads the
 // rendered field values on submit and dispatches to the same-named handler.
 
+export interface RegistryFormState {
+  kind?: string;
+  error?: string | null;
+}
+
 /** Renders the inline `.form-error` line when the current form carries a
  *  validation error (duplicate name, unknown workflow, etc.) — replaces
  *  `alert()` for these flows. */
-function renderRegistryFormError(formState) {
+function renderRegistryFormError(formState: RegistryFormState | null | undefined): string {
   return formState && formState.error
     ? '<p class="form-error">' + escapeHtml(formState.error) + "</p>"
     : "";
 }
 
-function renderAddWorkflowForm(formState, existingWorkflows, tiers) {
+function renderAddWorkflowForm(formState: RegistryFormState | null | undefined, existingWorkflows: string[], tiers: string[]): string {
   const available = WORKFLOW_STEMS.filter((s) => !existingWorkflows.includes(s));
   if (available.length === 0) {
     return (
@@ -129,7 +151,7 @@ function renderAddWorkflowForm(formState, existingWorkflows, tiers) {
   );
 }
 
-function renderDuplicateProfileForm(formState, profileNames) {
+function renderDuplicateProfileForm(formState: RegistryFormState | null | undefined, profileNames: string[]): string {
   if (profileNames.length === 0) {
     return (
       '<div class="registry-inline-form">' +
@@ -151,7 +173,7 @@ function renderDuplicateProfileForm(formState, profileNames) {
   );
 }
 
-function renderDeleteProfileForm(formState, profileNames) {
+function renderDeleteProfileForm(formState: RegistryFormState | null | undefined, profileNames: string[]): string {
   if (profileNames.length === 0) {
     return (
       '<div class="registry-inline-form">' +
@@ -172,7 +194,7 @@ function renderDeleteProfileForm(formState, profileNames) {
   );
 }
 
-function renderAddProfileForm(formState) {
+function renderAddProfileForm(formState: RegistryFormState | null | undefined): string {
   return (
     '<div class="registry-inline-form form-field">' +
     renderRegistryFormError(formState) +
@@ -185,6 +207,76 @@ function renderAddProfileForm(formState) {
   );
 }
 
+/** {model, effort} cell, shared by the overlay delta and the server's own
+ *  registry — optional properties ONLY (`model?: string | null`, never
+ *  `model: string | undefined`): ABSENT means inherit, PRESENT (even `null`)
+ *  is an explicit override/tombstone, and a `| undefined` union would invite
+ *  writing the key with value `undefined`, which the merge misreads as an
+ *  override rather than "not present". */
+export interface RegistryCell {
+  model?: string | null;
+  effort?: string | null;
+}
+
+export interface RegistryProfile {
+  description?: string;
+  hosts?: Record<string, Record<string, RegistryCell>>;
+}
+
+export interface RegistrySchema {
+  profiles?: Record<string, RegistryProfile>;
+  tiers?: string[];
+  hostDefaults?: Record<string, string>;
+  workflowTiers?: Record<string, string>;
+  agentTiers?: Record<string, Record<string, string>>;
+}
+
+export interface RegistrySource {
+  overlay?: {
+    profiles?: Record<string, unknown>;
+    hostDefaults?: Record<string, unknown>;
+    workflowTiers?: Record<string, unknown>;
+    /** Two-level delta (design D-1): `agentTiers[agent] === null` tombstones the whole
+     *  agent entry; `agentTiers[agent][host]` present tombstones/overrides one host key. */
+    agentTiers?: Record<string, Record<string, unknown> | null>;
+  } | null;
+  tombstoned?: string[];
+}
+
+/** Frontend mirror of `OverlayOverrideBreakdown` (scripts/lib/model-profiles.ts) — the
+ *  per-category count of overlay entries surviving normalization (WUT-17). Render-only:
+ *  these numbers are server-computed and already sum to `overlayOverrideCount` by
+ *  construction, so this file must never recompute them. */
+export interface RegistryOverlayOverrideBreakdown {
+  hostDefaults: number;
+  workflowTiers: number;
+  agentTiers: number;
+  tiers: number;
+  profiles: number;
+}
+
+interface RegistryAgent {
+  name: string;
+  charterTier: string;
+}
+
+export interface RegistryPayload {
+  registry?: RegistrySchema;
+  source?: RegistrySource;
+  overlayError?: string;
+  _error?: unknown;
+  overlayOverrideCount?: number;
+  overlayOverrideBreakdown?: RegistryOverlayOverrideBreakdown;
+  agents?: RegistryAgent[];
+  agentsError?: string;
+}
+
+interface RegistryRenderOpts {
+  writeMode?: boolean;
+  unsaved?: unknown;
+  registryForm?: unknown;
+}
+
 /**
  * Model-registry editor renderer. Renders a grid (rows = {host, tier} pairs,
  * columns = profiles, cells = {model, effort}). Marks overlay-sourced cells.
@@ -192,14 +284,14 @@ function renderAddProfileForm(formState) {
  * profile flows, hostDefaults + workflowTiers editable, regenerate +
  * clear-overlay + save-overlay buttons.
  */
-export function renderModelRegistry(data, opts) {
-  const payload = data || {};
+export function renderModelRegistry(data: RegistryPayload | null | undefined, opts?: RegistryRenderOpts | null): string {
+  const payload: RegistryPayload = data || {};
   const registry = payload.registry || {};
   const source = payload.source || {};
   const overlayError = payload.overlayError;
   const writeMode = opts && opts.writeMode !== undefined ? opts.writeMode : isWriteModeEnabled();
   const unsaved = opts && opts.unsaved ? ' <span class="badge" style="background:rgba(245,158,11,0.15);color:#92400e;">unsaved changes</span>' : "";
-  const registryFormState = (opts && opts.registryForm) || null;
+  const registryFormState = ((opts && opts.registryForm) || null) as RegistryFormState | null;
 
   const profiles = registry.profiles || {};
   const profileNames = Object.keys(profiles);
@@ -207,6 +299,12 @@ export function renderModelRegistry(data, opts) {
   const hostDefaults = registry.hostDefaults || {};
   const workflowTiers = registry.workflowTiers || {};
   const overlayProfiles = (source.overlay && source.overlay.profiles) || {};
+  // WUT-17: raw saved-overlay presence per non-profile category, mirroring `overlayProfiles`
+  // above — the same "present in source.overlay.* means override" rule the profile-column
+  // badge already applies, now extended to the sections that had no marker at all.
+  const overlayHostDefaults = (source.overlay && source.overlay.hostDefaults) || {};
+  const overlayWorkflowTiers = (source.overlay && source.overlay.workflowTiers) || {};
+  const overlayAgentTiers = (source.overlay && source.overlay.agentTiers) || {};
   const tombstoned = source.tombstoned || [];
 
   if (profileNames.length === 0 && !overlayError && !payload._error) {
@@ -226,13 +324,24 @@ export function renderModelRegistry(data, opts) {
   // count visible. A compact, honest line — nothing rendered when there is nothing to
   // override, so an operator with no overlay sees no noise.
   const overlayOverrideCount = typeof payload.overlayOverrideCount === "number" ? payload.overlayOverrideCount : 0;
+  // WUT-17 AC3/AC4: name which categories the count is made of, from the server-computed
+  // breakdown T41 returns — never recomputed here (task Non-goal). Absent breakdown (an
+  // older payload shape, or a caller that only ever set overlayOverrideCount) falls back to
+  // the un-named count line exactly as before.
+  const overlayBreakdown = payload.overlayOverrideBreakdown;
+  const overlayCategoryParts = overlayBreakdown
+    ? OVERLAY_CATEGORY_ORDER.filter((key) => overlayBreakdown[key] > 0).map(
+        (key) => overlayBreakdown[key] + " in " + OVERLAY_CATEGORY_LABELS[key],
+      )
+    : [];
   const overlayOverrideLine = overlayOverrideCount > 0
     ? '<p class="registry-override-count muted">You have ' + overlayOverrideCount +
-      " custom override" + (overlayOverrideCount === 1 ? "" : "s") + " of the built-in defaults.</p>"
+      " custom override" + (overlayOverrideCount === 1 ? "" : "s") + " of the built-in defaults" +
+      (overlayCategoryParts.length > 0 ? ": " + overlayCategoryParts.join(", ") : "") + ".</p>"
     : "";
 
   // Build rows = {host, tier} pairs
-  const rows = [];
+  const rows: { host: RegistryHost; tier: string }[] = [];
   for (const host of REGISTRY_HOSTS) {
     for (const tier of tiers) {
       rows.push({ host, tier });
@@ -260,7 +369,7 @@ export function renderModelRegistry(data, opts) {
       const isOverlay = Object.prototype.hasOwnProperty.call(overlayProfiles, profileName);
       const overlayClass = isOverlay ? " overlay-sourced" : "";
       const effortOptions = UI_HOST_EFFORT_ENUM[row.host];
-      let effortInput;
+      let effortInput: string;
       if (effortOptions && effortOptions.length > 0) {
         const opts2 = effortOptions.map((e) => {
           const sel = e === effort ? " selected" : "";
@@ -303,8 +412,10 @@ export function renderModelRegistry(data, opts) {
       const sel = p === current ? " selected" : "";
       return '<option value="' + escapeHtml(p) + '"' + sel + ">" + escapeHtml(p) + "</option>";
     }).join("");
+    const isOverlay = Object.prototype.hasOwnProperty.call(overlayHostDefaults, host);
+    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">override</span>' : "";
     return (
-      '<div class="config-field"><label>' + escapeHtml(host) + "</label>" +
+      '<div class="config-field"><label>' + escapeHtml(host) + overlayMark + "</label>" +
       '<select data-action="registry-hostDefault" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + opts2 + "</select></div>"
     );
   }).join("");
@@ -320,8 +431,10 @@ export function renderModelRegistry(data, opts) {
     const rmBtn = writeMode
       ? ' <button type="button" class="btn-delete" data-action="registry-workflowTier-remove" data-workflow="' + escapeHtml(wf) + '" style="padding:0.1rem 0.4rem;font-size:0.75rem;">Remove</button>'
       : "";
+    const isOverlay = Object.prototype.hasOwnProperty.call(overlayWorkflowTiers, wf);
+    const overlayMark = isOverlay ? ' <span class="badge overlay-badge">override</span>' : "";
     return (
-      '<div class="config-field"><label>' + escapeHtml(wf) + "</label>" +
+      '<div class="config-field"><label>' + escapeHtml(wf) + overlayMark + "</label>" +
       '<select data-action="registry-workflowTier" data-workflow="' + escapeHtml(wf) + '"' + (writeMode ? "" : " disabled") + ">" + tierOpts + "</select>" + rmBtn + "</div>"
     );
   }).join("");
@@ -338,7 +451,7 @@ export function renderModelRegistry(data, opts) {
   const agents = payload.agents || [];
   const agentsError = payload.agentsError;
   const agentTiersDisplay = registry.agentTiers || {};
-  let agentTierSection;
+  let agentTierSection: string;
   if (agentsError) {
     agentTierSection =
       '<div class="registry-agentTiers"><h3>Per-Agent Tier Overrides</h3>' +
@@ -351,9 +464,16 @@ export function renderModelRegistry(data, opts) {
     const agentHeaderCells = REGISTRY_HOSTS.map((h) => "<th>" + escapeHtml(REGISTRY_HOST_LABELS[h]) + "</th>").join("");
     const agentBodyRows = agents.map((agent) => {
       const perHost = agentTiersDisplay[agent.name] || {};
+      const overlayAgentEntry = overlayAgentTiers[agent.name];
       const cells = REGISTRY_HOSTS.map((host) => {
         const effective = perHost[host] || "";
         const overriddenClass = effective ? ' class="overridden"' : "";
+        // A `null` entry tombstones the whole agent (every host counts as overridden);
+        // otherwise a host-level override only marks the host key it actually names.
+        const isOverlayCell =
+          overlayAgentEntry !== undefined &&
+          (overlayAgentEntry === null || Object.prototype.hasOwnProperty.call(overlayAgentEntry, host));
+        const overlayMark = isOverlayCell ? ' <span class="badge overlay-badge">override</span>' : "";
         const options =
           '<option value="">(default: ' + escapeHtml(agent.charterTier) + ")</option>" +
           tiers.map((t) => {
@@ -361,7 +481,7 @@ export function renderModelRegistry(data, opts) {
             return '<option value="' + escapeHtml(t) + '"' + sel + ">" + escapeHtml(capitalizeLabel(t)) + "</option>";
           }).join("");
         return (
-          "<td" + overriddenClass + '><select data-action="registry-agentTier" data-agent="' + escapeHtml(agent.name) + '" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + options + "</select></td>"
+          "<td" + overriddenClass + '><select data-action="registry-agentTier" data-agent="' + escapeHtml(agent.name) + '" data-host="' + escapeHtml(host) + '"' + (writeMode ? "" : " disabled") + ">" + options + "</select>" + overlayMark + "</td>"
         );
       }).join("");
       return "<tr><th>" + escapeHtml(agent.name) + "</th>" + cells + "</tr>";

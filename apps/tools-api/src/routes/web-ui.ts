@@ -5,7 +5,7 @@
  * GET /ui/<asset>  - Serve a static asset (styles.css, app.js, ...)
  * GET /ui/<path>   - Unknown paths fall back to index.html
  *
- * Reads files verbatim from apps/web-ui/src/static/. Returns 404 for the whole
+ * Reads files verbatim from apps/web-ui/dist/static/. Returns 404 for the whole
  * prefix when WEB_UI_ENABLED=false. Path traversal is guarded. No new core
  * logic; the UI consumes existing /api/v1/* read routes at runtime.
  */
@@ -25,10 +25,12 @@ import { isTrustedWebUiCaller } from "../web-ui-trust.js";
  * container WORKDIR, and from arbitrary cwds by supervisors. So walk up from
  * the module's own directory first, then from cwd, checking both layouts at
  * every level:
- *   <root>/apps/web-ui/src/static   (walking up from the monorepo root)
- *   <apps>/web-ui/src/static        (sibling package, walking up from tools-api)
+ *   <root>/apps/web-ui/dist/static   (walking up from the monorepo root)
+ *   <apps>/web-ui/dist/static        (sibling package, walking up from tools-api)
  * This covers the src layout (src/routes/), the dist layout (dist/), and a
- * cwd anywhere at or below the repo root.
+ * cwd anywhere at or below the repo root. The web-ui bundle is now built
+ * (`bun run --filter @massa-ai/web-ui build`), so the served files live under
+ * its `dist/static`, not the hand-written `src/static` sources.
  *
  * Exported for tests: the route-level tests mock fs.stat, so only a direct
  * unit test on this pure function can catch a wrong candidate path.
@@ -38,8 +40,8 @@ export function buildStaticDirCandidates(moduleDir: string, cwd: string): string
   for (const root of [moduleDir, cwd]) {
     let dir = root;
     for (let i = 0; i < 10; i++) {
-      candidates.push(path.resolve(dir, "apps/web-ui/src/static"));
-      candidates.push(path.resolve(dir, "web-ui/src/static"));
+      candidates.push(path.resolve(dir, "apps/web-ui/dist/static"));
+      candidates.push(path.resolve(dir, "web-ui/dist/static"));
       const parent = path.dirname(dir);
       if (parent === dir) break;
       dir = parent;

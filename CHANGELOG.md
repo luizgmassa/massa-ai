@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`apps/web-ui`'s browser bundle is now real TypeScript, not zero-build JavaScript.**
+  All 22 `src/static/` modules (`app.js`, `dashboard.js`, `start-app.js`,
+  `wire-view-handlers.js`, every `lib/`/`views/` leaf) are converted to strict-mode
+  `.ts`, compiled by `tsc -p apps/web-ui/tsconfig.build.json` into
+  `apps/web-ui/dist/static/`, and served from there by the Tools API
+  (`apps/tools-api/src/routes/web-ui.ts`) instead of the raw `src/` tree — the
+  Dockerfile and CI image were already building it, only a stale comment claimed
+  otherwise. The config tab's section schema is now typed against `@massa-ai/shared`'s
+  `MassaAiConfig` (`keyof MassaAiConfig` drives `ConfigSectionKey`), so an added or
+  removed config key is a compile-time error instead of a silent UI gap. `bun run
+  dev:api` now also runs the web-ui's `tsc --watch`, and devtools opens the `.ts`
+  source via source maps. The conversion itself changed no renderer behaviour and no
+  exported surface: `public-surface.test.ts`'s frozen export lists are unmodified, and
+  `render-golden.json` stayed byte-identical across all 40 conversion tasks. The three
+  defect repairs under Fixed below are separate, deliberate behaviour changes that
+  landed on the same branch afterwards; between them they add 1 golden entry
+  (`renderModelRegistry/nonProfileOverlay`) and change 8 — both `renderConfig/*` and
+  six of the seven `renderLogs/*` — leaving 77 of the original 85 byte-identical.
+
+### Fixed
+
+- **The Model Catalog reported a phantom override with no marker anywhere on screen.**
+  `normalizeOverlay` had a normalization branch for every overlay key except `tiers`,
+  so a saved `tiers` array byte-identical to the builtin still charged `overlayOverrideCount`
+  1, and the only `override` badge lived on profile column headers — nothing rendered for
+  a `hostDefaults`/`workflowTiers`/`agentTiers`/`tiers` override. `tiers` is now normalized
+  by the same equality rule as the other keys, the server returns a per-category breakdown
+  that sums to the count, the Model Catalog marks every counted override where it is edited
+  and names the categories in the count line, and the breakdown now survives the display
+  merge that previously dropped it silently after first paint. Reproduces on `origin/main`.
+- **The Config tab rendered unset fields blank instead of showing the default in force, and
+  saving a partially-populated form could silently persist `false` over a `true` default.**
+  `GET /api/v1/config` returns only the persisted file, so an unresolved field showed
+  nothing rather than the default that actually governs the setting; on top of that, an
+  unchecked checkbox coerces to `false` rather than `undefined`, and `savePartialConfig`
+  replaces most sections wholesale, so one Save of a form with un-rendered defaults could
+  overwrite booleans that default `true`. The Config tab now receives and displays the
+  server's defaults, marks inherited fields, and a saved section no longer clobbers a field
+  that was never shown as anything but its default. Reproduces on `origin/main`.
+- **The Logs tab's Live toggle never remembered its stored preference across a reload.**
+  `start-app` seeded `logsLive: false` and only consulted the stored preference when the
+  state was `undefined`, which it never was, so the preference `writeLogsLivePreference`
+  wrote was never read back. The seed now reads the stored preference; an in-page toggle
+  still outranks it. Reproduces on `origin/main`.
+- **The Logs tab's live tail went dead every 10 minutes and said nothing.** The stream
+  route closes each connection after `SSE_MAX_DURATION_MS_DEFAULT` by design, and the
+  browser had no reconnect: the read loop simply ended, leaving the Live checkbox
+  checked over a tail that would never deliver another row until the page was
+  refreshed — for another 10 minutes. Any dev-server restart did the same, sooner. The
+  same function also never checked `res.ok`, so a 401 or 500 was indistinguishable from
+  a healthy idle stream: no rows, no error, no banner. The tail now reconnects after a
+  server-side close, counts only *consecutive rapid* closes against its give-up bound
+  so a scheduled close is not mistaken for a failure, and surfaces a non-200 instead of
+  swallowing it. The live-tail scope disclosure was stale in the other direction and is
+  now conditional: the server tails the shared file sink — every massa-ai process,
+  including the stdio MCP server — and only falls back to this process's ring buffer
+  when no sink file is readable. Reproduces on `origin/main`.
+
 ## [1.51.0] - 2026-08-11
 
 ### Fixed

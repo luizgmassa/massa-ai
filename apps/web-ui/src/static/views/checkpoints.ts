@@ -19,7 +19,27 @@ import { collectFormData } from "../lib/forms.js";
  */
 export const CHECKPOINTS_LIST_BODY = { limit: 50, format: "json" };
 
-export function renderCheckpoints(data) {
+interface CheckpointRow {
+  id?: string;
+  checkpointId?: string;
+  taskId?: string;
+  status?: string;
+  description?: string;
+  type?: string;
+  checkpointType?: string;
+  progressPercent?: number;
+  currentStep?: string;
+  totalSteps?: number;
+  completedSteps?: number;
+}
+
+interface CheckpointsResponse {
+  success?: boolean;
+  data?: unknown;
+  error?: unknown;
+}
+
+export function renderCheckpoints(data: CheckpointsResponse | null | undefined): string {
   const writeMode = isWriteModeEnabled();
   if (!data || data.success === false) {
     return '<section class="view"><h2>Checkpoints</h2>' + errorBlock(data) + "</section>";
@@ -106,22 +126,43 @@ export function renderCheckpoints(data) {
  * back to its "toon" default) puts a *string* here; collapsing that to `[]`
  * renders "No checkpoints" and hides the real failure.
  */
-export function extractCheckpointRows(data) {
-  const payload = data && (data.data || data);
-  if (Array.isArray(payload && payload.checkpoints)) return payload.checkpoints;
-  if (Array.isArray(payload && payload.data)) return payload.data;
-  if (Array.isArray(payload)) return payload;
+export function extractCheckpointRows(data: CheckpointsResponse): CheckpointRow[] | null {
+  const payload: unknown = data && (data.data || data);
+  if (Array.isArray((payload as { checkpoints?: unknown } | undefined)?.checkpoints)) {
+    return (payload as { checkpoints: CheckpointRow[] }).checkpoints;
+  }
+  if (Array.isArray((payload as { data?: unknown } | undefined)?.data)) {
+    return (payload as { data: CheckpointRow[] }).data;
+  }
+  if (Array.isArray(payload)) return payload as CheckpointRow[];
   if (payload && typeof payload === "object") return [];
   return null;
 }
 
+/** The subset of an input element `collectFormData` reads, and the DOM root
+ *  shape it needs — structurally identical to `lib/forms.ts`'s own unexported
+ *  parameter types, so `ctx.root` can be passed through without a cast. */
+interface CheckpointFormRoot {
+  querySelectorAll(selectors: string): {
+    forEach(
+      cb: (el: { dataset: { create?: string; [key: string]: string | undefined }; type: string; checked?: boolean; value: string }) => void,
+    ): void;
+  };
+}
+
+interface CheckpointCtx {
+  root: CheckpointFormRoot;
+  api: { request: (path: string, init?: { method?: string; body?: unknown }) => Promise<unknown> };
+  render: () => void;
+}
+
 /** Submits the Create Checkpoint form. The numeric fields are forwarded only
  *  when present, so an untouched field stays absent rather than becoming 0. */
-export async function handleCheckpointCreate(ctx) {
+export async function handleCheckpointCreate(ctx: CheckpointCtx): Promise<void> {
   const data = collectFormData(ctx.root, "checkpoint-create");
   if (!data.taskId) { alert("Task ID is required."); return; }
   if (!data.description) { alert("Description is required."); return; }
-  const body = {
+  const body: Record<string, unknown> = {
     taskId: data.taskId,
     description: data.description,
     status: data.status || "pending",
@@ -135,16 +176,16 @@ export async function handleCheckpointCreate(ctx) {
     await ctx.api.request("/api/v1/checkpoints/create", { method: "POST", body });
     ctx.render();
   } catch (e) {
-    alert("Create failed: " + String(e.message || e));
+    alert("Create failed: " + String((e as { message?: unknown }).message || e));
   }
 }
 
 /** Deletes one checkpoint. The confirm() lives at the wiring site. */
-export async function handleCheckpointDelete(ctx, id) {
+export async function handleCheckpointDelete(ctx: CheckpointCtx, id: string): Promise<void> {
   try {
     await ctx.api.request("/api/v1/checkpoints/delete", { method: "POST", body: { id } });
     ctx.render();
   } catch (e) {
-    alert("Delete failed: " + String(e.message || e));
+    alert("Delete failed: " + String((e as { message?: unknown }).message || e));
   }
 }

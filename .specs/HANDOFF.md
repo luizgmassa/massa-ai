@@ -1,4 +1,115 @@
-# Handoff — subagent-tool-inheritance (VALIDATED 2026-08-11 — 12 commits, 4 batch workers plus an independent verification pass; every gate green; unpushed, push/PR = user decision)
+# Handoff — web-ui-typescript (EXECUTE COMPLETE 2026-08-12 — 62 commits across 14 phases, sequential batch workers; every gate green; unpushed, push/PR is the user's call)
+
+Session `spec-web-ui-typescript` · workflow **spec-driven** (Large/Complex) · branch
+`spec/web-ui-typescript` from `origin/main` @ `6227b4ac`, worktree
+`/Users/luizmassa/Projects/massa-ai-wt-web-ui-typescript`. Range
+`6227b4ac..e1f26a02` plus this close-out commit — **62** commits total
+(`git rev-list --count main..HEAD`, not the `git log --oneline | wc -l` form,
+which under-reported at 50 in this same session): spec/design/breakdown commits,
+per-batch execution-log recordings, and task commits across T1-T40 and 14
+phases. Contract:
+`.specs/features/web-ui-typescript/{spec,design,tasks,CHARACTERIZATION}.md`.
+
+## Objective
+
+Convert `apps/web-ui`'s 21 zero-build browser modules under `src/static/` from
+plain JavaScript to strict-mode TypeScript, compiled by `tsc` into `dist/static/`
+and served from there instead of the raw source tree, with the config tab's
+section schema typed against `@massa-ai/shared`'s `MassaAiConfig` so an
+added/removed config key is a compile-time error.
+
+## State
+
+All 14 phases (T1-T40, 40 tasks) complete. **22 of 22** modules converted, 0 `.js`
+left under `src/static/` (`config-sections` split the schema into its own module
+mid-feature, T23/T24, which is why the denominator moved from 21 to 22). Two
+mid-execution remediation waves: T37-T39 (registry type consolidation, the
+write-gating scanner re-arm, restoring a dropped `doc` context member) and T40
+(the `dashboard.test.ts` type regression that kept `type-check` red from T26
+through T33 — six phases, invisible because only 9 of 40 tasks ran it).
+
+## Completed — Phase 14 (this close-out)
+
+- **T34** (`75b94042`): `bun scripts/check-security-allowlist.ts` measured, not
+  assumed. `apps/web-ui/src/` population went **1 → 23** tracked `.ts` files
+  (`index.ts` plus the 22 converted `src/static/**/*.ts` modules — design.md's
+  "1 → 22" estimate counted only the `static/` subtree). Zero hits across all
+  four classes (`child-process`, `bun-spawn`, `raw-sql-unsafe`, `dynamic-eval`).
+  No allowlist edit — recorded as measured zero.
+- **T35** (`e1f26a02`): corrected every stale "no build step" claim.
+  `git grep -n 'no build step' -- Dockerfile .github docs apps/web-ui CLAUDE.md`
+  went **2 → 0** (`Dockerfile:38-39`, `.github/workflows/ci.yml:360-361`, both
+  comments, no `COPY` line touched; one incidental unrelated `CLAUDE.md:478` hit
+  about the other three plugin dirs reworded to the same literal grep). Fixed
+  `apps/web-ui/src/index.ts`'s stale "intentionally NOT type-checked" docblock
+  (T33 already dropped `allowJs`/`checkJs`). Restated `CHARACTERIZATION.md`'s
+  verification recipe as the turbo-mediated build-first form (design Risks row
+  1). Added the `CHANGELOG.md` `[Unreleased]` → `### Added` entry (minor bump)
+  the CI merge gate requires — before this task, `git rev-list --count
+  6227b4ac..HEAD -- CHANGELOG.md` was **0**. `docs/ONBOARDING.md:102` inspected
+  and left alone: no false build-step claim there, and the file's own stated
+  convention is to leave stale generated counts unpatched rather than hand-fix
+  them outside a real architecture-layer change.
+- **T36** (this commit): `STATE.md` `## Decisions` (the L4005 table, the one
+  that already holds AD-001..AD-006 plus AD-016..AD-020, per the existing
+  placement-note comment) gains **AD-021**, extending AD-016's "consumers chain
+  the generation" contract to every untracked generated root — `apps/web-ui/dist/`
+  is the second instance, and the `beforeAll` sentinel in
+  `static-module-graph.test.ts` is the enforcement pattern for a consumer (a bare
+  `bun test` invocation) that cannot chain the build itself. Highest existing AD
+  re-checked at append time: **AD-020** (20 distinct `AD-` ids in `STATE.md` at
+  HEAD, counted, not assumed). `HANDOFF.md` rotated: this section's predecessor
+  renamed to `## Previous handoff — subagent-tool-inheritance` first, then this
+  section prepended — distinct session blocks (H1-marked current + `## Previous`
+  headers) went **12 → 13**. `FEATURES.json` gained a `web-ui-typescript` entry:
+  `phases.execute: true`, `status: "complete"`, `validation` path set (no
+  `validation.md` exists for this feature — spec-driven Execute-only close-out,
+  no independent verification pass was run; recorded honestly rather than
+  fabricating a validation artifact).
+
+## Gates (measured 2026-08-12, this worktree)
+
+| Gate | Result |
+| --- | --- |
+| `bun run build` | exit 0 |
+| `bun run type-check` (forced, non-cached) | exit 0, 6/6 tasks |
+| `bun run lint` (oxlint) | exit 0 |
+| `bun run --filter @massa-ai/web-ui build && bun test apps/web-ui/src/__tests__/` | **703 pass, 0 fail, 15 files** |
+| `render-golden.json` sha256 | `27195c2e9975ae28481d7fd6d8d778232f3df07e0556253a2dfbc05ffb77af30` — unchanged |
+| `bun skills/massa-ai/scripts/check_specs_delivered.ts web-ui-typescript --root .` | run **after** this commit lands (the check requires `.specs/` porcelain-clean, which this commit itself produces); reported in the builder's final response, not embeddable here |
+
+**Not run this close-out** (explicitly out of scope per the dispatching
+instructions): `bun run test:scripts`, `bun run test:plugins`,
+`bun run test:coverage`. `apps/web-ui/src/__tests__/public-surface.test.ts` has
+**0** commits across the entire branch — confirmed still true.
+
+## Next Step
+
+1. Push `spec/web-ui-typescript` and open the PR — the user's decision, not
+   taken unattended.
+2. No independent `massa-ai-verification-agent` pass was run for this feature;
+   consider dispatching one before merge, given the branch's own history of a
+   type-check regression (T26-T33) that stayed invisible through six phases of
+   green `quick`/`full` gates.
+3. `docs/ONBOARDING.md`'s knowledge-graph snapshot (frozen at commit `17ee7083`)
+   was not regenerated by this feature — optional follow-up, out of scope here.
+
+## Blockers
+
+- None blocking. Push/PR is the only remaining step.
+
+## Uncommitted Files
+
+- None at T36 commit time (all staged + committed).
+
+## Branch
+
+`spec/web-ui-typescript`, 62 commits ahead of `origin/main` @ `6227b4ac`
+(`git rev-list --count`), spanning spec/design/breakdown, per-batch
+execution-log recordings, and task commits across T1-T40 and 14 phases,
+ending in this Phase 14 close-out sequence T34-T36. Unpushed.
+
+## Previous handoff — subagent-tool-inheritance (VALIDATED 2026-08-11 — 12 commits, 4 batch workers plus an independent verification pass; every gate green; unpushed, push/PR = user decision)
 
 Session `spec-subagent-tool-inheritance` · workflow **spec-driven** · persona pin
 `context-skill-harness-engineer-architect` · branch `fix/subagent-tool-inheritance`
