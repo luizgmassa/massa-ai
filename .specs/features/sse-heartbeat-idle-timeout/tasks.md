@@ -36,9 +36,10 @@ is one atomic commit landed after its own gate passes.
   `apps/tools-api/src/routes/events.ts`
 - Do: delete `SSE_HEARTBEAT_MS_DEFAULT` / `HEARTBEAT_MS_DEFAULT` and both
   `MAX_DURATION_MS_DEFAULT` literals; call the resolvers instead.
-- Gate: `cd apps/tools-api && bun test src/routes/logs.test.ts src/routes/events.test.ts`
-  (**not** `run-tests-isolated.ts --filter=…` — `--filter` is core-only; the
-  tools-api wrapper rejects it with `Unknown argument(s)`. Verified.)
+- Gate: `cd apps/tools-api && bun test src/routes/logs.test.ts` **and**
+  `cd apps/tools-api && bun test src/routes/events.test.ts` — one file per
+  invocation. See the gate note below; neither `--filter` nor a multi-file
+  invocation is correct here.
 - Done when: no `15_000` / `15000` literal remains in either file, and every
   pre-existing `logs.test.ts` / `events.test.ts` case is still green — in
   particular the max-duration cases (AC-05.1).
@@ -108,9 +109,10 @@ is one atomic commit landed after its own gate passes.
 - Do: route the heartbeat catch and the `enqueue` catch through the same
   teardown `cancel()` performs — `unsubscribe?.()`, clear both timers,
   `controller.close()` guarded.
-- Gate: `cd apps/tools-api && bun test src/routes/logs.test.ts src/routes/events.test.ts`
-  (**not** `run-tests-isolated.ts --filter=…` — `--filter` is core-only; the
-  tools-api wrapper rejects it with `Unknown argument(s)`. Verified.)
+- Gate: `cd apps/tools-api && bun test src/routes/logs.test.ts` **and**
+  `cd apps/tools-api && bun test src/routes/events.test.ts` — one file per
+  invocation. See the gate note below; neither `--filter` nor a multi-file
+  invocation is correct here.
 - Done when: a test drives a throwing controller and observes the subscription
   released and the stream closed; it fails against the pre-fix code.
 
@@ -183,10 +185,24 @@ bun test apps/web-ui
 bun run test:scripts
 ```
 
-`--filter` is a **core-only** flag (`scripts/lib/run-tests-isolated.ts:155`);
-the tools-api wrapper rejects it. Single-file `bun test` invocations are safe —
-one file is one process, so the cross-contamination the isolation runner exists
-to prevent cannot occur.
+**One file per `bun test` invocation. Two are not "still targeted" — they share
+a process.** `--filter` is a core-only flag (`scripts/lib/run-tests-isolated.ts:155`)
+that the tools-api wrapper rejects, and the obvious workaround —
+`bun test fileA fileB` — reintroduces exactly the cross-contamination the
+isolation runner exists to prevent.
+
+Measured here, and it cost a Phase 1 detour: `bun test src/routes/logs.test.ts
+src/routes/events.test.ts` reports **49 pass / 1 fail**, while the same two
+files run separately report **51/0** and **6/0**. `events.test.ts` publishes
+`indexing:started` on the shared `eventBus`, which drives real `WorkspaceManager`
+logging into the global `logBuffer` singleton; `logs.test.ts` then asserts that
+buffer is empty and fails. It reproduces identically on clean `main`
+@ `89909051`, so it is pre-existing, not this feature's — and `bun run test`
+never sees it, because the runner classifies `events.test.ts` as needing
+isolation (it matches `eventBus`) and forks it into its own process.
+
+Treat a multi-file `bun test` failure as a suspected process-state collision
+until each file has been re-run alone.
 
 **Worktree provisioning precedes every gate.** A fresh worktree needs
 `bun install` *and* `bun run build` before any tools-api suite can run;
