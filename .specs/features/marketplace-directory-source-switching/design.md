@@ -74,14 +74,48 @@ Claude. It is not a no-op for a remote-source host, and that gap is what
 AC-04.1's per-host measurement exists to resolve — the design deliberately does
 not guess at it ahead of the measurement.
 
+## D4 — what the Plan Challenge Gate changed
+
+Four findings, all accepted, listed so a reader sees which parts of this design
+survived scrutiny and which were rewritten under it.
+
+1. **AC-01.2 was a correctness claim resting on no measurement.** It now reads
+   as an explicitly accepted, unmeasured risk, and MDS-05 owns closing it. The
+   gate also surfaced a *third* tree this design never mentioned — the live
+   clone at `~/.claude/plugins/marketplaces/<name>` that a remote-source
+   marketplace keeps beside its cache. If Claude prefers that clone, the remote
+   path ships the same defect. Unknown, and now written down as unknown.
+2. **AC-03.4's sensor could have validated the wrong answer.** Production
+   derived the generator list and the test derived it the same way, so a shared
+   parser bug would make both agree on a short list and pass green — Defect B
+   reintroduced through its own guard. The derivation now throws rather than
+   returning a short list (AC-03.5), and a hardcoded backstop asserts ≥2 entries
+   containing both known filenames (AC-03.6).
+3. **Retiring the codex refusal removed a guard with nothing behind it.** E5
+   measured one machine. A checkout predating AD-016, a fork made before it, or
+   a deliberately committed bundle file would each be dirtied by an in-place
+   rewrite. AC-02.4 adds a runtime tracked-path guard, so the removal is scoped
+   by what is actually true of the user's checkout rather than by what was true
+   of the author's.
+4. **D1 composed a write path from manifest data with no containment check.**
+   `plugins[i].source` is user-controlled relative data and this is the first
+   code path turning it into a live write target. AC-01.6 requires the resolved
+   path to be a descendant of `installLocation`.
+
+The gate also *strengthened* E2: the critic compared its own live system-prompt
+frontmatter against both trees and matched the source file's `disallowedTools:`
+line rather than the cache's `tools:` allowlist — which would have denied it the
+Task tool it was using. A running agent's own capabilities are better evidence
+of the loaded tree than a file census.
+
 ## Risks
 
 | Risk | Mitigation |
 | --- | --- |
-| The directory branch changes behavior for users on a remote-source marketplace | It cannot: the branch is gated on `source.source === "directory"` and AC-01.2 pins the remote path with its own test. |
+| The directory branch changes behavior for users on a remote-source marketplace | It cannot: the branch is gated on `source.source === "directory"`, and a test pins the remote path to `installPath`. Note this bounds the *change*, not the *defect* — whether the remote path was ever correct is unmeasured (AC-01.2, MDS-05). |
 | `known_marketplaces.json`'s schema is undocumented and may change | Same exposure the module already accepts for `installed_plugins.json`. Every read is defensive and resolves `null` on any deviation. Recorded as an accepted risk, not a solved one. |
-| Writing into a user's checkout surprises them | Measured non-issue: the written paths are gitignored (spec E5), and they are the same paths `generate:artifacts` already writes. |
-| The generator list derived from `package.json` breaks if the script is rewritten | The sensor derives from the same source, so a rewrite that the parser cannot read fails the test rather than silently shrinking the list. |
+| Writing into a user's checkout surprises them | Measured on one machine only: the written paths are gitignored there (spec E5) and are the same paths `generate:artifacts` already writes. A checkout predating AD-016, a fork, or a deliberately committed bundle would differ — AC-02.4's runtime tracked-path guard is what makes this safe generally, not E5. |
+| The generator list derived from `package.json` breaks if the script is rewritten | AC-03.5 requires the derivation to THROW rather than return a short list, and AC-03.6 adds a hardcoded backstop (>=2 entries, both known filenames). Without both, production and test derive the same wrong list and agree — passing green while skills stop shipping. |
 | Retiring the codex refusal enables a switch path nobody has exercised | AC-04.1 requires measuring codex against what it actually loads before this is claimed working. |
 
 ## Reproduction

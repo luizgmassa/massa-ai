@@ -50,7 +50,7 @@ holds and the refusal protects nothing.
 | Item | Reason |
 | --- | --- |
 | Changing where Claude loads plugins from | Not ours to change. This feature makes our writes follow Claude's loader, not the reverse. |
-| Remote-source marketplaces resolving to anything but the cache | No evidence available: this machine has only one directory-source marketplace for `massa-ai`. Changing the remote path on inference would be a guess, and the existing CMR feature already keeps that cache fresh. |
+| Remote-source marketplaces resolving to anything but the cache | **Accepted, unmeasured risk — see AC-01.2 and MDS-05, not a safety claim.** The two remote-source marketplaces on this machine are currently in sync with their pinned caches, so no natural divergence exists here to test precedence against. Changing that path on inference is the error this feature exists to correct. |
 | Replacing the marketplace route with the file route | The staged migration in `.specs/HANDOFF.md` is a **user-run environment change**. The user's direction is to fix the marketplace route instead, not to migrate off it. |
 | `claude plugin update` behavior | Owned by `claude-marketplace-cache-refresh` (CMR-01..04); unchanged here. |
 | Cursor profile switching | `resolveHostLayout` skips Cursor uniformly — every tier resolves to `inherit` because Cursor publishes no model-ID table. Unrelated to this defect. |
@@ -84,7 +84,16 @@ designer:
 | `~/.claude/plugins/cache/massa-ai/massa-ai/1.45.0/agents/` | 17 | no |
 | `~/.claude/agents/` | 0 (empty) | no |
 
-Corroborated by the registry's own record: the 1.48.0 entry pins
+**Independently corroborated by the Plan Challenge Gate**, which found a
+sharper proof than this file-count comparison. The `massa-ai-plan-critic`
+subagent compared its **own live system-prompt frontmatter** against both trees:
+it matches the source file's `disallowedTools: Write, Edit, NotebookEdit`, not
+the cache's `tools: ["Read","Grep","Glob","Bash"]` allowlist — which would have
+denied it the Task tool it was demonstrably using. It also reports all 17
+shared-name agent files differ between the two trees. A running agent's own
+capabilities are stronger evidence of which tree was loaded than a file census.
+
+Corroborated further by the registry's own record: the 1.48.0 entry pins
 `gitCommitSha: f8427283`, which is the **base commit of the designer feature** —
 so the cache is a snapshot taken before designer existed, while the session sees
 designer.
@@ -132,11 +141,25 @@ present:
   `installed_plugins.json` `installPath`.
 - **AC-01.2** Any other source kind keeps today's behavior exactly: the
   `installPath` from `installed_plugins.json`, selected by the existing
-  `selectRecord` precedence.
+  `selectRecord` precedence. **This is an explicitly accepted, UNMEASURED risk,
+  not a correctness claim.** Defect A's class has been measured only for a
+  directory source. A remote-source marketplace has a *third* tree this spec
+  does not otherwise mention — a live clone at
+  `~/.claude/plugins/marketplaces/<name>`, which exists on this machine for
+  `caveman` and `understand-anything` — and which of clone or cache Claude loads
+  there is untested. If the clone wins, AC-01.2 ships the same two-trees defect
+  for every remote-source user. It is left unchanged because changing it on
+  inference is precisely the error that produced the stale diagnosis this
+  feature had to correct, not because it is known safe. MDS-05 owns closing it.
 - **AC-01.3** Every failure mode resolves to `null`, never a throw: absent or
   unparseable `known_marketplaces.json`, missing `installLocation`, absent or
   unparseable `.claude-plugin/marketplace.json`, no plugin entry matching the
   name, or a composed path that does not exist on disk.
+- **AC-01.6** The composed path must resolve to a descendant of
+  `installLocation`. `plugins[i].source` is manifest-supplied relative data, and
+  this is the first code path that turns manifest content into a live **write**
+  target; a `../`-escaping value that happens to exist on disk must resolve
+  `null`, not a write root outside the marketplace tree.
 - **AC-01.4** Resolution stays uncached, per the module's existing contract.
 - **AC-01.5** The plugin key's marketplace half selects the marketplace entry
   (`massa-ai@massa-ai` → marketplace `massa-ai`), so a differently-named
@@ -150,6 +173,14 @@ present:
   absent record is still refused loudly with installer guidance.
 - **AC-02.3** A sensor asserts no refusal reason in the module cites checkout
   dirtiness, so the stale premise cannot be reintroduced by copy-paste.
+- **AC-02.4** A **runtime** guard replaces the removed refusal: before writing,
+  the engine verifies the resolved write target is not a git-tracked path, and
+  refuses loudly with the offending path if it is. E5 measured one machine — a
+  checkout predating AD-016's untracking, a fork made before it, or a user who
+  deliberately committed a generated bundle would all be dirtied by an in-place
+  rewrite. The premise is stale *for checkouts where AD-016 landed*, which is
+  narrower than "stale". Where `git` is unavailable the guard cannot verify and
+  proceeds, recording that it could not check.
 
 ### MDS-03 — Save & Apply regenerates and reinstalls skills
 
@@ -163,6 +194,25 @@ present:
 - **AC-03.4** A sensor asserts every generator named by `package.json`'s
   `generate:artifacts` script is spawned by the regenerate path — derived from
   that script, not from a hardcoded list of two.
+- **AC-03.5** The derivation **throws** on a script shape it cannot parse; it
+  never returns a short or empty list. A self-referential sensor — production
+  derives the list, the test derives it the same way, both agree — cannot tell
+  a correct derivation from a consistently wrong one, and would pass green while
+  production spawned one generator or none. That is Defect B reintroduced
+  through the guard built to prevent it.
+- **AC-03.6** An independent hardcoded backstop asserts the spawned list has at
+  least 2 entries and contains both known generator filenames, so a shared
+  parser bug cannot hide behind agreement between production and test.
+
+### MDS-05 — measure the remote-source load path, or say it is unmeasured
+
+- **AC-05.1** The experiment is recorded even if it cannot be run here: on a
+  remote-source marketplace whose upstream has diverged from its pinned cache,
+  diff a shared-name file between `~/.claude/plugins/marketplaces/<name>/…` and
+  `~/.claude/plugins/cache/<name>/<plugin>/<version>/…`, then invoke that
+  plugin's own agent and compare its live behavior against both trees.
+- **AC-05.2** Where no natural divergence exists to test against, that is
+  recorded as the reason it is unmeasured — never as evidence of safety.
 
 ### MDS-04 — the other three hosts are measured, not assumed
 
