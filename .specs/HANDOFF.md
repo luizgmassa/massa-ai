@@ -1,4 +1,64 @@
-# Handoff — web-ui-typescript (EXECUTE COMPLETE 2026-08-12 — 62 commits across 14 phases, sequential batch workers; every gate green; unpushed, push/PR is the user's call)
+# Handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
+
+Session `spec-marketplace-directory-source-switching` · workflow **spec-driven** ·
+branch `fix/marketplace-directory-source-switching` from `origin/main` @ `89909051`,
+worktree `/Users/luizmassa/Projects/massa-ai-wt-marketplace`. Contract:
+`.specs/features/marketplace-directory-source-switching/{spec,design,tasks,validation}.md`.
+
+## Objective
+
+Make config changes applied from the Admin Portal actually reach the Claude CLI.
+Two independent defects: the switch engine wrote to a version-pinned cache the
+host never loads, and Save & Apply ran one generator of two, so skills never
+regenerated at all.
+
+## State
+
+All 3 Phases complete (T1, T2, T2b, T3, T4, T5, T6). Independent verification's
+AC and mutation results clean (18/18 ACs, 5/5 mutations killed); its two
+NEEDS-FIX delivery gaps — a security-allowlist regression and T6 undone — both
+closed on this branch.
+
+## Next step
+
+Push and open the PR. Merge is a separate decision, and in this repo it is a
+**release** decision. `fix/sse-heartbeat-idle-timeout` (PR #107, green) is also
+open and unmerged; both branches touch `CHANGELOG.md`, `STATE.md` and
+`HANDOFF.md`, so whichever merges second needs conflict resolution — and
+conflicting PRs here silently stop running CI, so resolve promptly.
+
+## Traps recorded for the next session
+
+- **A worker's "out-of-scope stale fixture" may be a correct sensor.** Run the
+  named suite on `main` AND on the branch before accepting that framing. Here:
+  `main` 12/0 vs branch 11/1 — a real regression introduced by the requirement.
+- **A new `child_process` call site fails `bun run test:scripts`** until added to
+  `scripts/security-allowlist.txt` with a justification. `main` 39/0 vs branch 38/1.
+- **`check_specs_delivered.ts` exiting 0 is not evidence the close-out ran** — it
+  checks that the seven paths exist and are tracked, not that they were updated.
+  The verifier caught T6 as undone while that gate was green.
+- **A `cd` inside one bash call persists into the next.** Twice this session a
+  "run it on main" comparison silently ran in the branch worktree. Print `pwd`
+  and `git log --oneline -1` in the same command as the measurement.
+- **A branch cut from `origin/main` does not carry a sibling branch's close-out.**
+  A STATE.md rotation asserting the sibling's section is present will fail; assert
+  the section COUNT grew instead, which is base-independent.
+
+## Still open, needing the user
+
+1. `packages/core`'s `scheduler-store-pg.test.ts` fails against any dev database
+   that has ever run the API server — it is not scoped to its own rows. Five
+   `scheduled_jobs` rows are the cause; the delete was blocked by the permission
+   classifier and is staged for the user. CI unaffected (fresh database).
+2. Two out-of-scope findings from T5: every installed roster is stale at 17
+   (missing `designer`), and the installers do not prune retired agents —
+   `massa-ai-handoff-writer` survives on codex and opencode.
+3. MDS-05: the remote-source load path is unmeasured, experiment recorded. If the
+   clone wins over the cache there, this feature fixed one half of the class.
+
+---
+
+## Previous handoff — web-ui-typescript (EXECUTE COMPLETE 2026-08-12 — 62 commits across 14 phases, sequential batch workers; every gate green; unpushed, push/PR is the user's call)
 
 Session `spec-web-ui-typescript` · workflow **spec-driven** (Large/Complex) · branch
 `spec/web-ui-typescript` from `origin/main` @ `6227b4ac`, worktree
