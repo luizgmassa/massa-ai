@@ -29,7 +29,12 @@ import {
   handleIndexStatusEvent,
 } from "../static/views/projects.js";
 import { handleMemoryEdit, handleMemoryDelete, handleMemoryCreate } from "../static/views/memory.js";
-import { handleHandoffCreate, handleHandoffAction } from "../static/views/handoffs.js";
+import {
+  handleHandoffCreate,
+  handleHandoffAction,
+  handleHandoffEdit,
+  handleHandoffDelete,
+} from "../static/views/handoffs.js";
 import { handleProposalAction } from "../static/views/proposals.js";
 import { handleCheckpointCreate, handleCheckpointDelete } from "../static/views/checkpoints.js";
 
@@ -363,6 +368,100 @@ describe("handleHandoffAction", () => {
     const ctx = makeCtx({ request: throwingRequest() });
     expect(await withGlobals({}, async (a) => { await handleHandoffAction(ctx, "h1", "cancel"); return a; }))
       .toEqual(["cancel failed: boom"]);
+  });
+});
+
+// T12 (HPC-01, AC-01.1/.2): the PATCH body must be exactly the allowlisted
+// field(s) the user edited — nothing extra. `toHaveBeenCalledWith` does a
+// deep-equal on the `body`, so a mutant that slips in a rejected field like
+// `status` (which the route's own allowlist would 400 on, AC-01.2) turns
+// this red. RED proof recorded manually: adding `body.status = "x"` inside
+// `handleHandoffEdit` before sending the request fails this exact test with
+// a body-mismatch diff, restored immediately after observing the failure.
+describe("handleHandoffEdit", () => {
+  it("does nothing when the edit prompt is cancelled", async () => {
+    const ctx = makeCtx();
+    await withGlobals({ prompt: () => null }, () => handleHandoffEdit(ctx, "h1"));
+    expect(ctx.api.request).not.toHaveBeenCalled();
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("PATCHes only the summary field the user typed, then re-renders", async () => {
+    const ctx = makeCtx();
+    await withGlobals({ prompt: () => "revised summary" }, () => handleHandoffEdit(ctx, "h1"));
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/handoff/h1", {
+      method: "PATCH",
+      body: { summary: "revised summary" },
+    });
+    expect(ctx.render).toHaveBeenCalled();
+  });
+
+  it("encodes the id in the URL path", async () => {
+    const ctx = makeCtx();
+    await withGlobals({ prompt: () => "x" }, () => handleHandoffEdit(ctx, "h/1"));
+    expect((ctx.api.request as any).mock.calls[0][0]).toBe("/api/v1/handoff/h%2F1");
+  });
+
+  // Edge Cases: a 403 from the write-mode gate resolves (not throws) as
+  // `{success:false, error:"Write refused: read-only mode is active"}` —
+  // `api.request()` only throws on transport failure, never on HTTP status.
+  // Without checking `res.error`, this would be a silent no-op.
+  it("surfaces a write-gate 403 as a visible alert and does not re-render", async () => {
+    const ctx = makeCtx({
+      request: mock(async () => ({ success: false, error: "Write refused: read-only mode is active" })),
+    });
+    const alerts = await withGlobals({ prompt: () => "x" }, async (a) => {
+      await handleHandoffEdit(ctx, "h1");
+      return a;
+    });
+    expect(alerts).toEqual(["Edit failed: Write refused: read-only mode is active"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  // The route's own 400/404 domain rejections carry `{status, error}` with
+  // no `success` key at all — a different shape from the write-gate's
+  // `{success:false, error}`, and both must be caught by the same check.
+  it("surfaces a route-level 404 (no success key) as a visible alert", async () => {
+    const ctx = makeCtx({ request: mock(async () => ({ status: 404, error: "not-found" })) });
+    const alerts = await withGlobals({ prompt: () => "x" }, async (a) => {
+      await handleHandoffEdit(ctx, "h1");
+      return a;
+    });
+    expect(alerts).toEqual(["Edit failed: not-found"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("alerts when the request throws", async () => {
+    const ctx = makeCtx({ request: throwingRequest() });
+    expect(await withGlobals({ prompt: () => "x" }, async (a) => { await handleHandoffEdit(ctx, "h1"); return a; }))
+      .toEqual(["Edit failed: boom"]);
+  });
+});
+
+describe("handleHandoffDelete", () => {
+  it("DELETEs the handoff and re-renders on success", async () => {
+    const ctx = makeCtx();
+    await withGlobals({}, () => handleHandoffDelete(ctx, "h1"));
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/handoff/h1", { method: "DELETE" });
+    expect(ctx.render).toHaveBeenCalled();
+  });
+
+  it("surfaces a write-gate 403 as a visible alert and does not re-render", async () => {
+    const ctx = makeCtx({
+      request: mock(async () => ({ success: false, error: "Write refused: read-only mode is active" })),
+    });
+    const alerts = await withGlobals({}, async (a) => {
+      await handleHandoffDelete(ctx, "h1");
+      return a;
+    });
+    expect(alerts).toEqual(["Delete failed: Write refused: read-only mode is active"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("alerts when the request throws", async () => {
+    const ctx = makeCtx({ request: throwingRequest() });
+    expect(await withGlobals({}, async (a) => { await handleHandoffDelete(ctx, "h1"); return a; }))
+      .toEqual(["Delete failed: boom"]);
   });
 });
 

@@ -700,6 +700,106 @@ describe("startApp", () => {
     expect(dialogs.alerts).toEqual([]);
   });
 
+  /**
+   * T12 (HPC-01) — same shared-child fake-DOM cascade as the memory test
+   * above. Unlike `handoff-cancel`'s sibling `project-reset` (T10, above),
+   * `handoff-edit`/`handoff-delete` read only `btn.dataset.id`, which the
+   * shared child DOES carry (`dataset: { filter: "type", id: "fake-id" }`),
+   * so a click-simulation here genuinely reaches `confirm()` instead of
+   * exiting at the `if (!id) return;` guard — the trap this suite's fixture
+   * comment documents for `dataset.project`. This is therefore a real
+   * behavioural proof, not the source-span fallback T10 needed.
+   */
+  it("drives the handoff edit/delete dialog handlers through to their requests (T12)", async () => {
+    const { doc, elements } = makeFakeDom();
+    const dialogs = fakeDialogs("revised summary");
+    // `#/memory`, not `#/handoffs` — deliberately, matching the precedent
+    // test above. With no `state.project` set, the handoffs view's own
+    // `render()` skips its only `await` (the `if (state.project) { await
+    // ... }` guard) and runs fully synchronously through to
+    // `wireViewHandlers(ctx)`. That turns the pre-existing, unconfirmed
+    // `memory-delete-project` handler in the same click cascade (it calls
+    // `ctx.render()` with no guard at all) into a synchronous re-entrant
+    // loop: each synchronous `render()` re-wires the shared fake-DOM
+    // element, growing its `_handlers.click` array *during* this test's own
+    // `for...of` iteration over that same live array, which then keeps
+    // visiting the newly-appended entries. Measured: this hangs the process
+    // (multi-GB RSS growth, no completion). The memory view's `render()`
+    // always hits a real `await api.request(...)`, which breaks that
+    // synchronous chain — this test relies on the same property.
+    (globalThis as any).location = { hash: "#/memory" };
+    const calls = recordingJsonFetch((url) => {
+      if (url.includes("/memory/list")) {
+        return { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.5, content: "hi" }], total: 1, limit: 50, offset: 0 } };
+      }
+      if (url.includes("/handoff/list")) {
+        return { data: { pending: [{ id: "h1", targetAgent: "x", status: "open", summary: "s" }] } };
+      }
+      if (url.includes("/project/list")) return { data: { projects: [{ projectId: "p1" }] } };
+      return { data: {} };
+    });
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+
+    const child = elements["app"].querySelectorAll("x")[0];
+    for (const h of child._handlers.click ?? []) h();
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(dialogs.prompts).toContain("Edit handoff summary:");
+    expect(dialogs.confirms.some((m) => m.includes("Delete handoff"))).toBe(true);
+
+    const patch = calls.find((c) => c.method === "PATCH" && c.url.includes("/api/v1/handoff/fake-id"));
+    expect(patch).toBeDefined();
+    expect(patch?.body).toContain("revised summary");
+    // AC-01.2: the client never sends a rejected field alongside the edit.
+    expect(patch?.body).not.toContain('"status"');
+
+    const del = calls.find((c) => c.method === "DELETE" && c.url.includes("/api/v1/handoff/fake-id"));
+    expect(del).toBeDefined();
+  });
+
+  /**
+   * Trap #3 from T12's brief: "a declined confirm() must issue no request —
+   * assert that explicitly." `confirm()` is stubbed to always return
+   * `false` here, so every confirm-gated handler in the same click cascade
+   * (handoff-delete included) must decline. This is also RED proof #1's
+   * behavioural twin: if the wiring site's `if (confirm(...))` guard around
+   * `handleHandoffDelete` were removed, the DELETE call would fire
+   * unconditionally and this assertion would fail. RED proof recorded
+   * manually — see the task report.
+   */
+  it("a declined handoff-delete confirm issues no DELETE request (T12)", async () => {
+    const { doc, elements } = makeFakeDom();
+    (globalThis as any).prompt = () => null;
+    (globalThis as any).confirm = () => false;
+    (globalThis as any).alert = () => {};
+    // `#/memory`, not `#/handoffs` — see the sibling test above for why: an
+    // unselected-project handoffs render is fully synchronous and turns the
+    // pre-existing unconfirmed `memory-delete-project` handler into a
+    // synchronous re-entrant re-wiring loop over this test's own live
+    // `_handlers.click` iteration.
+    (globalThis as any).location = { hash: "#/memory" };
+    const calls = recordingJsonFetch((url) => {
+      if (url.includes("/memory/list")) {
+        return { data: { memories: [{ id: "m1", type: "code", level: 1, importance: 0.5, content: "hi" }], total: 1, limit: 50, offset: 0 } };
+      }
+      if (url.includes("/handoff/list")) {
+        return { data: { pending: [{ id: "h1", targetAgent: "x", status: "open", summary: "s" }] } };
+      }
+      if (url.includes("/project/list")) return { data: { projects: [{ projectId: "p1" }] } };
+      return { data: {} };
+    });
+    startApp({ document: doc, base: "" });
+    await new Promise((r) => setTimeout(r, 60));
+
+    const child = elements["app"].querySelectorAll("x")[0];
+    for (const h of child._handlers.click ?? []) h();
+    await new Promise((r) => setTimeout(r, 80));
+
+    const del = calls.find((c) => c.method === "DELETE" && c.url.includes("/api/v1/handoff/"));
+    expect(del).toBeUndefined();
+  });
+
   it("SSE subscribes to /api/v1/events when EventSource is available", async () => {
     const { doc } = makeFakeDom();
     const sseInstances: any[] = [];
@@ -1234,6 +1334,27 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
       expect(html).not.toContain("Create Handoff");
       expect(html).not.toContain('data-action="handoff-accept"');
       expect(html).not.toContain('data-action="handoff-cancel"');
+    });
+  });
+
+  describe("handoff edit + delete (T12, HPC-01)", () => {
+    it("renders edit + delete buttons on pending handoffs when write mode on", () => {
+      enableWrite();
+      const data = { data: { pending: [{ id: "h1", targetAgent: "orchestrator", status: "open", summary: "test" }] } };
+      const html = renderHandoffs(data, { project: "proj-1" });
+      expect(html).toContain('data-action="handoff-edit"');
+      expect(html).toContain('data-action="handoff-delete"');
+      // Both new buttons carry the row's id, same as accept/cancel.
+      expect(html).toContain('class="btn-edit" data-action="handoff-edit" data-id="h1"');
+      expect(html).toContain('class="btn-delete" data-action="handoff-delete" data-id="h1"');
+    });
+
+    it("hides edit + delete when write mode off", () => {
+      disableWrite();
+      const data = { data: { pending: [{ id: "h1", targetAgent: "x", status: "open", summary: "y" }] } };
+      const html = renderHandoffs(data, { project: "proj-1" });
+      expect(html).not.toContain('data-action="handoff-edit"');
+      expect(html).not.toContain('data-action="handoff-delete"');
     });
   });
 

@@ -326,6 +326,14 @@ describe("T13 create/delete forms render correct fields when trusted", () => {
     expect(html).toContain('data-id="h-trust"');
   });
 
+  it("handoff edit + delete buttons visible when trusted (T12, HPC-01)", () => {
+    trustedOn();
+    const data = { data: { pending: [{ id: "h-trust", targetAgent: "x", status: "open", summary: "s" }] } };
+    const html = renderHandoffs(data, { project: "p" });
+    expect(html).toContain('data-action="handoff-edit"');
+    expect(html).toContain('data-action="handoff-delete"');
+  });
+
   it("checkpoint create + edit + delete buttons visible when trusted (CHKP-02, CHKP-04, UIC-03)", () => {
     trustedOn();
     const data = { success: true, data: { checkpoints: [{ id: "c-trust", taskId: "t1", type: "manual", status: "completed", description: "d" }] } };

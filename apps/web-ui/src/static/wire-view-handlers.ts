@@ -24,7 +24,7 @@ import {
   handleMemoryDeleteProjectCancel,
   handleMemoryDeleteProject,
 } from "./views/memory.js";
-import { handleHandoffCreate, handleHandoffAction } from "./views/handoffs.js";
+import { handleHandoffCreate, handleHandoffAction, handleHandoffEdit, handleHandoffDelete } from "./views/handoffs.js";
 import { handleProposalAction } from "./views/proposals.js";
 import { handleCheckpointCreate, handleCheckpointDelete } from "./views/checkpoints.js";
 import { handleLogsLiveToggle, handleLogsExport } from "./views/logs.js";
@@ -203,7 +203,7 @@ export function wireViewHandlers(ctx: WireViewHandlersCtx): void {
   root.querySelector('[data-action="memory-create"]')?.addEventListener("click", () => {
     handleMemoryCreate(ctx);
   });
-  // write mode: handoff create/accept/cancel
+  // write mode: handoff create/accept/cancel/edit/delete
   root.querySelector('[data-action="handoff-create"]')?.addEventListener("click", () => {
     handleHandoffCreate(ctx);
   });
@@ -220,6 +220,26 @@ export function wireViewHandlers(ctx: WireViewHandlersCtx): void {
       if (!id) return;
       if (confirm("Cancel handoff " + id + "? This cannot be undone.")) {
         handleHandoffAction(ctx, id, "cancel");
+      }
+    });
+  });
+  // T12 (HPC-01): edit is not confirm-gated (design.md §D5) — only
+  // irreversible actions are, consistent with handoff-accept/cancel above.
+  root.querySelectorAll('[data-action="handoff-edit"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      if (!id) return;
+      handleHandoffEdit(ctx, id);
+    });
+  });
+  // T12: the confirm() lives here, at the wiring site, per this file's own
+  // docblock — never inside handleHandoffDelete.
+  root.querySelectorAll('[data-action="handoff-delete"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      if (!id) return;
+      if (confirm("Delete handoff " + id + "? This cannot be undone.")) {
+        handleHandoffDelete(ctx, id);
       }
     });
   });
