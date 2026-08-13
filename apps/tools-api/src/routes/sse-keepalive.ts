@@ -81,3 +81,86 @@ export function resolveHeartbeatMs(): number {
 export function resolveMaxDurationMs(): number {
   return Number(process.env.MASSA_AI_SSE_MAX_DURATION_MS) || SSE_MAX_DURATION_MS_DEFAULT;
 }
+
+// ── Per-request transport window override (spec SSE-07, design D6) ─────────
+//
+// `app.listen()`'s callback handle carries the native `Bun.Server` at
+// `handle.bun?.server`, and only THAT object exposes `timeout(request,
+// seconds)` — Bun's per-request idle override (spec E5). This is an
+// undocumented-by-Elysia traversal into an adapter internal, so it is
+// captured exactly ONCE, from `index.ts`'s listen callback via
+// `setSseRequestTimeoutSource`, and every SSE route reaches it only through
+// `applySseRequestTimeout` — never by re-deriving `handle.bun?.server` at
+// each call site (design D6 point 1).
+
+/** Structural, not `import("bun").Server` — deliberately loose so a handle
+ *  from a non-Bun runtime, a different adapter, or a test double that merely
+ *  lacks a `timeout` method degrades through the same `typeof … !== "function"`
+ *  branch below rather than needing its own type escape hatch. */
+export interface SseRequestTimeoutSource {
+  timeout?(request: Request, seconds: number): void;
+}
+
+let requestTimeoutSource: SseRequestTimeoutSource | undefined;
+
+/** How many times `applySseRequestTimeout` has actually called through to a
+ *  live `timeout()` method. Exists ONLY so a test can prove the override ran
+ *  on the request path (AC-07.4) — a survival assertion alone cannot tell
+ *  "the override worked" from "the override never applied and the heartbeat
+ *  carried the stream", which is the exact confusion that produced the first,
+ *  wrong draft of this spec (spec E4 vs E5). Production code never reads
+ *  this counter. */
+let applyCount = 0;
+
+/**
+ * Captures the native `Bun.Server` (or `undefined`) that SSE routes will
+ * apply their request-timeout override against. Called exactly once, from
+ * `index.ts`'s `app.listen()` callback, with `handle.bun?.server`.
+ *
+ * Passing `undefined` is a normal, expected value — not an error — for any
+ * non-Bun runtime, a future adapter change, or a test harness that never
+ * called `listen()` (AC-07.3); `applySseRequestTimeout` below degrades
+ * silently in that case.
+ */
+export function setSseRequestTimeoutSource(source: SseRequestTimeoutSource | undefined): void {
+  requestTimeoutSource = source;
+}
+
+/**
+ * Applies the SSE per-request idle-window override (`SSE_REQUEST_TIMEOUT_SECONDS`)
+ * to `request`. Called by each SSE route at stream start.
+ *
+ * MUST NEVER throw and MUST NEVER 500 the request (AC-07.3): both an absent
+ * source (no native handle captured — e.g. a route test that constructs the
+ * Elysia app directly and never calls `listen()`) and an absent/non-function
+ * `timeout` method are treated identically — a silent no-op. In that case the
+ * stream falls back to the un-widened `TRANSPORT_IDLE_WINDOW_MS`, which
+ * `SSE_HEARTBEAT_MS_DEFAULT` is deliberately sized to survive on its own
+ * (design D2).
+ */
+export function applySseRequestTimeout(request: Request): void {
+  const source = requestTimeoutSource;
+  if (!source || typeof source.timeout !== "function") return;
+  try {
+    source.timeout(request, SSE_REQUEST_TIMEOUT_SECONDS);
+    applyCount++;
+  } catch {
+    // Never throw, never 500 the request — AC-07.3. A native handle whose
+    // `timeout()` itself throws (unobserved in practice) is no worse than one
+    // that was never captured.
+  }
+}
+
+/** Test-only seam (AC-07.4): the count of successful `applySseRequestTimeout`
+ *  calls since the last reset. Production code never calls this. */
+export function __getSseRequestTimeoutApplyCountForTests(): number {
+  return applyCount;
+}
+
+/** Test-only seam: restores both the captured source and the apply counter to
+ *  their pre-`listen()` state, so one test's override doesn't leak into the
+ *  next. Production code never calls this. */
+export function __resetSseRequestTimeoutForTests(): void {
+  requestTimeoutSource = undefined;
+  applyCount = 0;
+}

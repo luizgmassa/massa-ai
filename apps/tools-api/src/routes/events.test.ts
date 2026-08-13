@@ -9,8 +9,14 @@
 process.env.MASSA_AI_SSE_HEARTBEAT_MS = "30";
 process.env.MASSA_AI_SSE_MAX_DURATION_MS = "90";
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { eventBus } from "@massa-ai/core";
+import {
+  SSE_REQUEST_TIMEOUT_SECONDS,
+  setSseRequestTimeoutSource,
+  __getSseRequestTimeoutApplyCountForTests,
+  __resetSseRequestTimeoutForTests,
+} from "./sse-keepalive.js";
 
 const { Elysia } = await import("elysia");
 const { eventsRoutes } = await import("./events.js");
@@ -79,5 +85,68 @@ describe("GET /api/v1/events cancel teardown", () => {
     );
     // If we reach here without hanging/throwing, the cancel hook ran cleanly.
     expect(true).toBe(true);
+  });
+});
+
+// ── GET /api/v1/events — per-request idle-window override (T2b, spec ───────
+// ── SSE-07, AC-07.1..AC-07.4) ────────────────────────────────────────────────
+
+describe("GET /api/v1/events — per-request idle-window override (SSE-07)", () => {
+  afterEach(() => {
+    __resetSseRequestTimeoutForTests();
+  });
+
+  test("AC-07.4: applies the override on the request path, observable via the apply counter", async () => {
+    __resetSseRequestTimeoutForTests();
+    const calls: Array<{ seconds: number }> = [];
+    setSseRequestTimeoutSource({
+      timeout: (_request: Request, seconds: number) => {
+        calls.push({ seconds });
+      },
+    });
+
+    expect(__getSseRequestTimeoutApplyCountForTests()).toBe(0);
+    const reader = await openStream("");
+
+    // A survival assertion alone cannot distinguish "the override ran" from
+    // "it never ran and the heartbeat carried the stream" (spec E4 vs E5) —
+    // the counter is what makes the distinction observable.
+    expect(__getSseRequestTimeoutApplyCountForTests()).toBe(1);
+    expect(calls).toEqual([{ seconds: SSE_REQUEST_TIMEOUT_SECONDS }]);
+    await reader.cancel().catch(() => {});
+  });
+
+  test("AC-07.3: no native handle registered — degrades silently, never throws, still serves the stream", async () => {
+    __resetSseRequestTimeoutForTests(); // leaves the source undefined
+    let threw = false;
+    let reader: Awaited<ReturnType<typeof openStream>> | undefined;
+    try {
+      reader = await openStream("");
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    expect(__getSseRequestTimeoutApplyCountForTests()).toBe(0);
+    await reader?.cancel().catch(() => {});
+  });
+
+  test("AC-07.3: a `timeout()` that itself throws is swallowed — never breaks the stream", async () => {
+    __resetSseRequestTimeoutForTests();
+    setSseRequestTimeoutSource({
+      timeout: () => {
+        throw new Error("simulated native handle failure");
+      },
+    });
+    let threw = false;
+    let reader: Awaited<ReturnType<typeof openStream>> | undefined;
+    try {
+      reader = await openStream("");
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    // The throw happens before the counter increment — never credited.
+    expect(__getSseRequestTimeoutApplyCountForTests()).toBe(0);
+    await reader?.cancel().catch(() => {});
   });
 });

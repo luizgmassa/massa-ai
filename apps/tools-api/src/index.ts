@@ -47,6 +47,7 @@ import { modelRegistryRoutes } from "./routes/model-registry.js";
 import { modelRegistryStreamRoutes } from "./routes/model-registry-stream.js";
 import { restartRoutes } from "./routes/restart.js";
 import { logsRoutes } from "./routes/logs.js";
+import { setSseRequestTimeoutSource, type SseRequestTimeoutSource } from "./routes/sse-keepalive.js";
 import { setServerStopper, setJobsStopper, gracefulShutdown } from "./lifecycle.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error.js";
@@ -191,6 +192,17 @@ await listenAfterParserValidation({
         // disconnect) yields the ticks that complete it. Do not "fix" this to
         // await a value stop() does not provide.
         setServerStopper(() => void (server as unknown as { stop: () => unknown }).stop());
+
+        // SSE-07 / design D6: capture the native Bun.Server from this same
+        // listen-callback handle, once, so every SSE route can widen its own
+        // per-request idle window past the 10s transport default (spec E4)
+        // through `applySseRequestTimeout` instead of re-deriving this same
+        // undocumented-by-Elysia `handle.bun?.server` traversal at each call
+        // site. `bun` is absent under a non-Bun runtime or a future adapter
+        // change — `setSseRequestTimeoutSource(undefined)` is the expected,
+        // silently-degrading case (AC-07.3), not an error.
+        const bunServer = (server as unknown as { bun?: { server?: SseRequestTimeoutSource } }).bun?.server;
+        setSseRequestTimeoutSource(bunServer);
       });
     } catch (error) {
       if ((error as NodeJS.ErrnoException)?.code === "EADDRINUSE") {

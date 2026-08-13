@@ -11,14 +11,14 @@
 
 import { Elysia } from "elysia";
 import { eventBus } from "@massa-ai/core";
-import { resolveHeartbeatMs, resolveMaxDurationMs } from "./sse-keepalive.js";
+import { resolveHeartbeatMs, resolveMaxDurationMs, applySseRequestTimeout } from "./sse-keepalive.js";
 
 // Heartbeat interval + max-duration default come from `sse-keepalive.ts`
 // (spec SSE-01, design D1) — this file no longer declares its own literal.
 
 export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
   "/events",
-  async ({ query, set }) => {
+  async ({ query, set, request }) => {
     // Read per-request so an env override (e.g. MASSA_AI_SSE_HEARTBEAT_MS) is
     // honored even when this module was first imported under the default.
     const HEARTBEAT_MS = resolveHeartbeatMs();
@@ -44,6 +44,12 @@ export const eventsRoutes = new Elysia({ prefix: "/api/v1" }).get(
 
     const stream = new ReadableStream({
       start(controller) {
+        // SSE-07 / design D6: widen this request's own transport idle window
+        // past the 10s default. No-ops silently when the native handle was
+        // never captured (AC-07.3) — the heartbeat above is what covers that
+        // case.
+        applySseRequestTimeout(request);
+
         const enqueue = (data: unknown) => {
           if (closed) return;
           try {

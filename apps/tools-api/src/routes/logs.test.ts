@@ -78,6 +78,12 @@ mock.module("@massa-ai/shared", () => ({
 
 import { logsRoutes, __setLogsReaderForTests, realReadTail, type LogsFileReader } from "./logs.js";
 import { logBuffer, type LogEntry } from "@massa-ai/shared";
+import {
+  SSE_REQUEST_TIMEOUT_SECONDS,
+  setSseRequestTimeoutSource,
+  __getSseRequestTimeoutApplyCountForTests,
+  __resetSseRequestTimeoutForTests,
+} from "./sse-keepalive.js";
 
 const app = new Elysia().use(logsRoutes);
 
@@ -953,4 +959,86 @@ describe("GET /api/v1/logs/export — real HTTP Content-Type + Content-Dispositi
     }
     expect(text).toContain("exported line");
   }, 15_000);
+});
+
+// ── GET /api/v1/logs/stream — per-request idle-window override (T2b, spec ──
+// ── SSE-07, AC-07.1..AC-07.4) ────────────────────────────────────────────────
+
+describe("GET /api/v1/logs/stream — per-request idle-window override (SSE-07)", () => {
+  afterEach(() => {
+    __resetSseRequestTimeoutForTests();
+  });
+
+  test("AC-07.4: applies the override on the request path, observable via the apply counter", async () => {
+    __resetSseRequestTimeoutForTests();
+    const calls: Array<{ seconds: number }> = [];
+    setSseRequestTimeoutSource({
+      timeout: (_request: Request, seconds: number) => {
+        calls.push({ seconds });
+      },
+    });
+
+    expect(__getSseRequestTimeoutApplyCountForTests()).toBe(0);
+    const res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    const reader = res.body!.getReader();
+
+    // A survival assertion alone cannot distinguish "the override ran" from
+    // "it never ran and the heartbeat carried the stream" (spec E4 vs E5) —
+    // the counter is what makes the distinction observable.
+    expect(__getSseRequestTimeoutApplyCountForTests()).toBe(1);
+    expect(calls).toEqual([{ seconds: SSE_REQUEST_TIMEOUT_SECONDS }]);
+    await reader.cancel().catch(() => {});
+  });
+
+  test("AC-07.3: no native handle registered — degrades silently, never throws, still serves the stream", async () => {
+    __resetSseRequestTimeoutForTests(); // leaves the source undefined
+    let threw = false;
+    let res: Response | undefined;
+    try {
+      res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    expect(res?.status).toBe(200);
+    expect(__getSseRequestTimeoutApplyCountForTests()).toBe(0);
+    await res?.body?.getReader().cancel().catch(() => {});
+  });
+
+  test("AC-07.3: a handle whose `timeout` method is absent degrades silently too", async () => {
+    __resetSseRequestTimeoutForTests();
+    setSseRequestTimeoutSource({}); // present source, no `timeout` function
+    let threw = false;
+    let res: Response | undefined;
+    try {
+      res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    expect(res?.status).toBe(200);
+    expect(__getSseRequestTimeoutApplyCountForTests()).toBe(0);
+    await res?.body?.getReader().cancel().catch(() => {});
+  });
+
+  test("AC-07.3: a `timeout()` that itself throws is swallowed — never 500s the request", async () => {
+    __resetSseRequestTimeoutForTests();
+    setSseRequestTimeoutSource({
+      timeout: () => {
+        throw new Error("simulated native handle failure");
+      },
+    });
+    let threw = false;
+    let res: Response | undefined;
+    try {
+      res = await app.handle(new Request("http://localhost/api/v1/logs/stream"));
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    expect(res?.status).toBe(200);
+    // The throw happens before the counter increment — never credited.
+    expect(__getSseRequestTimeoutApplyCountForTests()).toBe(0);
+    await res?.body?.getReader().cancel().catch(() => {});
+  });
 });

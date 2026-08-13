@@ -25,7 +25,7 @@
 import { Elysia } from "elysia";
 import fs from "node:fs";
 import { config, logBuffer, sinkFiles, type LogEntry } from "@massa-ai/shared";
-import { resolveHeartbeatMs, resolveMaxDurationMs } from "./sse-keepalive.js";
+import { resolveHeartbeatMs, resolveMaxDurationMs, applySseRequestTimeout } from "./sse-keepalive.js";
 
 const LOGS_DETAIL = { tags: ["logs"] };
 
@@ -511,7 +511,7 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
   )
   .get(
     "/stream",
-    () => {
+    ({ request }) => {
       // Read per-request, mirroring events.ts, so an env override is honored
       // even when this module was first imported under the default.
       const HEARTBEAT_MS = resolveHeartbeatMs();
@@ -527,6 +527,12 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
 
       const stream = new ReadableStream({
         start(controller) {
+          // SSE-07 / design D6: widen this request's own transport idle
+          // window past the 10s default. No-ops silently when the native
+          // handle was never captured (AC-07.3) — the heartbeat above is
+          // what covers that case.
+          applySseRequestTimeout(request);
+
           const enqueue = (data: unknown) => {
             if (closed) return;
             try {
