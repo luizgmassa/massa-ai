@@ -1,6 +1,65 @@
 # massa-ai Spec State
 
-## Current — Sub-agent tool inheritance (**VALIDATED 2026-08-11** — 12 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
+## Current — SSE heartbeat vs transport idle timeout (**VALIDATED 2026-08-13** — 13 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR authorized in-session but not yet taken)
+
+- projectId `massa-ai` · workflowSessionId `spec-sse-heartbeat-idle-timeout` · workflow
+  **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch
+  `fix/sse-heartbeat-idle-timeout` from `origin/main` @ `89909051`, worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-sse-heartbeat`.
+- Artifacts: `.specs/features/sse-heartbeat-idle-timeout/{spec,design,tasks,validation}.md`.
+- **Defect:** every SSE stream was killed by the transport ~10 s after its last byte. The
+  keep-alive heartbeat that exists to prevent exactly that was scheduled 15 s apart —
+  longer than the window it must stay inside — so it could never fire on an idle stream.
+  Reported as the Admin Portal Logs tab's Live toggle "stopping after some seconds";
+  `GET /api/v1/events` had the identical defect and hid it, because `EventSource`
+  reconnects automatically, presenting as a silent ~12 s reconnect cycle rather than a stop.
+  `logs.ts:347` and `events.ts:15` each declared their own `15_000` literal — two copies,
+  one defect.
+- **Fix:** one shared constant module (`routes/sse-keepalive.ts`) owns the heartbeat
+  (5 000 ms), the documented idle window, the max duration, and the per-request window
+  value; both routes read it. Each SSE request additionally widens its own transport window
+  via Bun's per-request `server.timeout(request, seconds)`, reached through one named
+  accessor in `index.ts` and degrading silently where the native handle is absent. The
+  enqueue-throw path now closes the stream and unsubscribes instead of leaving a flag set
+  with the socket open and the sink tail polling into a dead controller. Client-side, a
+  transient network drop is retried under the existing bounds instead of permanently
+  disabling the live tail; a non-200 stays terminal.
+- **The Plan Challenge Gate changed the fix, and that is the durable lesson.** The first
+  spec asserted the idle window "is not configurable", on five measured-inert placements.
+  All five were **listen-time** configuration; Bun also exposes a **per-request** override
+  that was never tried. Re-measured against the real route modules: a 60 s override moved
+  the drop to exactly 60.0 s. The gate's own proposed pivot — delete the heartbeat, keep
+  only the override — was then measured wrong too, because the window is finite and that
+  merely relocates the drop. With a 120 s window and the shipped 15 s heartbeat, both
+  endpoints held 180 s fully idle (12 and 11 heartbeats). Both sides move; the fix needs
+  both. **An exhaustive-looking negative result is only exhaustive over the API surface it
+  searched, and a critic falsifying a premise does not make its replacement right.**
+- **Independent verification PASS** (`massa-ai-verification-agent`, author ≠ verifier),
+  re-deriving every figure: 21/22 ACs covered, 6/6 mutations killed. Its one gap —
+  AC-07.1's `index.ts` wiring covered by code inspection only — was reproduced as a
+  **surviving mutant** (deleting the wiring left all four tools-api suites green) and then
+  closed by a source-level sensor in `8acd988f`, itself mutation-proved twice. Revised:
+  **22/22 ACs, 8/8 mutations killed**, honest denominator 8.
+- Gates 2026-08-13: `lint` 0 · `type-check` 6/6 · `bun test apps/web-ui` **727/0** ·
+  tools-api one file per invocation — `logs` 51/0 · `events` 8/0 · `sse-keepalive` 14/0 ·
+  `sse-keepalive-contract` 3/0 · `sse-idle-survival` 2/0 (~65 s, two real 30 s idle HTTP holds).
+- **Three traps found and written down.** (1) `bun test fileA fileB` for tools-api shares a
+  process: `logs`+`events` together report 49/1 while apart they are 51/0 and 8/0, because
+  `events.test.ts` publishes on the shared `eventBus` and drives `WorkspaceManager` logging
+  into the global `logBuffer` that `logs.test.ts` asserts is empty. Pre-existing, reproduces
+  on clean `main`, invisible to `bun run test` because the runner forks it. `--filter` is
+  core-only and rejected by the tools-api wrapper. (2) A fresh worktree needs `bun run
+  build`, not just `bun install`, or every tools-api suite fails with `Cannot find module
+  '@massa-ai/core'`. (3) Comments are source to a text scanner — a wiring sensor's first
+  draft failed against correct code because `index.ts`'s docblock names the literal
+  `setSseRequestTimeoutSource(undefined)` while explaining the degrading case.
+- Two sibling features are specified but not started, deliberately sequenced rather than
+  branched in parallel: three concurrent PRs would each touch `CHANGELOG.md`, and in this
+  repo conflicting PRs silently stop running CI while each merge re-cuts a release. See
+  `.specs/HANDOFF.md` for both, including the config-propagation feature's blocking
+  decision.
+
+## Previous — Sub-agent tool inheritance (**VALIDATED 2026-08-11** — 12 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
 
 - projectId `massa-ai` · workflowSessionId `spec-subagent-tool-inheritance` · workflow
   **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch

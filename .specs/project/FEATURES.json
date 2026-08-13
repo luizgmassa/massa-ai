@@ -1356,7 +1356,28 @@
       "tasks": ".specs/features/web-ui-typescript/tasks.md",
       "validation": ".specs/features/web-ui-typescript/validation.md",
       "notes": "Execute complete 2026-08-12: 14 phases, 40 tasks (T1-T40), 62 commits from origin/main @ 6227b4ac. 22 of 22 modules converted (the config-sections split at T23/T24 moved the denominator from 21 to 22), 0 .js left under src/static, served from dist/static (T5/T6). Config tab section schema coupled to @massa-ai/shared's MassaAiConfig (T24). Two mid-execution remediation waves: T37-T39 (registry type consolidation, write-gating scanner re-arm, restoring a dropped doc context member) and T40 (a dashboard.test.ts type regression that kept type-check red from T26 through T33, invisible for six phases because only 9 of 40 tasks ran it). Close-out (T34-T36): security-allowlist population measured 1 -> 23 tracked .ts files with zero hits across all four classes; stale no-build-step claims corrected in Dockerfile/ci.yml/index.ts/CLAUDE.md; CHANGELOG [Unreleased] entry added (CI merge gate requires it); STATE.md gained AD-021. render-golden.json sha256 unchanged (27195c2e...). Final gates: build 0, type-check 0 (forced), lint 0, web-ui 703/0. Independent massa-ai-verification-agent pass run after T36 (author != verifier): 5 of 7 load-bearing claims CONFIRMED outright, requirement-coverage returned PARTIAL on two stale status fields (spec.md traceability table still reading Pending/0-mapped, and tasks.md line 12 still reading In Progress) -- both fixed, and the verifier newly found that the MassaAiConfig coupling sensor gives a FALSE GREEN under a bare tsc --noEmit inside apps/web-ui, because turbo type-check dependsOn ^build rebuilds shared dist/*.d.ts and a direct tsc does not. Shipped gate is sound (CI uses the turbo form). Report at validation.md. Push/PR = user decision, not taken unattended."
+    },
+    {
+      "id": "sse-heartbeat-idle-timeout",
+      "slug": "sse-heartbeat-idle-timeout",
+      "title": "SSE heartbeat vs transport idle timeout — every idle SSE stream died ~10s after its last byte because the 15s keep-alive could never fire inside Bun's 10s window",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "fix/sse-heartbeat-idle-timeout",
+      "created": "2026-08-12",
+      "depends_on": [],
+      "spec": ".specs/features/sse-heartbeat-idle-timeout/spec.md",
+      "design": ".specs/features/sse-heartbeat-idle-timeout/design.md",
+      "tasks": ".specs/features/sse-heartbeat-idle-timeout/tasks.md",
+      "validation": ".specs/features/sse-heartbeat-idle-timeout/validation.md",
+      "notes": "Execute complete 2026-08-13: 4 Phases, 9 tasks, 13 commits from origin/main @ 89909051, 4 sequential batch workers. Root cause measured, not inferred: the SSE keep-alive heartbeat (15s, declared twice as independent literals in logs.ts:347 and events.ts:15) is longer than Bun.serve's 10s transport idle window, so it can never fire on an idle stream. Reproduced at the HTTP layer: 8 frames then SILENT 9.0s then socket drop at 13.6s with hb=0. Both SSE endpoints affected; /api/v1/events hid it because EventSource auto-reconnects. The Plan Challenge Gate (evidence-audit) falsified the spec's central premise: 'the idle window is not configurable' rested on five LISTEN-TIME placements, while Bun exposes a PER-REQUEST server.timeout(request, seconds) at listenHandle.bun.server that was never tried -- re-measured against the real routes, a 60s override moved the drop to exactly 60.0s. The gate's own pivot (drop the heartbeat) was then measured wrong too: the window is finite, so it relocates the drop. 120s window + the shipped 15s heartbeat held both endpoints 180s idle (12 and 11 heartbeats). Shipped fix uses both sides. Also fixed: the enqueue-throw path left the stream open with the sink tail polling into a dead controller for the life of the process; and the web-ui live tail treated a transient network drop as terminal. Independent verification PASS (author != verifier), 21/22 ACs, 6/6 mutations killed; its one gap (AC-07.1 index.ts wiring, code-inspection-only) was reproduced as a SURVIVING mutant and closed by a mutation-proved source-level sensor -- revised to 22/22 ACs and 8/8 mutations, honest denominator 8. Gates: lint 0, type-check 6/6, web-ui 727/0, tools-api 51+8+14+3+2 run one file per invocation. Push/PR authorized in-session; merge is a separate decision and in this repo it is a release decision."
     }
   ],
-  "active_feature": "web-ui-typescript"
+  "active_feature": "sse-heartbeat-idle-timeout"
 }

@@ -1,4 +1,95 @@
-# Handoff — web-ui-typescript (EXECUTE COMPLETE 2026-08-12 — 62 commits across 14 phases, sequential batch workers; every gate green; unpushed, push/PR is the user's call)
+# Handoff — sse-heartbeat-idle-timeout (EXECUTE COMPLETE 2026-08-13 — 13 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR authorized but not yet taken)
+
+Session `spec-sse-heartbeat-idle-timeout` · workflow **spec-driven** (Large) ·
+persona pin `context-skill-harness-engineer-architect` · branch
+`fix/sse-heartbeat-idle-timeout` from `origin/main` @ `89909051`, worktree
+`/Users/luizmassa/Projects/massa-ai-wt-sse-heartbeat`. Contract:
+`.specs/features/sse-heartbeat-idle-timeout/{spec,design,tasks,validation}.md`.
+
+## Objective
+
+Every SSE stream this API serves was killed by the transport ~10 s after its
+last byte, because the keep-alive heartbeat meant to prevent that was scheduled
+15 s apart — longer than the window it had to stay inside, so it could never
+fire on an idle stream. Reported as the Admin Portal Logs tab's Live toggle
+"stopping after some seconds".
+
+## State
+
+All 4 Phases complete (T1, T2, T2b, T3, T4, T5, T6, T7, T8). Independent
+verification PASS. 22/22 acceptance criteria carry an automated sensor; 8/8
+mutations killed across the verifier's pass and the author's gap closure.
+
+## The correction that shaped the fix
+
+The first spec asserted the transport idle window "is not configurable", on
+five measured-inert placements. The Plan Challenge Gate (evidence-audit mode)
+falsified that: all five were **listen-time** configuration, and Bun also
+exposes a **per-request** override, `server.timeout(request, seconds)`, at
+`listenHandle.bun.server`. Re-measured against the real route modules, a 60 s
+override moved the drop to exactly 60.0 s.
+
+The gate's own proposed pivot — delete the heartbeat, keep only the override —
+was then measured wrong too: the window is finite, so that relocates the drop
+rather than removing it. With a 120 s window and the shipped 15 s heartbeat,
+both endpoints held 180 s fully idle (12 and 11 heartbeats). Both sides of the
+inequality move, and the shipped fix uses both: the override removes the
+invisible default, the heartbeat is what makes a stream survive indefinitely
+inside whatever window is set.
+
+## Gates (measured 2026-08-13, this worktree)
+
+- `bun run lint` (oxlint, repo root) — 0 errors
+- `bun run type-check` — 6/6
+- `bun test apps/web-ui` — 727 pass / 0 fail
+- tools-api, **one file per invocation**: `logs` 51/0 · `events` 8/0 ·
+  `sse-keepalive` 14/0 · `sse-keepalive-contract` 3/0 · `sse-idle-survival`
+  2/0 (~65 s wall, two real 30 s idle HTTP holds)
+
+## Traps recorded for the next session
+
+- **One file per `bun test` for tools-api.** `bun test logs.test.ts
+  events.test.ts` reports 49/1 while the same files apart report 51/0 and 8/0:
+  `events.test.ts` publishes on the shared `eventBus`, driving
+  `WorkspaceManager` logging into the global `logBuffer` that `logs.test.ts`
+  then asserts is empty. Pre-existing, reproduces on clean `main`, and
+  invisible to `bun run test` because the runner forks `events.test.ts`.
+  `--filter` is core-only and rejected by the tools-api wrapper.
+- **A fresh worktree needs `bun run build`**, not just `bun install`, or every
+  tools-api suite fails identically with `Cannot find module '@massa-ai/core'`.
+- **Comments are source to a text scanner.** A wiring sensor's first draft
+  failed against correct code because `index.ts`'s docblock names the literal
+  `setSseRequestTimeoutSource(undefined)` while explaining the degrading case.
+
+## Next step
+
+Push and open the PR (authorized in-session, not yet taken). Merge is a
+separate decision, and in this repo it is a **release** decision — merging to
+`main` auto-cuts a release and will re-conflict `CHANGELOG.md` for the two
+queued sibling features.
+
+## Queued behind this feature (specified, not started)
+
+1. **Config propagation** — Save & Apply writes agent files to
+   `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents/` (17 files, no
+   `designer`) while the `massa-ai` marketplace is registered as a **directory
+   source** at `/Users/luizmassa/Projects/massa-ai`, so Claude reads from
+   `apps/claude-plugin/agents/` (18 files). Two trees, one button. Separately,
+   the regenerate route spawns only `generate-subagent-artifacts.ts`, never
+   `generate-skill-artifacts.ts`, so skills are never regenerated or
+   reinstalled at all. Per-host sweep for Codex/Cursor/OpenCode still unrun;
+   `installRoute` already differs per host. **Blocked on a user decision:**
+   write into the repo checkout (correct for a directory source, but a portal
+   button then edits generated files in the working tree) or target the
+   versioned cache and reconcile the install route.
+2. **Admin Portal CRUD for handoffs and proposals** — handoffs have
+   create/accept/cancel, proposals only approve/reject; no PATCH, PUT or DELETE
+   exists on either route. Agreed shape is full CRUD with hard delete, plus
+   manual proposal creation.
+
+---
+
+## Previous handoff — web-ui-typescript (EXECUTE COMPLETE 2026-08-12 — 62 commits across 14 phases, sequential batch workers; every gate green; unpushed, push/PR is the user's call)
 
 Session `spec-web-ui-typescript` · workflow **spec-driven** (Large/Complex) · branch
 `spec/web-ui-typescript` from `origin/main` @ `6227b4ac`, worktree
