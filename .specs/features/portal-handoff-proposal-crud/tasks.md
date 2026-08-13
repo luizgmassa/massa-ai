@@ -72,9 +72,12 @@ phases slip, the write gate still ships on its own.
   population if they stop holding.
 - Gate: `cd apps/tools-api && bun test src/middleware/write-mode-population.test.ts`
 - Done when: the population is **printed beside the verdict** and asserted as a
-  floor (`>= 81` routes, `>= 50` non-`GET`) rather than pinned to today's exact
+  floor (`>= 86` routes, `>= 54` non-`GET`) rather than pinned to today's exact
   figures — T7/T8 add 5 non-`GET` routes later in this same branch, and an
-  equality assertion would redden on our own work. Adding a fake unclassified
+  equality assertion would redden on our own work. The floor must be the
+  *measured* population, not the first estimate: it was initially set at 81/50
+  from a newline-anchored regex that missed 5 real routes, and a floor set below
+  reality would let those 5 disappear again without a failure. Adding a fake unclassified
   non-`GET` route to a route file turns it red. A test asserting over an
   accidentally-empty set passes vacuously, which is why the count is printed.
 

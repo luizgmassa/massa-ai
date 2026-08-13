@@ -36,9 +36,8 @@ produced each is recorded in `validation.md`.
 
 | Fact | Value | Source |
 | --- | --- | --- |
-| Routes in `apps/tools-api/src/routes/` | 81 | source enumeration |
-| By verb | POST 44, GET 31, DELETE 3, PATCH 1, PUT 2 | same |
-| Non-`GET` routes | 50 | same |
+| Routes in `apps/tools-api/src/routes/` | **86** | source enumeration |
+| `GET` / non-`GET` | **32 / 54** | same |
 | Route files | 28 | same |
 | Route files calling `recordOperation` | **1** (`project.ts`) | source enumeration |
 | FK constraints touching `handoffs`/`proposals` | **0**, both directions | live `pg_constraint` + all 23 migrations |
@@ -47,6 +46,27 @@ produced each is recorded in `validation.md`.
 | `handoffs` by project | `p` 30, `massa-ai` 2 | live database |
 | memories soft-referencing a handoff | 3 of 2 481 | live database |
 | memories soft-referencing a proposal | 0 | live database |
+
+**The route figures above are a correction.** The first enumeration reported
+81 routes / 50 non-`GET`, and that number reached this spec, a commit message
+and the Phase 1 task floors before it was caught. Its regex was newline-anchored
+(`\n\s*\.`), so it silently missed every route chained onto its own
+`new Elysia({ prefix })` call on the same line — five of them:
+`POST /api/v1/analytics/`, `POST /api/v1/bootstrap/`, `POST /api/v1/file/read`,
+`POST /api/v1/web/fetch_and_index`, and `GET /api/v1/events`.
+
+That miss is the strongest available argument for D1's default-deny, and it was
+not a hypothetical when it was made: four of the five are non-`GET`, one of them
+fetches and indexes remote content, and **all four were protected anyway**,
+because default-deny refuses what nobody classified. A denylist of "destructive
+routes" — the design first reached for — can only ever contain what its author's
+enumeration found, so those four would have shipped silently unguarded. The
+enumeration error was absorbed rather than exploited.
+
+Two consequences are recorded rather than assumed: the Phase 1 floors must be
+raised from the wrong baseline to the measured one, and two of the newly-visible
+non-`GET` routes (`POST /api/v1/analytics/`, `POST /api/v1/file/read`) are
+semantic **reads** now over-blocked under read-only mode — see AC-03.3c.
 
 Two independent measurements agree that a hard `DELETE` on either table
 destroys exactly one row: there is no `FOREIGN KEY` in either direction, so no
@@ -172,6 +192,19 @@ audit-trail metadata inside `memories` (`metadata.handoffId`, tag
   working under read-only mode without retaining its write path. Dropping the
   route from the allowlist instead was rejected: it would 403 project search
   entirely, and a read-only instance still needs to search.
+- **AC-03.3c** `POST /api/v1/analytics/` and `POST /api/v1/file/read` are
+  **deliberately left unclassified**, and therefore refused under read-only mode,
+  pending a full trace. Both became visible only when the enumeration error above
+  was corrected, and both look like reads: `get_analytics.ts:70-111` calls only
+  getters (`getSummary`, `getProjectStats`, `getQueryStats`,
+  `getCachePerformance`, `getRecentSearches`), and `read_file.ts:106` delegates
+  to `ReadFileService.read` — but this repo documents a read-file cache, and that
+  path has not been traced to a verdict. Over-blocking a read fails safe;
+  allowlisting a write does not, which is the entire lesson of `/search/project`.
+  Closing this requires the same standard as the other ten: a trace to source,
+  a justification carrying `file:line`, and a behavioural no-write test. Until
+  then read-only mode costs the portal its analytics and file-view panels, and
+  that is the correct trade at this stage.
 - **AC-03.3b** Every one of the ten entries has a test asserting the route
   performs no write with read-only mode active — including whatever body flags
   its schema exposes. Path-and-verb classification cannot see a body flag that

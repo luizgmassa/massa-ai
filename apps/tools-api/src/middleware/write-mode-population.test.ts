@@ -128,13 +128,36 @@ const unclassifiedNonGet = nonGetRoutes.filter((r) => !findReadOnlyRoute(r.metho
 // IS covered, by default-deny.
 const ungatedUnclassified = unclassifiedNonGet.filter((r) => isPublicPath(r.path));
 
+/**
+ * The MEASURED population when Phase 1 landed — 86 routes, 54 of them non-GET.
+ *
+ * Declared once and used by BOTH the printed line and the assertion below. They
+ * were briefly two separate literals, and that is the same defect in miniature
+ * that produced these numbers: the assertion was corrected to 86/54 while the
+ * printed line still read "(floor 81)", so the output contradicted the rule it
+ * claimed to report.
+ *
+ * The first figures written here were 81/50, from a newline-anchored regex
+ * (`\n\s*\.`) that silently missed every route chained onto its own
+ * `new Elysia({ prefix })` call on the same line — five of them:
+ * POST /api/v1/analytics/, POST /api/v1/bootstrap/, POST /api/v1/file/read,
+ * POST /api/v1/web/fetch_and_index, GET /api/v1/events.
+ *
+ * A floor set below the real population is not a weak guard; it is a hole
+ * exactly the size of the error — those five could vanish again with this test
+ * still green. Raise these when the population legitimately grows. Never lower
+ * them to make a failure go away.
+ */
+const TOTAL_ROUTE_FLOOR = 86;
+const NON_GET_ROUTE_FLOOR = 54;
+
 // Printed unconditionally — this is what stops the floor check below from
 // passing vacuously over an accidentally-emptied population, and what
 // satisfies "print any unclassified path by name" as a standing fact, not
 // only on failure.
 console.log(
-  `[write-mode-population] files=${files.length} total=${allRoutes.length} (floor 81) ` +
-    `GET=${getRoutes.length} non-GET=${nonGetRoutes.length} (floor 50) ` +
+  `[write-mode-population] files=${files.length} total=${allRoutes.length} (floor ${TOTAL_ROUTE_FLOOR}) ` +
+    `GET=${getRoutes.length} non-GET=${nonGetRoutes.length} (floor ${NON_GET_ROUTE_FLOOR}) ` +
     `classified=${classifiedNonGet.length} (of ${READ_ONLY_ROUTES.length} table entries) ` +
     `gate-refused=${unclassifiedNonGet.length}`,
 );
@@ -170,8 +193,8 @@ describe("write-mode population — enumeration assumptions hold (AC-03.10)", ()
 
 describe("write-mode population — cardinality floor (AC-03.4)", () => {
   test("total and non-GET route counts meet the floor, printed rather than pinned", () => {
-    expect(allRoutes.length).toBeGreaterThanOrEqual(81);
-    expect(nonGetRoutes.length).toBeGreaterThanOrEqual(50);
+    expect(allRoutes.length).toBeGreaterThanOrEqual(TOTAL_ROUTE_FLOOR);
+    expect(nonGetRoutes.length).toBeGreaterThanOrEqual(NON_GET_ROUTE_FLOOR);
   });
 
   test("every T1 classification entry corresponds to a real scanned route", () => {
