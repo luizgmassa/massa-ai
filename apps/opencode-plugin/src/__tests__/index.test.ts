@@ -3,7 +3,7 @@
  *
  * Hooks-only (AD-017): the plugin registers zero in-process tools — the MCP
  * server registered by scripts/install-agents.sh is the one canonical tool
- * surface (54 tools). This suite asserts the hooks-only contract (zero
+ * surface (59 tools). This suite asserts the hooks-only contract (zero
  * `tool` map entries) and exercises every lifecycle hook, the event
  * handler, and the HTTP helpers — with mocked fetch + mocked config so no
  * real API or filesystem config is needed.
