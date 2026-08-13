@@ -29,6 +29,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retried under the existing reconnect bounds instead of permanently turning
   Live off and bannering an error; a non-200 response still stays terminal,
   and exhausting the bounds still turns Live off with a banner.
+- **Model-profile changes applied from the Admin Portal never reached the Claude
+  CLI on a directory-source marketplace.** `resolveClaudeMarketplaceRoot`
+  returned `installed_plugins.json`'s `installPath` unconditionally — a
+  version-pinned cache snapshot. That is right for a remote-source marketplace
+  and wrong for a directory-source one, where Claude loads the plugin live from
+  the source directory. Every profile switch and every Save & Apply wrote agent
+  files into a tree nothing would ever read, so pressing Save & Apply and
+  restarting the CLI produced no observable change, indefinitely. Resolution now
+  reads `known_marketplaces.json`, and for a directory source composes the live
+  root from that directory's own `.claude-plugin/marketplace.json`. A composed
+  path that escapes `installLocation` is rejected.
+- **Save & Apply never regenerated or reinstalled skills.** The regenerate
+  stream spawned only `generate-subagent-artifacts.ts`, while the repository's
+  own `generate:artifacts` entrypoint is both generators — so a skill edit could
+  not reach any host through the portal at all. The stream now derives its
+  generator list from that script and runs every generator it names, reporting
+  per-host skill reach and naming the failing generator on a non-zero exit.
+
+### Changed
+
+- Codex marketplace-route profile switching is no longer refused. Its stated
+  reason — that an in-place bundle rewrite "would dirty a checkout" — was true
+  when plugin bundles were checked in and false since AD-016 made them
+  gitignored generated output. A **runtime** tracked-path guard replaces it, so
+  the removal is scoped by what is true of the user's actual checkout rather
+  than by what was true of one machine: a fork or a checkout predating AD-016
+  is still refused, loudly, naming the offending path.
 
 ## [1.52.0] - 2026-08-13
 

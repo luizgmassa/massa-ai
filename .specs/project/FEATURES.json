@@ -1377,7 +1377,28 @@
       "tasks": ".specs/features/sse-heartbeat-idle-timeout/tasks.md",
       "validation": ".specs/features/sse-heartbeat-idle-timeout/validation.md",
       "notes": "Execute complete 2026-08-13: 4 Phases, 9 tasks, 13 commits from origin/main @ 89909051, 4 sequential batch workers. Root cause measured, not inferred: the SSE keep-alive heartbeat (15s, declared twice as independent literals in logs.ts:347 and events.ts:15) is longer than Bun.serve's 10s transport idle window, so it can never fire on an idle stream. Reproduced at the HTTP layer: 8 frames then SILENT 9.0s then socket drop at 13.6s with hb=0. Both SSE endpoints affected; /api/v1/events hid it because EventSource auto-reconnects. The Plan Challenge Gate (evidence-audit) falsified the spec's central premise: 'the idle window is not configurable' rested on five LISTEN-TIME placements, while Bun exposes a PER-REQUEST server.timeout(request, seconds) at listenHandle.bun.server that was never tried -- re-measured against the real routes, a 60s override moved the drop to exactly 60.0s. The gate's own pivot (drop the heartbeat) was then measured wrong too: the window is finite, so it relocates the drop. 120s window + the shipped 15s heartbeat held both endpoints 180s idle (12 and 11 heartbeats). Shipped fix uses both sides. Also fixed: the enqueue-throw path left the stream open with the sink tail polling into a dead controller for the life of the process; and the web-ui live tail treated a transient network drop as terminal. Independent verification PASS (author != verifier), 21/22 ACs, 6/6 mutations killed; its one gap (AC-07.1 index.ts wiring, code-inspection-only) was reproduced as a SURVIVING mutant and closed by a mutation-proved source-level sensor -- revised to 22/22 ACs and 8/8 mutations, honest denominator 8. Gates: lint 0, type-check 6/6, web-ui 727/0, tools-api 51+8+14+3+2 run one file per invocation. Push/PR authorized in-session; merge is a separate decision and in this repo it is a release decision."
+    },
+    {
+      "id": "marketplace-directory-source-switching",
+      "slug": "marketplace-directory-source-switching",
+      "title": "Marketplace directory-source profile switching — the switch engine wrote to a version-pinned cache the host never loads, and Save & Apply ran one generator of two",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "fix/marketplace-directory-source-switching",
+      "created": "2026-08-13",
+      "depends_on": [],
+      "spec": ".specs/features/marketplace-directory-source-switching/spec.md",
+      "design": ".specs/features/marketplace-directory-source-switching/design.md",
+      "tasks": ".specs/features/marketplace-directory-source-switching/tasks.md",
+      "validation": ".specs/features/marketplace-directory-source-switching/validation.md",
+      "notes": "Execute complete 2026-08-13: 3 Phases, 7 tasks, 11 commits from origin/main @ 89909051. Defect A: resolveClaudeMarketplaceRoot returned the version-pinned cache installPath even for a DIRECTORY-source marketplace, where Claude loads live from the source dir -- proven by the plugin cache pinning gitCommitSha f8427283 (the designer feature's base commit) and holding 17 agents while the session advertised 18 including designer, and corroborated by the plan-critic subagent matching its own live frontmatter to the source file's disallowedTools line rather than the cache's tools allowlist. Defect B: the regenerate stream spawned only generate-subagent-artifacts.ts. Pre-mortem gate returned 4 findings, 2 critical, all accepted: AC-01.2 reframed from a correctness claim to an explicitly unmeasured risk (MDS-05); AC-03.5/03.6 added because the anti-regression sensor shared a parser with production and could have certified the regression; AC-02.4 added a runtime tracked-path guard behind the retired codex refusal; AC-01.6 added path containment. AC-01.3 was then AMENDED mid-implementation: it made an absent known_marketplaces.json refuse, which broke the pre-existing cache path for any install with no marketplace registry -- caught by variant-sync.test.ts T18 measuring main 12/0 vs branch 11/1. A Phase 1 worker had reported that as an out-of-scope stale fixture; it was a correct sensor catching a regression from the requirement. Independent verification returned NEEDS FIX on two delivery-bar gaps (a security-allowlist regression from T2b's execFileSync git probes, and T6 not yet run), both since closed; its AC and mutation results were clean at 18/18 and 5/5. T5 measured all four hosts: codex/opencode write where they load (no defect of this class), cursor is never switched, and separately EVERY installed roster is stale at 17 (missing designer) with codex/opencode still carrying the retired massa-ai-handoff-writer -- recorded as two out-of-scope findings, not patched. MDS-05 remains honestly unmeasured: both github-source marketplaces are exactly in sync with their pinned caches, so no divergence exists here to test remote precedence against."
     }
   ],
-  "active_feature": "sse-heartbeat-idle-timeout"
+  "active_feature": "marketplace-directory-source-switching"
 }

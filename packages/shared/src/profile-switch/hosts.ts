@@ -143,27 +143,34 @@ export type RouteDecision = { kind: "proceed" } | { kind: "refuse"; reason: stri
  * making `route` read `undefined` and every host refuse. With the parameter
  * trailing and optional, every existing single-argument call compiles and
  * behaves identically, and the marketplace-proceed path activates only when
- * a caller explicitly supplies `host: "claude"` — omitting it keeps today's
- * conservative refusal.
+ * a caller explicitly supplies a known host — omitting it keeps the
+ * conservative refusal below.
+ *
+ * MDS-02 / D2 (T2): a marketplace-route switch for **claude or codex** now
+ * proceeds. The codex-specific refusal that used to sit here claimed an
+ * in-place bundle rewrite would leave a checkout in a modified state and
+ * break the drift gate — true when plugin bundles were checked in, false
+ * since AD-016 made them gitignored generated output (spec E5). That
+ * branch, and its stale premise, is retired rather than reworded: AC-02.4 adds a
+ * runtime replacement in the engine (a git-tracked-path guard, right before
+ * a write) that is scoped to what is actually true of a given checkout,
+ * instead of a blanket refusal resting on a premise measured on one machine.
+ * A host this module doesn't yet resolve a live write target for still
+ * refuses — that is a "not implemented for this host" refusal, not a revival
+ * of the retired premise, and AC-02.3's sensor below only tripwires the
+ * specific retired phrasing.
  */
 export function detectRoute(platform: PlatformRecord | undefined, host?: Host): RouteDecision {
   const route = platform?.installRoute;
   if (route === "file") return { kind: "proceed" };
   if (route === "marketplace") {
-    if (host === "claude") return { kind: "proceed" };
-    if (host === "codex") {
-      return {
-        kind: "refuse",
-        reason:
-          "codex marketplace-route installs are refused (in-place bundle rewrite would dirty a checkout " +
-          "and break the drift gate) — use the dev path: MASSA_AI_MODEL_PROFILE + regenerate.",
-      };
-    }
+    if (host === "claude" || host === "codex") return { kind: "proceed" };
     return {
       kind: "refuse",
       reason:
-        "claude/codex marketplace-route installs are refused (in-place bundle rewrite would dirty a checkout " +
-        "and break the drift gate) — use the dev path: MASSA_AI_MODEL_PROFILE + regenerate.",
+        "marketplace-route installs need an explicit, supported host before switching " +
+        "(claude and codex proceed; no other host resolves a live write target yet) — " +
+        "use the dev path: MASSA_AI_MODEL_PROFILE + regenerate.",
     };
   }
   return {

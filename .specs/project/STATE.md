@@ -1,6 +1,55 @@
 # massa-ai Spec State
 
-## Current — SSE heartbeat vs transport idle timeout (**VALIDATED 2026-08-13** — 13 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR authorized in-session but not yet taken)
+## Current — Marketplace directory-source switching (**VALIDATED 2026-08-13** — 11 commits, 2 batch workers plus a pre-mortem gate and an independent verification pass; unpushed)
+
+- projectId `massa-ai` · workflowSessionId `spec-marketplace-directory-source-switching` ·
+  workflow **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch
+  `fix/marketplace-directory-source-switching` from `origin/main` @ `89909051`, worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-marketplace`.
+- **Defect A:** `resolveClaudeMarketplaceRoot` returned `installed_plugins.json`'s
+  `installPath` — a version-pinned cache — even for a **directory-source** marketplace, where
+  Claude loads the plugin live from the source directory. Every switch wrote where nothing
+  reads, so Save & Apply plus a CLI restart produced no observable change, indefinitely.
+- **Defect B:** the regenerate stream spawned only `generate-subagent-artifacts.ts` while
+  `generate:artifacts` is both generators, so a skill edit could never reach a host.
+- **Two premises were checked and found stale rather than inherited.** `.specs/HANDOFF.md`
+  recorded that the marketplace route "refuses profile switching by design" — `hosts.ts`
+  shows Claude **proceeds**; only codex refused. And that codex refusal cited checkout
+  dirtiness, true before AD-016 made bundles gitignored generated output and false since.
+- **AD-022 — an amendment worth carrying forward.** AC-01.3 originally made an absent
+  `known_marketplaces.json` refuse. That broke the pre-existing cache path for any install
+  with **no** marketplace registry: `variant-sync.test.ts` T18 measured `main` 12/0 against
+  branch 11/1. Absence means "cannot determine the kind" (fall through), not "a directory
+  source exists and is broken" (refuse). A Phase 1 worker reported that failure as an
+  out-of-scope stale fixture; it was a correct sensor catching a regression introduced by the
+  requirement. Fix the subject — and when the subject is the requirement, amend it with its
+  reason recorded in both the spec and the test.
+- Plan Challenge (pre_mortem) returned 4 findings, 2 critical, all accepted: AC-01.2 reframed
+  from a correctness claim to an explicitly **unmeasured** risk (MDS-05); AC-03.5/AC-03.6
+  added because the anti-regression sensor shared a parser with production and could have
+  certified the very regression it guarded; AC-02.4 added a runtime tracked-path guard behind
+  the retired refusal; AC-01.6 added path containment for manifest-supplied relative data.
+- Independent verification returned **NEEDS FIX** on two delivery-bar gaps — a
+  security-allowlist regression from T2b's `execFileSync("git", …)` probes (measured `main`
+  39/0 vs branch 38/1) and T6 not yet run — with its AC and mutation results clean at 18/18
+  and 5/5. Both gaps closed on this branch.
+- **T5 found a second, different defect and file counts nearly hid it.** Every installed
+  roster is stale at 17 (missing `designer`), and `~/.codex/agents` plus
+  `~/.config/opencode/agents` still carry `massa-ai-handoff-writer`, an agent retired from
+  `skills/agents/`. Two out-of-scope findings recorded with evidence, not patched: nothing
+  refreshes installed trees after a roster change, and the installers do not prune removed
+  agents from a host's active directory.
+- MDS-05 stays honestly unmeasured: both github-source marketplaces are exactly in sync with
+  their pinned caches (`clone HEAD == pinned gitCommitSha`), so no divergence exists here to
+  test remote precedence against. Recorded as the reason, never as evidence of safety.
+- Gates 2026-08-13: `lint` 0 · `type-check` 6/6 · `bun test packages/shared` 498/0 ·
+  `model-registry-stream` 32/0 · `variant-sync` 12/0 · `claude-marketplace` 25/0 · `hosts`
+  20/0 · `engine` 31/0 · `test:scripts` 1810/0 on two runs. **One caveat, recorded rather
+  than smoothed over:** an earlier `test:scripts` run reported 1809/1 and its failing test
+  name was never captured; two subsequent full runs were green at exit 0. Treated as an
+  uncharacterized flake, not a clean gate.
+
+## Previous — SSE heartbeat vs transport idle timeout (**VALIDATED 2026-08-13** — 13 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR authorized in-session but not yet taken)
 
 - projectId `massa-ai` · workflowSessionId `spec-sse-heartbeat-idle-timeout` · workflow
   **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch

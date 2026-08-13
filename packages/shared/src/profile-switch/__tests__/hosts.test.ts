@@ -1,9 +1,11 @@
 /**
  * hosts.ts unit tests — per-host active/variant path resolution + route
- * detection (design F1). Covers MPS-02, MPS-09, MPS-10.
+ * detection (design F1). Covers MPS-02, MPS-09, MPS-10, and MDS-02 (T2).
  */
 import { describe, test, expect } from "bun:test";
+import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { resolveHostLayout, detectRoute, HOSTS } from "../hosts.js";
 import type { PlatformRecord } from "../state.js";
 
@@ -144,13 +146,9 @@ describe("detectRoute — host-aware marketplace proceed (T17, pre-mortem #3)", 
     expect(decision.kind).toBe("proceed");
   });
 
-  test('codex + host:"codex" refuses with a reason naming codex only', () => {
+  test('codex + host:"codex" now proceeds (T2/MDS-02: the stale "would dirty a checkout" refusal is retired)', () => {
     const decision = detectRoute(marketplacePlatform, "codex");
-    expect(decision.kind).toBe("refuse");
-    if (decision.kind === "refuse") {
-      expect(decision.reason).toMatch(/codex/i);
-      expect(decision.reason).not.toMatch(/claude/i);
-    }
+    expect(decision.kind).toBe("proceed");
   });
 
   test("omitting host keeps the conservative marketplace refusal", () => {
@@ -159,6 +157,11 @@ describe("detectRoute — host-aware marketplace proceed (T17, pre-mortem #3)", 
     if (decision.kind === "refuse") {
       expect(decision.reason).toMatch(/marketplace/i);
     }
+  });
+
+  test("an unresolved host (e.g. opencode) still refuses on the marketplace route — not a revival of the retired premise", () => {
+    const decision = detectRoute(marketplacePlatform, "opencode");
+    expect(decision.kind).toBe("refuse");
   });
 
   test("absent route still refuses even when a host is supplied", () => {
@@ -174,5 +177,21 @@ describe("detectRoute — host-aware marketplace proceed (T17, pre-mortem #3)", 
     expect(detectRoute(marketplacePlatform).kind).toBe("refuse");
     const filePlatform: PlatformRecord = { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" };
     expect(detectRoute(filePlatform).kind).toBe("proceed");
+  });
+});
+
+describe("detectRoute — AC-02.3: no refusal reason cites checkout dirtiness (source-level sensor)", () => {
+  // T2/D2 deleted the codex refusal whose reason was "would dirty a
+  // checkout and break the drift gate" — a premise AD-016 retired (spec E5).
+  // This sensor reads hosts.ts's own source rather than exercising every
+  // RouteDecision, so the stale phrasing can't be reintroduced by
+  // copy-paste into a refusal branch this test suite doesn't happen to
+  // exercise. It is a tripwire on the known wording (design D2 says so
+  // explicitly), not a proof that no equivalent premise could return under
+  // different words.
+  test('the module source contains no "dirty" / "checkout" refusal wording', () => {
+    const hostsSourcePath = fileURLToPath(new URL("../hosts.ts", import.meta.url));
+    const source = fs.readFileSync(hostsSourcePath, "utf8");
+    expect(source).not.toMatch(/dirty a checkout/i);
   });
 });

@@ -7,6 +7,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { execFileSync } from "node:child_process";
 import { resolveHostLayout, type Host, type HostFileLayout } from "../hosts.js";
 import { acquireLock } from "../lock.js";
 import { listProfiles, switchProfile } from "../engine.js";
@@ -55,8 +56,23 @@ function writeState(h: string, state: unknown): string {
  * as the single "user"-scoped record for the massa-ai plugin — the fixture
  * `resolveClaudeMarketplaceRoot` (claude-marketplace.test.ts's own subject)
  * reads. Does NOT create `installPath` itself — callers stage that
- * separately so a test can exercise the "path missing on disk" case too. */
+ * separately so a test can exercise the "path missing on disk" case too.
+ *
+ * Also stages `known_marketplaces.json` with a non-"directory" (remote)
+ * source entry for "massa-ai" (T1/AC-01.3): since `resolveClaudeMarketplace
+ * Root` now reads that registry first and resolves `null` outright when it
+ * is absent, a fixture exercising the `installed_plugins.json` cache path
+ * has to declare itself "remote" there — otherwise it would exercise
+ * AC-01.3's "registry absent" null case instead of the cache path this
+ * helper's callers actually mean to test. */
 function stageMarketplaceRegistry(h: string, installPath: string): void {
+  const knownMarketplacesPath = path.join(h, ".claude", "plugins", "known_marketplaces.json");
+  fs.mkdirSync(path.dirname(knownMarketplacesPath), { recursive: true });
+  fs.writeFileSync(
+    knownMarketplacesPath,
+    JSON.stringify({ "massa-ai": { source: { source: "github", repo: "octo/example" }, installLocation: "/opt/unused" } }, null, 2),
+  );
+
   const registryPath = path.join(h, ".claude", "plugins", "installed_plugins.json");
   fs.mkdirSync(path.dirname(registryPath), { recursive: true });
   fs.writeFileSync(
@@ -416,7 +432,7 @@ describe("Claude marketplace parity (T18, CPP-03..06)", () => {
     expect(report.hosts[0].filesChanged).toBe(1);
   });
 
-  test("codex marketplace-route switch still refuses even after the host-aware detectRoute wiring, reason names codex only", () => {
+  test("codex marketplace-route switch now proceeds (T2/MDS-02: the stale refusal is retired) and switches codex's file-route layout", () => {
     stageVariant(home, "codex", "work", { "massa-ai-planner.toml": "opus" });
     stageActive(home, "codex", { "massa-ai-planner.toml": "sonnet" });
     writeState(home, {
@@ -425,9 +441,78 @@ describe("Claude marketplace parity (T18, CPP-03..06)", () => {
     });
 
     const report = switchProfile({ profile: "work", host: "codex", targetHome: home });
+    expect(report.hosts[0].status).toBe("switched");
+    expect(report.hosts[0].filesChanged).toBe(1);
+    const codexActive = layoutFor(home, "codex").activeDir;
+    expect(fs.readFileSync(path.join(codexActive, "massa-ai-planner.toml"), "utf-8")).toBe("opus");
+  });
+});
+
+describe("switchProfile — T2b: runtime tracked-path guard (AC-02.4)", () => {
+  // D2 (T2) retired the "would dirty a checkout" refusal that used to block
+  // codex outright. This guard is its runtime replacement — before a host's
+  // files are overwritten, it verifies the destination isn't a git-tracked
+  // path, scoped to what is actually true of THIS checkout (spec E5 measured
+  // only one machine: a checkout predating AD-016, a fork, or a
+  // deliberately committed bundle file would all still be dirtied).
+  function gitInit(dir: string): void {
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+  }
+
+  function gitAdd(dir: string, relPathFromDir: string): void {
+    execFileSync("git", ["add", relPathFromDir], { cwd: dir });
+  }
+
+  test("a deliberately git add-ed destination file is refused, naming the offending path", () => {
+    stageVariant(home, "claude", "work", { "massa-ai-planner.md": "opus" });
+    stageActive(home, "claude", { "massa-ai-planner.md": "sonnet" });
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
+    });
+
+    gitInit(home);
+    const activeDir = layoutFor(home, "claude").activeDir;
+    const destFile = path.join(activeDir, "massa-ai-planner.md");
+    gitAdd(home, path.relative(home, destFile));
+
+    const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
     expect(report.hosts[0].status).toBe("failed");
-    expect(report.hosts[0].reason).toMatch(/codex/i);
-    expect(report.hosts[0].reason).not.toMatch(/claude/i);
+    expect(report.hosts[0].reason).toContain(destFile);
+    // Refused before any write — the git-tracked content is untouched.
+    expect(fs.readFileSync(destFile, "utf-8")).toBe("sonnet");
+  });
+
+  test("an ignored (untracked) destination path proceeds normally", () => {
+    stageVariant(home, "claude", "work", { "massa-ai-planner.md": "opus" });
+    stageActive(home, "claude", { "massa-ai-planner.md": "sonnet" });
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
+    });
+
+    gitInit(home);
+    fs.writeFileSync(path.join(home, ".gitignore"), ".claude/agents/*\n");
+    // No git add — the file exists on disk but git never tracks it.
+
+    const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
+    expect(report.hosts[0].status).toBe("switched");
+    const activeDir = layoutFor(home, "claude").activeDir;
+    expect(fs.readFileSync(path.join(activeDir, "massa-ai-planner.md"), "utf-8")).toBe("opus");
+  });
+
+  test("a non-repo target (no git anywhere above it) proceeds normally — nothing there could be tracked", () => {
+    stageVariant(home, "claude", "work", { "massa-ai-planner.md": "opus" });
+    stageActive(home, "claude", { "massa-ai-planner.md": "sonnet" });
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
+    });
+    // `home` is a plain temp dir — never git-init'd.
+
+    const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
+    expect(report.hosts[0].status).toBe("switched");
+    expect(report.hosts[0].reason).toBeUndefined(); // a verified pass, not "unchecked"
   });
 });
 
