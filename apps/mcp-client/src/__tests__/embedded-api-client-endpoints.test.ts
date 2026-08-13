@@ -365,6 +365,81 @@ describe("EmbeddedApiClient validation branches (missing required params)", () =
   });
 });
 
+// T10 (HPC-05/AC-05.1) — handoff/proposal PATCH/DELETE + proposal create
+// routing added for MCP parity with the Phase 3 portal CRUD REST routes.
+// Round-trips a real row through the real DB rather than only checking a
+// branch is reached, since these mirror route logic (allowlist rejection,
+// not-found handling) that a bare "doesn't 404" check would not exercise.
+describe("EmbeddedApiClient handoff/proposal PATCH/DELETE (T10, HPC-05/AC-05.1)", () => {
+  test("PATCH then DELETE a handoff via embedded routing", async () => {
+    const { result: beginResult } = await call(() =>
+      client.post("/api/v1/handoff/begin", { projectId: "embed-t10", summary: "s0" }),
+    );
+    const id = (beginResult as any)?.data?.id;
+    expect(typeof id).toBe("string");
+
+    const { result: patchResult } = await call(() => client.patch(`/api/v1/handoff/${id}`, { summary: "s1" }));
+    expect((patchResult as any)?.success).toBe(true);
+    expect((patchResult as any)?.data?.summary).toBe("s1");
+
+    const { result: deleteResult } = await call(() => client.delete(`/api/v1/handoff/${id}`));
+    expect((deleteResult as any)?.success).toBe(true);
+    expect((deleteResult as any)?.data?.id).toBe(id);
+  });
+
+  test("PATCH handoff rejects a disallowed field by name (AC-01.2)", async () => {
+    const { err } = await call(() => client.patch("/api/v1/handoff/no-such-id", { status: "accepted" }));
+    expect(err).toBeInstanceOf(ApiHttpError);
+    expect((err as ApiHttpErrorInstance).status).toBe(400);
+    expect(String((err as ApiHttpErrorInstance).body?.error)).toContain("status");
+  });
+
+  test("DELETE handoff missing id → 404", async () => {
+    const { err } = await call(() => client.delete("/api/v1/handoff/no-such-id"));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(404);
+  });
+
+  test("POST proposal/create then PATCH then DELETE via embedded routing", async () => {
+    const { result: createResult } = await call(() =>
+      client.post("/api/v1/proposal/create", {
+        projectId: "embed-t10",
+        kind: "memory.tag",
+        payload: { tags: ["a"] },
+        rationale: "r0",
+      }),
+    );
+    const created = (createResult as any)?.data;
+    expect(created?.id).toBeDefined();
+
+    const { result: patchResult } = await call(() =>
+      client.patch(`/api/v1/proposal/${created.id}`, { rationale: "r1" }),
+    );
+    expect((patchResult as any)?.success).toBe(true);
+    expect((patchResult as any)?.data?.rationale).toBe("r1");
+
+    const { result: deleteResult } = await call(() => client.delete(`/api/v1/proposal/${created.id}`));
+    expect((deleteResult as any)?.success).toBe(true);
+    expect((deleteResult as any)?.data?.id).toBe(created.id);
+  });
+
+  test("proposal/create rejects an invalid kind (AC-02.1)", async () => {
+    const { err } = await call(() =>
+      client.post("/api/v1/proposal/create", { projectId: "embed-t10", kind: "nope", payload: {} }),
+    );
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  test("PATCH proposal rejects a disallowed field by name (AC-02.4)", async () => {
+    const { err } = await call(() => client.patch("/api/v1/proposal/no-such-id", { kind: "memory.tag" }));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  test("DELETE proposal missing id → 404", async () => {
+    const { err } = await call(() => client.delete("/api/v1/proposal/no-such-id"));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(404);
+  });
+});
+
 describe("EmbeddedApiClient synapse session with buffer", () => {
   let bufferedSessionId: string | undefined;
 

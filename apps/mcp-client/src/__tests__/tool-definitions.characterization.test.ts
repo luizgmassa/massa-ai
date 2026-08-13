@@ -6,8 +6,11 @@
  * schema) is caught. These tests are mutation-killing anchors.
  *
  * NOTE: The spec design.md said "57 tools" — actual roster count was 52,
- * then 54 after model-profile-switching (T12) added profile_list/profile_set.
- * This characterization pins the ACTUAL count (54), not the spec number.
+ * then 54 after model-profile-switching (T12) added profile_list/profile_set,
+ * then 59 after portal-handoff-proposal-crud's T10 (HPC-05/AC-05.1) added
+ * handoff_update, handoff_delete, create_proposal, update_proposal and
+ * delete_proposal for MCP parity with the Phase 3 portal CRUD REST routes.
+ * This characterization pins the ACTUAL count (59), not the spec number.
  * A future task that adds/removes a tool MUST update this test
  * intentionally (never silently).
  *
@@ -63,9 +66,14 @@ const EXPECTED_NAMES = [
   "handoff_accept",
   "handoff_cancel",
   "handoff_list_pending",
+  "handoff_update",
+  "handoff_delete",
   "list_proposals",
   "approve_proposal",
   "reject_proposal",
+  "create_proposal",
+  "update_proposal",
+  "delete_proposal",
   "execute",
   "execute_file",
   "batch_execute",
@@ -77,8 +85,8 @@ const EXPECTED_NAMES = [
 ] as const;
 
 describe("ToolDefinitions — characterization (T02)", () => {
-  test("TOOL_DEFINITIONS count is exactly 54 (spec said 57 — actual is 54)", () => {
-    expect(TOOL_DEFINITIONS.length).toBe(54);
+  test("TOOL_DEFINITIONS count is exactly 59 (54 + T10's 5 new handoff/proposal PATCH/DELETE/create tools)", () => {
+    expect(TOOL_DEFINITIONS.length).toBe(59);
   });
 
   test("every tool name matches the pinned roster in order", () => {

@@ -42,11 +42,20 @@ describe("Embedded mode wiring (T19)", () => {
   });
 
   test("both clients implement ToolProxyApiClient (get/post/patch/delete)", () => {
+    // T11 (HPC-05/AC-05.1): this test's title has claimed patch/delete since
+    // it was written, but only asserted get/post — the exact gap AC-05.2
+    // names. `call-tool-proxy.ts`'s PATCH/DELETE branches (`proxyToolRequest`)
+    // throw "API client does not support PATCH/DELETE" when either method is
+    // absent, so an un-asserted client here is a silent parity break for
+    // every `:id` tool (synapse_update/synapse_end and the new T10
+    // handoff_update/handoff_delete/update_proposal/delete_proposal tools).
     const http = new ApiClient();
     const embedded = new EmbeddedApiClient();
     for (const client of [http, embedded]) {
       expect(typeof client.get).toBe("function");
       expect(typeof client.post).toBe("function");
+      expect(typeof client.patch).toBe("function");
+      expect(typeof client.delete).toBe("function");
     }
   });
 

@@ -288,7 +288,7 @@ Repositories and services are reached through `get*()` factory functions with ma
   "this path must 401" test proves nothing unless a real route is registered; and HTTP
   strips whitespace from header values, so a `"   "` key arrives as `""`.
 
-- `apps/mcp-client` — MCP stdio server exposing 54 tools. Tool schemas are plain
+- `apps/mcp-client` — MCP stdio server exposing 59 tools. Tool schemas are plain
   `ToolDefinition[]` JSON Schema arrays in `src/tool-defs/tool-defs-*.ts`;
   `call-tool-proxy.ts` maps a tool call onto an HTTP method + endpoint template.
 

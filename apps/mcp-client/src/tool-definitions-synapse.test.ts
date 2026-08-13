@@ -18,7 +18,9 @@ describe("Synapse MCP tool definitions", () => {
     // + get_architecture (W5-T04) + synapse_task_begin (W5-T21)
     // + synapse_task_end (W5-T22) = 52.
     // + profile_list + profile_set (model-profile-switching T12) = 54.
-    expect(TOOL_DEFINITIONS).toHaveLength(54);
+    // + handoff_update, handoff_delete, create_proposal, update_proposal,
+    //   delete_proposal (portal-handoff-proposal-crud T10, HPC-05/AC-05.1) = 59.
+    expect(TOOL_DEFINITIONS).toHaveLength(59);
     for (const [name, method, endpoint, required] of expected) {
       const definition = getToolDefinition(name);
       expect(definition?.apiMethod).toBe(method);

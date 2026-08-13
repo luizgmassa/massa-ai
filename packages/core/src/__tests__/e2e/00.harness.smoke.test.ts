@@ -1,7 +1,7 @@
 /**
  * T1 smoke — proves the E2E harness end-to-end:
  *   1. HTTP transport reaches the live API.
- *   2. MCP subprocess boots, advertises all 54 tools.
+ *   2. MCP subprocess boots, advertises all 59 tools.
  *   3. Matrix machinery holds for a read-only tool (list_projects).
  *
  * Skipped unless RUN_E2E=1, the API is up, the MCP dist is built, and the
@@ -17,11 +17,14 @@ import {
 } from "./_helpers";
 import { startMcp, mcpCall, type McpHandle } from "./_mcp";
 
-// The 54 tools declared in apps/mcp-client/src/tool-definitions.ts (in
+// The 59 tools declared in apps/mcp-client/src/tool-definitions.ts (in
 // declaration order). SF3: this list must mirror tool-definitions.ts exactly —
 // the assertion below is strict (===), so a missing tool fails loudly instead
 // of being hidden by the old leaky >= check. When a tool is added upstream,
 // append it here in the same declaration order and the count self-updates.
+// handoff_update/handoff_delete and create_proposal/update_proposal/
+// delete_proposal (portal-handoff-proposal-crud T10, HPC-05/AC-05.1) brought
+// the count from 54 to 59.
 const EXPECTED_TOOLS = [
   "index", "index_status", "search", "remember", "recall",
   "memory_update", "memory_delete", "list_checkpoints", "create_checkpoint", "restore_checkpoint",
@@ -33,7 +36,10 @@ const EXPECTED_TOOLS = [
   "synapse_task_begin", "synapse_task_end",
   "symbol_snippet", "memory_list", "reindex", "hook_ingest", "compact_snapshot",
   "bootstrap", "handoff_begin", "handoff_accept", "handoff_cancel", "handoff_list_pending",
-  "list_proposals", "approve_proposal", "reject_proposal", "execute", "execute_file",
+  "handoff_update", "handoff_delete",
+  "list_proposals", "approve_proposal", "reject_proposal",
+  "create_proposal", "update_proposal", "delete_proposal",
+  "execute", "execute_file",
   "batch_execute", "fetch_and_index",
   "rename_project", "merge_projects",
   "profile_list", "profile_set",
@@ -64,7 +70,7 @@ describe.skipIf(!READY)("T1 harness smoke", () => {
     expect(res.service).toBe("massa-ai-tools-api");
   }, 10_000);
 
-  test("MCP advertises all 54 tools", async () => {
+  test("MCP advertises all 59 tools", async () => {
     expect(mcp).not.toBeNull();
     const names = mcp!.toolNames;
     // SF3: strict equality — the MCP tool roster must match

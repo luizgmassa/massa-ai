@@ -1,4 +1,4 @@
-# massa-ai Tool Contracts (54 Tools)
+# massa-ai Tool Contracts (59 Tools)
 
 Load when exact MCP schemas, REST fallbacks, response modes, or
 polling rules are needed. Prefer the active tool declaration over copied
@@ -103,6 +103,8 @@ depends on exact content.
 | `handoff_accept` | Accept an open handoff (open→accepted) | Req: `id`. Opt: `projectId`. |
 | `handoff_cancel` | Cancel/expire an open handoff | Req: `id`. Opt: `projectId`. |
 | `handoff_list_pending` | List open handoffs, oldest-first | Req: `projectId`. Opt: `targetAgent`. |
+| `handoff_update` | Edit targetAgent/summary/openQuestions/nextSteps/files by id | Req: `id`. Opt: `projectId`, `targetAgent`, `summary`, `openQuestions`, `nextSteps`, `files` — at least one editable field required. Unknown/restricted fields (`status`, `acceptedAt`, etc.) are rejected by name. |
+| `handoff_delete` | Hard-delete a handoff, any status | Req: `id`. Opt: `projectId`. |
 
 ## MCP Capability Matrix — Auto-improvement (Proposals)
 
@@ -111,6 +113,9 @@ depends on exact content.
 | `list_proposals` | List pending auto-improvement proposals, newest-first | Req: `projectId`. |
 | `approve_proposal` | Approve a proposal; applies the memory edit | Req: `id`. Opt: `projectId`, `source`. |
 | `reject_proposal` | Reject a proposal (no edit applied) | Req: `id`. Opt: `projectId`, `reason`. |
+| `create_proposal` | Create a pending proposal by hand | Req: `projectId`, `kind` (`memory.create`\|`memory.update`\|`memory.tag`), `payload`. Opt: `rationale`, `targetMemoryId`. `payload` is validated against the same per-kind rules the store enforces on read. |
+| `update_proposal` | Edit rationale/payload by id, any status | Req: `id`. Opt: `projectId`, `rationale`, `payload` — at least one editable field required. `kind`/`targetMemoryId`/`status`/`decidedAt` are immutable. A `payload` edit re-validates against the row's existing `kind`. |
+| `delete_proposal` | Hard-delete a proposal, any status | Req: `id`. Opt: `projectId`. Deleting an approved proposal does not reverse its applied memory edit. |
 
 ## MCP Capability Matrix — Passive Capture
 

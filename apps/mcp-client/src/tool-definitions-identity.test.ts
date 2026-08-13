@@ -27,7 +27,9 @@ describe("Project identity MCP tool definitions (T5)", () => {
     // 49 pre-Wave-5 tools + get_architecture (W5-T04)
     // + synapse_task_begin (W5-T21) + synapse_task_end (W5-T22) = 52.
     // + profile_list + profile_set (model-profile-switching T12) = 54.
-    expect(TOOL_DEFINITIONS.length).toBe(54);
+    // + handoff_update, handoff_delete, create_proposal, update_proposal,
+    //   delete_proposal (portal-handoff-proposal-crud T10, HPC-05/AC-05.1) = 59.
+    expect(TOOL_DEFINITIONS.length).toBe(59);
   });
 
   test("proxyCallTool routes rename_project/merge_projects to their REST endpoints with the body intact", async () => {

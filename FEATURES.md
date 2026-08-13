@@ -34,7 +34,7 @@ Every feature in massa-ai, what it does, why it exists, and how to use it.
 - [Query Understanding (Rewrite + HyDE)](#query-understanding-rewrite--hyde)
 - [Rerank (LLM-judge)](#rerank-llm-judge)
 - [Fetch and Index](#fetch-and-index)
-- [MCP Server (54 Tools)](#mcp-server-54-tools)
+- [MCP Server (59 Tools)](#mcp-server-59-tools)
 - [REST API](#rest-api)
 - [API Authentication](#api-authentication)
 - [Configuration](#configuration)
@@ -275,7 +275,7 @@ bash apps/cursor-plugin/install.sh --uninstall
 
 ### OpenCode plugin (`apps/opencode-plugin/`)
 
-**What it bundles:** hooks only (AD-017: plugins deliver, MCP serves tools, hooks observe) — 6 in-process lifecycle handlers and 18 subagent specialists. It registers zero in-process tools; the massa-ai MCP server (54 tools) is registered alongside it via `scripts/install-agents.sh --agent opencode`, same as every other host. It is published as `@massa-ai/opencode-plugin`. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai` and `persona-router` skills plus the 18 agent charters, so a registry install needs no repository checkout.
+**What it bundles:** hooks only (AD-017: plugins deliver, MCP serves tools, hooks observe) — 6 in-process lifecycle handlers and 18 subagent specialists. It registers zero in-process tools; the massa-ai MCP server (59 tools) is registered alongside it via `scripts/install-agents.sh --agent opencode`, same as every other host. It is published as `@massa-ai/opencode-plugin`. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai` and `persona-router` skills plus the 18 agent charters, so a registry install needs no repository checkout.
 
 **Hook events (in-process, 6 lifecycle handlers):** `session.created`, `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`, `dispose` — all registered in-process by the plugin. No external hooks file needed.
 
@@ -596,7 +596,7 @@ switching" non-goal in `.specs/features/model-profile-registry/spec.md` in place
 
 ## Workflow Tools (52-Tool Adoption)
 
-**What:** The massa-ai workflow skill (`skills/massa-ai/`) references the full 54-tool surface from `apps/mcp-client/src/tool-definitions.ts` CANONICAL_ORDER (52 at the time of adoption; grown to 54 since). Every tool name uses the canonical un-prefixed form (e.g. `recall`, not `recall`), matching what the MCP server exposes (AD-017: MCP is the one canonical tool surface across all four host plugins). The tool-contract reference (`references/mcp-tools.md`) contains a complete MCP Capability Matrix for all 54 tools grouped by category, and each workflow adopts the tools that materially benefit its flow.
+**What:** The massa-ai workflow skill (`skills/massa-ai/`) references the full 59-tool surface from `apps/mcp-client/src/tool-definitions.ts` CANONICAL_ORDER (52 at the time of adoption; 54 after model-profile-switching T12; 59 after portal-handoff-proposal-crud's T10). Every tool name uses the canonical un-prefixed form (e.g. `recall`, not `recall`), matching what the MCP server exposes (AD-017: MCP is the one canonical tool surface across all four host plugins). The tool-contract reference (`references/mcp-tools.md`) contains a complete MCP Capability Matrix for all 59 tools grouped by category, and each workflow adopts the tools that materially benefit its flow.
 
 **Why:** The workflows previously referenced only ~11 of 52+ shipped tools and used stale `th0th_*`-prefixed names that diverged from the actual MCP tool declarations. Powerful shipped features — checkpoints, cross-session handoffs, bootstrap, compact_snapshot, trace_path, impact_analysis, code execution, the full Synapse lifecycle, read_file, symbol_snippet, memory_update/delete, analytics, fetch_and_index — were unguided by the workflow router. Agents following massa-ai workflows missed deterministic, first-class tool support for long-running task save/resume, cross-session continuity, code-path tracing, impact analysis, and code execution for analysis.
 
@@ -974,9 +974,9 @@ fetch_and_index { requests: [{ url: "https://..." }, { url: "https://..." }], co
 
 ---
 
-## MCP Server (54 Tools)
+## MCP Server (59 Tools)
 
-**What:** A stdio MCP server (`@massa-ai/mcp-client`) exposing 54 tools across indexing, search, symbol graph, memory, lifecycle, Synapse, passive capture, handoffs, auto-improvement, checkpoints, and code execution. Connects to the Tools API via HTTP. The current roster fits in one MCP `tools/list` page (pagination via `nextCursor` activates over 100 tools).
+**What:** A stdio MCP server (`@massa-ai/mcp-client`) exposing 59 tools across indexing, search, symbol graph, memory, lifecycle, Synapse, passive capture, handoffs, auto-improvement, checkpoints, and code execution. Connects to the Tools API via HTTP. The current roster fits in one MCP `tools/list` page (pagination via `nextCursor` activates over 100 tools).
 
 **Why:** MCP is the standard protocol for connecting AI tools to external services. The MCP server makes massa-ai's full capability set available to any MCP-compatible client (Claude Code, Codex, Cursor, OpenCode).
 
@@ -1085,6 +1085,8 @@ Each row lists **Req:** required and **Opt:** optional params.
 | `handoff_accept` | Accept an open handoff by id (open→accepted). **Req:** `id`. **Opt:** `projectId` |
 | `handoff_cancel` | Cancel (expire) an open handoff by id. **Req:** `id`. **Opt:** `projectId` |
 | `handoff_list_pending` | List open handoffs for a project, oldest-first. **Req:** `projectId`. **Opt:** `targetAgent` |
+| `handoff_update` | Edit `targetAgent`/`summary`/`openQuestions`/`nextSteps`/`files` by id. **Req:** `id`. **Opt:** `projectId`, `targetAgent`, `summary`, `openQuestions`[], `nextSteps`[], `files`[] — at least one editable field required; unknown/restricted fields (`status`, `acceptedAt`, etc.) are rejected by name |
+| `handoff_delete` | Hard-delete a handoff, any status. Dual-written memory row is left intact. **Req:** `id`. **Opt:** `projectId` |
 
 #### Auto-improvement (Proposals)
 
@@ -1093,6 +1095,9 @@ Each row lists **Req:** required and **Opt:** optional params.
 | `list_proposals` | List pending auto-improvement proposals, newest-first. **Req:** `projectId` |
 | `approve_proposal` | Approve a proposal by id; applies the memory edit. **Req:** `id`. **Opt:** `projectId`, `source`∈{`llm`,`rule-based`} |
 | `reject_proposal` | Reject a proposal by id (no edit applied). **Req:** `id`. **Opt:** `projectId`, `reason` |
+| `create_proposal` | Create a pending proposal by hand. **Req:** `projectId`, `kind`∈{`memory.create`,`memory.update`,`memory.tag`}, `payload`. **Opt:** `rationale`, `targetMemoryId` — `payload` is validated against the same per-kind rules the store enforces on read |
+| `update_proposal` | Edit `rationale`/`payload` by id, any status. **Req:** `id`. **Opt:** `projectId`, `rationale`, `payload` — at least one editable field required; `kind`/`targetMemoryId`/`status`/`decidedAt` are immutable |
+| `delete_proposal` | Hard-delete a proposal, any status; does not reverse an approved proposal's applied memory edit. **Req:** `id`. **Opt:** `projectId` |
 
 #### Checkpoints
 
