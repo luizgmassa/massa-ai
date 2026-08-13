@@ -6,15 +6,23 @@
  *
  * Validation order (design): state readable+writable -> hosts detected ->
  * variant availability (unknown-profile check) -> lock acquired -> per-host
- * copy -> per-host state write. Copies happen before that host's state
- * write, and a host's failure never rolls back another host's completed
- * switch (per-host atomicity) — only state-file corruption/unwritability is
- * a global precondition (design F4 amendment).
+ * tracked-path guard -> per-host copy -> per-host state write. Copies happen
+ * before that host's state write, and a host's failure never rolls back
+ * another host's completed switch (per-host atomicity) — only state-file
+ * corruption/unwritability is a global precondition (design F4 amendment).
+ *
+ * T2b / AC-02.4: the per-host tracked-path guard (`checkTrackedPathGuard`,
+ * below) is this engine's runtime replacement for the "would dirty a
+ * checkout" refusal `hosts.ts`'s `detectRoute` used to hard-code for codex
+ * (D2). Retiring that refusal removed a guard with nothing behind it except
+ * one machine's measurement (spec E5); this one checks the actual checkout
+ * about to be written, every time.
  */
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { HOSTS, type Host, resolveHostLayout, detectRoute, type HostFileLayout } from "./hosts.js";
 import { readInstallState, updatePlatform, UnwritableInstallStateError, type InstallState } from "./state.js";
 import { acquireLock, type AcquireLockOptions } from "./lock.js";
@@ -198,6 +206,102 @@ function matchesGlob(filename: string, glob: string): boolean {
   );
 }
 
+/** The massa-ai-owned filenames a switch of this host would write into
+ * `dir` — shared by both copy strategies below and by the tracked-path
+ * guard, so the guard checks exactly what is about to be written, no more
+ * and no less. */
+function matchingFileNames(dir: string, glob: string): string[] {
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile() && matchesGlob(e.name, glob))
+    .map((e) => e.name);
+}
+
+// ── T2b / AC-02.4: runtime tracked-path guard ───────────────────────────
+//
+// D2 retired the "would dirty a checkout" refusal that used to block a
+// codex marketplace switch outright — that premise held only while plugin
+// bundles were checked in, and AD-016 made them gitignored generated output
+// on this machine (spec E5). But E5 measured ONE machine: a checkout
+// predating AD-016, a fork made before it, or a user who deliberately
+// committed a generated bundle file would still be dirtied by an in-place
+// rewrite. This guard is what makes the retirement safe generally rather
+// than only on the author's machine — it runs right before a host's files
+// are overwritten, scoped to what is actually true of THIS checkout.
+
+/** Distinguishes "git isn't installed at all" (ENOENT) from "git is
+ * installed but `dir` isn't inside a work tree" — the two cases the guard
+ * must tell apart, since only the former is truly "could not check"
+ * (AC-02.4); the latter is a definite, verified "nothing here is tracked." */
+function detectGitAvailability(dir: string): "no-git" | "not-a-repo" | "in-repo" {
+  try {
+    const out = execFileSync("git", ["-C", dir, "rev-parse", "--is-inside-work-tree"], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return out.toString().trim() === "true" ? "in-repo" : "not-a-repo";
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "ENOENT" ? "no-git" : "not-a-repo";
+  }
+}
+
+/** Of `filenames` (relative to `dir`), returns the subset git's index
+ * already tracks in the repo `dir` belongs to. Never throws — a git failure
+ * here is treated as "nothing tracked" rather than blocking a switch on an
+ * unrelated git error. */
+function gitTrackedFileNames(dir: string, filenames: readonly string[]): Set<string> {
+  if (filenames.length === 0) return new Set();
+  try {
+    const out = execFileSync("git", ["-C", dir, "ls-files", "--", ...filenames], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return new Set(
+      out
+        .toString()
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/** Result of the T2b guard for one host's about-to-be-overwritten files. */
+interface TrackedPathGuardResult {
+  /** true when a destination file is confirmed git-tracked — the caller
+   *  must refuse the write and name `path`. */
+  readonly blocked: boolean;
+  readonly path?: string;
+  /** true when git itself was unavailable and the guard could not verify
+   *  anything — the caller proceeds, but must record this rather than
+   *  reporting success as if the guard had actually run (AC-02.4). */
+  readonly unchecked: boolean;
+}
+
+const GUARD_PASS: TrackedPathGuardResult = { blocked: false, unchecked: false };
+const GUARD_UNCHECKED: TrackedPathGuardResult = { blocked: false, unchecked: true };
+
+/**
+ * Before `filenames` are overwritten in `activeDir`, verifies none of them
+ * is a git-tracked path. `activeDir` not existing yet (first-ever install)
+ * or `filenames` being empty short-circuits to a pass — there is nothing to
+ * dirty. A directory that exists but isn't inside a git work tree is also a
+ * verified pass, not "unchecked": there is definitively no git to dirty
+ * there. Only a missing `git` binary is genuinely unverifiable (AC-02.4).
+ */
+function checkTrackedPathGuard(activeDir: string, filenames: readonly string[]): TrackedPathGuardResult {
+  if (filenames.length === 0 || !fs.existsSync(activeDir)) return GUARD_PASS;
+
+  const availability = detectGitAvailability(activeDir);
+  if (availability === "no-git") return GUARD_UNCHECKED;
+  if (availability === "not-a-repo") return GUARD_PASS;
+
+  const tracked = gitTrackedFileNames(activeDir, filenames);
+  if (tracked.size === 0) return GUARD_PASS;
+  const offending = filenames.find((name) => tracked.has(name));
+  return { blocked: true, path: path.join(activeDir, offending!), unchecked: false };
+}
+
 /** Assert the state file's location can be written to, without writing
  * anything — the global precondition that state corruption/unwritability
  * fails before any copy (design F4 amendment). */
@@ -365,12 +469,33 @@ export function switchProfile(opts: SwitchProfileOptions): SwitchReport {
         continue;
       }
 
+      // T2b / AC-02.4: the runtime replacement for the refusal D2 retired —
+      // right before this host's files are overwritten, refuse a write that
+      // would dirty a git-tracked path in the destination checkout.
+      const candidateNames = matchingFileNames(h.variantDir, h.layout.activeGlob);
+      const guard = checkTrackedPathGuard(h.layout.activeDir, candidateNames);
+      if (guard.blocked) {
+        rows.push({
+          host: h.host,
+          status: "failed",
+          reason: `refusing to write ${guard.path} — it is tracked by git and this switch would dirty the checkout`,
+        });
+        continue;
+      }
+
       try {
         const filesChanged = copyVariant(h.host, h.layout, h.variantDir);
         updatePlatform(stateFilePath, h.host, {
           modelProfile: { profile: opts.profile, switchedAt: new Date().toISOString() },
         });
-        rows.push({ host: h.host, status: "switched", filesChanged });
+        rows.push({
+          host: h.host,
+          status: "switched",
+          filesChanged,
+          ...(guard.unchecked
+            ? { reason: "tracked-path guard could not verify (git unavailable) — proceeded unchecked" }
+            : {}),
+        });
       } catch (err) {
         rows.push({ host: h.host, status: "failed", reason: (err as Error).message });
       }
