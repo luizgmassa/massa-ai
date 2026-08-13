@@ -5,15 +5,33 @@ Contract: `.specs/features/sse-heartbeat-idle-timeout/spec.md`.
 ## Approach
 
 The defect is an inequality that is wrong by construction: `heartbeat (15 s) >
-idle window (10 s)`. Only one side can move (spec E4), so the design moves the
-heartbeat and then **pins the inequality with a sensor** so it cannot silently
-invert again.
+idle window (10 s)`. **Both** sides can move — that took two rounds to
+establish, and the correction is the most important thing in this document.
 
-Three alternatives were considered and rejected:
+The first draft moved only the heartbeat, on the strength of five *listen-time*
+attempts to raise the window (spec E4). The Plan Challenge Gate falsified that
+with Bun's *per-request* `server.timeout(request, seconds)`, reachable at
+`listenHandle.bun.server`, and re-measurement against the real route modules
+confirmed it: a 60 s override moved the drop to exactly 60.0 s (spec E5).
+
+So the design does both, because measurement shows each alone is insufficient:
+
+- The **override** removes the invisible 10 s default, which is what made this
+  defect possible in the first place — no edit site named the window at all.
+- The **heartbeat** is what makes a stream survive *indefinitely*, because the
+  override sets a finite window. Dropping the heartbeat just relocates the drop
+  (spec E5). With a 120 s window and the unchanged 15 s heartbeat, both
+  endpoints held 180 s idle — survival past the window, produced by the
+  heartbeat resetting the idle timer inside it (spec E6).
+
+A sensor then **pins the inequality** so it cannot silently invert again.
+
+Alternatives considered and rejected:
 
 | Alternative | Rejected because |
 | --- | --- |
-| Raise `Bun.serve`'s `idleTimeout` to 120 s | Unreachable through Elysia's public surface under `adapter: node()` — five placements measured inert (spec E4). |
+| Raise `Bun.serve`'s `idleTimeout` at listen time | Unreachable through Elysia's public surface under `adapter: node()` — five placements measured inert (spec E4). The per-request API is a different surface and **is** used (D6). |
+| Per-request override alone, heartbeat deleted | Measured insufficient: the window is finite, so the stream drops exactly when it expires (spec E5). Fewer moving parts, but it trades a 10 s bug for an N-second one. |
 | Migrate off `adapter: node()` to Bun's native adapter | Would reach `idleTimeout`, but `reusePort: false` and the restart/drain stopper are built on the node adapter (`index.ts:170-200`), and that path has its own recorded split-brain incident. A transport swap to fix a constant is disproportionate, and belongs in its own spec. |
 | Let the client reconnect every ~12 s and call it fixed | Turns a broken keep-alive into a reconnect storm: each reconnect re-runs `startSinkTail`, re-stats the sink, and restarts from the current end of file — so entries appended during the reconnect gap are lost, silently. |
 
@@ -48,11 +66,22 @@ the name states the role, and the location states the ownership).
 
 ## D2 — why 5 000 ms
 
-Measured, not chosen by feel. The window is 10 s (Bun's own message). A
-heartbeat at 5 s survived 45 s fully idle with 9 frames and zero drops
-(spec E2). The margin is a factor of 2, which absorbs a loaded host without
-making the heartbeat itself a traffic source: on an idle stream this is 12
-comment frames per minute, ~10 bytes each.
+Measured, not chosen by feel, and sized against the **worst case rather than
+the nominal one**. The nominal window is 10 s (Bun's own message), but the
+observed floor across E3's samples was 8.5 s, so the honest margin is
+8.5 ÷ 5 = **1.7×**, not the 2× the nominal implies. The Plan Challenge Gate
+raised this; the arithmetic here uses the observed floor.
+
+The heartbeat is deliberately sized against the **un-widened** window even
+though D6 widens it to 120 s. That is the graceful-degradation property: on any
+deployment where the native handle is absent (AC-07.3), the stream still
+survives on the heartbeat alone. Cost of the smaller interval is 12 comment
+frames per minute per stream, ~10 bytes each.
+
+Not swept: the 8.5 s outlier was recorded, not explained. It stops mattering
+once D6 lands, because the override replaces the default window wherever it
+applies — which is why the sweep the Plan Challenge Gate asked for was
+answered by changing the design instead of by taking more samples.
 
 ## D3 — the sensor enumerates, it does not assume
 
@@ -120,6 +149,42 @@ Return type becomes a discriminated string so the caller can tell them apart:
 
 `rapidCloseStreak` and `maxReconnectAttempts` are reused unchanged, so a
 genuinely broken endpoint still gives up in ~10 s instead of hot-looping.
+
+## D6 — the per-request window override
+
+`app.listen()`'s callback handle carries the native `Bun.Server` at
+`handle.bun.server`, and that object has `timeout(request, seconds)` — Bun's
+per-request idle override. `index.ts` captures it once and exposes it through a
+named accessor; each SSE route calls it at stream start with
+`SSE_REQUEST_TIMEOUT_SECONDS` from the shared constant module.
+
+```
+listen callback ──> setSseRequestTimeoutSource(handle.bun?.server)
+                             │
+route stream start ──> applySseRequestTimeout(request)   // no-op if absent
+```
+
+Three properties this shape buys, each of which a naive inline
+`handle.bun.server.timeout(...)` at each call site would lose:
+
+1. **One place knows the handle's shape.** `handle.bun?.server` is an
+   undocumented-by-Elysia traversal into an adapter internal; it belongs behind
+   one accessor that can be re-pointed when the adapter changes, not repeated in
+   every route.
+2. **Absence is normal, not exceptional** (AC-07.3). Under a non-Bun runtime, a
+   different adapter, or any test that imports a route without calling
+   `listen()`, there is no native server. The accessor returns `undefined` and
+   the call is skipped; the heartbeat (D2) is what covers that case, which is
+   exactly why D2 sizes against the un-widened window.
+3. **It is observable.** AC-07.4 requires counting applications, because a
+   survival assertion cannot tell "the override worked" from "the override was
+   never applied and the heartbeat carried it". That confusion is precisely how
+   the first draft of this design reached a wrong conclusion, and a test that
+   cannot distinguish the two would let it recur.
+
+Applied from the route's stream start rather than a global `onRequest` hook so
+non-SSE requests keep the default window — a widened idle window on ordinary
+JSON routes would hold sockets open for no benefit.
 
 ## Risks
 

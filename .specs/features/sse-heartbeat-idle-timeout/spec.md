@@ -43,8 +43,9 @@ presents as a silent ~12-second reconnect cycle instead of a visible stop.
 
 | Item | Reason |
 | --- | --- |
-| Raising `Bun.serve`'s `idleTimeout` | Measured unreachable under `adapter: node()` — see Evidence E4. Four placements and two node-server knobs all inert. |
+| Configuring `Bun.serve`'s `idleTimeout` at **listen time** | Measured unreachable under `adapter: node()` — see E4. Five placements all inert. The **per-request** override is reachable and is now in scope (SSE-07); these are different APIs. |
 | Migrating off `adapter: node()` | `reusePort: false` and the restart/drain path are built on it (`apps/tools-api/src/index.ts:170-200`); swapping the adapter is a separate, higher-risk change with its own spec. |
+| Removing the heartbeat in favor of the per-request override alone | Measured insufficient: the override sets a **finite** window, so a stream with no keep-alive inside it drops exactly when the window expires (E5: `server.timeout(request, 60)` → dropped at 60.0 s). Streams are designed to live 10 minutes. |
 | `SSE_MAX_DURATION_MS` (10-minute scheduled close) | Working as designed; the client's T47/T49 reconnect path already handles it and was measured correct. |
 | The live tail's source selection (file sink vs ring buffer) | Correct as shipped; `startSinkTail` was observed delivering 8 entries before the drop. |
 | `POST /api/v1/model-registry/regenerate-*-stream` heartbeat | That stream has no heartbeat and needs none — it emits generator output continuously and terminates in seconds. Covered by AC-03's sensor only as a non-offender. |
@@ -94,15 +95,15 @@ the way (`MASSA_AI_SSE_HEARTBEAT_MS=600000`), both SSE endpoints drop:
 `events.ts:15` and `logs.ts:347` each declare their own `15_000` literal. Two
 copies, one defect.
 
-**E4 — the idle window is not configurable here.** Bun states the mechanism
-itself on every drop:
+**E4 — the idle window is not configurable at listen time.** Bun states the
+mechanism itself on every drop:
 
 ```
 [Bun.serve]: request timed out after 10 seconds. Pass `idleTimeout` to configure.
 ```
 
-Five placements were tried against a minimal `Elysia({ adapter: node() })`
-server; all five dropped at 12.0 s:
+Five **listen-time** placements were tried against a minimal
+`Elysia({ adapter: node() })` server; all five dropped at 12.0 s:
 
 | Attempt | Observed |
 | --- | --- |
@@ -113,9 +114,49 @@ server; all five dropped at 12.0 s:
 | `server.setTimeout(...)` / `server.timeout = …` | handle is a plain `Object`, `hasSetTimeout: false`; field writes accepted, inert |
 
 The listen callback's handle exposes `runtime, options, bun, serveOptions,
-fetch, …` — an Elysia server abstraction, not a `node:http.Server`. So the
-window is a fixed 10 s from this codebase's point of view, and the heartbeat is
-the only side of the inequality that can move.
+fetch, …` — an Elysia server abstraction, not a `node:http.Server`.
+
+**E5 — but the window IS configurable per request, and this spec originally got
+that wrong.** The Plan Challenge Gate (evidence-audit mode) rejected E4's
+"not configurable" conclusion as overreaching: every placement tried was
+*listen-time* configuration, and Bun also exposes a *per-request* override,
+`server.timeout(request, seconds)`, on the native `Bun.Server` reachable at
+`listenHandle.bun.server`. Re-measured against the **real** `logsRoutes` and
+`eventsRoutes` modules — not a minimal repro — applied from an `onRequest` hook,
+with heartbeats pushed out of reach (`MASSA_AI_SSE_HEARTBEAT_MS=600000`) so
+survival could only be credited to the override:
+
+| Configuration | `GET /api/v1/events` |
+| --- | --- |
+| no override (this harness's own baseline) | DROPPED at 12.0 s |
+| `server.timeout(request, 60)` | DROPPED at **60.0 s** |
+
+The window is therefore not fixed: it tracks the value passed, exactly.
+
+**E6 — and the override alone is not the fix; the two are complements.** The
+override sets a *finite* window, so removing the heartbeat merely moves the drop
+(E5's 60 s row is that failure). With the window widened to 120 s and the
+**shipped, unchanged 15 s heartbeat** left in place, both endpoints were held
+fully idle for 180 s:
+
+| Endpoint | Outcome | Heartbeats received |
+| --- | --- | --- |
+| `GET /api/v1/logs/stream` | SURVIVED 180 s | 12 |
+| `GET /api/v1/events` | SURVIVED 180 s | 11 |
+
+180 s > 120 s, so survival is not the window being large — it is each heartbeat
+resetting the idle timer inside it. Both sides of the inequality move, and the
+fix needs both: the override removes the invisible 10 s default, and the
+heartbeat is what keeps a stream alive indefinitely inside whatever window is
+set.
+
+**Measurement conditions.** All figures above: macOS arm64, Bun 1.3.14, host at
+load average 1.46, 35 days uptime, real PostgreSQL, nothing else contending.
+The one 8.5 s sample in E3's four is unexplained and was not swept further —
+recorded rather than dismissed. It no longer affects the design's correctness,
+because SSE-07's override makes the default window's exact floor irrelevant
+whenever it can be applied, and SSE-01's heartbeat is chosen to sit inside the
+**un-widened** floor for the case where it cannot.
 
 ---
 
@@ -130,8 +171,11 @@ rather than per route.
 - **AC-01.1** A single exported module owns the SSE keep-alive default; both
   `routes/logs.ts` and `routes/events.ts` read it and neither declares its own
   numeric literal.
-- **AC-01.2** The default is 5 000 ms — half the measured 10 s window, the
-  value proven green in E2.
+- **AC-01.2** The default is 5 000 ms, chosen against the **un-widened** window
+  so the stream survives even on a deployment where SSE-07's override cannot be
+  applied. Margin is stated against the observed floor, not the nominal one:
+  8.5 s ÷ 5 s = 1.7×, not the 2× a 10 s nominal would suggest. Proven green in
+  E2.
 - **AC-01.3** The existing `MASSA_AI_SSE_HEARTBEAT_MS` override still wins, on
   both endpoints, read per request (the current behavior; unchanged).
 - **AC-01.4** The documented idle window (10 000 ms) is declared beside the
@@ -160,8 +204,21 @@ rather than per route.
 - **AC-03.3** The sensor is proved RED before it is trusted: restoring the
   15 000 ms literal makes it fail, and that failure is recorded in
   `validation.md`.
+- **AC-03.4** The enumeration's detection rule is stated as a named limitation
+  rather than left implicit: it matches the literal `text/event-stream` in route
+  source, so a future route that sets its content-type from an imported constant
+  would fall outside the population entirely. Raised by the Plan Challenge Gate
+  as a narrower recurrence of the very blind spot this sensor exists to close.
+  The test's own docblock records it, and the printed population is what a
+  reviewer checks against `routes/`.
 
 ### SSE-04 — the drop is diagnosable if it ever returns
+
+**Opportunistic co-fix, not a dependency.** This leak is triggered by
+`controller.enqueue` throwing on client disconnect and is independent of the
+heartbeat interval; SSE-01–03 are correct without it. It is included because it
+lives on the same lines, and it is isolated in its own task with its own gate
+so it never rides along inside another task's diff.
 
 - **AC-04.1** When a stream's heartbeat `controller.enqueue` throws, the route
   closes the stream rather than leaving `closed = true` with an open socket and
@@ -175,6 +232,27 @@ rather than per route.
 
 - **AC-05.1** `SSE_MAX_DURATION_MS` semantics are unchanged, and the client's
   existing clean-close reconnect (T47/T49) still fires for it.
+
+### SSE-07 — widen the transport window explicitly, per request
+
+The 10 s default is invisible at every edit site and is the reason this defect
+was possible. Every SSE route MUST set its own window rather than inherit it.
+
+- **AC-07.1** The native `Bun.Server` captured at `app.listen()` is exposed
+  through one named accessor in `apps/tools-api/src/index.ts`, not read ad hoc
+  from the listen handle at each call site.
+- **AC-07.2** Every SSE route calls `server.timeout(request, N)` at stream
+  start, with `N` from the shared constant module (SSE-01), so the window is
+  declared beside the heartbeat it must exceed.
+- **AC-07.3** The call degrades silently when the native handle or its
+  `timeout` method is absent — a non-Bun runtime, a future adapter change, or a
+  test harness that never called `listen()`. Absence reduces the stream to the
+  un-widened window, which AC-01.2's heartbeat already survives; it must never
+  throw and must never 500 the request.
+- **AC-07.4** A test asserts the override is actually applied on the request
+  path, counting applications. A survival assertion alone cannot distinguish
+  "the override worked" from "the override was never applied and the heartbeat
+  carried it" — the exact confusion that produced the wrong E4.
 
 ### SSE-06 — a transient drop does not permanently disable the live tail
 
@@ -210,8 +288,15 @@ rather than per route.
 | SSE-04 | Unit: a throwing controller drives the heartbeat path and the stream is observed closed and unsubscribed. |
 | SSE-05 | Existing `logs.test.ts` / `events.test.ts` max-duration cases stay green. |
 | SSE-06 | Unit against `connectLogsStreamOnce` / `runLogsLiveStream`: thrown-network-error reconnects, non-200 does not, abort is silent. |
+| SSE-07 | Application counter asserted non-zero on the request path, plus absent-handle degradation test. |
 
 ## Open Questions
 
-None. The one design unknown — whether the idle window could be raised instead
-— was closed by measurement (E4) before this spec was written.
+None open. One was closed **wrongly** and is recorded here so the correction is
+not lost: the first draft of this spec asserted that the transport idle window
+could not be raised, on the strength of five listen-time placements. The Plan
+Challenge Gate falsified that with Bun's per-request `server.timeout`, which was
+then re-measured against the real routes (E5, E6) and became SSE-07. The
+lesson generalizes past this feature: an exhaustive-looking negative result is
+only exhaustive over the API surface it searched, and "I tried five things"
+is not "there is no sixth".
