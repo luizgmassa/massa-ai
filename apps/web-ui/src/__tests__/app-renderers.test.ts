@@ -677,12 +677,24 @@ describe("startApp", () => {
     expect(dialogs.prompts).toContain("Edit memory content:");
     expect(dialogs.confirms.some((m) => m.includes("Delete this memory?"))).toBe(true);
 
-    const put = calls.find((c) => c.method === "PUT" && c.url.includes("/api/v1/memory/fake-id"));
-    expect(put).toBeDefined();
-    expect(put?.body).toContain("edited content");
+    // These asserted `PUT`/`DELETE /api/v1/memory/fake-id` until T9. No such
+    // route was ever registered — memory.ts exposes five body-keyed POSTs and
+    // nothing else — so this test, like two others, asserted the defect and
+    // passed, because the request capture accepts any URL. Three separate tests
+    // pinned a dead call path in place; `route-contract.test.ts` is the sensor
+    // that compares against the real route population instead of a stub's
+    // willingness to record a string. The id now travels in the body, so assert
+    // on the body rather than the URL.
+    const update = calls.find(
+      (c) => c.method === "POST" && c.url.includes("/api/v1/memory/update"),
+    );
+    expect(update).toBeDefined();
+    expect(update?.body).toContain("edited content");
+    expect(update?.body).toContain("fake-id");
 
-    const del = calls.find((c) => c.method === "DELETE" && c.url.includes("/api/v1/memory/fake-id"));
+    const del = calls.find((c) => c.method === "POST" && c.url.includes("/api/v1/memory/delete"));
     expect(del).toBeDefined();
+    expect(del?.body).toContain("fake-id");
 
     // Nothing failed, so no failure path ran.
     expect(dialogs.alerts).toEqual([]);

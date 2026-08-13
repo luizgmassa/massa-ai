@@ -164,12 +164,18 @@ describe("collectFormData — type coercion per input kind", () => {
 // ── Memory ──────────────────────────────────────────────────────────────────
 
 describe("handleMemoryEdit", () => {
-  it("PUTs the prompted content and re-renders", async () => {
+  // Was: `PUT /api/v1/memory/m%201`, which no route ever served — this test
+  // asserted the defect and passed anyway, because `ctx.api.request` is a mock
+  // and accepts any URL string. That is exactly how the dead call path survived
+  // review; `route-contract.test.ts` is the sensor that can actually see it.
+  // The id keeps its space: body-keyed, it must arrive UNENCODED, where the
+  // path-parameter form had to percent-encode it.
+  it("POSTs the prompted content to /memory/update and re-renders", async () => {
     const ctx = makeCtx();
     await withGlobals({ prompt: () => "new body" }, () => handleMemoryEdit(ctx, "m 1"));
-    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/memory/m%201", {
-      method: "PUT",
-      body: { content: "new body" },
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/memory/update", {
+      method: "POST",
+      body: { id: "m 1", content: "new body" },
     });
     expect(ctx.render).toHaveBeenCalled();
   });
@@ -199,10 +205,17 @@ describe("handleMemoryEdit", () => {
 });
 
 describe("handleMemoryDelete", () => {
-  it("DELETEs the encoded id and re-renders", async () => {
+  // Was: `DELETE /api/v1/memory/a%2Fb`, a route that never existed — see the
+  // note on handleMemoryEdit above. The `a/b` id is deliberate: a slash in a
+  // path parameter is the case percent-encoding exists for, and body-keyed it
+  // must survive verbatim instead.
+  it("POSTs the id to /memory/delete and re-renders", async () => {
     const ctx = makeCtx();
     await withGlobals({}, () => handleMemoryDelete(ctx, "a/b"));
-    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/memory/a%2Fb", { method: "DELETE" });
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/memory/delete", {
+      method: "POST",
+      body: { id: "a/b" },
+    });
     expect(ctx.render).toHaveBeenCalled();
   });
 
