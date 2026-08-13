@@ -27,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   polling into a dead controller for the life of the process.
 - A transient mid-stream network error on the Logs tab's live tail is now
   retried under the existing reconnect bounds instead of permanently turning
-  Live off and banners; a non-200 response still stays terminal.
+  Live off and bannering an error; a non-200 response still stays terminal,
+  and exhausting the bounds still turns Live off with a banner.
 
 ## [1.52.0] - 2026-08-13
 
