@@ -56,7 +56,10 @@ const {
   handleMemoryDeleteProjectCancel: (ctx: any) => void;
   handleMemoryDeleteProject: (ctx: any) => Promise<void>;
   stopLogsLiveStream: (ctx: any) => void;
-  runLogsLiveStream: (ctx: any, opts?: { reconnectDelayMs?: number; maxReconnectAttempts?: number }) => Promise<void>;
+  runLogsLiveStream: (
+    ctx: any,
+    opts?: { reconnectDelayMs?: number; maxReconnectAttempts?: number; now?: () => number },
+  ) => Promise<void>;
   handleLogsLiveToggle: (ctx: any) => void;
   handleLogsExport: (ctx: any) => Promise<void>;
   handleProfileSwitch: (ctx: any, profile: string, host: string) => Promise<void>;
@@ -2322,6 +2325,69 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     expect(ctx.state.logsLive).toBe(false);
     expect(ctx.root.children[0].textContent).toContain("Live log stream failed");
     expect(ctx.root.children[0].textContent).toContain("401");
+  });
+
+  it("does not give up after more scheduled-length closes than the bound allows for rapid ones — lifetime resets the streak (T49)", async () => {
+    // T49: T47's counter treated every clean close the same, so the
+    // server's own 10-minute scheduled close (SSE_MAX_DURATION_MS_DEFAULT)
+    // tripped the identical bound as a hot loop — after ~6 scheduled closes
+    // (~an hour on a healthy install) the tail gave up and bannered as
+    // though something had failed. This simulates each connection living a
+    // full scheduled interval via the injected `now` clock (no frames, no
+    // real sleep — "delivering a frame is not the signal") for more cycles
+    // than `maxReconnectAttempts` would tolerate if they counted as rapid,
+    // then ends the run with a genuine fetch failure so the test terminates
+    // deterministically. Observed red against T47's plain attempt counter:
+    // it gave up ("giving up") after exactly `maxReconnectAttempts + 1`
+    // connections instead of continuing past that count.
+    const SCHEDULED_MS = 10 * 60 * 1000; // matches SSE_MAX_DURATION_MS_DEFAULT
+    const maxReconnectAttempts = 3;
+    const scheduledClosesToObserve = maxReconnectAttempts + 3; // more than the old bound would allow
+    let clock = 0;
+    const now = () => clock;
+    let calls = 0;
+    const fetchMock = mock(async () => {
+      calls += 1;
+      if (calls > scheduledClosesToObserve) {
+        throw new Error("stop the run deliberately");
+      }
+      clock += SCHEDULED_MS; // this connection "lived" a full scheduled interval
+      return makeSseResponse([]);
+    });
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    await runLogsLiveStream(ctx, { reconnectDelayMs: 0, maxReconnectAttempts, now });
+    // More connections happened than a plain attempt counter would have
+    // tolerated (maxReconnectAttempts + 1) — proves the scheduled-length
+    // lifetime reset the rapid-close streak on every cycle instead of
+    // accumulating it.
+    expect(calls).toBe(scheduledClosesToObserve + 1); // ran every cycle, then the deliberate failure
+    expect(calls).toBeGreaterThan(maxReconnectAttempts + 1);
+    expect(ctx.state.logsLive).toBe(false); // ended via the genuine failure, not the bound
+    expect(ctx.root.children[0].textContent).toContain("Live log stream failed");
+    expect(ctx.root.children[0].textContent).not.toContain("giving up");
+  });
+
+  it("still gives up after the bound's worth of rapid (sub-threshold) closes, with the lifetime clock wired in (T49)", async () => {
+    // Re-asserts the hot-loop bound under the new lifetime-based counter,
+    // deterministically rather than relying on real-clock test speed: the
+    // injected clock never advances, so every close reads as 0ms — rapid —
+    // on every cycle.
+    let clock = 0;
+    const now = () => clock;
+    const fetchMock = mock(async () => makeSseResponse([]));
+    (globalThis as any).fetch = fetchMock;
+    const ctx = makeCtx({
+      state: { logsLive: true },
+      api: { request: mock(async () => ({})), authHeaders: () => ({ "x-api-key": "k" }) },
+    });
+    await runLogsLiveStream(ctx, { reconnectDelayMs: 0, maxReconnectAttempts: 2, now });
+    expect(fetchMock).toHaveBeenCalledTimes(3); // bound(2) + 1 connections, all rapid
+    expect(ctx.state.logsLive).toBe(false);
+    expect(ctx.root.children[0].textContent).toContain("giving up");
   });
 });
 

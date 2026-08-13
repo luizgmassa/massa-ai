@@ -293,18 +293,41 @@ function appendLogsLiveEntry(ctx: LogsCtx, entry: LogEntry): void {
  *  export list, which this task must not edit. */
 const LOGS_RECONNECT_DELAY_MS_DEFAULT = 2000;
 
-/** T47: bound on consecutive reconnect attempts after a clean server close
- *  before giving up, banners LOG-15's error, and turns Live off. A close
- *  that repeats immediately, over and over, is not the 10-minute schedule —
- *  it is something broken (auth expired mid-session, the route removed, the
- *  server down) — and with no bound at all a broken endpoint would hot-loop
- *  `fetch` forever. 5 reconnects (6 connections total, capped at 2s apart
- *  = 10s of retries) is enough to ride out a single bad close without
- *  looking like a hang. Injectable via `opts.maxReconnectAttempts` for the
- *  same reason as the delay — tests set it to 0 to keep their original
- *  single-shot semantics, or to a small number to observe the give-up path
- *  without waiting out the real bound. */
+/** T47: bound on consecutive *rapid* reconnect attempts after a clean server
+ *  close before giving up, banners LOG-15's error, and turns Live off. A
+ *  close that repeats immediately, over and over, is not the 10-minute
+ *  schedule — it is something broken (auth expired mid-session, the route
+ *  removed, the server down) — and with no bound at all a broken endpoint
+ *  would hot-loop `fetch` forever. 5 reconnects (6 connections total, capped
+ *  at 2s apart = 10s of retries) is enough to ride out a single bad close
+ *  without looking like a hang. Injectable via `opts.maxReconnectAttempts`
+ *  for the same reason as the delay — tests set it to 0 to keep their
+ *  original single-shot semantics, or to a small number to observe the
+ *  give-up path without waiting out the real bound.
+ *
+ *  T49: "consecutive" here means consecutive *rapid* closes specifically —
+ *  see `LOGS_RECONNECT_HEALTHY_MS_DEFAULT`. A connection that lived at least
+ *  that long resets the streak to 0 before this bound is even consulted, so
+ *  the server's own 10-minute schedule (`SSE_MAX_DURATION_MS_DEFAULT`) never
+ *  counts against it — only a close that repeats *immediately* does. */
 const LOGS_RECONNECT_ATTEMPTS_MAX_DEFAULT = 5;
+
+/** T49: a connection that lived at least this long, before closing, counts
+ *  as healthy and resets the consecutive-rapid-close streak
+ *  (`LOGS_RECONNECT_ATTEMPTS_MAX_DEFAULT`) rather than accumulating toward
+ *  it. Lifetime is the signal, not whether a frame arrived — the measured
+ *  hot-loop case (a scratch server that sends one frame then closes)
+ *  delivered one frame per connection in about 100ms, so "it delivered
+ *  data" does not mean healthy. 30 seconds is chosen to sit far from both
+ *  ends it needs to separate: ~300x the measured ~100ms hot-loop lifetime,
+ *  so a real hot loop still trips the bound almost immediately, and 1/20th
+ *  of the server's 10-minute (`SSE_MAX_DURATION_MS_DEFAULT`) scheduled
+ *  close, so the scheduled close is never mistaken for a failure. Injectable
+ *  via `opts.now` for the same reason as the delay and attempt bound above —
+ *  a test simulates a long-lived connection by controlling what this clock
+ *  reports, instead of sleeping 30 real seconds or depending on wall-clock
+ *  speed. */
+const LOGS_RECONNECT_HEALTHY_MS_DEFAULT = 30_000;
 
 /** Resolves after `ms`, or immediately if `signal` is already aborted or
  *  becomes aborted while waiting — so a reconnect delay in progress when
@@ -432,10 +455,19 @@ async function connectLogsStreamOnce(
  *  whole reconnect loop, not just the first connection, so a second call
  *  while a reconnect is pending still no-ops, and `stopLogsLiveStream`
  *  aborts whichever phase — an in-flight read or a pending reconnect delay
- *  — is currently running. */
+ *  — is currently running.
+ *
+ *  T49: `attempt` used to count every clean close, so the server's own
+ *  10-minute schedule tripped the same bound as a hot loop — after ~6
+ *  scheduled closes (~an hour on a healthy install) the tail gave up
+ *  permanently and bannered as though something had failed. Each
+ *  connection's lifetime is now measured via `opts.now` (default
+ *  `Date.now`) and only a close shorter than `LOGS_RECONNECT_HEALTHY_MS_DEFAULT`
+ *  extends `rapidCloseStreak`; a longer one resets it to 0, so the bound
+ *  means consecutive *rapid* closes, not consecutive closes. */
 export async function runLogsLiveStream(
   ctx: LogsCtx,
-  opts?: { reconnectDelayMs?: number; maxReconnectAttempts?: number },
+  opts?: { reconnectDelayMs?: number; maxReconnectAttempts?: number; now?: () => number },
 ): Promise<void> {
   const state = ctx.state || (ctx.state = {});
   if (!state.logsLive) return;
@@ -445,19 +477,29 @@ export async function runLogsLiveStream(
     opts && opts.reconnectDelayMs !== undefined ? opts.reconnectDelayMs : LOGS_RECONNECT_DELAY_MS_DEFAULT;
   const maxReconnectAttempts =
     opts && opts.maxReconnectAttempts !== undefined ? opts.maxReconnectAttempts : LOGS_RECONNECT_ATTEMPTS_MAX_DEFAULT;
+  const now = opts && typeof opts.now === "function" ? opts.now : () => Date.now();
   const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
   state.logsStreamAbort = controller;
   try {
-    for (let attempt = 0; ; attempt++) {
+    let rapidCloseStreak = 0;
+    for (;;) {
+      const connectStartMs = now();
       const cleanClose = await connectLogsStreamOnce(ctx, state, controller);
       if (!cleanClose) return; // our own abort, Live toggled off, or a genuine failure already banner'd
       if (!state.logsLive) return; // toggled off between the read loop ending and here
-      if (attempt >= maxReconnectAttempts) {
+      const lifetimeMs = now() - connectStartMs;
+      // T49: lifetime is the signal, not whether a frame arrived — see
+      // LOGS_RECONNECT_HEALTHY_MS_DEFAULT's comment for the measured
+      // hot-loop case this has to stay distinguishable from.
+      rapidCloseStreak = lifetimeMs < LOGS_RECONNECT_HEALTHY_MS_DEFAULT ? rapidCloseStreak + 1 : 0;
+      if (rapidCloseStreak > maxReconnectAttempts) {
         state.logsLive = false;
         showBanner(
           ctx.root,
           "error",
-          "Live log stream closed " + (attempt + 1) + " times in a row; giving up. Toggle Live to retry.",
+          "Live log stream closed too quickly " +
+            rapidCloseStreak +
+            " times in a row; giving up. Toggle Live to retry.",
         );
         return;
       }
