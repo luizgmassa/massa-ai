@@ -1,6 +1,48 @@
+## Current — Installer prune and test-scoping (**VALIDATED 2026-08-17** — 13 commits, 7 parallel batch workers partitioned by file plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
+
+Two briefed defects, both wider than briefed.
+
+**Defect A.** `packages/core/src/__tests__/scheduler-store-pg.test.ts` guarded an
+exact-equality assertion with a monkey-patched seam filtering ids beginning
+`scheduled-` — a denylist coupled to a naming convention it does not own. It
+patched `listAll` and the assertion on the next line calls `listEnabled`, so the
+suite was **red on `main`** against any database holding enabled scheduled jobs:
+5 pass / 1 fail on the shared developer database. The dedicated test database
+reports 6/0 pre-fix and cannot observe the defect at all, which is why CI never
+saw it. Now scoped by a positive allowlist to the suite's own prefixes; seam
+deleted; 6/0 on both databases.
+
+**Defect B.** One install site shed retired members; five did not, and two
+removal loops derived their population from the source bundle rather than the
+installed directory — both self-refuting against comments in their own files.
+Under AD-016 the bundle is normally absent, so opencode's `--uninstall` removed
+zero agent symlinks. All six sites now **copy-then-prune** (prune-then-copy
+loses live specialists when `set -euo pipefail` aborts a run mid-copy), each
+using that host's own documented ownership test — prefix for claude/cursor,
+`# massa-ai-owned` marker for codex, symlink-ness for opencode. A uniform
+`rm -f` would have deleted user files on two hosts.
+
+Also: `install-skills.sh --apply` now removes a stale skill behind the
+`skillsOwner != "plugin"` gate; all four plugin installers install
+`skills/profile/`, which the generator emits and only the checkout route
+shipped; and the roster gate that had been green while `CLAUDE.md` advertised 17
+specialists now scans whole-file, because the claim spanned a line break.
+
+Gates: test:scripts 1810/0 → **1820/0**; test:plugins 135/0 → **141/0**; four new
+prune suites **182/0**; scheduler 5/1 → **6/0** on the shared database; lint
+clean; type-check 6/6; `bun run test` 12/12.
+
+Review changed the design four times before code was written, twice by finding
+defects in the specification itself: an ownership-test citation three lines too
+narrow that would have made `--apply` delete plugin-owned skill trees, and a
+skill-derivation rule that would have installed 49 skills on cursor.
+
+Artifacts: `.specs/features/installer-prune-and-test-scoping/{spec,design,tasks,validation}.md`.
+Open: IPT-F1, IPT-F4, IPT-F6, IPT-F7 (all recorded in validation.md).
+
 # massa-ai Spec State
 
-## Current — Sub-agent tool inheritance (**VALIDATED 2026-08-11** — 12 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
+## Previous — Sub-agent tool inheritance (**VALIDATED 2026-08-11** — 12 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
 
 - projectId `massa-ai` · workflowSessionId `spec-subagent-tool-inheritance` · workflow
   **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch

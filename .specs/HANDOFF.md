@@ -1,4 +1,28 @@
-# Handoff — web-ui-typescript (EXECUTE COMPLETE 2026-08-12 — 62 commits across 14 phases, sequential batch workers; every gate green; unpushed, push/PR is the user's call)
+# Handoff — installer-prune-and-test-scoping (EXECUTE COMPLETE 2026-08-17 — 13 commits, 4 Phases / 10 Tasks, 7 parallel batch workers plus independent verification; every gate green; unpushed, push/PR is the user's call)
+
+**Branch:** `fix/installer-prune-and-test-scoping`, off `main@89909051`. Worktree
+`~/Projects/massa-ai-wt-prune`. Shares no source file with PR #107 or
+`feat/portal-handoff-proposal-crud`; merges in any order relative to them.
+
+**What shipped.** Six installer sites now shed retired agents/commands in
+copy-then-prune order, each honouring that host's own ownership test; two
+removal loops repointed from the source bundle to the installed directory;
+`install-skills.sh --apply` removes stale skills behind the plugin-owner gate;
+all four plugin installers install `skills/profile/`; the roster gate can see a
+count claim that spans a line break; and the scheduler store parity suite is
+scoped to rows it created.
+
+**Read `validation.md` first.** It carries the unmodified-tree RED, the seven
+mutations, and the two traps that cost real time: a cache replay is not a
+measurement, and measuring while sibling workers run is not measuring — the
+generated bundles are shared state that file-partitioning does not isolate.
+
+**Next.** Push and open the PR (user's call). `[Unreleased]` carries `### Added`
+and `### Fixed`, so this cuts a **minor** bump. Open follow-ups IPT-F1, F4, F6,
+F7 are recorded in `validation.md`, plus Feature 3's carried AC-03.3c, HPC-06,
+HPC-07.
+
+# Previous handoff — web-ui-typescript (EXECUTE COMPLETE 2026-08-12 — 62 commits across 14 phases, sequential batch workers; every gate green; unpushed, push/PR is the user's call)
 
 Session `spec-web-ui-typescript` · workflow **spec-driven** (Large/Complex) · branch
 `spec/web-ui-typescript` from `origin/main` @ `6227b4ac`, worktree
