@@ -7,31 +7,17 @@ import type { ScheduledJob } from "../services/scheduler/scheduler-types.js";
 
 const DB_AVAILABLE = (process.env.DATABASE_URL ?? "").startsWith("postgres");
 const TEST_PREFIX = "pg-scheduler-test-";
+const PROBE_PREFIX = "pg-scheduler-probe-"; // AC-01.4: a second prefix this suite also owns
 let prisma: any;
 
-// M35: instance-scoped seam tracking. The shared DB may carry `scheduled-*`
-// rows from the production scheduler. The parity test at :101 asserts an
-// exact listAll() result; on a shared DB those scheduled-* rows leak in and
-// break the assertion. We wrap storeB.listAll per-test to filter them out,
-// then restore in afterEach. A follow-up test proves restoration by asserting
-// a fresh storeB sees the full unfiltered set (including scheduled-*).
-let seamStore: PgScheduledJobStore | null = null;
-let seamOriginalListAll: (() => ScheduledJob[]) | null = null;
-
-function installScheduledFilterSeam(store: PgScheduledJobStore): void {
-  seamOriginalListAll = store.listAll.bind(store);
-  store.listAll = function () {
-    return seamOriginalListAll!().filter((e) => !e.id.startsWith("scheduled-"));
-  };
-  seamStore = store;
-}
-
-function restoreSeam(): void {
-  if (seamStore && seamOriginalListAll) {
-    seamStore.listAll = seamOriginalListAll;
-  }
-  seamStore = null;
-  seamOriginalListAll = null;
+/**
+ * Ids this suite created. A shared database may carry unrelated rows (for
+ * example the production scheduler's `scheduled-*` defaults); every
+ * set-valued assertion is scoped to this suite's own TEST_PREFIX rows via a
+ * positive allowlist, never a denylist of what to exclude.
+ */
+function own(entries: ScheduledJob[]): string[] {
+  return entries.filter((e) => e.id.startsWith(TEST_PREFIX)).map((e) => e.id);
 }
 
 function job(
@@ -62,7 +48,7 @@ function testId(): string {
 async function cleanup(): Promise<void> {
   if (!prisma) return;
   await prisma.$executeRaw`
-    DELETE FROM scheduled_jobs WHERE id LIKE ${TEST_PREFIX + "%"}
+    DELETE FROM scheduled_jobs WHERE id LIKE ${TEST_PREFIX + "%"} OR id LIKE ${PROBE_PREFIX + "%"}
   `;
 }
 
@@ -84,10 +70,7 @@ describe.skipIf(!DB_AVAILABLE)("PgScheduledJobStore — PostgreSQL parity", () =
     await cleanup();
   });
 
-  afterEach(() => {
-    restoreSeam();
-    return cleanup();
-  });
+  afterEach(cleanup);
   afterAll(cleanup);
 
   test("persists every field and hydrates interval and cron jobs after restart", async () => {
@@ -130,46 +113,36 @@ describe.skipIf(!DB_AVAILABLE)("PgScheduledJobStore — PostgreSQL parity", () =
       enabled: false,
       payload: { nested: { value: 42 }, flag: true },
     }));
-    // M35: install the instance-scoped seam so the exact-listAll assertion
-    // passes against a shared DB that may carry `scheduled-*` rows from the
-    // production scheduler. The seam filters `scheduled-*` rows for this
-    // storeB instance only; afterEach restores the original listAll.
-    installScheduledFilterSeam(storeB);
-    expect(storeB.listAll().map((entry) => entry.id)).toEqual([cronId, intervalId]);
-    expect(storeB.listEnabled().map((entry) => entry.id)).toEqual([intervalId]);
+    expect(own(storeB.listAll())).toEqual([cronId, intervalId]);
+    expect(own(storeB.listEnabled())).toEqual([intervalId]);
+
+    // AC-01.4: a foreign row — matching neither this suite's TEST_PREFIX nor
+    // the production `scheduled-` prefix — must not disturb the scoped
+    // assertions above. AC-01.4a: enabled: false, so it stays invisible to a
+    // live Scheduler.start(), which seeds its tick loop from listEnabled()
+    // (see "Risks accepted" in spec.md).
+    const probeId = `${PROBE_PREFIX}${randomUUID()}`;
+    storeB.save(job(probeId, { enabled: false }));
+    await storeB.__drain();
+
+    expect(own(storeB.listAll())).toEqual([cronId, intervalId]);
+    expect(own(storeB.listEnabled())).toEqual([intervalId]);
+
+    storeB.delete(probeId);
+    await storeB.__drain();
+    expect(await row(probeId)).toBeNull();
   });
 
-  // M35: follow-up test proving the seam restores. After afterEach runs
-  // (restoreSeam + cleanup), a fresh storeB sees the full unfiltered set.
-  // On a dedicated test DB with no scheduled-* rows, this test asserts the
-  // seam did not pollute the PgScheduledJobStore class or global SQL. On a
-  // shared DB, it asserts the scheduled-* rows are visible again.
-  test("M35: seam restores — fresh storeB.listAll returns unfiltered set after afterEach", async () => {
-    const storeB = new PgScheduledJobStore();
-    await hydrate(storeB);
-    const allIds = storeB.listAll().map((entry) => entry.id);
-    // The fresh storeB (no seam installed) sees whatever the DB holds. We
-    // only assert the seam did NOT modify the class — listAll is the original
-    // method. The presence/absence of scheduled-* rows depends on the DB
-    // state; the invariant is that no test-prefixed rows leaked (cleanup ran).
-    expect(allIds.filter((id) => id.startsWith(TEST_PREFIX))).toEqual([]);
-    // Behavioral proof that the seam is reversible: install the seam, verify
-    // it filters scheduled-* rows; restore, verify listAll returns the same
-    // unfiltered set as before the seam. This proves the seam did NOT modify
-    // the PgScheduledJobStore class or global SQL — it's instance-scoped.
-    const beforeSeam = storeB.listAll();
-    installScheduledFilterSeam(storeB);
-    const duringSeam = storeB.listAll();
-    expect(duringSeam.every((e) => !e.id.startsWith("scheduled-"))).toBe(true);
-    // The seam MUST filter at least as much as the original (scheduled-* rows
-    // are removed). If there were no scheduled-* rows, duringSeam === beforeSeam.
-    expect(duringSeam.length).toBeLessThanOrEqual(beforeSeam.length);
-    restoreSeam();
-    const afterSeam = storeB.listAll();
-    // After restore, listAll returns the same set as before the seam (the
-    // original method). If there were scheduled-* rows before, they're back.
-    expect(afterSeam.length).toBe(beforeSeam.length);
-    expect(afterSeam.map((e) => e.id).sort()).toEqual(beforeSeam.map((e) => e.id).sort());
+  // AC-01.3: the seam's one durable assertion — that cleanup() leaves no
+  // test-prefixed row behind — survives as a plain assertion. AC-01.8 widens
+  // it to both prefixes this suite owns.
+  test("cleanup leaves no row from either prefix behind", async () => {
+    const store = new PgScheduledJobStore();
+    await hydrate(store);
+    const allIds = store.listAll().map((entry) => entry.id);
+    expect(
+      allIds.filter((id) => id.startsWith(TEST_PREFIX) || id.startsWith(PROBE_PREFIX)),
+    ).toEqual([]);
   });
 
   test("rapid same-ID saves commit in call order and preserve the latest value", async () => {
