@@ -14,7 +14,7 @@ Every Task below owns a disjoint write set. All seven may run concurrently.
 | **T2** | `apps/claude-plugin/install.sh`, `scripts/tests/test-installer-prune-claude.sh` (new), `apps/claude-plugin/__tests__/` | IPT-02 sites 1–2, IPT-03 site 6, IPT-05 | `bash scripts/tests/test-installer-prune-claude.sh`; `bun run test:plugins` |
 | **T3** | `apps/codex-plugin/install.sh`, `scripts/tests/test-installer-prune-codex.sh` (new), `apps/codex-plugin/__tests__/` | IPT-02 site 3, IPT-05 | `bash scripts/tests/test-installer-prune-codex.sh`; `bun run test:plugins` |
 | **T4** | `apps/opencode-plugin/install.sh`, `scripts/tests/test-installer-prune-opencode.sh` (new), `apps/opencode-plugin/__tests__/` | IPT-02 sites 4–5, IPT-03 site 7, IPT-05 | `bash scripts/tests/test-installer-prune-opencode.sh`; `bun run test:plugins` |
-| **T5** | `apps/cursor-plugin/install.sh`, `apps/cursor-plugin/__tests__/` | IPT-05 only (AC-02.6: prune loop untouched) | `bun run test:plugins` |
+| **T5** | `apps/cursor-plugin/install.sh`, `scripts/tests/test-installer-prune-cursor.sh` (new), `apps/cursor-plugin/__tests__/` | IPT-02 site 6 (AC-02.6/6a), IPT-05 | `bash scripts/tests/test-installer-prune-cursor.sh`; `bun run test:plugins` |
 | **T6** | `scripts/install-skills.sh`, `scripts/tests/test-install-skills-stale-apply.sh` (new) | IPT-04 | `bash scripts/tests/test-install-skills-stale-apply.sh` + the 5 existing `test-install-skills-*.sh` |
 | **T7** | `scripts/__tests__/workflow-harness-contract.test.ts`, `CLAUDE.md` | IPT-06 | `bun test scripts/__tests__/workflow-harness-contract.test.ts` |
 
@@ -40,8 +40,13 @@ the bundle-absent test sets `MASSA_AI_SKIP_ARTIFACT_GENERATION=1`, or the
 installer regenerates the bundle before the removal loop and the test is green
 for the wrong reason.
 
-**T5** — cursor's agent prune at `:625` is **not** touched (AC-02.6). T5 adds
-`profile` to `install_bundled_skills` and its behavioural guard, nothing else.
+**T5** — cursor's agent prune at `:625` **is** converted from prune-then-copy to
+copy-then-prune (AC-02.6). Its ownership test stays the prefix glob, which is
+already correct. Write the AC-02.4 retired-member test **first** and observe it
+pass against the current prune-then-copy code — cursor is the one site where the
+retired-member behaviour already works, so that test is not a RED-then-GREEN
+sensor here; it is a regression guard proving the reorder preserved behaviour.
+T5 also adds `profile` to `install_bundled_skills`.
 
 **T6** — port `install-skills.sh:665-698`, the **gated** block. `:665` is the
 `owner != "plugin"` guard; `apply_platform()` has no `owner` variable today, so

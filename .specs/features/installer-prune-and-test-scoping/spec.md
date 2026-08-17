@@ -258,15 +258,24 @@ is absent" is the normal state, not an edge case.
   member that the ownership test must reject — an unmarked `massa-ai-*.toml`,
   and a regular file at an opencode agent path — and asserts it survives the
   install. This is the AC that catches a uniform `rm -f`.
-- **AC-02.6** `apps/cursor-plugin/install.sh:625` is not modified. Scope that
-  claim precisely: cursor is verified correct on the **ownership-test**
-  dimension only (prefix-glob, matching its own uninstall at `:505-509`). It is
-  **not** verified on the interruption dimension — it carries exactly the
-  prune-then-copy window AC-02.1 rejects, and no test in this repository
-  currently exercises its agent-prune loop at all (measured: zero hits for
-  prune/retired/stale fixtures against that loop in
-  `apps/cursor-plugin/__tests__/install.test.ts`). Leaving it unchanged is a
-  scope decision, not a correctness finding. Recorded as **IPT-F5**.
+- **AC-02.6** `apps/cursor-plugin/install.sh:625` **is** converted to
+  copy-then-prune, making it site 6 of 6. Scope the reason precisely: cursor is
+  verified correct on the **ownership-test** dimension (prefix-glob, matching
+  its own uninstall at `:505-509`) and was the model for that. It is not correct
+  on the interruption dimension — it carries exactly the prune-then-copy window
+  AC-02.1 rejects, and no test in this repository exercises its agent-prune loop
+  at all (measured: zero prune/retired/stale fixtures against that loop in
+  `apps/cursor-plugin/__tests__/install.test.ts`).
+
+  Leaving cursor alone would make it the sole host on the order this feature
+  documents as unsafe, while every sibling moved. The before/after reference
+  point it was preserved for is no longer needed: both plan critics verified the
+  ownership table against source independently, which is stronger evidence than
+  an unmodified example.
+- **AC-02.6a** Cursor's prune loop gains the AC-02.4 retired-member test it
+  currently lacks. Converting an untested destructive loop without first giving
+  it a sensor would be the one change in this feature with no way to tell
+  whether it worked.
 
 ### IPT-03 — removal loops read the installed directory, never the bundle
 
@@ -522,10 +531,9 @@ word 'specialist' forty lines later".
   A future order-sensitive test reusing the `job()` fixture's default
   `nextRunAt: 2_000` for two rows would tie on the sort key and fall back to
   unspecified row-scan order. Recorded so it is not rediscovered as a new flake.
-- **IPT-F5** — convert `apps/cursor-plugin/install.sh:625` from prune-then-copy
-  to copy-then-prune, matching AC-02.1, and give its agent-prune loop the test
-  coverage it currently lacks entirely. Left out of scope because cursor was not
-  among the sites the scope decision covered; see AC-02.6.
+- ~~**IPT-F5**~~ — cursor's conversion to copy-then-prune was folded into scope
+  by user decision on 2026-08-17; see AC-02.6/AC-02.6a. Kept as a struck entry
+  so the earlier reference in `design.md` D1 is not read as an open item.
 - **IPT-F2** — `install-skills.sh --check` reports stale skills as `drift`. After
   IPT-04, `--apply` fixes them. Whether `--check` should exit non-zero on stale
   drift in CI is unresolved and unchanged here.
