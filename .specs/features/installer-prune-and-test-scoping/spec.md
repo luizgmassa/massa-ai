@@ -288,6 +288,19 @@ is absent" is the normal state, not an edge case.
   normal state under AD-016 — asserting that installed members are still
   removed. With the bundle present and complete, the pre-fix and post-fix
   behaviour coincide, so a bundle-present test does not discriminate.
+- **AC-03.3b** "Bundle absent" is **not reachable** as literally worded on
+  opencode, and the AC is amended rather than left unsatisfiable. Every
+  installer runs a sentinel before the `--uninstall` branch — *"missing or empty
+  `$SCRIPT_DIR/agents` — run `bun run generate:artifacts` first"*, `exit 1` — so
+  emptying the bundle directory makes the script exit before the removal loop
+  is ever reached, and the test would prove nothing about the loop.
+
+  The reachable equivalent, which is what T4 implemented and what this AC now
+  requires: the bundle is missing **exactly one previously-installed member**
+  while remaining non-empty. That is the discriminating condition either way —
+  a source-derived loop cannot see the member the source no longer has,
+  regardless of whether the rest of the directory is populated. Found during
+  implementation, not review.
 - **AC-03.3a** That test must set `MASSA_AI_SKIP_ARTIFACT_GENERATION=1`. All
   four installers regenerate the bundle at the top of the script whenever
   `scripts/generate-skill-artifacts.ts` is reachable and that variable is not
@@ -531,6 +544,13 @@ word 'specialist' forty lines later".
   A future order-sensitive test reusing the `job()` fixture's default
   `nextRunAt: 2_000` for two rows would tie on the sort key and fall back to
   unspecified row-scan order. Recorded so it is not rediscovered as a new flake.
+- **IPT-F6** — the four `uninstall_bundled_skills` loops prune a **hardcoded
+  name list** (`massa-ai persona-router profile`), so retiring a harness skill
+  would leave it installed on the plugin route — the same defect class this
+  feature removed from the agent and command paths. Surfaced by AC-03.4's sweep
+  once it separated prune loops from refresh loops. Out of scope because these
+  are uninstall paths, not the install paths the scope decision covered. The
+  sweep pins them at exactly four files so the class cannot grow silently.
 - ~~**IPT-F5**~~ — cursor's conversion to copy-then-prune was folded into scope
   by user decision on 2026-08-17; see AC-02.6/AC-02.6a. Kept as a struck entry
   so the earlier reference in `design.md` D1 is not read as an open item.
