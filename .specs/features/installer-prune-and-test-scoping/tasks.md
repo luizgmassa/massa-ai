@@ -82,7 +82,14 @@ Re-derive every figure; reproduce at least these mutations by hand, without
 2. Replace one host's ownership test with a bare `rm -f massa-ai-*` → AC-02.5's
    user-owned fixture must go red.
 3. Revert `apply_platform`'s `owner != "plugin"` gate → AC-04.4b must go red.
-4. Revert the roster matcher widening → T7's RED must reappear.
+4. Revert the roster gate's **scan loop** (whole-body → per-line `split`), not
+   just the regex → the gate must go falsely green with `CLAUDE.md` at 17.
+   Reverting only the regex does **not** reproduce the blindness: JavaScript's
+   `\s` already matches a literal newline, so the original pattern would have
+   matched across the line break had it ever been shown one. The per-line
+   `split` was the structural cause; the regex was never the whole story. (T7
+   established this; the earlier wording here was ambiguous and would have led
+   a verifier to conclude the gate was fine.)
 5. Re-scope T1's assertions to `listAll` only → the shared-DB run must go red at
    `:139`.
 
