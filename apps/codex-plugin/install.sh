@@ -307,7 +307,7 @@ install_bundled_skills() {
   fi
 
   local installed=0 name src dest
-  for name in massa-ai persona-router; do
+  for name in massa-ai persona-router profile; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -336,7 +336,7 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router"] };
+data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile"] };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. modelProfile (T10, MPS-03 round-trip
 // obligation) is engine-owned; installRoute is installer-owned but written by
@@ -381,7 +381,7 @@ NODE
   )"
   [[ "$raw_owner" == "plugin" ]] && {
     local name
-    for name in massa-ai persona-router; do
+    for name in massa-ai persona-router profile; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
     rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
@@ -686,6 +686,35 @@ for src in "$ACTIVE_AGENTS_SRC/"massa-ai-*.toml; do
   specialist_count=$((specialist_count + 1))
 done
 vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
+
+# Shed retired specialists — IPT-02 site 3 (D1 copy-then-prune, D2/AC-02.1a).
+# The copy loop above writes the current set FIRST; only then do we remove
+# owned destination entries the bundle no longer ships. Never the reverse —
+# an interrupted run must never leave the user with fewer agents than before
+# (D1). The removal POPULATION is the destination directory ($AGENTS_DIR,
+# every *.toml, not just files matching the massa-ai- prefix — mirrors the
+# --uninstall loop's population above); the current bundle
+# ($ACTIVE_AGENTS_SRC) supplies only the keep-predicate. Never loop over the
+# bundle to decide removals (D2, AC-02.1a).
+#
+# Ownership test is per-host (D3/AC-02.2), taken verbatim from this file's own
+# --uninstall above: the first line must be exactly "# massa-ai-owned". This
+# is NOT a name-prefix test — $AGENTS_DIR is a directory shared with
+# user-authored agents, and a blind `rm -f massa-ai-*.toml` would delete a
+# user's own file that happens to share the name prefix but carries no marker
+# (AC-02.3, AC-02.5).
+pruned=0
+for f in "$AGENTS_DIR/"*.toml; do
+  [[ -f "$f" ]] || continue
+  head -n1 "$f" | grep -q "^# massa-ai-owned$" || continue   # ownership test (D3)
+  base="$(basename "$f")"
+  [[ -f "$ACTIVE_AGENTS_SRC/$base" ]] && continue             # keep-list: still shipped
+  rm -f "$f"
+  pruned=$((pruned + 1))
+done
+if [[ "$pruned" -gt 0 ]]; then
+  vecho "  - pruned ${pruned} retired massa-ai-owned agent TOML files from $AGENTS_DIR/"
+fi
 
 install_variant_tree
 

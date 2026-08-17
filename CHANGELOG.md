@@ -40,6 +40,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `update_proposal`, `delete_proposal` — taking the surface from 54 to 59, in both
   the HTTP and embedded clients.
 
+- **Installers now shed retired agents, commands and skills.** Six install-path
+  copy loops across the four plugin installers wrote the current set and removed
+  nothing, so a specialist or workflow command deleted from the bundle stayed
+  installed forever — `skills/agents/handoff-writer/` was retired in `93c1ee1c`
+  and survives on any machine installed before it. All six now **copy-then-prune**:
+  the current set lands first, then owned destination entries the bundle no
+  longer ships are removed. The order matters under interruption. `set -euo
+  pipefail` aborts on a mid-loop `cp` failure, so prune-then-copy can leave a
+  user with fewer agents than before they upgraded; copy-then-prune's worst case
+  is a retired member lingering one more run.
+
+  Ownership is decided per host, taken verbatim from each installer's own
+  uninstall path, and the tests are not interchangeable: claude and cursor use
+  the `massa-ai-` name prefix, codex requires the exact `# massa-ai-owned` first
+  line because `~/.codex/agents/` is shared with user-authored agents, and
+  opencode unlinks only symlinks because its copy loop already refuses to
+  clobber a regular file at an owned path. A uniform `rm -f massa-ai-*` would
+  have deleted user files on two of the four hosts.
+
+- **`scripts/install-skills.sh --apply` removes a stale skill.** A skill recorded
+  in `install-state.json`, gone from `skills/`, and still massa-ai-owned was
+  reported as drift by `--check` and never removed. It is now removed on
+  `--apply`, behind the same `skillsOwner != "plugin"` gate `--uninstall`
+  uses — a plugin tarball's skill directories are never touched by the repo
+  installer. `--check` behaviour is unchanged and `--dry-run` still removes
+  nothing.
+
+- **`scripts/__tests__/installer-removal-derivation.test.ts`** — a committed
+  sweep asserting that no installer prune loop derives its population from the
+  source bundle. It classifies by the loop's iteration expression alone, since
+  every correct copy-then-prune loop names the bundle in its body as the
+  keep-predicate.
+
+### Changed
+
+- Codex marketplace-route profile switching is no longer refused. Its stated
+  reason — that an in-place bundle rewrite "would dirty a checkout" — was true
+  when plugin bundles were checked in and false since AD-016 made them
+  gitignored generated output. A **runtime** tracked-path guard replaces it, so
+  the removal is scoped by what is true of the user's actual checkout rather
+  than by what was true of one machine: a fork or a checkout predating AD-016
+  is still refused, loudly, naming the offending path.
+
 ### Fixed
 
 - **Admin Portal memory edit and delete did nothing.** Both called
@@ -88,15 +131,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generator list from that script and runs every generator it names, reporting
   per-host skill reach and naming the failing generator on a non-zero exit.
 
-### Changed
+- **The plugin installers never installed `skills/profile/`.** All four
+  hardcoded `massa-ai persona-router` while the generator emits three bundles
+  and `install-skills.sh` discovers all three from the repo — so the checkout
+  route shipped the profile-switching skill and the registry-tarball route
+  silently did not. All four now install the generator's full set.
 
-- Codex marketplace-route profile switching is no longer refused. Its stated
-  reason — that an in-place bundle rewrite "would dirty a checkout" — was true
-  when plugin bundles were checked in and false since AD-016 made them
-  gitignored generated output. A **runtime** tracked-path guard replaces it, so
-  the removal is scoped by what is true of the user's actual checkout rather
-  than by what was true of one machine: a fork or a checkout predating AD-016
-  is still refused, loudly, naming the offending path.
+- **`apps/opencode-plugin/install.sh --uninstall` removed no agent symlinks when
+  the bundle was absent.** It derived its removal list from `$SCRIPT_DIR/agents/`
+  — the source bundle — which under AD-016 is generated on demand and normally
+  absent. The block immediately below it already carried a comment explaining
+  that removals must come from the installed directory. Now destination-derived,
+  with its symlink ownership test unchanged. **Behaviour change on a public
+  surface:** a standalone `--uninstall` now removes installed massa-ai agent
+  symlinks it previously left in place.
+
+- **`apps/claude-plugin/install.sh` left retired commands behind when switching
+  to the marketplace route.** `remove_file_route_artifacts` derived its command
+  removals from the source bundle while its own agents branch, three lines
+  below, already iterated the installed directory.
+
+- **The roster gate could not see a claim that spans a line break.**
+  `workflow-harness-contract.test.ts` asserts nothing advertises a specialist
+  count other than 18, and passed while `CLAUDE.md` advertised 17 — the number
+  and the noun sat on different lines and the scan was per-line. It now scans
+  the whole file with a bounded whitespace matcher that still stops at a
+  paragraph break. `CLAUDE.md` corrected to 18.
+
+- **`packages/core/src/__tests__/scheduler-store-pg.test.ts` asserted over rows
+  it did not create.** It monkey-patched `listAll` to filter ids beginning
+  `scheduled-`, a denylist coupled to a naming convention it does not own, and
+  guarded the wrong accessor: the assertion on the next line calls
+  `listEnabled`, which the seam never patched. The suite was **red on any
+  database holding enabled scheduled jobs** — 5 pass / 1 fail against a real
+  developer database. Now scoped by a positive allowlist to the suite's own
+  prefixes, with the seam deleted.
 
 ## [1.52.0] - 2026-08-13
 

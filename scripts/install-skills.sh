@@ -559,10 +559,11 @@ is_owned_target() {
 # ── Per-platform: apply ─────────────────────────────────────────────────────
 apply_platform() {
   local p="$1"
-  local root skills_dir agents_md
+  local root skills_dir agents_md owner
   root="$(platform_root "$p")"
   skills_dir="$root/skills"
   agents_md="$root/AGENTS.md"
+  owner="$(state_owner_for "$p")"
 
   # Pre-pass: a foreign (not massa-ai-owned) file or directory where a copy
   # belongs aborts the whole platform BEFORE any mutation. Never overwrite
@@ -601,6 +602,51 @@ apply_platform() {
     vinfo "Copied: $source -> $target"
     record "changed" "$p" "$target" "Copied: $source -> $target"
   done
+
+  # D3/PDO-09: a "plugin"-owned record means a plugin tarball install claimed
+  # this platform's skills directory, not this repo installer — never remove
+  # or otherwise touch what we do not own, and never drop that record either.
+  # Stale: tracked in state, no longer a repo skill (SKILL_NAMES), still
+  # massa-ai-owned — the --apply counterpart to check_platform's drift report
+  # and uninstall_platform's removal loop (IPT-04, AC-04.1/AC-04.4/AC-04.4a).
+  if [ "$owner" != "plugin" ]; then
+    local stale_name stale_target stale_current stale_marker
+    for stale_name in $(state_skills_for "$p"); do
+      case " $SKILL_NAMES " in
+        *" $stale_name "*) continue ;;
+      esac
+      stale_target="$skills_dir/$stale_name"
+      stale_marker="$(skill_marker_path "$skills_dir" "$stale_name")"
+      if [ -L "$stale_target" ]; then
+        # Legacy symlink install: only remove links that resolve inside the
+        # repo root (the same ownership test uninstall_platform uses).
+        stale_current="$(cd "$(dirname "$stale_target")" 2>/dev/null && installer_resolve_path "$(readlink "$stale_target")")"
+        case "$stale_current" in
+          "$REPO_ROOT"/*|"$REPO_ROOT") ;;
+          *) continue ;;
+        esac
+        if [ "$DRY_RUN" = "1" ]; then
+          vinfo "Would remove stale symlink: $stale_target"
+          record "would-change" "$p" "$stale_target" "Would remove stale symlink: $stale_target"
+          continue
+        fi
+        rm -f "$stale_target"
+        vinfo "Removed stale symlink: $stale_target"
+        record "changed" "$p" "$stale_target" "Removed stale symlink: $stale_target"
+      elif [ -d "$stale_target" ] && [ -f "$stale_marker" ]; then
+        # Copy-based install: the per-skill marker is the ownership proof.
+        if [ "$DRY_RUN" = "1" ]; then
+          vinfo "Would remove stale copy: $stale_target"
+          record "would-change" "$p" "$stale_target" "Would remove stale copy: $stale_target"
+          continue
+        fi
+        rm -rf "$stale_target"
+        rm -f "$stale_marker"
+        vinfo "Removed stale copy: $stale_target"
+        record "changed" "$p" "$stale_target" "Removed stale copy: $stale_target"
+      fi
+    done
+  fi
 
   local mode="apply" bootstrap_changed=0
   [ "$DRY_RUN" = "1" ] && mode="plan"

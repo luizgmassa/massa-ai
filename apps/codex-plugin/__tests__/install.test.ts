@@ -299,12 +299,12 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
 });
 
 describe("codex-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
-  test("install copies massa-ai + persona-router into ~/.codex/skills (not the plugin cache) as plugin-owned", async () => {
+  test("install copies massa-ai + persona-router + profile into ~/.codex/skills (not the plugin cache) as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("harness skills installed");
 
-    for (const name of ["massa-ai", "persona-router"]) {
+    for (const name of ["massa-ai", "persona-router", "profile"]) {
       const skillMd = path.join(tmp, `.codex/skills/${name}/SKILL.md`);
       expect(await pathExists(skillMd)).toBe(true);
       const lst = await fs.lstat(skillMd);
@@ -314,6 +314,20 @@ describe("codex-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
     const state = await readJson(path.join(tmp, ".config/massa-ai/install-state.json"));
     const platforms = state.platforms as Record<string, { skillsOwner: string }>;
     expect(platforms.codex.skillsOwner).toBe("plugin");
+  });
+
+  // AC-05.3: a behavioural guard — run the real install.sh against a scratch
+  // HOME and assert it lands EXACTLY the three harness skill directories the
+  // generator's own constant names (generate-skill-artifacts.ts:138). Not a
+  // static parse of the `for name in ...` literal — that shortcut is exactly
+  // what AC-03.4 rejects for the sibling requirement.
+  test("AC-05.3: a scratch-HOME install lands exactly the three harness skill directories", async () => {
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const harnessSkillsDir = path.join(tmp, ".codex/skills");
+    const entries = await fs.readdir(harnessSkillsDir);
+    expect(entries.sort()).toEqual(["massa-ai", "persona-router", "profile"].sort());
   });
 
   test("the existing 6 host-command skills copy is unaffected — no massa-ai/persona-router leak into the plugin cache", async () => {
@@ -462,12 +476,12 @@ describe("codex-plugin generated workflow-command delivery (T8, WFC-08)", () => 
     expect(await pathExists(installedSkillsDir)).toBe(true);
 
     // Sanity: generated commands never leaked into the harness skills dir —
-    // only massa-ai/persona-router (the two names install_bundled_skills
-    // copies) live there, never a workflow-command stem.
+    // only massa-ai/persona-router/profile (the three names
+    // install_bundled_skills copies) live there, never a workflow-command stem.
     const harnessSkillsDir = path.join(tmp, ".codex/skills");
     if (await pathExists(harnessSkillsDir)) {
       const harnessEntries = await fs.readdir(harnessSkillsDir);
-      expect(harnessEntries.sort()).toEqual(["massa-ai", "persona-router"].sort());
+      expect(harnessEntries.sort()).toEqual(["massa-ai", "persona-router", "profile"].sort());
     }
 
     const res = runInstall(["--uninstall"], { HOME: tmp });
