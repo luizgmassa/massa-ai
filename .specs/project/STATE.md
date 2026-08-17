@@ -1,6 +1,210 @@
+## Current — Installer prune and test-scoping (**VALIDATED 2026-08-17** — 13 commits, 7 parallel batch workers partitioned by file plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
+
+Two briefed defects, both wider than briefed.
+
+**Defect A.** `packages/core/src/__tests__/scheduler-store-pg.test.ts` guarded an
+exact-equality assertion with a monkey-patched seam filtering ids beginning
+`scheduled-` — a denylist coupled to a naming convention it does not own. It
+patched `listAll` and the assertion on the next line calls `listEnabled`, so the
+suite was **red on `main`** against any database holding enabled scheduled jobs:
+5 pass / 1 fail on the shared developer database. The dedicated test database
+reports 6/0 pre-fix and cannot observe the defect at all, which is why CI never
+saw it. Now scoped by a positive allowlist to the suite's own prefixes; seam
+deleted; 6/0 on both databases.
+
+**Defect B.** One install site shed retired members; five did not, and two
+removal loops derived their population from the source bundle rather than the
+installed directory — both self-refuting against comments in their own files.
+Under AD-016 the bundle is normally absent, so opencode's `--uninstall` removed
+zero agent symlinks. All six sites now **copy-then-prune** (prune-then-copy
+loses live specialists when `set -euo pipefail` aborts a run mid-copy), each
+using that host's own documented ownership test — prefix for claude/cursor,
+`# massa-ai-owned` marker for codex, symlink-ness for opencode. A uniform
+`rm -f` would have deleted user files on two hosts.
+
+Also: `install-skills.sh --apply` now removes a stale skill behind the
+`skillsOwner != "plugin"` gate; all four plugin installers install
+`skills/profile/`, which the generator emits and only the checkout route
+shipped; and the roster gate that had been green while `CLAUDE.md` advertised 17
+specialists now scans whole-file, because the claim spanned a line break.
+
+Gates: test:scripts 1810/0 → **1820/0**; test:plugins 135/0 → **141/0**; four new
+prune suites **182/0**; scheduler 5/1 → **6/0** on the shared database; lint
+clean; type-check 6/6; `bun run test` 12/12.
+
+Review changed the design four times before code was written, twice by finding
+defects in the specification itself: an ownership-test citation three lines too
+narrow that would have made `--apply` delete plugin-owned skill trees, and a
+skill-derivation rule that would have installed 49 skills on cursor.
+
+Artifacts: `.specs/features/installer-prune-and-test-scoping/{spec,design,tasks,validation}.md`.
+Open: IPT-F1, IPT-F4, IPT-F6, IPT-F7 (all recorded in validation.md).
+
 # massa-ai Spec State
 
-## Current — Sub-agent tool inheritance (**VALIDATED 2026-08-11** — 12 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
+# massa-ai Spec State
+
+## Previous — Portal handoff/proposal CRUD + default-deny write gate (**VALIDATED 2026-08-13** — 9 commits, 6 Phases / 14 Tasks via batch workers, two Plan Challenge critics and an independent verification pass; unpushed)
+
+- projectId `massa-ai` · workflowSessionId `spec-portal-handoff-proposal-crud` ·
+  workflow **spec-driven** · branch `feat/portal-handoff-proposal-crud` stacked on
+  `dbdceead` (PR #107, **unmerged**), worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-portal-crud`. Contract:
+  `.specs/features/portal-handoff-proposal-crud/{spec,design,tasks,validation}.md`.
+- Three deliverables: full CRUD for handoffs and proposals (PATCH over an explicit
+  editable-field allowlist, hard DELETE, manual proposal creation); a **default-deny
+  server-side write gate** across every non-`GET` route; and a fix for portal memory
+  edit/delete, which called `PUT`/`DELETE /api/v1/memory/<id>` — routes that never
+  existed, so both 404ed before auth was even consulted.
+- Hard delete measured safe at the storage layer: **zero FK constraints** on
+  `handoffs`/`proposals` in either direction, verified twice (live `pg_constraint`
+  and all 23 migrations), so a DELETE destroys exactly one row.
+- **Two Plan Challenge critics on different lenses** (`red_team` on the gate,
+  `pre_mortem` on everything else) returned 11 findings, all accepted. Three changed
+  the design materially: `POST /api/v1/search/project` was classified read-only and
+  **writes** via `autoReindex` → `ensureFreshIndex`, which path-and-verb
+  classification is structurally blind to (→ AC-03.3a sanitizers, AC-03.3b per-entry
+  no-write tests); the gate would have **failed open**, because four existing config
+  gates in this tree resolve a throwing read to "not disabled" (AC-03.8 inverts it,
+  deliberately against local house style); and PATCH would have left the handoff's
+  dual-written memory permanently stale — active, FTS-indexed, wrong content, worse
+  than the inert dangling pointer AC-01.5 already accepted (AC-01.8).
+- **The route population was wrong twice before it was right**: 81/50 from a
+  newline-anchored regex that missed five routes chained onto their own
+  `new Elysia({ prefix })` call, then 86/54, finally **91/59**. Four of the five
+  missed routes were non-`GET`, one of them `web/fetch_and_index`, and default-deny
+  protected all four anyway — D1's argument as a measurement, not a prediction.
+- Three separate tests were asserting the dead memory URLs and passing, because a
+  mocked request capture accepts any URL string. The contract sensor now diffs Web UI
+  call literals against the real registered-route population.
+- MCP surface 54 → **59** tools; the count was asserted in 4 tests and stated in 8
+  doc surfaces, two of which a `head -20`-truncated sweep missed.
+- Independent verification (an agent that built none of it) re-derived every figure
+  and **independently reproduced four mutations** rather than trusting commit
+  messages. No coverage-matrix row was false.
+- Gates: write-mode 12/0, classification 34/0, population 8/0, handoff 43/0,
+  proposals 55/0, memory 12/0, handoff-service 40/0, store parity 20/0 (needs
+  `MASSA_AI_DEDICATED=1` + the :5433 URL or it executes none of the 20), web-ui
+  778/0, MCP parity 14/0, plugins 135/0, **test:scripts 1810/0 with a scratch
+  `XDG_CONFIG_HOME`** (a local profile overlay manufactures drift CI never sees),
+  lint clean, type-check 6/6.
+- Open, recorded, not built: **AC-03.3c** (`/api/v1/analytics/` and
+  `/api/v1/file/read` over-blocked pending a trace of `ReadFileService.read`'s cache
+  path — **this gates read-only mode being usable**), **HPC-06** (docblock claims
+  every destructive op audits; measured 1 of 28 route files calls `recordOperation`),
+  **HPC-07** (four fail-open config gates).
+- Next: **#107 merges first**, then take `main` by merge (never rebase) and re-check
+  `[Unreleased]` before relying on the changelog entry.
+
+## Previous — Marketplace directory-source switching (**VALIDATED 2026-08-13** — 11 commits, 2 batch workers plus a pre-mortem gate and an independent verification pass; unpushed)
+
+- projectId `massa-ai` · workflowSessionId `spec-marketplace-directory-source-switching` ·
+  workflow **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch
+  `fix/marketplace-directory-source-switching` from `origin/main` @ `89909051`, worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-marketplace`.
+- **Defect A:** `resolveClaudeMarketplaceRoot` returned `installed_plugins.json`'s
+  `installPath` — a version-pinned cache — even for a **directory-source** marketplace, where
+  Claude loads the plugin live from the source directory. Every switch wrote where nothing
+  reads, so Save & Apply plus a CLI restart produced no observable change, indefinitely.
+- **Defect B:** the regenerate stream spawned only `generate-subagent-artifacts.ts` while
+  `generate:artifacts` is both generators, so a skill edit could never reach a host.
+- **Two premises were checked and found stale rather than inherited.** `.specs/HANDOFF.md`
+  recorded that the marketplace route "refuses profile switching by design" — `hosts.ts`
+  shows Claude **proceeds**; only codex refused. And that codex refusal cited checkout
+  dirtiness, true before AD-016 made bundles gitignored generated output and false since.
+- **AD-022 — an amendment worth carrying forward.** AC-01.3 originally made an absent
+  `known_marketplaces.json` refuse. That broke the pre-existing cache path for any install
+  with **no** marketplace registry: `variant-sync.test.ts` T18 measured `main` 12/0 against
+  branch 11/1. Absence means "cannot determine the kind" (fall through), not "a directory
+  source exists and is broken" (refuse). A Phase 1 worker reported that failure as an
+  out-of-scope stale fixture; it was a correct sensor catching a regression introduced by the
+  requirement. Fix the subject — and when the subject is the requirement, amend it with its
+  reason recorded in both the spec and the test.
+- Plan Challenge (pre_mortem) returned 4 findings, 2 critical, all accepted: AC-01.2 reframed
+  from a correctness claim to an explicitly **unmeasured** risk (MDS-05); AC-03.5/AC-03.6
+  added because the anti-regression sensor shared a parser with production and could have
+  certified the very regression it guarded; AC-02.4 added a runtime tracked-path guard behind
+  the retired refusal; AC-01.6 added path containment for manifest-supplied relative data.
+- Independent verification returned **NEEDS FIX** on two delivery-bar gaps — a
+  security-allowlist regression from T2b's `execFileSync("git", …)` probes (measured `main`
+  39/0 vs branch 38/1) and T6 not yet run — with its AC and mutation results clean at 18/18
+  and 5/5. Both gaps closed on this branch.
+- **T5 found a second, different defect and file counts nearly hid it.** Every installed
+  roster is stale at 17 (missing `designer`), and `~/.codex/agents` plus
+  `~/.config/opencode/agents` still carry `massa-ai-handoff-writer`, an agent retired from
+  `skills/agents/`. Two out-of-scope findings recorded with evidence, not patched: nothing
+  refreshes installed trees after a roster change, and the installers do not prune removed
+  agents from a host's active directory.
+- MDS-05 stays honestly unmeasured: both github-source marketplaces are exactly in sync with
+  their pinned caches (`clone HEAD == pinned gitCommitSha`), so no divergence exists here to
+  test remote precedence against. Recorded as the reason, never as evidence of safety.
+- Gates 2026-08-13: `lint` 0 · `type-check` 6/6 · `bun test packages/shared` 498/0 ·
+  `model-registry-stream` 32/0 · `variant-sync` 12/0 · `claude-marketplace` 25/0 · `hosts`
+  20/0 · `engine` 31/0 · `test:scripts` 1810/0 on two runs. **One caveat, recorded rather
+  than smoothed over:** an earlier `test:scripts` run reported 1809/1 and its failing test
+  name was never captured; two subsequent full runs were green at exit 0. Treated as an
+  uncharacterized flake, not a clean gate.
+
+## Previous — SSE heartbeat vs transport idle timeout (**VALIDATED 2026-08-13** — 13 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR authorized in-session but not yet taken)
+
+- projectId `massa-ai` · workflowSessionId `spec-sse-heartbeat-idle-timeout` · workflow
+  **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch
+  `fix/sse-heartbeat-idle-timeout` from `origin/main` @ `89909051`, worktree
+  `/Users/luizmassa/Projects/massa-ai-wt-sse-heartbeat`.
+- Artifacts: `.specs/features/sse-heartbeat-idle-timeout/{spec,design,tasks,validation}.md`.
+- **Defect:** every SSE stream was killed by the transport ~10 s after its last byte. The
+  keep-alive heartbeat that exists to prevent exactly that was scheduled 15 s apart —
+  longer than the window it must stay inside — so it could never fire on an idle stream.
+  Reported as the Admin Portal Logs tab's Live toggle "stopping after some seconds";
+  `GET /api/v1/events` had the identical defect and hid it, because `EventSource`
+  reconnects automatically, presenting as a silent ~12 s reconnect cycle rather than a stop.
+  `logs.ts:347` and `events.ts:15` each declared their own `15_000` literal — two copies,
+  one defect.
+- **Fix:** one shared constant module (`routes/sse-keepalive.ts`) owns the heartbeat
+  (5 000 ms), the documented idle window, the max duration, and the per-request window
+  value; both routes read it. Each SSE request additionally widens its own transport window
+  via Bun's per-request `server.timeout(request, seconds)`, reached through one named
+  accessor in `index.ts` and degrading silently where the native handle is absent. The
+  enqueue-throw path now closes the stream and unsubscribes instead of leaving a flag set
+  with the socket open and the sink tail polling into a dead controller. Client-side, a
+  transient network drop is retried under the existing bounds instead of permanently
+  disabling the live tail; a non-200 stays terminal.
+- **The Plan Challenge Gate changed the fix, and that is the durable lesson.** The first
+  spec asserted the idle window "is not configurable", on five measured-inert placements.
+  All five were **listen-time** configuration; Bun also exposes a **per-request** override
+  that was never tried. Re-measured against the real route modules: a 60 s override moved
+  the drop to exactly 60.0 s. The gate's own proposed pivot — delete the heartbeat, keep
+  only the override — was then measured wrong too, because the window is finite and that
+  merely relocates the drop. With a 120 s window and the shipped 15 s heartbeat, both
+  endpoints held 180 s fully idle (12 and 11 heartbeats). Both sides move; the fix needs
+  both. **An exhaustive-looking negative result is only exhaustive over the API surface it
+  searched, and a critic falsifying a premise does not make its replacement right.**
+- **Independent verification PASS** (`massa-ai-verification-agent`, author ≠ verifier),
+  re-deriving every figure: 21/22 ACs covered, 6/6 mutations killed. Its one gap —
+  AC-07.1's `index.ts` wiring covered by code inspection only — was reproduced as a
+  **surviving mutant** (deleting the wiring left all four tools-api suites green) and then
+  closed by a source-level sensor in `8acd988f`, itself mutation-proved twice. Revised:
+  **22/22 ACs, 8/8 mutations killed**, honest denominator 8.
+- Gates 2026-08-13: `lint` 0 · `type-check` 6/6 · `bun test apps/web-ui` **727/0** ·
+  tools-api one file per invocation — `logs` 51/0 · `events` 8/0 · `sse-keepalive` 14/0 ·
+  `sse-keepalive-contract` 3/0 · `sse-idle-survival` 2/0 (~65 s, two real 30 s idle HTTP holds).
+- **Three traps found and written down.** (1) `bun test fileA fileB` for tools-api shares a
+  process: `logs`+`events` together report 49/1 while apart they are 51/0 and 8/0, because
+  `events.test.ts` publishes on the shared `eventBus` and drives `WorkspaceManager` logging
+  into the global `logBuffer` that `logs.test.ts` asserts is empty. Pre-existing, reproduces
+  on clean `main`, invisible to `bun run test` because the runner forks it. `--filter` is
+  core-only and rejected by the tools-api wrapper. (2) A fresh worktree needs `bun run
+  build`, not just `bun install`, or every tools-api suite fails with `Cannot find module
+  '@massa-ai/core'`. (3) Comments are source to a text scanner — a wiring sensor's first
+  draft failed against correct code because `index.ts`'s docblock names the literal
+  `setSseRequestTimeoutSource(undefined)` while explaining the degrading case.
+- Two sibling features are specified but not started, deliberately sequenced rather than
+  branched in parallel: three concurrent PRs would each touch `CHANGELOG.md`, and in this
+  repo conflicting PRs silently stop running CI while each merge re-cuts a release. See
+  `.specs/HANDOFF.md` for both, including the config-propagation feature's blocking
+  decision.
+
+## Previous — Sub-agent tool inheritance (**VALIDATED 2026-08-11** — 12 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
 
 - projectId `massa-ai` · workflowSessionId `spec-subagent-tool-inheritance` · workflow
   **spec-driven** · persona pin `context-skill-harness-engineer-architect` · branch
@@ -3977,7 +4181,13 @@ native-runtime-rebaseline complete. Wave 3 follow-up exhausted. Clean up: delete
 
 ---
 
-## Current
+## Previous — multi-language-tree-sitter-breadth (archived; was mislabelled `## Current`)
+
+This section sat below the archive separator still titled `## Current`, so the file
+carried two "Current" headings and a reader looking for present state could land on
+a long-finished feature. Renamed on 2026-08-13 when a close-out asserted the
+heading count and found the duplicate. The invariant is now real: exactly one
+`## Current`, at the top.
 
 - projectId: `massa-ai`
 - workflowSessionId: `spec-multi-language`

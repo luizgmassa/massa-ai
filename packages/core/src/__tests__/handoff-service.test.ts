@@ -16,6 +16,7 @@ import {
   HandoffService,
   buildHandoffMemoryInput,
   formatMemoryContent,
+  dualWriteMemoryId,
   type HandoffMemorySeam,
 } from "../services/handoff/handoff-service.js";
 import {
@@ -23,7 +24,7 @@ import {
   type HandoffRecord,
   type HandoffStore,
 } from "../data/handoff/handoff-repository.js";
-import type { InsertMemoryInput } from "../data/memory/memory-repository.js";
+import type { InsertMemoryInput, UpdateMemoryPatch } from "../data/memory/memory-repository.js";
 import type { LlmSurface } from "../services/memory/consolidator.js";
 import { eventBus } from "../services/events/event-bus.js";
 import { MemoryLevel, MemoryType } from "@massa-ai/shared";
@@ -31,13 +32,33 @@ import { MemoryLevel, MemoryType } from "@massa-ai/shared";
 // ── Fakes ────────────────────────────────────────────────────────────────────
 
 interface CapturedInsert extends InsertMemoryInput {}
+interface CapturedUpdate {
+  id: string;
+  patch: UpdateMemoryPatch;
+}
 
-function makeFakeMemoryRepo(): HandoffMemorySeam & { inserted: CapturedInsert[] } {
+function makeFakeMemoryRepo(): HandoffMemorySeam & {
+  inserted: CapturedInsert[];
+  updated: CapturedUpdate[];
+  rowsById: Map<string, { content: string }>;
+} {
   const inserted: CapturedInsert[] = [];
+  const updated: CapturedUpdate[] = [];
+  const rowsById = new Map<string, { content: string }>();
   const repo = {
     inserted,
+    updated,
+    rowsById,
     insert(input: InsertMemoryInput): void {
       inserted.push(input);
+      rowsById.set(input.id, { content: input.content });
+    },
+    update(id: string, patch: UpdateMemoryPatch): boolean {
+      updated.push({ id, patch });
+      const row = rowsById.get(id);
+      if (!row) return false;
+      if (patch.content !== undefined) row.content = patch.content;
+      return true;
     },
   };
   return repo as any;
@@ -210,6 +231,9 @@ describe("HandoffService — begin", () => {
     const throwingMem: HandoffMemorySeam = {
       insert(): void {
         throw new Error("mem boom");
+      },
+      update(): boolean {
+        throw new Error("mem update boom");
       },
     };
     const svcMem = new HandoffService({
@@ -512,6 +536,178 @@ describe("HandoffAutoInjector — session-start surfacing", () => {
   });
 });
 
+// ── T7: update (AC-01.1, AC-01.3, AC-01.7, AC-01.8) ─────────────────────────
+
+describe("HandoffService — update", () => {
+  let store: ReturnType<typeof makeFakeStore>;
+  let mem: ReturnType<typeof makeFakeMemoryRepo>;
+  let svc: HandoffService;
+  let id: string;
+
+  beforeEach(async () => {
+    store = makeFakeStore();
+    mem = makeFakeMemoryRepo();
+    svc = new HandoffService({
+      store,
+      memoryRepo: mem,
+      llm: disabledSurface(),
+      idFactory: deterministicIdFactory(),
+    });
+    const r = await svc.begin({
+      projectId: "proj-upd",
+      summary: "original summary",
+      openQuestions: ["q1"],
+      nextSteps: ["n1"],
+      files: ["f1"],
+    });
+    id = r.id!;
+  });
+
+  it("AC-01.1: writes only the provided allowlisted fields, leaving the rest untouched", async () => {
+    const res = await svc.update({ id, patch: { targetAgent: "agent-x" } });
+    expect(res.ok).toBe(true);
+    expect(res.handoff!.targetAgent).toBe("agent-x");
+    expect(res.handoff!.summary).toBe("original summary");
+    expect(res.handoff!.openQuestions).toEqual(["q1"]);
+  });
+
+  it("AC-01.6: update on an unknown id -> {ok:false, not-found}", async () => {
+    const res = await svc.update({ id: "does-not-exist", patch: { summary: "x" } });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("not-found");
+  });
+
+  it("AC-01.7: update with projectId mismatch -> {ok:false, project-mismatch}, row untouched", async () => {
+    const res = await svc.update({ id, projectId: "wrong-project", patch: { summary: "hacked" } });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("project-mismatch");
+    const row = store.rows.find((r) => r.id === id);
+    expect(row!.summary).toBe("original summary");
+  });
+
+  it("update: works in any status, including open (no state-machine restriction)", async () => {
+    const row = store.rows.find((r) => r.id === id)!;
+    expect(row.status).toBe("open");
+    const res = await svc.update({ id, patch: { summary: "still open, still editable" } });
+    expect(res.ok).toBe(true);
+  });
+
+  it("AC-01.8: a summary PATCH refreshes the dual-written memory's CONTENT, not merely the handoff row", async () => {
+    const memId = dualWriteMemoryId(id);
+    const before = mem.rowsById.get(memId);
+    expect(before).toBeDefined();
+    expect(before!.content).toContain("original summary");
+    expect(before!.content).not.toContain("revised summary");
+
+    const res = await svc.update({ id, patch: { summary: "revised summary" } });
+    expect(res.ok).toBe(true);
+
+    const after = mem.rowsById.get(memId);
+    expect(after!.content).toContain("revised summary");
+    expect(after!.content).not.toContain("original summary");
+    // Full recompute via formatMemoryContent — sections beyond summary are
+    // still present, proving this is a real refresh and not a partial patch.
+    expect(after!.content).toBe(formatMemoryContent(store.rows.find((r) => r.id === id)!));
+  });
+
+  it("AC-01.8: openQuestions/nextSteps/files edits also refresh the memory content", async () => {
+    const memId = dualWriteMemoryId(id);
+    const res = await svc.update({ id, patch: { nextSteps: ["revised next step"] } });
+    expect(res.ok).toBe(true);
+    const after = mem.rowsById.get(memId);
+    expect(after!.content).toContain("revised next step");
+  });
+
+  it("a targetAgent-only PATCH does not touch the memory row (no content-affecting field changed)", async () => {
+    const memId = dualWriteMemoryId(id);
+    const before = { ...mem.rowsById.get(memId)! };
+    await svc.update({ id, patch: { targetAgent: "agent-only" } });
+    expect(mem.updated.length).toBe(0);
+    expect(mem.rowsById.get(memId)).toEqual(before);
+  });
+
+  it("AC-01.8: the memory refresh is best-effort — a throwing memory seam does not fail the handoff update", async () => {
+    const throwingMem: HandoffMemorySeam = {
+      insert(): void {},
+      update(): boolean {
+        throw new Error("refresh boom");
+      },
+    };
+    const svc2 = new HandoffService({
+      store,
+      memoryRepo: throwingMem,
+      llm: disabledSurface(),
+      idFactory: deterministicIdFactory(),
+    });
+    const res = await svc2.update({ id, patch: { summary: "will not throw" } });
+    expect(res.ok).toBe(true);
+    expect(res.handoff!.summary).toBe("will not throw");
+  });
+
+  it("update: missing id -> {ok:false, missing-id}", async () => {
+    const res = await svc.update({ id: "", patch: { summary: "x" } });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("missing-id");
+  });
+});
+
+// ── T7: delete (AC-01.4, AC-01.5, AC-01.6, AC-01.7) ─────────────────────────
+
+describe("HandoffService — delete", () => {
+  let store: ReturnType<typeof makeFakeStore>;
+  let mem: ReturnType<typeof makeFakeMemoryRepo>;
+  let svc: HandoffService;
+  let id: string;
+
+  beforeEach(async () => {
+    store = makeFakeStore();
+    mem = makeFakeMemoryRepo();
+    svc = new HandoffService({
+      store,
+      memoryRepo: mem,
+      llm: disabledSurface(),
+      idFactory: deterministicIdFactory(),
+    });
+    const r = await svc.begin({ projectId: "proj-del", summary: "to delete" });
+    id = r.id!;
+  });
+
+  it("AC-01.4: hard-deletes an open handoff and returns its id", async () => {
+    const row = store.rows.find((r) => r.id === id)!;
+    expect(row.status).toBe("open");
+    const res = await svc.delete({ id });
+    expect(res.ok).toBe(true);
+    expect(res.id).toBe(id);
+    expect(store.rows.find((r) => r.id === id)).toBeUndefined();
+  });
+
+  it("AC-01.5: deleting a handoff leaves its dual-written memory row intact", async () => {
+    const memId = dualWriteMemoryId(id);
+    expect(mem.rowsById.has(memId)).toBe(true);
+    await svc.delete({ id });
+    expect(mem.rowsById.has(memId)).toBe(true);
+  });
+
+  it("AC-01.6: delete on an unknown id -> {ok:false, not-found}", async () => {
+    const res = await svc.delete({ id: "does-not-exist" });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("not-found");
+  });
+
+  it("AC-01.7: delete with projectId mismatch -> {ok:false, project-mismatch}, row survives", async () => {
+    const res = await svc.delete({ id, projectId: "wrong-project" });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("project-mismatch");
+    expect(store.rows.find((r) => r.id === id)).toBeDefined();
+  });
+
+  it("delete: missing id -> {ok:false, missing-id}", async () => {
+    const res = await svc.delete({ id: "" });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("missing-id");
+  });
+});
+
 // ── Pure helpers ─────────────────────────────────────────────────────────────
 
 describe("HandoffService — pure helpers", () => {
@@ -584,5 +780,11 @@ describe("HandoffService — pure helpers", () => {
       acceptedAt: null,
     };
     expect(formatMemoryContent(record)).toContain("(no summary)");
+  });
+
+  it("dualWriteMemoryId is deterministic by handoff id (no random suffix)", () => {
+    expect(dualWriteMemoryId("h1")).toBe("handoff-mem-h1");
+    expect(dualWriteMemoryId("h1")).toBe(dualWriteMemoryId("h1"));
+    expect(dualWriteMemoryId("h2")).not.toBe(dualWriteMemoryId("h1"));
   });
 });

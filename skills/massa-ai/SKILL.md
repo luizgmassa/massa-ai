@@ -46,7 +46,7 @@ Before reading any massa-ai file:
   Never pass `workflowSessionId` in that field. Use `synapse_task_begin`/`synapse_task_end`
   for task envelopes and `synapse_prefetch` to warm the buffer on file open.
 - Prefer the shared v2 retrieval order; fall back gracefully if the massa-ai
-  server or Synapse is unavailable. The full tool surface includes 54 tools
+  server or Synapse is unavailable. The full tool surface includes 59 tools
   (see `references/mcp-tools.md`): indexing, search, symbol graph
   (`trace_path`, `impact_analysis`, `get_architecture`), memory CRUD
   (`remember`, `recall`, `memory_update`, `memory_delete`), checkpoints

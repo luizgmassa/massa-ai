@@ -45,6 +45,10 @@ import {
   getHookService,
   getHandoffService,
   getAutoImproveJob,
+  getProposalStore,
+  newProposalId,
+  PROPOSAL_KINDS,
+  ProposalPayloadValidationError,
   getBootstrapService,
   getSessionRegistry,
   newSynapseSessionId,
@@ -58,6 +62,7 @@ import {
   getMemoryRepository,
 } from "@massa-ai/core";
 import type { PrefetchEntry } from "@massa-ai/core/services";
+import type { ProposalKind, ProposalPayload } from "@massa-ai/core";
 import { SearchSource, logger } from "@massa-ai/shared";
 import {
   listProfiles as switchEngineListProfiles,
@@ -254,6 +259,41 @@ function boundedInt(val: unknown, def: number, min: number, max: number): number
   if (!Number.isFinite(n)) return def;
   const i = Math.trunc(n);
   return Math.max(min, Math.min(max, i));
+}
+
+/**
+ * T10 (HPC-05, AC-05.1) — handoff/proposal PATCH allowlists, mirroring
+ * `routes/handoff.ts`'s `HANDOFF_PATCH_ALLOWED_FIELDS` and
+ * `routes/proposals.ts`'s `PROPOSAL_PATCH_ALLOWED_FIELDS` byte-for-byte.
+ * Not importable across the package boundary (tools-api is not a dependency
+ * of mcp-client — same reasoning as `profileEngineError` above), so the two
+ * copies must be kept in sync by hand whenever the route's allowlist moves.
+ */
+const HANDOFF_PATCH_ALLOWED_FIELDS = [
+  "targetAgent",
+  "summary",
+  "openQuestions",
+  "nextSteps",
+  "files",
+] as const;
+
+const PROPOSAL_PATCH_ALLOWED_FIELDS = ["rationale", "payload"] as const;
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isProposalKind(value: unknown): value is ProposalKind {
+  return typeof value === "string" && (PROPOSAL_KINDS as readonly string[]).includes(value);
+}
+
+/** Maps the store's write-time payload rejection to its HTTP status (mirrors `proposalPayloadValidationStatus`). */
+function proposalPayloadValidationStatus(error: unknown): number | null {
+  return error instanceof ProposalPayloadValidationError ? error.statusCode : null;
 }
 
 /** Serialize a Synapse session to the same shape the REST route returns. */
@@ -562,6 +602,9 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
         case "/api/v1/proposal/reject":
           return await this.handleProposalReject(body as Record<string, unknown>);
 
+        case "/api/v1/proposal/create":
+          return await this.handleProposalCreate(body as Record<string, unknown>);
+
         case "/api/v1/synapse/session":
           return await this.handleSynapseSession(body as Record<string, unknown>);
 
@@ -642,6 +685,19 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
         if (!updated) return { success: false, error: "Session not found or expired" };
         return { success: true, data: serializeSession(updated) };
       }
+
+      // Match /api/v1/handoff/:id (T10, HPC-05/AC-05.1 — mirrors routes/handoff.ts PATCH)
+      const handoffMatch = endpoint.match(/^\/api\/v1\/handoff\/([^/]+)$/);
+      if (handoffMatch) {
+        return await this.handleHandoffUpdate(handoffMatch[1]!, body);
+      }
+
+      // Match /api/v1/proposal/:id (T10, HPC-05/AC-05.1 — mirrors routes/proposals.ts PATCH)
+      const proposalMatch = endpoint.match(/^\/api\/v1\/proposal\/([^/]+)$/);
+      if (proposalMatch) {
+        return await this.handleProposalUpdate(proposalMatch[1]!, body);
+      }
+
       return httpError(404, `EmbeddedApiClient: no PATCH handler for ${endpoint}`);
     } catch (error) {
       if (error instanceof ApiHttpError) throw error;
@@ -665,6 +721,19 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
         await workspaceManager.removeWorkspace(wsMatch[1]!);
         return { success: true, data: { removed: wsMatch[1]! } };
       }
+
+      // Match /api/v1/handoff/:id (T10, HPC-05/AC-05.1 — mirrors routes/handoff.ts DELETE)
+      const handoffMatch = endpoint.match(/^\/api\/v1\/handoff\/([^/]+)$/);
+      if (handoffMatch) {
+        return await this.handleHandoffDelete(handoffMatch[1]!, _body as Record<string, unknown> | undefined);
+      }
+
+      // Match /api/v1/proposal/:id (T10, HPC-05/AC-05.1 — mirrors routes/proposals.ts DELETE)
+      const proposalMatch = endpoint.match(/^\/api\/v1\/proposal\/([^/]+)$/);
+      if (proposalMatch) {
+        return await this.handleProposalDelete(proposalMatch[1]!, _body as Record<string, unknown> | undefined);
+      }
+
       return httpError(404, `EmbeddedApiClient: no DELETE handler for ${endpoint}`);
     } catch (error) {
       if (error instanceof ApiHttpError) throw error;
@@ -958,6 +1027,81 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
     }
   }
 
+  /**
+   * PATCH /api/v1/handoff/:id (T10, HPC-05/AC-05.1 — mirrors `routes/handoff.ts`'s
+   * PATCH handler byte-for-byte, including AC-01.2's allowlist-by-name rejection
+   * and AC-01.8's dual-write memory refresh, which `HandoffService.update` itself
+   * performs). `projectId` arrives mixed into the same payload as the patch
+   * fields (the embedded transport has no separate query/body split), so it is
+   * destructured out before the allowlist check runs.
+   */
+  private async handleHandoffUpdate(id: string, body: unknown): Promise<unknown> {
+    const raw = (body ?? {}) as Record<string, unknown>;
+    const { projectId, ...patchFields } = raw;
+    const keys = Object.keys(patchFields);
+    const rejected = keys.filter(
+      (k) => !(HANDOFF_PATCH_ALLOWED_FIELDS as readonly string[]).includes(k),
+    );
+    if (rejected.length > 0) {
+      throw httpError(400, `field not allowed: ${rejected.join(", ")}`);
+    }
+
+    const patch: {
+      targetAgent?: string | null;
+      summary?: string;
+      openQuestions?: string[];
+      nextSteps?: string[];
+      files?: string[];
+    } = {};
+
+    if ("targetAgent" in patchFields) {
+      const v = patchFields.targetAgent;
+      if (v !== null && typeof v !== "string") throw httpError(400, "targetAgent must be a string or null");
+      patch.targetAgent = v as string | null;
+    }
+    if ("summary" in patchFields) {
+      if (typeof patchFields.summary !== "string") throw httpError(400, "summary must be a string");
+      patch.summary = patchFields.summary;
+    }
+    if ("openQuestions" in patchFields) {
+      if (!isStringArray(patchFields.openQuestions)) throw httpError(400, "openQuestions must be an array of strings");
+      patch.openQuestions = patchFields.openQuestions;
+    }
+    if ("nextSteps" in patchFields) {
+      if (!isStringArray(patchFields.nextSteps)) throw httpError(400, "nextSteps must be an array of strings");
+      patch.nextSteps = patchFields.nextSteps;
+    }
+    if ("files" in patchFields) {
+      if (!isStringArray(patchFields.files)) throw httpError(400, "files must be an array of strings");
+      patch.files = patchFields.files;
+    }
+
+    if (Object.keys(patch).length === 0) throw httpError(400, "no editable field provided");
+
+    const result = await getHandoffService().update({
+      id,
+      projectId: projectId as string | undefined,
+      patch,
+    });
+    if (!result.ok) {
+      const status = result.reason === "not-found" || result.reason === "project-mismatch" ? 404 : 400;
+      throw httpError(status, result.reason ?? "update failed");
+    }
+    return { success: true, data: result.handoff };
+  }
+
+  /**
+   * DELETE /api/v1/handoff/:id (T10, HPC-05/AC-05.1 — mirrors `routes/handoff.ts`'s
+   * DELETE handler: hard-delete in any status, always a 404 on failure regardless
+   * of reason, matching the route's undifferentiated `set.status = 404`).
+   */
+  private async handleHandoffDelete(id: string, body?: Record<string, unknown>): Promise<unknown> {
+    const projectId = body?.projectId as string | undefined;
+    const result = await getHandoffService().delete({ id, projectId });
+    if (!result.ok) throw httpError(404, result.reason ?? "not-found");
+    return { success: true, data: { id: result.id } };
+  }
+
   private async handleProposalList(body: Record<string, unknown>): Promise<unknown> {
     const { projectId } = body as { projectId?: string };
     if (!projectId || !String(projectId).trim()) {
@@ -995,6 +1139,130 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
     } catch (e) {
       throw httpError(500, `proposal reject failed: ${(e as Error).message}`);
     }
+  }
+
+  /**
+   * POST /api/v1/proposal/create (T10, HPC-05/AC-05.1 — mirrors
+   * `routes/proposals.ts`'s create handler, including AC-02.2's per-kind
+   * payload validation: the store's own `create` re-runs the same validator
+   * on write, so a write the reader would reject is refused here instead.
+   */
+  private async handleProposalCreate(body: Record<string, unknown>): Promise<unknown> {
+    const raw = body ?? {};
+
+    if (typeof raw.projectId !== "string" || !raw.projectId.trim()) {
+      throw httpError(400, "projectId required");
+    }
+    if (!isProposalKind(raw.kind)) {
+      throw httpError(400, `kind must be one of ${PROPOSAL_KINDS.join(", ")}`);
+    }
+    if (!isRecord(raw.payload)) {
+      throw httpError(400, "payload must be an object");
+    }
+    if (raw.rationale !== undefined && typeof raw.rationale !== "string") {
+      throw httpError(400, "rationale must be a string");
+    }
+    if (
+      raw.targetMemoryId !== undefined &&
+      raw.targetMemoryId !== null &&
+      typeof raw.targetMemoryId !== "string"
+    ) {
+      throw httpError(400, "targetMemoryId must be a string or null");
+    }
+
+    const projectId = raw.projectId;
+    const kind = raw.kind;
+    const payload = raw.payload;
+
+    try {
+      const record = await getProposalStore().create({
+        id: newProposalId(),
+        projectId,
+        kind,
+        payload: payload as unknown as ProposalPayload,
+        rationale: raw.rationale as string | undefined,
+        targetMemoryId: raw.targetMemoryId as string | null | undefined,
+      });
+      return { success: true, data: record };
+    } catch (e) {
+      const validationStatus = proposalPayloadValidationStatus(e);
+      if (validationStatus !== null) throw httpError(validationStatus, (e as Error).message);
+      throw e;
+    }
+  }
+
+  /**
+   * PATCH /api/v1/proposal/:id (T10, HPC-05/AC-05.1 — mirrors
+   * `routes/proposals.ts`'s PATCH handler: allowlist-by-name rejection
+   * (AC-02.4), not-found/project-mismatch via `getById` first (`ProposalStore`
+   * has no built-in projectId enforcement, same shape `auto-improve-ops.ts`
+   * uses), and re-validation of a payload edit against the row's existing
+   * kind (AC-02.3).
+   */
+  private async handleProposalUpdate(id: string, body: unknown): Promise<unknown> {
+    const raw = (body ?? {}) as Record<string, unknown>;
+    const { projectId, ...patchFields } = raw;
+    const keys = Object.keys(patchFields);
+    const rejected = keys.filter(
+      (k) => !(PROPOSAL_PATCH_ALLOWED_FIELDS as readonly string[]).includes(k),
+    );
+    if (rejected.length > 0) {
+      throw httpError(400, `field not allowed: ${rejected.join(", ")}`);
+    }
+
+    const patch: { rationale?: string; payload?: Record<string, unknown> } = {};
+    if ("rationale" in patchFields) {
+      if (typeof patchFields.rationale !== "string") throw httpError(400, "rationale must be a string");
+      patch.rationale = patchFields.rationale;
+    }
+    if ("payload" in patchFields) {
+      if (!isRecord(patchFields.payload)) throw httpError(400, "payload must be an object");
+      patch.payload = patchFields.payload;
+    }
+    if (Object.keys(patch).length === 0) throw httpError(400, "no editable field provided");
+
+    const current = await getProposalStore().getById(id);
+    if (!current) throw httpError(404, "not-found");
+    if (projectId && current.projectId !== (projectId as string)) throw httpError(404, "project-mismatch");
+
+    try {
+      const updated = await getProposalStore().update(id, {
+        ...(patch.rationale !== undefined ? { rationale: patch.rationale } : {}),
+        ...(patch.payload !== undefined ? { payload: patch.payload as unknown as ProposalPayload } : {}),
+      });
+      if (!updated) throw httpError(404, "not-found");
+      return { success: true, data: updated };
+    } catch (e) {
+      if (e instanceof ApiHttpError) throw e;
+      const validationStatus = proposalPayloadValidationStatus(e);
+      if (validationStatus !== null) throw httpError(validationStatus, (e as Error).message);
+      throw e;
+    }
+  }
+
+  /**
+   * DELETE /api/v1/proposal/:id (T10, HPC-05/AC-05.1 — mirrors
+   * `routes/proposals.ts`'s DELETE handler: hard-delete in any status, and an
+   * already-approved proposal's response carries the same explicit `note`
+   * that its applied memory edit was not reversed (AC-02.5).
+   */
+  private async handleProposalDelete(id: string, body?: Record<string, unknown>): Promise<unknown> {
+    const projectId = body?.projectId as string | undefined;
+    const current = await getProposalStore().getById(id);
+    if (!current) throw httpError(404, "not-found");
+    if (projectId && current.projectId !== projectId) throw httpError(404, "project-mismatch");
+
+    const deletedId = await getProposalStore().delete(id);
+    if (!deletedId) throw httpError(404, "not-found");
+    return {
+      success: true,
+      data: {
+        id: deletedId,
+        ...(current.status === "approved"
+          ? { note: "approved proposal's applied memory edit was not reversed" }
+          : {}),
+      },
+    };
   }
 
   private async handleSynapseSession(body: Record<string, unknown>): Promise<unknown> {

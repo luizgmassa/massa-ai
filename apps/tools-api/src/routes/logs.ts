@@ -25,6 +25,7 @@
 import { Elysia } from "elysia";
 import fs from "node:fs";
 import { config, logBuffer, sinkFiles, type LogEntry } from "@massa-ai/shared";
+import { resolveHeartbeatMs, resolveMaxDurationMs, applySseRequestTimeout } from "./sse-keepalive.js";
 
 const LOGS_DETAIL = { tags: ["logs"] };
 
@@ -343,9 +344,9 @@ function renderTxtLine(entry: LogEntry): string {
 }
 
 // ── SSE tail (LOG-05) ───────────────────────────────────────────────────────
-
-const SSE_HEARTBEAT_MS_DEFAULT = 15_000;
-const SSE_MAX_DURATION_MS_DEFAULT = 10 * 60 * 1000; // 10 minutes
+//
+// Heartbeat interval + max-duration default now come from `sse-keepalive.ts`
+// (spec SSE-01, design D1) — this file no longer declares its own literal.
 
 /** How often the live tail checks the sink for appended bytes. A log tail is
  *  not a low-latency channel, and a shorter interval buys nothing but stat
@@ -510,11 +511,11 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
   )
   .get(
     "/stream",
-    () => {
+    ({ request }) => {
       // Read per-request, mirroring events.ts, so an env override is honored
       // even when this module was first imported under the default.
-      const HEARTBEAT_MS = Number(process.env.MASSA_AI_SSE_HEARTBEAT_MS) || SSE_HEARTBEAT_MS_DEFAULT;
-      const MAX_DURATION_MS = Number(process.env.MASSA_AI_SSE_MAX_DURATION_MS) || SSE_MAX_DURATION_MS_DEFAULT;
+      const HEARTBEAT_MS = resolveHeartbeatMs();
+      const MAX_DURATION_MS = resolveMaxDurationMs();
 
       const encoder = new TextEncoder();
       let closed = false;
@@ -526,12 +527,48 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
 
       const stream = new ReadableStream({
         start(controller) {
+          // SSE-07 / design D6: widen this request's own transport idle
+          // window past the 10s default. No-ops silently when the native
+          // handle was never captured (AC-07.3) — the heartbeat above is
+          // what covers that case.
+          applySseRequestTimeout(request);
+
+          /**
+           * Single teardown path for every way this stream ends once `start`
+           * has run: a throwing enqueue (the data path below, or the
+           * heartbeat tick further down) and the MAX_DURATION_MS auto-close.
+           * Before SSE-04 the enqueue/heartbeat throw paths only set
+           * `closed = true` (the heartbeat also cleared its own interval) —
+           * the source subscription and the stream itself were left open
+           * forever, so `startSinkTail`'s 1s poll kept stat-ing and reading
+           * the sink into a dead controller for the life of the process
+           * (design D4). `cancel` (below) has no access to `controller` —
+           * it stays its own minimal teardown — but everything reachable
+           * from inside `start` routes through here. Idempotent: `closed`,
+           * `clearInterval`/`clearTimeout`, and the guarded `close()` are
+           * all safe to invoke more than once.
+           */
+          const teardown = () => {
+            closed = true;
+            unsubscribe?.();
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            if (closeTimer) clearTimeout(closeTimer);
+            try {
+              controller.close();
+            } catch {
+              // already closed
+            }
+          };
+
           const enqueue = (data: unknown) => {
             if (closed) return;
             try {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
             } catch {
-              closed = true;
+              // The client is gone — close the stream and release the
+              // source subscription now instead of leaving both open
+              // (SSE-04, design D4).
+              teardown();
             }
           };
 
@@ -565,21 +602,13 @@ export const logsRoutes = new Elysia({ prefix: "/api/v1/logs" })
             try {
               controller.enqueue(encoder.encode(`: heartbeat\n\n`));
             } catch {
-              closed = true;
-              clearInterval(heartbeatTimer);
+              // Same leak as the data path above (SSE-04) — route through
+              // the shared teardown instead of only flipping `closed`.
+              teardown();
             }
           }, HEARTBEAT_MS);
 
-          closeTimer = setTimeout(() => {
-            closed = true;
-            unsubscribe?.();
-            clearInterval(heartbeatTimer);
-            try {
-              controller.close();
-            } catch {
-              // already closed
-            }
-          }, MAX_DURATION_MS);
+          closeTimer = setTimeout(teardown, MAX_DURATION_MS);
         },
         // Cleanup on stream cancel (client disconnected). `cancel` is the
         // only reliable teardown seam: ReadableStream ignores a function

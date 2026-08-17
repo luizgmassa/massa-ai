@@ -10,12 +10,19 @@ import {
 import {
   PROPOSAL_KINDS,
   PROPOSAL_STATUSES,
+  type ProposalCreateInput,
   type ProposalKind,
   type ProposalPayload,
   type ProposalRecord,
   type ProposalStatus,
   type ProposalStore,
+  type ProposalUpdatePatch,
 } from "./proposal-contract.js";
+import {
+  assertValidProposalPayload,
+  isRecord,
+  isValidProposalPayload,
+} from "./proposal-payload-validation.js";
 
 interface PgProposalRow {
   id: string;
@@ -29,18 +36,12 @@ interface PgProposalRow {
   decided_at: Date | null;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function stringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
-
-function validKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
-  return Object.keys(value).every((key) => allowed.includes(key));
-}
-
+/**
+ * Read-side application of the shared `PROPOSAL_PAYLOAD_RULES` table
+ * (`proposal-payload-validation.ts`, D4). This is the *reader* half of the
+ * "one table, two callers" contract — `create`/`update` below are the write
+ * half, and neither may re-derive its own copy of the key table.
+ */
 function parsePayload(raw: string, kind: ProposalKind): ProposalPayload {
   let value: unknown;
   try {
@@ -51,27 +52,7 @@ function parsePayload(raw: string, kind: ProposalKind): ProposalPayload {
   if (!isRecord(value)) {
     throw storeCorruption("proposal.payload_json", new TypeError("expected object"));
   }
-
-  let valid = false;
-  if (kind === "memory.create") {
-    valid =
-      validKeys(value, ["content", "type", "level", "importance", "tags"]) &&
-      typeof value.content === "string" &&
-      (value.type === undefined || typeof value.type === "string") &&
-      (value.level === undefined || typeof value.level === "number") &&
-      (value.importance === undefined || typeof value.importance === "number") &&
-      (value.tags === undefined || stringArray(value.tags));
-  } else if (kind === "memory.update") {
-    valid =
-      validKeys(value, ["content", "importance", "tags"]) &&
-      Object.keys(value).length > 0 &&
-      (value.content === undefined || typeof value.content === "string") &&
-      (value.importance === undefined || typeof value.importance === "number") &&
-      (value.tags === undefined || stringArray(value.tags));
-  } else {
-    valid = validKeys(value, ["tags"]) && stringArray(value.tags);
-  }
-  if (!valid) {
+  if (!isValidProposalPayload(kind, value)) {
     throw storeCorruption("proposal.payload_json", new TypeError("invalid proposal payload"));
   }
   return value as ProposalPayload;
@@ -214,6 +195,90 @@ export class PgProposalStore implements ProposalStore {
     const persisted = toRecord(rows[0]);
     this.mirror.set(id, persisted);
     return structuredClone(persisted);
+  }
+
+  /**
+   * Manual create (AC-02.1): always lands at `status: "pending"` /
+   * `decidedAt: null`, both stamped here rather than caller-suppliable, and
+   * the payload is re-validated against T5's shared table before the row
+   * is ever written — so a create can never write a row `parsePayload`
+   * would refuse on the next read.
+   */
+  async create(input: ProposalCreateInput): Promise<ProposalRecord> {
+    assertValidProposalPayload(input.kind, input.payload);
+    const record: ProposalRecord = {
+      id: input.id,
+      projectId: input.projectId,
+      kind: input.kind,
+      targetMemoryId: input.targetMemoryId ?? null,
+      payload: input.payload,
+      rationale: input.rationale ?? "",
+      status: "pending",
+      createdAt: input.createdAt ?? Date.now(),
+      decidedAt: null,
+    };
+    await this.insert(record);
+    return record;
+  }
+
+  /**
+   * Writes only `rationale` and `payload` (AC-02.3/AC-02.4). `kind` /
+   * `targetMemoryId` / `status` / `decided_at` never appear in this SQL —
+   * `applyProposal` branches on the first two, and the second two stay
+   * exclusively `setStatus`'s paired write, whose corruption guard
+   * (`toRecord`) throws when `(status === "pending") !== (decidedAt ===
+   * null)`. A `payload` edit re-validates against the row's *existing*
+   * `kind` — changing `kind` here would let a payload for the old kind slip
+   * past validation for the new one.
+   */
+  async update(id: string, patch: ProposalUpdatePatch): Promise<ProposalRecord | null> {
+    await this.ensureHydrated();
+    const current = this.mirror.get(id);
+    if (!current) return null;
+    if (patch.payload !== undefined) {
+      assertValidProposalPayload(current.kind, patch.payload);
+    }
+
+    const merged: ProposalRecord = {
+      ...current,
+      ...(patch.rationale !== undefined ? { rationale: patch.rationale } : {}),
+      ...(patch.payload !== undefined ? { payload: patch.payload } : {}),
+    };
+
+    let rows: PgProposalRow[];
+    try {
+      rows = await this.getClient().$queryRaw<PgProposalRow[]>`
+        UPDATE proposals
+        SET rationale = ${merged.rationale}, payload_json = ${JSON.stringify(merged.payload)}
+        WHERE id = ${id}
+        RETURNING id, project_id, kind, target_memory_id, payload_json,
+                  rationale, status, created_at, decided_at`;
+    } catch (error) {
+      throw searchBackendUnavailable("proposal_store", error);
+    }
+    if (!rows[0]) return null;
+    const persisted = toRecord(rows[0]);
+    this.mirror.set(id, persisted);
+    return structuredClone(persisted);
+  }
+
+  /**
+   * Hard-deletes in any status (AC-02.5), including `approved` — the memory
+   * edit an approved proposal already applied is not reversed. As in
+   * `PgHandoffStore.delete` (D3), the DB's affected-row count is the source
+   * of truth and `mirror.delete` runs only after that write succeeds.
+   */
+  async delete(id: string): Promise<string | null> {
+    await this.ensureHydrated();
+    let affected: number;
+    try {
+      affected = await this.getClient().$executeRaw`DELETE FROM proposals WHERE id = ${id}`;
+    } catch (error) {
+      throw searchBackendUnavailable("proposal_store", error);
+    }
+    if (affected === 0) return null;
+    this.mirror.delete(id);
+    return id;
   }
 
   async journalMode(): Promise<string> {

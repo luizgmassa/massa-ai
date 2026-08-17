@@ -14,6 +14,7 @@ import {
   resetProposalStore,
   type ProposalRecord,
 } from "../data/proposal/proposal-repository.js";
+import { ProposalPayloadValidationError } from "../data/proposal/proposal-payload-validation.js";
 
 // The dedicated-database predicate, in the form the other 12 `DEDICATED_DB`
 // suites under this directory already use. Source of truth is
@@ -226,6 +227,85 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
         component: "handoff.open_questions_json",
       });
     });
+
+    test("update writes only the five allowlisted columns and never touches status/acceptedAt (AC-01.1, AC-01.3)", async () => {
+      const store = new PgHandoffStore();
+      await store.__hydrate();
+      const record = handoff({ status: "open" });
+      await store.insert(record);
+      await store.setStatus(record.id, "accepted", 4242);
+
+      const updated = await store.update(record.id, {
+        targetAgent: "reviewer",
+        summary: "revised summary",
+        openQuestions: ["q-new"],
+        nextSteps: ["n-new"],
+        files: ["c.ts"],
+      });
+      expect(updated).toMatchObject({
+        targetAgent: "reviewer",
+        summary: "revised summary",
+        openQuestions: ["q-new"],
+        nextSteps: ["n-new"],
+        files: ["c.ts"],
+        status: "accepted",
+        acceptedAt: 4242,
+      });
+      await store.__drain();
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT * FROM handoffs WHERE id = ${record.id}`;
+      expect(rows[0].status).toBe("accepted");
+      expect(rows[0].accepted_at).not.toBeNull();
+
+      // A partial patch leaves every unspecified field untouched.
+      const partial = await store.update(record.id, { summary: "only summary changes" });
+      expect(partial).toMatchObject({
+        summary: "only summary changes",
+        targetAgent: "reviewer",
+        openQuestions: ["q-new"],
+        nextSteps: ["n-new"],
+        files: ["c.ts"],
+      });
+
+      expect(await store.update("missing", { summary: "x" })).toBeNull();
+    });
+
+    test("delete hard-deletes and is visible through the same store instance (AC-01.4)", async () => {
+      const record = handoff();
+      const store = new PgHandoffStore();
+      await store.__hydrate();
+      await store.insert(record);
+      await store.__drain();
+
+      // The trap this proves: a delete that forgets `mirror.delete(id)` keeps
+      // serving this row from memory for the life of the process. Reading
+      // through the *same* instance is what makes that omission visible.
+      expect(await store.delete(record.id)).toBe(record.id);
+      expect(await store.getById(record.id)).toBeNull();
+      expect(await store.delete(record.id)).toBeNull();
+      expect(await store.delete("never-existed")).toBeNull();
+
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT id FROM handoffs WHERE id = ${record.id}`;
+      expect(rows).toHaveLength(0);
+    });
+
+    test("delete is durable: a freshly-hydrated store instance never sees the deleted row", async () => {
+      // Contrast with the previous case: this one passes even without
+      // `mirror.delete(id)`, because a fresh store re-hydrates from
+      // PostgreSQL, where the row is truly gone. It exists to prove the
+      // same-instance case above is the one actually sensing the mirror bug.
+      const record = handoff();
+      const seed = new PgHandoffStore();
+      await seed.__hydrate();
+      await seed.insert(record);
+      await seed.__drain();
+      await seed.delete(record.id);
+
+      const fresh = new PgHandoffStore();
+      await fresh.__hydrate();
+      expect(await fresh.getById(record.id)).toBeNull();
+    });
   });
 
   describe("PgProposalStore", () => {
@@ -332,6 +412,131 @@ describe.skipIf(!DEDICATED_DB)("handoff/proposal PostgreSQL parity", () => {
         code: "STORE_CORRUPTION",
         component: "proposal.payload_json",
       });
+    });
+
+    test("create stamps pending/decidedAt-null and defaults, and re-runs T5 validation (AC-02.1, AC-02.2)", async () => {
+      const store = new PgProposalStore();
+      await store.__hydrate();
+      const pid = projectId();
+
+      const created = await store.create({
+        id: `pg-create-${randomUUID()}`,
+        projectId: pid,
+        kind: "memory.tag",
+        payload: { tags: ["a", "b"] },
+      });
+      expect(created).toMatchObject({
+        projectId: pid,
+        kind: "memory.tag",
+        payload: { tags: ["a", "b"] },
+        rationale: "",
+        targetMemoryId: null,
+        status: "pending",
+        decidedAt: null,
+      });
+      expect(await store.getById(created.id)).toEqual(created);
+
+      const withRationale = await store.create({
+        id: `pg-create-${randomUUID()}`,
+        projectId: pid,
+        kind: "memory.create",
+        payload: { content: "hello" },
+        rationale: "because",
+        targetMemoryId: "mem-1",
+      });
+      expect(withRationale).toMatchObject({
+        rationale: "because",
+        targetMemoryId: "mem-1",
+        status: "pending",
+        decidedAt: null,
+      });
+
+      // A payload the reader would reject must never reach the INSERT.
+      await expect(
+        store.create({
+          id: `pg-create-${randomUUID()}`,
+          projectId: pid,
+          kind: "memory.tag",
+          payload: { content: "not a tag payload" } as any,
+        }),
+      ).rejects.toBeInstanceOf(ProposalPayloadValidationError);
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT count(*)::int AS n FROM proposals WHERE project_id = ${pid}`;
+      expect(rows[0].n).toBe(2);
+    });
+
+    test("update writes only rationale/payload, never status/decidedAt, and re-validates against the row's kind (AC-02.3, AC-02.4)", async () => {
+      const store = new PgProposalStore();
+      await store.__hydrate();
+      const pid = projectId();
+      const record = proposal({ projectId: pid, kind: "memory.update", payload: { content: "v1" } });
+      await store.insert(record);
+      await store.setStatus(record.id, "approved", 9999);
+
+      const updated = await store.update(record.id, {
+        rationale: "revised",
+        payload: { content: "v2", tags: ["x"] },
+      });
+      expect(updated).toMatchObject({
+        rationale: "revised",
+        payload: { content: "v2", tags: ["x"] },
+        // Paired-field guard (D4): status/decidedAt survive the update
+        // untouched — `toRecord`'s `(status==="pending") !== (decidedAt===null)`
+        // invariant still holds because this write path never SETs either
+        // column.
+        status: "approved",
+        decidedAt: 9999,
+      });
+      await store.__drain();
+      expect(await store.getById(record.id)).toEqual(updated as ProposalRecord);
+
+      // A second, still-valid payload edit for the same kind succeeds...
+      const revalidated = await store.update(record.id, { payload: { tags: ["y"] } });
+      expect(revalidated!.payload).toEqual({ tags: ["y"] });
+      // ...but a payload re-validated against the row's existing kind
+      // (`memory.update` has no `wrongField`) is refused, and the row is
+      // left at its last-accepted payload rather than silently corrupted.
+      await expect(
+        store.update(record.id, { payload: { wrongField: 1 } as any }),
+      ).rejects.toBeInstanceOf(ProposalPayloadValidationError);
+      expect((await store.getById(record.id))!.payload).toEqual({ tags: ["y"] });
+
+      expect(await store.update("missing", { rationale: "x" })).toBeNull();
+
+      // A partial patch (rationale only) leaves payload untouched.
+      const partial = await store.update(record.id, { rationale: "only rationale" });
+      expect(partial!.rationale).toBe("only rationale");
+      expect(partial!.payload).toEqual({ tags: ["y"] });
+    });
+
+    test("delete hard-deletes and is visible through the same store instance (AC-02.5)", async () => {
+      const record = proposal();
+      const store = new PgProposalStore();
+      await store.__hydrate();
+      await store.insert(record);
+      await store.__drain();
+
+      expect(await store.delete(record.id)).toBe(record.id);
+      expect(await store.getById(record.id)).toBeNull();
+      expect(await store.delete(record.id)).toBeNull();
+      expect(await store.delete("never-existed")).toBeNull();
+
+      const rows = await prisma.$queryRaw<any[]>`
+        SELECT id FROM proposals WHERE id = ${record.id}`;
+      expect(rows).toHaveLength(0);
+    });
+
+    test("delete is durable: a freshly-hydrated store instance never sees the deleted row", async () => {
+      const record = proposal();
+      const seed = new PgProposalStore();
+      await seed.__hydrate();
+      await seed.insert(record);
+      await seed.__drain();
+      await seed.delete(record.id);
+
+      const fresh = new PgProposalStore();
+      await fresh.__hydrate();
+      expect(await fresh.getById(record.id)).toBeNull();
     });
   });
 

@@ -29,7 +29,7 @@ process.env.XDG_CONFIG_HOME = SCRATCH_CONFIG_HOME;
 
 const { EmbeddedApiClient } = await import("../embedded-api-client.js");
 const { ApiHttpError } = await import("../api-client.js");
-const { _setLlmEnabledForTesting } = await import("@massa-ai/core");
+const { _setLlmEnabledForTesting, workspaceManager } = await import("@massa-ai/core");
 
 // Second gate, mirroring buildChildEnv's MASSA_AI_LLM_ENABLED=false pin: the
 // scratch config home closes the config.json path, this closes the env path
@@ -208,12 +208,33 @@ describe("EmbeddedApiClient POST endpoints", () => {
     await call(() => client.post("/api/v1/handoff/begin", { projectId: "p", targetAgent: "builder", summary: "s" }));
   });
 
-  test("POST handoff/accept", async () => {
-    await call(() => client.post("/api/v1/handoff/accept", { handoffId: "h1", acceptingAgent: "x" }));
+  // The handlers destructure `{ id }` from the body (see
+  // `handleHandoffAccept`/`handleHandoffCancel`), not `handoffId` — a body
+  // keyed `handoffId` always falls into the "id required" 400 branch and
+  // never reaches the real accept/cancel call, so it can never fail this
+  // test's "not 404" assertion even when the routing itself is broken. Route
+  // through a real handoff so the try/return path in each handler actually
+  // executes.
+  test("POST handoff/accept (real id round-trip)", async () => {
+    const { result: begun } = await call(() =>
+      client.post("/api/v1/handoff/begin", { projectId: "embed-accept", summary: "s" }),
+    );
+    const id = (begun as any)?.data?.id;
+    expect(typeof id).toBe("string");
+    const { result, err } = await call(() => client.post("/api/v1/handoff/accept", { id }));
+    if (err instanceof ApiHttpError) expect(err.status).not.toBe(404);
+    expect((result as any)?.success).toBe(true);
   });
 
-  test("POST handoff/cancel", async () => {
-    await call(() => client.post("/api/v1/handoff/cancel", { handoffId: "h1" }));
+  test("POST handoff/cancel (real id round-trip)", async () => {
+    const { result: begun } = await call(() =>
+      client.post("/api/v1/handoff/begin", { projectId: "embed-cancel", summary: "s" }),
+    );
+    const id = (begun as any)?.data?.id;
+    expect(typeof id).toBe("string");
+    const { result, err } = await call(() => client.post("/api/v1/handoff/cancel", { id }));
+    if (err instanceof ApiHttpError) expect(err.status).not.toBe(404);
+    expect((result as any)?.success).toBe(true);
   });
 
   test("POST handoff/list", async () => {
@@ -224,12 +245,38 @@ describe("EmbeddedApiClient POST endpoints", () => {
     await call(() => client.post("/api/v1/proposal/list", { projectId: "p" }));
   });
 
-  test("POST proposal/approve", async () => {
-    await call(() => client.post("/api/v1/proposal/approve", { proposalId: "pr1" }));
+  // Same routing-field bug as handoff/accept + handoff/cancel above: the
+  // handler destructures `{ id }`, so a body keyed `proposalId` always takes
+  // the "id required" 400 branch and the real approve/reject try/return path
+  // never executes. Route through real proposals.
+  test("POST proposal/approve (real id round-trip)", async () => {
+    const { result: created } = await call(() =>
+      client.post("/api/v1/proposal/create", {
+        projectId: "embed-approve",
+        kind: "memory.create",
+        payload: { content: "approve-me" },
+      }),
+    );
+    const id = (created as any)?.data?.id;
+    expect(typeof id).toBe("string");
+    const { result, err } = await call(() => client.post("/api/v1/proposal/approve", { id }));
+    if (err instanceof ApiHttpError) expect(err.status).not.toBe(404);
+    expect(result).toBeDefined();
   });
 
-  test("POST proposal/reject", async () => {
-    await call(() => client.post("/api/v1/proposal/reject", { proposalId: "pr1" }));
+  test("POST proposal/reject (real id round-trip)", async () => {
+    const { result: created } = await call(() =>
+      client.post("/api/v1/proposal/create", {
+        projectId: "embed-reject",
+        kind: "memory.create",
+        payload: { content: "reject-me" },
+      }),
+    );
+    const id = (created as any)?.data?.id;
+    expect(typeof id).toBe("string");
+    const { result, err } = await call(() => client.post("/api/v1/proposal/reject", { id }));
+    if (err instanceof ApiHttpError) expect(err.status).not.toBe(404);
+    expect((result as any)?.success).toBe(true);
   });
 
   test("POST executor/execute", async () => {
@@ -362,6 +409,81 @@ describe("EmbeddedApiClient validation branches (missing required params)", () =
   test("proposal/reject missing id → 400", async () => {
     const { err } = await call(() => client.post("/api/v1/proposal/reject", {}));
     expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+});
+
+// T10 (HPC-05/AC-05.1) — handoff/proposal PATCH/DELETE + proposal create
+// routing added for MCP parity with the Phase 3 portal CRUD REST routes.
+// Round-trips a real row through the real DB rather than only checking a
+// branch is reached, since these mirror route logic (allowlist rejection,
+// not-found handling) that a bare "doesn't 404" check would not exercise.
+describe("EmbeddedApiClient handoff/proposal PATCH/DELETE (T10, HPC-05/AC-05.1)", () => {
+  test("PATCH then DELETE a handoff via embedded routing", async () => {
+    const { result: beginResult } = await call(() =>
+      client.post("/api/v1/handoff/begin", { projectId: "embed-t10", summary: "s0" }),
+    );
+    const id = (beginResult as any)?.data?.id;
+    expect(typeof id).toBe("string");
+
+    const { result: patchResult } = await call(() => client.patch(`/api/v1/handoff/${id}`, { summary: "s1" }));
+    expect((patchResult as any)?.success).toBe(true);
+    expect((patchResult as any)?.data?.summary).toBe("s1");
+
+    const { result: deleteResult } = await call(() => client.delete(`/api/v1/handoff/${id}`));
+    expect((deleteResult as any)?.success).toBe(true);
+    expect((deleteResult as any)?.data?.id).toBe(id);
+  });
+
+  test("PATCH handoff rejects a disallowed field by name (AC-01.2)", async () => {
+    const { err } = await call(() => client.patch("/api/v1/handoff/no-such-id", { status: "accepted" }));
+    expect(err).toBeInstanceOf(ApiHttpError);
+    expect((err as ApiHttpErrorInstance).status).toBe(400);
+    expect(String((err as ApiHttpErrorInstance).body?.error)).toContain("status");
+  });
+
+  test("DELETE handoff missing id → 404", async () => {
+    const { err } = await call(() => client.delete("/api/v1/handoff/no-such-id"));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(404);
+  });
+
+  test("POST proposal/create then PATCH then DELETE via embedded routing", async () => {
+    const { result: createResult } = await call(() =>
+      client.post("/api/v1/proposal/create", {
+        projectId: "embed-t10",
+        kind: "memory.tag",
+        payload: { tags: ["a"] },
+        rationale: "r0",
+      }),
+    );
+    const created = (createResult as any)?.data;
+    expect(created?.id).toBeDefined();
+
+    const { result: patchResult } = await call(() =>
+      client.patch(`/api/v1/proposal/${created.id}`, { rationale: "r1" }),
+    );
+    expect((patchResult as any)?.success).toBe(true);
+    expect((patchResult as any)?.data?.rationale).toBe("r1");
+
+    const { result: deleteResult } = await call(() => client.delete(`/api/v1/proposal/${created.id}`));
+    expect((deleteResult as any)?.success).toBe(true);
+    expect((deleteResult as any)?.data?.id).toBe(created.id);
+  });
+
+  test("proposal/create rejects an invalid kind (AC-02.1)", async () => {
+    const { err } = await call(() =>
+      client.post("/api/v1/proposal/create", { projectId: "embed-t10", kind: "nope", payload: {} }),
+    );
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  test("PATCH proposal rejects a disallowed field by name (AC-02.4)", async () => {
+    const { err } = await call(() => client.patch("/api/v1/proposal/no-such-id", { kind: "memory.tag" }));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  test("DELETE proposal missing id → 404", async () => {
+    const { err } = await call(() => client.delete("/api/v1/proposal/no-such-id"));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(404);
   });
 });
 
@@ -542,5 +664,263 @@ describe("EmbeddedApiClient GET/POST /api/v1/profiles — invalid-host guard", (
   test("POST /api/v1/profiles/switch with an unknown host → InvalidHostError, no engine call", async () => {
     const result = await client.post("/api/v1/profiles/switch", { profile: "work", host: "nonesuch" });
     expect(result).toMatchObject({ success: false, error: { code: "InvalidHostError" } });
+  });
+});
+
+// coverage-90pct follow-up: apps/mcp-client/src/embedded-api-client.ts landed
+// at 89.87% on CI's floor gate. The blocks below close the real gaps the
+// existing suite left: a genuine symbol/snippet read (the prior test only
+// covered the "workspace not found" 400), the POST /synapse/sessions 404
+// fallthrough, a real synapse/task/end success, handoff PATCH's array-typed
+// fields, proposal/create's remaining field-shape validations, and the
+// prefetch "entries provided but empty" branch (the prior test's filePath
+// only produced stop-word topics, so `plan.enabled` was always false there).
+describe("EmbeddedApiClient symbol/snippet — real read (AC-05.1 follow-up)", () => {
+  const projectId = "embed-snippet-real";
+  let projDir: string;
+
+  beforeAll(async () => {
+    projDir = mkdtempSync(path.join(BASE_TMP, "embed-snippet-"));
+    writeFileSync(
+      path.join(projDir, "a.ts"),
+      Array.from({ length: 10 }, (_, i) => `line ${i + 1}`).join("\n"),
+    );
+    // markIndexing is the cheap real path to a real workspace row — it does
+    // not run a full ETL, unlike uploadAndIndex/indexProjectTool.
+    await workspaceManager.markIndexing(projectId, projDir);
+  });
+
+  afterAll(() => {
+    rmSync(projDir, { recursive: true, force: true });
+  });
+
+  test("reads a real file without lineEnd (defaults to start+20)", async () => {
+    const result = (await client.get("/api/v1/symbol/snippet", {
+      projectId,
+      file: "a.ts",
+      lineStart: 2,
+    })) as any;
+    expect(result.success).toBe(true);
+    expect(result.data.startLine).toBe(2);
+    expect(result.data.source_clipped).toBe(false);
+    expect(result.data.lines[0]).toMatchObject({ lineNumber: 2, content: "line 2" });
+  });
+
+  test("reads a real file with a lineEnd within the cap (not clipped)", async () => {
+    const result = (await client.get("/api/v1/symbol/snippet", {
+      projectId,
+      file: "a.ts",
+      lineStart: 1,
+      lineEnd: 5,
+    })) as any;
+    expect(result.success).toBe(true);
+    expect(result.data.endLine).toBe(5);
+    expect(result.data.source_clipped).toBe(false);
+  });
+
+  test("a lineEnd requesting more than MASSA_AI_READ_FILE_MAX_LINES clips and flags source_clipped", async () => {
+    const result = (await client.get("/api/v1/symbol/snippet", {
+      projectId,
+      file: "a.ts",
+      lineStart: 1,
+      lineEnd: 600, // default cap is 500 lines
+    })) as any;
+    expect(result.success).toBe(true);
+    expect(result.data.source_clipped).toBe(true);
+    // The file only has 10 lines, so the slice itself is bounded by the
+    // file's real length even though the cap computation targets line 500 —
+    // `source_clipped` (not `endLine`) is the signal this test is after.
+    expect(result.data.endLine).toBe(10);
+  });
+
+  test("a real workspace but a missing file surfaces as a 500 (top-level catch, not a thrown ApiHttpError from the handler itself)", async () => {
+    const { err } = await call(() =>
+      client.get("/api/v1/symbol/snippet", { projectId, file: "no-such-file.ts" }),
+    );
+    expect(err).toBeInstanceOf(ApiHttpError);
+    expect((err as ApiHttpErrorInstance).status).toBe(500);
+  });
+});
+
+describe("EmbeddedApiClient POST /api/v1/synapse/sessions — undefined in REST, falls through to 404", () => {
+  test("POST → 404 (only GET is defined for this endpoint)", async () => {
+    const { err } = await call(() => client.post("/api/v1/synapse/sessions", {}));
+    expect(err).toBeInstanceOf(ApiHttpError);
+    expect((err as ApiHttpErrorInstance).status).toBe(404);
+  });
+});
+
+describe("EmbeddedApiClient synapse task begin/end — real success round-trip", () => {
+  test("task begin then task end on the same session → success:true with a real summary", async () => {
+    const { result: beginResult } = await call(() =>
+      client.post("/api/v1/synapse/task/begin", { agentId: "a1", query: "q", projectId: "embed-task" }),
+    );
+    const sessionId = (beginResult as any)?.data?.sessionId;
+    expect(typeof sessionId).toBe("string");
+
+    const { result: endResult } = await call(() => client.post(`/api/v1/synapse/task/${sessionId}/end`, {}));
+    expect((endResult as any)?.success).toBe(true);
+    expect((endResult as any)?.data?.sessionId).toBe(sessionId);
+    expect(typeof (endResult as any)?.data?.durationMs).toBe("number");
+  });
+});
+
+describe("EmbeddedApiClient PATCH /api/v1/handoff/:id — array-typed + targetAgent fields (AC-01.2)", () => {
+  test("patches targetAgent, openQuestions, nextSteps, and files in one call", async () => {
+    const { result: begun } = await call(() =>
+      client.post("/api/v1/handoff/begin", { projectId: "embed-patch-arrays", summary: "s0" }),
+    );
+    const id = (begun as any)?.data?.id;
+    expect(typeof id).toBe("string");
+
+    const { result } = await call(() =>
+      client.patch(`/api/v1/handoff/${id}`, {
+        targetAgent: "builder",
+        openQuestions: ["q1", "q2"],
+        nextSteps: ["n1"],
+        files: ["a.ts", "b.ts"],
+      }),
+    );
+    expect((result as any)?.success).toBe(true);
+    expect((result as any)?.data?.targetAgent).toBe("builder");
+    expect((result as any)?.data?.openQuestions).toEqual(["q1", "q2"]);
+    expect((result as any)?.data?.nextSteps).toEqual(["n1"]);
+    expect((result as any)?.data?.files).toEqual(["a.ts", "b.ts"]);
+  });
+
+  test("rejects a non-string-array openQuestions", async () => {
+    const { result: begun } = await call(() =>
+      client.post("/api/v1/handoff/begin", { projectId: "embed-patch-bad-array", summary: "s0" }),
+    );
+    const id = (begun as any)?.data?.id;
+    const { err } = await call(() => client.patch(`/api/v1/handoff/${id}`, { openQuestions: [1, 2] }));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  test("PATCH a nonexistent handoff with a valid field → 404 (not the allowlist 400)", async () => {
+    const { err } = await call(() => client.patch("/api/v1/handoff/no-such-id", { summary: "x" }));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(404);
+  });
+});
+
+describe("EmbeddedApiClient proposal/create — remaining field-shape validations (AC-02.2/AC-02.3)", () => {
+  test("missing projectId → 400", async () => {
+    const { err } = await call(() =>
+      client.post("/api/v1/proposal/create", { kind: "memory.tag", payload: { tags: ["a"] } }),
+    );
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  test("non-object payload → 400", async () => {
+    const { err } = await call(() =>
+      client.post("/api/v1/proposal/create", { projectId: "p", kind: "memory.tag", payload: "not-an-object" }),
+    );
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  test("non-string rationale → 400", async () => {
+    const { err } = await call(() =>
+      client.post("/api/v1/proposal/create", {
+        projectId: "p",
+        kind: "memory.tag",
+        payload: { tags: ["a"] },
+        rationale: 42,
+      }),
+    );
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  test("non-string, non-null targetMemoryId → 400", async () => {
+    const { err } = await call(() =>
+      client.post("/api/v1/proposal/create", {
+        projectId: "p",
+        kind: "memory.tag",
+        payload: { tags: ["a"] },
+        targetMemoryId: 42,
+      }),
+    );
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  // AC-02.2: the client-side `isRecord` check only rejects a non-object
+  // payload; a well-shaped-but-wrong-for-its-kind payload (here, `memory.tag`
+  // with no `tags`) passes that check and is rejected by the store's own
+  // write-time validator instead. `proposalPayloadValidationStatus` maps
+  // that `ProposalPayloadValidationError` back onto its declared statusCode.
+  test("a payload shape the store's write-time validator rejects → 400 via ProposalPayloadValidationError", async () => {
+    const { err } = await call(() =>
+      client.post("/api/v1/proposal/create", { projectId: "p", kind: "memory.tag", payload: {} }),
+    );
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+    expect(String((err as ApiHttpErrorInstance)?.body?.error)).toContain("invalid");
+  });
+});
+
+describe("EmbeddedApiClient PATCH /api/v1/proposal/:id — payload validation (AC-02.3/AC-02.4)", () => {
+  test("non-object payload → 400", async () => {
+    const { result: created } = await call(() =>
+      client.post("/api/v1/proposal/create", {
+        projectId: "embed-patch-proposal",
+        kind: "memory.tag",
+        payload: { tags: ["a"] },
+      }),
+    );
+    const id = (created as any)?.data?.id;
+    const { err } = await call(() => client.patch(`/api/v1/proposal/${id}`, { payload: "not-an-object" }));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+
+  test("a payload shape the store's write-time validator rejects on update → 400", async () => {
+    const { result: created } = await call(() =>
+      client.post("/api/v1/proposal/create", {
+        projectId: "embed-patch-proposal-2",
+        kind: "memory.tag",
+        payload: { tags: ["a"] },
+      }),
+    );
+    const id = (created as any)?.data?.id;
+    const { err } = await call(() => client.patch(`/api/v1/proposal/${id}`, { payload: {} }));
+    expect((err as ApiHttpErrorInstance)?.status).toBe(400);
+  });
+});
+
+describe("EmbeddedApiClient prefetch — entries provided as empty array with a real (non-stop-word) topic", () => {
+  test("plan.enabled (real topic from filePath) + empty entries → primed:0, 'No entries provided.' note", async () => {
+    const { result: sessionResult } = await call(() =>
+      client.post("/api/v1/synapse/session", {
+        agentId: "prefetch-agent",
+        taskContext: "prefetch-empty",
+        enableBuffer: true,
+      }),
+    );
+    const sessionId = (sessionResult as any)?.data?.sessionId;
+    expect(typeof sessionId).toBe("string");
+
+    // "src/b.ts" (used elsewhere in this file) only yields stop-word segments
+    // (src, ts) — plan.enabled is always false there. "authHandler" is not a
+    // stop word, so buildPrefetchPlan actually enables the plan here.
+    const { result } = await call(() =>
+      client.post(`/api/v1/synapse/session/${sessionId}/prefetch`, {
+        filePath: "components/authHandler.ts",
+        entries: [],
+      }),
+    );
+    expect((result as any)?.success).toBe(true);
+    expect((result as any)?.data?.enabled).toBe(true);
+    expect((result as any)?.data?.primed).toBe(0);
+    expect((result as any)?.data?.note).toBe("No entries provided.");
+  });
+});
+
+describe("EmbeddedApiClient uploadAndIndex — staging-directory escape via an empty relativePath", () => {
+  test("an empty relativePath resolves to the staging dir itself (no trailing sep) and is rejected", async () => {
+    const { err } = await call(() =>
+      client.uploadAndIndex({
+        projectPath: "/tmp/x",
+        files: [{ relativePath: "", content: "x" }],
+      }),
+    );
+    const msg = err instanceof Error ? err.message : String((err as ApiHttpErrorInstance)?.body?.error ?? err);
+    expect(msg).toContain("escapes staging directory");
   });
 });

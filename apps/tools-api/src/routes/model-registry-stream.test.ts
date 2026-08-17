@@ -1,5 +1,8 @@
 import { describe, test, expect, mock, beforeAll, afterAll, beforeEach } from "bun:test";
 import { createServer } from "node:net";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { Elysia } from "elysia";
 import { node } from "@elysiajs/node";
 
@@ -141,7 +144,11 @@ function makeFakeChild(opts: {
   };
 }
 
-const spawnMock = mock((..._args: unknown[]): any => {
+// Named (not inline) so tests that temporarily override the mock's
+// persistent implementation (see the T3 cancel-hook test below, which must
+// give every spawn() call in the two-generator chain the same custom kill())
+// can restore exactly this default afterward rather than reconstructing it.
+function defaultSpawnImpl(..._args: unknown[]): any {
   const opts = (_args[2] || {}) as { stdoutLines?: string[]; stderrLines?: string[]; exitCode: number | null; spawnError?: Error | null };
   if (opts.spawnError) throw opts.spawnError;
   return makeFakeChild({
@@ -150,7 +157,9 @@ const spawnMock = mock((..._args: unknown[]): any => {
     exitCode: opts.exitCode ?? 0,
     spawnError: opts.spawnError ?? null,
   });
-});
+}
+
+const spawnMock = mock(defaultSpawnImpl);
 
 mock.module("child_process", () => ({
   ...child_process,
@@ -259,8 +268,17 @@ describe("POST /api/v1/model-registry/regenerate-stream — SSE line emission (R
   });
 
   test("cancel hook kills the child on client disconnect", async () => {
+    // T3 spawns the generator chain sequentially (skill, then subagent), so
+    // `child` may already have been reassigned to the second generator's
+    // process by the time the test calls reader.cancel() (each fake child's
+    // "close" event fires on a queued microtask that can race ahead of the
+    // test's own `await`). A persistent mockImplementation — not
+    // mockImplementationOnce — gives every spawn() call in the chain the same
+    // custom kill(), so this test still proves the cancel hook reaches
+    // whichever child is current, regardless of chain position. Restored to
+    // the default implementation at the end so later tests are unaffected.
     let killed = false;
-    spawnMock.mockImplementationOnce(() => {
+    spawnMock.mockImplementation(() => {
       const child = makeFakeChild({ stdoutLines: [], exitCode: 0 });
       return {
         ...child,
@@ -268,14 +286,18 @@ describe("POST /api/v1/model-registry/regenerate-stream — SSE line emission (R
       };
     });
 
-    const res = await app.handle(new Request("http://localhost/api/v1/model-registry/regenerate-stream", { method: "POST" }));
-    expect(res.status).toBe(200);
-    expect(res.body).toBeDefined();
-    // Cancel the stream reader — triggers the ReadableStream cancel hook
-    const reader = res.body!.getReader();
-    await reader.cancel();
-    // The cancel hook should have called child.kill()
-    expect(killed).toBe(true);
+    try {
+      const res = await app.handle(new Request("http://localhost/api/v1/model-registry/regenerate-stream", { method: "POST" }));
+      expect(res.status).toBe(200);
+      expect(res.body).toBeDefined();
+      // Cancel the stream reader — triggers the ReadableStream cancel hook
+      const reader = res.body!.getReader();
+      await reader.cancel();
+      // The cancel hook should have called child.kill()
+      expect(killed).toBe(true);
+    } finally {
+      spawnMock.mockImplementation(defaultSpawnImpl);
+    }
   });
 
   test("emits done exit 0 with install line when stdout/stderr empty", async () => {
@@ -516,6 +538,152 @@ describe("POST /api/v1/model-registry/regenerate-and-install-stream — variant-
     expect(syncEvent).toMatchObject({ host: "claude", status: "failed", error: "disk full" });
     expect(installEvents.length).toBeGreaterThanOrEqual(1); // install loop still ran
     expect(done!.exitCode).toBe(0);
+  });
+});
+
+// ── T3: generator chain derived from package.json's generate:artifacts ──────
+// (AC-03.1, AC-03.2, AC-03.4, AC-03.5, AC-03.6)
+
+/** Independent, test-owned parse of the real package.json's generate:artifacts
+ *  script — deliberately NOT calling into the route's own derivation. AC-03.5's
+ *  whole point is that production and test must not share one parser: if both
+ *  degrade the same way, they agree on a wrong list and this suite would pass
+ *  green while Defect B (one generator spawned) was back. */
+function independentlyDeriveExpectedGenerators(root: string): string[] {
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8")) as { scripts?: Record<string, string> };
+  const command = pkg.scripts?.["generate:artifacts"];
+  if (typeof command !== "string") throw new Error("test fixture assumption broken: no generate:artifacts script");
+  return command
+    .split("&&")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map((segment) => {
+      const match = /^bun\s+(\S+\.ts)$/.exec(segment);
+      if (!match) throw new Error(`test fixture assumption broken: unexpected segment ${segment}`);
+      return match[1] as string;
+    });
+}
+
+describe("POST /regenerate-and-install-stream — generator chain derived from generate:artifacts (T3)", () => {
+  beforeEach(() => {
+    listProfilesMock.mockClear();
+    switchProfileMock.mockClear();
+  });
+
+  test("spawns every generator package.json's generate:artifacts names, in its own order (AC-03.1, AC-03.4)", async () => {
+    if (!realDeploymentRoot) throw new Error("this suite requires a real checkout — realDeploymentRoot resolved null");
+    const expected = independentlyDeriveExpectedGenerators(realDeploymentRoot);
+    expect(expected.length).toBeGreaterThanOrEqual(2);
+
+    await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+
+    expect(spawnMock).toHaveBeenCalledTimes(expected.length);
+    expected.forEach((relPath, i) => {
+      const call = spawnMock.mock.calls[i] as unknown as [string, string[]];
+      expect(call[0]).toBe("bun");
+      expect(call[1][0]!.endsWith(relPath)).toBe(true);
+    });
+  });
+
+  test("a failing first generator is reported by name; the chain stops and nothing downstream runs (AC-03.2)", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], stderrLines: ["boom"], exitCode: 7 }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    const done = events.find((e) => e.type === "done");
+
+    expect(spawnMock).toHaveBeenCalledTimes(1); // the second generator never spawns
+    expect(done).toBeDefined();
+    expect(done!.exitCode).toBe(7);
+    expect(done!.error as string).toContain("generate-skill-artifacts.ts");
+    expect(done!.error as string).toContain("exit code 7");
+    expect(events.some((e) => e.type === "skills")).toBe(false);
+    expect(events.some((e) => e.type === "install")).toBe(false);
+    expect(events.some((e) => e.type === "variant-sync")).toBe(false);
+    expect(listProfilesMock).not.toHaveBeenCalled();
+  });
+
+  test("an unparseable generate:artifacts throws — a fixture missing the script key never spawns anything (AC-03.5)", async () => {
+    const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "mrs-fixture-missing-"));
+    try {
+      fs.writeFileSync(path.join(fixtureDir, "package.json"), JSON.stringify({ name: "fixture", scripts: {} }));
+      getDeploymentRoot.mockImplementationOnce(() => fixtureDir);
+
+      const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+      const events = parseSseEvents(res.text);
+      const done = events.find((e) => e.type === "done");
+
+      expect(done).toBeDefined();
+      expect(done!.exitCode).toBeNull();
+      expect(done!.error as string).toContain("could not derive the generator list");
+      expect(spawnMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  test("an unparseable generate:artifacts throws — a fixture with a shape that doesn't match 'bun <script.ts>' never spawns anything (AC-03.5)", async () => {
+    const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "mrs-fixture-shape-"));
+    try {
+      fs.writeFileSync(
+        path.join(fixtureDir, "package.json"),
+        JSON.stringify({ name: "fixture", scripts: { "generate:artifacts": "echo not-a-generator-invocation" } }),
+      );
+      getDeploymentRoot.mockImplementationOnce(() => fixtureDir);
+
+      const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+      const events = parseSseEvents(res.text);
+      const done = events.find((e) => e.type === "done");
+
+      expect(done).toBeDefined();
+      expect(done!.exitCode).toBeNull();
+      expect(done!.error as string).toContain("could not derive the generator list");
+      expect(spawnMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  test("AC-03.6 hardcoded backstop — the actually-spawned list has >=2 entries and contains both known generator filenames, checked with literals owned by this test, not any shared parser", async () => {
+    await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+
+    const spawnedPaths = spawnMock.mock.calls.map((call) => ((call as unknown as [string, string[]])[1])[0]!);
+    expect(spawnedPaths.length).toBeGreaterThanOrEqual(2);
+    expect(spawnedPaths.some((p) => p.endsWith("generate-skill-artifacts.ts"))).toBe(true);
+    expect(spawnedPaths.some((p) => p.endsWith("generate-subagent-artifacts.ts"))).toBe(true);
+  });
+});
+
+// ── T4: skills reach each host's location — per-host reporting frame ────────
+// (AC-03.3)
+
+describe("POST /regenerate-and-install-stream — skills frame per host (T4, AC-03.3)", () => {
+  beforeEach(() => {
+    listProfilesMock.mockClear();
+    switchProfileMock.mockClear();
+  });
+
+  test("emits one skills frame per known host, after every generator succeeds and before variant-sync/install", async () => {
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+
+    const skillsEvents = events.filter((e) => e.type === "skills");
+    const firstSyncOrInstallIdx = events.findIndex((e) => e.type === "variant-sync" || e.type === "install");
+
+    expect(skillsEvents.length).toBe(4);
+    expect(skillsEvents.map((e) => e.host).sort()).toEqual(["claude", "codex", "cursor", "opencode"]);
+    expect(skillsEvents.every((e) => e.status === "generated")).toBe(true);
+
+    const lastSkillsIdx = events.map((e, i) => (e.type === "skills" ? i : -1)).filter((i) => i >= 0).pop()!;
+    expect(lastSkillsIdx).toBeLessThan(firstSyncOrInstallIdx);
+  });
+
+  test("no skills frame is emitted when a generator fails", async () => {
+    spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 1 }));
+
+    const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+    const events = parseSseEvents(res.text);
+    expect(events.some((e) => e.type === "skills")).toBe(false);
   });
 });
 

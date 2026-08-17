@@ -2219,27 +2219,62 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     expect(fetchArg.headers["x-api-key"]).toBe("secret-key");
   });
 
-  it("a stream failure turns Live off, banners the error, and keeps already-rendered rows intact (LOG-15)", async () => {
-    (globalThis as any).fetch = mock(async () => {
+  // ── SSE-06 (design D5): `connectLogsStreamOnce`'s four-way exit ──────────
+  // classification. Pre-fix, this function returned a plain `boolean`, and a
+  // thrown fetch error that was neither our own abort nor a non-200 was
+  // indistinguishable from a non-200 — both hit the same `catch` branch,
+  // set `logsLive = false`, bannered immediately, and never reconnected
+  // (exactly the reported Logs-tab symptom: the initial burst delivers, a
+  // transient drop throws, and the tail dies permanently). The test below
+  // is the "retryable" exit's dedicated sensor (AC-06.1 + AC-06.4) and was
+  // run against the pre-fix code to confirm it actually discriminates: it
+  // FAILED there — pre-fix, `fetchMock` was called exactly once,
+  // `ctx.state.logsLive` was already `false` after that one call, and the
+  // banner read "Live log stream failed: network down" rather than
+  // "giving up". The other three exits ("clean", "terminal", "aborted")
+  // have their own dedicated assertions elsewhere in this describe block —
+  // see the tests tagged SSE-06 below — but their downstream behavior is
+  // UNCHANGED by design (AC-06.2/AC-06.3 both say "preserve the existing
+  // rule"), so those three do not and cannot discriminate pre- from
+  // post-fix; only "retryable" does, because it is the one classification
+  // that did not exist before.
+  it("a thrown fetch error that is not our abort and not a non-200 is retryable — it reconnects instead of turning Live off immediately, and keeps already-rendered rows intact (SSE-06 AC-06.1, LOG-15)", async () => {
+    const fetchMock = mock(async () => {
       throw new Error("network down");
     });
+    (globalThis as any).fetch = fetchMock;
     const render = mock(() => {});
     const priorEntries = [{ seq: 0, ts: "t", level: "info", message: "already here" }];
     const ctx = makeCtx({ state: { logsLive: true, logsEntries: priorEntries }, render });
-    await runLogsLiveStream(ctx);
-    expect(ctx.state.logsLive).toBe(false);
-    expect(ctx.root.children[0].textContent).toContain("Live log stream failed");
-    expect(ctx.root.children[0].textContent).toContain("network down");
-    // the accumulator (and, by extension, whatever it already fed into the
-    // DOM) is untouched — LOG-15's "without discarding already-rendered
-    // entries"
+    // reconnectDelayMs: 0 keeps this deterministic and instant. Every
+    // connection here is "network down", so every one is rapid — two
+    // consecutive rapid closes exhausts maxReconnectAttempts: 1, so the
+    // SECOND fetch call proves the retry happened without depending on a
+    // third.
+    await runLogsLiveStream(ctx, { reconnectDelayMs: 0, maxReconnectAttempts: 1 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2); // it retried at least once
+    expect(ctx.state.logsLive).toBe(false); // bound exhausted (AC-06.4) — gives up
+    // Exactly one banner — the give-up message (AC-06.4) — not a per-failure
+    // "Live log stream failed" banner for each retryable attempt.
+    expect(ctx.root.children.length).toBe(1);
+    expect(ctx.root.children[0].textContent).toContain("giving up");
+    expect(ctx.root.children[0].textContent).not.toContain("network down");
+    // LOG-15's own guarantee, preserved: the accumulator (and, by extension,
+    // whatever it already fed into the DOM) is untouched.
     expect(ctx.state.logsEntries).toBe(priorEntries);
     expect(ctx.state.logsEntries.length).toBe(1);
     // no full re-render happened; already-rendered rows were never replaced
     expect(render).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 
-  it("does not banner an error when the fetch rejection is our own teardown abort, not a genuine failure", async () => {
+  // SSE-06's "aborted" exit (AC-06.3) dedicated assertion — silent, no
+  // banner, no reconnect, when the fetch rejection is our own teardown
+  // abort. Checked against pre-fix: this test ALSO passes there (the old
+  // boolean code already special-cased `controller.signal.aborted` the same
+  // way), so it does not discriminate pre- from post-fix — it is included
+  // as this exit's dedicated regression sensor, not as a new-behavior proof.
+  it("does not banner an error when the fetch rejection is our own teardown abort, not a genuine failure (SSE-06 AC-06.3)", async () => {
     class FakeAbortController {
       signal: { aborted: boolean };
       constructor() {
@@ -2269,6 +2304,12 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     }
   });
 
+  // SSE-06's "clean" exit (AC-06.1's reconnect path) dedicated assertion.
+  // Checked against pre-fix: this test ALSO passes there (a clean `done`
+  // close already fell through to the same reconnect logic under the old
+  // `boolean` return), so it does not discriminate pre- from post-fix — it
+  // guards against a regression where "clean" stopped reconnecting, not a
+  // new capability.
   it("reconnects after a clean server close while Live is still on — the exact measured scenario (T47)", async () => {
     // Measured against a scratch SSE server that sends one frame then
     // closes: pre-T47, `runLogsLiveStream` returned after exactly 1 fetch
@@ -2304,6 +2345,12 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     expect(ctx.root.children[0].textContent).toContain("giving up");
   });
 
+  // SSE-06's "terminal" exit (AC-06.2) dedicated assertion. Checked against
+  // pre-fix: this test ALSO passes there (a non-200 already bannered +
+  // stopped, unconditionally, under the old `boolean` return — that
+  // behavior is deliberately UNCHANGED by SSE-06), so it does not
+  // discriminate pre- from post-fix — it guards against a regression where
+  // "terminal" started reconnecting like "retryable" now does.
   it("a non-200 (401) banners, turns Live off, and does not reconnect — a bad status will not fix itself on retry (T47)", async () => {
     // Measured: a keyless request to /api/v1/logs/stream returns 401, 68
     // bytes, application/json. Pre-T47 there was no `res.ok` check: the
@@ -2336,10 +2383,15 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     // full scheduled interval via the injected `now` clock (no frames, no
     // real sleep — "delivering a frame is not the signal") for more cycles
     // than `maxReconnectAttempts` would tolerate if they counted as rapid,
-    // then ends the run with a genuine fetch failure so the test terminates
-    // deterministically. Observed red against T47's plain attempt counter:
-    // it gave up ("giving up") after exactly `maxReconnectAttempts + 1`
-    // connections instead of continuing past that count.
+    // then ends the run with a genuine, TERMINAL fetch failure (a non-200 —
+    // SSE-06's "terminal" exit, AC-06.2) so the test terminates
+    // deterministically. A generic thrown error would no longer do this
+    // under SSE-06: it is "retryable" (AC-06.1) and would itself reconnect
+    // rather than ending the run, which is exactly the behavior this test
+    // must not depend on — it is asserting the *lifetime* bound, not the
+    // failure-classification one. Observed red against T47's plain attempt
+    // counter: it gave up ("giving up") after exactly `maxReconnectAttempts
+    // + 1` connections instead of continuing past that count.
     const SCHEDULED_MS = 10 * 60 * 1000; // matches SSE_MAX_DURATION_MS_DEFAULT
     const maxReconnectAttempts = 3;
     const scheduledClosesToObserve = maxReconnectAttempts + 3; // more than the old bound would allow
@@ -2349,7 +2401,7 @@ describe("runLogsLiveStream — live tail fetch + append (T15, LOG-14, LOG-15)",
     const fetchMock = mock(async () => {
       calls += 1;
       if (calls > scheduledClosesToObserve) {
-        throw new Error("stop the run deliberately");
+        return { ok: false, status: 599, headers: new Map(), body: null };
       }
       clock += SCHEDULED_MS; // this connection "lived" a full scheduled interval
       return makeSseResponse([]);

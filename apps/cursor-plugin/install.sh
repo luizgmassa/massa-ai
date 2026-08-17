@@ -325,7 +325,11 @@ install_bundled_skills() {
   fi
 
   local installed=0 name src dest
-  for name in massa-ai persona-router; do
+  # Three harness skills, matching generate-skill-artifacts.ts:138's
+  # authoritative constant (D6/IPT-05) — not derived by scanning the bundle's
+  # skills/ directory, which would install 49 on cursor (every workflow skill
+  # ships as its own directory here).
+  for name in massa-ai persona-router profile; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -354,7 +358,7 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router"] };
+data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile"] };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. installRoute (T9) is installer-owned but
 // written by a LATER step of this same install (record_plugin_version), so it
@@ -400,7 +404,7 @@ NODE
   )"
   [[ "$raw_owner" == "plugin" ]] && {
     local name
-    for name in massa-ai persona-router; do
+    for name in massa-ai persona-router profile; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
     rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
@@ -617,12 +621,18 @@ fi
 # Flat agents and harness skills are written in BOTH branches (PAU-08/09):
 # Cursor discovers subagents only from the flat directory regardless of which
 # plugin-load path is active, and MCP/harness-skills ownership is independent
-# of it too. Prune-then-copy so a specialist deleted from the bundle cannot
-# linger installed. All of them, navigator included, are generated from
+# of it too. All of them, navigator included, are generated from
 # skills/agents/*/SKILL.md and owned by the massa-ai- name prefix (CRS-04) —
 # user-authored agents are untouched.
+#
+# Copy-then-prune (D1/IPT-02 AC-02.6), not prune-then-copy: this loop copies
+# the current set first, and only afterward sheds destination entries the
+# bundle no longer ships. `set -euo pipefail` is in force, so a mid-loop `cp`
+# failure aborts the script — under the old prune-first order that left the
+# user with fewer agents than before the upgrade (possibly none); under this
+# order the worst case is a retired agent lingering one run longer, which is
+# the pre-fix status quo this feature already tolerates.
 mkdir -p "$CURSOR_AGENTS_DIR"
-rm -f "$CURSOR_AGENTS_DIR/"massa-ai-*.md
 for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
@@ -631,6 +641,19 @@ for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
   specialist_count=$((specialist_count + 1))
 done
 vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
+
+# Shed owned members the bundle no longer ships (D2): the removal population
+# is the destination directory; the bundle supplies only the keep-predicate.
+# Loop over the destination, consult the bundle only to decide whether to
+# keep — never loop over the bundle to decide removals. Ownership test is the
+# massa-ai- name prefix (D3), same as the uninstall loop above.
+for f in "$CURSOR_AGENTS_DIR/"massa-ai-*.md; do
+  [[ -f "$f" ]] || continue
+  name="$(basename "$f")"
+  [[ -f "$SCRIPT_DIR/agents/$name" ]] && continue   # keep-list: still shipped
+  rm -f "$f"
+  vecho "  - $name (retired, no longer shipped)"
+done
 
 # Skills bundling (PDO-08, 09): install massa-ai/persona-router into the
 # shared harness skills directory, unless scripts/install-skills.sh already

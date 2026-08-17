@@ -234,6 +234,7 @@ for (const wm of [false, true]) {
   add(`renderHandoffs/${s}/empty`, () => withWriteMode(wm, () => mod.renderHandoffs({ data: { pending: [] } }, { project: "p" })));
   add(`renderProposals/${s}`, () => withWriteMode(wm, () => mod.renderProposals(PROPOSALS, { project: "p" })));
   add(`renderProposals/${s}/noProject`, () => withWriteMode(wm, () => mod.renderProposals(PROPOSALS, {})));
+  add(`renderProposals/${s}/empty`, () => withWriteMode(wm, () => mod.renderProposals({ data: { pending: [] } }, { project: "p" })));
   add(`renderCheckpoints/${s}`, () => withWriteMode(wm, () => mod.renderCheckpoints(CHECKPOINTS)));
   add(`renderCheckpoints/${s}/empty`, () => withWriteMode(wm, () => mod.renderCheckpoints({ data: { checkpoints: [] } })));
   add(`renderLogs/${s}`, () => withWriteMode(wm, () => mod.renderLogs(LOGS, LOGS_STATE)));

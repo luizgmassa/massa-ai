@@ -1,4 +1,232 @@
-# Handoff — web-ui-typescript (EXECUTE COMPLETE 2026-08-12 — 62 commits across 14 phases, sequential batch workers; every gate green; unpushed, push/PR is the user's call)
+# Handoff — installer-prune-and-test-scoping (EXECUTE COMPLETE 2026-08-17 — 13 commits, 4 Phases / 10 Tasks, 7 parallel batch workers plus independent verification; every gate green; unpushed, push/PR is the user's call)
+
+**Branch:** `fix/installer-prune-and-test-scoping`, off `main@89909051`. Worktree
+`~/Projects/massa-ai-wt-prune`. Shares no source file with PR #107 or
+`feat/portal-handoff-proposal-crud`; merges in any order relative to them.
+
+**What shipped.** Six installer sites now shed retired agents/commands in
+copy-then-prune order, each honouring that host's own ownership test; two
+removal loops repointed from the source bundle to the installed directory;
+`install-skills.sh --apply` removes stale skills behind the plugin-owner gate;
+all four plugin installers install `skills/profile/`; the roster gate can see a
+count claim that spans a line break; and the scheduler store parity suite is
+scoped to rows it created.
+
+**Read `validation.md` first.** It carries the unmodified-tree RED, the seven
+mutations, and the two traps that cost real time: a cache replay is not a
+measurement, and measuring while sibling workers run is not measuring — the
+generated bundles are shared state that file-partitioning does not isolate.
+
+**Next.** Push and open the PR (user's call). `[Unreleased]` carries `### Added`
+and `### Fixed`, so this cuts a **minor** bump. Open follow-ups IPT-F1, F4, F6,
+F7 are recorded in `validation.md`, plus Feature 3's carried AC-03.3c, HPC-06,
+HPC-07.
+
+# Previous handoff — portal-handoff-proposal-crud (EXECUTE COMPLETE 2026-08-13 — 9 commits; gates green; unpushed)
+
+Session `spec-portal-handoff-proposal-crud` · workflow **spec-driven** · branch
+`feat/portal-handoff-proposal-crud` stacked on `dbdceead` (PR #107, **unmerged**),
+worktree `/Users/luizmassa/Projects/massa-ai-wt-portal-crud`. Contract:
+`.specs/features/portal-handoff-proposal-crud/{spec,design,tasks,validation}.md`.
+
+## Objective
+
+Make handoffs and proposals fully manageable from the Admin Portal, put a real
+server-side write gate behind every mutation, and fix portal memory edit/delete.
+
+## State
+
+**Done and validated.** 6 Phases / 14 Tasks, 9 commits, `e86d0e31 … feed5575`
+plus close-out. Independent verification (an agent that built none of it)
+re-derived every figure and independently reproduced four mutations rather than
+trusting commit messages; no coverage-matrix row was false. Full gate results and
+the persisted AC-04.4 pre-fix RED are in `validation.md`.
+
+## Next step
+
+1. **Merge PR #107 first.** `[Unreleased]` on this branch still carries its
+   entries, so the changelog here is only correct once #107 lands.
+2. Take `main` into this branch by **merge, never rebase** — long spec branches
+   rebase badly in this repo — and re-check `[Unreleased]`.
+3. Push and open the PR for this branch.
+
+## Traps worth carrying forward
+
+- **`handoff-proposal-pg.test.ts` is `describe.skipIf(!DEDICATED_DB)`.** Without
+  `MASSA_AI_DEDICATED=1` and a `127.0.0.1:5433/massa_ai_test` URL it reports a pass
+  having executed **none** of its 20 substantive cases.
+- **`test:scripts` needs a scratch `XDG_CONFIG_HOME` locally.** `generate:artifacts`
+  reads the developer's profile overlay while the drift gate's `--check` is
+  builtin-only, so a local overlay manufactures drift CI never sees. Measured on the
+  same commit: `EXIT=1, 1806/4` plain vs `EXIT=0, 1810/0` scratch.
+- **A background-run wrapper reports its own exit code, not the gate's.** A
+  `test:scripts` run reported "exit code 0" by the harness had `EXIT=1` in its log.
+- **`bun run test:plugins` is a separate runner** `bun run test` never reaches.
+- Read-only mode is **off by default**; turning it on today costs the portal its
+  analytics and file-view panels until AC-03.3c is closed.
+
+## Open, recorded, not built
+
+**AC-03.3c** (`/api/v1/analytics/`, `/api/v1/file/read` over-blocked pending a trace
+of `ReadFileService.read`'s cache path — gates read-only mode being usable),
+**HPC-06** (docblock claims every destructive op audits; measured 1 of 28 route
+files calls `recordOperation`), **HPC-07** (four config gates fail open on a
+throwing read).
+
+---
+
+# Previous handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
+
+Session `spec-marketplace-directory-source-switching` · workflow **spec-driven** ·
+branch `fix/marketplace-directory-source-switching` from `origin/main` @ `89909051`,
+worktree `/Users/luizmassa/Projects/massa-ai-wt-marketplace`. Contract:
+`.specs/features/marketplace-directory-source-switching/{spec,design,tasks,validation}.md`.
+
+## Objective
+
+Make config changes applied from the Admin Portal actually reach the Claude CLI.
+Two independent defects: the switch engine wrote to a version-pinned cache the
+host never loads, and Save & Apply ran one generator of two, so skills never
+regenerated at all.
+
+## State
+
+All 3 Phases complete (T1, T2, T2b, T3, T4, T5, T6). Independent verification's
+AC and mutation results clean (18/18 ACs, 5/5 mutations killed); its two
+NEEDS-FIX delivery gaps — a security-allowlist regression and T6 undone — both
+closed on this branch.
+
+## Next step
+
+Push and open the PR. Merge is a separate decision, and in this repo it is a
+**release** decision. `fix/sse-heartbeat-idle-timeout` (PR #107, green) is also
+open and unmerged; both branches touch `CHANGELOG.md`, `STATE.md` and
+`HANDOFF.md`, so whichever merges second needs conflict resolution — and
+conflicting PRs here silently stop running CI, so resolve promptly.
+
+## Traps recorded for the next session
+
+- **A worker's "out-of-scope stale fixture" may be a correct sensor.** Run the
+  named suite on `main` AND on the branch before accepting that framing. Here:
+  `main` 12/0 vs branch 11/1 — a real regression introduced by the requirement.
+- **A new `child_process` call site fails `bun run test:scripts`** until added to
+  `scripts/security-allowlist.txt` with a justification. `main` 39/0 vs branch 38/1.
+- **`check_specs_delivered.ts` exiting 0 is not evidence the close-out ran** — it
+  checks that the seven paths exist and are tracked, not that they were updated.
+  The verifier caught T6 as undone while that gate was green.
+- **A `cd` inside one bash call persists into the next.** Twice this session a
+  "run it on main" comparison silently ran in the branch worktree. Print `pwd`
+  and `git log --oneline -1` in the same command as the measurement.
+- **A branch cut from `origin/main` does not carry a sibling branch's close-out.**
+  A STATE.md rotation asserting the sibling's section is present will fail; assert
+  the section COUNT grew instead, which is base-independent.
+
+## Still open, needing the user
+
+1. `packages/core`'s `scheduler-store-pg.test.ts` fails against any dev database
+   that has ever run the API server — it is not scoped to its own rows. Five
+   `scheduled_jobs` rows are the cause; the delete was blocked by the permission
+   classifier and is staged for the user. CI unaffected (fresh database).
+2. Two out-of-scope findings from T5: every installed roster is stale at 17
+   (missing `designer`), and the installers do not prune retired agents —
+   `massa-ai-handoff-writer` survives on codex and opencode.
+3. MDS-05: the remote-source load path is unmeasured, experiment recorded. If the
+   clone wins over the cache there, this feature fixed one half of the class.
+
+---
+
+## Previous handoff — sse-heartbeat-idle-timeout (EXECUTE COMPLETE 2026-08-13 — 13 commits, 4 sequential batch workers plus an independent verification pass; every gate green; unpushed, push/PR authorized but not yet taken)
+
+Session `spec-sse-heartbeat-idle-timeout` · workflow **spec-driven** (Large) ·
+persona pin `context-skill-harness-engineer-architect` · branch
+`fix/sse-heartbeat-idle-timeout` from `origin/main` @ `89909051`, worktree
+`/Users/luizmassa/Projects/massa-ai-wt-sse-heartbeat`. Contract:
+`.specs/features/sse-heartbeat-idle-timeout/{spec,design,tasks,validation}.md`.
+
+## Objective
+
+Every SSE stream this API serves was killed by the transport ~10 s after its
+last byte, because the keep-alive heartbeat meant to prevent that was scheduled
+15 s apart — longer than the window it had to stay inside, so it could never
+fire on an idle stream. Reported as the Admin Portal Logs tab's Live toggle
+"stopping after some seconds".
+
+## State
+
+All 4 Phases complete (T1, T2, T2b, T3, T4, T5, T6, T7, T8). Independent
+verification PASS. 22/22 acceptance criteria carry an automated sensor; 8/8
+mutations killed across the verifier's pass and the author's gap closure.
+
+## The correction that shaped the fix
+
+The first spec asserted the transport idle window "is not configurable", on
+five measured-inert placements. The Plan Challenge Gate (evidence-audit mode)
+falsified that: all five were **listen-time** configuration, and Bun also
+exposes a **per-request** override, `server.timeout(request, seconds)`, at
+`listenHandle.bun.server`. Re-measured against the real route modules, a 60 s
+override moved the drop to exactly 60.0 s.
+
+The gate's own proposed pivot — delete the heartbeat, keep only the override —
+was then measured wrong too: the window is finite, so that relocates the drop
+rather than removing it. With a 120 s window and the shipped 15 s heartbeat,
+both endpoints held 180 s fully idle (12 and 11 heartbeats). Both sides of the
+inequality move, and the shipped fix uses both: the override removes the
+invisible default, the heartbeat is what makes a stream survive indefinitely
+inside whatever window is set.
+
+## Gates (measured 2026-08-13, this worktree)
+
+- `bun run lint` (oxlint, repo root) — 0 errors
+- `bun run type-check` — 6/6
+- `bun test apps/web-ui` — 727 pass / 0 fail
+- tools-api, **one file per invocation**: `logs` 51/0 · `events` 8/0 ·
+  `sse-keepalive` 14/0 · `sse-keepalive-contract` 3/0 · `sse-idle-survival`
+  2/0 (~65 s wall, two real 30 s idle HTTP holds)
+
+## Traps recorded for the next session
+
+- **One file per `bun test` for tools-api.** `bun test logs.test.ts
+  events.test.ts` reports 49/1 while the same files apart report 51/0 and 8/0:
+  `events.test.ts` publishes on the shared `eventBus`, driving
+  `WorkspaceManager` logging into the global `logBuffer` that `logs.test.ts`
+  then asserts is empty. Pre-existing, reproduces on clean `main`, and
+  invisible to `bun run test` because the runner forks `events.test.ts`.
+  `--filter` is core-only and rejected by the tools-api wrapper.
+- **A fresh worktree needs `bun run build`**, not just `bun install`, or every
+  tools-api suite fails identically with `Cannot find module '@massa-ai/core'`.
+- **Comments are source to a text scanner.** A wiring sensor's first draft
+  failed against correct code because `index.ts`'s docblock names the literal
+  `setSseRequestTimeoutSource(undefined)` while explaining the degrading case.
+
+## Next step
+
+Push and open the PR (authorized in-session, not yet taken). Merge is a
+separate decision, and in this repo it is a **release** decision — merging to
+`main` auto-cuts a release and will re-conflict `CHANGELOG.md` for the two
+queued sibling features.
+
+## Queued behind this feature (specified, not started)
+
+1. **Config propagation** — Save & Apply writes agent files to
+   `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents/` (17 files, no
+   `designer`) while the `massa-ai` marketplace is registered as a **directory
+   source** at `/Users/luizmassa/Projects/massa-ai`, so Claude reads from
+   `apps/claude-plugin/agents/` (18 files). Two trees, one button. Separately,
+   the regenerate route spawns only `generate-subagent-artifacts.ts`, never
+   `generate-skill-artifacts.ts`, so skills are never regenerated or
+   reinstalled at all. Per-host sweep for Codex/Cursor/OpenCode still unrun;
+   `installRoute` already differs per host. **Blocked on a user decision:**
+   write into the repo checkout (correct for a directory source, but a portal
+   button then edits generated files in the working tree) or target the
+   versioned cache and reconcile the install route.
+2. **Admin Portal CRUD for handoffs and proposals** — handoffs have
+   create/accept/cancel, proposals only approve/reject; no PATCH, PUT or DELETE
+   exists on either route. Agreed shape is full CRUD with hard delete, plus
+   manual proposal creation.
+
+---
+
+## Previous handoff — web-ui-typescript (EXECUTE COMPLETE 2026-08-12 — 62 commits across 14 phases, sequential batch workers; every gate green; unpushed, push/PR is the user's call)
 
 Session `spec-web-ui-typescript` · workflow **spec-driven** (Large/Complex) · branch
 `spec/web-ui-typescript` from `origin/main` @ `6227b4ac`, worktree

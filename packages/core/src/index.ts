@@ -164,6 +164,18 @@ export {
   PROPOSAL_STATUSES,
   PROPOSAL_KINDS,
 } from "./data/proposal/proposal-repository.js";
+// Exported so transports can identify a write-time payload rejection with
+// `instanceof` rather than duck-typing `error.name`. `apps/tools-api`'s
+// proposal routes need to map this to a 400, and without the class on the
+// public surface the only available check was a string comparison against
+// `name` — which a rename, a subclass, or a minifier breaks silently, turning
+// a 400 into a 500 with no test able to see the difference.
+export {
+  ProposalPayloadValidationError,
+  assertValidProposalPayload,
+  isValidProposalPayload,
+  PROPOSAL_PAYLOAD_RULES,
+} from "./data/proposal/proposal-payload-validation.js";
 export type {
   ProposalStore,
   ProposalRecord,

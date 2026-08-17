@@ -21,7 +21,6 @@
  * landmine (memory-crud.test.ts) does not poison handoff tests.
  */
 
-import { randomUUID } from "crypto";
 import { z } from "zod";
 import { MemoryLevel, MemoryType } from "@massa-ai/shared";
 import {
@@ -29,9 +28,10 @@ import {
   newHandoffId,
   type HandoffRecord,
   type HandoffStore,
+  type HandoffUpdatePatch,
 } from "../../data/handoff/handoff-repository.js";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
-import type { InsertMemoryInput } from "../../data/memory/memory-repository.js";
+import type { InsertMemoryInput, UpdateMemoryPatch } from "../../data/memory/memory-repository.js";
 import { eventBus } from "../events/event-bus.js";
 import { llm as defaultLlmSurface } from "../memory/llm-client.js";
 import type { LlmSurface } from "../memory/consolidator.js";
@@ -62,12 +62,27 @@ export interface AcceptCancelResult {
   reason?: string;
 }
 
+/** T7 — PATCH/DELETE results (AC-01.1..AC-01.8). */
+export interface UpdateResult {
+  ok: boolean;
+  handoff?: HandoffRecord;
+  reason?: string;
+}
+
+export interface DeleteResult {
+  ok: boolean;
+  id?: string;
+  reason?: string;
+}
+
 /**
  * Injectable memory-repository seam. The default implementation resolves
  * getMemoryRepository() lazily inside each method (test-isolation).
  */
 export interface HandoffMemorySeam {
   insert(input: InsertMemoryInput): void | Promise<void>;
+  /** AC-01.8: refresh the dual-written memory's content after an edit. */
+  update(id: string, patch: UpdateMemoryPatch): boolean | Promise<boolean>;
 }
 
 export interface HandoffDeps {
@@ -107,6 +122,7 @@ export class HandoffService {
       injectedRepo ??
       ({
         insert: (i: InsertMemoryInput) => getMemoryRepository().insert(i),
+        update: (id: string, p: UpdateMemoryPatch) => getMemoryRepository().update(id, p),
       } as HandoffMemorySeam);
   }
 
@@ -162,7 +178,7 @@ export class HandoffService {
   }
 
   private async dualWrite(record: HandoffRecord): Promise<string | null> {
-    const memId = `handoff-mem-${record.id}-${randomUUID().slice(0, 8)}`;
+    const memId = dualWriteMemoryId(record.id);
     const input = buildHandoffMemoryInput(memId, record);
     await Promise.resolve(this.memoryRepo.insert(input));
     return memId;
@@ -228,9 +244,100 @@ export class HandoffService {
   async listPending(projectId: string, targetAgent?: string | null): Promise<HandoffRecord[]> {
     return this.store.listPending(projectId, targetAgent ?? undefined);
   }
+
+  // ── update (T7 — AC-01.1, AC-01.3, AC-01.7, AC-01.8) ─────────────────────
+
+  /**
+   * Applies an already-allowlisted patch (the route owns rejecting
+   * disallowed/unknown fields by name — AC-01.2). `status`/`acceptedAt` are
+   * not reachable through `HandoffUpdatePatch` at all, so they cannot be
+   * written here even by mistake (AC-01.3).
+   */
+  async update(params: {
+    id: string;
+    projectId?: string;
+    patch: HandoffUpdatePatch;
+  }): Promise<UpdateResult> {
+    if (!params || !params.id) {
+      return { ok: false, reason: "missing-id" };
+    }
+
+    const row = await this.store.getById(params.id);
+    if (!row) return { ok: false, reason: "not-found" };
+    if (params.projectId && row.projectId !== params.projectId) {
+      return { ok: false, reason: "project-mismatch" };
+    }
+
+    const updated = await this.store.update(params.id, params.patch);
+    if (!updated) return { ok: false, reason: "not-found" };
+
+    // AC-01.8: the dual-written memory's content was built once at `begin`
+    // and nothing else ever refreshes it. Any patch field that feeds
+    // `formatMemoryContent` must re-run it and push the new content into the
+    // memory row, or an edit ships active, FTS-indexed, wrong content.
+    const touchesMemoryContent =
+      params.patch.summary !== undefined ||
+      params.patch.openQuestions !== undefined ||
+      params.patch.nextSteps !== undefined ||
+      params.patch.files !== undefined;
+    if (touchesMemoryContent) {
+      await this.refreshDualWriteMemory(updated);
+    }
+
+    return { ok: true, handoff: updated };
+  }
+
+  private async refreshDualWriteMemory(record: HandoffRecord): Promise<void> {
+    // Best-effort, mirroring dualWrite's own swallow in begin(): the memory
+    // row may not exist (dualWrite is itself best-effort), and a refresh
+    // failure must never fail the handoff edit that triggered it.
+    try {
+      const memId = dualWriteMemoryId(record.id);
+      const content = formatMemoryContent(record);
+      await Promise.resolve(this.memoryRepo.update(memId, { content }));
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  // ── delete (T7 — AC-01.4, AC-01.5, AC-01.6, AC-01.7) ─────────────────────
+
+  /**
+   * Hard-deletes in any status (AC-01.4). The dual-written memory row is
+   * left untouched (AC-01.5) — its dangling `metadata.handoffId` is accepted,
+   * documented behaviour, not an integrity break.
+   */
+  async delete(params: { id: string; projectId?: string }): Promise<DeleteResult> {
+    if (!params || !params.id) {
+      return { ok: false, reason: "missing-id" };
+    }
+
+    const row = await this.store.getById(params.id);
+    if (!row) return { ok: false, reason: "not-found" };
+    if (params.projectId && row.projectId !== params.projectId) {
+      return { ok: false, reason: "project-mismatch" };
+    }
+
+    const deletedId = await this.store.delete(params.id);
+    if (!deletedId) return { ok: false, reason: "not-found" };
+    return { ok: true, id: deletedId };
+  }
 }
 
 // ── Pure helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Deterministic by handoff id (no random suffix): a PATCH must be able to
+ * recompute the id of the memory row `dualWrite` created at `begin` without
+ * any new lookup primitive on the data layer (out of this task's write set),
+ * so a PATCH that touches summary/openQuestions/nextSteps/files can refresh
+ * that row's content directly (AC-01.8). Safe against collision because a
+ * handoff id (`newHandoffId()`) is itself already unique per row and
+ * `dualWrite` runs at most once per handoff id (inside `begin`).
+ */
+export function dualWriteMemoryId(handoffId: string): string {
+  return `handoff-mem-${handoffId}`;
+}
 
 export function buildHandoffMemoryInput(
   memId: string,

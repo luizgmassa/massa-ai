@@ -4,6 +4,11 @@ import {
   type ProposalRecord,
 } from "../data/proposal/proposal-contract.js";
 import { PgProposalStore } from "../data/proposal/proposal-repository-pg.js";
+import {
+  assertValidProposalPayload,
+  isValidProposalPayload,
+  ProposalPayloadValidationError,
+} from "../data/proposal/proposal-payload-validation.js";
 import { SearchServiceError } from "../kernel/search-diagnostics.js";
 
 function proposal(overrides: Partial<ProposalRecord> = {}): ProposalRecord {
@@ -134,6 +139,58 @@ describe("async proposal stores", () => {
   });
 });
 
+describe("shared per-kind payload validation (D4, AC-02.2)", () => {
+  // One table, two callers: these are the *write-side* cases, and they are
+  // the mirror image of the read-side `storeCorruption` cases above — same
+  // table, different wrapper error, so a payload accepted here is guaranteed
+  // not to blow up the next `getById`/`listPending`/`approve` on that row.
+  test.each([
+    ["memory.create", { content: "hello", tags: ["t"] }],
+    ["memory.update", { content: "edited" }],
+    ["memory.tag", { tags: ["a", "b"] }],
+  ] as const)("accepts a valid %s payload", (kind, payload) => {
+    expect(isValidProposalPayload(kind, payload)).toBe(true);
+    expect(() => assertValidProposalPayload(kind, payload)).not.toThrow();
+  });
+
+  test.each([
+    ["memory.create", {}, "missing required content"],
+    ["memory.create", { content: "x", extra: true }, "unknown key"],
+    ["memory.update", {}, "empty patch"],
+    ["memory.update", { tags: [1] }, "wrong tags element type"],
+    ["memory.tag", { content: "x" }, "missing required tags"],
+    ["memory.tag", {}, "missing required tags"],
+  ] as const)(
+    "refuses an invalid %s payload at write time with a 400-shaped error (%s)",
+    (kind, payload) => {
+      expect(isValidProposalPayload(kind, payload)).toBe(false);
+      expect(() => assertValidProposalPayload(kind, payload)).toThrow(
+        ProposalPayloadValidationError,
+      );
+      try {
+        assertValidProposalPayload(kind, payload);
+        throw new Error("expected assertValidProposalPayload to throw");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ProposalPayloadValidationError);
+        expect((error as ProposalPayloadValidationError).statusCode).toBe(400);
+        expect((error as ProposalPayloadValidationError).kind).toBe(kind);
+      }
+    },
+  );
+
+  test("refuses a non-object payload at write time", () => {
+    expect(() => assertValidProposalPayload("memory.tag", ["not", "an", "object"])).toThrow(
+      ProposalPayloadValidationError,
+    );
+    expect(() => assertValidProposalPayload("memory.tag", "a string")).toThrow(
+      ProposalPayloadValidationError,
+    );
+    expect(() => assertValidProposalPayload("memory.tag", null)).toThrow(
+      ProposalPayloadValidationError,
+    );
+  });
+});
+
 describe("MemoryProposalStore branch coverage", () => {
   test("listPending filters + orders; setStatus on pending/non-pending/missing", async () => {
     const store = new MemoryProposalStore();
@@ -159,5 +216,53 @@ describe("MemoryProposalStore branch coverage", () => {
     // Missing row → null; getById miss → null.
     expect(await store.setStatus("missing", "approved")).toBeNull();
     expect(await store.getById("missing")).toBeNull();
+  });
+
+  test("create stamps pending/decidedAt-null and validates payload; update writes only rationale/payload; delete hard-deletes", async () => {
+    const store = new MemoryProposalStore();
+    const created = await store.create({
+      id: "p-created",
+      projectId: "project-1",
+      kind: "memory.tag",
+      payload: { tags: ["a"] },
+    });
+    expect(created).toMatchObject({
+      rationale: "",
+      targetMemoryId: null,
+      status: "pending",
+      decidedAt: null,
+    });
+
+    await expect(
+      store.create({
+        id: "p-invalid",
+        projectId: "project-1",
+        kind: "memory.tag",
+        payload: { content: "not a tag payload" } as any,
+      }),
+    ).rejects.toBeInstanceOf(ProposalPayloadValidationError);
+    expect(await store.getById("p-invalid")).toBeNull();
+
+    await store.setStatus(created.id, "approved", 4242);
+    const updated = await store.update(created.id, {
+      rationale: "revised",
+      payload: { tags: ["b", "c"] },
+    });
+    // Paired-field guard: update never touches status/decidedAt.
+    expect(updated).toMatchObject({
+      rationale: "revised",
+      payload: { tags: ["b", "c"] },
+      status: "approved",
+      decidedAt: 4242,
+    });
+
+    await expect(
+      store.update(created.id, { payload: { content: "wrong kind" } as any }),
+    ).rejects.toBeInstanceOf(ProposalPayloadValidationError);
+    expect(await store.update("missing", { rationale: "x" })).toBeNull();
+
+    expect(await store.delete(created.id)).toBe(created.id);
+    expect(await store.getById(created.id)).toBeNull();
+    expect(await store.delete(created.id)).toBeNull();
   });
 });

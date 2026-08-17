@@ -183,7 +183,7 @@ export const MassaAiPlugin: Plugin = async ({ project, directory, worktree, clie
     // -----------------------------------------------------------------------
     // No `tool` key: AD-017 — plugins deliver, MCP serves tools, hooks
     // observe. The MCP server registered by scripts/install-agents.sh is the
-    // one canonical tool surface (54 tools); in-process tools are never a
+    // one canonical tool surface (59 tools); in-process tools are never a
     // coverage mechanism. `tool` is optional on Hooks, so omitting it is
     // valid per @opencode-ai/plugin's type.
     //

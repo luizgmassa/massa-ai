@@ -345,14 +345,22 @@ export async function handleMemoryDeleteProject(ctx: MemoryCtx): Promise<void> {
 /** Per-row edit. Still a prompt(): the Memory tab's inline-form conversion is
  *  scoped to the Models catalog (P2-D), and registry-editor.test.ts asserts this
  *  literal survives precisely to prove that sensor is span-scoped rather than a
- *  whole-file scan. */
+ *  whole-file scan.
+ *
+ *  Body-keyed against `POST /api/v1/memory/update` (design decision D2):
+ *  `PUT /api/v1/memory/:id` was never registered — `memory.ts` only exposes
+ *  five body-keyed POSTs (`/store`, `/search`, `/update`, `/delete`, `/list`)
+ *  — so this call 404'd before auth was even consulted. Changing the client
+ *  was chosen over adding a `PUT` route because `/update` already exists, is
+ *  already tested, and is already what the MCP tools call; a new verb would
+ *  duplicate a working path and leave two routes to keep in sync. */
 export async function handleMemoryEdit(ctx: MemoryCtx, id: string): Promise<void> {
   const newContent = prompt("Edit memory content:", "");
   if (newContent === null) return;
   try {
-    await ctx.api.request("/api/v1/memory/" + encodeURIComponent(id), {
-      method: "PUT",
-      body: { content: newContent },
+    await ctx.api.request("/api/v1/memory/update", {
+      method: "POST",
+      body: { id, content: newContent },
     });
     ctx.render();
   } catch (e) {
@@ -360,11 +368,16 @@ export async function handleMemoryEdit(ctx: MemoryCtx, id: string): Promise<void
   }
 }
 
-/** Single-memory delete. The confirm() lives at the wiring site. */
+/** Single-memory delete. The confirm() lives at the wiring site.
+ *
+ *  Body-keyed against `POST /api/v1/memory/delete` for the same reason as
+ *  `handleMemoryEdit` above — `DELETE /api/v1/memory/:id` was never
+ *  registered. */
 export async function handleMemoryDelete(ctx: MemoryCtx, id: string): Promise<void> {
   try {
-    await ctx.api.request("/api/v1/memory/" + encodeURIComponent(id), {
-      method: "DELETE",
+    await ctx.api.request("/api/v1/memory/delete", {
+      method: "POST",
+      body: { id },
     });
     ctx.render();
   } catch (e) {

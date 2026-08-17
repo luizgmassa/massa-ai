@@ -29,8 +29,18 @@ import {
   handleIndexStatusEvent,
 } from "../static/views/projects.js";
 import { handleMemoryEdit, handleMemoryDelete, handleMemoryCreate } from "../static/views/memory.js";
-import { handleHandoffCreate, handleHandoffAction } from "../static/views/handoffs.js";
-import { handleProposalAction } from "../static/views/proposals.js";
+import {
+  handleHandoffCreate,
+  handleHandoffAction,
+  handleHandoffEdit,
+  handleHandoffDelete,
+} from "../static/views/handoffs.js";
+import {
+  handleProposalAction,
+  handleProposalCreate,
+  handleProposalEdit,
+  handleProposalDelete,
+} from "../static/views/proposals.js";
 import { handleCheckpointCreate, handleCheckpointDelete } from "../static/views/checkpoints.js";
 
 // ── Harness ─────────────────────────────────────────────────────────────────
@@ -164,12 +174,18 @@ describe("collectFormData — type coercion per input kind", () => {
 // ── Memory ──────────────────────────────────────────────────────────────────
 
 describe("handleMemoryEdit", () => {
-  it("PUTs the prompted content and re-renders", async () => {
+  // Was: `PUT /api/v1/memory/m%201`, which no route ever served — this test
+  // asserted the defect and passed anyway, because `ctx.api.request` is a mock
+  // and accepts any URL string. That is exactly how the dead call path survived
+  // review; `route-contract.test.ts` is the sensor that can actually see it.
+  // The id keeps its space: body-keyed, it must arrive UNENCODED, where the
+  // path-parameter form had to percent-encode it.
+  it("POSTs the prompted content to /memory/update and re-renders", async () => {
     const ctx = makeCtx();
     await withGlobals({ prompt: () => "new body" }, () => handleMemoryEdit(ctx, "m 1"));
-    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/memory/m%201", {
-      method: "PUT",
-      body: { content: "new body" },
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/memory/update", {
+      method: "POST",
+      body: { id: "m 1", content: "new body" },
     });
     expect(ctx.render).toHaveBeenCalled();
   });
@@ -199,10 +215,17 @@ describe("handleMemoryEdit", () => {
 });
 
 describe("handleMemoryDelete", () => {
-  it("DELETEs the encoded id and re-renders", async () => {
+  // Was: `DELETE /api/v1/memory/a%2Fb`, a route that never existed — see the
+  // note on handleMemoryEdit above. The `a/b` id is deliberate: a slash in a
+  // path parameter is the case percent-encoding exists for, and body-keyed it
+  // must survive verbatim instead.
+  it("POSTs the id to /memory/delete and re-renders", async () => {
     const ctx = makeCtx();
     await withGlobals({}, () => handleMemoryDelete(ctx, "a/b"));
-    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/memory/a%2Fb", { method: "DELETE" });
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/memory/delete", {
+      method: "POST",
+      body: { id: "a/b" },
+    });
     expect(ctx.render).toHaveBeenCalled();
   });
 
@@ -353,6 +376,100 @@ describe("handleHandoffAction", () => {
   });
 });
 
+// T12 (HPC-01, AC-01.1/.2): the PATCH body must be exactly the allowlisted
+// field(s) the user edited — nothing extra. `toHaveBeenCalledWith` does a
+// deep-equal on the `body`, so a mutant that slips in a rejected field like
+// `status` (which the route's own allowlist would 400 on, AC-01.2) turns
+// this red. RED proof recorded manually: adding `body.status = "x"` inside
+// `handleHandoffEdit` before sending the request fails this exact test with
+// a body-mismatch diff, restored immediately after observing the failure.
+describe("handleHandoffEdit", () => {
+  it("does nothing when the edit prompt is cancelled", async () => {
+    const ctx = makeCtx();
+    await withGlobals({ prompt: () => null }, () => handleHandoffEdit(ctx, "h1"));
+    expect(ctx.api.request).not.toHaveBeenCalled();
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("PATCHes only the summary field the user typed, then re-renders", async () => {
+    const ctx = makeCtx();
+    await withGlobals({ prompt: () => "revised summary" }, () => handleHandoffEdit(ctx, "h1"));
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/handoff/h1", {
+      method: "PATCH",
+      body: { summary: "revised summary" },
+    });
+    expect(ctx.render).toHaveBeenCalled();
+  });
+
+  it("encodes the id in the URL path", async () => {
+    const ctx = makeCtx();
+    await withGlobals({ prompt: () => "x" }, () => handleHandoffEdit(ctx, "h/1"));
+    expect((ctx.api.request as any).mock.calls[0][0]).toBe("/api/v1/handoff/h%2F1");
+  });
+
+  // Edge Cases: a 403 from the write-mode gate resolves (not throws) as
+  // `{success:false, error:"Write refused: read-only mode is active"}` —
+  // `api.request()` only throws on transport failure, never on HTTP status.
+  // Without checking `res.error`, this would be a silent no-op.
+  it("surfaces a write-gate 403 as a visible alert and does not re-render", async () => {
+    const ctx = makeCtx({
+      request: mock(async () => ({ success: false, error: "Write refused: read-only mode is active" })),
+    });
+    const alerts = await withGlobals({ prompt: () => "x" }, async (a) => {
+      await handleHandoffEdit(ctx, "h1");
+      return a;
+    });
+    expect(alerts).toEqual(["Edit failed: Write refused: read-only mode is active"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  // The route's own 400/404 domain rejections carry `{status, error}` with
+  // no `success` key at all — a different shape from the write-gate's
+  // `{success:false, error}`, and both must be caught by the same check.
+  it("surfaces a route-level 404 (no success key) as a visible alert", async () => {
+    const ctx = makeCtx({ request: mock(async () => ({ status: 404, error: "not-found" })) });
+    const alerts = await withGlobals({ prompt: () => "x" }, async (a) => {
+      await handleHandoffEdit(ctx, "h1");
+      return a;
+    });
+    expect(alerts).toEqual(["Edit failed: not-found"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("alerts when the request throws", async () => {
+    const ctx = makeCtx({ request: throwingRequest() });
+    expect(await withGlobals({ prompt: () => "x" }, async (a) => { await handleHandoffEdit(ctx, "h1"); return a; }))
+      .toEqual(["Edit failed: boom"]);
+  });
+});
+
+describe("handleHandoffDelete", () => {
+  it("DELETEs the handoff and re-renders on success", async () => {
+    const ctx = makeCtx();
+    await withGlobals({}, () => handleHandoffDelete(ctx, "h1"));
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/handoff/h1", { method: "DELETE" });
+    expect(ctx.render).toHaveBeenCalled();
+  });
+
+  it("surfaces a write-gate 403 as a visible alert and does not re-render", async () => {
+    const ctx = makeCtx({
+      request: mock(async () => ({ success: false, error: "Write refused: read-only mode is active" })),
+    });
+    const alerts = await withGlobals({}, async (a) => {
+      await handleHandoffDelete(ctx, "h1");
+      return a;
+    });
+    expect(alerts).toEqual(["Delete failed: Write refused: read-only mode is active"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("alerts when the request throws", async () => {
+    const ctx = makeCtx({ request: throwingRequest() });
+    expect(await withGlobals({}, async (a) => { await handleHandoffDelete(ctx, "h1"); return a; }))
+      .toEqual(["Delete failed: boom"]);
+  });
+});
+
 // ── Proposals ───────────────────────────────────────────────────────────────
 
 describe("handleProposalAction", () => {
@@ -372,6 +489,235 @@ describe("handleProposalAction", () => {
     const ctx = makeCtx({ request: throwingRequest() });
     expect(await withGlobals({}, async (a) => { await handleProposalAction(ctx, "p1", "approve"); return a; }))
       .toEqual(["approve failed: boom"]);
+  });
+});
+
+// T13 (HPC-02, AC-02.1/.2): `kind` must be one of exactly memory.create /
+// memory.update / memory.tag, validated client-side before any request goes
+// out. RED proof recorded manually: removing the `isValidProposalKind` guard
+// (or its call) inside `handleProposalCreate` lets an illegal kind reach
+// `ctx.api.request`, which turns "refuses a kind outside the allowed three"
+// below red — it asserts BOTH the alert text and that no request fired.
+// Restored immediately after observing the failure.
+describe("handleProposalCreate", () => {
+  it("posts kind/payload and the optional rationale/targetMemoryId when present", async () => {
+    const ctx = makeCtx({
+      fields: [
+        field("projectId", "proposal-create", "p1"),
+        field("kind", "proposal-create", "memory.create"),
+        field("payload", "proposal-create", '{"content":"x"}'),
+        field("rationale", "proposal-create", "why"),
+        field("targetMemoryId", "proposal-create", "m1"),
+      ],
+    });
+    await withGlobals({}, () => handleProposalCreate(ctx));
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/proposal/create", {
+      method: "POST",
+      body: {
+        projectId: "p1",
+        kind: "memory.create",
+        payload: { content: "x" },
+        rationale: "why",
+        targetMemoryId: "m1",
+      },
+    });
+    expect(ctx.render).toHaveBeenCalled();
+  });
+
+  it("omits rationale and targetMemoryId when blank", async () => {
+    const ctx = makeCtx({
+      fields: [
+        field("projectId", "proposal-create", "p1"),
+        field("kind", "proposal-create", "memory.tag"),
+        field("payload", "proposal-create", "{}"),
+      ],
+    });
+    await withGlobals({}, () => handleProposalCreate(ctx));
+    expect((ctx.api.request as any).mock.calls[0][1].body).toEqual({
+      projectId: "p1",
+      kind: "memory.tag",
+      payload: {},
+    });
+  });
+
+  it("refuses a missing projectId before issuing a request", async () => {
+    const ctx = makeCtx({
+      fields: [field("kind", "proposal-create", "memory.create"), field("payload", "proposal-create", "{}")],
+    });
+    expect(await withGlobals({}, async (a) => { await handleProposalCreate(ctx); return a; }))
+      .toEqual(["Project ID is required."]);
+    expect(ctx.api.request).not.toHaveBeenCalled();
+  });
+
+  it("refuses a blank kind before issuing a request", async () => {
+    const ctx = makeCtx({
+      fields: [field("projectId", "proposal-create", "p1"), field("payload", "proposal-create", "{}")],
+    });
+    const alerts = await withGlobals({}, async (a) => { await handleProposalCreate(ctx); return a; });
+    expect(alerts).toEqual(["kind must be one of memory.create, memory.update, memory.tag"]);
+    expect(ctx.api.request).not.toHaveBeenCalled();
+  });
+
+  // The RED proof this suite requires: an illegal kind must never reach the
+  // network. This test fails (not just alerts differently) if the client-side
+  // check is removed, because `ctx.api.request` would then be called.
+  it("refuses a kind outside the allowed three, without issuing a request", async () => {
+    const ctx = makeCtx({
+      fields: [
+        field("projectId", "proposal-create", "p1"),
+        field("kind", "proposal-create", "memory.delete"),
+        field("payload", "proposal-create", "{}"),
+      ],
+    });
+    const alerts = await withGlobals({}, async (a) => { await handleProposalCreate(ctx); return a; });
+    expect(alerts).toEqual(["kind must be one of memory.create, memory.update, memory.tag"]);
+    expect(ctx.api.request).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty payload before issuing a request", async () => {
+    const ctx = makeCtx({
+      fields: [field("projectId", "proposal-create", "p1"), field("kind", "proposal-create", "memory.create")],
+    });
+    const alerts = await withGlobals({}, async (a) => { await handleProposalCreate(ctx); return a; });
+    expect(alerts).toEqual(["Payload is required."]);
+    expect(ctx.api.request).not.toHaveBeenCalled();
+  });
+
+  it("refuses payload text that is not valid JSON, without issuing a request", async () => {
+    const ctx = makeCtx({
+      fields: [
+        field("projectId", "proposal-create", "p1"),
+        field("kind", "proposal-create", "memory.create"),
+        field("payload", "proposal-create", "{not json"),
+      ],
+    });
+    const alerts = await withGlobals({}, async (a) => { await handleProposalCreate(ctx); return a; });
+    expect(alerts.length).toBe(1);
+    expect(alerts[0]).toContain("Payload is not valid JSON");
+    expect(ctx.api.request).not.toHaveBeenCalled();
+  });
+
+  // Edge Cases: a 403 from the write-mode gate resolves (not throws) — same
+  // shape as handleHandoffEdit/Delete's check above.
+  it("surfaces a write-gate 403 as a visible alert and does not re-render", async () => {
+    const ctx = makeCtx({
+      fields: [
+        field("projectId", "proposal-create", "p1"),
+        field("kind", "proposal-create", "memory.create"),
+        field("payload", "proposal-create", "{}"),
+      ],
+      request: mock(async () => ({ success: false, error: "Write refused: read-only mode is active" })),
+    });
+    const alerts = await withGlobals({}, async (a) => { await handleProposalCreate(ctx); return a; });
+    expect(alerts).toEqual(["Create failed: Write refused: read-only mode is active"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a route-level 400 (no success key) as a visible alert", async () => {
+    const ctx = makeCtx({
+      fields: [
+        field("projectId", "proposal-create", "p1"),
+        field("kind", "proposal-create", "memory.create"),
+        field("payload", "proposal-create", "{}"),
+      ],
+      request: mock(async () => ({ status: 400, error: "payload does not match kind" })),
+    });
+    const alerts = await withGlobals({}, async (a) => { await handleProposalCreate(ctx); return a; });
+    expect(alerts).toEqual(["Create failed: payload does not match kind"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("alerts when the request throws", async () => {
+    const ctx = makeCtx({
+      fields: [
+        field("projectId", "proposal-create", "p1"),
+        field("kind", "proposal-create", "memory.create"),
+        field("payload", "proposal-create", "{}"),
+      ],
+      request: throwingRequest(),
+    });
+    expect(await withGlobals({}, async (a) => { await handleProposalCreate(ctx); return a; }))
+      .toEqual(["Create failed: boom"]);
+  });
+});
+
+describe("handleProposalEdit", () => {
+  it("does nothing when the edit prompt is cancelled", async () => {
+    const ctx = makeCtx();
+    await withGlobals({ prompt: () => null }, () => handleProposalEdit(ctx, "p1"));
+    expect(ctx.api.request).not.toHaveBeenCalled();
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("PATCHes only the rationale field the user typed, then re-renders", async () => {
+    const ctx = makeCtx();
+    await withGlobals({ prompt: () => "revised rationale" }, () => handleProposalEdit(ctx, "p1"));
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/proposal/p1", {
+      method: "PATCH",
+      body: { rationale: "revised rationale" },
+    });
+    expect(ctx.render).toHaveBeenCalled();
+  });
+
+  it("encodes the id in the URL path", async () => {
+    const ctx = makeCtx();
+    await withGlobals({ prompt: () => "x" }, () => handleProposalEdit(ctx, "p/1"));
+    expect((ctx.api.request as any).mock.calls[0][0]).toBe("/api/v1/proposal/p%2F1");
+  });
+
+  it("surfaces a write-gate 403 as a visible alert and does not re-render", async () => {
+    const ctx = makeCtx({
+      request: mock(async () => ({ success: false, error: "Write refused: read-only mode is active" })),
+    });
+    const alerts = await withGlobals({ prompt: () => "x" }, async (a) => {
+      await handleProposalEdit(ctx, "p1");
+      return a;
+    });
+    expect(alerts).toEqual(["Edit failed: Write refused: read-only mode is active"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a route-level 404 (no success key) as a visible alert", async () => {
+    const ctx = makeCtx({ request: mock(async () => ({ status: 404, error: "not-found" })) });
+    const alerts = await withGlobals({ prompt: () => "x" }, async (a) => {
+      await handleProposalEdit(ctx, "p1");
+      return a;
+    });
+    expect(alerts).toEqual(["Edit failed: not-found"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("alerts when the request throws", async () => {
+    const ctx = makeCtx({ request: throwingRequest() });
+    expect(await withGlobals({ prompt: () => "x" }, async (a) => { await handleProposalEdit(ctx, "p1"); return a; }))
+      .toEqual(["Edit failed: boom"]);
+  });
+});
+
+describe("handleProposalDelete", () => {
+  it("DELETEs the proposal and re-renders on success", async () => {
+    const ctx = makeCtx();
+    await withGlobals({}, () => handleProposalDelete(ctx, "p1"));
+    expect(ctx.api.request).toHaveBeenCalledWith("/api/v1/proposal/p1", { method: "DELETE" });
+    expect(ctx.render).toHaveBeenCalled();
+  });
+
+  it("surfaces a write-gate 403 as a visible alert and does not re-render", async () => {
+    const ctx = makeCtx({
+      request: mock(async () => ({ success: false, error: "Write refused: read-only mode is active" })),
+    });
+    const alerts = await withGlobals({}, async (a) => {
+      await handleProposalDelete(ctx, "p1");
+      return a;
+    });
+    expect(alerts).toEqual(["Delete failed: Write refused: read-only mode is active"]);
+    expect(ctx.render).not.toHaveBeenCalled();
+  });
+
+  it("alerts when the request throws", async () => {
+    const ctx = makeCtx({ request: throwingRequest() });
+    expect(await withGlobals({}, async (a) => { await handleProposalDelete(ctx, "p1"); return a; }))
+      .toEqual(["Delete failed: boom"]);
   });
 });
 

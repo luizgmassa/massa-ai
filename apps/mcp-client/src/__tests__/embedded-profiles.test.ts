@@ -64,6 +64,21 @@ describe("EmbeddedApiClient GET /api/v1/profiles", () => {
     await client.get("/api/v1/profiles", { host: "codex" });
     expect((listProfiles.mock.calls.at(-1) as any[] | undefined)?.[0]).toMatchObject({ hosts: ["codex"] });
   });
+
+  // coverage-90pct follow-up: `listProfiles` throwing is the one branch of
+  // GET /api/v1/profiles the endpoints suite cannot reach against the real
+  // switch engine (it would require an actually-corrupt install-state.json
+  // on the machine running the suite). Mirrors the switchProfile MPS-09
+  // mapping tests below, for the same `profileEngineError` helper.
+  test("500 (ApiHttpError) when listProfiles throws a CorruptInstallStateError", async () => {
+    listProfiles.mockImplementationOnce(() => {
+      throw CorruptInstallStateError("/tmp/install-state.json", "invalid JSON");
+    });
+    await expect(client.get("/api/v1/profiles")).rejects.toMatchObject({
+      status: 500,
+      body: { success: false, error: { code: "CorruptInstallStateError" } },
+    });
+  });
 });
 
 describe("EmbeddedApiClient POST /api/v1/profiles/switch — MPS-09 error surfacing", () => {

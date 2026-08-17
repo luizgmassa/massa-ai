@@ -150,4 +150,38 @@ describe("MemoryHandoffStore branch coverage", () => {
     // Accepted/expired rows drop out of listPending.
     expect((await store.listPending("project-1")).map((r) => r.id)).toEqual([]);
   });
+
+  test("update writes only the five allowlisted fields; delete hard-deletes", async () => {
+    const store = new MemoryHandoffStore();
+    await store.insert(handoff({ id: "h-e", status: "open" }));
+    await store.setStatus("h-e", "accepted", 7_000);
+
+    const updated = await store.update("h-e", {
+      targetAgent: "reviewer",
+      summary: "revised",
+      openQuestions: ["q-new"],
+      nextSteps: ["n-new"],
+      files: ["c.ts"],
+    });
+    // Paired-field guard analogue: update never touches status/acceptedAt.
+    expect(updated).toMatchObject({
+      targetAgent: "reviewer",
+      summary: "revised",
+      openQuestions: ["q-new"],
+      nextSteps: ["n-new"],
+      files: ["c.ts"],
+      status: "accepted",
+      acceptedAt: 7_000,
+    });
+
+    // Partial patch leaves unspecified fields untouched.
+    const partial = await store.update("h-e", { summary: "only summary" });
+    expect(partial).toMatchObject({ summary: "only summary", targetAgent: "reviewer" });
+
+    expect(await store.update("missing", { summary: "x" })).toBeNull();
+
+    expect(await store.delete("h-e")).toBe("h-e");
+    expect(await store.getById("h-e")).toBeNull();
+    expect(await store.delete("h-e")).toBeNull();
+  });
 });

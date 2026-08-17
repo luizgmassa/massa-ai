@@ -208,7 +208,11 @@ install_bundled_skills() {
   fi
 
   local installed=0 name src dest
-  for name in massa-ai persona-router; do
+  # IPT-05/AC-05.1/D6: the authoritative set of harness skills is the
+  # generator's own constant (generate-skill-artifacts.ts:138) — massa-ai,
+  # persona-router, profile. Do NOT derive this by scanning the bundle's
+  # skills/ directory; that installs 49 skills on cursor (AC-05.2).
+  for name in massa-ai persona-router profile; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -237,7 +241,7 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router"] };
+data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile"] };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. modelProfile (T10, MPS-03 round-trip
 // obligation) is engine-owned; installRoute is installer-owned but written by
@@ -282,7 +286,7 @@ NODE
   )"
   [[ "$raw_owner" == "plugin" ]] && {
     local name
-    for name in massa-ai persona-router; do
+    for name in massa-ai persona-router profile; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
     rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
@@ -427,16 +431,20 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     fi
   fi
 
-  # Remove agent symlinks
+  # Remove agent symlinks (IPT-03 site 7, D2/AC-03.1/AC-03.2). The removal
+  # population is the INSTALLED directory, not the source bundle — deriving it
+  # from $SCRIPT_DIR/agents/*.md would miss installed copies whenever the
+  # bundle is absent or stale at uninstall time (normal under AD-016), which
+  # is exactly what left this loop removing zero agents before this fix. The
+  # ownership test stays symlink-ness ([[ -L ]]), unchanged — only the
+  # population widened.
   if [[ -d "$AGENTS_DIR" ]]; then
     removed=0
-    for agent in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
-      [[ -f "$agent" ]] || continue
-      name="$(basename "$agent")"
-      if [[ -L "$AGENTS_DIR/$name" ]]; then
-        rm -f "$AGENTS_DIR/$name"
-        removed=$((removed + 1))
-      fi
+    for dest in "$AGENTS_DIR/"massa-ai-*.md; do
+      [[ -e "$dest" || -L "$dest" ]] || continue
+      [[ -L "$dest" ]] || continue
+      rm -f "$dest"
+      removed=$((removed + 1))
     done
     if [[ "$removed" -gt 0 ]]; then
       vinfo "removed $removed agent symlinks from $AGENTS_DIR/"
@@ -614,6 +622,31 @@ for src in "$ACTIVE_AGENTS_SRC/"massa-ai-*.md; do
 done
 
 vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
+
+# Shed retired agent symlinks (IPT-02 site 4, D1/D2/D3): copy-then-prune —
+# the current set was just linked above, so an interrupted run leaves the
+# user no worse off than before the upgrade (D1). The removal population is
+# the destination directory; $ACTIVE_AGENTS_SRC (the same source the copy
+# loop above just used) supplies only the keep-predicate (D2/AC-02.1a).
+# Ownership test is symlink-ness (D3/AC-02.2), not a name prefix: the
+# pre-flight check above refuses to clobber a regular file at this path
+# because that is the user's own content, so this prune must leave a regular
+# file alone too, or it would delete exactly what that check protects
+# (AC-02.3).
+if [[ -d "$AGENTS_DIR" ]]; then
+  agents_pruned=0
+  for dest in "$AGENTS_DIR/"massa-ai-*.md; do
+    [[ -e "$dest" || -L "$dest" ]] || continue
+    [[ -L "$dest" ]] || continue
+    dest_name="$(basename "$dest")"
+    [[ -f "$ACTIVE_AGENTS_SRC/$dest_name" ]] && continue
+    rm -f "$dest"
+    agents_pruned=$((agents_pruned + 1))
+  done
+  if [[ "$agents_pruned" -gt 0 ]]; then
+    vinfo "pruned $agents_pruned retired agent symlink(s) from $AGENTS_DIR/"
+  fi
+fi
 vecho ""
 
 # Install generated workflow commands (T10, WFC-08/12) — copy, not symlink,
@@ -628,6 +661,22 @@ for src in "$SCRIPT_DIR/command/"massa-ai-*.md; do
   command_count=$((command_count + 1))
 done
 vecho "  + ${command_count} workflow commands installed to $COMMANDS_DIR"
+
+# Shed retired workflow commands (IPT-02 site 5, D1/D2/D3): copy-then-prune,
+# same reasoning as the agent prune above. Ownership test here IS the
+# massa-ai- name prefix (D3/AC-02.2, opencode's own uninstall at :445-456),
+# unlike the symlink test used for agents.
+commands_pruned=0
+for dest in "$COMMANDS_DIR/"massa-ai-*.md; do
+  [[ -f "$dest" ]] || continue
+  dest_name="$(basename "$dest")"
+  [[ -f "$SCRIPT_DIR/command/$dest_name" ]] && continue
+  rm -f "$dest"
+  commands_pruned=$((commands_pruned + 1))
+done
+if [[ "$commands_pruned" -gt 0 ]]; then
+  vinfo "pruned $commands_pruned retired workflow command(s) from $COMMANDS_DIR/"
+fi
 vecho ""
 
 # Skills bundling (PDO-08, 09): install massa-ai/persona-router into the

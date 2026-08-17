@@ -7,6 +7,166 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Handoffs and proposals are now fully manageable from the Admin Portal.** Both
+  gain per-row Edit and Delete; proposals additionally gain a create form, which
+  they never had — so a portal with no proposals had no way to produce one. Edit
+  is a `PATCH` restricted to an explicit allowlist of content fields, so a status
+  can only ever change through its own state machine. Delete is a hard delete of
+  exactly one row: `handoffs` and `proposals` carry no foreign keys in either
+  direction, verified against both the live catalog and all 23 migrations, so
+  nothing cascades and nothing is orphaned. Editing a handoff also refreshes the
+  memory row it wrote at creation time, which was previously built once and never
+  updated — so a corrected handoff no longer leaves stale, searchable, wrong
+  content behind it.
+- **A server-side write gate for the REST API.** `MASSA_AI_READ_ONLY_MODE=true`
+  refuses every mutating request with a 403. It is **default-deny**: a route is a
+  write unless it appears in an explicit, source-traced read-only classification,
+  so a route nobody classifies is refused rather than silently exposed. The gate
+  is off by default and changes nothing for existing callers. Until now the only
+  thing called "write mode" lived in the browser and decided which buttons to
+  draw; every mutation in the product, including the three routes that execute
+  arbitrary code, was authorized by the API key alone.
+
+  Default-deny was not a stylistic choice. A keyword-and-verb sweep for
+  "destructive" routes flagged 14 of 50 and missed 9 — among them all three
+  `executor/*` code-execution routes, `profiles/switch`, `checkpoints/restore`,
+  and every `model-registry` regenerate variant. A later correction found the
+  route enumeration itself had been undercounting by five. Every one of those
+  missed routes is protected anyway, because a denylist can only ever contain
+  what its author's enumeration found.
+- **Five MCP tools** — `handoff_update`, `handoff_delete`, `create_proposal`,
+  `update_proposal`, `delete_proposal` — taking the surface from 54 to 59, in both
+  the HTTP and embedded clients.
+
+- **Installers now shed retired agents, commands and skills.** Six install-path
+  copy loops across the four plugin installers wrote the current set and removed
+  nothing, so a specialist or workflow command deleted from the bundle stayed
+  installed forever — `skills/agents/handoff-writer/` was retired in `93c1ee1c`
+  and survives on any machine installed before it. All six now **copy-then-prune**:
+  the current set lands first, then owned destination entries the bundle no
+  longer ships are removed. The order matters under interruption. `set -euo
+  pipefail` aborts on a mid-loop `cp` failure, so prune-then-copy can leave a
+  user with fewer agents than before they upgraded; copy-then-prune's worst case
+  is a retired member lingering one more run.
+
+  Ownership is decided per host, taken verbatim from each installer's own
+  uninstall path, and the tests are not interchangeable: claude and cursor use
+  the `massa-ai-` name prefix, codex requires the exact `# massa-ai-owned` first
+  line because `~/.codex/agents/` is shared with user-authored agents, and
+  opencode unlinks only symlinks because its copy loop already refuses to
+  clobber a regular file at an owned path. A uniform `rm -f massa-ai-*` would
+  have deleted user files on two of the four hosts.
+
+- **`scripts/install-skills.sh --apply` removes a stale skill.** A skill recorded
+  in `install-state.json`, gone from `skills/`, and still massa-ai-owned was
+  reported as drift by `--check` and never removed. It is now removed on
+  `--apply`, behind the same `skillsOwner != "plugin"` gate `--uninstall`
+  uses — a plugin tarball's skill directories are never touched by the repo
+  installer. `--check` behaviour is unchanged and `--dry-run` still removes
+  nothing.
+
+- **`scripts/__tests__/installer-removal-derivation.test.ts`** — a committed
+  sweep asserting that no installer prune loop derives its population from the
+  source bundle. It classifies by the loop's iteration expression alone, since
+  every correct copy-then-prune loop names the bundle in its body as the
+  keep-predicate.
+
+### Changed
+
+- Codex marketplace-route profile switching is no longer refused. Its stated
+  reason — that an in-place bundle rewrite "would dirty a checkout" — was true
+  when plugin bundles were checked in and false since AD-016 made them
+  gitignored generated output. A **runtime** tracked-path guard replaces it, so
+  the removal is scoped by what is true of the user's actual checkout rather
+  than by what was true of one machine: a fork or a checkout predating AD-016
+  is still refused, loudly, naming the offending path.
+
+### Fixed
+
+- **Admin Portal memory edit and delete did nothing.** Both called
+  `PUT`/`DELETE /api/v1/memory/<id>`, which no route has ever served — the memory
+  routes are five body-keyed `POST`s — so each request 404ed before authentication
+  was even consulted. Three separate tests asserted those dead URLs and passed,
+  because a mocked request capture accepts any URL string. A contract check now
+  diffs every URL the Web UI calls against the routes the server actually
+  registers, so a call to a nonexistent endpoint fails the build instead of the
+  user's click.
+- **The Admin Portal Logs tab's Live toggle delivered a burst of entries, then
+  stopped "after some seconds."** Every idle SSE stream did — the keep-alive
+  heartbeat on `GET /api/v1/logs/stream` was scheduled 15 s apart, longer
+  than Bun's 10 s transport idle window, so the heartbeat could never fire
+  before the socket was already dropped. Both that route and
+  `GET /api/v1/events` now read one shared default (5 000 ms) from a single
+  keep-alive module instead of each declaring its own literal, and every SSE
+  request also widens its own transport window via Bun's per-request
+  `server.timeout(request, seconds)`. `GET /api/v1/events` — the stream that
+  drives the portal's real-time updates — had the identical defect but hid
+  it, because `EventSource` reconnects automatically, so it presented as a
+  silent ~12 s reconnect cycle rather than a visible stop.
+- A throwing `controller.enqueue` on either SSE route's heartbeat now closes
+  the stream and unsubscribes from its source, instead of leaving a closed
+  flag set with the socket still open and the source subscription still
+  polling into a dead controller for the life of the process.
+- A transient mid-stream network error on the Logs tab's live tail is now
+  retried under the existing reconnect bounds instead of permanently turning
+  Live off and bannering an error; a non-200 response still stays terminal,
+  and exhausting the bounds still turns Live off with a banner.
+- **Model-profile changes applied from the Admin Portal never reached the Claude
+  CLI on a directory-source marketplace.** `resolveClaudeMarketplaceRoot`
+  returned `installed_plugins.json`'s `installPath` unconditionally — a
+  version-pinned cache snapshot. That is right for a remote-source marketplace
+  and wrong for a directory-source one, where Claude loads the plugin live from
+  the source directory. Every profile switch and every Save & Apply wrote agent
+  files into a tree nothing would ever read, so pressing Save & Apply and
+  restarting the CLI produced no observable change, indefinitely. Resolution now
+  reads `known_marketplaces.json`, and for a directory source composes the live
+  root from that directory's own `.claude-plugin/marketplace.json`. A composed
+  path that escapes `installLocation` is rejected.
+- **Save & Apply never regenerated or reinstalled skills.** The regenerate
+  stream spawned only `generate-subagent-artifacts.ts`, while the repository's
+  own `generate:artifacts` entrypoint is both generators — so a skill edit could
+  not reach any host through the portal at all. The stream now derives its
+  generator list from that script and runs every generator it names, reporting
+  per-host skill reach and naming the failing generator on a non-zero exit.
+
+- **The plugin installers never installed `skills/profile/`.** All four
+  hardcoded `massa-ai persona-router` while the generator emits three bundles
+  and `install-skills.sh` discovers all three from the repo — so the checkout
+  route shipped the profile-switching skill and the registry-tarball route
+  silently did not. All four now install the generator's full set.
+
+- **`apps/opencode-plugin/install.sh --uninstall` removed no agent symlinks when
+  the bundle was absent.** It derived its removal list from `$SCRIPT_DIR/agents/`
+  — the source bundle — which under AD-016 is generated on demand and normally
+  absent. The block immediately below it already carried a comment explaining
+  that removals must come from the installed directory. Now destination-derived,
+  with its symlink ownership test unchanged. **Behaviour change on a public
+  surface:** a standalone `--uninstall` now removes installed massa-ai agent
+  symlinks it previously left in place.
+
+- **`apps/claude-plugin/install.sh` left retired commands behind when switching
+  to the marketplace route.** `remove_file_route_artifacts` derived its command
+  removals from the source bundle while its own agents branch, three lines
+  below, already iterated the installed directory.
+
+- **The roster gate could not see a claim that spans a line break.**
+  `workflow-harness-contract.test.ts` asserts nothing advertises a specialist
+  count other than 18, and passed while `CLAUDE.md` advertised 17 — the number
+  and the noun sat on different lines and the scan was per-line. It now scans
+  the whole file with a bounded whitespace matcher that still stops at a
+  paragraph break. `CLAUDE.md` corrected to 18.
+
+- **`packages/core/src/__tests__/scheduler-store-pg.test.ts` asserted over rows
+  it did not create.** It monkey-patched `listAll` to filter ids beginning
+  `scheduled-`, a denylist coupled to a naming convention it does not own, and
+  guarded the wrong accessor: the assertion on the next line calls
+  `listEnabled`, which the seam never patched. The suite was **red on any
+  database holding enabled scheduled jobs** — 5 pass / 1 fail against a real
+  developer database. Now scoped by a positive allowlist to the suite's own
+  prefixes, with the seam deleted.
+
 ## [1.52.0] - 2026-08-13
 
 ### Added

@@ -42,8 +42,10 @@ Docs also claimed 52 MCP tools; the measured count was 54.
   host-specific wiring. It is not a tool-serving mechanism.
 - The MCP server registered by `scripts/install-agents.sh` (the single
   writer of host MCP config — `scripts/tests/test-mcp-single-writer.sh`) is
-  the **one canonical tool surface**, currently 54 tools across
-  hooks-exec/memory/project/search/synapse.
+  the **one canonical tool surface**, currently 59 tools across
+  hooks-exec/memory/project/search/synapse (54 at this ADR's writing;
+  portal-handoff-proposal-crud's T10 added 5 handoff/proposal PATCH/DELETE/
+  create tools to hooks-exec since — see CLAUDE.md's tool-count history).
 - **Hooks are host-native and always on**, independent of any tool
   registration path.
 - **In-process tools are never a coverage mechanism.** No plugin may treat
