@@ -257,9 +257,17 @@ describe("plugin installers install exactly the generator's harness skills", () 
   for (const file of INSTALLERS.filter((f) => f.startsWith("apps/"))) {
     test(`${file} installs exactly [${expected.join(", ")}]`, () => {
       const body = readFileSync(join(REPO, file), "utf8");
-      const loops = [...body.matchAll(/for name in ((?:[a-z0-9-]+\s*)+); do/g)].map((m) =>
-        m[1].trim().split(/\s+/),
-      );
+      // A negated class (`[^;\n]+`) has exactly one way to match a given span, so
+      // this can't backtrack ambiguously the way the prior nested-quantifier
+      // pattern (`(?:[a-z0-9-]+\s*)+`) could — a long run of hyphens gave that
+      // pattern exponentially many ways to split the match (CodeQL js/redos,
+      // alert #39). The `$` filter keeps the original scope: only a literal,
+      // space-separated name list counts as a loop, not a variable-driven one
+      // like `for name in $SKILL_NAMES; do`.
+      const loops = [...body.matchAll(/for name in ([^;\n]+); do/g)]
+        .map((m) => m[1].trim())
+        .filter((s) => !s.includes("$"))
+        .map((s) => s.split(/\s+/));
       // Every literal skill-name loop in a plugin installer must name the full
       // set: the install path AND the uninstall path, or an uninstall leaves a
       // skill behind that the install just placed.
