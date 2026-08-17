@@ -62,7 +62,7 @@ mkdir -p "$CURSOR_AGENTS_DIR"
 # Plant a retired massa-ai-owned agent — a specialist the bundle no longer
 # ships (matches the ownership test: the massa-ai- name prefix, D3, same as
 # cursor's own uninstall at install.sh:505-509).
-RETIRED_AGENT="$CURSOR_AGENTS_DIR/massa-ai-handoff-writer.md"
+RETIRED_AGENT="$CURSOR_AGENTS_DIR/massa-ai-retired-specialist.md"
 echo "# retired specialist, no longer in the bundle" > "$RETIRED_AGENT"
 
 # Plant a user-authored agent WITHOUT the massa-ai- prefix. The ownership
@@ -73,7 +73,7 @@ echo "# a user's own cursor subagent" > "$USER_AGENT"
 OUT="$(run_install "$H1")"; RC=$?
 assert_eq "install exits 0" "$RC" "0"
 
-check "retired agent (massa-ai-handoff-writer.md) is gone" "$([ ! -f "$RETIRED_AGENT" ] && echo 0 || echo 1)"
+check "retired agent (massa-ai-retired-specialist.md) is gone" "$([ ! -f "$RETIRED_AGENT" ] && echo 0 || echo 1)"
 check "current set lands: massa-ai-navigator.md present" "$([ -f "$CURSOR_AGENTS_DIR/massa-ai-navigator.md" ] && echo 0 || echo 1)"
 check "user-authored agent (no massa-ai- prefix) survives" "$([ -f "$USER_AGENT" ] && echo 0 || echo 1)"
 
