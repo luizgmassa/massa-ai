@@ -309,7 +309,7 @@ install_bundled_skills() {
   fi
 
   local installed=0 name src dest
-  for name in massa-ai persona-router; do
+  for name in massa-ai persona-router profile; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -338,7 +338,7 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router"] };
+data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile"] };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. modelProfile (T10, MPS-03 round-trip
 // obligation) is engine-owned; installRoute is installer-owned but written by
@@ -385,7 +385,7 @@ NODE
   )"
   [[ "$raw_owner" == "plugin" ]] && {
     local name
-    for name in massa-ai persona-router; do
+    for name in massa-ai persona-router profile; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
     rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
@@ -734,10 +734,16 @@ remove_file_route_artifacts() {
   if [[ -f "$SETTINGS_JSON" ]]; then
     merge_settings_hooks "$SETTINGS_JSON" "uninstall"
   fi
+  # Prefix-glob against the INSTALLED directory, not the source bundle (IPT-03
+  # site 6, D2): deriving removals from $SCRIPT_DIR/commands/*.md misses
+  # installed copies whenever the bundle is absent or stale (normal under
+  # AD-016). Mirrors the agents loop directly below, which already does this
+  # correctly. The keep-list here is empty by design — the marketplace bundle
+  # serves its own commands, so every loose file-route copy is removed.
   if [[ -d "$TARGET/commands" ]]; then
-    for src in "$SCRIPT_DIR/commands/"*.md; do
-      [[ -f "$src" ]] || continue
-      rm -f "$TARGET/commands/massa-ai-$(basename "$src" .md).md"
+    for f in "$TARGET/commands/"massa-ai-*.md; do
+      [[ -f "$f" ]] || continue
+      rm -f "$f"
     done
   fi
   if [[ -d "$TARGET/agents" ]]; then
@@ -824,6 +830,21 @@ else
     command_count=$((command_count + 1))
   done
 
+  # Shed commands retired from the bundle (IPT-02 site 2, D1 copy-then-prune):
+  # copy the current set first, then remove owned destination entries the
+  # bundle no longer ships — never the reverse, so an interrupted run never
+  # leaves the user with fewer commands than before. Removal population is the
+  # destination directory (D2); ownership test is the massa-ai- name prefix
+  # (install.sh:765).
+  for f in "$TARGET/commands/"massa-ai-*.md; do
+    [[ -f "$f" ]] || continue
+    prune_name="$(basename "$f" .md)"
+    prune_name="${prune_name#massa-ai-}"
+    [[ -f "$SCRIPT_DIR/commands/${prune_name}.md" ]] && continue
+    rm -f "$f"
+    vecho "  - removed retired command $(basename "$f")"
+  done
+
   # Subagent specialists (generated from skills/agents/*/SKILL.md, navigator
   # included). The massa-ai- name prefix is the ownership marker used by uninstall.
   #
@@ -858,6 +879,20 @@ else
     specialist_count=$((specialist_count + 1))
   done
   vecho "  + ${specialist_count} subagent specialists (generated from skills/agents/*/SKILL.md)"
+
+  # Shed specialists retired from the bundle (IPT-02 site 1, D1
+  # copy-then-prune): copy the current set first, then remove owned
+  # destination entries ACTIVE_AGENTS_SRC (the bundle, or the active
+  # model-profile variant) no longer ships. Never prune-then-copy — an
+  # interrupted run must never leave the user with fewer agents than before.
+  # Removal population is the destination directory (D2); ownership test is
+  # the massa-ai- name prefix (install.sh:775-777).
+  for f in "$TARGET/agents/"massa-ai-*.md; do
+    [[ -f "$f" ]] || continue
+    [[ -f "$ACTIVE_AGENTS_SRC/$(basename "$f")" ]] && continue
+    rm -f "$f"
+    vecho "  - removed retired specialist $(basename "$f")"
+  done
 
   install_variant_tree
 fi

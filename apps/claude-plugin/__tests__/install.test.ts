@@ -360,12 +360,12 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
 });
 
 describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
-  test("install copies massa-ai + persona-router into ~/.claude/skills as plugin-owned", async () => {
+  test("install copies massa-ai + persona-router + profile into ~/.claude/skills as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("harness skills installed");
 
-    for (const name of ["massa-ai", "persona-router"]) {
+    for (const name of ["massa-ai", "persona-router", "profile"]) {
       const skillMd = path.join(tmp, `.claude/skills/${name}/SKILL.md`);
       expect(await pathExists(skillMd)).toBe(true);
       const lst = await fs.lstat(skillMd);
@@ -375,6 +375,29 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
     const state = await readJson(path.join(tmp, ".config/massa-ai/install-state.json"));
     const platforms = state.platforms as Record<string, { skillsOwner: string }>;
     expect(platforms.claude.skillsOwner).toBe("plugin");
+  });
+
+  // AC-05.3: a behavioural guard, not a static parse of the installer's
+  // `for name in …` literal (that shortcut is what let profile silently ship
+  // through the repo route while every plugin route omitted it — IPT-05).
+  test("install lands exactly the three harness skill directories (AC-05.3)", async () => {
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    const skillsDir = path.join(tmp, ".claude/skills");
+    const dirs = (await fs.readdir(skillsDir, { withFileTypes: true }))
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .sort();
+    expect(dirs).toEqual(["massa-ai", "persona-router", "profile"]);
+
+    const state = await readJson(path.join(tmp, ".config/massa-ai/install-state.json"));
+    const platforms = state.platforms as Record<string, { skills: string[] }>;
+    expect([...platforms.claude.skills].sort()).toEqual([
+      "massa-ai",
+      "persona-router",
+      "profile",
+    ]);
   });
 
   test("install defers to install-skills.sh when the state file already records a repo-owned install", async () => {
@@ -407,6 +430,7 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
     expect(res.exitCode).toBe(0);
     expect(await pathExists(path.join(tmp, ".claude/skills/massa-ai"))).toBe(false);
     expect(await pathExists(path.join(tmp, ".claude/skills/persona-router"))).toBe(false);
+    expect(await pathExists(path.join(tmp, ".claude/skills/profile"))).toBe(false);
 
     const stateFile = path.join(tmp, ".config/massa-ai/install-state.json");
     if (await pathExists(stateFile)) {
