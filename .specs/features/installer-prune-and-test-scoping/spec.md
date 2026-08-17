@@ -8,7 +8,7 @@ Independent of PR #107 (`fix/sse-heartbeat-idle-timeout`) and of
 `feat/portal-handoff-proposal-crud`. Touches no file either of those touches.
 See "Merge sequencing" for the one shared file.
 
-## Problem
+## Problem Statement
 
 Two defects were briefed as a pair. Both are the same underlying mistake —
 **an operation that never established which members it owns** — and measurement
@@ -146,6 +146,27 @@ is absent" is the normal state, not an edge case.
 - **IPT-06.** `CLAUDE.md:331` claims the plugins ship *"those same 17"*
   specialists. There are **18** (`skills/agents/` directory count), and
   `CLAUDE.md:326`, `FEATURES.md:370`, and `docs/ONBOARDING.md:340` all say 18.
+
+## User Stories
+
+- **As a developer who upgrades the harness**, when a specialist is retired from
+  the bundle, I want it gone from my machine, so the agent list I am offered
+  matches the agents that actually exist. Today `massa-ai-handoff-writer`,
+  retired in `93c1ee1c`, is still installed on any machine provisioned before it.
+- **As a developer with user-authored agents in a shared directory**, I want the
+  installer to remove only what it owns, so pruning never costs me my own files.
+  Two hosts decide ownership by something other than the file name.
+- **As a developer whose upgrade is interrupted**, I want to be left with the
+  agents I already had rather than none, so a failed install is never worse than
+  no install.
+- **As a developer installing from the npm registry rather than a checkout**, I
+  want the same skills the checkout route installs, so the two routes do not
+  diverge silently.
+- **As a developer running the test suite against my own database**, I want the
+  suite to assert only over rows it created, so a real scheduled job in my
+  database is not reported as a test failure.
+- **As a reviewer**, I want a documentation count claim to be caught by the gate
+  that exists for it, even when the sentence wraps across a line.
 
 ## Requirements
 
@@ -459,7 +480,38 @@ word 'specialist' forty lines later".
   (a single intervening newline, no blank line) rather than made unbounded. The
   measured target spans exactly one newline.
 
-## Non-goals
+## Assumptions & Open Questions
+
+Assumptions, each verified rather than presumed:
+
+- Each host's **uninstall** path is the project's already-committed answer to
+  "what do we own on this host", so adopting it verbatim for the install-path
+  prune introduces no new ownership policy. Verified against source by two
+  independent reviewers.
+- `generate-skill-artifacts.ts`'s `["massa-ai","persona-router","profile"]`
+  constant is the authoritative harness-skill set. `install-skills.sh` reaches
+  the same three independently by repo discovery.
+- The scheduler store's writes are single-id only (one upsert, one delete), so
+  running the parity suite against a shared database cannot touch a foreign row.
+  Verified empirically: the five production rows were byte-identical before and
+  after.
+- Model-profile variant directories always ship the full agent-name set, so a
+  profile-active install cannot mistake a switched profile for a retirement.
+
+Open questions: none.
+
+## Requirement Traceability
+
+| ID | Requirement | Sensor | Status |
+| --- | --- | --- | --- |
+| IPT-01 | Scheduler store suite scopes to rows it created | `scheduler-store-pg.test.ts`, both databases | complete |
+| IPT-02 | Every install-path copy sheds retired members | 4 prune suites (182/0), per-host ownership mutations | complete |
+| IPT-03 | Removal loops read the destination, never the bundle | `installer-removal-derivation.test.ts` | complete |
+| IPT-04 | `install-skills.sh --apply` removes a stale skill | `test-install-skills-stale-apply.sh` (25/0) | complete |
+| IPT-05 | Plugin installers install every harness skill | per-host behavioural guard under `test:plugins` | complete |
+| IPT-06 | The roster gate sees a claim spanning a line break | `workflow-harness-contract.test.ts` | complete |
+
+## Out of Scope
 
 - Changing which agents exist, or retiring any agent. This feature makes
   retirement propagate; it retires nothing.

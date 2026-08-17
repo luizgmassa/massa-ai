@@ -2,6 +2,34 @@
 
 Contract: `spec.md`. Tasks: `tasks.md`.
 
+## Design Summary
+
+Six installer sites shed retired members in **copy-then-prune** order, each
+using its own host's documented ownership test; two removal loops are repointed
+from the source bundle to the installed directory; `install-skills.sh --apply`
+gains stale removal behind the platform-owner gate; the four plugin installers
+are brought into agreement with the generator's harness-skill constant; the
+existing roster gate is made whitespace-tolerant across one line break; and the
+scheduler store parity suite is scoped by a positive allowlist to rows it
+created.
+
+One sentence carries the whole design: **the removal population is the
+destination directory, and the bundle supplies only a keep-predicate.** Every
+defect fixed here violates one half of it.
+
+## Tech Decisions
+
+| # | Decision | Rejected alternative | Why |
+| --- | --- | --- | --- |
+| D1 | Copy-then-prune | Prune-then-copy (the in-repo precedent) | Under `set -euo pipefail` an interrupted copy leaves the user with fewer agents than before; copy-then-prune's worst case is the pre-fix status quo |
+| D2 | Population = destination, bundle = keep-predicate | "Loop the bundle and remove what's missing" | That phrasing is literally the defect in sites 6-7; looping the bundle cannot reach what the bundle lacks |
+| D3 | Per-host ownership tests, adopted verbatim | One unified `is_owned` helper | A unification error deletes user files on four hosts at once; deferred as IPT-F1 |
+| D4 | Positive allowlist on every set-valued accessor | Extend the denylist seam to `listEnabled` | The seam's failure mode was enumerating call sites; extending it repeats the mistake |
+| D5 | Port the owner gate with the removal loop | Port only the loop (as the spec first cited) | `--apply` would delete plugin-owned skill trees |
+| D6 | Generator constant as the skill-list authority | Derive by scanning the bundle's `skills/` | Installs 49 skills on cursor, whose bundle ships workflow skills as directories |
+| D7 | Widen the existing roster gate | Write a new sweep | A new line-oriented sweep would be blind in exactly the same way — measured |
+| D8 | Partition workers by file | Partition by requirement | Three requirements collide on three of four `install.sh` files |
+
 ## D1 — Copy-then-prune, not prune-then-copy
 
 The only in-repo precedent (`cursor/install.sh:625`) prunes first. This design
@@ -221,7 +249,7 @@ routes being mutually exclusive (so `remove_file_route_artifacts` can never run
 after the file-route copy), `install_variant_tree` running at most once per
 invocation, and the assertion-order stability in D4.
 
-## Risks
+## Risks & Concerns
 
 | Risk | Mitigation |
 | --- | --- |
