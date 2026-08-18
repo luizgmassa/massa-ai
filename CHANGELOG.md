@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.54.0] - 2026-08-18
-
 ### Fixed
 
 - **`verify-harness-install.ts` read Claude hooks from the wrong file on the
@@ -20,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   firing. It now resolves the route first, reads the matching file, and reports
   `settings.json` entries alongside a serving bundle as `DOUBLE-FIRE` instead of
   as success — a condition invisible from either file on its own.
+
+## [1.54.0] - 2026-08-18
+
+### Fixed
 
 - **Only `.claude/` was gitignored, so a `--project` install of any other host
   left its bundle loose in the working tree.** Every plugin installer supports
