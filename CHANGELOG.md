@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Hook entries without the `_massaAiOwned` marker were orphans: never deduped,
+  never removed, firing forever.** All three hook-writing installers identified
+  their own entries *solely* by that marker, in both directions — the install
+  path used it to avoid appending a duplicate, the uninstall and route-change
+  paths used it to remove them. An entry carrying no marker was invisible to
+  both.
+
+  That is not hypothetical: `apps/claude-plugin/settings.json.template` is a
+  documented hand-merge block that shipped **without** the marker and instructs
+  the reader to rewrite the command to an absolute path. Measured live on
+  2026-08-17 on a machine whose Claude was on the marketplace route: 5 unmarked
+  massa-ai blocks in `~/.claude/settings.json` beside the plugin bundle's own
+  `hooks/hooks.json`, every lifecycle event ingested **twice**. The route change
+  had run `remove_file_route_artifacts`, whose filter matched nothing and
+  reported success.
+
+  Ownership is now decided by what an entry *is* — a command referencing the
+  `massa-ai-hook` binary — with the marker kept as the primary signal. Applied
+  to Claude, Codex and Cursor, since all three carried the identical filter.
+  Alongside it:
+
+  - Removal iterates **every** event, not only the ones the current release
+    writes; the predicate identifies our commands, not a location.
+  - A block that *mixes* user and massa-ai commands loses only ours, and an
+    event left with nothing is deleted rather than emptied.
+  - The removal path now takes a backup, which only the install path did — it
+    deletes entries it did not necessarily write, so the asymmetry no longer
+    holds.
+  - When the plugin is registered but no usable `claude` CLI exists (so the
+    marketplace route never runs), the install path now *strips* pre-existing
+    entries instead of merely declining to add more. Declining was only half a
+    double-fire guard.
+  - `settings.json.template` now carries the marker on every block, so future
+    hand-merges are recognisable.
+
+  New suite `scripts/tests/test-hook-ownership-orphans.sh` (22 assertions).
+  Mutation-checked: reverting the ownership test to marker-only reddens 4
+  assertions, and narrowing removal back to the 5 written events reddens 2. An
+  earlier version of the suite caught only 1 of those, because counting
+  `massa-ai-hook` occurrences cannot see a block stripped of its commands but
+  left in place — the assertions now check for that residue directly.
+
 - **The harness self-heal probe watched one artifact class as a proxy for all of
   them, so a partially-installed host was skipped forever.**
   `install-harness.sh` skips a host whose recorded plugin version equals the

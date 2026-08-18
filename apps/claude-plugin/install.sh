@@ -185,8 +185,54 @@ try {
   }
 }
 
+// Ownership test. The `_massaAiOwned` marker is the precise signal, but it is
+// NOT the only way our hook entries reach settings.json: this plugin also ships
+// settings.json.template, a hand-merge guide whose blocks carry no marker and
+// whose command the reader is told to rewrite to an absolute path. Entries that
+// arrived that way were invisible to both directions of this merge — never
+// deduped on install, never removed when the marketplace route took over — so
+// they fired alongside the bundle's own hooks/hooks.json. Measured live
+// 2026-08-17: 5 unmarked massa-ai blocks in ~/.claude/settings.json beside a
+// registered marketplace plugin, and every event ingested twice.
+//
+// So recognise our entries by WHAT THEY ARE as well. Referencing the
+// massa-ai-hook binary is unambiguous — it is this project's own file name, in
+// every shape it is documented in (`bun run "<abs>/massa-ai-hook.ts" <sub>`,
+// `bun run "${CLAUDE_PLUGIN_ROOT}/hooks/massa-ai-hook.ts" <sub>`). A user hook
+// that merely mentions massa-ai elsewhere (`rtk hook claude`, an MCP tool name)
+// does not match and is preserved.
+const OWNED_COMMAND = /massa-ai-hook/;
+
+function commandIsOwned(h) {
+  return Boolean(h) && typeof h.command === "string" && OWNED_COMMAND.test(h.command);
+}
+
+// A matcher-group block is ours when it is marked, or when every command it
+// carries is ours. A block MIXING user and massa-ai commands is not owned
+// wholesale — stripOwnedHooks below removes only our commands from it.
+function blockIsOwned(b) {
+  if (!b || typeof b !== "object") return false;
+  if (b._massaAiOwned === true) return true;
+  return Array.isArray(b.hooks) && b.hooks.length > 0 && b.hooks.every(commandIsOwned);
+}
+
 function hasOwned(arr) {
-  return Array.isArray(arr) && arr.some((e) => e && e._massaAiOwned === true);
+  return Array.isArray(arr) && arr.some(blockIsOwned);
+}
+
+// Returns the event array with our entries removed: whole blocks that are ours,
+// and our individual commands out of blocks we share with the user.
+function stripOwnedHooks(arr) {
+  const kept = [];
+  for (const b of arr) {
+    if (blockIsOwned(b)) continue;
+    if (b && Array.isArray(b.hooks) && b.hooks.some(commandIsOwned)) {
+      kept.push({ ...b, hooks: b.hooks.filter((h) => !commandIsOwned(h)) });
+      continue;
+    }
+    kept.push(b);
+  }
+  return kept;
 }
 
 // Double-fire guard: true when massa-ai is already installed as a Claude Code
@@ -223,20 +269,54 @@ function pluginAlreadyInstalled() {
 if (mode === "uninstall") {
   const hooks = cfg.hooks;
   if (hooks && typeof hooks === "object" && !Array.isArray(hooks)) {
-    for (const [evt] of EVENTS) {
+    // Back up before removing. The install path has always done this; removal
+    // did not, and now that it deletes unmarked entries it did not necessarily
+    // write, the asymmetry is not defensible.
+    if (existed) {
+      fs.copyFileSync(file, `${file}.massa-ai.bak-${ts}`);
+    }
+    // Every event, not just the 5 we write. The predicate identifies our
+    // commands rather than a location, so an entry parked under an event this
+    // release does not use is still ours, and a user's is still not.
+    for (const evt of Object.keys(hooks)) {
       if (Array.isArray(hooks[evt])) {
-        hooks[evt] = hooks[evt].filter((e) => !(e && e._massaAiOwned === true));
+        hooks[evt] = stripOwnedHooks(hooks[evt]);
         if (hooks[evt].length === 0) delete hooks[evt];
       }
     }
     if (Object.keys(hooks).length === 0) delete cfg.hooks;
   }
 } else if (pluginAlreadyInstalled()) {
-  console.error(
-    "  ↷ massa-ai is installed as a Claude Code plugin — skipping settings.json" +
-      " hooks (the plugin already provides them; wiring both would double-fire)",
-  );
-  process.exit(0);
+  // Not writing is only half the guard. If settings.json ALREADY carries our
+  // entries — from an older release, or from a hand-merge of
+  // settings.json.template — declining to add more still leaves both sources
+  // live. This branch is reached with the plugin registered but no usable
+  // `claude` CLI, so the marketplace route (which removes them) never runs.
+  // Strip them here and fall through to the write.
+  const hooks = cfg.hooks;
+  let removed = 0;
+  if (hooks && typeof hooks === "object" && !Array.isArray(hooks)) {
+    for (const evt of Object.keys(hooks)) {
+      if (!Array.isArray(hooks[evt])) continue;
+      const before = JSON.stringify(hooks[evt]);
+      hooks[evt] = stripOwnedHooks(hooks[evt]);
+      if (JSON.stringify(hooks[evt]) !== before) removed++;
+      if (hooks[evt].length === 0) delete hooks[evt];
+    }
+    if (Object.keys(hooks).length === 0) delete cfg.hooks;
+  }
+  if (removed > 0) {
+    if (existed) fs.copyFileSync(file, `${file}.massa-ai.bak-${ts}`);
+    console.error(
+      `  ↷ massa-ai is installed as a Claude Code plugin — removed ${removed} stale` +
+        " settings.json hook event(s) that would have fired alongside the plugin's own",
+    );
+  } else {
+    console.error(
+      "  ↷ massa-ai is installed as a Claude Code plugin — skipping settings.json" +
+        " hooks (the plugin already provides them; wiring both would double-fire)",
+    );
+  }
 } else {
   // install: backup before first write if file existed
   if (existed) {

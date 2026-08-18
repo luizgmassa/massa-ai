@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "_description": "massa-ai plugin settings template. Merge the 'hooks' block into your project (.claude/settings.json) or user (~/.claude/settings.json) settings. The single massa-ai-hook binary replaces the 7 shell scripts; it fire-and-forgets POST lifecycle observations to the Tools API, always exits 0, and never blocks the agent. Set CLAUDE_PLUGIN_ROOT to the repo root, or replace it with an absolute path to apps/claude-plugin. Pass the event type as the first argument (session-start, user-prompt-submit, post-tool-use, pre-compact, stop).",
+  "_description": "massa-ai plugin settings template. Merge the 'hooks' block into your project (.claude/settings.json) or user (~/.claude/settings.json) settings. The single massa-ai-hook binary replaces the 7 shell scripts; it fire-and-forgets POST lifecycle observations to the Tools API, always exits 0, and never blocks the agent. Set CLAUDE_PLUGIN_ROOT to the repo root, or replace it with an absolute path to apps/claude-plugin. Keep the _massaAiOwned marker on each block: it is how the installer recognises these entries as its own, so it can remove or replace them later instead of leaving them to fire alongside the plugin bundle. Pass the event type as the first argument (session-start, user-prompt-submit, post-tool-use, pre-compact, stop).",
   "hooks": {
     "SessionStart": [
       {
@@ -9,7 +9,8 @@
             "type": "command",
             "command": "bun run \"${CLAUDE_PLUGIN_ROOT}/hooks/massa-ai-hook.ts\" session-start"
           }
-        ]
+        ],
+        "_massaAiOwned": true
       }
     ],
     "UserPromptSubmit": [
@@ -19,7 +20,8 @@
             "type": "command",
             "command": "bun run \"${CLAUDE_PLUGIN_ROOT}/hooks/massa-ai-hook.ts\" user-prompt-submit"
           }
-        ]
+        ],
+        "_massaAiOwned": true
       }
     ],
     "PostToolUse": [
@@ -29,7 +31,8 @@
             "type": "command",
             "command": "bun run \"${CLAUDE_PLUGIN_ROOT}/hooks/massa-ai-hook.ts\" post-tool-use"
           }
-        ]
+        ],
+        "_massaAiOwned": true
       }
     ],
     "Stop": [
@@ -39,7 +42,8 @@
             "type": "command",
             "command": "bun run \"${CLAUDE_PLUGIN_ROOT}/hooks/massa-ai-hook.ts\" stop"
           }
-        ]
+        ],
+        "_massaAiOwned": true
       }
     ],
     "PreCompact": [
@@ -49,7 +53,8 @@
             "type": "command",
             "command": "bun run \"${CLAUDE_PLUGIN_ROOT}/hooks/massa-ai-hook.ts\" pre-compact"
           }
-        ]
+        ],
+        "_massaAiOwned": true
       }
     ]
   },

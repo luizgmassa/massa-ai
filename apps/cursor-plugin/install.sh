@@ -294,14 +294,37 @@ if (typeof cfg.hooks !== "object" || cfg.hooks === null) cfg.hooks = {};
 
 const hooks = cfg.hooks;
 
+// Ownership test — marker first, command shape as the fallback. The marker is
+// precise but not the only way our entries reach this file: an entry written by
+// a release before the marker existed, or copied by hand from documentation,
+// carries none, and was invisible to BOTH directions here — never deduped on
+// install, never removed on uninstall. Claude's copy of this merge had exactly
+// that gap and it double-fired every lifecycle event (measured live
+// 2026-08-17). Referencing the massa-ai-hook binary is unambiguous; a user hook
+// that merely mentions massa-ai elsewhere does not match.
+const OWNED_COMMAND = /massa-ai-hook/;
+
+function entryIsOwned(e) {
+  if (!e || typeof e !== "object") return false;
+  if (e._massaAiOwned === true) return true;
+  return typeof e.command === "string" && OWNED_COMMAND.test(e.command);
+}
+
 function hasOwned(arr) {
-  return Array.isArray(arr) && arr.some((e) => e && e._massaAiOwned === true);
+  return Array.isArray(arr) && arr.some(entryIsOwned);
 }
 
 if (mode === "uninstall") {
-  for (const [evt] of EVENTS) {
+  // Back up before removing: this now deletes unmarked entries it did not
+  // necessarily write, so the install path's backup discipline applies here too.
+  if (existed) {
+    fs.copyFileSync(file, `${file}.massa-ai.bak-${ts}`);
+  }
+  // Every event, not just the ones this release writes — the predicate
+  // identifies our commands rather than a location.
+  for (const evt of Object.keys(hooks)) {
     if (Array.isArray(hooks[evt])) {
-      hooks[evt] = hooks[evt].filter((e) => !(e && e._massaAiOwned === true));
+      hooks[evt] = hooks[evt].filter((e) => !entryIsOwned(e));
       if (hooks[evt].length === 0) delete hooks[evt];
     }
   }
