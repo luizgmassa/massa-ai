@@ -346,14 +346,24 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
 });
 
 describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
-  test("bridge detected: no local plugin dir, zero owned hook entries, agents+skills present, installRoute=bridge", async () => {
+  // The bridge delivers HOOKS ONLY — the plugin bundle is installed on both
+  // routes. This test previously asserted the opposite (no local plugin dir),
+  // encoding the all-or-nothing premise the header pinned against a 2026-08-05
+  // capture. Measured on Cursor 3.16.17: with the bridge active, hooks fire
+  // while the plugin and its 46 workflow commands are absent from the UI, so
+  // deleting the bundle cost the user every workflow command and replaced it
+  // with nothing. The hook half of the contract is unchanged and still
+  // asserted below — that is what prevents a double-fire.
+  test("--prefer-bridge with a bridge available: plugin bundle present, zero owned hook entries, agents+skills present, installRoute=bridge", async () => {
     await writeClaudeRegistry(tmp);
-    const res = runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--user", "--prefer-bridge"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
     expect(
-      await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
-    ).toBe(false);
+      await pathExists(
+        path.join(tmp, ".cursor/plugins/local/massa-ai/.cursor-plugin/plugin.json"),
+      ),
+    ).toBe(true);
     expect(await ownedHookCount(path.join(tmp, ".cursor/hooks.json"))).toBe(0);
     expect(
       await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
@@ -370,6 +380,35 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
       { installRoute?: string }
     >;
     expect(platforms.cursor.installRoute).toBe("bridge");
+  });
+
+  // The headline of the local-by-default reversal: a bridge being AVAILABLE no
+  // longer decides anything on its own. Before this, merely having massa-ai
+  // enabled in ~/.claude switched the route and deleted the local bundle.
+  test("bridge available but not opted into: local route wins, hooks wired, warning emitted", async () => {
+    await writeClaudeRegistry(tmp);
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(
+      await pathExists(
+        path.join(tmp, ".cursor/plugins/local/massa-ai/.cursor-plugin/plugin.json"),
+      ),
+    ).toBe(true);
+    expect(
+      await ownedHookCount(path.join(tmp, ".cursor/hooks.json")),
+    ).toBeGreaterThan(0);
+    // AD-017: both sources may now be live, so the run must say so.
+    expect(res.stderr).toContain("fire TWICE");
+
+    const state = await readJson(
+      path.join(tmp, ".config/massa-ai/install-state.json"),
+    );
+    const platforms = state.platforms as Record<
+      string,
+      { installRoute?: string }
+    >;
+    expect(platforms.cursor.installRoute).toBe("local");
   });
 
   test("no Claude registry: full local install, installRoute=local", async () => {
@@ -415,9 +454,9 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
     expect(platforms.cursor.installRoute).toBe("local");
   });
 
-  test("absent settings.json / absent enabledPlugins key: treated as enabled → bridge", async () => {
+  test("absent settings.json / absent enabledPlugins key: treated as enabled → bridge (with --prefer-bridge)", async () => {
     await writeClaudeRegistry(tmp, { enabled: "absent-file" });
-    const res = runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--user", "--prefer-bridge"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     const state = await readJson(
       path.join(tmp, ".config/massa-ai/install-state.json"),
@@ -462,7 +501,13 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
     expect(platforms.cursor.installRoute).toBe("local");
   });
 
-  test("pre-existing local install + bridge appears: one run converges (local dir gone, owned hooks stripped)", async () => {
+  // Convergence is now about HOOK entries only: exactly one hook source must
+  // survive, so a local install followed by a bridge appearing must end with
+  // the local hook entries stripped. The plugin bundle is not part of that
+  // convergence — it has no hook wiring of its own (plugin.json declares only
+  // name/version/description), so keeping it cannot double-fire anything, and
+  // deleting it silently removed every workflow command.
+  test("pre-existing local install + --prefer-bridge: hooks converge to the bridge, bundle stays", async () => {
     runInstall(["--user"], { HOME: tmp });
     expect(
       await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
@@ -472,12 +517,12 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
     ).toBeGreaterThan(0);
 
     await writeClaudeRegistry(tmp);
-    const res = runInstall(["--user"], { HOME: tmp });
+    const res = runInstall(["--user", "--prefer-bridge"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
     expect(
       await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
-    ).toBe(false);
+    ).toBe(true);
     expect(await ownedHookCount(path.join(tmp, ".cursor/hooks.json"))).toBe(0);
     expect(
       await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),

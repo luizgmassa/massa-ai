@@ -208,6 +208,45 @@ seed_state() { # seed_state HOME — writes stdin as the install state
   cat > "$1/.config/massa-ai/install-state.json"
 }
 
+# seed_installed_artifacts HOME HOST — create every artifact class the sentinel
+# probe demands, i.e. the disk state a REAL install of that host leaves behind.
+#
+# The earlier version of these fixtures created one file (an agents-glob entry,
+# or opencode's index.js) because the probe checked exactly one class per host.
+# Seeding one class is now a PARTIAL install, which is precisely what the probe
+# exists to catch — so a "true skip" case has to seed the whole set or it
+# asserts the opposite of what it claims. See the sentinel table in
+# scripts/lib/installer-shared.sh, and test-plugin-sentinel-classes.sh for the
+# per-class wipes that pin each member.
+seed_installed_artifacts() {
+  local h="$1" host="$2"
+  case "$host" in
+    claude)
+      mkdir -p "$h/.claude/agents" "$h/.claude/commands"
+      touch "$h/.claude/agents/massa-ai-navigator.md" "$h/.claude/commands/massa-ai-spec-driven.md"
+      printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"massa-ai-hook"}]}]}}' > "$h/.claude/settings.json"
+      ;;
+    codex)
+      mkdir -p "$h/.codex/plugins/massa-ai/skills" "$h/.codex/agents"
+      touch "$h/.codex/plugins/massa-ai/skills/spec-driven.md" "$h/.codex/agents/massa-ai-navigator.toml"
+      printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"massa-ai-hook"}]}]}}' > "$h/.codex/hooks.json"
+      ;;
+    cursor)
+      mkdir -p "$h/.cursor/plugins/local/massa-ai/skills/spec-driven" "$h/.cursor/agents"
+      touch "$h/.cursor/plugins/local/massa-ai/skills/spec-driven/SKILL.md" \
+            "$h/.cursor/agents/massa-ai-navigator.md"
+      printf '{"version":1,"hooks":{"beforeSubmitPrompt":[{"command":"massa-ai-hook"}]}}' > "$h/.cursor/hooks.json"
+      ;;
+    opencode)
+      mkdir -p "$h/.config/opencode/plugins/massa-ai" "$h/.config/opencode/agents" \
+               "$h/.config/opencode/command"
+      touch "$h/.config/opencode/plugins/massa-ai/index.js" \
+            "$h/.config/opencode/agents/massa-ai-navigator.md" \
+            "$h/.config/opencode/command/massa-ai-spec-driven.md"
+      ;;
+  esac
+}
+
 echo ""
 echo "2.1 detection matrix via harness: dir-only ×4 hosts (PAI-01, AC-1)"
 for host in claude codex cursor opencode; do
@@ -240,12 +279,12 @@ assert_no_file "no config dir fabricated for opencode" "$H/.config/opencode"
 echo ""
 echo "2.4 same-version no-op: seeded equal version skips the installer (PAI-05)"
 # PAU-05/06 amendment: a version-current record is only a true skip when the
-# host's installed-artifact sentinel is present on disk too — this fixture now
-# creates it (~/.cursor/agents/massa-ai-*.md), matching what a real install
-# actually leaves behind. Without it, 2.14 below shows the same seed state
-# reinstalling instead.
-H="$ROOT/m24"; mkdir -p "$H/.cursor/agents"
-touch "$H/.cursor/agents/massa-ai-navigator.md"
+# host's installed artifacts are present on disk too — this fixture creates
+# ALL of them, matching what a real install leaves behind. Seeding only the
+# agents glob (what this fixture did while the probe watched one class) is a
+# partial install, and 2.14 below shows that state reinstalling instead.
+H="$ROOT/m24"; mkdir -p "$H/.cursor"
+seed_installed_artifacts "$H" cursor
 seed_state "$H" <<'JSON'
 { "version": 2, "repository": "/x",
   "platforms": { "cursor": { "root": "/x/.cursor", "skills": ["massa-ai"], "skillsOwner": "plugin",
@@ -293,11 +332,10 @@ assert_contains "install log line" "$OUT" "install cursor@2.0.0"
 echo ""
 echo "2.8 dry-run: per-host decision lines, nothing written (PAI-09, AC-10)"
 H="$ROOT/m28"; mkdir -p "$H/.claude" "$H/.cursor"
-# PAU-05/06 amendment: opencode's recorded version is current, so its sentinel
-# (the installed plugin file, not an agents glob) must exist too or this
-# becomes a reinstall — see the sentinel table in installer-shared.sh.
-mkdir -p "$H/.config/opencode/plugins/massa-ai"
-touch "$H/.config/opencode/plugins/massa-ai/index.js"
+# PAU-05/06 amendment: opencode's recorded version is current, so its installed
+# artifacts must all exist too or this becomes a reinstall — index.js alone is
+# a partial install. See the sentinel table in installer-shared.sh.
+seed_installed_artifacts "$H" opencode
 seed_state "$H" <<'JSON'
 { "version": 2, "repository": "/x",
   "platforms": {
@@ -415,8 +453,8 @@ assert_not_contains "wiped-sentinel run never claims skip-current" "$OUT" "skip 
 
 echo ""
 echo "2.15 PAI-11 counterpart: sentinel present + version current → true skip is preserved (PAU-05)"
-H="$ROOT/m215"; mkdir -p "$H/.cursor/agents"
-touch "$H/.cursor/agents/massa-ai-navigator.md"
+H="$ROOT/m215"; mkdir -p "$H/.cursor"
+seed_installed_artifacts "$H" cursor
 seed_state "$H" <<'JSON'
 { "version": 2, "repository": "/x",
   "platforms": { "cursor": { "root": "/x/.cursor", "skills": ["massa-ai"], "skillsOwner": "plugin",
@@ -426,6 +464,32 @@ run_shadow "$SAFE_PATH" "$H"
 assert_eq "sentinel-present skip → exit 0" "$RC" "0"
 assert_eq "sentinel-present skip → installer NOT run" "$(called_hosts)" ""
 assert_contains "sentinel-present skip → unchanged skip-current log shape" "$OUT" "skip cursor: already at 2.0.0"
+
+echo ""
+echo "2.15b PARTIAL install reinstalls: one surviving class is not proof of the rest"
+# The live 2026-08-17 Cursor state: ~/.cursor/agents/massa-ai-*.md intact,
+# plugin directory and hook wiring both gone. The version record said current
+# and the old one-class probe was satisfied by the agents alone, so every
+# re-run of setup-local-first.sh reported skip-current and repaired nothing.
+# Each subcase keeps exactly one class and drops the others.
+for keep in agents plugin hooks; do
+  H="$ROOT/m215b-$keep"; mkdir -p "$H/.cursor"
+  seed_installed_artifacts "$H" cursor
+  case "$keep" in
+    agents) rm -rf "$H/.cursor/plugins" "$H/.cursor/hooks.json" ;;
+    plugin) rm -rf "$H/.cursor/agents" "$H/.cursor/hooks.json" ;;
+    hooks)  rm -rf "$H/.cursor/agents" "$H/.cursor/plugins" ;;
+  esac
+  seed_state "$H" <<'JSON'
+{ "version": 2, "repository": "/x",
+  "platforms": { "cursor": { "root": "/x/.cursor", "skills": ["massa-ai"], "skillsOwner": "plugin",
+                             "plugin": { "version": "2.0.0", "installedAt": "2026-07-29T12:00:00Z" } } } }
+JSON
+  run_shadow "$SAFE_PATH" "$H"
+  assert_eq "partial (only ${keep}) → exit 0" "$RC" "0"
+  assert_eq "partial (only ${keep}) → installer ran" "$(called_hosts)" "cursor "
+  assert_not_contains "partial (only ${keep}) never claims skip-current" "$OUT" "skip cursor: already at"
+done
 
 # ================================================================
 echo ""

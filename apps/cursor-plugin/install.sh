@@ -11,15 +11,38 @@
 # MCP registration is delegated to scripts/install-agents.sh, the single writer
 # of host MCP config. This installer no longer ships a plugin-local mcp.json.
 #
-# Cursor 3.14 also bridges the Claude marketplace registry from ~/.claude and
-# loads any plugin listed there IN ADDITION to a local install — a machine
-# with both would load massa-ai twice and fire every hook twice (AD-017). At
-# USER scope, this installer prefers the bridge: when ~/.claude lists massa-ai
-# as installed and enabled, it skips its own local plugin copy and hook
-# wiring (removing a pre-existing local copy so one run converges), while
-# still writing the flat subagents, harness skills, and MCP registration this
-# installer always owns. Project-scope installs are unaffected — ~/.claude is
-# a user surface, never a project one.
+# LOCAL IS THE DEFAULT ROUTE. The Claude bridge is opt-in (--prefer-bridge).
+#
+# Cursor can bridge the Claude marketplace registry from ~/.claude — observed
+# live in Cursor 3.14's "Cursor Plugins" exthost log on 2026-08-05
+# ("loadClaudePlugin massa-ai@massa-ai"). This installer used to PREFER that
+# bridge at user scope: on detection it deleted its own plugin directory and
+# stripped its hook wiring, on the premise that the bridge loads the whole
+# plugin.
+#
+# Measured on Cursor 3.16.17 (2026-08-17), with massa-ai listed and
+# `enabledPlugins` true in ~/.claude, that premise is at best half true:
+#
+#   hooks    → fire in Cursor
+#   plugin   → absent from the Cursor UI
+#   commands → absent (all 46 workflow commands)
+#
+# So bridge-preference silently withheld a working local install, and the user
+# lost every workflow command with nothing replacing them. Detection reads
+# ~/.claude, which is a fact about CLAUDE's files — never proof that Cursor
+# loaded anything from them — and nothing here can observe the difference.
+#
+# The default therefore installs everything locally. --prefer-bridge (or
+# MASSA_AI_CURSOR_PREFER_BRIDGE=1) restores the old behaviour for anyone whose
+# bridge does deliver hooks.
+#
+# AD-017 TRADE-OFF, STATED PLAINLY: if the bridge IS delivering hooks and you
+# take the default, both sources are live and every hook fires TWICE. The
+# install warns when it detects that combination. Choose --prefer-bridge, or
+# disable massa-ai in ~/.claude/settings.json, to keep exactly one source.
+#
+# Project-scope installs never consult the bridge — ~/.claude is a user
+# surface, never a project one.
 #
 # Idempotent: re-running is a no-op when owned entries already present.
 # Uninstall removes only ownership-marked entries + the plugin directory,
@@ -29,6 +52,13 @@
 #   apps/cursor-plugin/install.sh             # install at user scope (~/.cursor)
 #   apps/cursor-plugin/install.sh --user      #   (same)
 #   apps/cursor-plugin/install.sh --project  # install at project scope (./.cursor)
+#   apps/cursor-plugin/install.sh --prefer-bridge # leave hook wiring to the
+#                                             # Claude bridge instead of
+#                                             # installing it locally; use when
+#                                             # bridge-delivered hooks DO fire
+#                                             # in your Cursor, to avoid every
+#                                             # hook firing twice. Same as
+#                                             # MASSA_AI_CURSOR_PREFER_BRIDGE=1
 #   apps/cursor-plugin/install.sh --uninstall # remove owned entries + plugin dir
 #   apps/cursor-plugin/install.sh -h|--help   # show this help
 
@@ -41,11 +71,26 @@ CLAUDE_PLUGIN_BIN="$REPO_ROOT/apps/claude-plugin/hooks/massa-ai-hook.ts"
 SCOPE="user"
 UNINSTALL=0
 DRY_RUN=0
+# Local is the DEFAULT route; the Claude bridge is opt-in.
+#
+# Bridge detection reads ~/.claude — a fact about CLAUDE's files — and infers
+# from it that Cursor is loading massa-ai. That inference cannot be verified
+# from here, and it was measured wrong on Cursor 3.16.17: the plugin and its
+# 46 workflow commands were absent from the Cursor UI while ~/.claude said the
+# plugin was installed and enabled. Preferring the bridge by default therefore
+# meant silently withholding a working local install on the strength of a
+# claim about a different product.
+#
+# So the default installs everything locally, and --prefer-bridge (or
+# MASSA_AI_CURSOR_PREFER_BRIDGE=1) opts into leaving hook wiring to the
+# bridge. See the AD-017 double-fire note where PREFER_BRIDGE is consumed.
+PREFER_BRIDGE="${MASSA_AI_CURSOR_PREFER_BRIDGE:-0}"
 
 for arg in "$@"; do
   case "$arg" in
     --user) SCOPE="user" ;;
     --project) SCOPE="project" ;;
+    --prefer-bridge) PREFER_BRIDGE=1 ;;
     --uninstall) UNINSTALL=1 ;;
     --quiet) MASSA_AI_VERBOSE=0 ;;
     --verbose) MASSA_AI_VERBOSE=1 ;;
@@ -249,14 +294,37 @@ if (typeof cfg.hooks !== "object" || cfg.hooks === null) cfg.hooks = {};
 
 const hooks = cfg.hooks;
 
+// Ownership test — marker first, command shape as the fallback. The marker is
+// precise but not the only way our entries reach this file: an entry written by
+// a release before the marker existed, or copied by hand from documentation,
+// carries none, and was invisible to BOTH directions here — never deduped on
+// install, never removed on uninstall. Claude's copy of this merge had exactly
+// that gap and it double-fired every lifecycle event (measured live
+// 2026-08-17). Referencing the massa-ai-hook binary is unambiguous; a user hook
+// that merely mentions massa-ai elsewhere does not match.
+const OWNED_COMMAND = /massa-ai-hook/;
+
+function entryIsOwned(e) {
+  if (!e || typeof e !== "object") return false;
+  if (e._massaAiOwned === true) return true;
+  return typeof e.command === "string" && OWNED_COMMAND.test(e.command);
+}
+
 function hasOwned(arr) {
-  return Array.isArray(arr) && arr.some((e) => e && e._massaAiOwned === true);
+  return Array.isArray(arr) && arr.some(entryIsOwned);
 }
 
 if (mode === "uninstall") {
-  for (const [evt] of EVENTS) {
+  // Back up before removing: this now deletes unmarked entries it did not
+  // necessarily write, so the install path's backup discipline applies here too.
+  if (existed) {
+    fs.copyFileSync(file, `${file}.massa-ai.bak-${ts}`);
+  }
+  // Every event, not just the ones this release writes — the predicate
+  // identifies our commands rather than a location.
+  for (const evt of Object.keys(hooks)) {
     if (Array.isArray(hooks[evt])) {
-      hooks[evt] = hooks[evt].filter((e) => !(e && e._massaAiOwned === true));
+      hooks[evt] = hooks[evt].filter((e) => !entryIsOwned(e));
       if (hooks[evt].length === 0) delete hooks[evt];
     }
   }
@@ -536,86 +604,110 @@ fi
 # ── Install ──────────────────────────────────────────────────────────────────
 # PAU-08/09: bridge-preferred, local-fallback. Computed once, used to decide
 # both which artifacts this run writes and what installRoute gets recorded.
+# Local by default. The probe still runs when the bridge is NOT opted into,
+# purely so the AD-017 double-fire warning below can be accurate — its result
+# no longer decides what gets installed.
 IS_BRIDGE=0
+BRIDGE_AVAILABLE=0
 if claude_bridge_detected; then
-  IS_BRIDGE=1
+  BRIDGE_AVAILABLE=1
+fi
+if [[ "$PREFER_BRIDGE" == "1" ]]; then
+  if [[ "$BRIDGE_AVAILABLE" == "1" ]]; then
+    IS_BRIDGE=1
+    vecho "--prefer-bridge: leaving hook wiring to the Claude bridge."
+  else
+    # Opting into a bridge that is not there would leave the user with no hooks
+    # at all, which is strictly worse than the default. Fall back loudly.
+    echo "  ⚠ --prefer-bridge requested, but ~/.claude does not list massa-ai as installed and enabled." >&2
+    echo "    Falling back to a local hook install so hooks are not silently absent." >&2
+  fi
 fi
 
 skill_count=0
 specialist_count=0
 
 if [[ "$IS_BRIDGE" -eq 1 ]]; then
-  vecho "Installing massa-ai Cursor plugin (Claude-bridge route): ~/.claude already lists massa-ai as installed and enabled, so Cursor loads it via the bridge."
-  # Converge (PAU-08, spec edge case): a pre-existing local install (current
-  # or pre-fix legacy location) must not double-load alongside the bridge, so
-  # one run here ends with exactly one load path. Owned hook entries are
-  # stripped with the SAME filter merge_hooks_json's "uninstall" mode already
-  # uses — the bridge delivers hooks instead.
-  if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
-    rm -rf "$LEGACY_PLUGIN_DIR"
-    echo -e "  - removed pre-fix plugin copy at $LEGACY_PLUGIN_DIR"
-  fi
-  if [[ -d "$PLUGIN_DIR" ]]; then
-    rm -rf "$PLUGIN_DIR"
-    echo -e "  - removed local plugin copy at $PLUGIN_DIR (Claude bridge already loads massa-ai)"
-  fi
+  vecho "Claude-bridge route: ~/.claude lists massa-ai as installed and enabled, so Cursor delivers its HOOKS via the bridge. The plugin bundle is still installed locally — see below."
+  # Hook wiring, and only hook wiring, is what the bridge actually delivers.
+  # Owned entries are stripped with the SAME filter merge_hooks_json's
+  # "uninstall" mode uses, so the bridge's copy is the only one that fires.
   if [[ -f "$HOOKS_JSON" ]]; then
     merge_hooks_json "$HOOKS_JSON" "uninstall"
     echo -e "  - removed massa-ai hook entries from $HOOKS_JSON (the bridge delivers hooks instead)"
   fi
-else
-  vecho "Installing massa-ai Cursor plugin to: $PLUGIN_DIR"
-  # Migration: a pre-fix install left a copy at plugins/massa-ai. Leaving it in
-  # place risks Cursor discovering both and firing every hook twice, so it goes
-  # before the new location is written.
-  if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
-    rm -rf "$LEGACY_PLUGIN_DIR"
-    echo -e "  - removed pre-fix plugin copy at $LEGACY_PLUGIN_DIR"
-  fi
-  mkdir -p "$PLUGIN_DIR/.cursor-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks"
-  # Migration: pre-fix installs bundled agents inside the plugin dir, which
-  # Cursor never reads. Drop that copy so upgraders converge on the one real
-  # discovery surface and a future Cursor plugin scan cannot double-register.
-  if [[ -d "$PLUGIN_DIR/agents" ]]; then
-    rm -rf "$PLUGIN_DIR/agents"
-    echo -e "  - removed pre-fix agents copy at $PLUGIN_DIR/agents (Cursor reads $CURSOR_AGENTS_DIR)"
-  fi
+fi
 
-  # Copy manifest
-  cp "$SCRIPT_DIR/.cursor-plugin/plugin.json" "$PLUGIN_DIR/.cursor-plugin/plugin.json"
-  vecho "  + .cursor-plugin/plugin.json"
+# The plugin bundle (manifest + workflow-command skills) installs on BOTH
+# routes. It used to be skipped whenever the bridge was detected, on the
+# premise that the bridge loads the whole plugin.
+#
+# Measured against Cursor 3.16.17 on 2026-08-17, that premise is half true.
+# With the bridge active — massa-ai listed and `enabledPlugins` true in
+# ~/.claude — hooks DO fire in Cursor, while the plugin and its 46 workflow
+# commands are absent from the UI entirely. The old branch therefore deleted a
+# working local bundle and nothing replaced it: the user kept the hooks and
+# silently lost every workflow command. The header's "Cursor 3.14 also bridges
+# the Claude marketplace registry" was pinned against a 2026-08-05 capture and
+# was never re-verified against a later Cursor.
+#
+# So the two deliveries are gated independently: hooks by $IS_BRIDGE above,
+# the bundle never. Reinstating the bundle on the bridge route cannot
+# double-fire hooks — .cursor-plugin/plugin.json declares only
+# name/version/description, so the bundle carries no hook wiring of its own;
+# $HOOKS_JSON is the only surface that does, and on the bridge route it is
+# left stripped.
+vecho "Installing the massa-ai Cursor plugin bundle to: $PLUGIN_DIR"
+# Migration: a pre-fix install left a copy at plugins/massa-ai. Leaving it in
+# place risks Cursor discovering both and firing every hook twice, so it goes
+# before the new location is written. Runs on both routes.
+if [[ -d "$LEGACY_PLUGIN_DIR" ]]; then
+  rm -rf "$LEGACY_PLUGIN_DIR"
+  echo -e "  - removed pre-fix plugin copy at $LEGACY_PLUGIN_DIR"
+fi
+mkdir -p "$PLUGIN_DIR/.cursor-plugin" "$PLUGIN_DIR/skills" "$PLUGIN_DIR/hooks"
+# Migration: pre-fix installs bundled agents inside the plugin dir, which
+# Cursor never reads. Drop that copy so upgraders converge on the one real
+# discovery surface and a future Cursor plugin scan cannot double-register.
+if [[ -d "$PLUGIN_DIR/agents" ]]; then
+  rm -rf "$PLUGIN_DIR/agents"
+  echo -e "  - removed pre-fix agents copy at $PLUGIN_DIR/agents (Cursor reads $CURSOR_AGENTS_DIR)"
+fi
 
-  # Copy the host-command skills (each in a subdirectory: skills/<name>/SKILL.md),
-  # quick + generated workflow commands alike. massa-ai/, persona-router/,
-  # agents/, and profile/ are the PDO-06 harness bundle, not a Cursor command
-  # skill — they are installed separately, into the shared harness skills
-  # directory (see "Skills bundling" below), not into this plugin-cache
-  # skills/ tree. `profile` was missing from this exclusion pre-fix, which
-  # leaked it into the command-skill cache mislabeled as `/profile`.
-  for src in "$SCRIPT_DIR/skills/"*/SKILL.md; do
-    name="$(basename "$(dirname "$src")")"
-    case "$name" in
-      massa-ai|persona-router|agents|profile) continue ;;
-    esac
-    mkdir -p "$PLUGIN_DIR/skills/$name"
-    cp "$src" "$PLUGIN_DIR/skills/$name/SKILL.md"
-    vecho "  + skills/$name/SKILL.md"
-    skill_count=$((skill_count + 1))
-  done
+# Copy manifest
+cp "$SCRIPT_DIR/.cursor-plugin/plugin.json" "$PLUGIN_DIR/.cursor-plugin/plugin.json"
+vecho "  + .cursor-plugin/plugin.json"
 
-  # Copy hooks.json (the placeholder version — installer replaces paths)
-  cp "$SCRIPT_DIR/hooks/hooks.json" "$PLUGIN_DIR/hooks/hooks.json"
-  vecho "  + hooks/hooks.json"
+# Copy the host-command skills (each in a subdirectory: skills/<name>/SKILL.md),
+# quick + generated workflow commands alike. massa-ai/, persona-router/,
+# agents/, and profile/ are the PDO-06 harness bundle, not a Cursor command
+# skill — they are installed separately, into the shared harness skills
+# directory (see "Skills bundling" below), not into this plugin-cache
+# skills/ tree. `profile` was missing from this exclusion pre-fix, which
+# leaked it into the command-skill cache mislabeled as `/profile`.
+for src in "$SCRIPT_DIR/skills/"*/SKILL.md; do
+  name="$(basename "$(dirname "$src")")"
+  case "$name" in
+    massa-ai|persona-router|agents|profile) continue ;;
+  esac
+  mkdir -p "$PLUGIN_DIR/skills/$name"
+  cp "$src" "$PLUGIN_DIR/skills/$name/SKILL.md"
+  vecho "  + skills/$name/SKILL.md"
+  skill_count=$((skill_count + 1))
+done
 
-  # Older installs shipped a plugin-local mcp.json here. Cursor reads
-  # ~/.cursor/mcp.json, not the plugin dir, and MCP is now owned by
-  # scripts/install-agents.sh — drop the residue so upgraders converge.
-  if [[ -f "$PLUGIN_DIR/mcp.json" ]]; then
-    rm -f "$PLUGIN_DIR/mcp.json"
-    # Not gated by --quiet: this deletes a file in the user's home, so it is a
-    # mutation notice rather than per-file chatter.
-    echo -e "  - removed stale mcp.json (MCP is now registered in ~/.cursor/mcp.json)"
-  fi
+# Copy hooks.json (the placeholder version — installer replaces paths)
+cp "$SCRIPT_DIR/hooks/hooks.json" "$PLUGIN_DIR/hooks/hooks.json"
+vecho "  + hooks/hooks.json"
+
+# Older installs shipped a plugin-local mcp.json here. Cursor reads
+# ~/.cursor/mcp.json, not the plugin dir, and MCP is now owned by
+# scripts/install-agents.sh — drop the residue so upgraders converge.
+if [[ -f "$PLUGIN_DIR/mcp.json" ]]; then
+  rm -f "$PLUGIN_DIR/mcp.json"
+  # Not gated by --quiet: this deletes a file in the user's home, so it is a
+  # mutation notice rather than per-file chatter.
+  echo -e "  - removed stale mcp.json (MCP is now registered in ~/.cursor/mcp.json)"
 fi
 
 # Flat agents and harness skills are written in BOTH branches (PAU-08/09):
@@ -708,9 +800,20 @@ fi
 # Summary line in quiet mode
 if [ "${MASSA_AI_VERBOSE:-0}" != "1" ]; then
   if [[ "$IS_BRIDGE" -eq 1 ]]; then
-    ok "cursor plugin: using the Claude bridge (${specialist_count} specialists) — hooks delivered by the bridge, not installed locally"
+    ok "cursor plugin installed (${skill_count} skills, ${specialist_count} specialists) — hooks left to the Claude bridge (--prefer-bridge)"
+    ok "  if massa-ai hooks do NOT fire in Cursor, the bridge is not delivering them: re-run without --prefer-bridge"
   else
     ok "cursor plugin installed (${skill_count} skills, ${specialist_count} specialists, 7 hooks)"
+    if [[ "$BRIDGE_AVAILABLE" -eq 1 ]]; then
+      # AD-017: both sources live. Not an error — the default is local by
+      # design — but the user must be told, because a doubled hook is silent
+      # and looks like the tool misbehaving rather than being installed twice.
+      echo "  ⚠ ~/.claude also lists massa-ai as installed and enabled." >&2
+      echo "    If Cursor's Claude bridge delivers those hooks, they now fire TWICE" >&2
+      echo "    (once from the bridge, once from ~/.cursor/hooks.json)." >&2
+      echo "    Keep one source: re-run with --prefer-bridge, or disable massa-ai" >&2
+      echo "    in ~/.claude/settings.json (enabledPlugins)." >&2
+    fi
   fi
 else
   vecho ""

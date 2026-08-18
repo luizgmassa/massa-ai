@@ -7,6 +7,130 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Only `.claude/` was gitignored, so a `--project` install of any other host
+  left its bundle loose in the working tree.** Every plugin installer supports
+  `--project`, which writes agents, skills, `hooks.json` and a real copy of the
+  hook binary into `$(pwd)/<dotdir>`. Observed 2026-08-17: `.cursor/` with 68
+  untracked files in the repo root, which a `git add -A` would have committed.
+  `.codex/`, `.cursor/` and `.opencode/` now sit beside `.claude/`. No file is
+  tracked under any of the four, so nothing is shadowed by the new rules.
+
+- **Hook entries without the `_massaAiOwned` marker were orphans: never deduped,
+  never removed, firing forever.** All three hook-writing installers identified
+  their own entries *solely* by that marker, in both directions — the install
+  path used it to avoid appending a duplicate, the uninstall and route-change
+  paths used it to remove them. An entry carrying no marker was invisible to
+  both.
+
+  That is not hypothetical: `apps/claude-plugin/settings.json.template` is a
+  documented hand-merge block that shipped **without** the marker and instructs
+  the reader to rewrite the command to an absolute path. Measured live on
+  2026-08-17 on a machine whose Claude was on the marketplace route: 5 unmarked
+  massa-ai blocks in `~/.claude/settings.json` beside the plugin bundle's own
+  `hooks/hooks.json`, every lifecycle event ingested **twice**. The route change
+  had run `remove_file_route_artifacts`, whose filter matched nothing and
+  reported success.
+
+  Ownership is now decided by what an entry *is* — a command referencing the
+  `massa-ai-hook` binary — with the marker kept as the primary signal. Applied
+  to Claude, Codex and Cursor, since all three carried the identical filter.
+  Alongside it:
+
+  - Removal iterates **every** event, not only the ones the current release
+    writes; the predicate identifies our commands, not a location.
+  - A block that *mixes* user and massa-ai commands loses only ours, and an
+    event left with nothing is deleted rather than emptied.
+  - The removal path now takes a backup, which only the install path did — it
+    deletes entries it did not necessarily write, so the asymmetry no longer
+    holds.
+  - When the plugin is registered but no usable `claude` CLI exists (so the
+    marketplace route never runs), the install path now *strips* pre-existing
+    entries instead of merely declining to add more. Declining was only half a
+    double-fire guard.
+  - `settings.json.template` now carries the marker on every block, so future
+    hand-merges are recognisable.
+
+  New suite `scripts/tests/test-hook-ownership-orphans.sh` (22 assertions).
+  Mutation-checked: reverting the ownership test to marker-only reddens 4
+  assertions, and narrowing removal back to the 5 written events reddens 2. An
+  earlier version of the suite caught only 1 of those, because counting
+  `massa-ai-hook` occurrences cannot see a block stripped of its commands but
+  left in place — the assertions now check for that residue directly.
+
+- **The harness self-heal probe watched one artifact class as a proxy for all of
+  them, so a partially-installed host was skipped forever.**
+  `install-harness.sh` skips a host whose recorded plugin version equals the
+  bundle version, escaping that skip only when the host's installed artifacts
+  are still on disk. That escape checked a *single* class per host — subagents
+  for Claude/Codex/Cursor, `index.js` for OpenCode. A host that kept its
+  subagents and lost its hooks, commands or plugin directory satisfied the probe
+  and was never repaired.
+
+  This is what made the Cursor breakage below unrepairable by re-running
+  `setup-local-first.sh`: `~/.cursor/agents/massa-ai-*.md` was intact, so every
+  re-run reported `skip-current` and wrote nothing.
+
+  `installer_plugin_sentinel_present` now requires **every** class a reinstall
+  restores, keyed on the recorded `installRoute`. The expected set per host was
+  measured by installing each one into a scratch `HOME` and enumerating what
+  landed, not read off the installers' prose. Route-awareness is load-bearing in
+  both directions: Cursor's `--prefer-bridge` route deliberately writes no local
+  hooks, and Claude's marketplace route deletes the file-route copies and skips
+  the `settings.json` hook merge, so demanding either there would reinstall on
+  every single run instead of never.
+
+  New suite `scripts/tests/test-plugin-sentinel-classes.sh` installs each host
+  for real, then wipes exactly one class at a time — against the old probe it
+  reported **15 passed, 14 failed**, one failure per blind class across the four
+  hosts and the two alternate routes. It also pins termination (install →
+  harness re-run → `skip-current`) for OpenCode, the one host absent from
+  `test-plugin-auto-install.sh`'s end-to-end loop.
+
+  Three fixtures in `test-plugin-auto-install.sh` seeded a single artifact and
+  asserted a "true skip". Under the corrected probe that seed *is* a partial
+  install, so they now seed the full set; a new case 2.15b asserts the reverse,
+  that each one-surviving-class state reinstalls.
+
+### Changed
+
+- **The Cursor installer no longer prefers the Claude bridge.** Local is now the
+  default route and the bridge is opt-in via `--prefer-bridge` (or
+  `MASSA_AI_CURSOR_PREFER_BRIDGE=1`).
+
+  Cursor can load massa-ai from Claude's marketplace registry — observed live in
+  Cursor 3.14's exthost log on 2026-08-05 (`loadClaudePlugin massa-ai@massa-ai`).
+  On detecting that, the installer used to delete its own plugin directory and
+  strip its hook wiring, on the premise that the bridge delivers the whole
+  plugin. Measured on **Cursor 3.16.17** with massa-ai listed and enabled in
+  `~/.claude`, that premise is at best half true: hooks fire, while the plugin
+  and all **46 workflow commands are absent from the Cursor UI**. So the
+  preference silently withheld a working local install and replaced it with
+  nothing.
+
+  Detection reads `~/.claude` — a fact about Claude's files, never proof that
+  Cursor loaded anything from them — and nothing in the installer can observe
+  the difference. Defaulting to local means the outcome no longer depends on an
+  unverifiable claim about another product.
+
+  **Trade-off, stated rather than hidden (AD-017):** if the bridge *is*
+  delivering hooks and you take the default, both sources are live and every
+  hook fires twice. The install now warns on stderr whenever it detects that
+  combination, and `--prefer-bridge` keeps exactly one source. Opting into a
+  bridge that is not present falls back to a local hook install loudly, rather
+  than leaving a machine with no hooks at all.
+
+### Added
+
+- **`scripts/verify-harness-install.ts`** — reports which of MCP, plugin, hooks,
+  skills, commands and subagents is actually installed for each of the four
+  hosts, by reading the destinations the installers write to rather than
+  trusting `install-state.json`, which records intent and is what goes stale. It
+  resolves each host's real location — Claude's marketplace `installPath`,
+  Codex's and Cursor's workflow commands inside the plugin directory — instead
+  of reporting "n/a" for a surface it merely failed to find.
+
 ## [1.53.0] - 2026-08-17
 
 ### Added
