@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Only `.claude/` was gitignored, so a `--project` install of any other host
+  left its bundle loose in the working tree.** Every plugin installer supports
+  `--project`, which writes agents, skills, `hooks.json` and a real copy of the
+  hook binary into `$(pwd)/<dotdir>`. Observed 2026-08-17: `.cursor/` with 68
+  untracked files in the repo root, which a `git add -A` would have committed.
+  `.codex/`, `.cursor/` and `.opencode/` now sit beside `.claude/`. No file is
+  tracked under any of the four, so nothing is shadowed by the new rules.
+
 - **Hook entries without the `_massaAiOwned` marker were orphans: never deduped,
   never removed, firing forever.** All three hook-writing installers identified
   their own entries *solely* by that marker, in both directions — the install
