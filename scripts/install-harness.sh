@@ -221,16 +221,19 @@ if [ "$DO_PLUGINS" = "1" ]; then
     done
   }
 
-  # plugin_sentinel_hint <host> — human-readable description of the sentinel
-  # path installer_plugin_sentinel_present probes for <host>, used only in the
-  # reinstall log line below (never in a filesystem check — the probe itself
-  # is the single source of truth for what "present" means).
+  # plugin_sentinel_hint <host> — human-readable description of the artifact
+  # classes installer_plugin_sentinel_present probes for <host>, used only in
+  # the reinstall log line below (never in a filesystem check — the probe
+  # itself is the single source of truth for what "present" means, and it
+  # reports a boolean, not which member was missing). The wording is plural
+  # deliberately: the probe checks every class a reinstall restores, so naming
+  # one path here would send a reader looking at the wrong absence.
   plugin_sentinel_hint() {
     case "$1" in
-      claude)   echo "~/.claude/agents/massa-ai-*.md (or installed_plugins.json on the marketplace route)" ;;
-      codex)    echo "~/.codex/agents/massa-ai-*.toml" ;;
-      cursor)   echo "~/.cursor/agents/massa-ai-*.md" ;;
-      opencode) echo "~/.config/opencode/plugins/massa-ai/index.js" ;;
+      claude)   echo "~/.claude/{agents,commands}/massa-ai-* + settings.json hooks (or the marketplace bundle's agents/ + commands/)" ;;
+      codex)    echo "~/.codex/plugins/massa-ai/skills + agents/massa-ai-*.toml + hooks.json" ;;
+      cursor)   echo "~/.cursor/plugins/local/massa-ai/skills + agents/massa-ai-*.md + hooks.json (hooks not expected on the bridge route)" ;;
+      opencode) echo "~/.config/opencode/{plugins/massa-ai/index.js,agents/massa-ai-*.md,command/massa-ai-*.md}" ;;
       *) echo "" ;;
     esac
   }

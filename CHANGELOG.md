@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The harness self-heal probe watched one artifact class as a proxy for all of
+  them, so a partially-installed host was skipped forever.**
+  `install-harness.sh` skips a host whose recorded plugin version equals the
+  bundle version, escaping that skip only when the host's installed artifacts
+  are still on disk. That escape checked a *single* class per host — subagents
+  for Claude/Codex/Cursor, `index.js` for OpenCode. A host that kept its
+  subagents and lost its hooks, commands or plugin directory satisfied the probe
+  and was never repaired.
+
+  This is what made the Cursor breakage below unrepairable by re-running
+  `setup-local-first.sh`: `~/.cursor/agents/massa-ai-*.md` was intact, so every
+  re-run reported `skip-current` and wrote nothing.
+
+  `installer_plugin_sentinel_present` now requires **every** class a reinstall
+  restores, keyed on the recorded `installRoute`. The expected set per host was
+  measured by installing each one into a scratch `HOME` and enumerating what
+  landed, not read off the installers' prose. Route-awareness is load-bearing in
+  both directions: Cursor's `--prefer-bridge` route deliberately writes no local
+  hooks, and Claude's marketplace route deletes the file-route copies and skips
+  the `settings.json` hook merge, so demanding either there would reinstall on
+  every single run instead of never.
+
+  New suite `scripts/tests/test-plugin-sentinel-classes.sh` installs each host
+  for real, then wipes exactly one class at a time — against the old probe it
+  reported **15 passed, 14 failed**, one failure per blind class across the four
+  hosts and the two alternate routes. It also pins termination (install →
+  harness re-run → `skip-current`) for OpenCode, the one host absent from
+  `test-plugin-auto-install.sh`'s end-to-end loop.
+
+  Three fixtures in `test-plugin-auto-install.sh` seeded a single artifact and
+  asserted a "true skip". Under the corrected probe that seed *is* a partial
+  install, so they now seed the full set; a new case 2.15b asserts the reverse,
+  that each one-surviving-class state reinstalls.
+
 ### Changed
 
 - **The Cursor installer no longer prefers the Claude bridge.** Local is now the

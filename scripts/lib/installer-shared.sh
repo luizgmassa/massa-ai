@@ -246,15 +246,96 @@ installer_host_detected() {
 #      installed artifacts (observed live 2026-08-05: ~/.cursor/agents +
 #      plugins/local/massa-ai deleted minutes after install) then reports
 #      skip-current forever with zero artifacts on disk. This probe is the
-#      fix: one read-only existence check per host, against a surface that
-#      host actually reads, keyed on the recorded installRoute for the one
-#      host (claude) whose routes point at different surfaces.
+#      fix: read-only existence checks against the surfaces the host actually
+#      reads, keyed on the recorded installRoute wherever a host's routes point
+#      at different surfaces.
 # Impacts: PAU-05 (skip-current requires the sentinel), PAU-06 (absent →
 #          reinstall, naming the missing sentinel).
 # Test: bash scripts/tests/test-plugin-auto-install.sh — T5 wires the harness
 #       gating that calls this helper; it is unreachable by any suite until
 #       then (co-location rule: the helper and its caller land as sequential
 #       commits, and the gap between them is the observed-red window).
+#       bash scripts/tests/test-plugin-sentinel-classes.sh wipes one artifact
+#       class at a time and is what keeps the probe from narrowing back to one.
+#
+# ONE CLASS IS NOT A PROXY FOR THE REST. The probe originally checked a single
+# artifact class per host (subagents for claude/codex/cursor, index.js for
+# opencode). A host that kept its subagents and lost its hooks, commands or
+# plugin directory therefore satisfied the probe and was skipped forever —
+# measured 2026-08-17 as 14 blind sibling wipes across the four hosts and the
+# two alternate routes, and observed live on Cursor, where re-running
+# setup-local-first.sh repaired nothing because ~/.cursor/agents was intact.
+#
+# TERMINATION IS THE DESIGN CONSTRAINT. Every class demanded below must be one
+# that a plugin reinstall ON THE RECORDED ROUTE puts back; otherwise "absent"
+# is permanent and the self-heal reinstalls on every run. That is why the route
+# is consulted rather than assumed, and why classes owned by a different phase
+# are deliberately out of scope: harness skills belong to install-skills.sh
+# (and are conditional on skillsOwner), MCP registration to install-agents.sh.
+# Both of those phases are ungated and repair themselves every run.
+
+# installer_glob_present <glob>
+# 0 when the unquoted glob matches at least one existing path. Callers pass the
+# pattern as a single word; word-splitting it here is the point.
+installer_glob_present() {
+  local f
+  for f in $1; do
+    [ -e "$f" ] && return 0
+  done
+  return 1
+}
+
+# installer_hooks_wired <json_file> [runner]
+# 0 when the file's top-level `hooks` map mentions massa-ai. Scoped to that
+# subtree deliberately: ~/.claude/settings.json also carries enabledPlugins and
+# allowedMcpServers entries naming massa-ai, so a whole-file grep would report
+# wired hooks for a host that has none. No runner, unreadable or unparseable
+# file → 1, matching the probe's reinstall bias.
+installer_hooks_wired() {
+  local file="$1" runner="${2:-}"
+  [ -f "$file" ] || return 1
+  if [ -z "$runner" ]; then
+    runner="$(installer_detect_runner)" || return 1
+  fi
+  "$runner" - "$file" <<'NODE'
+const fs = require("fs");
+const [, , file] = process.argv;
+let data;
+try { data = JSON.parse(fs.readFileSync(file, "utf8")); } catch { process.exit(1); }
+const hooks = data && typeof data === "object" && !Array.isArray(data) ? data.hooks : null;
+process.exit(hooks && JSON.stringify(hooks).includes("massa-ai") ? 0 : 1);
+NODE
+}
+
+# installer_claude_bundle_path <target_home> [runner]
+# Echoes the installPath of a listed massa-ai marketplace entry that exists on
+# disk, or nothing. Nothing also covers: no registry, unparseable registry, the
+# plugin unlisted, and a registry that still lists a cache directory a `claude
+# plugin update` has already moved — the last is indistinguishable from a wipe
+# from the probe's side, and both want the same answer (reinstall).
+installer_claude_bundle_path() {
+  local target_home="$1" runner="${2:-}"
+  [ -n "$target_home" ] || return 0
+  if [ -z "$runner" ]; then
+    runner="$(installer_detect_runner)" || return 0
+  fi
+  "$runner" - "${target_home}/.claude/plugins/installed_plugins.json" <<'NODE'
+const fs = require("fs");
+const [, , file] = process.argv;
+let data;
+try { data = JSON.parse(fs.readFileSync(file, "utf8")); } catch { process.exit(0); }
+const plugins = data && typeof data === "object" && !Array.isArray(data) ? data.plugins : null;
+if (!plugins || typeof plugins !== "object") process.exit(0);
+const pool = [];
+for (const [id, entries] of Object.entries(plugins)) {
+  if (!id.startsWith("massa-ai@") || !Array.isArray(entries)) continue;
+  for (const e of entries) if (e && typeof e.installPath === "string") pool.push(e.installPath);
+}
+for (const p of pool) {
+  try { if (fs.statSync(p).isDirectory()) { process.stdout.write(p); break; } } catch { /* next */ }
+}
+NODE
+}
 
 # installer_plugin_route <runner> <state_file> <host>
 # Echoes platforms[host].installRoute, or nothing when absent/unparsable/
@@ -282,29 +363,57 @@ NODE
 }
 
 # installer_plugin_sentinel_present <host> <target_home> <state_file>
-# 0 = the host's installed-artifact sentinel exists on disk; 1 = absent,
-# including any parse/route-lookup failure or an empty target_home (mirrors
-# installer_host_detected: an empty home never fabricates a match) — the
-# probe's failure bias is always "reinstall", never a false "skip". Unknown
-# host → return 2. Read-only; performs no writes.
+# 0 = EVERY artifact class a plugin reinstall would restore is on disk; 1 = at
+# least one is absent, which also covers any parse/route-lookup failure, a
+# missing runner, and an empty target_home (mirrors installer_host_detected: an
+# empty home never fabricates a match) — the probe's failure bias is always
+# "reinstall", never a false "skip". Unknown host → 2. Read-only; no writes.
 #
-# Sentinel table (design.md "Sentinel table (A1)"):
-#   claude    route=marketplace → ~/.claude/plugins/installed_plugins.json
-#                                  exists and lists massa-ai
-#   claude    route=file | ""   → glob ~/.claude/agents/massa-ai-*.md non-empty
-#   codex     (single route)    → glob ~/.codex/agents/massa-ai-*.toml
-#                                  non-empty — confirmed live against a
-#                                  sandboxed `apps/codex-plugin/install.sh
-#                                  --user` run (e.g.
-#                                  massa-ai-architecture-specialist.toml,
-#                                  massa-ai-builder.toml)
-#   cursor    (bridge|local|"") → glob ~/.cursor/agents/massa-ai-*.md
-#                                  non-empty — written by both branches
-#   opencode  (single route)    → ~/.config/opencode/plugins/massa-ai/index.js
-#                                  is a regular file (never a symlink)
+# Sentinel table — measured 2026-08-17 by installing each host into a scratch
+# HOME and enumerating what landed, not read off the installers' prose:
+#
+#   claude   route=marketplace → a listed massa-ai entry whose installPath is
+#                                a real directory, holding agents/massa-ai-*.md
+#                                AND commands/*.md. The file-route copies are
+#                                deleted on this route (remove_file_route_-
+#                                artifacts) and the settings.json hook merge is
+#                                skipped, so demanding either would never
+#                                terminate. Measured live: 18 agents,
+#                                46 commands under the 1.52.0 cache dir.
+#   claude   route=file | ""   → ~/.claude/agents/massa-ai-*.md
+#                              + ~/.claude/commands/massa-ai-*.md
+#                              + massa-ai entries in settings.json → hooks
+#                                (measured: 18 / 46 / 5 events)
+#   codex    (single route)    → ~/.codex/plugins/massa-ai/ (its skills/*.md
+#                                ARE the 46 workflow commands)
+#                              + ~/.codex/agents/massa-ai-*.toml
+#                              + massa-ai entries in ~/.codex/hooks.json
+#                                (measured: 46 / 18 / 6 events)
+#   cursor   route=local | ""  → ~/.cursor/plugins/local/massa-ai/ (its
+#                                skills/*/SKILL.md are the 46 commands)
+#                              + ~/.cursor/agents/massa-ai-*.md
+#                              + massa-ai entries in ~/.cursor/hooks.json
+#                                (measured: 46 / 18 / 7 events)
+#   cursor   route=bridge      → as local, MINUS hooks: --prefer-bridge leaves
+#                                hook wiring to ~/.claude on purpose, so a
+#                                hooks demand here reinstalls on every run.
+#   opencode (single route)    → plugins/massa-ai/index.js a regular file
+#                                (never a symlink)
+#                              + ~/.config/opencode/agents/massa-ai-*.md
+#                              + ~/.config/opencode/command/massa-ai-*.md
+#                                (measured: 18 / 40). AD-017: its hooks are
+#                                in-process handlers inside index.js, so the
+#                                plugin check already covers them.
+#
+# An unrecorded route ("") takes the local/file expectations. That is safe in
+# the direction that matters: a bridge-route Cursor with no recorded route
+# reinstalls once, the reinstall wires hooks locally and records the route it
+# took, and the next run reads that record. Because the route is re-recorded on
+# every install, the probe always evaluates against the last route actually
+# taken — never a stale one.
 installer_plugin_sentinel_present() {
   local host="$1" target_home="$2" state_file="$3"
-  local glob_path f
+  local runner route plugin_dir plugin_js bundle
 
   case "$host" in
     claude|codex|cursor|opencode) ;;
@@ -313,37 +422,55 @@ installer_plugin_sentinel_present() {
 
   [ -n "$target_home" ] || return 1
 
+  runner=""
+  route=""
+  if runner="$(installer_detect_runner)"; then
+    route="$(installer_plugin_route "$runner" "$state_file" "$host" 2>/dev/null)"
+  else
+    runner=""
+  fi
+
   case "$host" in
     claude)
-      local runner route
-      route=""
-      if runner="$(installer_detect_runner)"; then
-        route="$(installer_plugin_route "$runner" "$state_file" "$host" 2>/dev/null)"
-      fi
       if [ "$route" = "marketplace" ]; then
-        local registry="${target_home}/.claude/plugins/installed_plugins.json"
-        [ -f "$registry" ] || return 1
-        grep -q '"massa-ai@' "$registry" 2>/dev/null || return 1
+        bundle="$(installer_claude_bundle_path "$target_home" "$runner")"
+        [ -n "$bundle" ] || return 1
+        installer_glob_present "${bundle}/agents/massa-ai-*.md" || return 1
+        installer_glob_present "${bundle}/commands/"'*.md' || return 1
         return 0
       fi
-      glob_path="${target_home}/.claude/agents/massa-ai-*.md"
+      installer_glob_present "${target_home}/.claude/agents/massa-ai-*.md" || return 1
+      installer_glob_present "${target_home}/.claude/commands/massa-ai-*.md" || return 1
+      installer_hooks_wired "${target_home}/.claude/settings.json" "$runner" || return 1
+      return 0
       ;;
     codex)
-      glob_path="${target_home}/.codex/agents/massa-ai-*.toml"
+      plugin_dir="${target_home}/.codex/plugins/massa-ai"
+      [ -d "$plugin_dir" ] || return 1
+      installer_glob_present "${plugin_dir}/skills/"'*.md' || return 1
+      installer_glob_present "${target_home}/.codex/agents/massa-ai-*.toml" || return 1
+      installer_hooks_wired "${target_home}/.codex/hooks.json" "$runner" || return 1
+      return 0
       ;;
     cursor)
-      glob_path="${target_home}/.cursor/agents/massa-ai-*.md"
+      plugin_dir="${target_home}/.cursor/plugins/local/massa-ai"
+      [ -d "$plugin_dir" ] || return 1
+      installer_glob_present "${plugin_dir}/skills/"'*/SKILL.md' || return 1
+      installer_glob_present "${target_home}/.cursor/agents/massa-ai-*.md" || return 1
+      if [ "$route" != "bridge" ]; then
+        installer_hooks_wired "${target_home}/.cursor/hooks.json" "$runner" || return 1
+      fi
+      return 0
       ;;
     opencode)
-      local plugin_js="${target_home}/.config/opencode/plugins/massa-ai/index.js"
-      [ -f "$plugin_js" ] && [ ! -L "$plugin_js" ]
-      return $?
+      plugin_js="${target_home}/.config/opencode/plugins/massa-ai/index.js"
+      if [ ! -f "$plugin_js" ] || [ -L "$plugin_js" ]; then return 1; fi
+      installer_glob_present "${target_home}/.config/opencode/agents/massa-ai-*.md" || return 1
+      installer_glob_present "${target_home}/.config/opencode/command/massa-ai-*.md" || return 1
+      return 0
       ;;
   esac
 
-  for f in $glob_path; do
-    [ -e "$f" ] && return 0
-  done
   return 1
 }
 

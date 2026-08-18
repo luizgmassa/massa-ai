@@ -8,11 +8,15 @@
  * intent and is exactly what goes stale.
  *
  * Why this exists: install-harness.sh skips a host whose recorded plugin
- * version equals the bundle version, and its self-heal check consults ONE
- * sentinel per host (for cursor, `~/.cursor/agents/massa-ai-*.md`). A host that
- * has agents but lost its hooks therefore looks fully installed and is skipped
- * forever. This script checks every artifact class independently, so a partial
- * install cannot hide behind a present sibling.
+ * version equals the bundle version. Its self-heal check used to consult ONE
+ * sentinel per host (for cursor, `~/.cursor/agents/massa-ai-*.md`), so a host
+ * that had agents but had lost its hooks looked fully installed and was
+ * skipped forever — measured live on Cursor, 2026-08-17. That probe now checks
+ * every class (installer_plugin_sentinel_present in scripts/lib/installer-shared.sh),
+ * and this script is the independent reading of the same disk state: it answers
+ * "what is installed" rather than "should the installer run", and it is written
+ * against the real destinations rather than sharing the probe's code, so the
+ * two have to agree by observation instead of by construction.
  *
  *   bun scripts/verify-harness-install.ts
  *   bun scripts/verify-harness-install.ts --home /tmp/scratch-home
@@ -188,7 +192,7 @@ try {
     ours
       ? `hooks.json → ${evts.length} event(s)`
       : bridge
-        ? "none in ~/.cursor/hooks.json — Claude bridge detected, so this is expected IF hooks fire in Cursor; if they do not, re-run with --force-local"
+        ? "none in ~/.cursor/hooks.json — expected only if this host was installed with --prefer-bridge, which leaves hook wiring to ~/.claude; a default install wires them locally"
         : "no massa-ai entries in ~/.cursor/hooks.json",
   );
 
@@ -293,11 +297,13 @@ if (AS_JSON) {
   if (bad.length) {
     console.log(`\n${bad.length} problem(s):`);
     for (const r of bad) console.log(`  [${r.host}] ${r.artifact}: ${r.detail}`);
-    console.log(`\nRepair a single host without touching the others:`);
+    console.log(`\nRepair everything the harness owns:`);
+    console.log(`  bash scripts/install-harness.sh --all --mcp-source local --yes`);
+    console.log(`\nOr a single host, without touching the others:`);
     console.log(`  bash apps/<host>-plugin/install.sh --user`);
-    console.log(`\nThe harness skips a host already recorded at the bundle version, so`);
-    console.log(`re-running setup-local-first.sh will NOT repair it. Call the host's own`);
-    console.log(`installer directly, as above.`);
+    console.log(`\nThe harness still skips a host already recorded at the bundle version,`);
+    console.log(`but only when EVERY artifact class it installed is still on disk — a`);
+    console.log(`partial install like the ones above now reinstalls instead of skipping.`);
   } else {
     console.log(`\nAll expected artifacts present.`);
   }
