@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Cursor installer no longer prefers the Claude bridge.** Local is now the
+  default route and the bridge is opt-in via `--prefer-bridge` (or
+  `MASSA_AI_CURSOR_PREFER_BRIDGE=1`).
+
+  Cursor can load massa-ai from Claude's marketplace registry — observed live in
+  Cursor 3.14's exthost log on 2026-08-05 (`loadClaudePlugin massa-ai@massa-ai`).
+  On detecting that, the installer used to delete its own plugin directory and
+  strip its hook wiring, on the premise that the bridge delivers the whole
+  plugin. Measured on **Cursor 3.16.17** with massa-ai listed and enabled in
+  `~/.claude`, that premise is at best half true: hooks fire, while the plugin
+  and all **46 workflow commands are absent from the Cursor UI**. So the
+  preference silently withheld a working local install and replaced it with
+  nothing.
+
+  Detection reads `~/.claude` — a fact about Claude's files, never proof that
+  Cursor loaded anything from them — and nothing in the installer can observe
+  the difference. Defaulting to local means the outcome no longer depends on an
+  unverifiable claim about another product.
+
+  **Trade-off, stated rather than hidden (AD-017):** if the bridge *is*
+  delivering hooks and you take the default, both sources are live and every
+  hook fires twice. The install now warns on stderr whenever it detects that
+  combination, and `--prefer-bridge` keeps exactly one source. Opting into a
+  bridge that is not present falls back to a local hook install loudly, rather
+  than leaving a machine with no hooks at all.
+
+### Added
+
+- **`scripts/verify-harness-install.ts`** — reports which of MCP, plugin, hooks,
+  skills, commands and subagents is actually installed for each of the four
+  hosts, by reading the destinations the installers write to rather than
+  trusting `install-state.json`, which records intent and is what goes stale. It
+  resolves each host's real location — Claude's marketplace `installPath`,
+  Codex's and Cursor's workflow commands inside the plugin directory — instead
+  of reporting "n/a" for a surface it merely failed to find.
+
 ## [1.53.0] - 2026-08-17
 
 ### Added
