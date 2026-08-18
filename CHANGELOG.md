@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`verify-harness-install.ts` read Claude hooks from the wrong file on the
+  marketplace route.** It always checked `~/.claude/settings.json`, but on that
+  route the installer skips the settings merge and strips prior entries by
+  design — Claude loads the bundle's own `hooks/hooks.json`. A correctly
+  installed marketplace host therefore reported `hooks MISSING`, and the state
+  it called healthy was the double-fire: massa-ai entries in *both* files, each
+  firing. It now resolves the route first, reads the matching file, and reports
+  `settings.json` entries alongside a serving bundle as `DOUBLE-FIRE` instead of
+  as success — a condition invisible from either file on its own.
+
 - **Only `.claude/` was gitignored, so a `--project` install of any other host
   left its bundle loose in the working tree.** Every plugin installer supports
   `--project`, which writes agents, skills, `hooks.json` and a real copy of the
