@@ -123,10 +123,46 @@ try {
     viaMarketplace ? "marketplace route (installed_plugins.json)" : fileRouteAgents ? "file route" : "neither route detected",
   );
 
+  const installPathEarly: string | undefined =
+    registry?.plugins?.["massa-ai@massa-ai"]?.[0]?.installPath;
+
+  // Claude's two routes put hooks in DIFFERENT files, and this check used to
+  // read only settings.json. On the marketplace route the installer skips the
+  // settings.json merge and strips prior entries on purpose — the bundle's own
+  // hooks/hooks.json is what Claude loads. So a correctly-installed marketplace
+  // host reported `hooks MISSING`, and worse, the state it called healthy was
+  // the double-fire: entries in BOTH files. Route first, then the right file.
   const settings = readJson(join(dir, "settings.json"));
-  const hookEvents = settings?.hooks ? Object.keys(settings.hooks) : [];
-  const ours = JSON.stringify(settings?.hooks ?? {}).includes("massa-ai");
-  add(h, "hooks", ours ? "ok" : "missing", ours ? `settings.json → ${hookEvents.length} event(s)` : "no massa-ai hook entries in ~/.claude/settings.json");
+  const inSettings = JSON.stringify(settings?.hooks ?? {}).includes("massa-ai-hook");
+  const settingsEvents = settings?.hooks ? Object.keys(settings.hooks).length : 0;
+
+  if (viaMarketplace) {
+    const bundleHooks = installPathEarly ? readJson(join(installPathEarly, "hooks", "hooks.json")) : null;
+    const bundleEvents = bundleHooks?.hooks ? Object.keys(bundleHooks.hooks) : [];
+    const inBundle = JSON.stringify(bundleHooks?.hooks ?? {}).includes("massa-ai-hook");
+    // Entries in settings.json TOO are not a bonus — both sources fire, so
+    // every lifecycle event is ingested twice. Report it as a problem, because
+    // it is one, and because it is invisible from any single file.
+    add(
+      h,
+      "hooks",
+      inBundle && inSettings ? "partial" : inBundle ? "ok" : "missing",
+      inBundle && inSettings
+        ? `DOUBLE-FIRE: ${bundleEvents.length} event(s) in the marketplace bundle AND massa-ai entries in ~/.claude/settings.json — both sources fire. Re-run apps/claude-plugin/install.sh --user to strip the settings.json copy.`
+        : inBundle
+          ? `${bundleEvents.length} event(s) served by the marketplace bundle (settings.json correctly has none)`
+          : "no massa-ai hook entries in the marketplace bundle's hooks/hooks.json",
+    );
+  } else {
+    add(
+      h,
+      "hooks",
+      inSettings ? "ok" : "missing",
+      inSettings
+        ? `settings.json → ${settingsEvents} event(s)`
+        : "no massa-ai hook entries in ~/.claude/settings.json",
+    );
+  }
 
   checkSkills(h, join(dir, "skills"));
 
@@ -135,7 +171,7 @@ try {
   // design. That is not a reason to skip the check — resolve installPath and
   // count them there. Reporting "n/a" here would be an unverified claim of
   // absence, and would pass just as happily if the cache were empty.
-  const installPath: string | undefined = registry?.plugins?.["massa-ai@massa-ai"]?.[0]?.installPath;
+  const installPath = installPathEarly;
 
   if (viaMarketplace && installPath && existsSync(installPath)) {
     const bundleCmds = existsSync(join(installPath, "commands"))
