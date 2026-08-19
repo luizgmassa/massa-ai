@@ -26,6 +26,16 @@
  *      defined (class 7) but no workflow `Dispatch:` block ever emitted it, so
  *      a subagent never actually received the id the contract describes. See
  *      .specs/features/persona-emit/spec.md.
+ *   9. Charter reference base — all 18 charters cited their references bare
+ *      (`references/x.md`) while owning no references/ directory, and every
+ *      host installs charters to <host>/agents/ but references to
+ *      <host>/skills/massa-ai/references/. The file existed, so class 4 passed:
+ *      that check falls back to massa-ai's root for any citing file, which
+ *      encodes the convention the charter never stated. A subagent reading only
+ *      its own charter had no base to resolve against.
+ *  10. Repo-root .specs cites — a reference claimed `.specs/STATE.md` where the
+ *      file is `.specs/project/STATE.md` (1 of 45 cites). Unlike references/,
+ *      `.specs/` is repo-root-anchored, so no skill-relative fallback hides it.
  *
  * `bun run test:scripts` runs this file; CI runs that script.
  */
@@ -874,5 +884,104 @@ describe("portability: no shipped harness file names a developer's machine", () 
   test("the scan actually enumerated the tree", async () => {
     // Guard the guard: a mis-rooted walk finds no files and no offenders.
     expect((await skillMarkdownFiles()).length).toBeGreaterThan(100);
+  });
+});
+
+// ── 9. Charter reference base ──────────────────────────────────────────────
+
+/**
+ * The one sentence that makes a bare `references/…` cite resolvable by a
+ * subagent that has read nothing but its own charter. Charters install to
+ * <host>/agents/ while the reference tree installs to
+ * <host>/skills/massa-ai/references/ — sibling trees, so no relative path from
+ * the charter reaches them and the base has to be named in the charter itself.
+ */
+const CHARTER_REFERENCE_BASE =
+  "References (paths relative to the `massa-ai` skill directory):";
+
+describe("charter reference base: a charter states where its references live", () => {
+  test("every charter citing references/ names the massa-ai skill directory", async () => {
+    const names = await charterNames();
+    const offenders: string[] = [];
+    let citing = 0;
+    for (const name of names) {
+      const file = path.join(SKILLS_DIR, "agents", name, "SKILL.md");
+      const content = await read(file);
+      if (!/`references\/[A-Za-z0-9._/-]+`/.test(content)) continue;
+      citing += 1;
+      if (!content.includes(CHARTER_REFERENCE_BASE)) {
+        offenders.push(`${name}: cites references/ without naming the base skill`);
+      }
+    }
+    expect(offenders).toEqual([]);
+    // Guard the guard: a regex that stops matching makes every charter vacuously
+    // compliant. Class 9 was found across all 18 charters, so the citing set is
+    // the whole roster.
+    expect(citing).toBe(names.length);
+  });
+
+  test("every reference a charter cites resolves under skills/massa-ai/", async () => {
+    const dead: string[] = [];
+    let checked = 0;
+    for (const name of await charterNames()) {
+      const file = path.join(SKILLS_DIR, "agents", name, "SKILL.md");
+      const content = await read(file);
+      for (const m of content.matchAll(/`(references\/[A-Za-z0-9._/-]+)`/g)) {
+        checked += 1;
+        const target = path.join(SKILLS_DIR, "massa-ai", m[1]!.replace(/\/$/, ""));
+        if (!(await exists(target))) {
+          dead.push(`${name} -> ${m[1]}`);
+        }
+      }
+    }
+    expect(dead).toEqual([]);
+    expect(checked).toBeGreaterThan(50);
+  });
+});
+
+// ── 10. Repo-root .specs cites ─────────────────────────────────────────────
+
+/**
+ * Paths the harness documents as created on demand rather than tracked: the
+ * onboarding output dir, the gitignored observation buffer, and the quick-task
+ * template tree. Everything else under `.specs/` is a real tracked artifact and
+ * a cite that misses it is a typo, not a forward reference.
+ */
+const SPECS_CREATED_ON_DEMAND = [
+  ".specs/project/onboarding/",
+  ".specs/observations.json",
+  ".specs/quick/",
+];
+const SPECS_PLACEHOLDER = /NNN|<|\{|\*|slug/;
+
+describe("repo-root .specs cites resolve", () => {
+  test("no skills/ file cites a .specs path that does not exist", async () => {
+    const offenders: string[] = [];
+    let checked = 0;
+    for (const file of await skillMarkdownFiles()) {
+      const content = await read(file);
+      let fenced = false;
+      const lines = content.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i += 1) {
+        const line = lines[i]!;
+        if (line.startsWith("```")) {
+          fenced = !fenced;
+          continue;
+        }
+        if (fenced) continue;
+        for (const m of line.matchAll(/`(\.specs\/[A-Za-z0-9._/-]+)`/g)) {
+          const cite = m[1]!;
+          if (SPECS_PLACEHOLDER.test(cite)) continue;
+          if (SPECS_CREATED_ON_DEMAND.some((p) => cite.startsWith(p))) continue;
+          checked += 1;
+          if (!(await exists(path.join(REPO_ROOT, cite.replace(/\/$/, ""))))) {
+            offenders.push(`${path.relative(REPO_ROOT, file)}:${i + 1} -> ${cite}`);
+          }
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+    // Guard the guard: an over-broad allowlist or a dead regex checks nothing.
+    expect(checked).toBeGreaterThan(20);
   });
 });
