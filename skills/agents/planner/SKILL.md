@@ -56,7 +56,7 @@ Transform an engineering request into a structured implementation plan.
 - Verification Ladder: plan references expected sensors; does not run them.
 - Massa-ai Memory: suggest durable decision memories only when the plan locks a strategy; main agent persists.
 - Synapse: none (planning is not a repeated-search task).
-- References: `references/agent-orchestration.md`, `references/subagent-design.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/agent-orchestration.md`, `references/subagent-design.md`.
 
 ## Validation Sensors
 - Every step in the plan references a concrete file, module, or task.

@@ -56,7 +56,7 @@ Provide architectural guidance by evaluating structure, suggesting boundaries, a
 - Verification Ladder: static (coupling, depth, boundary) checks; no behavioral changes.
 - Massa-ai Memory: suggest durable architecture-decision memories only when a boundary or abstraction is recommended; main agent persists.
 - Synapse: own ephemeral session when evaluation spans multiple modules with repeated searches.
-- References: `references/architecture-lenses.md`, `references/architecture-domain-lens.md`, `references/architecture-coupling-lens.md`, `references/architecture-deepening-lens.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/architecture-lenses.md`, `references/architecture-domain-lens.md`, `references/architecture-coupling-lens.md`, `references/architecture-deepening-lens.md`.
 
 ## Validation Sensors
 - Every finding has a `path:line` or metric pointer.

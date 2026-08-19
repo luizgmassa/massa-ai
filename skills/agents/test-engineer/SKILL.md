@@ -58,7 +58,7 @@ Generate a testing strategy that covers unit, integration, edge cases, negative 
 - Verification Ladder: behavioral (tests) and file-integrity (no validation assets weakened).
 - Massa-ai Memory: suggest durable test-pattern memories only when a testing convention is established; main agent persists.
 - Synapse: none (test planning is not a repeated-search task).
-- References: `references/verification-ladder.md`, `references/code-annotation.md`, `references/root-cause-scripts.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/verification-ladder.md`, `references/code-annotation.md`, `references/root-cause-scripts.md`.
 
 ## Validation Sensors
 - Every acceptance criterion maps to at least one test case.

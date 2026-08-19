@@ -56,7 +56,7 @@ Generate engineering documentation artifacts (README, ADR, RFC, changelog, KDoc,
 - Verification Ladder: static (doc-lint, stale-reference, link check); no behavioral sensors.
 - Massa-ai Memory: suggest durable doc-format memories only when a documentation convention is established; main agent persists.
 - Synapse: none (documentation is not a repeated-search task).
-- References: `references/adr-authoring.md`, `references/rfc/`.
+- References (paths relative to the `massa-ai` skill directory): `references/adr-authoring.md`, `references/rfc/`.
 
 ## Validation Sensors
 - Stale-reference scan passes (no dead links to removed files).

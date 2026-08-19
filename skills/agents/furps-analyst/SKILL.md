@@ -60,7 +60,7 @@ Analyze exactly one FURPS+ dimension of a PRD or ADR against its checklist secti
 - Verification Ladder: static evidence checks only — source-location proof per claim, absent-claim detection per `missing`.
 - Massa-ai Memory: suggest durable memories only when a reusable refinement pattern is discovered; the main agent persists.
 - Synapse: own ephemeral session when >= 2 searches are expected, per `references/synapse-policy.md`.
-- References: `references/furps/checklist.md`, `references/furps/report-contract.md`, `references/furps/intake.md`, `references/agent-orchestration.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/furps/checklist.md`, `references/furps/report-contract.md`, `references/furps/intake.md`, `references/agent-orchestration.md`.
 
 ## Validation Sensors
 - Source-location proof (quote plus section) for every `covered`/`partial` claim.

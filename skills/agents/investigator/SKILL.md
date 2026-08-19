@@ -59,7 +59,7 @@ Read and understand the codebase to answer engineering questions without modifyi
 - Verification Ladder: static checks (grep, search) and file-integrity; no behavioral changes.
 - Massa-ai Memory: suggest durable architecture/dependency memories only when useful; main agent persists.
 - Synapse: own ephemeral session per `references/synapse-policy.md`; pass `synapseSessionId` on every `search`.
-- References: `references/codebase-investigation.md`, `references/agent-orchestration.md`, `references/synapse-policy.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/codebase-investigation.md`, `references/agent-orchestration.md`, `references/synapse-policy.md`.
 
 ## Validation Sensors
 - Source-backed evidence for every claim (`path:line`).

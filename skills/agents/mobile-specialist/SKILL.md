@@ -73,7 +73,7 @@ If none are present, refuse with: `Non-mobile target. Refusing mobile-specialist
 - Verification Ladder: platform-specific static checks when available; no behavioral changes.
 - Massa-ai Memory: suggest durable mobile-decision memories only when a platform constraint or lifecycle pattern is established; main agent persists.
 - Synapse: own ephemeral session when guidance spans multiple mobile modules with repeated searches.
-- References: `references/mobile-context.md`, `references/mobile-diagnosis.md`, `references/maestro.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/mobile-context.md`, `references/mobile-diagnosis.md`, `references/maestro.md`.
 
 ## Validation Sensors
 - At least one detection signal is confirmed present before guidance is given.

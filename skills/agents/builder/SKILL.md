@@ -58,7 +58,7 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 - Verification Ladder: run the task's sensors (static + behavioral) before claiming Complete.
 - Massa-ai Memory: suggest durable code-pattern memories only when the implementation establishes a reusable convention; main agent persists.
 - Synapse: none (implementation is not a repeated-search task).
-- References: `references/agent-orchestration.md`, `references/naming-standards.md`, `references/code-annotation.md`, `references/root-cause-scripts.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/agent-orchestration.md`, `references/naming-standards.md`, `references/code-annotation.md`, `references/root-cause-scripts.md`.
 
 ## Validation Sensors
 - Verification commands from the plan pass (tests, build, typecheck, lint).

@@ -80,7 +80,7 @@ next_step: <string>
 - Verification Ladder: every score cites a quotation; a score without a quote is a sensor failure.
 - Massa-ai Memory: suggest durable memories only for reusable evaluation failure patterns; the main agent persists.
 - Policy: the orchestrator owns dispatch, consensus arithmetic, and the final verdict; this agent owns its scores and its file only.
-- References: `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
+- References (paths relative to the `massa-ai` skill directory): `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
 
 ## Model Hint
 See `references/agent-orchestration.md` (Model Diversity Fallback): `metadata.model_tier`

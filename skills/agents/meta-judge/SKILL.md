@@ -71,7 +71,7 @@ overall: weighted-mean
 - Verification Ladder: every criterion must be checkable by quoting the artifact — a criterion that cannot be evidenced is not a criterion.
 - Massa-ai Memory: suggest durable memories only for reusable rubric patterns; the main agent persists.
 - Policy: the main agent (judge-with-debate orchestrator) owns dispatch, YAML validation, retry, and consensus; this agent owns the specification only.
-- References: `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
+- References (paths relative to the `massa-ai` skill directory): `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
 
 ## Model Hint
 See `references/agent-orchestration.md` (Model Diversity Fallback): `metadata.model_tier`
