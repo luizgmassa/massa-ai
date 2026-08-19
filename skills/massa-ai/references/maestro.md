@@ -19,22 +19,6 @@ Official source anchors:
 - Cloud limits: https://docs.maestro.dev/maestro-cloud/limits.md
 - Maestro MCP: https://docs.maestro.dev/get-started/maestro-mcp.md
 
-## Load Map
-
-| Need | Load |
-|---|---|
-| Source authority, Q&A checklist handling, unsupported facts, transcript requirements | `references/maestro/fact-ledger.md` |
-| CLI preflight, device/platform readiness, local command flags, sharding, live help capture | `references/maestro/cli-device.md` |
-| YAML commands, flow headers, AI commands, examples | `references/maestro/yaml-commands.md` |
-| Core, relational, trait, state, dimension, platform, regex, and web-only selector behavior | `references/maestro/selectors.md` |
-| Flow discovery, config.yaml discovery patterns, tags, execution order, suite isolation | `references/maestro/workspace-execution.md` |
-| Flow header/config/env/report-output boundaries | `references/maestro/config-env-output.md` |
-| `evalScript`, `runScript`, `output`, `faker`, logging, `maestro.log` | `references/maestro/js-scripting.md` |
-| JUnit/HTML reports, artifact directories, debug output, screenshots, videos, AI reports, recording | `references/maestro/artifacts-reports.md` |
-| Cloud binary eligibility, auth/plan needs, app-binary reuse, Cloud device flags, Cloud limits | `references/maestro/cloud.md` |
-| Maestro MCP install/use, tool metadata, Viewer, Cloud-auth tools | `references/maestro/mcp.md` |
-| Stable suite design, setup/teardown, selectors, fixtures, output contracts, skipped checks | `references/maestro/patterns.md` |
-
 ## Minimum Step Selection
 
 - Flow implementation: load `fact-ledger.md`, `cli-device.md`, then only the focused files for the flow surface being edited: commonly `yaml-commands.md`, `selectors.md`, `workspace-execution.md`, `config-env-output.md`, `js-scripting.md`, and `patterns.md`.

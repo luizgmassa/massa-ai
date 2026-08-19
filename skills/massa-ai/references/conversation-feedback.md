@@ -17,19 +17,7 @@ repeated micro-events.
 
 ## Line Shape
 
-Each status update must be 1-2 lines. Use an emoji, a capitalized label in square brackets, and one or two plain sentences.
-
-Do:
-
-```md
-🔵 [Start] Planning visual feedback for massa-ai. Workflow: Spec Driven. Session: Visual Feedback.
-🔄 [Loading] Reading AGENTS.md and massa-ai router guidance before planning.
-🧠 [Context] Found 8 relevant massa-ai memories and queried the requested NotebookLM source.
-🤖 [Agent Running] Plan Critic is checking failure modes for the proposed design.
-⚠️ [Divergence] Expected the legacy router path, but this checkout uses skills/massa-ai/SKILL.md.
-✅ [Verified] Stale-reference checks and skill validation passed.
-🏁 [Finished] Plan complete. Changed files: none. Remaining risk: none found.
-```
+Each status update must be 1-2 lines. Use an emoji, a capitalized label in square brackets, and one or two plain sentences. The worked example is not repeated here — it lives in the canonical policy block named under Policy Source above, which is always in context.
 
 Avoid terse machine-shaped status lines, lowercase labels, equals-sign syntax, and tiny abbreviations.
 

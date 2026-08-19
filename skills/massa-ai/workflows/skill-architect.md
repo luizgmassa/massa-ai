@@ -47,32 +47,15 @@ what "success" looks like.
 
 ### 1.1 — Understand the Problem
 
-Start by asking about the OUTCOME, not the implementation. Key questions
-(ask conversationally, not as a checklist dump):
-
-- **What workflow do you want to make consistent?** Get a concrete example
-  of what they do today, step by step.
-- **What goes wrong without the skill?** Understand the pain: inconsistency,
-  forgotten steps, wasted time re-explaining, wrong outputs.
-- **Who will use this skill?** Just them? Their team? Public distribution?
-  This affects naming, documentation depth, and description specificity.
-- **What tools are involved?** Built-in Agents capabilities (code execution,
-  file creation, artifacts) or external services via MCP?
+Determine: the workflow to make consistent, what goes wrong without the
+skill, who will use it (affects naming, documentation depth, and description
+specificity), and what tools are involved (built-in Agents capabilities or
+external services via MCP).
 
 ### 1.2 — Define Use Cases
 
-Nail down 2-3 concrete use cases. For each, capture:
-
-```
-Use Case: [Name]
-Trigger: What the user would say or do
-Steps: The sequence of actions
-Tools: Built-in or MCP tools needed
-Result: What success looks like (specific output)
-```
-
-If the user is vague, give them examples to react to. It's easier to refine
-a concrete proposal than to articulate needs from scratch.
+Nail down 2-3 concrete use cases, each capturing name, trigger, steps, tools
+needed, and expected result.
 
 ### 1.3 — Identify the Category
 
@@ -87,11 +70,8 @@ detailed pattern guidance):
 
 ### 1.4 — Establish Success Criteria
 
-Before moving on, agree on how they'll know the skill works:
-
-- **Trigger accuracy:** What should trigger it? What should NOT?
-- **Output quality:** What does a good result look like concretely?
-- **Efficiency:** How many interactions should it take?
+Before moving on, agree on trigger accuracy, output quality, and efficiency
+expectations — how they'll know the skill works.
 
 **Exit criteria for Discovery:**
 
