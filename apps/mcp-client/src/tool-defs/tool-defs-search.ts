@@ -224,6 +224,7 @@ export const SEARCH_TOOL_DEFINITIONS: ToolDefinition[] = [
       "Trace paths through the code graph from a seed symbol, following typed edges (CALLS/DATA_FLOWS/HTTP_CALLS/EMITS/LISTENS). " +
       "Modes: calls (callers/callees), data_flow (value propagation), cross_service (HTTP/async hops), all. " +
       "Direction: outbound (what it reaches) | inbound (what reaches it) | both. " +
+      "Requires a seed: supply exactly one of function_name, symbol, or qualifiedName (they are aliases). " +
       `Use INSTEAD OF grep for callers, dependencies, impact analysis, or data flow tracing. ${STRUCTURAL_FQN_DESCRIPTION}`,
     apiEndpoint: "/api/v1/symbol/trace",
     apiMethod: "GET",
@@ -293,12 +294,13 @@ export const SEARCH_TOOL_DEFINITIONS: ToolDefinition[] = [
             "Optional precondition: the client's last-known `activatedGraphGenerationId`. If it mismatches the current active generation, the tool returns a 412 teaching error.",
         },
       },
+      // NOTE: no root-level `anyOf` for the function_name/symbol/qualifiedName
+      // seed. Vertex AI rejects a functionDeclaration whose `parameters` is not
+      // a plain OBJECT schema ("parameters schema should be of type OBJECT"),
+      // which broke every Gemini/Vertex-backed host that loaded this server.
+      // The constraint is stated in the description and enforced server-side by
+      // GET /api/v1/symbol/trace.
       required: ["projectId"],
-      anyOf: [
-        { required: ["function_name"] },
-        { required: ["symbol"] },
-        { required: ["qualifiedName"] },
-      ],
     },
   },
   {

@@ -40,11 +40,13 @@ describe("structural MCP contracts", () => {
     expect(byName.go_to_definition.description).toContain(STRUCTURAL_FQN_DESCRIPTION);
     expect(byName.get_references.description).toContain(STRUCTURAL_FQN_DESCRIPTION);
     expect(byName.trace_path.description).toContain(STRUCTURAL_FQN_DESCRIPTION);
-    expect((byName.trace_path.inputSchema as any).anyOf).toEqual([
-      { required: ["function_name"] },
-      { required: ["symbol"] },
-      { required: ["qualifiedName"] },
-    ]);
+    // The seed contract lives in the description, not a root-level `anyOf`:
+    // Vertex AI rejects any functionDeclaration whose `parameters` is not a
+    // plain OBJECT schema. Enforcement is server-side (GET /api/v1/symbol/trace).
+    expect((byName.trace_path.inputSchema as any).anyOf).toBeUndefined();
+    expect(byName.trace_path.description).toContain(
+      "exactly one of function_name, symbol, or qualifiedName",
+    );
     expect(byName.project_map.description).toContain("parser-diagnostic summary");
     expect(byName.index_status.description).toContain("activatedGraphGenerationId");
   });
