@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`trace_path` made every Vertex AI / Gemini request fail with the whole tool list.** Its
+  `inputSchema` carried a root-level `anyOf` (the `function_name` / `symbol` /
+  `qualifiedName` seed alternatives) beside `type: "object"`; Vertex requires a
+  `functionDeclaration`'s `parameters` to be a plain OBJECT schema and rejects the entire
+  request — `parameters schema should be of type OBJECT` — so no massa-ai tool was reachable
+  from a Vertex-backed host, not just this one. It was the only offender of the 59 published
+  tools. The seed constraint moves into the tool description; enforcement was already
+  server-side in `GET /api/v1/symbol/trace`. Nested combinators (`search_definitions.kind`)
+  are unaffected and stay.
+
+### Added
+
+- **`apps/mcp-client/src/__tests__/tool-schema-provider-compat.test.ts`** asserts every
+  published tool's `inputSchema` is a root-level OBJECT with no `anyOf`/`oneOf`/`allOf`/`$ref`
+  — the shape Vertex, Moonshot, and OpenAI strict mode all reject, and a whole-server outage
+  rather than a single broken tool.
+
 ## [1.54.1] - 2026-08-18
 
 ### Fixed
