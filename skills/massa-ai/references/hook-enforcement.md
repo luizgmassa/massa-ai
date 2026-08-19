@@ -131,7 +131,7 @@ recall stays owned by the router.
 
 | Failure | Behavior |
 |---|---|
-| massa-ai REST unavailable | lesson still lands in `lessons.json`; skipped memory write logged to `scripts/hooks-state/skip.log` |
-| `.specs/STATE.md` absent / workflow unset | stop gate falls back to flat matrix |
+| massa-ai REST unavailable | lesson still lands in `lessons.json`; the memory write is fire-and-forget and is dropped silently (a timeout emits a `deadline-on-fire` JSON breadcrumb on **stderr**, nothing is written to disk) |
+| `.specs/project/STATE.md` absent / workflow unset | stop gate falls back to flat matrix |
 | bad / malformed stdin | hook exits 0, never blocks |
-| hook non-critical error | exit 0, approve, log skip |
+| hook non-critical error | exit 0, approve, degrade silently — there is no skip log file |

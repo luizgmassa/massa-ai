@@ -166,5 +166,5 @@ best-effort. An ungrounded lesson is refused by both `add` and the massa-ai writ
 ### Self-Check
 
 After verification: if a reusable signal was found but no lesson was recorded,
-state the skipped reason. The hook loop logs every skip to
-`scripts/hooks-state/skip.log`.
+state the skipped reason. Nothing else records it — the hook loop keeps no skip
+log on disk, so your stated reason is the only record.

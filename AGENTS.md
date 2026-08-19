@@ -127,11 +127,19 @@ and completion evidence.
 
 ## Tech Stack
 
-- **Runtime**: Bun 1.3.14 (pinned via `.tool-versions`, `mise.toml`, Dockerfile)
-- **Build helper**: Node 25.9.0 (pinned via `.tool-versions`, `mise.toml`)
+Versions are pinned in `.tool-versions` and `mise.toml`; read them there rather
+than from a copy that can drift.
+
+- **Runtime**: Bun — the application runtime *and* package manager. Never run app
+  code under Node.
+- **Build helper**: Node + npm exist only as the `node-gyp` helper that builds the
+  native tree-sitter grammars. Never the app runtime.
 - **Language**: TypeScript (ESM, strict)
 - **Test runner**: `bun test` (Bun-native)
-- **Type-check**: `bun run type-check` (6 tsc projects)
-- **Build**: `bun run build` (turbo build, 5 packages)
-- **Database**: PostgreSQL 17 + pgvector
-- **Packages**: `packages/core`, `packages/shared`; `apps/tools-api`, `apps/mcp-client`, `apps/opencode-plugin`, `apps/claude-plugin`, `apps/web-ui`
+- **Type-check**: `bun run type-check` — covers only the packages that declare the
+  script; `core` and `shared` are type-checked by their `build` instead.
+- **Build**: `bun run build` (turbo)
+- **Database**: PostgreSQL + pgvector, pinned in `docker-compose.yml`. The only
+  backend — there is no SQLite path.
+- **Packages**: `packages/*` are libraries, `apps/*` are transports and install
+  surfaces. Enumerate with `ls packages apps`; do not trust a copied list.
