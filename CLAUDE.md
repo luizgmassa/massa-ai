@@ -55,7 +55,7 @@ retrieval benchmark corpus (`benchmarks/needles/fixtures/sicad.json`,
 
 ```bash
 bun install                    # workspace install (--frozen-lockfile in CI)
-bun run build                  # turbo build — 5 buildable packages (core, shared, tools-api, mcp-client, opencode-plugin)
+bun run build                  # turbo build — 6 packages (core, shared, tools-api, mcp-client, opencode-plugin, web-ui)
 bun run type-check             # turbo tsc --noEmit — 4 packages (see below)
 bun run test                   # turbo test — 6 packages; does NOT cover scripts/ (see below)
 bun run test:scripts           # root-level suites outside the workspace globs

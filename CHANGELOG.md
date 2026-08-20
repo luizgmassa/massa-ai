@@ -18,6 +18,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tools. The seed constraint moves into the tool description; enforcement was already
   server-side in `GET /api/v1/symbol/trace`. Nested combinators (`search_definitions.kind`)
   are unaffected and stay.
+- **Sub-agent charters now say where their references live.** All 18 charters cited
+  `references/<file>.md` bare while owning no `references/` directory, and every host
+  installs charters to `<host>/agents/` but the reference tree to
+  `<host>/skills/massa-ai/references/` — sibling trees, so no relative path from a charter
+  reached them. The convention was stated only in `skills/AGENTS.md`, which a sub-agent
+  never loads. Each charter's References bullet now names the `massa-ai` skill directory as
+  the base.
+- **`references/hook-enforcement.md` and `references/lessons.md` claimed a skip log that
+  nothing writes.** Both pointed at `scripts/hooks-state/skip.log`; the hook writes only a
+  session pin file and emits `deadline-on-fire` breadcrumbs on stderr. Both now describe the
+  real fire-and-forget behavior.
+- **`references/hook-enforcement.md` cited `.specs/STATE.md`**, 1 of 45 cites; every sibling
+  uses the real path `.specs/project/STATE.md`.
+- **`AGENTS.md`'s Tech Stack block carried three stale hand-copied figures.** The package
+  list omitted `apps/codex-plugin` and `apps/cursor-plugin`; `type-check` was described as
+  6 tsc projects where only 4 packages declare the script; `build` was described as 5
+  packages where `turbo run build --dry-run` reports 6 real build tasks. The counts and the
+  copied list are gone rather than corrected — the block now names the shape and points at
+  `.tool-versions` / `mise.toml` / `docker-compose.yml` / `ls packages apps`, which cannot
+  drift.
+- **`CLAUDE.md` described `bun run build` as "5 buildable packages"** and named the five
+  publishable ones. `turbo run build --dry-run=json` reports **6** real build tasks — the
+  list omitted `apps/web-ui`, which builds but is `private: true` and so never publishes.
+  The figure conflated buildable with publishable. The adjacent `type-check` (4) and `test`
+  (6) counts were re-measured the same way and are correct.
 
 ### Added
 
@@ -25,6 +50,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   published tool's `inputSchema` is a root-level OBJECT with no `anyOf`/`oneOf`/`allOf`/`$ref`
   — the shape Vertex, Moonshot, and OpenAI strict mode all reject, and a whole-server outage
   rather than a single broken tool.
+
+### Changed
+
+- **Trimmed duplicated and generic bulk from five harness surfaces** (behavior contracts
+  unchanged): `references/architecture-lenses.md` now cross-references the coupling and
+  deepening lens files instead of restating their level definitions; `references/maestro.md`
+  drops the Load Map pointer table that Minimum Step Selection already covers;
+  `workflows/discovery.md` drops the generic HMW/JTBD/SCAMPER/OODA framework catalogue;
+  `workflows/skill-architect.md` compresses the generic discovery-interview methodology;
+  `references/conversation-feedback.md` drops the `Line Shape` example fence, which was a
+  verbatim copy of the one in the always-in-context `skills/AGENTS.md` bootstrap block. The
+  label table's `Use When` column stays — it exists nowhere else.
+- **`scripts/__tests__/skills-harness-integrity.test.ts` gained two defect classes**: a
+  charter that cites `references/` must name the `massa-ai` skill directory as its base, and
+  no file under `skills/` may cite a `.specs/` path that does not exist. The pre-existing
+  reference-integrity check could not catch either — it resolves any citing file against
+  massa-ai's root, encoding the very convention charters failed to state.
 
 ## [1.54.1] - 2026-08-18
 

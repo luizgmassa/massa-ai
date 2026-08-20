@@ -55,7 +55,7 @@ Centralize Verification Ladder logic and validate that a task's output meets its
 - Verification Ladder: this agent IS the ladder; choose the cheapest sufficient evidence first.
 - Massa-ai Memory: suggest durable verification-recipe memories only when a sensor pattern is reusable; main agent persists.
 - Synapse: none (verification is not a repeated-search task).
-- References: `references/verification-ladder.md`, `references/evidence-gate.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/verification-ladder.md`, `references/evidence-gate.md`.
 
 ## Validation Sensors
 - Every acceptance criterion has a PASS/FAIL verdict with evidence.

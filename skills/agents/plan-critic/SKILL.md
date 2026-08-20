@@ -79,7 +79,7 @@ Never receives full conversation context.
 - Verification Ladder: every challenge names the concrete sensor that would settle it.
 - Massa-ai Memory: suggest durable memories only for reusable failure modes or rejected approaches; the main agent persists.
 - Policy: the main agent owns mode selection, synthesis, plan revision, and the Evidence Gate; this agent owns the critique only.
-- References: `references/agent-orchestration.md`, `references/the-fool/`, `references/verification-ladder.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/agent-orchestration.md`, `references/the-fool/`, `references/verification-ladder.md`.
 
 ## Validation Sensors
 - Every challenge ties to a plan section plus a concrete evidence gap or falsifiable check.

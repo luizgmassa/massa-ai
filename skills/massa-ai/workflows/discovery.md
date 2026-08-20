@@ -89,39 +89,6 @@ effects ("if we do X, what does that enable or foreclose?"); bring in
 competitive response; think in timeframes (3 months vs 12 months vs 3
 years).
 
-## Frameworks As Tools
-
-Pull a framework in when it moves the conversation forward — never dump
-frameworks or force the conversation through them as a checklist.
-
-- **How Might We (HMW)**: "How might we [outcome] for [user] without
-  [constraint]?" Aim between too broad ("improve onboarding") and too narrow
-  (a disguised solution); generate 5–10 reframings — each opens a different
-  solution space.
-- **Jobs-to-be-Done (JTBD)**: "When [situation], I want to [motivation] so I
-  can [outcome]." The job is stable while solutions change; emotional and
-  social jobs often outweigh functional ones. Ask "what did they fire to
-  hire this?" — it reveals the real competitive set.
-- **Opportunity Solution Tree**: outcome → opportunities (evidence-backed
-  user needs) → multiple solutions per opportunity → cheapest experiment per
-  solution. One solution per opportunity means exploration stopped too
-  early; the tree is a living artifact.
-- **First Principles Decomposition**: state the assumption, break it into
-  fundamental components, ask of each "law of physics or convention?", then
-  rebuild from only the fundamentals. Use when the team is stuck in
-  incremental thinking.
-- **SCAMPER**: seven lenses on an existing product — Substitute, Combine,
-  Adapt, Modify (10x bigger/smaller/faster), Put to other use, Eliminate
-  ("would anyone notice?"), Reverse (flip the sequence or the default).
-- **OODA Loop** (Observe–Orient–Decide–Act): a decision-tempo framework —
-  gather raw signals wide, make sense of them while challenging your own
-  orientation, choose a proportional reversible bet, act, and cycle. Use
-  when the conversation over-deliberates or keeps circling: orient with what
-  exists, decide, and let the next observation correct course.
-- **Reverse Brainstorming**: invert the problem ("how could we make this
-  worse?"), generate freely — people find flaws more easily than fixes —
-  then reverse each worsening idea into the seed of a solution.
-
 ## Session Rhythm
 
 A good session opens up before it narrows down. Move through five stages;
@@ -134,8 +101,9 @@ name the stage transition when it helps the user follow.
    to nothing.
 2. **Diverge** — Generate many ideas without judgment; build on ideas rather
    than shooting them down; follow tangents; push past the first 3–5 obvious
-   ideas; use the frameworks above to open new angles. Do not evaluate
-   feasibility here — that kills divergent thinking.
+   ideas; pull in whatever brainstorming frameworks fit the conversation to
+   open new angles. Do not evaluate feasibility here — that kills divergent
+   thinking.
 3. **Provoke** — The sparring-partner stage: "What is the strongest argument
    against this?", "Who would hate this and why?", "What are we not
    seeing?", "What if the opposite were true?", "What is the 10x more

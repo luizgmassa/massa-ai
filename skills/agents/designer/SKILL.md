@@ -59,7 +59,7 @@ Own the screen: verify an existing user-facing screen against its design source,
 - Verification Ladder: behavioral (the UI module builds and its tests pass) and file-integrity (no validation asset weakened).
 - Massa-ai Memory: suggest durable memories only when a reusable screen or design-token convention is established; the main agent persists.
 - Synapse: none by default; request an ephemeral session only when the scope needs two or more related searches across the UI layer.
-- References: `references/figma-pre-analysis.md`, `references/figma-wiring.md`, `references/design-implementation.md`, `references/naming-standards.md`, `references/verification-ladder.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/figma-pre-analysis.md`, `references/figma-wiring.md`, `references/design-implementation.md`, `references/naming-standards.md`, `references/verification-ladder.md`.
 
 ## Validation Sensors
 - Every design element in scope appears in the conformance table with a verdict, or the table states why the design source did not cover it.

@@ -55,7 +55,7 @@ Analyze requirements before implementation to surface ambiguity, gaps, contradic
 - Verification Ladder: static (spec citation) only; no behavioral sensors.
 - Massa-ai Memory: suggest durable requirement-decision memories only when an implicit requirement is accepted as an assumption; main agent persists.
 - Synapse: none (analysis is not a repeated-search task).
-- References: `references/spec-driven/specify.md`, `references/furps/`.
+- References (paths relative to the `massa-ai` skill directory): `references/spec-driven/specify.md`, `references/furps/`.
 
 ## Validation Sensors
 - Every finding cites a requirement ID or spec section.

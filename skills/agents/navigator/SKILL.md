@@ -66,7 +66,7 @@ The user's codebase is **already indexed** by massa-ai. The first move on any qu
 - Orphaned-dims recovery: if a vector `search` returns 0 results while other dim tables hold chunks for the project, report to the parent agent that `index` with `forceReindex=true` is required. Do not run it.
 - Context Firewall: summarize search output; return only `path:line` pointers and findings.
 - Massa-ai Memory: suggest durable navigation facts (entry points, ownership boundaries) only when reusable; the main agent persists.
-- References: `references/mcp-tools.md`, `references/codebase-investigation.md`, `references/synapse-policy.md`, `references/context-firewall.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/mcp-tools.md`, `references/codebase-investigation.md`, `references/synapse-policy.md`, `references/context-firewall.md`.
 
 ## Validation Sensors
 - Every claim carries a `path:line` or symbol pointer.

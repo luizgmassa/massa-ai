@@ -72,7 +72,7 @@ All lenses share `references/audit-scope.md` (scope rules) and `references/audit
 - Verification Ladder: static checks per lens; no behavioral changes (findings-only).
 - Massa-ai Memory: suggest durable audit-pattern memories only when a lens reveals a recurring issue class; main agent persists.
 - Synapse: own ephemeral session when the audit spans multiple modules with repeated searches.
-- References: `references/audit-scope.md`, `references/audit-report-io.md`, plus the per-lens references above.
+- References (paths relative to the `massa-ai` skill directory): `references/audit-scope.md`, `references/audit-report-io.md`, plus the per-lens references above.
 
 ## Validation Sensors
 - Every finding has a `path:line` pointer.

@@ -57,7 +57,7 @@ Review implementation quality by analyzing the diff and flagging bugs, regressio
 - Verification Ladder: static checks (lint, typecheck) as supporting evidence; behavioral checks belong to verification-agent.
 - Massa-ai Memory: suggest durable code-quality memories only when a review reveals a reusable pattern; main agent persists.
 - Synapse: none (review is not a repeated-search task).
-- References: `references/agent-orchestration.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/agent-orchestration.md`.
 
 ## Validation Sensors
 - Every finding has a `path:line` pointer.

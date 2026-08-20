@@ -39,28 +39,7 @@ Analyze dependency cost with strength, distance, and volatility.
 
 Load `references/architecture-coupling-lens.md` when the audit target includes dependencies, imports, service calls, shared schemas/models, direct persistence access, co-change, or contract leakage.
 
-Strength levels:
-
-- Intrusive: downstream depends on internals not designed for integration.
-- Functional: sequential, transactional, or duplicated symmetric business rules.
-- Model: upstream exposes internal domain model to downstream.
-- Contract: integration-specific DTO/protocol hides internals.
-
-Distance levels:
-
-- same function or class
-- same package
-- same module/library
-- different service
-- external system or team
-
-Volatility signals:
-
-- core business logic
-- frequent git changes or co-change
-- TODO/FIXME clusters
-- evolving API versions
-- fragile tests or recurring regressions
+Strength, distance, and volatility level definitions: full detail in `references/architecture-coupling-lens.md`.
 
 Flag highest risk when high strength, high distance, and high volatility combine.
 
@@ -88,10 +67,7 @@ Check:
 - test-only extraction that loses locality
 - concepts split across many files without leverage
 
-Use the deletion test:
-
-- If deleting a module removes complexity, it was probably shallow.
-- If deleting it spreads complexity across callers, it was probably earning its keep.
+Deletion test: full detail in `references/architecture-deepening-lens.md`.
 
 Only recommend a new seam when variation, dependency direction, external I/O, or test substitution is real.
 

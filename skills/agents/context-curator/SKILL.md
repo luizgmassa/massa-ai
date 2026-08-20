@@ -58,7 +58,7 @@ Prepare the minimum high-quality Context Packet required for another agent to do
 - Verification Ladder: static checks only (file existence, reference existence).
 - Massa-ai Memory: retrieve via `recall`; do not persist unless the main agent assigns it.
 - Synapse: own ephemeral session per `references/synapse-policy.md`; pass `synapseSessionId` on every `search`.
-- References: `references/context-firewall.md`, `references/synapse-policy.md`, `references/mcp-tools.md`.
+- References (paths relative to the `massa-ai` skill directory): `references/context-firewall.md`, `references/synapse-policy.md`, `references/mcp-tools.md`.
 
 ## Validation Sensors
 - Every file in the Context Packet exists (`test -f`).
