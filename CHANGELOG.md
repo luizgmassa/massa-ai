@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.55.0] - 2026-08-20
+
 ### Fixed
 
 - **`trace_path` made every Vertex AI / Gemini request fail with the whole tool list.** Its
