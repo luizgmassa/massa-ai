@@ -40,8 +40,8 @@ retrieval benchmark corpus (`benchmarks/needles/fixtures/sicad.json`,
   tree-sitter grammars. Never run app code under Node.
 - Turborepo drives cross-package tasks; TypeScript ESM strict, `module: NodeNext`.
 - **PostgreSQL 17 + pgvector is the only backend.** There is no SQLite path. Prisma
-  schema and migrations live in `packages/core/prisma/` (23 migrations — 23 `migration.sql`
-  directories; the 24th tracked entry under `migrations/` is `migration_lock.toml`, the lock
+  schema and migrations live in `packages/core/prisma/` (24 migrations — 24 `migration.sql`
+  directories; the 25th tracked entry under `migrations/` is `migration_lock.toml`, the lock
   file, not a migration).
 - Native tree-sitter grammars build via **node-gyp during `bun install`**. On macOS arm64
   the build helper must be **Node 22**, not the pinned 25 — Node 25's V8 headers use a
@@ -135,7 +135,7 @@ Measured 2026-08-03: fresh worktree red 1227/3 → addon copy → 9/0 and the fu
 globs and run from a separate script:
 
 ```bash
-bun run test:scripts   # scripts/__tests__ + scripts/tests (1230 TS tests across 55 files + 21 shell suites)
+bun run test:scripts   # scripts/__tests__ + scripts/tests (81 TS test files + 37 shell suites, counted 2026-08-22)
 ```
 
 That covers `scripts/__tests__/subagent-parity.test.ts`, the guard for the generated
@@ -253,7 +253,8 @@ Imports run one way, `tools → services → data`, so **`data → services` is 
 a shortcut**. `kernel/` is the answer to "this module is needed by two tiers": it is joined
 by `git mv`, membership being the path prefix `packages/core/src/kernel/`, and **there is no
 allowlist** — an allowlisted exception is indistinguishable from a new violation, which is
-the property the tier exists to preserve. It holds 11 modules.
+the property the tier exists to preserve. It holds 12 top-level entries (11 modules plus
+the `sanitize/` subdirectory).
 
 **`controllers/` was a fifth layer and is retired.** The five orchestrators moved into the
 `services/` subdirectory that already held their collaborators — `services/{memory,search,
@@ -277,8 +278,9 @@ Repositories and services are reached through `get*()` factory functions with ma
 - `apps/tools-api` — Elysia REST on :3333, routes in `src/routes/*.ts`, Swagger at
   `/swagger`, Web UI mounted at `/ui`. Route files sit beside their own `*.test.ts`.
 
-  **Auth is mandatory (AD-011).** Every route outside `PUBLIC_PATHS` (`/health`,
-  `/swagger`, `/swagger/json`, `/ui`, `/ui/`) needs `x-api-key`; the old no-key
+  **Auth is mandatory (AD-011).** Every route outside `PUBLIC_PATHS` (three prefixes —
+  `/health`, `/swagger`, `/ui` — matched exact or prefix-with-`/`, so `/swagger/json`
+  and `/ui/*` are public; `src/middleware/auth.ts`) needs `x-api-key`; the old no-key
   pass-through is deleted and is not configurable. The key is resolved by an explicit
   `initAuth()` called **only from `index.ts`** — never at module-import time, because
   `CONFIG_DIR` is a module-level const and an import-time resolve would provision a key
