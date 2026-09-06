@@ -5,83 +5,28 @@
 
 For every new conversation involving coding, planning before coding, debugging,
 code review, refactoring, or implementation, activate this stack in order:
+`caveman full` → `massa-ai` → `persona-router`. Each rule below can be
+switched off individually through `massa-ai-config bootstrap`; a disabled
+rule's section is absent from the rendered contract.
 
-1. `caveman full`
-2. `massa-ai`
-3. `persona-router`
+<!-- massa-ai:rule:caveman:start -->
+### 1. `caveman full`
+
+Keep communication compressed while preserving technical accuracy; relax
+compression when clarity or safety requires it.
+<!-- massa-ai:rule:caveman:end -->
+<!-- massa-ai:rule:massa-ai-router:start -->
+### 2. `massa-ai`
 
 Activation means loading and using each available behavior. Load the installed
-`massa-ai` skill's `SKILL.md` once before substantive work begins. Let it
-select the most specific workflow; use `workflows/general.md` only when no
-specialized workflow applies. Recall relevant durable context before work,
-retrieve only source context needed for the goal, remember only verified
-outcomes worth reusing, and compact context only when size reduces execution
-quality. After massa-ai finishes its initial memory setup, load and run
-`persona-router` against the first user prompt before substantive work.
-
-For generic non-coding conversations, preserve massa-ai's exclusion: do not
-load `massa-ai` solely for persona selection. Run `persona-router` directly
-against the configured policy, persona catalog, workspace documentation, and
-the first user prompt.
-
-### Dedupe And Lazy-Load Guardrails
-
-Before reading any massa-ai workflow or reference:
-
-- First ensure `massa-ai` has been loaded in the current conversation. If it
-  has not, load it before applying any dedupe rule.
-- After the initial load, reuse already-loaded `massa-ai`, The Fool, or the
-  selected workflow/reference context.
-- Do not re-read a massa-ai skill or reference only because `AGENTS.md` names
-  it after initial activation is complete.
-- Treat `massa-ai` as a router, not permission to bulk-load all workflows or
-  references.
-- Load only the missing minimum context required for the current request.
-- Never load all workflows or all references "just in case."
-
-Load `persona-router` once per conversation after the coding bootstrap, or
-directly for non-coding conversations. Reuse its selected route across turns;
-do not reload the router or persona prompt unless its rerouting rules apply.
-
-The first load is mandatory in each new coding conversation and must load
-`massa-ai`. Dedupe applies only after that load and must never skip initial
-activation.
-
-### Skill Summary
-
-- `caveman full`: keep communication compressed while preserving technical
-  accuracy; relax compression when clarity or safety requires it.
-- `massa-ai`: use it as the public workflow router and load internal
-  workflows or references only on demand, including
-  `references/coding-guidelines.md` before implementation edits.
-- `persona-router`: select one cataloged specialist perspective after
-  massa-ai context is available, using progressive disclosure and at most
-  one secondary review lens.
-
-### Conditional RTK Rules
-
-RTK is a token-optimized CLI proxy. When the `rtk` command is available in the
-current environment, prefix shell commands with `rtk`:
-
-```bash
-rtk git status
-rtk cargo test
-rtk npm run build
-rtk pytest -q
-```
-
-Useful RTK commands:
-
-```bash
-rtk gain
-rtk gain --history
-rtk proxy <cmd>
-rtk --version
-which rtk
-```
-
-If `rtk` is unavailable, run commands normally. Its absence must not block or
-fail the task. An availability check may run without the prefix.
+`massa-ai` skill's `SKILL.md` once before substantive work begins. Use it as
+the public workflow router and load internal workflows or references only on
+demand, including `references/coding-guidelines.md` before implementation
+edits. Let it select the most specific workflow; use `workflows/general.md`
+only when no specialized workflow applies. Recall relevant durable context
+before work, retrieve only source context needed for the goal, remember only
+verified outcomes worth reusing, and compact context only when size reduces
+execution quality.
 
 ## Contract Ownership
 
@@ -93,6 +38,25 @@ graceful degradation, and completion behavior are canonical in
 `skills/massa-ai/SKILL.md`. Do not copy those contracts into this file.
 Persona selection, evidence gathering, route persistence, and persona failure
 handling are canonical in `skills/persona-router/SKILL.md`.
+
+## Runtime Contract Pointer
+
+After activation, follow `skills/massa-ai/SKILL.md` for all runtime behavior.
+Its selected workflows and references define exact tool contracts, memory
+tags, failure handling, and completion evidence.
+<!-- massa-ai:rule:massa-ai-router:end -->
+<!-- massa-ai:rule:persona-router:start -->
+### 3. `persona-router`
+
+After massa-ai finishes its initial memory setup, load and run
+`persona-router` against the first user prompt before substantive work,
+selecting one cataloged specialist perspective using progressive disclosure
+and at most one secondary review lens.
+
+For generic non-coding conversations, preserve massa-ai's exclusion: do not
+load `massa-ai` solely for persona selection. Run `persona-router` directly
+against the configured policy, persona catalog, workspace documentation, and
+the first user prompt.
 
 ## Persona Router Policy
 
@@ -144,7 +108,34 @@ Automatic routing must use progressive disclosure: inspect catalog metadata
 first, reuse relevant massa-ai evidence when available, read only targeted
 workspace documentation when needed, and load only the selected persona prompt.
 Ask the user only when the configured edge-case policy requires it.
+<!-- massa-ai:rule:persona-router:end -->
 
+<!-- massa-ai:rule:dedupe-guardrails:start -->
+### Dedupe And Lazy-Load Guardrails
+
+Before reading any massa-ai workflow or reference:
+
+- First ensure `massa-ai` has been loaded in the current conversation. If it
+  has not, load it before applying any dedupe rule.
+- After the initial load, reuse already-loaded `massa-ai`, The Fool, or the
+  selected workflow/reference context.
+- Do not re-read a massa-ai skill or reference only because `AGENTS.md` names
+  it after initial activation is complete.
+- Treat `massa-ai` as a router, not permission to bulk-load all workflows or
+  references.
+- Load only the missing minimum context required for the current request.
+- Never load all workflows or all references "just in case."
+
+Load `persona-router` once per conversation after the coding bootstrap, or
+directly for non-coding conversations. Reuse its selected route across turns;
+do not reload the router or persona prompt unless its rerouting rules apply.
+
+The first load is mandatory in each new coding conversation and must load
+`massa-ai`. Dedupe applies only after that load and must never skip initial
+activation.
+<!-- massa-ai:rule:dedupe-guardrails:end -->
+
+<!-- massa-ai:rule:plan-challenge:start -->
 ## Plan Challenge Policy
 
 This user-editable policy controls whether massa-ai runs The Fool after
@@ -191,7 +182,9 @@ references:
 - What evidence or deterministic check would falsify success?
 - Does the plan touch more than 5 files/classes/modules or a high-risk domain?
 - If a serious risk is found, revise the plan or load full The Fool.
+<!-- massa-ai:rule:plan-challenge:end -->
 
+<!-- massa-ai:rule:conversation-feedback:start -->
 ## Conversation Feedback Policy
 
 This user-editable policy controls chat-visible status updates for
@@ -233,13 +226,9 @@ Rules:
   subagent prompts.
 - Load `skills/massa-ai/references/conversation-feedback.md` only when
   detailed feedback guidance is needed.
+<!-- massa-ai:rule:conversation-feedback:end -->
 
-## Runtime Contract Pointer
-
-After activation, follow `skills/massa-ai/SKILL.md` for all runtime behavior.
-Its selected workflows and references define exact tool contracts, memory tags,
-failure handling, and completion evidence.
-
+<!-- massa-ai:rule:indexing-hygiene:start -->
 ## Indexing / Context Hygiene
 
 Always ignore these paths during indexing and context loading:
@@ -287,6 +276,31 @@ secrets.json
 .DS_Store
 Thumbs.db
 ```
+<!-- massa-ai:rule:indexing-hygiene:end -->
+
+<!-- massa-ai:rule:english-code:start -->
+## English-Only Code
+
+All generated code, identifiers, comments, commit-facing code artifacts
+(commit messages, PR titles and bodies), and code documentation are written
+in English, regardless of the language the user writes in. This rule does
+not change the language of the agent's conversational replies — only
+generated code and its accompanying artifacts are English-only.
+<!-- massa-ai:rule:english-code:end -->
+
+<!-- massa-ai:rule:code-comments:start -->
+## Code Comments
+
+While `code-comments` is enabled, follow §1 (API Doc Block) and §2 (Rationale
+Comment) of `skills/massa-ai/references/code-annotation.md` for every created
+or updated unit of code.
+
+<!-- massa-ai:rule:code-comments:off -->
+`code-comments` is disabled: generated code gets no API doc blocks and no
+rationale comments, overriding §1 (API Doc Block) and §2 (Rationale Comment)
+of `skills/massa-ai/references/code-annotation.md`.
+<!-- massa-ai:rule:code-comments:off-end -->
+<!-- massa-ai:rule:code-comments:end -->
 <!-- massa-ai:bootstrap:end -->
 
 # Sub-Agent Registry
