@@ -39,7 +39,7 @@ destroys a malformed `config.json`, so the state writer never uses `loadConfig`.
 | BST-09 | `rules.ts` registry + `UnknownRuleError` | registry unit suite |
 | BST-10 | `state.ts` + `engine.ts` | registry + engine unit suites |
 | BST-11 | both `config-cli.ts` + `skills/bootstrap/SKILL.md` | CLI suites + parity suite |
-| BST-12 | generator + `.gitignore` + parity tests | `generate:artifacts --check`, `test:scripts`, `test:plugins` |
+| BST-12 | generator + `.gitignore` + parity tests | `bun scripts/generate-skill-artifacts.ts --check`, `test:scripts`, `test:plugins` |
 
 ---
 
@@ -84,15 +84,25 @@ checkout, and the toggle CLI is a published npm package with no checkout.
 
 `packages/shared/src/bootstrap/render.ts` is the single implementation. Both CLIs
 import it as an ordinary published dependency. `install-skills.sh` invokes it through
-a small resolution ladder: run `scripts/render-bootstrap.ts` under `bun` when the
-detected runner is `bun`; otherwise require the built
-`packages/shared/dist/bootstrap/render.js`; if neither is reachable, abort that host
-with a named error telling the user to run `bun run build`.
+a resolution ladder that is keyed on **`command -v bun` directly**, never on
+`installer_detect_runner`: that helper returns `node` first whenever node is on
+`PATH` (`scripts/lib/installer-shared.sh:25-33`), and node is always present in this
+repo as the node-gyp build helper, so a ladder keyed on `$RUNNER` would take the bun
+branch on no machine at all.
+
+Ladder, in order: run `scripts/render-bootstrap.ts` under `bun` when `command -v bun`
+succeeds; otherwise require the built `packages/shared/dist/bootstrap/render.js`; if
+neither is reachable, abort that host with a named error naming `bun run build`.
 
 - **For:** one implementation, no vendoring, no new generated root, no new contract
   test for a mirrored copy. `packages/shared` is already a dependency of both CLIs.
-- **Against:** a checkout with only `node` on `PATH` and no build must build first.
-  The failure is loud and named, not silent.
+- **Against:** on a machine with neither `bun` nor a build, every host aborts, where
+  today `install-skills.sh` needs no build at all. `packages/shared/dist/` is
+  gitignored (`.gitignore:8`), only `install.sh:1026` runs `bun run build`, and
+  `scripts/install-harness.sh` runs none — so the abort is reachable from a fresh
+  clone driven through the harness installer. Mitigation: `install-harness.sh` gains
+  the same `bun run build` step, and the abort message names the exact command for
+  the current checkout. The failure is loud and named, never a default render.
 
 ### R2 — CommonJS renderer in `scripts/lib`, vendored into the plugin bundles
 
@@ -202,6 +212,51 @@ The Cursor warning at `scripts/install-skills.sh:673-677` stays and is reworded 
 name `MASSA-AI.md` — Cursor still reads nothing under `~/.cursor/`, and this feature
 does not change that.
 
+### State resolution — who supplies `state` on the installer path
+
+`install-skills.sh` has no awareness of `config.json` today: the only two matches for
+a massa-ai config path in that file are `install-state.json` (`:57`, `:174`). Left
+unstated, this design has two wrong branches and no right one. If the installer
+renders from registry defaults, every `--apply` silently resets every toggle the user
+set — and `--apply` runs on every repo install, every `install-harness.sh` run, and
+every plugin upgrade. If the installer calls `readRawConfigStrict`, a malformed
+`config.json` starts aborting harness installation, a failure mode that does not exist
+today.
+
+The contract is therefore explicit and asymmetric: **the strict throwing read belongs
+to the write path only.** `scripts/render-bootstrap.ts` resolves state through the same
+`resolveBootstrapState`, and a *read* failure degrades to registry defaults **with a
+named warning and no write to `config.json`**. The rendered file is still written, so
+an unreadable preference never blocks an install; the warning names the file and the
+parse error so the cause is not silent.
+
+The `--check` drift branch reads state the same way. Without this, `--check` would
+render defaults, report permanent drift on every machine holding a non-default toggle,
+and name `--apply` as the remedy — the command that would destroy the toggle.
+
+### Wiring probe — what `written` is allowed to mean
+
+The contract file and the wiring that loads it have two different writers over two
+different host populations. `--apply` iterates only hosts whose binary is on `PATH`
+(`scripts/install-skills.sh:257-272`); the toggle iterates every host recorded in
+`install-state.json`. And no plugin installer has ever written a bootstrap block —
+`git grep -n "massa-ai:bootstrap" -- apps/*/install.sh` returns zero hits, and the two
+writer sites in the repository are `scripts/install-skills.sh:654` and `:754`. So a
+machine recorded as `skillsOwner: "plugin"` has skills, has a state entry, and has
+never had the contract or any wiring.
+
+`applyBootstrapState` therefore probes each host's wiring artifact — the `@MASSA-AI.md`
+line in `CLAUDE.md`, the pointer block in `AGENTS.md`, or the `instructions` entry —
+**before** it is allowed to report `written`. A host whose contract was written but
+whose wiring is absent reports `written-not-wired` and names
+`scripts/install-skills.sh --apply` as the remedy. Reporting `written` for a host that
+cannot load the file is the silent-wrong-state failure this probe exists to prevent.
+
+`check_platform` returns early for a plugin-owned platform
+(`scripts/install-skills.sh:792-803`), so the new drift branch is placed after that
+guard deliberately, and the plugin-owned case is covered by the toggle's probe rather
+than by `--check`.
+
 ---
 
 ## Code Reuse Analysis
@@ -268,7 +323,12 @@ export type BootstrapState = Readonly<Record<BootstrapRuleId, boolean>>;
 /** One host's outcome from a render pass. */
 export interface BootstrapRenderResult {
   readonly host: Host;
-  readonly status: "written" | "skipped" | "failed";
+  /**
+   * `written-not-wired`: the contract file was written, but this host has no
+   * artifact that loads it. Never collapse it into `written` — a host recorded
+   * by a plugin install has skills and a state entry and has never had wiring.
+   */
+  readonly status: "written" | "written-not-wired" | "skipped" | "failed";
   readonly reason?: string;
 }
 
@@ -278,7 +338,29 @@ export interface BootstrapReport {
   readonly dryRun: boolean;
   readonly ignoredStateKeys: readonly string[];
 }
+
+/**
+ * Every entry point is explicitly scoped to a home. `install-skills.sh` scopes
+ * everything to `TARGET_HOME` and persists state under it
+ * (scripts/install-skills.sh:174); an engine that resolved the real
+ * `configDir("massa-ai")` internally could not be exercised against a scratch
+ * home at all, and the shell suite would have to write the developer's real
+ * `~/.claude/`, `~/.cursor/` and OpenCode config on every `bun run test:scripts`.
+ */
+export interface BootstrapApplyOptions {
+  readonly targetHome: string;
+  readonly dryRun?: boolean;
+}
+
+export function applyBootstrapState(opts: BootstrapApplyOptions): BootstrapReport;
 ```
+
+Both CLIs expose `--target <dir>` for the same reason, mirroring the installer's
+existing flag. An interactive `bootstrap enable|disable` against the real `$HOME` is
+**exempt from a consent gate** — the user typed the command naming the mutation, which
+is the consent — but `--target` pointing at a path that is not the resolved `$HOME`
+requires `--yes`, matching `installer_consent_gate`'s existing contract
+(`scripts/install-skills.sh:133`).
 
 Persisted shape in `~/.config/massa-ai/config.json`:
 
@@ -317,8 +399,29 @@ is reported once (BST-10 AC-12), never fatal.
 | `code-comments` off-text and untouched §3 | renderer suite asserting both toggle states | yes |
 | `rtk` absent from source and render | count assertion in the renderer suite | yes |
 | CLI subcommand in both CLIs | `config-cli-bootstrap.test.ts` in each app, plus an extended `profile-cli-parity.test.ts` | yes |
-| Skill bundle in all four hosts | `bun run generate:artifacts --check` plus `skill-artifact-parity.test.ts` | yes |
+| Skill bundle in all four hosts | `bun scripts/generate-skill-artifacts.ts --check` — **not** `bun run generate:artifacts --check` | yes |
 | Registry ids vs the skill's documented ids | new parity assertion, template `skills-harness-integrity.test.ts:272-286` | yes |
+| `--check` and `--dry-run` write nothing, against deliberate drift | `tree_fingerprint` before and after, plus an assertion that no `*.massa-ai.bak-*` appeared | **yes — the OpenCode path writes today** |
+| `--apply` after a toggle preserves the toggle | apply, disable one rule, apply again, assert the rule is still absent and `--check` exits 0 | yes |
+| A host recorded in state whose wiring is absent | shell-suite scenario seeding `install-state.json` with a host that has no wiring artifact; assert `written-not-wired` | yes |
+| Uninstall leaves no 0-byte residue | round-trip fixture including a host directory that did not exist pre-install | yes |
+
+**The gate command matters more than the gate.** `"generate:artifacts"` is
+`"bun scripts/generate-skill-artifacts.ts && bun scripts/generate-subagent-artifacts.ts"`
+(`package.json:31`), so `bun run generate:artifacts --check` appends the flag to the end
+of the chain: only the *second* generator sees it, the first runs in write mode and
+**repairs** the drift it was supposed to report, and a follow-up manual check then also
+passes. CI already uses the direct form (`.github/workflows/ci.yml:238`);
+`scripts/worktree-verify.sh:286` uses the broken one. Fixing `package.json:31` to forward
+arguments to both generators is a repo-wide change and is recorded as a follow-up
+finding, not absorbed here.
+
+**Frozen fingerprint exclusion list.** `tree_fingerprint` hashes `find "$root"` output
+including every path (`scripts/tests/lib/installer-test-helpers.sh:67-79`), so
+timestamped backups make it non-deterministic. The exclusion list is frozen here, before
+implementation, so that widening it later is visible as a spec change rather than a test
+edit: `*.massa-ai.bak-*` only. Nothing else may be excluded. Every other post-uninstall
+difference is a defect to fix in the subject, not in the sensor.
 
 The final gate is an independent `massa-ai-verification-agent` pass with its
 discrimination sensor; this table is the author's claim, not the verdict.
@@ -343,6 +446,18 @@ discrimination sensor; this table is the author's claim, not the verdict.
 | The two CLIs are about 92% identical with no shared module; the existing parity test covers only `--help` and argument validation | `apps/mcp-client/src/config-cli.ts`, `apps/opencode-plugin/src/config-cli.ts`, `scripts/__tests__/profile-cli-parity.test.ts` | A `bootstrap enable` that persists in one CLI and not the other would not redden | Put the formatters in `packages/shared/src/bootstrap/` so both CLIs call one implementation, and extend the parity test to assert the subcommand surface |
 | `writeFileAtomically` is not exported from either barrel | `packages/shared/src/config/config-loader.ts:247`; absent from `config/index.ts` and `packages/shared/src/index.ts` | The strict write path cannot reach it from a published CLI | Add the one barrel export |
 | Cursor still reads nothing under `~/.cursor/` | `scripts/install-skills.sh:673-677` | The contract reaches no Cursor session unless the user pastes it into Settings → Rules | Out of scope per the spec; the existing warning stays and is reworded to name `MASSA-AI.md` |
+| `--check` and `--dry-run` skip the consent gate by design, and the only OpenCode write path they reach is equality-guarded, not planned | `scripts/install-skills.sh:132-134`; `scripts/lib/opencode-config.cjs:172-183` | Against a config whose `instructions` array lacks the entry — exactly the drift `--check` exists to find — `--check` rewrites the user's config, strips JSONC comments and drops a backup, without consent | A compare-then-skip guard is not a plan mode. `writeConfig` gains the same four-mode contract `bootstrap_op` has (`plan`/`apply`/`remove-plan`/`remove-apply`), with **no filesystem contact** in either plan mode. Sensor: `--check` against a scratch home with deliberate drift asserts an unchanged fingerprint and no new backup |
+| A lock-free whole-document rewrite of `config.json` loses a concurrent write | `packages/shared/src/config/config-loader.ts:247-269` (atomicity, not lost-update); the file's own SEC-01 docblock | A server auto-provisioning `security.apiKey` while a toggle is in flight loses the key with no recovery copy, because `savePartialConfig`'s backup was deliberately rejected. Under AD-011 every API request then 401s with no diagnostic | The write is a surgical merge of the `bootstrap` subtree only, guarded by compare-and-swap on the bytes read before the mutation: re-read before writing, and if the file changed, re-apply the subtree onto the new document once, then fail loudly rather than clobber. Accepted risk is not available — the asset is a secret with no second copy |
+| `bootstrap_op` has no delete mode, and for `MASSA-AI.md` the block **is** the whole file | `scripts/install-skills.sh:494-499`, `:527` | `removeBlock` returns `""` and the caller writes it, so `--uninstall` leaves a 0-byte `MASSA-AI.md` on all four hosts, contradicting BST-05 AC-9 and reddening the round-trip fingerprint | Add a fifth mode that unlinks the target when the removal result is empty and the target is a massa-ai-owned whole-file artifact. Same treatment for a `CLAUDE.md` or `opencode.jsonc` this installer created whose managed block was its only content |
+| `--apply` overwrites a hand-edited `MASSA-AI.md` with no backup and no warning | `scripts/install-skills.sh:513` | A user who edits the rendered contract loses the edit silently, and the new `--check` branch reports it as drift with `--apply` as the remedy | Call `installer_backup_file` before any `MASSA-AI.md` overwrite where `current !== desired`. Note the helper has **zero production call sites** today (`git grep installer_backup_file` returns its own definition plus prose mentions only), so this is a new call site to write, not an existing one to reuse |
+| The spec's symlink rule is inverted, has no home in the engine, and contradicts a comment in the same file | `spec.md` symlink edge case; `scripts/install-skills.sh:513`, `:527`, `:549-557` | The common real case, `~/.claude/CLAUDE.md → ~/dotfiles/…`, resolves *inside* the home, so the rule permits writing into a git-tracked dotfiles repo and later deleting lines from it; the rare harmless out-of-home case is blocked. `bootstrap_op` contains no symlink check at all, and `is_owned_target`'s comment asserts the opposite policy ("a symlink is always ours to replace") | Invert the predicate: refuse write-through on **any** symlink unless the resolved target is already recorded as massa-ai-owned. Put the check inside `bootstrap_op`, the single engine, not in the caller. Reconcile or scope the `is_owned_target` comment in the same change |
+| `bootstrap_op` writes with `fs.writeFileSync`, which truncates in place | `scripts/install-skills.sh:513`, `:527` | A kill or ENOSPC mid-write leaves `~/.claude/CLAUDE.md` — the file with the most user-authored content — holding a start marker and no end marker. The next run hits `starts !== ends`, exits 2, and **stops the whole run for every host**, unrecoverable without hand-editing | Write through a temp file plus rename, the discipline `writeFileAtomically` already applies to `config.json` |
+| `applyBootstrapState()` had no `targetHome`, so the spec's own independent test was unrunnable against a scratch home | `scripts/install-skills.sh:174`; `packages/shared/src/config/config-loader.ts:8` | The path of least resistance for an implementer is to run the suite against the real home, at which point `bun run test:scripts` writes `~/.claude/MASSA-AI.md` and mutates the real OpenCode config on every run | `targetHome` is an explicit option on the engine and a `--target` flag on both CLIs; `readInstallState` already accepts a path and `defaultStatePath(targetHome)` already exists |
+| The contract file and its wiring have two writers over two different host populations | `scripts/install-skills.sh:257-272` vs `spec.md` BST-10 AC-10; `scripts/install-skills.sh:654`, `:754`; zero hits for a bootstrap write in any `apps/*/install.sh` | A plugin-only install reports `written` for a host that has no wiring and never loads the file, so the toggle looks broken while the file on disk looks right | The wiring probe and the `written-not-wired` status, specified above |
+| The installer had no defined access to the persisted rule state | `scripts/install-skills.sh:174` (only `install-state.json` appears in that file) | Rendering from defaults makes every `--apply` reset every toggle; reading strictly makes a malformed `config.json` abort harness installation | The asymmetric contract specified above: strict throwing read on the write path, degrade-to-defaults-with-a-named-warning on the render path |
+| The named BST-12 gate command cannot fail and silently repairs the drift it should report | `package.json:31`; `.github/workflows/ci.yml:238`; `scripts/worktree-verify.sh:286` | `bun run generate:artifacts --check` reaches only the second generator; the first regenerates the bundle, so the gate is green by construction and a follow-up check also passes | Use `bun scripts/generate-skill-artifacts.ts --check` in the task gate and observe it red by touching a file in the new bundle. Fixing the `package.json` script to forward arguments is recorded as a follow-up finding |
+| The R1 ladder was keyed on a runner detector that prefers node | `scripts/lib/installer-shared.sh:25-33`; `scripts/install-skills.sh:136`; `.gitignore:8` | Node is always present here as the node-gyp helper, so the bun branch would be dead and the gitignored `packages/shared/dist` would be an unconditional requirement — every host aborts from a fresh clone driven through `install-harness.sh`, which runs no build | Key the ladder on `command -v bun`; add `bun run build` to `install-harness.sh`; make the abort message name the exact command |
+| The recovery path for a disabled `massa-ai-router` may not exist on the machine, and could be deleted by the rule it recovers | `scripts/setup-local-first.sh:571`; `install.sh:828`; the A9 fold of `Contract Ownership` into the `massa-ai-router` span | If the recovery sentence lives inside a rule span, disabling that rule deletes the instructions for undoing it; and `massa-ai-config` is not put on `PATH` by any installer here | `render.ts` emits an **always-rendered header region**, outside every rule span, carrying the recovery command and the state file path in every toggle state. The all-off render asserts its presence. The command is written in the form that works without a global bin |
 
 ---
 
@@ -358,7 +473,13 @@ discrimination sensor; this table is the author's claim, not the verdict.
 | Command vehicle | A skill (`skills/bootstrap/`), not a generated workflow command | AD-018 restricts generated command bodies to explicit-route dispatch into the massa-ai router; a toggle command would be a second path |
 | MCP front | Not built | BST-11 requires the CLI and the skill only; an MCP tool would mean touching the documented three places, and BST-11.5 requires the surface to work with MCP unreachable |
 | Ownership proof for `MASSA-AI.md` | The file's own `<!-- massa-ai:bootstrap:start -->` pair, not a sidecar marker file | Self-describing and already the contract in BST-01 AC-2; the per-skill marker scheme keys on a name under `skills/` and cannot address a single file |
-| Concurrent toggles | Last writer wins; no lock | The spec chose it, and `acquireLock` derives its lock directory name from the state path, which would produce a misleading `config.json.switch.lock` |
+| Concurrent toggles | Compare-and-swap on the pre-read bytes, with a surgical `bootstrap`-subtree merge; one re-apply, then fail loudly | The spec's original "last writer wins" was written before the reuse scan showed that `config.json` holds `security.apiKey` and `database.url` and that no backup survives the rejection of `savePartialConfig`. A lost update there is an unrecoverable secret loss, not a stale preference. This supersedes the spec's final edge-case bullet, and the spec is amended with the reason rather than left contradicting the design |
+| `writeConfig` plan mode | A real four-mode contract mirroring `bootstrap_op`, with no filesystem contact in `plan`/`remove-plan` | An equality-only skip satisfies `--dry-run` exactly in the state where `--dry-run` is uninteresting, and writes in the state it exists for |
+| Symlink policy for the managed instruction files | Refuse write-through on any symlink whose resolved target is not already recorded as massa-ai-owned; the check lives inside `bootstrap_op` | The in-home dotfiles symlink is the common case and the damaging one; a predicate keyed on "target inside the home" permits exactly it |
+| Uninstall residue | Unlink, never write an empty file, for a whole-file artifact or an installer-created wiring file whose managed block was its only content | `removeBlock` returning `""` through `writeFileSync` is how a 0-byte `MASSA-AI.md` would be left on all four hosts |
+| Engine scoping | Explicit `targetHome` on the engine and `--target` on both CLIs | Without it the spec's own independent test can only be made to pass by writing the developer's real `$HOME` on every `bun run test:scripts` |
+| Consent for an interactive toggle | Exempt against the resolved `$HOME`; `--yes` required when `--target` names another path | The typed command naming the mutation is the consent; a redirected target is the case `installer_consent_gate` already exists for |
+| Recovery text placement | An always-rendered header region outside every rule span | A recovery line inside a rule span is deleted by disabling that rule |
 
 > **Project-level decisions:** none of the above sets a new project-wide convention.
 > The closest candidate, the strict config read path, is recorded here as a

@@ -92,6 +92,20 @@ is nothing to toggle.
 7. The managed pointer block SHALL contain no policy text of its own, so that `AGENTS.md` never becomes a second copy of the contract. <!-- BST-04 -->
 8. WHEN `--apply` runs against a host whose `AGENTS.md` still carries the pre-migration full bootstrap block THEN the installer SHALL replace it with the new shape for that host, leaving no bootstrap marker pair holding policy text in `AGENTS.md` on `claude` or `opencode`. <!-- BST-05 -->
 9. WHEN `scripts/install-skills.sh --uninstall` runs for a host THEN the installer SHALL remove that host's `MASSA-AI.md`, its managed block in `AGENTS.md` or `CLAUDE.md`, and its `instructions` entry, and SHALL leave every other line of those files unchanged. <!-- BST-05 -->
+9a. WHEN uninstall removes the managed block from a file this installer created, and that block was the file's only content, THEN the installer SHALL unlink the file rather than leave it empty. <!-- BST-05 -->
+9b. The installer SHALL unlink `MASSA-AI.md` on uninstall rather than write it empty, because for that file the managed block is the whole file. <!-- BST-05 -->
+9c. WHERE a `*.massa-ai.bak-<timestamp>` backup was created by an install, uninstall SHALL leave it in place and SHALL name it in the uninstall report. <!-- BST-05 -->
+
+> **Amended after the Plan Challenge gate.** AC-9 originally stood alone and its
+> "byte-identical" success criterion was false by construction in three states that
+> one ordinary apply-then-uninstall round trip reaches: a `CLAUDE.md` this installer
+> created (`removeBlock` returns `""` and the caller writes it, leaving an empty file
+> where none existed), an `opencode.jsonc` this installer created (left holding `{}`),
+> and the timestamped backups every write leaves behind. AC-9a/9b/9c decide each case
+> instead of leaving the criterion to be satisfied by weakening the sensor. The
+> round-trip fingerprint excludes `*.massa-ai.bak-*` and nothing else; that exclusion
+> list is frozen in `design.md` so widening it later reads as a spec change rather
+> than a test edit.
 10. WHEN `scripts/install-skills.sh --check` runs after a successful `--apply` with no source change THEN the command SHALL exit 0. <!-- BST-01 -->
 11. IF the OpenCode config file cannot be parsed THEN the installer SHALL abort that host with a named error and SHALL write no partial change to it. <!-- BST-03 -->
 
@@ -117,7 +131,9 @@ off, so that I keep the parts I want without hand-editing a generated file.
 7. WHEN the same rule state is rendered twice THEN the two outputs SHALL be byte-identical. <!-- BST-10 -->
 8. IF a rule id passed to `enable` or `disable` is not in the registry THEN the command SHALL exit non-zero, name the unknown id, and list the valid ids, changing no state. <!-- BST-09 -->
 9. WHEN every rule is disabled THEN the render SHALL still produce a `MASSA-AI.md` whose body states that every massa-ai bootstrap rule is disabled. <!-- BST-10 -->
-10. WHEN a toggle is applied THEN every host recorded in `install-state.json` SHALL be re-rendered in the same operation, and each host's outcome SHALL be reported as written, skipped with a reason, or failed with a reason. <!-- BST-10 -->
+10. WHEN a toggle is applied THEN every host recorded in `install-state.json` SHALL be re-rendered in the same operation, and each host's outcome SHALL be reported as written, written-not-wired, skipped with a reason, or failed with a reason. <!-- BST-10 -->
+10a. IF a host's contract file was written but that host has no artifact that loads it — no `@MASSA-AI.md` import, no pointer block, no `instructions` entry — THEN the report SHALL classify that host `written-not-wired` and SHALL name `scripts/install-skills.sh --apply` as the remedy. <!-- BST-10 -->
+10b. WHERE a rule state cannot be read during an install-time render, the installer SHALL render the registry defaults, SHALL emit a named warning identifying the file and the parse failure, and SHALL NOT write `config.json`. <!-- BST-10 -->
 11. The persisted rule state SHALL live under the `bootstrap.rules` key of `~/.config/massa-ai/config.json`. <!-- BST-10 -->
 12. IF the persisted state names a rule id absent from the registry THEN the renderer SHALL ignore that entry and report it once, rather than failing the render. <!-- BST-10 -->
 
@@ -196,7 +212,15 @@ own gates, so that a later edit cannot silently break delivery on one host.
 - WHEN a rendered `MASSA-AI.md` exceeds Codex's 32 KiB `project_doc_max_bytes` default THEN no failure occurs, because the pointer block, not the contract, is what Codex loads.
 - IF the user disables `massa-ai-router` THEN the contract SHALL still name `massa-ai-config bootstrap enable massa-ai-router` as the way back, so the off state is recoverable from the file itself.
 - WHEN `--dry-run` runs THEN the command SHALL write no file and SHALL report every change it would make.
-- IF two toggle commands run concurrently THEN the last writer wins on `config.json` and the render is re-run from the persisted state, so no host is left rendered from a state that was never persisted.
+- IF `config.json` changed on disk between the toggle's read and its write THEN the command SHALL re-apply the `bootstrap` subtree onto the current document once and, if that also races, SHALL fail loudly without writing.
+
+> **Amended after the Plan Challenge gate.** This bullet originally read "the last
+> writer wins on `config.json`". That was written before the reuse scan established
+> that the same file holds `security.apiKey` and `database.url`, and that rejecting
+> `savePartialConfig` on secret-hygiene grounds also removed the only writer that
+> produced a recovery copy. A lost update there destroys a secret with no second copy,
+> and under AD-011 the visible symptom is every Tools API request returning 401 with no
+> diagnostic. Last-writer-wins is acceptable for a preference and not for this file.
 
 ---
 
@@ -264,7 +288,8 @@ Author ≠ verifier: the final gate is a fresh `massa-ai-verification-agent` pas
 
 - [ ] A user can run one command in any of the four hosts and see a named rule disappear from that host's `MASSA-AI.md`.
 - [ ] Claude Code loads the massa-ai contract without the user hand-editing `~/.claude/CLAUDE.md`.
-- [ ] `--uninstall` restores a scratch home to byte-identical pre-install content.
+- [ ] `--uninstall` restores a scratch home to byte-identical pre-install content, excluding `*.massa-ai.bak-*` and nothing else.
+- [ ] `--check` and `--dry-run` leave a scratch home byte-identical even when the OpenCode config holds deliberate drift.
 - [ ] The rendered contract contains zero occurrences of `rtk`.
 - [ ] Generated code carries no doc blocks or rationale comments by default, and test coverage is unaffected.
 
