@@ -230,6 +230,19 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
       { name: "jobs.checkpoint-purge.intervalMs", type: "number", label: "Checkpoint Purge Interval (ms)", guide: "Interval between checkpoint-purge runs, in milliseconds. Minimum `60000`." },
     ],
   },
+  bootstrap: {
+    key: "bootstrap",
+    label: "Bootstrap",
+    fields: [
+      // `json`, not one boolean field per rule id: the nine ids live in
+      // `packages/shared/src/bootstrap/rules.ts`, not here, and this section
+      // would otherwise need to stay hand-synced with that registry every
+      // time a rule is added or removed. `massa-ai-config bootstrap` is the
+      // supported way to flip one rule; this field is read-only inspection
+      // of the persisted override map.
+      { name: "rules", type: "json", label: "Rule Overrides (JSON)", guide: "Persisted overrides of the bootstrap rule registry's defaults, one boolean per rule id. Manage individual rules with `massa-ai-config bootstrap enable|disable <id>` rather than editing this field directly." },
+    ],
+  },
 };
 
 /**
