@@ -39,15 +39,26 @@
  *     nothing. The positive half (exact + `<prefix>/child` are public) IS
  *     asserted. Owner of the negative half: `apps/tools-api/src/middleware/`
  *     unit tests over `isPublicPath`.
- *  2. EB-AUTH-6 — `*` origin combined with credentials is refused at boot
- *     (`apps/tools-api/src/startup-config.ts:36-43`). Needs a restart this
- *     suite must not perform (the stack is a single shared resource owned by
- *     the runner):
- *         bash scripts/e2e-stack.sh restart-api --profile auth \
- *              --env MASSA_AI_API_CORS_ORIGINS='*'
- *     Expected: the API process exits non-zero without binding :3334 and
- *     `logs/api.log` carries "Invalid CORS configuration". The *default*
- *     (empty allowlist) half is asserted live as EB-AUTH-5.
+ *  2. EB-AUTH-6 — CLOSED (was a declared skip). `*` combined with credentials
+ *     is refused at boot (`apps/tools-api/src/startup-config.ts:36-43`). The
+ *     old reason said it needed `restart-api --env MASSA_AI_API_CORS_ORIGINS='*'`,
+ *     a restart this suite must not perform. That premise was wrong about what
+ *     the scenario needs: `buildCorsOptions` is called at
+ *     `apps/tools-api/src/index.ts:84`, inside the module-level
+ *     `new Elysia(...)` chain, which evaluates BEFORE `app.listen()` at :195.
+ *     So the refusal reproduces in a throwaway child process on a scratch
+ *     ephemeral port and the shared :3334 stack is never restarted or touched.
+ *     Asserted: the exact refusal text, a non-zero exit with no signal, and —
+ *     polled independently of the child's own logging — that the scratch port
+ *     never accepted a connection. A control boots the same recipe with a real
+ *     origin and an unwritable config home, and must instead die at
+ *     `initAuthOrExit()` (index.ts:171) — past the CORS gate, short of
+ *     `app.listen`; without that control the case would pass for any early
+ *     spawn failure. The *default* (empty allowlist) half stays EB-AUTH-5.
+ *     Observed red (2026-09-07): swapping the subject value from `*` to
+ *     `https://legit.example` boots the child to completion
+ *     (`everBound=true`, "massa-ai Tools API running at …") and the case fails
+ *     at :668 with `Expected to contain: "Invalid CORS configuration"`.
  *  3. EB-CFG-2a — `--config-set` does not exist as a flag. The CLI surfaces
  *     tasks.md names are `massa-ai --config-show`
  *     (`apps/mcp-client/src/index.ts:39`) and `massa-ai-config set <k> <v>`
@@ -79,6 +90,7 @@
 import { describe, test, expect, afterAll } from "bun:test";
 import { spawn } from "node:child_process";
 import fsp from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -148,6 +160,14 @@ const UNAUTHORIZED_BODY = "Unauthorized: Invalid or missing API key";
 const SHARED_CONFIG_DIST = path.resolve(
   import.meta.dir,
   "../../../../../packages/shared/dist/config/index.js",
+);
+
+/** The Tools API's real entrypoint — the same file `e2e-stack.sh:start_api`
+ *  launches (`scripts/e2e-stack.sh:369`). EB-AUTH-6 boots a THROWAWAY copy of
+ *  it on a scratch port; it never touches the stack's own process. */
+const TOOLS_API_ENTRY = path.resolve(
+  import.meta.dir,
+  "../../../../../apps/tools-api/src/index.ts",
 );
 
 const scratchDirs: string[] = [];
@@ -542,17 +562,186 @@ describe.skipIf(!READY)("EB-AUTH-5 — CORS: the default empty allowlist permits
   );
 });
 
-// EB-AUTH-6 — declared skip; see header note 2. Restarting the API is the
-// runner's job, not this suite's.
-if (READY) {
-  console.log(
-    "[EB-AUTH-6] declared skip — `*` + credentials is refused at BOOT " +
-      "(apps/tools-api/src/startup-config.ts:36-43). Observing it requires " +
-      "`bash scripts/e2e-stack.sh restart-api --profile auth --env MASSA_AI_API_CORS_ORIGINS='*'` " +
-      "and asserting the process exits without binding :3334. This suite must not " +
-      "restart the shared stack.",
+// ── EB-AUTH-6 — `*` is refused at BOOT ──────────────────────────────────────
+//
+// Previously a declared skip whose stated blocker was "restarting the API is
+// the runner's job, not this suite's". That blocker was real but the scenario
+// did not need it: `buildCorsOptions` runs at apps/tools-api/src/index.ts:84,
+// inside the module-level `new Elysia(...)` chain, which is evaluated BEFORE
+// `app.listen()` at :195. So the refusal is observable in a THROWAWAY child
+// process on a scratch port — the shared :3334 stack is never touched, never
+// restarted, and never even read.
+//
+// Both cases below spawn `apps/tools-api/src/index.ts` under Bun with this
+// process's own (stack-pinned) environment plus two overrides. Neither child
+// can reach `registerDefaultJobs` (index.ts:288) — case A dies at :84 and case
+// B dies in the EADDRINUSE branch at :214-221 — so neither can write a
+// `scheduler_jobs` row and disturb 26.scheduler.test.ts.
+describe.skipIf(!READY)("EB-AUTH-6 — a `*` CORS origin is refused before the port binds", () => {
+  /** Ask the kernel for a free ephemeral port, then release it. */
+  async function freePort(): Promise<number> {
+    const srv = net.createServer();
+    await new Promise<void>((res, rej) => {
+      srv.once("error", rej);
+      srv.listen(0, "127.0.0.1", () => res());
+    });
+    const port = (srv.address() as net.AddressInfo).port;
+    await new Promise<void>((res) => srv.close(() => res()));
+    return port;
+  }
+
+  interface BootAttempt {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+    output: string;
+    elapsedMs: number;
+    everBound: boolean;
+  }
+
+  /**
+   * Boot a real Tools API child on `port` with the given CORS value and wait
+   * for it to exit. `everBound` is polled independently of the child's own
+   * logging so "the port never bound" is an observation, not an inference from
+   * the absence of a log line.
+   */
+  function bootApi(
+    port: number,
+    corsOrigins: string | undefined,
+    budgetMs: number,
+    /** Extra overrides; `null` deletes the variable from the child's env. */
+    extraEnv: Record<string, string | null> = {},
+  ): Promise<BootAttempt> {
+    const env: Record<string, string> = {};
+    for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
+    env.MASSA_AI_API_PORT = String(port);
+    if (corsOrigins === undefined) delete env.MASSA_AI_API_CORS_ORIGINS;
+    else env.MASSA_AI_API_CORS_ORIGINS = corsOrigins;
+    for (const [k, v] of Object.entries(extraEnv)) {
+      if (v === null) delete env[k];
+      else env[k] = v;
+    }
+
+    const started = Date.now();
+    let everBound = false;
+    const probe = setInterval(() => {
+      const sock = net.connect({ port, host: "127.0.0.1" });
+      sock.once("connect", () => {
+        everBound = true;
+        sock.destroy();
+      });
+      sock.once("error", () => sock.destroy());
+    }, 100);
+
+    return new Promise<BootAttempt>((resolve, reject) => {
+      const child = spawn(process.execPath, [TOOLS_API_ENTRY], {
+        cwd: path.dirname(TOOLS_API_ENTRY),
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let output = "";
+      const kill = setTimeout(() => child.kill("SIGKILL"), budgetMs);
+      child.stdout.on("data", (c) => (output += String(c)));
+      child.stderr.on("data", (c) => (output += String(c)));
+      child.on("error", (e) => {
+        clearInterval(probe);
+        clearTimeout(kill);
+        reject(e);
+      });
+      child.on("close", (code, signal) => {
+        clearInterval(probe);
+        clearTimeout(kill);
+        resolve({ code, signal, output, elapsedMs: Date.now() - started, everBound });
+      });
+    });
+  }
+
+  test(
+    "EB-AUTH-6: `MASSA_AI_API_CORS_ORIGINS=*` kills the process at startup and no port is bound",
+    async () => {
+      const port = await freePort();
+      const attempt = await bootApi(port, "*", 60_000);
+
+      console.log(
+        `[EB-AUTH-6] \`*\` boot on :${port} → code=${attempt.code} signal=${attempt.signal} ` +
+          `after ${attempt.elapsedMs} ms, everBound=${attempt.everBound}`,
+      );
+
+      // The exact refusal, verbatim from startup-config.ts:37-42. Asserting the
+      // MESSAGE and not merely a non-zero exit is what makes this case immune
+      // to passing for an unrelated boot failure (a missing module, a bad
+      // DATABASE_URL, an unbuilt dependency) — none of those produce this text.
+      expect(attempt.output).toContain("Invalid CORS configuration");
+      expect(attempt.output).toContain(`"*" is not an allowed origin`);
+      expect(attempt.output).toContain("A wildcard cannot be combined with credentials");
+
+      // Died, rather than degraded to a weaker policy.
+      expect(attempt.signal).toBeNull();
+      expect(attempt.code).not.toBe(0);
+
+      // "…without binding" is the half a message assertion cannot carry.
+      expect(attempt.everBound).toBe(false);
+      const reachable = await fetch(`http://127.0.0.1:${port}/health`, {
+        signal: AbortSignal.timeout(3_000),
+      })
+        .then((r) => r.status)
+        .catch(() => null);
+      expect(reachable).toBeNull();
+    },
+    180_000,
   );
-}
+
+  test(
+    "EB-AUTH-6 control: the same boot recipe gets PAST the CORS gate for a real origin",
+    async () => {
+      // Without this control the case above would pass for ANY spawn that died
+      // early — a missing module, an unbuilt dependency, a bad DATABASE_URL.
+      // The control gives the child a VALID allowlist and makes it die at a
+      // LATER, known boot stage instead: `initAuthOrExit()` at
+      // apps/tools-api/src/index.ts:171, which is past buildCorsOptions (:84)
+      // and still short of app.listen (:195) and registerDefaultJobs (:288).
+      // So the control binds no port and persists no row.
+      //
+      // The trigger is a config home that cannot hold a config file: HOME and
+      // XDG_CONFIG_HOME both point at a regular FILE, so the generate-and-write
+      // branch of resolveApiKey (`api-key.ts`) cannot mkdir, and
+      // initAuthOrExit's onFatal exits 1 (startup-config.ts:58-73).
+      // MASSA_AI_API_KEY must be cleared or the env tier short-circuits before
+      // any disk access.
+      //
+      // An earlier version of this control used an occupied port and expected
+      // the EADDRINUSE branch (index.ts:214-221). It was WRONG and is recorded
+      // here so it is not reintroduced: measured 2026-09-07, a `net` blocker on
+      // 127.0.0.1:50841 did NOT stop the child from binding — it printed
+      // "massa-ai Tools API running at http://localhost:50841" and ran to the
+      // 60 s budget. `app.listen` binds the wildcard address, so a loopback-only
+      // blocker is not the same socket and `reusePort:false` never sees a
+      // conflict. That control also reached registerDefaultJobs, which is
+      // exactly the shared-state write this suite must not perform.
+      const notADir = path.join(await makeScratchConfigHome("auth6"), "definitely-a-file");
+      await fsp.writeFile(notADir, "not a directory\n");
+      const port = await freePort();
+
+      const attempt = await bootApi(port, "https://eb-auth6.example", 90_000, {
+        HOME: notADir,
+        XDG_CONFIG_HOME: notADir,
+        MASSA_AI_API_KEY: null,
+      });
+      console.log(
+        `[EB-AUTH-6 control] valid-origin boot on :${port} → code=${attempt.code} ` +
+          `signal=${attempt.signal} after ${attempt.elapsedMs} ms, everBound=${attempt.everBound}`,
+      );
+
+      // The discriminator this control exists for: boot got past :84.
+      expect(attempt.output).not.toContain("Invalid CORS configuration");
+      // …and reached :171, which nothing before the CORS gate can produce.
+      expect(attempt.output).toContain("cannot start without an API key");
+      expect(attempt.code).toBe(1);
+      // Still short of :195 — this control must not bind anything either.
+      expect(attempt.everBound).toBe(false);
+    },
+    180_000,
+  );
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EB-CFG — configuration precedence and the server-side config surface.

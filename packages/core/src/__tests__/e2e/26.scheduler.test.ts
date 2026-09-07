@@ -17,12 +17,19 @@
  *             (FR-10), so both halves are executed by the matrix, one per run.
  *   EB-SCH-2  SAFE_DEFAULTS: the preset enables consolidation + decay and
  *             leaves auto-improve, observation-bridge and checkpoint-purge off.
- *   EB-SCH-3  The concurrency guard.                       (DECLARED SKIP — see below)
+ *   EB-SCH-3  The concurrency cap.        (profile `scheduler-fast` — see below)
+ *   EB-SCH-3b A product defect that profile exposed.       (KNOWN RED — see below)
  *   EB-SCH-4  Catch-up is bounded to a single tick.        (partial — see below)
  *   EB-SCH-5  The scheduler never triggers an index.
  *   EB-SCH-6  nextRunAt survives an API restart.
  *
- * ── Stack profile required ──────────────────────────────────────────────────
+ * ── Stack profiles required — this file is a TWO-profile matrix ─────────────
+ *   `bash scripts/e2e-stack.sh up --profile scheduler-on`    (EB-SCH-1/2/4/5/6)
+ *   `bash scripts/e2e-stack.sh up --profile scheduler-fast`  (EB-SCH-1/3/3b/5)
+ *   Neither run alone covers the file. `scheduler-fast` is the ADDITIVE profile
+ *   added for EB-SCH-3; `scheduler-on` keeps the production-shaped preset and
+ *   is the only profile under which EB-SCH-2 and the restart block may run.
+ *
  *   `bash scripts/e2e-stack.sh up --profile scheduler-on`
  *   That profile sets MASSA_AI_SCHEDULER_ENABLED=true and
  *   MASSA_AI_SCHEDULER_SAFE_DEFAULTS=true on the Tools API
@@ -54,26 +61,44 @@
  *      (dashboard.ts:32-43) — there is no `schedule`/`intervalMs` field on any
  *      HTTP surface, so the magnitude of the interval has no black-box sensor.
  *      The enable pattern, which is the half the preset exists for, IS asserted.
- *   4. EB-SCH-3 — DECLARED SKIP, printed at run time. Observing the guard needs
- *      a job that is actually executing (`running: Set<JobKind>`,
- *      scheduler.ts:116, surfaced as `currentlyRunning` at :533). Nothing on the
- *      HTTP surface fires a job on demand, and the `scheduler-on` profile
- *      configures no interval shorter than 30 minutes
- *      (scheduler-defaults.ts:69, :78), so no job fires inside a suite run.
- *      WHAT IT NEEDS: either a write surface that triggers one tick, or a stack
- *      profile that sets MASSA_AI_SCHEDULER_CONSOLIDATION_INTERVAL_MS to a
- *      few seconds so a real fire can be polled for. Neither exists today, and
- *      inventing one would mean running real memory consolidation against the
- *      acceptance database as a side effect of a status assertion.
- *   5. EB-SCH-4, missed-job half — DECLARED SKIP, printed at run time. The
- *      bound "one tick per missed job, never a stampede" needs a job whose
- *      persisted nextRunAt is already in the past by more than one tick
- *      (scheduler.ts:350-356). Producing one requires a >30 minute wait or a
- *      write surface for nextRunAt; neither exists. WHAT IS ASSERTED instead is
- *      the same predicate's other branch, which IS reachable: across a real API
- *      restart, catch-up fires ZERO ticks for jobs that were not missed, so
- *      lastRunAt does not move. That is a genuine bound, not a placeholder, but
- *      it is half of the scenario and is reported as such.
+ *   4. EB-SCH-3 — CLOSED (was `describe.skipIf(true)`, a hardcoded permanent
+ *      skip). The old reason said the guard needed either an on-demand fire
+ *      surface or "a stack profile that sets
+ *      MASSA_AI_SCHEDULER_CONSOLIDATION_INTERVAL_MS to a few seconds", and
+ *      concluded "neither exists today". The first half is still true; the
+ *      second was wrong about the product. That env var exists and is the TOP
+ *      of the precedence chain (`envNum(def.intervalEnvVar, …)`,
+ *      scheduler-defaults.ts:297-301), outranking both config.json and the
+ *      >=30 min clamp in `applySafeDefaults` — the clamp only supplies the
+ *      fallback. The stated objection (running real memory consolidation
+ *      against the acceptance database) was sound, and is answered by choosing
+ *      DIFFERENT kinds rather than by giving up: the new `scheduler-fast`
+ *      profile fires `checkpoint-purge` (a bounded DELETE of already-expired
+ *      rows) and `observation-bridge` (an immediate no-op while the LLM is
+ *      off) at 5 s on a 1 s tick, and leaves consolidation and decay OFF.
+ *      What the block asserts, and why `currentlyRunning` is NOT the sensor,
+ *      is documented at the block itself.
+ *   5. EB-SCH-4, missed-job half — STILL A SKIP, and the reason is now the
+ *      measured one rather than the assumed one. The old reason said producing
+ *      a past-due nextRunAt "requires a >30 minute wait or a write surface for
+ *      nextRunAt". With `scheduler-fast` the wait is 15 seconds, so that is no
+ *      longer the blocker — but the scenario is still unreachable, and it is
+ *      blocked by the EB-SCH-6 PRODUCT DEFECT this file already reports as a
+ *      known red. Measured 2026-09-07 on `scheduler-fast` (tick 1 s, interval
+ *      5 s), stopping the scheduler for 15 s and restarting:
+ *          before  checkpoint-purge nextRunAt=1788787618332
+ *          frozen  checkpoint-purge nextRunAt=1788787622743  (= boot + 5000)
+ *          after   checkpoint-purge nextRunAt=1788787639376  (= boot + 5000)
+ *      Every job's nextRunAt — including the three the profile leaves disabled
+ *      — was recomputed from `now` on each boot, so nothing was ever past-due
+ *      and `catchUpMissedJobs` (scheduler.ts:339-368) found nothing to catch
+ *      up. `/tmp/massa-ai-e2e-stack/logs/api.log` carried zero "catch-up" lines
+ *      across all three boots. WHAT IT NEEDS: the EB-SCH-6 defect fixed, i.e.
+ *      `registerOrResumeJob`'s preserve-nextRunAt branch (scheduler.ts:216-229)
+ *      actually reached from `registerDefaultJobs`. Until then a missed job
+ *      cannot exist at boot by construction. WHAT IS ASSERTED instead is the
+ *      same predicate's other branch: across a real restart, catch-up fires
+ *      ZERO ticks for jobs that were not missed.
  *   6. EB-SCH-6 — skipped with a printed reason when the stack's own state file
  *      does not attest that THIS script started the API under the
  *      `scheduler-on` profile. Without that attestation `restart-api` either
@@ -241,6 +266,43 @@ function readStackState(): Record<string, string> {
   return out;
 }
 
+/**
+ * Which stack profile the API was started under, read from the stack's own
+ * state file. `SCHEDULER_ON` above is deliberately derived from the PRODUCT's
+ * surface, not from this — but two profiles now report `running=true`
+ * (`scheduler-on` and `scheduler-fast`) and they configure DIFFERENT job tables
+ * and a different tick, so the profile name is needed to pick the right
+ * expected values. Reading it is not a substitute for the product probe: a
+ * block gated on the name still also requires `SCHEDULER_ON`.
+ */
+const STACK_PROFILE = readStackState().profile ?? "";
+
+/** `scheduler-on`: SAFE_DEFAULTS preset, 60 s tick, production intervals. */
+const PRESET_ON = SCHEDULER_ON && STACK_PROFILE === "scheduler-on";
+
+/**
+ * `scheduler-fast` (scripts/e2e-stack.sh): 1 s tick, MAX_CONCURRENT=1 and two
+ * side-effect-safe kinds on a 5 s interval, so jobs REALLY FIRE inside a run.
+ * This is what makes EB-SCH-3 assertable; see the block itself for the
+ * measurement that motivated the profile.
+ */
+const SCHEDULER_FAST = SCHEDULER_ON && STACK_PROFILE === "scheduler-fast";
+
+/** The tick each profile pins, stated as a contract rather than read back from
+ *  the response it is asserting. `scheduler-on` sets no MASSA_AI_SCHEDULER_TICK_MS
+ *  so it gets DEFAULTS.tickMs = 60_000 (scheduler.ts:74-77); `scheduler-fast`
+ *  pins 1_000 unless MASSA_AI_E2E_SCHED_TICK_MS overrides it. */
+const EXPECTED_TICK_MS: Record<string, number> = {
+  "scheduler-on": 60_000,
+  "scheduler-fast": Number(process.env.MASSA_AI_E2E_SCHED_TICK_MS ?? 1000),
+};
+
+/** The per-job interval `scheduler-fast` pins for its two enabled kinds. */
+const FAST_INTERVAL_MS = Number(process.env.MASSA_AI_E2E_SCHED_INTERVAL_MS ?? 5000);
+
+/** The two kinds `scheduler-fast` enables, in no particular order. */
+const FAST_KIND_IDS = ["scheduled-checkpoint-purge", "scheduled-observation-bridge"] as const;
+
 let RESTART_SKIP_REASON = "";
 const RESTART_READY = (() => {
   if (!SCHEDULER_ON) {
@@ -325,16 +387,21 @@ beforeAll(() => {
         `Bring the stack up with: bash scripts/e2e-stack.sh up --profile scheduler-on`,
     );
   }
+  if (!SCHEDULER_FAST) {
+    console.log(
+      "[EB-SCH-3/EB-SCH-3b:SKIP] declared skip — the concurrency cap needs jobs that " +
+        `actually fire, which only the \`scheduler-fast\` profile produces. Stack profile is ` +
+        `"${STACK_PROFILE || "unknown"}". Enable with: ` +
+        "bash scripts/e2e-stack.sh up --profile scheduler-fast",
+    );
+  }
   console.log(
-    "[EB-SCH-3:SKIP] concurrency guard not asserted — no HTTP surface fires a " +
-      "scheduled job on demand and the scheduler-on profile configures no " +
-      "interval shorter than 30 minutes, so no job executes inside a suite run.",
-  );
-  console.log(
-    "[EB-SCH-4:PARTIAL] the missed-job branch of catch-up is not asserted — " +
-      "producing a past-due nextRunAt needs a >30 minute wait or a write " +
-      "surface for nextRunAt. The not-missed bound (catch-up fires zero ticks) " +
-      "IS asserted across a real restart.",
+    "[EB-SCH-4:PARTIAL] the missed-job branch of catch-up is still not asserted, and the " +
+      "blocker is the EB-SCH-6 product defect, not the interval length: every job's " +
+      "nextRunAt is recomputed from `now` on every boot (measured on scheduler-fast — " +
+      "a 15 s scheduler outage produced nextRunAt = boot+interval and zero `catch-up` " +
+      "lines in the API log), so a past-due job cannot exist at boot by construction. " +
+      "The not-missed bound (catch-up fires zero ticks) IS asserted across a real restart.",
   );
   if (SCHEDULER_ON && !RESTART_READY) {
     console.log(`[EB-SCH-4/EB-SCH-6:SKIP] ${RESTART_SKIP_REASON}`);
@@ -396,9 +463,22 @@ describe.skipIf(!READY)("EB-SCH-1 scheduler master switch", () => {
       // the master switch is off (:299-302).
       const snapshot = await readSchedulerStatus();
       expect(snapshot.body.running).toBe(true);
-      // DEFAULTS.tickMs = 60_000 (scheduler.ts:74-77); the scheduler-on profile
-      // sets no MASSA_AI_SCHEDULER_TICK_MS override (e2e-stack.sh:166-168).
-      expect(snapshot.body.tickIntervalMs).toBe(60_000);
+      // The tick is profile-specific and is asserted EXACTLY, per profile —
+      // `scheduler-on` sets no MASSA_AI_SCHEDULER_TICK_MS so it gets
+      // DEFAULTS.tickMs = 60_000 (scheduler.ts:74-77), while `scheduler-fast`
+      // pins its own. Reading the expectation from a table keyed on the stack's
+      // recorded profile keeps this an exact-value assertion rather than
+      // relaxing it to a range; an unknown profile is a failure, not a pass.
+      const expectedTick = EXPECTED_TICK_MS[STACK_PROFILE];
+      if (expectedTick === undefined) {
+        throw new Error(
+          `EB-SCH-1: the scheduler reports running=true under stack profile ` +
+            `"${STACK_PROFILE}", which has no pinned tick in EXPECTED_TICK_MS ` +
+            `(${JSON.stringify(Object.keys(EXPECTED_TICK_MS))}). A new ` +
+            `scheduler-enabling profile must declare its tick here.`,
+        );
+      }
+      expect(snapshot.body.tickIntervalMs).toBe(expectedTick);
     },
     30_000,
   );
@@ -424,7 +504,12 @@ describe.skipIf(!READY)("EB-SCH-1 scheduler master switch", () => {
 });
 
 // ── EB-SCH-2 — SAFE_DEFAULTS ────────────────────────────────────────────────
-describe.skipIf(!SCHEDULER_ON)("EB-SCH-2 SAFE_DEFAULTS preset", () => {
+// Gated on the `scheduler-on` profile SPECIFICALLY, not merely on
+// running=true. `scheduler-fast` also reports running=true but deliberately
+// does not set MASSA_AI_SCHEDULER_SAFE_DEFAULTS and enables a different pair of
+// kinds, so running this block there would assert the preset's table against a
+// stack that never applied the preset.
+describe.skipIf(!PRESET_ON)("EB-SCH-2 SAFE_DEFAULTS preset", () => {
   test(
     "EB-SCH-2: the preset enables consolidation + decay and nothing else",
     async () => {
@@ -492,17 +577,252 @@ describe.skipIf(!SCHEDULER_ON)("EB-SCH-2 SAFE_DEFAULTS preset", () => {
   );
 });
 
-// ── EB-SCH-3 — concurrency guard (declared skip) ────────────────────────────
-describe.skipIf(true)("EB-SCH-3 concurrency guard", () => {
-  // DECLARED SKIP. See header declared-skip 4 for the full reason and for what
-  // this scenario would need. The body is intentionally left unwritten rather
-  // than filled with an assertion that cannot discriminate: with five distinct
-  // jobKinds and no job ever executing during a run, "no two rows of the same
-  // kind are currentlyRunning" (scheduler.ts:400-404, :429-432) is vacuously
-  // true and would report coverage the suite does not have.
-  test("EB-SCH-3: not asserted — no on-demand fire surface", () => {
-    throw new Error("EB-SCH-3 is a declared skip; this body must never execute");
-  });
+// ── EB-SCH-3 — the concurrency cap, on the `scheduler-fast` profile ─────────
+//
+// This was `describe.skipIf(true)` — a hardcoded permanent skip whose stated
+// reason was "no HTTP surface fires a scheduled job on demand and the
+// scheduler-on profile configures no interval shorter than 30 minutes". The
+// first half is still true. The second half was a statement about the PROFILE,
+// not about the product, and it was wrong about the product: the per-job
+// interval env var is real and is the TOP of the precedence chain —
+// `registerDefaultJobs` resolves `envNum(def.intervalEnvVar, fileJob?.intervalMs,
+// def.schedule.intervalMs)` (scheduler-defaults.ts:297-301), so it outranks both
+// config.json and the >=30 min clamp `applySafeDefaults` writes (:195-216),
+// which only supplies the fallback. `scripts/e2e-stack.sh`'s new
+// `scheduler-fast` profile uses it, on the two kinds whose handlers are
+// side-effect-safe (see the profile's own comment for why NOT consolidation or
+// decay).
+//
+// ── What is asserted, and what is NOT ───────────────────────────────────────
+// NOT asserted: `currentlyRunning === true`. That was the sensor the old skip
+// reason named, and it is unusable — measured 2026-09-07 over a 20 s window at
+// a 150 ms poll on this exact profile: 132 samples, ZERO with any job
+// `currentlyRunning`, because both handlers complete in well under one poll.
+// An assertion built on it would be vacuously green. Its invariant half ("never
+// more than maxConcurrent at once") IS still asserted below, but as a bound,
+// never as the proof that anything ran.
+//
+// Asserted instead, and it is deterministic rather than racy: `fireJob` adds to
+// `running` SYNCHRONOUSLY (scheduler.ts:460) and the tick loop never awaits
+// between jobs, so when two jobs come due in the same tick and
+// maxConcurrent === 1, the second hits the cap at :429-432 and is skipped
+// WITHOUT its nextRunAt advancing — it fires on the NEXT tick instead. Both
+// jobs are registered at boot with the same interval, so `registerOrResumeJob`
+// gives them the same nextRunAt and they DO collide on their first tick. The
+// cap therefore leaves a permanent, measurable stagger of exactly one tick
+// between the two kinds' `lastRunAt`.
+//
+// That stagger is the sensor, and it is causal, not incidental. Measured on
+// this stack:
+//   MAX_CONCURRENT=1 → lastRunAt deltas 1001, 1001, 1001, 1001 ms (tick 1000)
+//   MAX_CONCURRENT=2 → lastRunAt deltas 0, 0, 0 — byte-identical timestamps,
+//                      because `tick(now)` passes the same `now` to every
+//                      `fireJob` it makes in that pass (:435, :446, :502).
+describe.skipIf(!SCHEDULER_FAST)("EB-SCH-3 concurrency cap", () => {
+  interface Sample {
+    atMs: number;
+    tickIntervalMs: number;
+    /** id → lastRunAt, for the profile's two enabled kinds only. */
+    lastRunAt: Record<string, number>;
+    runningCount: number;
+  }
+
+  let samples: Sample[] = [];
+  let collectError: Error | null = null;
+
+  beforeAll(async () => {
+    if (!SCHEDULER_FAST) return;
+    try {
+      // Span four whole intervals, plus a tick of slack at each end. Three was
+      // measurably too tight: run immediately after a restart the follower kind
+      // reported only 2 distinct lastRunAt values against a floor of 2, because
+      // its FIRST post-boot fire advances nextRunAt while lastRunAt stays 0
+      // (observed on this stack — `observation-bridge last=0 next=…688438`,
+      // where next had already moved 6001 ms). The extra interval is margin for
+      // that, not a relaxation of the floor.
+      const windowMs = FAST_INTERVAL_MS * 4 + EXPECTED_TICK_MS["scheduler-fast"] * 2;
+      const started = Date.now();
+      const collected: Sample[] = [];
+      while (Date.now() - started < windowMs) {
+        const snapshot = await readSchedulerStatus();
+        const body = snapshot.body;
+        const lastRunAt: Record<string, number> = {};
+        for (const id of FAST_KIND_IDS) {
+          const job = jobById(body, id);
+          if (job) lastRunAt[id] = job.lastRunAt;
+        }
+        collected.push({
+          atMs: Date.now() - started,
+          tickIntervalMs: body.tickIntervalMs,
+          lastRunAt,
+          runningCount: body.jobs.filter((j) => j.currentlyRunning).length,
+        });
+        await new Promise((r) => setTimeout(r, 120));
+      }
+      samples = collected;
+    } catch (error) {
+      collectError = error as Error;
+    }
+  }, 120_000);
+
+  test(
+    "EB-SCH-3: the profile really fires jobs — without this the rest is vacuous",
+    () => {
+      if (collectError) throw collectError;
+      expect(samples.length).toBeGreaterThan(20);
+      expect(samples[0]!.tickIntervalMs).toBe(EXPECTED_TICK_MS["scheduler-fast"]);
+
+      for (const id of FAST_KIND_IDS) {
+        const distinct = [...new Set(samples.map((s) => s.lastRunAt[id]).filter((v) => v && v > 0))];
+        console.log(`[EB-SCH-3] ${id}: ${distinct.length} distinct lastRunAt over the window`);
+        // Three whole intervals were polled, so at least two fires must land in
+        // the window. One would be consistent with a job that fired once at
+        // boot and then stopped.
+        expect(distinct.length).toBeGreaterThanOrEqual(2);
+        // …and they must be moving FORWARD at the pinned interval, not jittering.
+        const sorted = [...distinct].sort((a, b) => a - b);
+        for (let i = 1; i < sorted.length; i++) {
+          const gap = sorted[i]! - sorted[i - 1]!;
+          expect(gap).toBeGreaterThanOrEqual(FAST_INTERVAL_MS - 500);
+          expect(gap).toBeLessThanOrEqual(FAST_INTERVAL_MS + 1500);
+        }
+      }
+    },
+    180_000,
+  );
+
+  test(
+    "EB-SCH-3: with maxConcurrent=1 two jobs due in the same tick never fire in the same tick",
+    () => {
+      if (collectError) throw collectError;
+      const tick = EXPECTED_TICK_MS["scheduler-fast"];
+      const [a, b] = FAST_KIND_IDS;
+
+      // Only samples in which BOTH kinds have already fired at least once can
+      // carry the comparison; a `lastRunAt` of 0 is "never fired", not a time.
+      const comparable = samples.filter(
+        (s) => (s.lastRunAt[a] ?? 0) > 0 && (s.lastRunAt[b] ?? 0) > 0,
+      );
+      const deltas = [...new Set(comparable.map((s) => Math.abs(s.lastRunAt[a]! - s.lastRunAt[b]!)))];
+      console.log(
+        `[EB-SCH-3] comparable samples=${comparable.length}/${samples.length}, ` +
+          `distinct |lastRunAt| deltas = ${JSON.stringify(deltas)} (tick ${tick} ms)`,
+      );
+
+      // Non-vacuity: there must BE something to compare.
+      expect(comparable.length).toBeGreaterThan(5);
+
+      // The cap's signature. A delta of exactly 0 is the uncapped behaviour —
+      // `tick(now)` stamps every job it fires in one pass with the same `now`,
+      // so two jobs firing in one tick are byte-identical, not merely close.
+      expect(deltas).not.toContain(0);
+
+      // A one-tick stagger presents as exactly TWO values, depending on which
+      // side of the cycle the poll landed on. With the leader at L and the
+      // capped follower one tick behind:
+      //   polled after the follower fired  → |Δ| = tick
+      //   polled after the leader fired    → |Δ| = interval - tick
+      // Measured 2026-09-07 (tick 1000, interval 5000): {1001, 1002, 4003,
+      // 4009, 4011} — the two clusters and nothing between them. Asserting
+      // membership in those two clusters is STRICTER than a range, and it is
+      // what excludes an unrelated 2500 ms drift as well as the uncapped 0.
+      const tolerance = Math.max(250, tick / 2);
+      const permitted = [tick, FAST_INTERVAL_MS - tick];
+      for (const delta of deltas) {
+        const nearest = permitted.reduce((best, p) =>
+          Math.abs(delta - p) < Math.abs(delta - best) ? p : best,
+        );
+        if (Math.abs(delta - nearest) > tolerance) {
+          throw new Error(
+            `EB-SCH-3: |lastRunAt| delta ${delta} ms matches neither phase of a ` +
+              `one-tick stagger (expected ~${permitted.join(" ms or ~")} ms, ` +
+              `tolerance ${tolerance} ms). Observed deltas: ${JSON.stringify(deltas)}. ` +
+              `A delta of 0 would mean the cap at scheduler.ts:429-432 did not skip ` +
+              `the second job; anything else means the schedule is not what this ` +
+              `profile pins.`,
+          );
+        }
+      }
+    },
+    180_000,
+  );
+
+  test(
+    "EB-SCH-3: no sample ever shows more concurrently-running jobs than the cap",
+    () => {
+      if (collectError) throw collectError;
+      // The bound half of the guard (scheduler.ts:429-432, surfaced as
+      // `currentlyRunning` at :533). Reported with the observed maximum so a
+      // future reader can see whether it was exercised — on this profile the
+      // handlers are far too fast for a 120 ms poll to catch one mid-flight,
+      // which is exactly why the case above, and not this one, is what proves
+      // the cap works.
+      const maxSeen = Math.max(...samples.map((s) => s.runningCount));
+      console.log(`[EB-SCH-3] max concurrently-running jobs observed = ${maxSeen} (cap 1)`);
+      expect(maxSeen).toBeLessThanOrEqual(1);
+    },
+    180_000,
+  );
+});
+
+// ── EB-SCH-3b — a product defect the `scheduler-fast` profile exposed ───────
+//
+// KNOWN RED — this reports a product defect, not a test defect. It became
+// findable only once jobs actually fired: before `scheduler-fast` no scheduled
+// job had ever executed on any E2E profile, so no health field had a value to
+// be wrong about.
+//
+// MECHANISM: apps/tools-api/src/routes/dashboard.ts:39-40 writes
+// `lastSuccessAt: null` and `consecutiveFailures: 0` as LITERALS into every job
+// of the `/api/v1/scheduler/status` payload. It has nothing else to write —
+// `Scheduler.status()` (packages/core/src/services/scheduler/scheduler.ts:519-536)
+// does not project either field. Both are nevertheless maintained by `fireJob`
+// (scheduler.ts:489-500) and really are persisted.
+//
+// MEASURED 2026-09-07 on the `scheduler-fast` profile, same instant, both kinds
+// having fired successfully several times:
+//   HTTP  GET /api/v1/scheduler/status → "lastSuccessAt":null, "consecutiveFailures":0
+//   SQL   SELECT last_run_at, last_success_at FROM scheduled_jobs
+//         scheduled-checkpoint-purge   → 1788787737541, 1788787737541
+//         scheduled-observation-bridge → 1788787738542, 1788787738542
+//
+// IMPACT: the only black-box health surface the scheduler has reports every job
+// as never-succeeded and never-failed. A job failing on every single tick is
+// indistinguishable over HTTP from a perfectly healthy one, which is the exact
+// discrimination `consecutiveFailures` exists to provide.
+//
+// Not masked, not weakened, and not fixed here: production source is out of
+// this suite's write set.
+describe.skipIf(!SCHEDULER_FAST)("EB-SCH-3b scheduler health fields are reported", () => {
+  test(
+    "EB-SCH-3b: a job that has succeeded reports a non-null lastSuccessAt",
+    async () => {
+      // Give the profile's interval a chance to produce at least one success.
+      let job: SchedulerStatusJob | undefined;
+      const deadline = Date.now() + FAST_INTERVAL_MS * 3;
+      while (Date.now() < deadline) {
+        const snapshot = await readSchedulerStatus();
+        const found = jobById(snapshot.body, "scheduled-checkpoint-purge");
+        if (found && found.lastRunAt > 0) {
+          job = found;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+
+      expect(job).toBeDefined();
+      expect(job!.lastRunAt).toBeGreaterThan(0);
+      console.log(
+        `[EB-SCH-3b] lastRunAt=${job!.lastRunAt} lastSuccessAt=${String(job!.lastSuccessAt)} ` +
+          `consecutiveFailures=${String(job!.consecutiveFailures)}`,
+      );
+
+      // The claim: a job the same payload says ran, and that the database
+      // records as having succeeded, must not be reported as never-succeeded.
+      expect(job!.lastSuccessAt).not.toBeNull();
+    },
+    120_000,
+  );
 });
 
 // ── EB-SCH-5 — the scheduler never triggers an index ────────────────────────

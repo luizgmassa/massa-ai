@@ -53,23 +53,50 @@
  *  1. EB-HOOK-2b — *forcing* writer-queue saturation. `WriterQueue.enqueue`
  *     admits and drains on the same promise chain, decrementing `pending` one
  *     admission per microtask turn (`services/hooks/writer-queue.ts:47-63`),
- *     and the persist itself is a synchronous insert
- *     (`hook-service.ts:266`). No HTTP client can guarantee `pending >= 256`
- *     (`FALLBACK_HOOKS.queue.maxPending`, `hook-service.ts:305`). EB-HOOK-2
- *     therefore asserts the two contracts that ARE deterministic — every
- *     response is 202 or 429, never 5xx — and asserts the full 429 envelope
- *     (`Retry-After` + body) on every 429 actually observed, printing the
- *     count either way.
+ *     and the persist itself is a synchronous insert (`hook-service.ts:266`).
+ *     The original reason stopped at "no HTTP client can guarantee
+ *     `pending >= 256`", which invited the obvious rebuttal: lower the
+ *     threshold. That was tried and it does not work, so the finding is
+ *     recorded here rather than left to be re-derived. `HOOKS_QUEUE_MAX_PENDING`
+ *     (`packages/shared/src/config/index.ts:840-843`) is a real env knob, and
+ *     at 1 it is verifiably in effect — `GET /api/v1/hooks/queue-status`
+ *     answered `{"pendingCount":0,"maxPending":1,"saturated":false}`. Against
+ *     that boot, measured 2026-09-07:
+ *         POST /api/v1/hook/batch with 2, 10 and 50 events → 202, 202, 202
+ *         400 concurrent POST /api/v1/hook                 → 202 x400, 429 x0
+ *     So saturation is unreachable from the HTTP surface at ANY threshold, not
+ *     merely at the default one, and the 429 branches (`routes/hooks.ts:58-62`,
+ *     `:103-107`) have no live-stack sensor at all — only the unit tier's
+ *     injected throw (`apps/tools-api/src/routes/hooks.test.ts:74`, `:131`).
+ *     `11.lifecycle.test.ts` F87 carries the same finding. EB-HOOK-2 therefore
+ *     asserts the two contracts that ARE deterministic — every response is 202
+ *     or 429, never 5xx — and asserts the full 429 envelope (`Retry-After` +
+ *     body) on every 429 actually observed, printing the count either way.
  *  2. EB-AI-1 — "at least 8 observations generate a proposal". NOT reachable
- *     over HTTP: `AutoImproveJob.maybeRun` (`auto-improve-job.ts:95`) has no
+ *     over HTTP, and the reason below replaces an earlier one that has since
+ *     become false. `AutoImproveJob.maybeRun` (`auto-improve-job.ts:95`) has no
  *     production call site — the hook bridge is wired to
  *     `ObservationConsolidationJob`, not to auto-improve
  *     (`hook-service.ts:336-352`) — and the only production trigger for
  *     `runOnce` is the scheduler's `auto-improve` job kind
- *     (`services/scheduler/scheduler-defaults.ts:259`). That needs the
- *     `scheduler-on` profile and belongs to T1.2 / `26.scheduler.test.ts`
- *     (tasks.md:24). `minObservations` is 8 by default
- *     (`auto-improve-config.ts:20`).
+ *     (`services/scheduler/scheduler-defaults.ts:255-260`).
+ *     The old reason said that trigger "needs the `scheduler-on` profile", and
+ *     that is no longer a blocker: `scripts/e2e-stack.sh`'s `scheduler-fast`
+ *     profile now fires real scheduled jobs inside a suite run, and
+ *     `MASSA_AI_SCHEDULER_AUTO_IMPROVE_ENABLED` +
+ *     `MASSA_AI_SCHEDULER_AUTO_IMPROVE_INTERVAL_MS` would enable this kind the
+ *     same way. The REAL blocker is the job's target: the handler resolves
+ *     `(job.payload?.projectId as string) ?? "default"`
+ *     (`scheduler-defaults.ts:257-258`), `registerDefaultJobs` registers the
+ *     job with NO payload, and the scheduler exposes no write surface — the
+ *     only HTTP endpoint it has is the read-only snapshot at
+ *     `GET /api/v1/scheduler/status` (`routes/dashboard.ts:24`). So a fired
+ *     auto-improve job always targets the literal project `"default"` and can
+ *     never be pointed at an `e2e-ai-`-prefixed project this suite seeded with
+ *     the 8 observations `minObservations` requires
+ *     (`auto-improve-config.ts:20`). WHAT IT NEEDS: a payload or projectId
+ *     write surface on the scheduler, or a non-scheduler trigger for
+ *     `runOnce`. Neither exists; this is a product gap, not a stack one.
  *  3. EB-AI-2a — `REVIEW_GATE=true` holding a proposal. `reviewGate()` is read
  *     only inside `runOnce` (`auto-improve-ops.ts:69`), the same unreachable
  *     path as skip 2, so the gate has no HTTP-observable effect. Setting
@@ -208,10 +235,15 @@ if (!READY) {
     );
   }
   console.log(
-    "[EB-AI-1] declared skip — no HTTP route triggers AutoImproveJob.runOnce; the only " +
+    "[EB-AI-1] declared skip — no HTTP route triggers AutoImproveJob.runOnce. The only " +
       "production trigger is the scheduler's `auto-improve` job kind " +
-      "(services/scheduler/scheduler-defaults.ts:259), which needs --profile scheduler-on " +
-      "and belongs to 26.scheduler.test.ts (tasks.md:24).",
+      "(services/scheduler/scheduler-defaults.ts:255-260), and firing it is no longer the " +
+      "blocker (the `scheduler-fast` profile fires real jobs inside a run). The blocker is " +
+      "that the handler targets `job.payload?.projectId ?? \"default\"`, registerDefaultJobs " +
+      "registers no payload, and the scheduler's only HTTP surface is the READ-ONLY " +
+      "GET /api/v1/scheduler/status — so the job can never be pointed at an e2e-ai- project " +
+      "carrying the 8 observations minObservations needs. Needs a product write surface; " +
+      "see declared skip 2 in the header.",
   );
 }
 

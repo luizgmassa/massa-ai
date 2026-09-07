@@ -45,6 +45,21 @@
  *     packages/core/src/services/search/reranker.ts:84-86 + :110,
  *     `[...reorderedHead, ...tail]`). The observed order IS logged.
  *
+ *  1b. EB-LLM-3b, rerank half — CLOSED (was a declared skip). The old skip left
+ *     an open question between two readings of a non-ascending `combinedRank`
+ *     order under a broken code model. The observation it asked for was made:
+ *     with MASSA_AI_LLM_CODE_MODEL pointed at a nonexistent model, the stack's
+ *     api.log carries `llmObject failed — degrading to non-LLM path {"error":
+ *     "model '<broken>' not found"}` immediately followed by `LLMJudgeReranker
+ *     got {ok:false} — degrading to input order`. Both readings were wrong: the
+ *     reranker DOES read the code role and DOES degrade. The defective part was
+ *     the SENSOR — `combinedRank` ascendingness is confounded by the
+ *     instruct-role query rewrite, which changes the candidate set before the
+ *     reranker runs. The case now asserts the log lines and only PRINTS the
+ *     order. Observed red (2026-09-07): pointing the same knob at the real
+ *     `qwen2.5-coder:7b` makes the log carry `json_schema: constrained decoding
+ *     used` and no failure line, failing the case at :793.
+ *
  *  2. EB-LLM-5b "the response says whether the LLM path ran" — SKIPPED, no such
  *     field. `code-compressor.ts` tracks `compressionSource: "regex" | "llm"`
  *     internally (`packages/core/src/services/compression/code-compressor.ts:76`,
@@ -95,6 +110,7 @@
  */
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import {
@@ -147,6 +163,26 @@ const READY = await (async () => {
 })();
 
 const STACK_SH = path.join(DEFAULT_PROJECT_PATH, "scripts/e2e-stack.sh");
+
+/**
+ * The dedicated stack's own API log. `start_api` opens it with `>` on every
+ * start (scripts/e2e-stack.sh:369), so after a `stackRestart` it contains ONLY
+ * the current phase — which is what makes an assertion over it scoped rather
+ * than cumulative. Same state dir the script uses (`e2e-stack.sh:51`), same
+ * override variable.
+ */
+const STACK_API_LOG = path.join(
+  process.env.MASSA_AI_E2E_STATE_DIR ?? "/tmp/massa-ai-e2e-stack",
+  "logs/api.log",
+);
+
+function readStackApiLog(): string {
+  try {
+    return readFileSync(STACK_API_LOG, "utf8");
+  } catch {
+    return "";
+  }
+}
 
 // ── Project IDs ─────────────────────────────────────────────────────────────
 const BOOTSTRAP_OFF_PID = `${PREFIX}llm-bs-off-${RUN_STAMP}`;
@@ -734,29 +770,65 @@ describe.skipIf(!READY)("EB-LLM-3b — the code role reads MASSA_AI_LLM_CODE_MOD
       //    gets {ok:false} and returns the input order verbatim
       //    (reranker.ts:102-107).
       //
-      // DECLARED SKIP (AC-05), with the measurement and the open question. On a
-      // stack whose embedding width was verified and whose LLM was otherwise
-      // healthy — the same run in which EB-LLM-4 confirmed `source=llm`, so the
-      // models were reachable — the returned order under a BROKEN code model was
-      // `2, 3, …, 1, …`: not ascending, i.e. the reranker still REORDERED. If
-      // the reranker is a code-role site (reranker.ts:92 passes modelRole
-      // "code"), a code model that cannot resolve should have degraded it.
+      // ── This half was a DECLARED SKIP and is now CLOSED. ──────────────────
+      // The old skip recorded a real observation — under a broken code model
+      // the returned `combinedRank` order was `2, 3, …, 1, …`, not ascending —
+      // and offered two readings: either the reranker does not read the code
+      // role, or a nonexistent model name does not fail the call. It named the
+      // observation that would settle it: "a single rerank call with the code
+      // model broken, read from the API log's LLM error line".
       //
-      // Two readings and this suite cannot choose between them: either the
-      // reranker is not really reading the code role, or a nonexistent model
-      // name does not fail the call the way `MASSA_AI_LLM_TIMEOUT_MS=1` does
-      // (EB-LLM-6 shows the timeout path DOES degrade it, ascending). Settling
-      // it needs one observation this file must not make — a single rerank call
-      // with the code model broken, read from the API log's LLM error line.
+      // That observation was made (2026-09-07). BOTH readings were wrong; there
+      // is a third. With MASSA_AI_LLM_CODE_MODEL pointed at a nonexistent model
+      // and the instruct model healthy, one search produced, in the stack's own
+      // api.log:
+      //   [WARN] llmObject failed — degrading to non-LLM path
+      //          {"error":"model 'eb-llm-3b-probe-no-such-model:0b' not found"}
+      //   [WARN] LLMJudgeReranker got {ok:false} — degrading to input order
+      // So the reranker IS a code-role site, the broken code model DOES reach
+      // it, and it DOES degrade. What was wrong was the SENSOR: `combinedRank`
+      // ascendingness cannot detect rerank degradation while query
+      // understanding is on, because the instruct-role rewrite changes the
+      // candidate set and the fusion before the reranker ever sees it. The
+      // non-ascending order was a query-understanding effect being read as a
+      // rerank effect.
       //
-      // The bootstrap half below is NOT skipped: it is the other code-role site
-      // and it does degrade, which is what keeps this case non-vacuous.
+      // The assertion below therefore uses the log line, which is the direct
+      // evidence, and NOT the rank order, which is a confounded proxy. The rank
+      // order is still printed so the confound stays visible to a future reader.
       const ranks = combinedRanks(res);
       expect(ranks.length).toBeGreaterThan(2);
+
+      // `stackRestart` truncates api.log (e2e-stack.sh:369 opens it with `>`),
+      // so everything in it belongs to THIS describe's phase.
+      const apiLog = readStackApiLog();
+      expect(apiLog.length).toBeGreaterThan(0);
+
+      // The code-role model really is what failed — the broken id is named.
+      expect(apiLog).toContain(NONEXISTENT_CODE_MODEL);
+      expect(apiLog).toContain("llmObject failed — degrading to non-LLM path");
+      // …and the reranker really is the site that took the {ok:false} branch
+      // (reranker.ts:102-107).
+      expect(apiLog).toContain("LLMJudgeReranker got {ok:false} — degrading to input order");
+
+      // The instruct role must NOT have been the thing that broke — otherwise
+      // this would prove only "some LLM call failed". Query understanding's own
+      // degradation is already asserted absent above; assert here that no
+      // failure line names the INSTRUCT model.
+      const instructModel = process.env.MASSA_AI_E2E_LLM_MODEL ?? "qwen2.5:7b-instruct";
+      const failureLines = apiLog
+        .split("\n")
+        .filter((l) => l.includes("llmObject failed") || l.includes("not found"));
+      for (const line of failureLines) {
+        expect(line).not.toContain(`model '${instructModel}' not found`);
+      }
+
       console.log(
-        `[EB-LLM-3b] SKIP (rerank half): with a broken code model the order was ` +
-          `${isStrictlyAscending(ranks) ? "ascending (degraded)" : "reordered (NOT degraded)"} ` +
-          `— combinedRank ${ranks.join(", ")}. Not asserted; see the comment above.`,
+        `[EB-LLM-3b] rerank half CLOSED: api.log carries the code-model failure and the ` +
+          `LLMJudgeReranker degrade. combinedRank order was ` +
+          `${isStrictlyAscending(ranks) ? "ascending" : "non-ascending"} ` +
+          `(${ranks.join(", ")}) — a query-understanding effect, not a rerank one; ` +
+          `${failureLines.length} LLM failure line(s), none naming the instruct model.`,
       );
 
       // 3. And the other code-role site agrees: bootstrap falls back.
