@@ -882,9 +882,9 @@ set and a behaviour change — it stays a finding for the verifier, recorded as 
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] The guard reaches persistence, not only `--help` text and argument validation — the existing suite would not catch an `enable` that persists in one CLI and not the other
-- [ ] Observed red by deliberately diverging one CLI, then reverted
-- [ ] Test count recorded
+- [x] The guard reaches persistence, not only `--help` text and argument validation — the existing suite would not catch an `enable` that persists in one CLI and not the other. Sensed at the seam, not in the source text: every case compares the exact argument lists each CLI hands `setBootstrapRuleEnabled` (the only writer of `config.json`) and `applyBootstrapState` (the only writer of any `MASSA-AI.md`), per CLI, for the same argv — `profile-cli-parity.test.ts:204` is the assertion the done-when names. A line-count-plus-diff over the two 122-line blocks was rejected: it is blind to a shared callee behaving differently per caller, and to a CLI that stops calling the writer while still printing the same report and exiting 0
+- [x] Observed red by deliberately diverging one CLI, then reverted — four mutations, four killed, each restored from a `/tmp` copy and sha256-verified (`git checkout` never used). M1 opencode's `setBootstrapRuleEnabled` call deleted → 17/4, first failure at `:204`; M2 its boolean hardcoded to `true` → 19/2, only the `disable` cases; M3 its `--dry-run` guard defeated → 20/1, only the dry-run case; M4 mcp-client's `applyBootstrapState` call replaced by a literal → 16/5. M2 is what proves the value half is load-bearing — it persists the right id, exactly once, and only the boolean comparison sees it
+- [x] Test count recorded: **9 → 21 pass / 0 fail**, 121 `expect()` calls. `bun run test:scripts` moved 1873 → **1885 pass / 2 fail across 83 files** (+12, exactly the new cases; the two documented pre-existing `pyts golden: lessons` failures, no third). The `mock.module("@massa-ai/shared")` this needs is process-global under `bun test scripts/__tests__`, so contamination was checked rather than assumed: no sibling in that directory imports the barrel at runtime (all six `git grep` hits are string literals inside fixtures), and the full-suite count confirms it
 
 **Tests**: unit
 **Gate**: quick — `bun test scripts/__tests__/profile-cli-parity.test.ts`
