@@ -28,7 +28,7 @@
     "bench:parser": "bun benchmarks/parser/run.ts --baseline 5d43a96f4c0f1dfbd04ee7ae95f589f9b023bf03",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "generate:artifacts": "bun scripts/generate-skill-artifacts.ts && bun scripts/generate-subagent-artifacts.ts",
+    "generate:artifacts": "sh -c 'bun scripts/generate-skill-artifacts.ts \"$@\" && bun scripts/generate-subagent-artifacts.ts \"$@\"' --",
     "pretest:coverage": "bun run generate:artifacts",
     "test:coverage": "bun scripts/check-coverage.ts",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist",
