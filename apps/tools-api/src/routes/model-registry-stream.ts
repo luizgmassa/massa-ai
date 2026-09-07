@@ -97,6 +97,38 @@ interface GeneratorScript {
 const KNOWN_GENERATOR_FILENAMES = ["generate-skill-artifacts.ts", "generate-subagent-artifacts.ts"] as const;
 
 /**
+ * Matches the one POSIX-sh wrapper `generate:artifacts` is allowed to carry:
+ * `sh -c '<chain>' --`, which is how the script forwards its own argv (`--check`)
+ * to *every* generator instead of only the last one. `--` is what makes `"$@"`
+ * inside the chain expand to the caller's arguments rather than to the script
+ * name, so the trailing `' --` is load-bearing and not decoration.
+ *
+ * Unwrapping to `<chain>` — which is literally the command `sh` would run — is
+ * deliberately preferred over teaching the per-segment regex below to tolerate
+ * stray `sh -c '` and `' --` fragments. Splitting `sh -c 'a && b' --` on `&&`
+ * cuts the wrapper in half, so a fragment-tolerant regex would have to accept a
+ * dangling open quote on one segment and a dangling close quote on another, and
+ * would then just as happily accept them on segments where they are unbalanced.
+ * This models the construct instead of its debris.
+ *
+ * `.*` is greedy so the final `' --` in the string closes the wrapper. POSIX
+ * single quotes do not nest, so there is no inner `'` to confuse it; a chain
+ * that smuggled one in via `'\''` fails the per-segment match below, which is
+ * the floor doing its job.
+ */
+const SH_C_WRAPPER = /^sh -c '(.*)' --$/;
+
+/**
+ * The shape of one generator invocation inside the chain: `bun <script.ts>`,
+ * optionally followed by the `"$@"` argv-forwarding token the wrapper above
+ * exists to serve. The path capture stays `\S+\.ts` and the match stays
+ * anchored, so this still rejects anything that is not a bun invocation of a
+ * TypeScript file — `npm run x`, `bun x.js`, `echo …`, a shell redirect, an
+ * extra positional argument.
+ */
+const GENERATOR_SEGMENT = /^bun\s+(\S+\.ts)(?:\s+"\$@")?$/;
+
+/**
  * Derives the ordered list of generator scripts this route must spawn from
  * `package.json`'s own `generate:artifacts` script (AC-03.1, AC-03.4) —
  * never a hardcoded list, so a future third generator is picked up by
@@ -107,6 +139,14 @@ const KNOWN_GENERATOR_FILENAMES = ["generate-skill-artifacts.ts", "generate-suba
  * has. A derivation that silently degraded to a short list here would agree
  * with an equally-broken test derivation and reintroduce Defect B through
  * the guard built to prevent it (spec AC-03.5, design D4 item 2).
+ *
+ * The wrapper and `"$@"` tolerance above widen what parses; they do not soften
+ * the throw. Every value that failed to parse before this widening still fails,
+ * because both patterns remain anchored and the wrapper is only stripped when
+ * the *whole* string is that exact wrapper. The one thing that changed is that
+ * the repository's own argv-forwarding `generate:artifacts` is now inside the
+ * accepted grammar rather than outside it — before this, it threw on every
+ * request and took both stream endpoints down with it.
  */
 function deriveGeneratorScripts(root: string): GeneratorScript[] {
   const pkgPath = path.join(root, "package.json");
@@ -127,12 +167,14 @@ function deriveGeneratorScripts(root: string): GeneratorScript[] {
   if (typeof command !== "string" || command.trim().length === 0) {
     throw new Error(`${pkgPath}'s scripts."generate:artifacts" is missing or not a string`);
   }
-  const segments = command.split("&&").map((s) => s.trim()).filter((s) => s.length > 0);
+  const wrapped = SH_C_WRAPPER.exec(command.trim());
+  const chain = wrapped ? (wrapped[1] as string) : command;
+  const segments = chain.split("&&").map((s) => s.trim()).filter((s) => s.length > 0);
   if (segments.length === 0) {
     throw new Error(`"generate:artifacts" parsed to zero commands: ${JSON.stringify(command)}`);
   }
   return segments.map((segment) => {
-    const match = /^bun\s+(\S+\.ts)$/.exec(segment);
+    const match = GENERATOR_SEGMENT.exec(segment);
     if (!match) {
       throw new Error(
         `"generate:artifacts" segment does not match the expected "bun <script.ts>" shape: ${JSON.stringify(segment)}`,

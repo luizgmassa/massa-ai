@@ -548,20 +548,24 @@ describe("POST /api/v1/model-registry/regenerate-and-install-stream — variant-
  *  script — deliberately NOT calling into the route's own derivation. AC-03.5's
  *  whole point is that production and test must not share one parser: if both
  *  degrade the same way, they agree on a wrong list and this suite would pass
- *  green while Defect B (one generator spawned) was back. */
+ *  green while Defect B (one generator spawned) was back.
+ *
+ *  The independence is in the *algorithm*, not just in the copy. The route
+ *  strips the `sh -c '…' --` argv-forwarding wrapper, splits the chain on `&&`,
+ *  and anchors a match on each segment. This one never looks at the wrapper or
+ *  at `&&` at all: it scans the whole command for every `bun <path>.ts` token in
+ *  source order. Two different routes to the same list, so a defect in the
+ *  route's unwrap-and-split cannot be mirrored here by construction — which is
+ *  the property that made this a separate function in the first place, and the
+ *  reason it was widened rather than replaced with an import when
+ *  `generate:artifacts` grew its wrapper. */
 function independentlyDeriveExpectedGenerators(root: string): string[] {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8")) as { scripts?: Record<string, string> };
   const command = pkg.scripts?.["generate:artifacts"];
   if (typeof command !== "string") throw new Error("test fixture assumption broken: no generate:artifacts script");
-  return command
-    .split("&&")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .map((segment) => {
-      const match = /^bun\s+(\S+\.ts)$/.exec(segment);
-      if (!match) throw new Error(`test fixture assumption broken: unexpected segment ${segment}`);
-      return match[1] as string;
-    });
+  const found = [...command.matchAll(/(?:^|[\s'])bun\s+(\S+\.ts)(?=[\s']|$)/g)].map((m) => m[1] as string);
+  if (found.length === 0) throw new Error(`test fixture assumption broken: no bun <script.ts> token in ${command}`);
+  return found;
 }
 
 describe("POST /regenerate-and-install-stream — generator chain derived from generate:artifacts (T3)", () => {
@@ -643,6 +647,73 @@ describe("POST /regenerate-and-install-stream — generator chain derived from g
       fs.rmSync(fixtureDir, { recursive: true, force: true });
     }
   });
+
+  /** The widening that let the `sh -c '… "$@" …' --` argv-forwarding wrapper
+   *  parse must not have turned the derivation into "find a .ts somewhere".
+   *  Every row below is a value the route must refuse: it emits the derivation
+   *  error and spawns nothing.
+   *
+   *  Which *layer* refuses is not the same question, and the rows split on it —
+   *  worth stating, because reading all six as parser coverage would overstate
+   *  what they sense. `assertGeneratorBackstop` rejects any list that does not
+   *  contain both known `.ts` basenames, so a fixture can only discriminate
+   *  `GENERATOR_SEGMENT`/`SH_C_WRAPPER` if a loosened parser would derive both
+   *  of those names from it. Measured by mutating the parser:
+   *
+   *  Parser-defended — a loosened parser derives both known names and the
+   *  backstop waves it through, so only these rows fail:
+   *   - an unbalanced wrapper (open quote, no closing `' --`). Killed by
+   *     dropping the segment anchors, and by loosening the wrapper to ignore
+   *     its closer. This is the row that justifies unwrapping the whole
+   *     wrapper rather than tolerating `sh -c '` debris per segment.
+   *   - a trailing argument that is not the `"$@"` token, so "optional `$@`"
+   *     did not become "optional anything". Killed by dropping the anchors and
+   *     by widening the tail group to `.*`.
+   *   - the right files under the wrong interpreter (`node`, not `bun`).
+   *     Killed by dropping the `bun` literal and by making a non-matching
+   *     segment skip instead of throw. The only row a parser bug can carry
+   *     past the backstop, since it yields both known basenames.
+   *
+   *  Backstop-defended — kept as end-to-end floor assertions, but they do not
+   *  discriminate the parser, because every loosening still yields names the
+   *  backstop rejects. Do not cite them as parser coverage:
+   *   - a non-bun command, unwrapped (the pre-existing floor, restated here)
+   *   - the same inside the wrapper, i.e. the wrapper does not launder contents
+   *   - `bun <script.js>`: relaxing the `.ts` requirement in the regex is
+   *     caught downstream, since `generate-skill-artifacts.js` is not a known
+   *     generator filename. */
+  const UNPARSEABLE_VALUES: readonly [string, string][] = [
+    ["a non-bun command", "echo not-a-generator-invocation"],
+    ["a non-bun command inside the sh -c wrapper", `sh -c 'echo not-a-generator-invocation "$@"' --`],
+    ["an unbalanced sh -c wrapper", `sh -c 'bun scripts/generate-skill-artifacts.ts "$@" && bun scripts/generate-subagent-artifacts.ts "$@"`],
+    ["a bun invocation of a non-.ts file", "bun scripts/generate-skill-artifacts.js && bun scripts/generate-subagent-artifacts.js"],
+    ["a trailing argument that is not the \"$@\" token", `sh -c 'bun scripts/generate-skill-artifacts.ts --check && bun scripts/generate-subagent-artifacts.ts --check' --`],
+    ["a wrapped chain whose second segment is not a bun invocation", `sh -c 'bun scripts/generate-skill-artifacts.ts "$@" && node scripts/generate-subagent-artifacts.ts "$@"' --`],
+  ];
+
+  for (const [label, value] of UNPARSEABLE_VALUES) {
+    test(`the defensive floor still throws on an unparseable generate:artifacts — ${label} — and never spawns anything (AC-03.5)`, async () => {
+      const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "mrs-fixture-floor-"));
+      try {
+        fs.writeFileSync(
+          path.join(fixtureDir, "package.json"),
+          JSON.stringify({ name: "fixture", scripts: { "generate:artifacts": value } }),
+        );
+        getDeploymentRoot.mockImplementationOnce(() => fixtureDir);
+
+        const res = await postStream("/api/v1/model-registry/regenerate-and-install-stream");
+        const events = parseSseEvents(res.text);
+        const done = events.find((e) => e.type === "done");
+
+        expect(done).toBeDefined();
+        expect(done!.exitCode).toBeNull();
+        expect(done!.error as string).toContain("could not derive the generator list");
+        expect(spawnMock).not.toHaveBeenCalled();
+      } finally {
+        fs.rmSync(fixtureDir, { recursive: true, force: true });
+      }
+    });
+  }
 
   test("AC-03.6 hardcoded backstop — the actually-spawned list has >=2 entries and contains both known generator filenames, checked with literals owned by this test, not any shared parser", async () => {
     await postStream("/api/v1/model-registry/regenerate-and-install-stream");
