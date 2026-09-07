@@ -1,4 +1,62 @@
-## Current — Installer prune and test-scoping (**VALIDATED 2026-08-17** — 13 commits, 7 parallel batch workers partitioned by file plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
+## Current — E2E feature battery, Phase 0 (**VALIDATED 2026-09-06** — 3 commits in worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR; Phases 1-5 not started)
+
+Goal: cover all 30 features in `FEATURES.md` with an executable E2E battery in
+four tiers. **Only Phase 0 (5 of 21 Tasks) is delivered.** Tiers B (host
+harness), C (Admin Portal in a real browser) and D (Claude Code) do not exist
+yet; Phase 1's five new Tier-A suites do not exist yet.
+
+**The suite could not be started from anything in this repository.** Its
+fail-closed guard requires four environment pins together and throws before the
+first HTTP call; the corpus it indexes came from
+`scripts/prepare-qwen-e2e-fixture.ts`, which has no history in any revision; and
+the only automated provisioning of PostgreSQL/Ollama/Tools API lived inside
+`23.owned-destructive.test.ts`. Two new scripts replace that:
+`scripts/prepare-e2e-fixture.ts` (manifest-driven, deterministic commit identity
+so the SHA is a pure function of content, two self-checks both observed red) and
+`scripts/e2e-stack.sh` (five profiles, `restart-api`, refuses any port whose
+listener it does not own, re-runs DB provisioning every `up`, and asserts after
+startup that the dedicated API really reached :11435 and `massa_ai_test` on
+:5433 — that assertion proven red by forcing `OLLAMA_BASE_URL` at the shared
+instance).
+
+**Six E2E tests asserted contracts the product no longer has**, invisible
+because the suite had only ever run one embedding profile, auth off, over the
+whole repository. Two asserted deleted behaviour (N19's `AUTH_REQUIRED === false`
+and N18's static skip, both against AD-011; N5's queue mutex, replaced by a
+`managed_runs` lease that refuses losers with `indexing_busy`). Two encoded a
+corpus rather than a contract (N15 named `vector_documents_4096d` literally; D2
+seeded `trace_path` on a class, whose call edges belong to its methods). One was
+green for the opposite of its stated reason (T15 checked warmth with the
+canonical corpus's probes after reindexing onto a different one). D4 asserted
+`Array.isArray` on six fields that `symbol-graph.service.ts:521-527` sets to
+`undefined` when empty.
+
+**One product defect, found by the battery and fixed here.** `EtlPipeline`
+reached `graphGenerations.begin()` → `lockWorkspace` before the `workspaces` row
+existed, because that row is created by an unawaited `indexing:started`
+subscriber costing two round-trips. Load-dependent: three distinct projects hit
+it in one loaded run while eight concurrent fresh projects on an idle stack hit
+it zero times. The pipeline now awaits `markIndexing` before opening the
+generation. Evidence is the absence counted the same way the defect was found —
+three occurrences before, **zero** across the full post-fix suite.
+
+Measured: 223 pass / 5 fail → 231/1 after the test repairs → **232 pass / 0 fail
+/ 3 skip, 235 tests, 361.14 s, exit 0**; `17.cleanup-verify` 2/0. `type-check`
+6/6, `check-core-layering` PASS, `lint` clean, `build` 6/6.
+
+**Not verified: the full `bun run test` workspace gate.** The one run attempted
+was contaminated by the dedicated-stack environment being exported into it —
+`system.test.ts` asserts the default `http://localhost:11434` and saw
+`127.0.0.1:11435`. That single suite re-measured 9 pass / 0 fail in a clean
+env; the aggregate was not re-run. Run it with the E2E vars unset before
+trusting it.
+
+**Unowned working-tree change:** `.specs/lessons.json` removes L-002 through
+L-005 (76 deletions) and `.gitignore` adds `.ralphy/`. Neither was written by
+the sessions that worked this branch; both predate them. Left uncommitted for
+the user to decide.
+
+## Previous — Installer prune and test-scoping (**VALIDATED 2026-08-17** — 13 commits, 7 parallel batch workers partitioned by file plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
 
 Two briefed defects, both wider than briefed.
 

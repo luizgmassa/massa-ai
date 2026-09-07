@@ -1,4 +1,66 @@
-# Handoff — installer-prune-and-test-scoping (EXECUTE COMPLETE 2026-08-17 — 13 commits, 4 Phases / 10 Tasks, 7 parallel batch workers plus independent verification; every gate green; unpushed, push/PR is the user's call)
+# Handoff — e2e-feature-battery (PHASE 0 COMPLETE 2026-09-06 — 3 commits, 5 of 21 Tasks; gates green except the unverified workspace aggregate; unpushed, no PR)
+
+**Branch:** `test/e2e-feature-battery`, off `main@d32fce58`. Worktree
+`~/Projects/massa-ai-wt-e2e-battery`. Primary checkout is back on `main` and clean.
+
+**Read `.specs/features/e2e-feature-battery/validation.md` first.** It carries the
+isolation evidence, both measured runs, the product defect's root cause, and the
+mutation record for every new sensor.
+
+**What shipped.** `scripts/prepare-e2e-fixture.ts` and `scripts/e2e-stack.sh` make the
+live-stack suite startable from the repository for the first time. Six E2E tests that
+asserted removed contracts were repaired. One product defect the battery exposed — a lost
+race for a project's own `workspaces` row — was fixed in `services/etl/pipeline.ts` and
+guarded by `packages/core/src/__tests__/etl-workspace-row-ordering.test.ts`.
+
+**Measured.** 223 pass / 5 fail / 4 skip → 231/1/3 after the test repairs → **232 pass /
+0 fail / 3 skip, 235 tests across 16 files, 361.14 s, exit 0**. `17.cleanup-verify` 2/0.
+`graph_generation_workspace_missing`: 3 distinct projects before the fix, **0** across the
+full post-fix suite. `type-check` 6/6, `check-core-layering` PASS (0 violations, 998
+edges), `lint` clean, `build` 6/6, `turbo-passthrough-env` 3/3.
+
+**Exact next step.** Re-run `bun run test` with the dedicated-stack variables UNSET. The
+only attempt was polluted by them: `apps/tools-api/src/routes/system.test.ts` asserts the
+default `http://localhost:11434` and saw `http://127.0.0.1:11435`. That suite alone
+re-measured 9 pass / 0 fail clean; the aggregate was never re-run, so it is unverified,
+not green.
+
+```bash
+cd ~/Projects/massa-ai-wt-e2e-battery
+env -u OLLAMA_BASE_URL -u MASSA_AI_API_URL -u MASSA_AI_DEDICATED \
+    -u MASSA_AI_E2E_PROJECT_PATH -u RUN_E2E -u XDG_CONFIG_HOME \
+    -u OLLAMA_EMBEDDING_MODEL -u OLLAMA_EMBEDDING_DIMENSIONS \
+    MASSA_AI_EXECUTOR_SANDBOX=none bun run test
+```
+
+**Then Phases 1-5**, unstarted, in `tasks.md` order. Phase 1 is five new Tier-A suites
+(observability — which recovers the deleted `12.observability.test.ts` scope — scheduler,
+auth/config/cache, hooks/handoffs/proposals, and an LLM-gated suite behind `RUN_E2E_LLM`).
+Phase 2 is the host harness against a scratch HOME, using the orphaned
+`scripts/verify-harness-install.ts` as its oracle but asserting per host rather than on its
+exit code, because a scratch HOME skips undetected hosts. Phase 3 is Playwright against the
+Admin Portal. Phase 4 drives the real `claude` binary.
+
+**Bringing the stack back up.**
+
+```bash
+cd ~/Projects/massa-ai-wt-e2e-battery
+bun scripts/prepare-e2e-fixture.ts --out /tmp/massa-ai-e2e-fixture
+bash scripts/e2e-stack.sh up --profile default
+eval "$(bash scripts/e2e-stack.sh env)"      # all four pins + the provisioned API key
+```
+
+Never start it from the primary checkout while the worktree holds the branch — the API
+serves whichever tree launched it, and a second session's `22.path-identity` `beforeAll`
+force-reindexes the shared index onto a wrong root, which invalidates every number measured
+in that window. Two figures were withdrawn during this work for exactly that reason.
+
+**Open, not ours to close.** `.specs/lessons.json` removes L-002 through L-005 and
+`.gitignore` adds `.ralphy/`; both predate every session that worked this branch and are
+left uncommitted for the user. L-004 is stale regardless — it describes a SQLite fallback
+removed in `5d43a96f`.
+
+# Previous handoff — installer-prune-and-test-scoping (EXECUTE COMPLETE 2026-08-17 — 13 commits, 4 Phases / 10 Tasks, 7 parallel batch workers plus independent verification; every gate green; unpushed, push/PR is the user's call)
 
 **Branch:** `fix/installer-prune-and-test-scoping`, off `main@89909051`. Worktree
 `~/Projects/massa-ai-wt-prune`. Shares no source file with PR #107 or

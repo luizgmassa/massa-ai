@@ -121,9 +121,35 @@ profile that is actually installed — **`qwen3-embedding:4b` at 2560 dimensions
 `qwen3-embedding:8b`/4096 the 2026-07-13 ledger below pins.
 
 **Before repairs: 223 pass / 5 fail / 4 skip, 232 tests across 16 files, 641.19 s, exit 1.**
-**After repairs: 232 pass / 0 fail / 3 skip, 235 tests across 16 files, 356.68 s, exit 0.**
-(The second run is faster because the shared index was already warm; the test count grew by
+**After test repairs: 231 pass / 1 fail / 3 skip, 235 tests across 16 files, 360.69 s, exit 1.**
+**After the product fix: 232 pass / 0 fail / 3 skip, 235 tests, 361.14 s, exit 0.**
+`17.cleanup-verify` passes 2/0 as its own final command.
+(The later runs are faster because the shared index was already warm; the test count grew by
 three because two repairs split a premise into its own case.)
+
+The after-repairs figure is from a run in a dedicated worktree with **no other session
+holding the checkout or the stack**. That qualifier is load-bearing, not ceremony: an interim
+`232 pass / 0 fail / 3 skip` was measured across an overlapping window and is withdrawn. A
+concurrent session's `22.path-identity` `beforeAll` force-reindexes `SHARED_PID` onto a
+deliberately wrong root, and that mutation lands on the shared index every other suite reads.
+Never quote a number from a run that shared its stack.
+
+The last failure to fall was a **product defect this battery exists to find**, not a stale
+test — and it is now fixed. `T9 N6` fires three concurrent `index()` calls on three
+*distinct*, brand-new projectIds and got `failed, completed, failed`; both losers died in
+under 15 ms with `graph_generation_workspace_missing`. `workspace-manager.ts:155-158` creates
+the `workspaces` row from an **unawaited** `indexing:started` handler, while `pipeline.ts`
+reached `lockWorkspace` (`graph-generation-repository-pg.ts`) immediately after Discover —
+which on this sparse fixture finishes faster than that upsert commits. The pipeline now
+awaits `markIndexing` before opening the generation.
+
+It was intermittent, so a green `N6` alone proves little: the same case passed 3/3 on an
+earlier run, and eight concurrent fresh projects on an idle stack reproduced it zero times.
+The evidence for the fix is therefore the **absence measured the same way the defect was
+found** — `graph_generation_workspace_missing` occurred against three distinct projects in
+the pre-fix run and **zero** times across the full post-fix suite. Detail in
+`.specs/features/e2e-feature-battery/validation.md`; the deterministic guard is
+`packages/core/src/__tests__/etl-workspace-row-ordering.test.ts`.
 
 The five failures are the value of the run: none of them was reachable before, because the
 suite had never been executed against a *different* embedding profile with auth on. A sixth,
@@ -134,7 +160,7 @@ warm state.
 | --- | --- |
 | `T9 N15` vector dimension integrity | Queries `vector_documents_4096d` by name. That table is empty under a 2560-dimension profile — the test hardcodes an embedding profile the harness is supposed to vary. |
 | `T9 N19` auth-off returns 200 | Asserts `AUTH_REQUIRED === false`. AD-011 deleted the no-key pass-through and made it non-configurable, so this asserts removed behaviour. |
-| `T9 N5` concurrent same-project index | Three concurrent `index()` calls on one projectId finished `failed, completed, failed`. `N6` (distinct projectIds) passed 3/3, so it is the same-projectId serialization path specifically. Not yet root-caused. |
+| `T9 N5` concurrent same-project index | Three concurrent `index()` calls on one projectId finished `failed, completed, failed`. Root cause: a `managed_runs` lease replaced the queue mutex the test cited and *refuses* the losers with `indexing_busy`. `N6` (distinct projectIds) passed 3/3 in this run — but it is intermittent and fails for an unrelated reason, so it does not narrow `N5` to the same-projectId path as first recorded here. |
 | `T11b D2` trace_path outbound | Reached `nodeCount=1`, expected `>= 2`. Corpus density: the sparse fixture has a thinner call graph than the whole repository. The same file already reports the *inbound* case as "a graph-density limitation, not worked around" — only the outbound side is unguarded. |
 | `T11b D4` project_map enriched fields | `Array.isArray(map.routes)` is false. The comment two lines above says routes "may be empty. Assert shape only when present", and then the assertion runs unconditionally — so an absent field on a corpus with no HTTP routes fails a test that documents itself as tolerant. |
 | `T15` shared-index identity *(surfaced after the other five)* | The `beforeAll` seeds SHARED_PID at a deliberately wrong root, then asserts warmth with `isSharedIndexWarm`, whose probes name canonical-corpus symbols absent from that root. It could only pass when the reindex failed to clear the previous corpus. |

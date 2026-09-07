@@ -36,10 +36,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Indexing a fresh project could fail outright on a lost race for its own `workspaces`
+  row.** `EtlPipeline` reaches `graphGenerations.begin()` as soon as the Discover stage
+  returns; `begin()` reaches `lockWorkspace`, which does
+  `SELECT … FROM workspaces WHERE project_id = $1 FOR UPDATE` and throws
+  `graph_generation_workspace_missing:<projectId>` when that row does not exist. On a fresh
+  projectId the row is created by `WorkspaceManager.markIndexing`, invoked from an
+  **unawaited** `indexing:started` subscriber (`workspace-manager.ts:155-158`,
+  fire-and-forget, `.catch`-logged only) that itself costs two round-trips — a
+  `getWorkspace` read followed by an `upsertWorkspace`. Nothing ordered that write against
+  the read, so a Discover stage faster than the upsert commits killed the whole run with no
+  user-visible cause and left the workspace marked `error`.
+
+  The pipeline now establishes the row itself, awaited, before opening the generation. It is
+  the component with the dependency, so it is the component that should guarantee it;
+  `markIndexing` is an idempotent upsert, so the subscriber still running is harmless, and
+  the event stays a notification for `project-root-cache` and `read-file.service`.
+
+  Load-dependent and therefore invisible until the battery ran a full sequential suite:
+  three distinct projects hit it in one loaded run (`e2e-ai-nfr-*-6-a`, `-6-c`, and
+  `e2e-ai-merge-tgt-*`, the last tolerated by a test that does not assert on job status),
+  the failing runs dying at durationMs 9 and 14 — while eight concurrent fresh projects on
+  an idle stack reproduced it zero times. Evidence for the fix is the absence, measured the
+  same way it was found: **zero** occurrences across the full post-fix suite, against three
+  before. `etl-workspace-row-ordering.test.ts` is the deterministic guard, verified red
+  against three separate mutations (guard deleted, `await` dropped, guard moved after
+  `begin()`); it asserts the ordering *and* that the unawaited subscriber that makes the
+  guard necessary still exists, so the guard cannot outlive its reason unnoticed.
 - **Six live-stack E2E tests asserted contracts the product no longer has.** They were
   invisible because the suite had only ever been run against one embedding profile with auth
-  off, on the whole repository as its corpus. Measured on the scripted stack: 223 pass / 5
-  fail before, **232 pass / 0 fail / 3 skip after** (235 tests, 356.68 s).
+  off, on the whole repository as its corpus. Measured on the scripted stack in an isolated
+  worktree, with no other session holding the checkout or the stack: 223 pass / 5 fail
+  before, then 231 pass / 1 fail / 3 skip once the six were repaired, and
+  **232 pass / 0 fail / 3 skip** (235 tests, 361.14 s, exit 0) once the product defect that
+  the last failure exposed was fixed — see the `workspaces` row race below. `17.cleanup-verify`
+  passes 2/0 as its own final command.
   - `N19` asserted `AUTH_REQUIRED === false` and `N18` was a static skip whose text said
     exercising 401 "would require restarting tools-api with a key (destructive)". AD-011
     deleted the no-key pass-through and made auth non-configurable, so no supported
