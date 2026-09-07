@@ -33,6 +33,10 @@
 #   auth          auth on with a generated key, exported by `env`
 #   hooks-off     HOOKS_ENABLED=false, for the 423 Locked scenarios
 #   scheduler-on  scheduler master switch + safe defaults on
+#   scheduler-fast  scheduler on with a 1 s tick and two SIDE-EFFECT-SAFE jobs on
+#                   a 5 s interval, so a real fire happens inside a suite run
+#                   (EB-SCH-3 / EB-SCH-4). Overridable with
+#                   MASSA_AI_E2E_SCHED_TICK_MS / MASSA_AI_E2E_SCHED_INTERVAL_MS.
 #   llm-on        MASSA_AI_LLM_ENABLED=true with the locally installed models
 #
 # Exit codes: 0 success; 1 runtime failure or a refused unsafe action;
@@ -139,7 +143,7 @@ state_set() {
 
 # ── profile → Tools API environment ─────────────────────────────────────────
 profile_is_known() {
-  case "$1" in default|auth|hooks-off|scheduler-on|llm-on) return 0 ;; *) return 1 ;; esac
+  case "$1" in default|auth|hooks-off|scheduler-on|scheduler-fast|llm-on) return 0 ;; *) return 1 ;; esac
 }
 
 # Emits `KEY=VALUE` lines for the extra environment a profile needs on top of
@@ -186,6 +190,50 @@ profile_env() {
       # packages/core/src/__tests__/scheduler-safe-defaults.test.ts.
       printf 'MASSA_AI_API_KEY=\nMASSA_AI_SCHEDULER_ENABLED=true\nMASSA_AI_SCHEDULER_SAFE_DEFAULTS=true\n'
       printf 'MASSA_AI_SCHEDULER_CONSOLIDATION_ENABLED=true\nMASSA_AI_SCHEDULER_DECAY_ENABLED=true\n'
+      ;;
+    scheduler-fast)
+      # ADDITIVE (added for EB-SCH-3 / EB-SCH-4). `scheduler-on` deliberately
+      # keeps production intervals, so no job ever executes inside a suite run
+      # and the concurrency guard and the catch-up missed-job branch have no
+      # black-box sensor at all. This profile is the smallest change that makes
+      # a REAL fire observable; it does not replace `scheduler-on` and does not
+      # relax anything it asserts.
+      #
+      # Why these two kinds and not the preset's two. The handlers decide it:
+      #   checkpoint-purge   → CheckpointManager.purgeExpired()
+      #                        (scheduler-defaults.ts:271-279) — a bounded DELETE
+      #                        of ALREADY-EXPIRED rows only.
+      #   observation-bridge → observationConsolidationJob.runOnce()
+      #                        (:262-269), which returns `noop` at its first
+      #                        gate when the LLM is off
+      #                        (observation-consolidation-job.ts:157-163) — and
+      #                        this profile leaves the LLM off.
+      # Both are side-effect-safe against the acceptance database. The preset's
+      # own pair (memory-consolidation, decay-sweep) both run the FULL
+      # `memoryConsolidationJob.consolidate()` decay+prune+merge cycle over every
+      # memory in `massa_ai_test`; firing those every few seconds would destroy
+      # the fixture data other suites read. They stay off here, which is also
+      # what keeps this profile from colliding with EB-SCH-2's preset table.
+      #
+      # The per-job INTERVAL env var is the top of the same documented
+      # precedence chain as the ENABLED one: registerDefaultJobs resolves
+      # `envNum(def.intervalEnvVar, fileJob?.intervalMs, def.schedule.intervalMs)`
+      # (scheduler-defaults.ts:297-301), so it outranks both the config.json the
+      # API materializes on boot and the >=30 min clamp `applySafeDefaults`
+      # writes into `def.schedule` (:195-216) — the clamp only supplies the
+      # FALLBACK. SAFE_DEFAULTS is therefore deliberately NOT set here.
+      #
+      # MAX_CONCURRENT=1 is what turns the cap at scheduler.ts:429-432 into an
+      # observable: `fireJob` adds to `running` synchronously (:460) and the
+      # tick loop never awaits between jobs, so with two jobs due in the same
+      # tick the second is skipped deterministically rather than racily.
+      printf 'MASSA_AI_API_KEY=\nMASSA_AI_SCHEDULER_ENABLED=true\n'
+      printf 'MASSA_AI_SCHEDULER_TICK_MS=%s\n' "${MASSA_AI_E2E_SCHED_TICK_MS:-1000}"
+      printf 'MASSA_AI_SCHEDULER_MAX_CONCURRENT=1\n'
+      printf 'MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_ENABLED=true\n'
+      printf 'MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_INTERVAL_MS=%s\n' "${MASSA_AI_E2E_SCHED_INTERVAL_MS:-5000}"
+      printf 'MASSA_AI_SCHEDULER_OBSERVATION_BRIDGE_ENABLED=true\n'
+      printf 'MASSA_AI_SCHEDULER_OBSERVATION_BRIDGE_INTERVAL_MS=%s\n' "${MASSA_AI_E2E_SCHED_INTERVAL_MS:-5000}"
       ;;
     llm-on)
       printf 'MASSA_AI_API_KEY=\nMASSA_AI_LLM_ENABLED=true\n'
