@@ -1,4 +1,70 @@
-# Handoff — e2e-feature-battery (PHASE 0 COMPLETE 2026-09-06 — 3 commits, 5 of 21 Tasks; gates green except the unverified workspace aggregate; unpushed, no PR)
+# Handoff — e2e-feature-battery (PHASES 0/1/1b/2 DELIVERED 2026-09-07 — 15 commits; independent validation returned FAIL, its five findings are closed, RE-VERIFICATION IS OWED; unpushed, no PR)
+
+**Branch:** `test/e2e-feature-battery`, off `main@d32fce58` (main has not moved). Worktree
+`~/Projects/massa-ai-wt-e2e-battery`.
+
+**Read `.specs/features/e2e-feature-battery/validation.md` first.** It carries the verifier's
+own report unedited — including its FAIL verdict — followed by a separately-marked
+implementer section recording what closed each finding. The verdict was deliberately not
+overwritten by the person it was returned to.
+
+**What shipped this session.** The tracking artifacts were re-specified to the measured truth
+(they claimed Phase 1 was not started while ten commits had delivered it); the three product
+defects the battery had found and nobody had fixed were fixed; Tier B was re-specified around
+two falsified premises and delivered; and five regressions found by independent validation
+were repaired.
+
+**Measured.** `bun run test --force --continue` **12 of 12 tasks, 0 cached, exit 0**.
+type-check 6/6, lint clean, `check-core-layering` PASS (0 violations, 998 edges, 1100 files).
+Tier A per profile with skip populations held constant: `29.audit-repairs` 14/1/0 →
+**15/0/0**; `26.scheduler` `scheduler-on` 8/1/6 → **9/0/6**; `scheduler-fast` 7/1/7 →
+**8/0/7**. Every other cell identical to baseline.
+
+**Exact next step — three, in order.**
+
+1. **Re-verify.** The FAIL verdict stands on the record until someone who did not write the
+   repairs confirms them. That is the only thing between this branch and a PR.
+2. Push and open the PR (the user's call). `[Unreleased]` carries both `### Added` and
+   `### Fixed`, so this cuts a **minor** bump.
+3. `bun skills/massa-ai/scripts/check_specs_delivered.ts e2e-feature-battery --root .` exits
+   **1**, and it cannot exit 0 while `.specs/lessons.json` stays uncommitted. All seven
+   required paths exist; both errors are the unowned working-tree files below.
+
+**Traps this session paid for.**
+
+- **A truncated sweep is not a population.** `git grep … | head -20` was used to enumerate the
+  consumers of `generate:artifacts`; the code consumer that *parses* that script
+  (`model-registry-stream.ts:130`) was below the cut, and the change broke two endpoints at
+  runtime. The aggregate went to 11 of 12 and only independent validation caught it.
+- **A load reading is not a reading.** The same file, same commit, same stack gave
+  `6 pass / 2 fail / 7 skip` at 1-minute load 11.05 and `8 pass / 0 fail / 7 skip` at load
+  3.36. `spec.md` puts anything above load 6 out of scope; that clause is load-bearing.
+- **A test can assert the defect as the contract.** `dashboard.test.ts` asserted
+  `lastSuccessAt: null` against a stub carrying no such field — it passed only because the
+  route hardcoded it, and would have gone red at the fix rather than before it.
+- **A mutation that leaves an equivalent path is not a mutation.** The dropped pty coverage of
+  `install.sh`'s menus failed because `s|S|"") return` gives an answered `s` and an unread
+  prompt the same branch, so the sensor could not fail for its own reason.
+- **`test:scripts` skipped all 38 shell suites** whenever its bun half failed. Fixed; the exit
+  code is unchanged either way, only the coverage grew.
+
+**Open, not ours to close.** Five suites are red on `main` with identical counts here and
+there: `cursor-bridge-delivery` 13/3, `plugin-registry-registration` 43/4,
+`hook-ownership-orphans` 12/10, plus the two `pyts golden: lessons` cases. Root cause untraced.
+Three of them were invisible until the `test:scripts` repair above.
+
+**Unowned working-tree change, unchanged across three sessions now.**
+`.specs/lessons.json` removes L-002 through L-005 and `.gitignore` adds `.ralphy/`. Neither
+was written by any session that worked this branch; both are left for the user. L-004 is stale
+regardless — it describes a SQLite fallback removed in `5d43a96f`.
+
+**Deferred, specified, not built.** Tier C (Playwright Admin Portal, 3 Tasks) — it needs
+`@playwright/test` plus edits to two shared blocking-gate surfaces (`bunfig.toml` `testMatch`,
+`check-coverage.ts`'s unscoped web-ui group), and 15 fake-DOM suites already cover most of what
+it would assert. Tier D's credentialed group and eval harness (1 Task) — `--max-cost-usd`
+exists only on `claude plugin eval`, so the group as originally specified had no cost ceiling.
+
+# Previous handoff — e2e-feature-battery (PHASE 0 COMPLETE 2026-09-06 — 3 commits, 5 of 21 Tasks; gates green except the unverified workspace aggregate; unpushed, no PR)
 
 **Branch:** `test/e2e-feature-battery`, off `main@d32fce58`. Worktree
 `~/Projects/massa-ai-wt-e2e-battery`. Primary checkout is back on `main` and clean.

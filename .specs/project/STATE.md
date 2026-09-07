@@ -1,4 +1,70 @@
-## Current — E2E feature battery, Phase 0 (**VALIDATED 2026-09-06** — 3 commits in worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR; Phases 1-5 not started)
+## Current — E2E feature battery, Phases 0/1/1b/2 (**2026-09-07** — 15 commits in worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR; independent validation returned FAIL, its five findings are closed, re-verification is owed)
+
+Goal: cover the features in `FEATURES.md` with an executable E2E battery in four tiers.
+Re-specified 2026-09-07 to **7 Phases = 21 active Tasks plus 4 deferred**. Phases 0, 1, 1b
+and 2 are delivered; Tier C is deferred in full and Tier D reduced to its credential-free
+half. `.specs/features/e2e-feature-battery/validation.md` is the evidence; read it first.
+
+**The tracking artifacts had been lying.** Ten commits (`13d07927..8d54762c`) delivered all
+six Phase-1 Tier-A suites, while `tasks.md`, `validation.md`, `STATE.md`, `HANDOFF.md`,
+`FEATURES.json` and `CHANGELOG.md` all still said "Phase 1 not started". `CHANGELOG`'s
+`[Unreleased]` mentioned none of it, which alone breaks the merge gate. Phase 1 had also
+shipped without the mandatory independent validation; that gate was supplied retroactively.
+
+**Three product defects the battery found, and nobody had fixed.** Zero product source
+changed in that ten-commit range. All three are fixed here, each with a deterministic sensor
+that runs without the live stack and each verified red against a deliberate mutation:
+
+- `EB-MCP-3` — `list_projects` answered two shapes by transport. The embedded client
+  delegates to the core tool while `GET /api/v1/workspace/list` hand-rolled a second
+  projection, and they drifted. Wider than the sensor could see: it compares with
+  `dropKeys: ["workspaces"]`, so it caught only the missing `filter`, while the route also
+  dropped per-workspace `createdAt`/`updatedAt` and validated `status` not at all. The route
+  delegates to the tool now — one projection where there were two.
+- `EB-SCH-3b` — `/api/v1/scheduler/status` wrote `lastSuccessAt: null` and
+  `consecutiveFailures: 0` as literals, so a job failing every tick was indistinguishable
+  over HTTP from a healthy one. `fireJob` maintained all four health fields; `status()` never
+  carried them outward. **The route's own test asserted the literals against a stub that
+  carried neither field** — it passed only because the bug existed, and would have gone red
+  at the fix.
+- `EB-SCH-6` — `nextRunAt` did not survive a restart, drifting by exactly the restart
+  duration (20702 ms). `registerOrResumeJob` is correct; it compares against a *synchronous*
+  `store.get()` that answers from a mirror hydrated fire-and-forget. Same shape as the Phase-0
+  `workspaces` race: an unawaited promise beside a synchronous requirement.
+
+**Tier B delivered, re-specified after its premises were falsified.** The oracle
+(`verify-harness-install.ts`) could not tell an absent host from a broken install, and under a
+scratch HOME detection collapses to `command -v` — four hosts here, zero in CI — so the
+planned assertion would have inverted between environments. It gained a `detected` field and
+its first test. `harness-e2e.test.ts` then grades a real `install-harness.sh --all` per host
+(1796 files, 24 of 24 rows `ok`), and root `install.sh` gained executed coverage behind
+recording stubs. T2.3 was **cut, not deferred**: profile switching is already covered by
+`test-model-profile-installer-*.sh` plus seven unit suites.
+
+**A regression I introduced, and how it was caught.** Making `generate:artifacts` a single
+wrapper broke `model-registry-stream.ts`, which *parses* that script on `&&` — the aggregate
+went to 11 of 12 tasks. The cause was enumerating consumers with `git grep … | head -20` and
+treating the visible rows as the population. Independent validation found it; it is fixed,
+with the generator list now pinned on both sides.
+
+Measured after the repairs: `bun run test --force --continue` **12 of 12 tasks, 0 cached,
+exit 0**; type-check 6/6; lint clean; `check-core-layering` PASS (0 violations, 998 edges,
+1100 files). Tier A per profile, skips held constant: `29.audit-repairs` 14/1/0 → **15/0/0**,
+`26.scheduler` under `scheduler-on` 8/1/6 → **9/0/6**, under `scheduler-fast` 7/1/7 →
+**8/0/7**.
+
+**Open, not ours.** Three shell suites are red on `main` with identical counts here and there
+(`cursor-bridge-delivery` 13/3, `plugin-registry-registration` 43/4,
+`hook-ownership-orphans` 12/10), newly visible because `test:scripts` used to skip all 38
+shell suites whenever its bun half failed. Two `pyts golden: lessons` failures are also
+`main`'s. Root cause untraced for all five.
+
+**Unowned working-tree change, unchanged from the previous session:** `.specs/lessons.json`
+removes L-002 through L-005 and `.gitignore` adds `.ralphy/`. Neither was written by any
+session that worked this branch. Left uncommitted for the user; `check_specs_delivered`
+cannot exit 0 while `lessons.json` stays uncommitted.
+
+## Previous — E2E feature battery, Phase 0 (**VALIDATED 2026-09-06** — 3 commits in worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR; Phases 1-5 not started)
 
 Goal: cover all 30 features in `FEATURES.md` with an executable E2E battery in
 four tiers. **Only Phase 0 (5 of 21 Tasks) is delivered.** Tiers B (host

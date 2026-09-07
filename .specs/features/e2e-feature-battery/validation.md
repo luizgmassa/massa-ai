@@ -1,269 +1,507 @@
 # E2E Feature Battery — Validation
 
-Scope: **Phase 0 only** (5 of 21 Tasks). Phases 1–5 are not started and are not validated
-here.
+Scope: **Phases 0, 1, 1b and 2.** Phase 3 (Tier C) and Tier D's credentialed group are
+deferred and are not validated here.
 
-## Isolation evidence
-
-| Item | Value |
-| --- | --- |
-| Worktree | `~/Projects/massa-ai-wt-e2e-battery` |
-| Branch | `test/e2e-feature-battery` @ `b6990adb` |
-| Primary checkout | returned to `main`, clean |
-| Stack | started by `scripts/e2e-stack.sh up --profile default` **from this worktree** |
-| Fixture | `/tmp/massa-ai-e2e-fixture` @ `788facbd87a568e4e3354cb541ef0d019fa5aaaf`, 70 tracked files, clean tree |
-| Concurrent sessions | none — peer session confirmed released before the run |
-
-Provisioning sensor for the fresh worktree: `bun test ./scripts/tests/verify-tree-sitter-grammars.test.ts`
-→ **9 pass / 0 fail**, matching the primary checkout. First attempt read 6 pass / 3 fail; the
-error was `dist consumer entry is missing: …/packages/core/dist/index.js`, i.e. an unbuilt
-`dist`, **not** the documented missing-grammar signature that the same failure count matches.
-`bun run build` (6/6) cleared it. `node_modules` was cloned with `cp -Rc` (APFS
-copy-on-write, 4.3 s for 1.6 GB) rather than reinstalled, which avoids the documented
-node-gyp break where `bun install` exits 0 while silently skipping the native grammars.
-
-## Measured result — the clean run
-
-```
-bun test --max-concurrency 1  <the 16-file sequence>
-  231 pass / 1 fail / 3 skip, 235 tests across 16 files, 360.69 s, exit 1
-bun test --max-concurrency 1 src/__tests__/e2e/17.cleanup-verify.test.ts
-  2 pass / 0 fail, 69 ms, exit 0
-```
-
-All six Phase-0 repairs hold: `N5` (1 winner, 2 refused `indexing_busy:134`, final state
-searchable), `N15` (`vector_documents_2560d`, 58 document rows + 1 metadata sentinel),
-`N18`/`N19` (401 without a key, 401 with a whitespace-only key, 200 with the configured key,
-`/health` 200 with no key), `D2` (`searchProject` → seeds=1, nodeCount=13, edgeCount=26; the
-class seed → nodeCount=1, edgeCount=0), `D4` (`routes` absent, the documented empty-analyzer
-case), `T15`.
-
-## Measured result — after fixing the product defect the run exposed
-
-The one remaining failure was the `workspaces` row race described below. It is fixed in
-`services/etl/pipeline.ts`; re-measured on the same stack after `bun run build` and
-`e2e-stack.sh restart-api`, no concurrent session:
-
-```
-bun test --max-concurrency 1  <the same 16-file sequence>
-  232 pass / 0 fail / 3 skip, 235 tests across 16 files, 361.14 s, exit 0
-bun test --max-concurrency 1 src/__tests__/e2e/17.cleanup-verify.test.ts
-  2 pass / 0 fail, exit 0
-```
-
-`N6` reading green is **not** the evidence, because `N6` is intermittent — it passed 3/3 on
-an earlier run with the defect present, and eight concurrent fresh projectIds on an idle
-stack reproduced the failure zero times. The evidence is the absence, counted the same way
-the defect was found: `graph_generation_workspace_missing` occurred against **three distinct
-projects** in the pre-fix run (`e2e-ai-nfr-*-6-a`, `-6-c`, `e2e-ai-merge-tgt-*`) and **zero**
-times across the entire post-fix suite, read from `/tmp/massa-ai-e2e-stack/logs/api.log`
-after a restart truncated it to a clean baseline.
-
-Deterministic guard: `packages/core/src/__tests__/etl-workspace-row-ordering.test.ts`,
-4 pass. Verified red against three separate mutations — the guard deleted, its `await`
-dropped, and the guard moved to after `graphGenerations.begin()` — each failing the ordering
-case and only that case. It also asserts that the unawaited subscriber which makes the guard
-necessary still exists, so the guard cannot outlive its own reason unnoticed.
-
-Gates after the product change: `bun run type-check` 6/6, `bun scripts/check-core-layering.ts`
-PASS (0 violations across 998 tier-to-tier edges in 1085 files — `services/etl` importing
-`services/workspace` is intra-tier), `bun run lint` clean, `bun run build` 6/6.
-
-## The one failure is a product defect, not a test defect
-
-`T9 N6 — concurrent index DIFFERENT projectIds parallelize` fails at
-`15.nfr.test.ts:351`: three concurrent `index()` calls on three *distinct*, brand-new
-projectIds returned `failed, completed, failed`.
-
-Root cause, read from `/tmp/massa-ai-e2e-stack/logs/api.log`:
-
-```
-EtlPipeline: run failed {"projectId":"e2e-ai-nfr-mtqj5czu-6-c","durationMs":9,
-  "error":{"message":"graph_generation_workspace_missing:e2e-ai-nfr-mtqj5czu-6-c",
-  "stack":"… at lockWorkspace (…/graph-generation-repository-pg.js:62:19)"}}
-```
-
-The mechanism is a race between an unawaited event handler and a synchronous requirement:
-
-1. `workspace-manager.ts:154-159` subscribes to `indexing:started` and calls
-   `this.markIndexing(...)` **fire-and-forget** — the promise is never awaited, only
-   `.catch`-logged. `markIndexing`'s own docblock says it "Creates the row if it doesn't
-   exist yet."
-2. `pipeline.ts:337` calls `graphGenerations.begin(...)` immediately after Stage 1 Discover.
-3. `begin` reaches `lockWorkspace` (`graph-generation-repository-pg.ts:107-114`), which does
-   `SELECT … FROM workspaces WHERE project_id = $1 FOR UPDATE` and throws
-   `graph_generation_workspace_missing` when the row is absent.
-
-On a fresh projectId over the sparse fixture, Discover completes in under 10 ms — faster than
-the unawaited upsert commits. `durationMs: 9` and `durationMs: 14` on the failing runs are
-that window. Three-way concurrency widens it through connection-pool contention, which is why
-one of the three wins and two lose.
-
-**This is intermittent, and that matters for how it was missed.** The same case passed 3/3 in
-an earlier run. `N5`, the same-projectId case, is unaffected: its losers are refused by the
-`managed_runs` lease with `indexing_busy` long before this point.
-
-The same error appears twice more in the log without failing its test — `e2e-ai-merge-tgt-*`
-in `24.dashboard-architecture`, and `graph_generation_stale_snapshot` on
-`e2e-ai-index-poly-*`. Those suites tolerate a failed job where `N6` asserts on it.
-
-**Not repaired here.** The fix is a product change (await the workspace row, or have `begin`
-create it) and this branch's Phase 0 is scoped to the harness and to tests that asserted
-removed contracts. Recorded as an open defect; `N6` is left failing because it is reporting
-the truth.
-
-## Corrections to earlier claims in this feature
-
-Two figures previously recorded for this work were measured while two sessions shared one
-checkout and one stack, and neither is admissible:
-
-- The `223 pass / 5 fail` baseline and the `232 pass / 0 fail / 3 skip` after-repairs figure
-  in `CHANGELOG.md` and `COVERAGE.md` were measured across overlapping windows. A concurrent
-  session's `22.path-identity` `beforeAll` force-reindexes `SHARED_PID` onto a deliberately
-  wrong root; that mutation lands on the shared index every other suite reads.
-- The observed red that motivated the `T15` repair was produced by exactly that foreign
-  reindex. The repair itself still stands, on evidence that needs no stack: `grep -rl` over
-  `packages/core/src/__tests__/e2e/fixtures/polyglot` returns zero files for each of
-  `ContextualSearchRLM`, `computePageRank` and `addDocuments` — the three symbols
-  `isSharedIndexWarm`'s probes require — so asserting all three hit against a copy of that
-  fixture is unsatisfiable on corpus logic alone. The reasoning is sound; the observation was
-  contaminated, and is withdrawn as evidence.
-- An earlier `N6` failure was attributed to cross-file coupling, and then to the same
-  contamination. Both attributions are wrong: `N6` reproduces in this clean run with the root
-  cause above.
-
-`360.69 s` and `231 pass / 1 fail / 3 skip` are the first figures in this feature measured in
-the state the work ships in.
-
-## The workspace aggregate, measured with the dedicated pins unset
-
-This was Phase 0's one outstanding gate: the only prior attempt ran with the dedicated
-stack's variables still exported, so `apps/tools-api/src/routes/system.test.ts` saw
-`http://127.0.0.1:11435` where it asserts the default `http://localhost:11434`. Re-measured
-here from this worktree, no concurrent session on the checkout, the stack, or the shared
-database.
-
-**The recorded command does not run as written, and the reason is provisioning, not
-product.** It unsets the dedicated pins but never restores `DATABASE_URL`, and a
-`git worktree` does not carry a gitignored `.env` — the primary checkout has one
-(`~/Projects/massa-ai/.env`, a single variable, `postgresql://massa_ai@localhost:5432/massa_ai`)
-and this worktree has none. The first attempt therefore died in 15.9 s with
-`error: DATABASE_URL is required and must be a PostgreSQL URL`, thrown from
-`requirePostgresDatabaseUrl`. The prior session got further only because its shell still held
-the stack's `eval`. `DATABASE_URL` is exported from the primary checkout's `.env` for the run
-rather than copied into the worktree, so there is only ever one definition in play.
-
-Two flags were added, and both make the measurement stricter:
-
-- `--force`. `test` is `turbo run test`, and turbo replays cached task results — a green line
-  can be a replay rather than an execution. The run reports `Cached: 0 cached, 12 total`.
-- `--continue`. Turbo cancels sibling tasks when one fails. The first attempt closed at
-  `8 successful, 12 total`: three tasks never ran at all, which is indistinguishable from
-  three tasks passing if only the tail is read.
-
-```
-env -u OLLAMA_BASE_URL -u MASSA_AI_API_URL -u MASSA_AI_DEDICATED \
-    -u MASSA_AI_E2E_PROJECT_PATH -u RUN_E2E -u XDG_CONFIG_HOME \
-    -u OLLAMA_EMBEDDING_MODEL -u OLLAMA_EMBEDDING_DIMENSIONS \
-    MASSA_AI_EXECUTOR_SANDBOX=none bun run test --force --continue
-
-package                    pass  fail  skip  files  bun-invocations
-@massa-ai/core             3877     0   688    285  158
-@massa-ai/mcp-client        311     0     0     25   12
-@massa-ai/opencode-plugin   138     0     0      8    1
-@massa-ai/shared            498     0     0     29    1
-@massa-ai/tools-api         767     0     0     63   34
-@massa-ai/web-ui            778     0     0     15    1
-TOTAL                      6369     0   688    425  207
-
-Tasks:    12 successful, 12 total
-Cached:    0 cached, 12 total
-Time:     1m16.843s        exit 0
-```
-
-The per-package figures are parsed from the log by script into a file, not read through a
-shell filter. Zero `(fail)` lines and zero `ERROR` lines; the task count closes. A peer
-session was running `bun test` in `packages/shared` from a different worktree during the
-window — CPU only, no PostgreSQL, no Ollama, no network — so the counts are unaffected and
-the 1m16.843s wall clock may be slightly inflated.
-
-## The two runners `bun run test` never reaches
-
-- `bun run test:plugins` — **142 pass / 0 fail**, 10 files, 108.2 s.
-- `bun run test:scripts` — **1820 pass / 3 fail**, exit 1. One of the three was ours.
-
-### EDC-06: Phase 0 shipped an unlisted embedding surface
-
-```
-(fail) embedding defaults parity (EDC-06) > no unlisted tracked file assigns an
-       OLLAMA_EMBEDDING_* default
-+   "scripts/e2e-stack.sh: OLLAMA_EMBEDDING_MODEL=${EMBED_MODEL}"
-```
-
-`scripts/e2e-stack.sh` is this feature's own file — `git log main -- scripts/e2e-stack.sh` is
-empty — and EDC-06's Tier-3 completeness scan exists precisely to fail by name when a new
-surface ships unlisted. `bun run test` cannot see it: turbo only reaches `packages/*` and
-`apps/*`, and `scripts/` is neither.
-
-Repaired by enrolling the surface in `PAIR_SURFACES`, not by widening the allowlist, so the
-script's model and width are now both checked against the runtime reference on every run.
-That is strictly stricter than the silence it replaces, and it guards the failure this
-feature's own `design.md` calls out as invisible: a wrong width does not fail, it silently
-routes the run into a different `vector_documents_<n>d` table. The extractors anchor on the
-two `${VAR:-default}` definitions rather than the `OLLAMA_EMBEDDING_*` assignments that
-expand them; `extractOne` demands exactly one match, so a rotted anchor fails loudly.
-
-Verified red before trusted, each mutation reverted by editing the literal back — never by
-`git checkout`, which would have taken the uncommitted files with it:
-
-| mutation | observed |
-| --- | --- |
-| width `2560` → `4096` | red — `scripts/e2e-stack.sh: dims=4096 (want 2560)` |
-| model `4b` → `8b` | red — `scripts/e2e-stack.sh: model=qwen3-embedding:8b (want qwen3-embedding:4b)` |
-| unmutated | 7 pass / 0 fail, 8 pair surfaces against `qwen3-embedding:4b/2560` |
-
-`test:scripts` after the repair: **1821 pass / 2 fail**.
-
-### The remaining two failures are `main`'s, and the first attribution was wrong
-
-`pyts golden: lessons > list --status all` and `> list --query filter` both fail with
-`Expected - 4 / Received + 0`, the four missing lines being `L-002`…`L-005`. The working tree
-carries an uncommitted `.specs/lessons.json` that removes exactly those four, which makes the
-attribution look settled. It is wrong. Restoring `git show HEAD:.specs/lessons.json` in place
-and re-running reproduces both failures unchanged; the working copy was then restored and
-verified byte-identical by `shasum -a 256` before and after. Running the same suite in the
-primary checkout on clean `main` (`d32fce58`) gives the same **44 pass / 2 fail**.
-
-So `bun run test:scripts` is red on `main` today, from a `lessons list` golden that no longer
-matches what the tool emits. Pre-existing, outside this feature, and recorded rather than
-fixed. After the EDC-06 repair this branch has exactly `main`'s two failures and no others.
-
-## Bring-up budget, measured
-
-`up --profile default` aborted with `timed out after 30s waiting for postgres :5433` on a host
-at load 5.17; `status` immediately afterwards reported that same PID healthy, so the postmaster
-was starting, not stuck. Because `up` dies at the first failed wait, ollama and the API were
-never attempted and the status table showed three services down when one was slow. The
-listener budget is now 90 s (matching the API wait) and the query-readiness budget 60 s. Both
-are startup budgets, not assertions; a genuinely dead postmaster still fails.
-
-Environment contract re-verified against the running stack after the change:
-`dedicated? true`, no throw, `PROJECT_PATH: /tmp/massa-ai-e2e-fixture`,
-`SHARED_PID: e2e-ai-shared-1f0530f72b887cbe`, API `http://127.0.0.1:3334`. Fixture at
-`788facbd87a568e4e3354cb541ef0d019fa5aaaf`, the expected SHA; the generator refused to
-overwrite it without `--force`, which is the intended behaviour.
+Author ≠ verifier. Every figure below was re-derived by an agent that authored none of the
+code it measures; no figure is copied from a commit message, a comment, or `COVERAGE.md`.
+This supplies the independent gate T5.0 records as missing for Phases 1 and 1b.
 
 ## Verdict
 
-**Phase 0: PASS with one recorded product defect.** Every Phase-0 acceptance criterion holds.
-AC-03 is met in form — the sequence ran from the feature's own worktree against a stack it
-started, with no concurrent session — and the single non-green result is a defect in the
-product the battery was built to find, not a failure of the battery.
+**FAIL.** Phase 1 and Phase 1b are sound — all ten Tier-A cells reproduce, all three product
+fixes are real and kill independent mutations. Phase 2's own deliverables pass. But three
+regressions introduced on this branch are red, and two of them redden `ci.yml`'s first gate:
 
-The one gate left unverified at the previous handoff is now closed: the workspace aggregate
-is **6369 pass / 0 fail / 688 skip, 12 of 12 turbo tasks, 0 cached**, measured with the
-dedicated pins unset. Two Phase-0 residuals surfaced only because the two runners outside
-`bun run test` were run for the first time in this feature, and both are repaired here — the
-unlisted embedding surface (`3224c795`) and the postgres bring-up budget (`7d7973d5`). They
-are repairs to T0.2's deliverable, recorded the same way T0.5's six repairs were, and do not
-change the plan's `6 Phases = 21 Tasks` accounting.
+| id | severity | what |
+| --- | --- | --- |
+| **F1** | blocker | `72c13ad1` breaks `/api/v1/model-registry/regenerate-stream` and `/regenerate-and-install-stream` **at runtime**, not only in tests |
+| **F2** | blocker | `72c13ad1` breaks `generated-bundles-contract.test.ts` UGB-17 |
+| **F3** | blocker | four of this feature's own `MASSA_AI_E2E_*` vars are unlisted in `turbo.json` `passThroughEnv` (AD-010) |
+| F4 | medium | a declared skip and a KNOWN RED block in `26.scheduler.test.ts` are falsified by this session's own `a83e4f5d` |
+| F5 | low | `test:scripts`'s `&&` means one bun-side failure silently skips all 38 shell suites |
+| F6 | info | 5 shell suites fail identically on `main`; not this branch's |
+
+## Measured state, and the concurrency the brief predicted
+
+| Item | Value |
+| --- | --- |
+| Worktree | `/Users/luizmassa/Projects/massa-ai-wt-e2e-battery`, branch `test/e2e-feature-battery` |
+| HEAD at start | `0f0507a9` |
+| HEAD at end | `9dcf4702` |
+| Code under test across that move | **unchanged** — `git diff --name-only 0f0507a9 9dcf4702` = `CHANGELOG.md`, `packages/core/src/__tests__/e2e/COVERAGE.md`. Both documentation. |
+| Working tree | `M .gitignore`, `M .specs/lessons.json` (both the user's, untouched), `M .specs/project/FEATURES.json` (parent, in flight) |
+| Stack | started from **this** worktree — API process cwd read from `lsof`: `…/massa-ai-wt-e2e-battery/apps/tools-api` |
+| Fixture | `/tmp/massa-ai-e2e-fixture` @ `788facbd87a568e4e3354cb541ef0d019fa5aaaf`, clean tree |
+| Primary checkout | `main` @ `d32fce58`, clean but for untracked `.ralphy/` — used only for `main` baselines |
+| Host 1-min load | between **1.86 and 3.24** for every Tier-A cell, recorded per run; the spec's ceiling is 6 |
+
+No `git checkout`, `git stash`, `git restore` or `git clean` was run at any point. Every
+mutation below was reverted by `cp` from a scratch copy, and `git diff` on the mutated path
+was confirmed empty afterwards.
+
+One stack mutation was observed and chased down rather than assumed: `state.env` changed to
+`profile=default` at 14:40:24, the exact second the `llm-on` run ended. Cause is
+`30.llm-features.test.ts`'s own `afterAll` (`:423-436`), which deliberately restores
+`default` so later files do not silently exercise LLM paths. Not a foreign session.
+
+## Phase 1 — the Tier-A profile matrix
+
+One file per `bun test` invocation, `--max-concurrency 1`, stack brought up by
+`bash scripts/e2e-stack.sh up --profile <p>` and the environment taken from
+`eval "$(bash scripts/e2e-stack.sh env)"`.
+
+**Gate vector, common to every row** (AC-07): `RUN_E2E=1`, `MASSA_AI_DEDICATED=1`,
+`MASSA_AI_E2E_PROJECT_PATH=/tmp/massa-ai-e2e-fixture`, `MASSA_AI_API_URL=http://127.0.0.1:3334`,
+`DATABASE_URL=…127.0.0.1:5433/massa_ai_test`, `XDG_CONFIG_HOME=/tmp/massa-ai-e2e-stack/config`,
+`OLLAMA_BASE_URL=http://127.0.0.1:11435`, `EMBEDDING_PROVIDER=ollama`,
+`OLLAMA_EMBEDDING_MODEL=qwen3-embedding:4b`, `OLLAMA_EMBEDDING_DIMENSIONS=2560`, plus the
+per-row profile, which was read back from `/tmp/massa-ai-e2e-stack/state.env` **at run time**
+and is quoted below rather than assumed from the `up` command.
+
+| profile | file | before | **after** | state.env | load 1m | dur | exit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| default | `25.observability` | 17/0/0 | 17/0/0 | default | 2.52 | 8 s | 0 |
+| default | `28.hooks-handoffs-proposals` | 17/0/5 | 17/0/5 | default | 2.87 | 20 s | 0 |
+| default | `29.audit-repairs` | 14/1/0 | **15/0/0** | default | 2.91 | 12 s | 0 |
+| default | `10.synapse` | 26/0/1 | 26/0/1 | default | 2.68 | 2 s | 0 |
+| default | `11.lifecycle` | 21/0/2 | 21/0/2 | default | 2.87 | 121 s | 0 |
+| scheduler-on | `26.scheduler` | 8/1/6 | **9/0/6** | scheduler-on | 3.24 | 14 s | 0 |
+| scheduler-fast | `26.scheduler` | 7/1/7 | **8/0/7** | scheduler-fast | 2.44 | 34 s | 0 |
+| auth | `27.auth-config-cache` | 34/0/0 | 34/0/0 | auth | 2.45 | 5 s | 0 |
+| hooks-off | `28.hooks-handoffs-proposals` | 16/0/6 | 16/0/6 | hooks-off | 2.44 | 22 s | 0 |
+| llm-on (+`RUN_E2E_LLM=1`) | `30.llm-features` | 9/0/0 | 9/0/0 | llm-on | 1.86 | 85 s | 0 |
+
+Triples are pass/fail/skip. "before" is the pre-fix baseline recorded earlier in this
+feature; "after" is this session's measurement.
+
+**The skip population is unchanged in every one of the ten cells.** That is what makes the
+three flips attributable: a fix that converted a failure into a skip would show here as a
+moved skip count, and none moved. The two scheduler cells were additionally checked for skip
+*identity*, not just count — both print exactly one `[EB-SCH-4:PARTIAL]` declaration and no
+other declared-skip marker, before and after.
+
+Each flip lands in the only profile where its scenario executes, confirmed from source
+rather than assumed: `26.scheduler.test.ts:796` is `describe.skipIf(!SCHEDULER_FAST)`
+(EB-SCH-3b) and `:898` is `describe.skipIf(!RESTART_READY)` (EB-SCH-6), and
+`SCHEDULER_FAST`/`RESTART_READY` are derived from `readStackState().profile` at `:278-307`.
+
+## Phase 1b — the three product fixes, verified adversarially
+
+Each fix carries a deterministic sensor that runs with **no live stack**. For each I injected
+a behaviour-level fault into scratch state, confirmed the sensor kills it, and restored by
+file copy. The commit messages quote their own mutation figures; mine were derived
+independently and are compared below.
+
+### Controls (unmutated)
+
+| sensor | result |
+| --- | --- |
+| `apps/tools-api/src/routes/dashboard.test.ts` | 5 pass / 0 fail |
+| `apps/tools-api/src/routes/workspace.test.ts` | 48 pass / 0 fail |
+| `packages/core/src/__tests__/list-projects-tool.test.ts` | 8 pass / 0 fail |
+| `apps/tools-api/src/__tests__/scheduler-boot-order.test.ts` | 3 pass / 0 fail |
+| `packages/core/src/__tests__/scheduler-boot-hydration.test.ts` | 4 pass / 0 fail |
+
+### Mutations
+
+| defect | mutation injected | my result | commit claims | verdict |
+| --- | --- | --- | --- | --- |
+| EB-SCH-3b | `dashboard.ts` returns the four fields as `null`/`0` literals again | **3 pass / 2 fail** | 3 / 2 | killed, matches |
+| EB-MCP-3 | `workspace.ts` strips `status` from the passthrough (`handle({})`) | **47 pass / 1 fail** | 47 / 1 | killed, matches |
+| EB-MCP-3 | `workspace.ts` deletes the `instanceof ToolError` branch | **47 pass / 1 fail** | 47 / 1 | killed, matches |
+| EB-SCH-6 | `apps/tools-api/src/index.ts` moves `await scheduler.ready()` **after** `registerDefaultJobs` | **2 pass / 1 fail** | 2 / 1 | killed, matches |
+
+Every restored file re-measured green and produced an empty `git diff`.
+
+The EB-SCH-6 mutation is the load-bearing one and reproduces the property the commit claims:
+both strings remain present and only their order changes, so a sensor that merely greps for
+the two calls would stay green. It goes red.
+
+### The `dashboard.test.ts` vacuity suspicion is resolved — the replacement is not vacuous
+
+The old case asserted `lastSuccessAt: null, consecutiveFailures: 0` against a stub carrying
+neither field, so it passed only because the route hardcoded them. The replacement cannot
+pass that way: a full literal revert of `dashboard.ts:44-47` kills it at 3 pass / 2 fail,
+measured above. The mechanism is a second stub job — `failing` — carrying
+`lastSuccessAt: null, lastFailureAt: 9, consecutiveFailures: 5, lastError: "handler threw"`,
+so every one of the four fields has at least one non-default counterpart that a literal
+cannot reproduce, plus an explicit
+`expect(failing.consecutiveFailures).not.toBe(healthy.consecutiveFailures)`.
+
+Individually, several stub values are still `null`/`0` and cannot discriminate on their own
+(the `healthy` job's `lastFailureAt`/`consecutiveFailures`/`lastError`, and `failing`'s
+`lastSuccessAt`). The suite discriminates as a whole, not case by case.
+
+`Scheduler.status()` was read directly and does project all four from the persisted record
+(`scheduler.ts:553-556`, sourced from the `fireJob` finally block at `:489-499` and persisted
+at `:505`). Its own sensor, `packages/core/src/__tests__/scheduler-status-projection.test.ts`,
+guards the snapshot; `dashboard.test.ts` guards the route. Both are needed — the core sensor
+stays green if only the route reverts.
+
+## Phase 2 — Tier B
+
+| deliverable | measured |
+| --- | --- |
+| `scripts/__tests__/harness-e2e.test.ts` + `scripts/__tests__/verify-harness-install-detection.test.ts` | **18 pass / 0 fail**, 3.49 s |
+| `scripts/tests/test-root-install-live-exec.sh` | **pass** (run directly; see F5 for why the aggregate never reached it) |
+
+**AC-08 holds.** `harness-e2e.test.ts:17-26` explicitly states which strategy it uses, and
+names both: it SEEDS the four config directories (the
+`test-install-harness-cli.sh:62-65` strategy) for the positive cases, and scrubs `PATH` (the
+`test-plugin-auto-install.sh:6-9` strategy) for the negative case. It does both in code —
+`scratchHome({ seedConfigDirs: true })` at `:117`, `scrubbedPath()` at `:92-95`. The
+assertions cannot invert between this machine and CI because every case constructs its own
+scratch `HOME`/`PATH` and asserts against what it constructed: `EB-HB-1..7` assert
+per-host `detected === true` after seeding all four dirs, and `EB-HB-8` (`:197-221`) asserts
+zero detected from an unseeded home plus a scrubbed `PATH`. No assertion reads the ambient
+host count.
+
+`scripts/verify-harness-install.ts` gained the `detected` field (`:52`, `:56`), computed by
+`detectHost` (`:99-110`) from the same rule the installer uses — config dir under `--home`,
+else a host binary on `PATH`. It is orthogonal to `status`, so an absent host
+(`detected:false, status:"missing"`) is now distinguishable from a broken install
+(`detected:true, status:"missing"`). The row count is still fixed at 24 (4 hosts × 6
+artifacts), independently asserted at `verify-harness-install-detection.test.ts:72`. That
+file is the oracle's first test and carries 5 cases.
+
+### The dropped pty coverage was dropped for a TRUE reason
+
+`test-root-install-live-exec.sh:231-261` records why the three unseamed `/dev/tty` reads
+ship without pty coverage. The claim was checked at source rather than accepted:
+
+```
+install.sh:663    read -rp "  Choice [s]: " _post_choice <>/dev/tty
+install.sh:664    case "${_post_choice:-s}" in
+install.sh:681      s|S|"") return ;;
+```
+
+An empty read and a typed `s` both reach `return`, so an oracle asserting "answered `s` →
+returned cleanly" cannot discriminate. The conclusion is TRUE, and it generalises to all
+three reads, not just the one quoted: `:709`/`:715` and `:750`/`:794` use a byte-identical
+`${VAR:-s}` + `s|S|"") return ;;` idiom. `install.sh` has 6 `/dev/tty` reads in total,
+matching the suite's own `TTY_COUNT=6`.
+
+One correction to the recorded text, which does not change its conclusion: it attributes the
+convergence to the `""` alternative in the `case` pattern. That alternative is unreachable at
+these three call sites, because `${_post_choice:-s}` has already rewritten an empty value to
+the literal `s` before `case` runs. The convergence is real; the stated mechanism is
+imprecise.
+
+## Repo-wide gates
+
+| gate | result |
+| --- | --- |
+| `npx turbo run type-check --force` | **6 successful / 6 total, 0 cached**, exit 0 |
+| `bun run lint` (oxlint) | clean, exit 0 |
+| `bun scripts/check-core-layering.ts` | **PASS — 0 violations across 998 tier-to-tier edges in 1100 tracked files**, exit 0 |
+| `bun run generate:artifacts --check` (scratch `XDG_CONFIG_HOME`) | exit 0, **both** markers present, **0** write-mode `Emitted` lines |
+| `bun run test --force --continue` | **exit 1** — `Tasks: 11 successful, 12 total`, `Cached: 0 cached, 12 total`, 1m17.105s |
+| `bun run test:plugins` | **142 pass / 0 fail**, 10 files, 109.62 s, exit 0 |
+| `bun run test:scripts` | **exit 1** — 1847 pass / 4 fail across 84 files; 0 of 38 shell suites reached |
+| 38 shell suites, run individually | 33 pass / 5 fail (all 5 also fail on `main`) |
+| `bun skills/massa-ai/scripts/check_specs_delivered.ts e2e-feature-battery --root .` | **exit 1**, 2 errors |
+
+`DATABASE_URL` was exported from `~/Projects/massa-ai/.env` for every non-E2E run rather than
+copied into the worktree, so only one definition was ever in play. `MASSA_AI_EXECUTOR_SANDBOX=none`
+was set for the aggregate, matching `ci.yml`.
+
+### `generate:artifacts --check` now reaches both generators (`72c13ad1`, the good half)
+
+Verified in the state it ships in, under a scratch `XDG_CONFIG_HOME` so a local profile
+overlay could not manufacture drift:
+
+```
+No drift: generated skill bundles match checked-in files.
+No drift: generated files match checked-in files.
+```
+
+One occurrence of each marker, zero `Emitted` lines, exit 0. Under the old `&&` form the flag
+reached only the second generator and the skill half ran in write mode. That defect is closed.
+
+### `check_specs_delivered` — exit 1, both errors external
+
+All 7 required paths exist. The two errors are `M .specs/lessons.json` (the user's, declared
+out of scope by `spec.md`) and `M .specs/project/FEATURES.json` (the parent agent's, in
+flight at measurement time). Neither is a missing artifact. **This gate cannot go green until
+the parent commits `.specs/`, and `.specs/lessons.json` will keep it red for as long as that
+file stays uncommitted.**
+
+## The blocking findings
+
+### F1 — `72c13ad1` breaks two live endpoints, not just tests
+
+`apps/tools-api/src/routes/model-registry-stream.ts` derives the generator list **at request
+time** by parsing `package.json`:
+
+- `deriveGeneratorScripts` (`:130`) splits `scripts["generate:artifacts"]` on `&&`.
+- `assertGeneratorBackstop` (`:153-162`) then requires at least 2 segments **and** that the
+  names include both `generate-skill-artifacts.ts` and `generate-subagent-artifacts.ts`.
+
+`72c13ad1` changed that script from the two-command `&&` chain to
+`bun scripts/generate-artifacts.ts`. The derivation now yields `["generate-artifacts.ts"]`,
+and the backstop throws on every request:
+
+```
+could not derive the generator list: generator list ["generate-artifacts.ts"] does not
+contain the known generators generate-skill-artifacts.ts, generate-subagent-artifacts.ts
+— refusing to spawn an implausibly short list
+```
+
+`/api/v1/model-registry/regenerate-stream` and `/api/v1/model-registry/regenerate-and-install-stream`
+therefore refuse to spawn anything. This is a runtime break in the Admin Portal, not a test
+artifact.
+
+Attribution is decisive, by reverse mutation on `package.json` alone, restored by file copy:
+
+| `scripts["generate:artifacts"]` | `model-registry-stream.test.ts` |
+| --- | --- |
+| pre-`72c13ad1` `&&` chain | **32 pass / 0 fail** |
+| HEAD | **10 pass / 22 fail** |
+
+That is the whole of `@massa-ai/tools-api#test`'s failure and the whole of the aggregate's
+`11 successful, 12 total`. `bun run test` is `ci.yml`'s first gate, so this fails CI.
+
+The irony is load-bearing: that backstop's own docblock says it exists to catch "a
+`generate:artifacts` edit that lost a segment". It worked. `72c13ad1`'s commit message
+enumerates its exposed callers as `CLAUDE.md:403`/`:496` and `README.md:195/214/222` — all
+documentation. It never enumerated the code consumer.
+
+### F2 — the same commit breaks a second guard
+
+`scripts/__tests__/generated-bundles-contract.test.ts:36` (UGB-17, "generate:artifacts runs
+both generators") asserts `scripts["generate:artifacts"]` contains
+`generate-skill-artifacts.ts`. It receives `bun scripts/generate-artifacts.ts` and fails.
+Measured on the primary checkout at `main` @ `d32fce58`: **1 pass / 0 fail**. So it is this
+branch's.
+
+### F3 — four of this feature's own env vars violate AD-010
+
+`scripts/__tests__/turbo-passthrough-env.test.ts` fails here and passes on `main` (3 pass /
+0 fail). The missing names are all this feature's:
+
+```
+MASSA_AI_E2E_LLM_MODEL, MASSA_AI_E2E_SCHED_INTERVAL_MS,
+MASSA_AI_E2E_SCHED_TICK_MS, MASSA_AI_E2E_STATE_DIR
+```
+
+They are read via literal `process.env` accessors but are absent from `turbo.json`
+`tasks.test.passThroughEnv`. Under `bun run test` they arrive `undefined` while working fine
+under a direct `bun test`. `FR-04` already lists `turbo.json` `passThroughEnv` as a Phase-0
+repair surface; the Phase-1 profiles added new knobs without extending it.
+
+### F4 — a declared skip and a KNOWN RED block that `a83e4f5d` falsified
+
+`26.scheduler.test.ts:399-404` prints, unconditionally, that the EB-SCH-4 missed-job branch
+cannot be asserted because "every job's `nextRunAt` is recomputed from `now` on every boot …
+so a past-due job cannot exist at boot by construction."
+
+That is no longer true, and the commit that made it untrue is in this session. Read at source:
+
+- `apps/tools-api/src/index.ts:296-297` — `await scheduler.ready();` now precedes
+  `registerDefaultJobs(scheduler);`.
+- `packages/core/src/services/scheduler/scheduler.ts:216-222` — with the mirror hydrated,
+  `existing` is the real persisted row and `full.nextRunAt = existing.nextRunAt` preserves it,
+  with a comment stating explicitly that past-due values are kept so `catchUpMissedJobs()`
+  can identify missed jobs.
+- `scheduler.ts:352-356` — `catchUpMissedJobs` fires when `overdueMs > tickIntervalMs`.
+
+So a past-due job *can* now exist at boot. The `KNOWN RED` block at `:1004-1023` is the same
+problem in a sharper form: it sits above an assertion that now **passes**, and still narrates
+the defect as live ("left failing … it is telling the truth").
+
+`git log a83e4f5d..HEAD -- packages/core/src/__tests__/e2e/26.scheduler.test.ts` is empty —
+neither the fix commit nor any commit after it revisited this text.
+
+This bears on **AC-05**: the skip is declared and reasoned, but the reason is false, which is
+a worse failure mode than a silent pass because it asserts a product defect that no longer
+exists. It does **not** violate AC-06 — no KNOWN RED block was *widened* and no `dropKeys`
+list grew. I did not measure whether the missed-job branch is now assertable in practice;
+only that the stated blocker is gone.
+
+### F5 — `test:scripts` skipped all 38 shell suites, including this branch's own deliverable
+
+```
+"test:scripts": "bun test scripts/__tests__ scripts/tests/*.test.ts && for f in scripts/tests/*.sh; do bash \"$f\" || exit 1; done"
+```
+
+The `&&` means any bun-side failure skips the entire shell loop. With F2 and F3 red, **0 of
+38** shell suites executed — including `scripts/tests/test-root-install-live-exec.sh`, a
+Phase-2 deliverable of this branch. Run directly, it passes.
+
+A consequence for this feature's own record: every `test:scripts` figure previously written
+down here (`1820 pass / 3 fail`, `1821 pass / 2 fail`) was **bun-only** and never included a
+single shell suite, because the bun half was already failing when they were taken.
+
+### F6 — five shell suites are red on `main` too, not this branch's
+
+Run individually: 33 pass / 5 fail. Compared against the primary checkout at `main` @
+`d32fce58` with the same environment, the per-suite pass/fail counts are identical and the
+failure lists are byte-identical apart from `mktemp` path suffixes:
+
+| suite | here | `main` |
+| --- | --- | --- |
+| `test-cursor-bridge-delivery.sh` | 13 / 3 | 13 / 3 |
+| `test-hook-ownership-orphans.sh` | 12 / 10 | 12 / 10 |
+| `test-install-skills-cli.sh` | 40 / 2 | 40 / 2 |
+| `test-plugin-auto-install.sh` | 194 / 16 | 194 / 16 |
+| `test-plugin-registry-registration.sh` | 43 / 4 | 43 / 4 |
+
+Many report `got='7' want='7'` — identical values graded as failures — and
+`test-plugin-auto-install` reports an extra `claude` host throughout. Both signatures point
+at host-environment sensitivity on this machine rather than at a code defect, and both
+predate this branch. Recorded, not fixed, and explicitly **not** this feature's to fix.
+
+### The two pre-existing `pyts` failures — claim confirmed, not accepted
+
+`pyts golden: lessons > list --status all` and `> list --query filter` were verified on the
+primary checkout at clean `main` @ `d32fce58`, whose `.specs/lessons.json` is the committed
+one carrying `L-002`…`L-005`:
+
+```
+bun test scripts/__tests__/pyts-golden.test.ts   →   44 pass / 2 fail
+```
+
+Exactly the two named cases. They are `main`'s, and the worktree's uncommitted
+`.specs/lessons.json` is not the cause.
+
+## Acceptance criteria
+
+| AC | verdict | evidence |
+| --- | --- | --- |
+| AC-01 | carried from Phase 0 | not re-measured this session; fixture SHA re-confirmed at `788facbd` with a clean tree |
+| AC-02 | PASS (observed) | every `up` logged `isolation verified: ollama :11435, postgres :5433/massa_ai_test` and an unchanged `shared stack before/after: 3333=… 5432=… 11434=…`; `refuse_if_foreign_listener` read at source. Not adversarially re-tested this session. |
+| AC-03 | carried from Phase 0 | the 16-file sequence plus `17.cleanup-verify` was **not** re-run this session |
+| AC-04 | carried from Phase 0 | not re-measured this session |
+| AC-05 | **PARTIAL** | every cell's skips are declared and reasoned, and skip counts held constant across all ten cells; but one declared reason is falsified — see F4 |
+| AC-06 | **PASS** | three fixes at source; each has a deterministic sensor that runs with no live stack; all four of my independent mutations were killed and match the commits' own figures; no KNOWN RED block widened and no `dropKeys` list grown |
+| AC-07 | **PASS** | every triple above carries its gate vector including the `state.env` profile read at run time; after-fix figures re-derived per profile; skip population held constant in all ten cells |
+| AC-08 | **PASS** | `harness-e2e.test.ts:17-26` states its strategy and names both; assertions are per-host against a self-constructed scratch `HOME`/`PATH`, so they cannot invert between this machine and CI |
+
+## What was not measured, and why
+
+Stated explicitly rather than omitted:
+
+- **AC-03's 16-file sequence** was not re-run. The brief scoped this gate to the Tier-A
+  profile matrix, the three fixes, and the repo-wide runners. The Phase-0 figure
+  (232 pass / 0 fail / 3 skip, 361.14 s) stands as previously recorded and is **not**
+  re-derived here.
+- **AC-01 and AC-04** were not re-measured for the same reason.
+- **`bun run build`** was not run.
+- **`bun run test:coverage`** (the 90%-per-file floor) was not run; it is a separate blocking
+  workflow and no coverage claim is made here.
+- **Whether EB-SCH-4's missed-job branch is now assertable** after `a83e4f5d` was not
+  measured. F4 establishes only that its stated blocker is gone.
+- **The five `main`-red shell suites** were not root-caused beyond confirming they are
+  identical on `main`.
+- **`bun run test` on `main`** was not run as a whole; F1's attribution rests on the
+  reverse-mutation of `package.json` in this worktree (32/0 vs 10/22), which is narrower and
+  more direct.
+
+## Retained from Phase 0
+
+The Phase-0 evidence not restated above still stands as previously recorded: the six repairs
+(`N5`, `N15`, `N18`/`N19`, `D2`, `D4`, `T15`), the `workspaces`-row race fixed in
+`services/etl/pipeline.ts` with its `etl-workspace-row-ordering.test.ts` guard, the EDC-06
+embedding-surface enrolment, and the postgres bring-up budget. The corrections section
+recording two contaminated figures as withdrawn also stands.
+
+The Phase-0 aggregate figure of `6369 pass / 0 fail / 688 skip, 12 of 12 turbo tasks` is
+**superseded**: the same command on this branch now closes at 11 of 12 with 22 failures, for
+the reason in F1.
+
+## Exact next step
+
+Fix F1, F2 and F3 before this branch can merge:
+
+1. Teach `model-registry-stream.ts` to spawn the single `scripts/generate-artifacts.ts`
+   entrypoint (and adjust `assertGeneratorBackstop`'s notion of a plausible list), or restore
+   a parseable two-segment script. The endpoint is broken at runtime either way.
+2. Update `generated-bundles-contract.test.ts` UGB-17 to assert the new single-entrypoint
+   contract — that `generate-artifacts.ts` invokes both generators — rather than to grep the
+   package script for two filenames.
+3. Add the four `MASSA_AI_E2E_*` names to `turbo.json` `tasks.test.passThroughEnv`.
+4. Then rewrite the falsified `[EB-SCH-4:PARTIAL]` reason and the stale `KNOWN RED` block in
+   `26.scheduler.test.ts` (F4), and re-run `bun run test`, `bun run test:scripts` and the
+   shell loop.
+
+---
+
+# Findings resolution — written by the implementer, 2026-09-07 (`e2199bba`)
+
+Everything above this line is the independent verifier's report and is left unedited,
+including its FAIL verdict and its next-step list. This section records what closed each
+finding, and is kept separate so the verdict is not quietly overwritten by the person it was
+returned to. **A re-verification pass is still owed** — see "Still owed" at the bottom.
+
+| Finding | Status | Evidence |
+| --- | --- | --- |
+| F1 `model-registry-stream` throws on every regenerate request | closed | `model-registry-stream.test.ts` 32 pass / 0 fail (was 31/1) |
+| F2 `generated-bundles-contract` UGB-17 | closed | 24 pass / 0 fail (was 23/1) |
+| F3 four `MASSA_AI_E2E_*` unlisted (AD-010) | closed | `turbo-passthrough-env` 3 pass / 0 fail; `passThroughEnv` 70 → 74 |
+| F4 falsified skip reason + stale KNOWN RED | closed | both rewritten in `26.scheduler.test.ts`; the KNOWN RED becomes a regression sensor that keeps its history |
+| F5 `test:scripts` ran 0 of 38 shell suites | closed | the script runs both halves and aggregates |
+
+**The aggregate is restored.** `bun run test --force --continue` closes at **12 of 12 tasks
+successful, 0 cached, exit 0, zero `(fail)` lines** — it had been 11 of 12 with 22 failures.
+That supersedes the "superseded" note above.
+
+**F1 and F2 were one mistake with a name this repository already uses.** The consumer
+inventory for the `generate:artifacts` change was taken with
+`git grep "generate:artifacts" | head -20`, and the visible rows were treated as the
+population. `model-registry-stream.ts` was below the cut. A truncated sweep is not a
+population.
+
+The repair keeps the wrapper — reverting it would restore the argv defect the wrapper exists
+to fix — and pins the generator list on **both** sides so they cannot drift: the route keeps
+its literal `KNOWN_GENERATOR_FILENAMES`, and `generate-artifacts-argv.test.ts` asserts the
+wrapper's own `GENERATORS` equals it. AC-03.5's independence is preserved rather than traded
+away: the route's test derives from the *wrapper's source*, the route from its *literal*, and
+neither calls `deriveGeneratorScripts`.
+
+**F5's fix cannot change CI's verdict, and that was checked rather than assumed.** The old
+form was `bunHalf && loop`; the new is `bunHalf; loop; exit rc`. When the bun half fails both
+exit 1; when it passes both run the loop. Coverage changes, outcome does not.
+
+It does surface three shell suites that were already red and invisible. Attribution measured
+in both places rather than inferred — identical counts on this branch and on the primary
+checkout at clean `main`, and identical again under a scrubbed `HOME`, so they are not a
+local-environment artifact:
+
+| suite | this branch | primary checkout @ main |
+| --- | --- | --- |
+| `test-cursor-bridge-delivery.sh` | 13 passed / 3 failed | 13 passed / 3 failed |
+| `test-plugin-registry-registration.sh` | 43 passed / 4 failed | 43 passed / 4 failed |
+| `test-hook-ownership-orphans.sh` | 12 passed / 10 failed | 12 passed / 10 failed |
+
+None belongs to this branch. They are recorded, not fixed, and are outside its scope — but
+they are a follow-up worth opening, because `test:scripts` has been reporting on 38 suites it
+never ran.
+
+**The three flipped Tier-A cells, re-confirmed after the repairs**, because
+`26.scheduler.test.ts` was edited (comments only, but the file changed):
+
+| profile | file | result |
+| --- | --- | --- |
+| `default` | `29.audit-repairs` | 15 pass / 0 fail / 0 skip |
+| `scheduler-on` | `26.scheduler` | 9 pass / 0 fail / 6 skip |
+| `scheduler-fast` | `26.scheduler` | 8 pass / 0 fail / 7 skip |
+
+`[EB-SCH-3b] lastRunAt=1788805612811 lastSuccessAt=1788805612811 consecutiveFailures=0` —
+`lastSuccessAt` non-null over HTTP, the fix observed live rather than inferred from a passing
+assertion.
+
+**One reading was discarded here, and the rule that caught it earned its place.** The first
+re-confirmation of `scheduler-fast` read **6 pass / 2 fail / 7 skip** at 1-minute load
+**11.05**. The same file, same commit, same stack, re-run at load **3.36**, read **8 pass /
+0 fail / 7 skip**. `spec.md` puts a figure measured above load 6 out of scope; that clause is
+not bookkeeping, and this is the measurement it excluded.
+
+## Still owed
+
+- **Re-verification by someone who did not write these repairs.** This section is the
+  implementer's account of closing the verifier's findings, not an independent confirmation
+  of them, and it does not upgrade the FAIL above to a PASS.
+- The three `main`-red shell suites (17 assertions) have a root cause nobody has traced.
+- AC-03's 16-file sequence, AC-01 and AC-04 are carried from Phase 0 and were not re-derived
+  this session.
