@@ -33,8 +33,20 @@ export const QUICK_COMMAND_NAMES = ["def", "find", "graph", "index", "map", "sta
 /** Reserved skill-bundle root names. A stem colliding with one of these
  *  would, on Cursor, land inside a directory-root-pruned managed path
  *  (`skills/<name>/...`) — two prune mechanisms aimed at one path (critic
- *  F3). Sensor-locked. */
-export const RESERVED_BUNDLE_ROOTS = ["massa-ai", "persona-router", "profile", "agents"] as const;
+ *  F3). Sensor-locked.
+ *
+ *  Must list every bundle `collectSkillEntries` emits under `skills/`, plus
+ *  `agents`. `bootstrap` joined in T21: without it, the new bundle root is
+ *  read as a workflow-command stem by `manifest.test.ts` and by cursor's
+ *  install exclusion, which is how `profile` leaked into the command-skill
+ *  cache before it was added here. */
+export const RESERVED_BUNDLE_ROOTS = [
+  "massa-ai",
+  "persona-router",
+  "profile",
+  "bootstrap",
+  "agents",
+] as const;
 
 /** Command-name charset (WFC-05 Edge Case): lowercase kebab-case, must not
  *  start with a hyphen. */

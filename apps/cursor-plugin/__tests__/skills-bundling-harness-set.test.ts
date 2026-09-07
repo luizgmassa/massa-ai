@@ -2,9 +2,9 @@
  * IPT-05 AC-05.3 — behavioural guard for cursor's harness skill bundling.
  *
  * install_bundled_skills (apps/cursor-plugin/install.sh) must install exactly
- * the three harness skills the generator's own constant names
+ * the four harness skills the generator's own constant names
  * (scripts/generate-skill-artifacts.ts:138 —
- * ["massa-ai", "persona-router", "profile"]), not just massa-ai and
+ * ["massa-ai", "persona-router", "profile", "bootstrap"]), not just massa-ai and
  * persona-router. This is deliberately a real run of install.sh against a
  * scratch HOME, not a static parse of the `for name in …` literal — AC-05.3
  * rejects the "read the list rather than run it" shortcut, the same one
@@ -27,7 +27,7 @@ import os from "os";
 const REPO_ROOT = path.resolve(import.meta.dir, "../../..");
 const INSTALL_SH = path.resolve(REPO_ROOT, "apps/cursor-plugin/install.sh");
 
-const EXPECTED_HARNESS_SKILLS = ["massa-ai", "persona-router", "profile"];
+const EXPECTED_HARNESS_SKILLS = ["massa-ai", "persona-router", "profile", "bootstrap"];
 
 let tmp: string;
 
@@ -48,7 +48,7 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 describe("cursor-plugin harness skill bundling (IPT-05 AC-05.1, AC-05.3)", () => {
-  test("a scratch-HOME install lands exactly the three harness skill directories", async () => {
+  test("a scratch-HOME install lands exactly the four harness skill directories", async () => {
     // MASSA_AI_SKIP_ARTIFACT_GENERATION=1: this checkout's bundle is already
     // generated and shared with sibling in-flight workers in this worktree —
     // regenerating it here would race their edits.

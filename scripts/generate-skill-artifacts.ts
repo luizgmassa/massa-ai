@@ -128,14 +128,20 @@ async function walkFiles(dir: string): Promise<string[]> {
 
 /**
  * Every file this generator owns under `apps/<host>-plugin/skills/`, for all
- * four hosts: skills/massa-ai/**, skills/persona-router/**, and one SKILL.md
- * per skills/agents/<name>/ directory. `relPath` is relative to the plugin's
- * `skills/` directory.
+ * four hosts: skills/massa-ai/**, skills/persona-router/**, skills/profile/**,
+ * skills/bootstrap/**, and one SKILL.md per skills/agents/<name>/ directory.
+ * `relPath` is relative to the plugin's `skills/` directory.
+ *
+ * The bundle list below is one of TWO hardcoded lists a new bundle has to be
+ * added to; `managedRootsFor` is the other. Adding it here alone makes emit
+ * work while `--check` never walks the new subtree and prune never reaches
+ * into it, so a stale file there survives forever and the drift gate reports
+ * clean (T21 / TASK-021).
  */
 export async function collectSkillEntries(): Promise<ManagedEntry[]> {
   const entries: ManagedEntry[] = [];
 
-  for (const bundleName of ["massa-ai", "persona-router", "profile"] as const) {
+  for (const bundleName of ["massa-ai", "persona-router", "profile", "bootstrap"] as const) {
     const sourceDir = path.join(SKILLS_DIR, bundleName);
     const files = await walkFiles(sourceDir);
     for (const rel of files) {
@@ -214,10 +220,15 @@ async function assertCopyable(entry: ManagedEntry): Promise<void> {
 // arbitrary capability combination drives this list (production always uses
 // the real capabilitiesFor()).
 export function managedRootsFor(host: string, capsLookup: CapsLookup = REAL_CAPS_LOOKUP): string[] {
+  // Keep in step with `collectSkillEntries`'s bundle list: that one decides
+  // what is emitted, this one decides what `--check` walks and what prune may
+  // delete inside. A bundle present in only one of the two is the failure mode
+  // T21 documents at the other site.
   const common = [
     path.join("skills", "massa-ai"),
     path.join("skills", "persona-router"),
     path.join("skills", "profile"),
+    path.join("skills", "bootstrap"),
     path.join("skills", "agents"),
   ];
   const extra = capsLookup(host)?.extraManagedRoots ?? [];

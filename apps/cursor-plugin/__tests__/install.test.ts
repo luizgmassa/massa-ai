@@ -19,6 +19,7 @@ import { spawnSync } from "child_process";
 import { promises as fs, existsSync } from "fs";
 import path from "path";
 import os from "os";
+import { RESERVED_BUNDLE_ROOTS as SHARED_RESERVED_BUNDLE_ROOTS } from "../../../scripts/lib/workflow-commands.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../..");
 const INSTALL_SH = path.resolve(
@@ -652,7 +653,15 @@ describe("cursor-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
 // ── T9: generated workflow-command delivery + exclusion-list audit ──────────
 describe("cursor-plugin generated workflow-command delivery (T9, WFC-08)", () => {
   const QUICK_STEM_NAMES = ["def", "find", "graph", "index", "map", "status"];
-  const RESERVED_BUNDLE_ROOTS = ["massa-ai", "persona-router", "agents", "profile"];
+  // Every harness-bundle root the generator emits under this plugin's skills/
+  // dir. Taken from `scripts/lib/workflow-commands.ts` rather than restated:
+  // this used to be a local literal, and T21 found that a bundle added to one
+  // copy and not the other is invisible — the WFC-08 guard below is what makes
+  // membership load-bearing, since a root missing from both this list and
+  // install.sh's `case` is read as a workflow-command stem on both sides of
+  // the scan-derived equality and leaks into the command-skill cache with
+  // every assertion still green.
+  const RESERVED_BUNDLE_ROOTS: readonly string[] = SHARED_RESERVED_BUNDLE_ROOTS;
 
   async function sourceStemDirs(): Promise<string[]> {
     const skillsDir = path.join(REPO_ROOT, "apps/cursor-plugin/skills");
@@ -710,6 +719,10 @@ describe("cursor-plugin generated workflow-command delivery (T9, WFC-08)", () =>
     // was the pre-existing gap (design.md Risks table) — this is its regression
     // guard. Observed red before the install.sh exclusion-list fix: profile/
     // WAS present in installedSkillsDir (leaked, mislabeled as a command skill).
+    // `bootstrap` (T21) is the same class and is asserted by name here for the
+    // same reason: the scan-derived equality above cannot see it, because a
+    // leaked root appears on both sides of that comparison.
+    expect(await pathExists(path.join(installedSkillsDir, "bootstrap"))).toBe(false);
     for (const reserved of ["massa-ai", "persona-router", "agents"]) {
       expect(await pathExists(path.join(installedSkillsDir, reserved))).toBe(false);
     }

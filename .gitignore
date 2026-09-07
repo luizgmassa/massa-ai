@@ -79,6 +79,7 @@ benchmarks/datasets/
 apps/*-plugin/skills/massa-ai/
 apps/*-plugin/skills/persona-router/
 apps/*-plugin/skills/profile/
+apps/*-plugin/skills/bootstrap/
 apps/*-plugin/skills/agents/
 apps/*-plugin/agents/
 apps/*-plugin/agent-profiles/

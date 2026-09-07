@@ -57,6 +57,30 @@ describe("skill-bundle parity — drift gate (PDO-06 AC2)", () => {
   });
 });
 
+describe("skill-bundle parity — the bootstrap bundle is inside --check's walk (T21)", () => {
+  // The behavioural half of the two-list requirement. `collectSkillEntries`
+  // alone would make every byte-identity case above pass while `--check` never
+  // inspected `skills/bootstrap/` at all — an unmanaged file dropped in there
+  // would survive prune forever and the drift gate would report clean. So the
+  // stale file is planted and the gate is read, rather than the list being
+  // asserted and the behaviour assumed.
+  test("an unmanaged extra file inside a plugin's skills/bootstrap makes --check exit non-zero", () => {
+    const stale = path.join(REPO_ROOT, "apps/claude-plugin/skills/bootstrap/UNMANAGED.md");
+    try {
+      require("fs").writeFileSync(stale, "planted by skill-artifact-parity.test.ts\n");
+      const res = spawnSync("bun", ["run", GEN_SCRIPT, "--check"], {
+        encoding: "utf8",
+        cwd: REPO_ROOT,
+        timeout: 60000,
+      });
+      expect(res.status).not.toBe(0);
+      expect(`${res.stdout}${res.stderr}`).toContain("bootstrap");
+    } finally {
+      require("fs").rmSync(stale, { force: true });
+    }
+  }, 90_000);
+});
+
 describe("skill-bundle parity — byte identity (PDO-06 AC7)", () => {
   test.each(HOSTS)("%s: skills/massa-ai/SKILL.md is byte-identical to the source", async (host) => {
     const source = await fs.readFile(path.join(REPO_ROOT, "skills/massa-ai/SKILL.md"));
@@ -80,6 +104,25 @@ describe("skill-bundle parity — byte identity (PDO-06 AC7)", () => {
       path.join(REPO_ROOT, `apps/${host}-plugin/skills/profile/SKILL.md`),
     );
     expect(bundled.equals(source)).toBe(true);
+  });
+
+  test.each(HOSTS)("%s: skills/bootstrap/SKILL.md is byte-identical to the source (T21)", async (host) => {
+    const source = await fs.readFile(path.join(REPO_ROOT, "skills/bootstrap/SKILL.md"));
+    const bundled = await fs.readFile(
+      path.join(REPO_ROOT, `apps/${host}-plugin/skills/bootstrap/SKILL.md`),
+    );
+    expect(bundled.equals(source)).toBe(true);
+  });
+
+  test.each(HOSTS)("%s: skills/bootstrap is inside the generator's managed roots, not only its emit list (T21)", async (host) => {
+    // The second of the two hardcoded lists. Registering the bundle in
+    // `collectSkillEntries` alone makes emit work while `--check` never walks
+    // the subtree and prune never reaches into it, so this asserts the
+    // `managedRootsFor` half directly rather than inferring it from a passing
+    // emit: an unmanaged extra file dropped inside the bundle must make
+    // `--check` exit non-zero.
+    const { managedRootsFor } = await import("../generate-skill-artifacts.ts");
+    expect(managedRootsFor(host)).toContain(path.join("skills", "bootstrap"));
   });
 
   test.each(HOSTS)("%s: every skills/agents/<name>/SKILL.md charter is bundled byte-identical", async (host) => {
