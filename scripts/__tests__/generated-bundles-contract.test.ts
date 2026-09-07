@@ -33,8 +33,21 @@ describe("generation pre-script wiring (UGB-17)", () => {
   }
 
   test("generate:artifacts runs both generators", () => {
-    expect(scripts["generate:artifacts"]).toContain("generate-skill-artifacts.ts");
-    expect(scripts["generate:artifacts"]).toContain("generate-subagent-artifacts.ts");
+    // The script used to name both generators directly, joined by `&&`. It no
+    // longer can: a package script appends the caller's argv to the END of the
+    // whole string, so `bun run generate:artifacts --check` gave `--check` to
+    // the second generator only while the first ran in write mode. The
+    // delegation moved into a wrapper that forwards argv to each.
+    //
+    // So the contract is checked one level down, where it now lives: the entry
+    // point is the wrapper, and the wrapper imports both generators. Asserting
+    // only the script string would have gone quiet about which generators
+    // actually run.
+    expect(scripts["generate:artifacts"]).toBe("bun scripts/generate-artifacts.ts");
+
+    const wrapper = readFileSync(path.join(repoRoot, "scripts", "generate-artifacts.ts"), "utf8");
+    expect(wrapper).toContain("generate-skill-artifacts.ts");
+    expect(wrapper).toContain("generate-subagent-artifacts.ts");
   });
 
   test("opencode package pretest chains both generators (turbo test path)", () => {

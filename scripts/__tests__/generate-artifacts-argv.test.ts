@@ -119,6 +119,27 @@ describe("generate-artifacts argv forwarding (CONTRIBUTING Step 3)", () => {
 });
 
 describe("generate:artifacts call site", () => {
+  test("the wrapper's generator list matches the one model-registry-stream expands it to", () => {
+    // apps/tools-api/src/routes/model-registry-stream.ts spawns each generator
+    // individually to stream its output as its own SSE frame, so it cannot
+    // spawn the wrapper. It recognises the wrapper and expands it to its own
+    // KNOWN_GENERATOR_FILENAMES literal. Two lists, one truth — this is what
+    // stops them drifting, and it is the check that was missing when the
+    // package script became a single command and that route began throwing on
+    // every /regenerate-stream request.
+    const routeSrc = readFileSync(
+      path.join(REPO_ROOT, "apps", "tools-api", "src", "routes", "model-registry-stream.ts"),
+      "utf8",
+    );
+    const literal = /const KNOWN_GENERATOR_FILENAMES = \[([^\]]+)\]/.exec(routeSrc);
+    expect(literal).not.toBeNull();
+
+    const routeNames = [...(literal![1] as string).matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    const wrapperNames = GENERATORS.map((g) => `${g.name}.ts`);
+
+    expect(routeNames).toEqual(wrapperNames);
+  });
+
   test("the package script is a single command, so argv cannot land on only the last one", () => {
     // This is the regression that matters. The wrapper can be present and
     // correct while package.json still chains two commands with `&&`, and then

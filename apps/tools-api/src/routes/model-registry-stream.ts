@@ -131,6 +131,27 @@ function deriveGeneratorScripts(root: string): GeneratorScript[] {
   if (segments.length === 0) {
     throw new Error(`"generate:artifacts" parsed to zero commands: ${JSON.stringify(command)}`);
   }
+
+  // `generate:artifacts` stopped being an `&&` chain: a package script appends
+  // the caller's argv to the END of the whole string, so `--check` reached only
+  // the last command and the skill-artifacts half ran in write mode. It is now
+  // one wrapper that forwards argv to every generator by direct call.
+  //
+  // This route cannot spawn that wrapper: it streams each generator's output as
+  // its own SSE frame and needs them individually. So the wrapper expands to the
+  // scripts it delegates to. The list stays honest because it is pinned on both
+  // sides — `scripts/__tests__/generate-artifacts-argv.test.ts` asserts the
+  // wrapper's own `GENERATORS` is exactly these two names in this order, and
+  // `assertGeneratorBackstop` below still refuses anything shorter. A third
+  // generator therefore has to be added in both places, and the wrapper's test
+  // fails until it is.
+  if (segments.length === 1 && /^bun\s+scripts\/generate-artifacts\.ts$/.test(segments[0] as string)) {
+    return KNOWN_GENERATOR_FILENAMES.map((name) => ({
+      relPath: path.join("scripts", name),
+      name,
+    }));
+  }
+
   return segments.map((segment) => {
     const match = /^bun\s+(\S+\.ts)$/.exec(segment);
     if (!match) {

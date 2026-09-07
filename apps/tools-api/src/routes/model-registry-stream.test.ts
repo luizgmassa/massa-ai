@@ -553,6 +553,31 @@ function independentlyDeriveExpectedGenerators(root: string): string[] {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8")) as { scripts?: Record<string, string> };
   const command = pkg.scripts?.["generate:artifacts"];
   if (typeof command !== "string") throw new Error("test fixture assumption broken: no generate:artifacts script");
+
+  // `generate:artifacts` is a single wrapper now, not an `&&` chain: a package
+  // script appends the caller's argv to the END of the whole string, so
+  // `--check` used to reach only the last command while the first ran in write
+  // mode. The route still spawns the generators individually — it streams each
+  // one's output as its own SSE frame — so it expands the wrapper, and this
+  // derivation must expand it too or the suite compares two different things.
+  //
+  // The independence AC-03.5 asks for is preserved rather than dropped: this
+  // reads the WRAPPER'S OWN SOURCE for the scripts it imports, while the route
+  // uses its literal KNOWN_GENERATOR_FILENAMES. Two different sources of truth,
+  // neither calling deriveGeneratorScripts, so a parser bug still cannot agree
+  // with itself — and a third generator added to the wrapper makes this
+  // derivation return three while the route returns two, which fails loudly.
+  if (/^bun\s+scripts\/generate-artifacts\.ts$/.test(command.trim())) {
+    const wrapperSrc = fs.readFileSync(path.join(root, "scripts", "generate-artifacts.ts"), "utf-8");
+    const imported = [...wrapperSrc.matchAll(/from\s+"\.\/(generate-[a-z-]+\.ts)"/g)].map(
+      (m) => `scripts/${m[1] as string}`,
+    );
+    if (imported.length === 0) {
+      throw new Error("test fixture assumption broken: the wrapper imports no generator scripts");
+    }
+    return imported;
+  }
+
   return command
     .split("&&")
     .map((s) => s.trim())

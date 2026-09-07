@@ -96,7 +96,11 @@
         "RUN_E2E_DESTRUCTIVE",
         "RUN_E2E_LLM",
         "RUN_OWNED_DESTRUCTIVE",
-        "RUN_POSTGRES_TESTS"
+        "RUN_POSTGRES_TESTS",
+        "MASSA_AI_E2E_LLM_MODEL",
+        "MASSA_AI_E2E_SCHED_INTERVAL_MS",
+        "MASSA_AI_E2E_SCHED_TICK_MS",
+        "MASSA_AI_E2E_STATE_DIR"
       ]
     }
   }

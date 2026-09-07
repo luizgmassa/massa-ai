@@ -396,11 +396,15 @@ beforeAll(() => {
     );
   }
   console.log(
-    "[EB-SCH-4:PARTIAL] the missed-job branch of catch-up is still not asserted, and the " +
-      "blocker is the EB-SCH-6 product defect, not the interval length: every job's " +
-      "nextRunAt is recomputed from `now` on every boot (measured on scheduler-fast — " +
-      "a 15 s scheduler outage produced nextRunAt = boot+interval and zero `catch-up` " +
-      "lines in the API log), so a past-due job cannot exist at boot by construction. " +
+    "[EB-SCH-4:PARTIAL] the missed-job branch of catch-up is still not asserted, but its " +
+      "recorded blocker is GONE as of 2026-09-07 (`a83e4f5d`) and this reason is now the " +
+      "narrower one. The old text said a past-due job could not exist at boot by " +
+      "construction, because every nextRunAt was recomputed from `now` — that was the " +
+      "EB-SCH-6 defect, and it is fixed: index.ts awaits the store's hydration before " +
+      "registering, and scheduler.ts preserves a past-due nextRunAt deliberately so " +
+      "catch-up can identify which jobs were missed. What is still missing is only the " +
+      "setup: producing a genuinely past-due persisted job across a restart needs an " +
+      "outage longer than the job's interval, which no current profile makes cheap. " +
       "The not-missed bound (catch-up fires zero ticks) IS asserted across a real restart.",
   );
   if (SCHEDULER_ON && !RESTART_READY) {
@@ -1001,26 +1005,27 @@ describe.skipIf(!RESTART_READY)("EB-SCH-4/EB-SCH-6 restart survival", () => {
         // PostgreSQL via PgScheduledJobStore (scheduler-store-factory.ts:16-22),
         // which is what makes the value survive a process replacement at all.
         //
-        // KNOWN RED — this reports a product defect, not a test defect, and is
-        // left failing for the same reason N6 was in Phase 0: it is telling the
-        // truth. Measured on the dedicated stack, nextRunAt moved by exactly the
-        // restart duration (1788749118946 -> 1788749139648, 20702 ms), i.e. it
-        // was recomputed as now + intervalMs. Root cause, read from source:
-        // `PgScheduledJobStore.get()` is synchronous and answers from an
-        // in-memory mirror, firing `void this.ensureHydrated()` fire-and-forget
-        // (scheduler-store-pg.ts:246-247). `registerDefaultJobs` runs
-        // synchronously at boot (apps/tools-api/src/index.ts:288), before that
-        // hydration can resolve, so `existing` is null for every job and
-        // registerOrResumeJob takes its "New job" branch (scheduler.ts:210-212).
-        // Hydration's own overlay then keeps the local value over the DB row
+        // WAS KNOWN RED — FIXED 2026-09-07 in `a83e4f5d`. Kept as a regression
+        // sensor, and the history kept with it, because the mechanism is subtle
+        // enough for a plausible refactor to reintroduce it.
+        //
+        // Measured before the fix: nextRunAt moved by exactly the restart
+        // duration (1788749118946 -> 1788749139648, 20702 ms), i.e. recomputed
+        // as now + intervalMs. `PgScheduledJobStore.get()` is synchronous and
+        // answers from an in-memory mirror, firing `void this.ensureHydrated()`
+        // fire-and-forget (scheduler-store-pg.ts:246-249). `registerDefaultJobs`
+        // ran at boot before that hydration could resolve, so `existing` was
+        // null for every job and registerOrResumeJob took its "New job" branch.
+        // Hydration's overlay then kept the local value over the DB row
         // (scheduler-store-pg.ts:118-125), discarding what was persisted.
         //
-        // Two consequences beyond this assertion: the documented "resume on
-        // restart" contract is unreachable from the only path that calls it, and
-        // `catchUpMissedJobs()` (Wave 5 FR-13) can never observe a missed job,
-        // because every nextRunAt was just set to now + interval. A process that
-        // restarts more often than a job's interval — 30 min for consolidation,
-        // 60 min for decay — never fires that job at all.
+        // The repair is an optional `ready()` on the store contract, implemented
+        // only by the PostgreSQL backend and awaited once in
+        // `apps/tools-api/src/index.ts` before `registerDefaultJobs`. Reads stay
+        // synchronous — the tick loop must not await inside a scheduling
+        // decision — so deleting that one await restores the defect in full
+        // while every unit test stays green. `scheduler-boot-order.test.ts`
+        // guards the call site by ORDER for exactly that reason.
         expect(resumed.nextRunAt).toBe(job.nextRunAt);
         expect(resumed.enabled).toBe(job.enabled);
         expect(resumed.jobKind).toBe(job.jobKind);
