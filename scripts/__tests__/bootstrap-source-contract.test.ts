@@ -156,3 +156,65 @@ describe("bootstrap source contract: skills/AGENTS.md rule markers", () => {
     expect(contexts).toEqual([]);
   });
 });
+
+/**
+ * Removes every rule's own span (start marker through end marker, inclusive)
+ * from the bootstrap block, in one pass over the whole string. What remains
+ * is prose no toggle state can ever hide — the always-rendered residue. A
+ * rule that reasserts itself there (an activation instruction outside every
+ * span) survives being disabled: the same defect class the design already
+ * solved for `code-comments` with an explicit off-text, but never
+ * generalized to the activation stack.
+ */
+function stripAllRuleSpans(content: string): string {
+  const startRe = /<!--\s*massa-ai:rule:([a-z0-9-]+):start\s*-->/g;
+  let out = "";
+  let cursor = 0;
+  let m: RegExpExecArray | null;
+  while ((m = startRe.exec(content)) !== null) {
+    if (m.index < cursor) continue; // already consumed by a prior span
+    const id = m[1];
+    const endTag = `<!-- massa-ai:rule:${id}:end -->`;
+    const endIdx = content.indexOf(endTag, m.index);
+    if (endIdx === -1) continue; // malformed pair; the marker-pair test above already fails this
+    out += content.slice(cursor, m.index);
+    cursor = endIdx + endTag.length;
+  }
+  out += content.slice(cursor);
+  return out;
+}
+
+describe("bootstrap source contract: no rule leaks outside every span", () => {
+  // Scope note: this checks the always-rendered residue — content outside
+  // EVERY rule span — for the 9 registry ids and the 3 literal
+  // activation-stack names. It deliberately does not flag a rule's name
+  // appearing inside a *different* rule's own span (e.g. dedupe-guardrails
+  // or conversation-feedback prose mentioning `massa-ai` while describing
+  // their own, unrelated behavior): that is a same-domain cross-reference
+  // inside content that is itself already toggleable, not an instruction
+  // that survives the referenced rule being disabled. A fully precise
+  // "outside its own span specifically" check would also have to model
+  // which cross-span mentions are load-bearing instructions versus
+  // incidental prose, which is not mechanically expressible from the
+  // markup alone; this narrower, defensible check is what is asserted here.
+  test("the always-rendered residue names no rule id and no activation-stack name", async () => {
+    const content = await read(AGENTS_MD);
+    const bootstrapStart = content.indexOf(BOOTSTRAP_START);
+    const bootstrapEnd = content.indexOf(BOOTSTRAP_END);
+    expect(bootstrapStart).toBeGreaterThanOrEqual(0);
+    expect(bootstrapEnd).toBeGreaterThan(bootstrapStart);
+
+    const block = content.slice(bootstrapStart, bootstrapEnd + BOOTSTRAP_END.length);
+    const residue = stripAllRuleSpans(block);
+
+    const idLeaks = RULE_IDS.filter((id) => residue.includes(id));
+    expect(idLeaks).toEqual([]);
+
+    // Backtick-delimited so a path (`skills/massa-ai/SKILL.md`) or a
+    // compound CLI token (`massa-ai-config bootstrap`) cannot match — only
+    // the bare, standalone activation-stack name counts as a leak.
+    const ACTIVATION_NAMES = ["`caveman full`", "`massa-ai`", "`persona-router`"];
+    const nameLeaks = ACTIVATION_NAMES.filter((name) => residue.includes(name));
+    expect(nameLeaks).toEqual([]);
+  });
+});
