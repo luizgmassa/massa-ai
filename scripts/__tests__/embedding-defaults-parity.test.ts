@@ -115,6 +115,18 @@ const PAIR_SURFACES: Array<{ file: string; model: RegExp; dims: RegExp }> = [
     model: /provider === "ollama"\) \{[\s\S]*?model: \(options\.model as string\) \|\| "([^"]+)"/g,
     dims: /provider === "ollama"\) \{[\s\S]*?dimensions:\s*(\d+)/g,
   },
+  {
+    // The dedicated E2E stack pins its own embedding profile, and a mismatch
+    // here is invisible rather than loud: a wrong width does not fail, it
+    // silently routes the run into a different `vector_documents_<n>d` table
+    // (.specs/features/e2e-feature-battery/design.md). The two `${VAR:-…}`
+    // defaults at the top of the script are the only literals; the
+    // `OLLAMA_EMBEDDING_*` assignments further down expand these variables,
+    // so the extractors anchor on the definitions, not the exports.
+    file: "scripts/e2e-stack.sh",
+    model: /\$\{MASSA_AI_E2E_EMBED_MODEL:-([^}]+)\}/g,
+    dims: /\$\{MASSA_AI_E2E_EMBED_DIMS:-(\d+)\}/g,
+  },
 ];
 
 const MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
