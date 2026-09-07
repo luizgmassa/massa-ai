@@ -4,19 +4,20 @@
 ## Required Coding Bootstrap
 
 For every new conversation involving coding, planning before coding, debugging,
-code review, refactoring, or implementation, activate this stack in order:
-`caveman full` → `massa-ai` → `persona-router`. Each rule below can be
-switched off individually through `massa-ai-config bootstrap`; a disabled
-rule's section is absent from the rendered contract.
+code review, refactoring, or implementation, activate the rules below in the
+order they appear. Each rule can be switched off individually through
+`massa-ai-config bootstrap`; a disabled rule's section is absent from the
+rendered contract, and the remaining rules still activate in their own
+relative order.
 
 <!-- massa-ai:rule:caveman:start -->
-### 1. `caveman full`
+### `caveman full`
 
 Keep communication compressed while preserving technical accuracy; relax
 compression when clarity or safety requires it.
 <!-- massa-ai:rule:caveman:end -->
 <!-- massa-ai:rule:massa-ai-router:start -->
-### 2. `massa-ai`
+### `massa-ai`
 
 Activation means loading and using each available behavior. Load the installed
 `massa-ai` skill's `SKILL.md` once before substantive work begins. Use it as
@@ -46,7 +47,7 @@ Its selected workflows and references define exact tool contracts, memory
 tags, failure handling, and completion evidence.
 <!-- massa-ai:rule:massa-ai-router:end -->
 <!-- massa-ai:rule:persona-router:start -->
-### 3. `persona-router`
+### `persona-router`
 
 After massa-ai finishes its initial memory setup, load and run
 `persona-router` against the first user prompt before substantive work,
