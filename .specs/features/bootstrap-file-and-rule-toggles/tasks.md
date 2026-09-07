@@ -100,12 +100,25 @@ Guidelines were found, so the Coverage Expectation below conforms to them rather
 | Gate Level | When to Use | Command |
 | --- | --- | --- |
 | Quick | After a task whose tests are a single unit or contract file | `bun test <the task's named test file>` |
-| Full | After a task touching the installer, the generator, or a plugin bundle | `bun run test:scripts && bun run test:plugins` |
+| Full | After a task touching the installer, the generator, or a plugin bundle | `MASSA_AI_EXECUTOR_SANDBOX=none bun run test && bun run test:scripts && bun run test:plugins` |
 | Build | After phase completion | `bun run lint && bunx turbo run type-check --force && bun run build && bun run test:scripts && bun run test:plugins` |
 
 **The artifact gate is `bun scripts/generate-skill-artifacts.ts --check`, never `bun run generate:artifacts --check`.** `package.json:31` is an `&&` chain, so the flag reaches only the second generator while the first runs in write mode and repairs the drift it should report. CI uses the direct form (`.github/workflows/ci.yml:238`).
 
 **Baseline to beat, measured at `09e9a597` after `bun run build`:** `test:scripts` 1821 pass / 2 fail across 81 files. The two failures are `pyts golden: lessons > list --status all …` and `… list --query filter …`, and both reproduce at `origin/main` — they are pre-existing and out of scope. Any third failure is this feature's. Re-measured at `9cd23199` (Phase 7 complete): **1873 pass / 2 fail across 83 files**, same two failures.
+
+**PC-G2 — `bun run test` was absent from this table for the whole feature, and that is how two
+regressions shipped undetected.** Every phase ran `bun run test:scripts` and `bun run
+test:plugins` and treated them as the whole suite. They are the **supplement**: `CLAUDE.md`
+says plainly that `bun run test` is the turbo task over the six packages and that
+`test:scripts` covers the root-level suites turbo cannot reach. Reading that as "test:scripts
+is the real one" inverts it. Measured one package at a time at both refs, after the
+re-verification gate flagged it: `apps/web-ui` **778/0 at `origin/main` → 772/6 at HEAD**
+(red since Phase 2, from T3's `MassaAiConfig` addition), and `apps/tools-api`'s
+`model-registry-stream.test.ts` **32/0 → 10/22** (from T28). Neither is reachable from
+`test:scripts` or `test:plugins`. The Full row above now names it first. Note turbo **cancels
+sibling tasks** on the first failure, so `Tasks: N successful, M total` under-reports — run the
+suspect package directly before attributing anything.
 
 **PC-G1 — two gate commands this artifact named do not run, and a third env fact.** Found by
 executing them before Phase 8 rather than at dispatch time.
@@ -1172,6 +1185,93 @@ touches this next.
 **Tests**: unit
 **Gate**: quick — `cd packages/shared && bun test src/bootstrap`, then full
 **Commit**: `fix(bootstrap): consume each host's recorded root and correct the test fixture`
+
+---
+
+### T30: Repair the Web UI config-section regression
+
+**Task ID**: TASK-030 — **verification fix, iteration 3 of a maximum 3**
+
+**What**: Bring `apps/web-ui`'s config expectations in line with the `bootstrap` section T3 added, so `bun run test` is green for that package.
+**Where**: `apps/web-ui/src/static/views/` and its `__tests__/`
+**Depends on**: the re-verification gate
+**Requirement**: BST-10 AC-11 (the persisted shape), regression repair
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why — this has been red since Phase 2 and nothing caught it.** T3 added `bootstrap` to
+`MassaAiConfig`, which `apps/web-ui/src/static/views/config-sections.ts` declares as a mapped
+type over every `ConfigSectionKey`, so the section list grew. The package's tests still assert
+the old population. **Measured, one package at a time, at both refs:**
+
+| Suite | `origin/main` | HEAD |
+| --- | --- | --- |
+| `cd apps/web-ui && bun test` | **778 pass / 0 fail** across 15 files | **772 pass / 6 fail** across 15 files |
+
+The 6 failures are `renders all 16 sections`, `renders all 16 sections even when config is
+empty`, `renders a details field guide per section`, `the declared population is 104 fields
+across 16 sections`, and the two `render golden fixture … renders byte-identically` cases.
+
+**This was missed because the orchestrator's gate table never included `bun run test`.** Every
+phase ran `test:scripts` and `test:plugins` and treated them as the whole suite; they are the
+*supplement*. `bun run test` is the turbo task over the six packages, and it is where this
+lives. Add it to any future gate table for this repository.
+
+**Done when**:
+- [ ] `cd apps/web-ui && bun test` is **778 pass / 0 fail across 15 files**, matching the `origin/main` baseline exactly — a lower total means assertions were dropped rather than updated
+- [ ] The section-count and field-count assertions state the **new** truth (17 sections, and whatever the field sweep now measures), not a loosened inequality. `toBeGreaterThanOrEqual` in place of an exact count is a weakened assertion and fails this task
+- [ ] The golden fixture is regenerated deliberately, with an inline note recording that the `bootstrap` section is the reason it moved and naming the commit that introduced it. It is a frozen pre-split behaviour guard; moving it silently would destroy its meaning
+- [ ] The `bootstrap` section renders as the read-only `json` field Phase 2's log describes, and the out-of-scope row in `spec.md` — no per-rule **toggle** UI — stays true
+- [ ] Observed red first: confirm the 6 named failures before changing anything, and quote the count
+
+**Tests**: unit
+**Gate**: `cd apps/web-ui && bun test`, then `MASSA_AI_EXECUTOR_SANDBOX=none bun run test`
+**Commit**: `fix(web-ui): account for the bootstrap config section`
+
+---
+
+### T31: Reconcile `generate:artifacts` with the Tools API parser
+
+**Task ID**: TASK-031 — **verification fix, iteration 3 of a maximum 3**
+
+**What**: Make `package.json`'s `generate:artifacts` forward `--check` to both generators **and** stay parseable by the Tools API route that derives the generator list from it.
+**Where**: `package.json`, `apps/tools-api/src/routes/model-registry-stream.ts`, and their suites
+**Depends on**: T28
+**Requirement**: BST-12 AC-1 (as amended), regression repair
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why — T28's fix broke a shipped product surface.**
+`apps/tools-api/src/routes/model-registry-stream.ts:130-143` reads
+`scripts["generate:artifacts"]`, splits it on `&&`, and requires every segment to match
+`/^bun\s+(\S+\.ts)$/`, throwing otherwise. T28 replaced the plain chain with
+`sh -c 'bun … "$@" && bun … "$@"' --`, whose segments match neither, so
+`deriveGeneratorScripts` now throws per request and **both `/regenerate-stream` and
+`/regenerate-and-install-stream` are down**. Measured at both refs:
+
+| Suite | `origin/main` | HEAD |
+| --- | --- | --- |
+| `cd apps/tools-api && bun test src/routes/model-registry-stream.test.ts` | **32 pass / 0 fail** | **10 pass / 22 fail** |
+
+**The constraint that decides the shape.** `model-registry-stream.test.ts:652-653` asserts the
+route spawns **both** generator paths:
+`expect(spawnedPaths.some((p) => p.endsWith("generate-skill-artifacts.ts"))).toBe(true)` and
+the same for `generate-subagent-artifacts.ts`. So collapsing `generate:artifacts` into a single
+wrapper script would satisfy the regex and break these instead — the route would derive and
+spawn one script. And the regex is anchored, so **no** argument-forwarding form can satisfy it
+as written. Something has to give on the parser side.
+
+**Done when**:
+- [ ] Both `bun run generate:artifacts --check` and `bun scripts/generate-skill-artifacts.ts --check` exit non-zero under planted drift and leave the plant in place (BST-12 AC-1 as amended)
+- [ ] A plain no-flag `bun run generate:artifacts` still regenerates both generators — `pretest:scripts`, `pretest:plugins`, `pretest:coverage` and the opencode package's own `pretest` all depend on it
+- [ ] `deriveGeneratorScripts` still derives **exactly two** entries, `generate-skill-artifacts.ts` and `generate-subagent-artifacts.ts`, so `:652-653` hold unchanged
+- [ ] `cd apps/tools-api && bun test` is green, and its `model-registry-stream.test.ts` is back to **32 pass / 0 fail**
+- [ ] Its defensive floor stays a floor: whatever widening the parser gets, it must still **throw** on a genuinely unparseable script value. Add a case proving that, and observe it red
+- [ ] Do not weaken `:652-653` or any existing assertion to accommodate a new script shape — if the only way forward requires changing them, stop and report
+
+**Tests**: unit
+**Gate**: `cd apps/tools-api && bun test`, then `MASSA_AI_EXECUTOR_SANDBOX=none bun run test`, plus both `--check` forms by hand under a scratch `XDG_CONFIG_HOME`
+**Commit**: `fix(build): keep generate:artifacts parseable while forwarding arguments`
 
 ---
 
