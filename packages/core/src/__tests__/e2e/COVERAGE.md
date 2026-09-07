@@ -2,7 +2,12 @@
 
 Current E2E contract for `packages/core/src/__tests__/e2e/`.
 
-Last updated: 2026-07-24. Acceptance backend: PostgreSQL 17 + pgvector 0.8.4.
+Last updated: 2026-09-07. Acceptance backend: PostgreSQL 17 + pgvector 0.8.4.
+
+The figures under "Latest real verification data" below predate the six Phase-1 suites and the
+three product fixes of 2026-09-07; `.specs/features/e2e-feature-battery/validation.md` carries
+the current per-profile measurements and is the one to read first. Nothing in this file is
+evidence — it is a map of what exists and how to run it.
 
 ## Coverage decisions
 
@@ -52,6 +57,12 @@ Last updated: 2026-07-24. Acceptance backend: PostgreSQL 17 + pgvector 0.8.4.
 | `22.path-identity.test.ts` | same-process wrong-root rebuild and non-force reuse rejection |
 | `23.owned-destructive.test.ts` | owned N1/N3/E25/F88 outage, restart, configuration, and recovery orchestration |
 | `24.dashboard-architecture.test.ts` | dashboard routes (scheduler/hooks), get_architecture MCP+HTTP, rename/merge dryRun preview |
+| `25.observability.test.ts` | `EB-OBS-1..7` — recovers the scope of the deleted `12.observability.test.ts`. Profile `default` |
+| `26.scheduler.test.ts` | `EB-SCH-1..6` + `3b` — a two-profile matrix, `scheduler-on` and `scheduler-fast` |
+| `27.auth-config-cache.test.ts` | `EB-AUTH-1..6`, `EB-CFG-1..3`, `EB-CACHE-1..4`. Profile `auth` |
+| `28.hooks-handoffs-proposals.test.ts` | `EB-HOOK-1..3`, `EB-HO-1..3`, `EB-AI-1..3` — runs under `default` and again under `hooks-off` |
+| `29.audit-repairs.test.ts` | `EB-SRCH`, `EB-MEM`, `EB-SYN`, `EB-EXEC`, `EB-MCP`, `EB-IDX`, `EB-TOOL` — scenarios an audit found missing behind rows already marked OK. Profile `default` |
+| `30.llm-features.test.ts` | `EB-LLM-1..6` + `3b`. Profile `llm-on`, double-gated on `RUN_E2E=1` **and** `RUN_E2E_LLM=1`; never in the default aggregate |
 
 The MCP surface is defined by `apps/mcp-client/src/tool-definitions.ts`; coverage should follow
 that source rather than duplicating a tool count here. When a tool or endpoint is added, update
@@ -61,8 +72,18 @@ the responsible suite row and add HTTP/MCP equivalence where both transports exi
 `21.qwen-fixture.test.ts`, and `backend-attestation.test.ts` (28 lines) were all removed in
 commit `5d43a96f` ("feat(storage): require PostgreSQL and remove SQLite runtime"). The first two
 rows survived the deletion and were still listed here — including inside the runnable command
-block below, which meant the documented standard sequence could not execute as written. The
-observability surface they covered is unowned until a replacement suite lands.
+block below, which meant the documented standard sequence could not execute as written.
+`25.observability.test.ts` now owns that surface again; the row above is its replacement.
+
+**A pass/fail/skip triple from these suites is not a property of the branch.** They decide what
+executes from runtime probes over ambient machine state, not from code — `READY` is an async
+probe, and the rest are conjunctions of it with `OLLAMA_UP`, `MCP_BIN`, `CONFIG_OK`, `OWNED`
+and `STACK_PROFILE`. Stack state lives at the machine-global path `/tmp/massa-ai-e2e-stack`.
+So a figure quoted without the gate vector that produced it cannot distinguish a real change
+from a differently provisioned stack, and two of the scenarios are visible under exactly one
+profile each: `EB-SCH-3b` only under `scheduler-fast`, and `EB-SCH-6` only under
+`scheduler-on` (under `scheduler-fast` the suite sets `RESTART_READY=false`, because
+`restart-api` re-derives the profile from `state.env`).
 
 ## Tests updated in the 2026-07-13 maintenance pass
 
@@ -166,9 +187,17 @@ warm state.
 | `T15` shared-index identity *(surfaced after the other five)* | The `beforeAll` seeds SHARED_PID at a deliberately wrong root, then asserts warmth with `isSharedIndexWarm`, whose probes name canonical-corpus symbols absent from that root. It could only pass when the reindex failed to clear the previous corpus. |
 
 All six are repaired; see the CHANGELOG entry for what each now asserts instead. The three
-remaining skips are the pre-existing self-reported ones (search-internals with no public
-introspection, graph density on the inbound BFS, `impact_analysis` with no committed diff in
-the fixture) — none is a silent skip.
+remaining skips **in that 16-file sequence** are the pre-existing self-reported ones
+(search-internals with no public introspection, graph density on the inbound BFS,
+`impact_analysis` with no committed diff in the fixture) — none is a silent skip.
+
+That count is scoped to the sequence above and is **not** a repository-wide skip census. The
+six Phase-1 suites added on 2026-09-07 carry many more declared skips, most of them
+profile-conditional by design: `28` reports a different skip count under `default` than under
+`hooks-off`, and `26` a different one under `scheduler-on` than under `scheduler-fast`. Each
+is a stated, reasoned line naming either a measurement or a source location. Read the
+per-profile table in `.specs/features/e2e-feature-battery/validation.md` rather than
+extrapolating this number.
 
 Relevance held on the new corpus: `14.needles.test.ts` passed, with N01 @1, N03 @1, N07 @1,
 N04/N06/N08 @2, N02 @3, N05 @5.
@@ -244,6 +273,34 @@ bun test --max-concurrency 1 src/__tests__/e2e/17.cleanup-verify.test.ts
 RUN_E2E_DESTRUCTIVE=1 bun test src/__tests__/e2e/16.destructive.test.ts
 RUN_OWNED_DESTRUCTIVE=1 bun test --max-concurrency 1 src/__tests__/e2e/23.owned-destructive.test.ts
 ```
+
+### The Phase-1 suites are a profile matrix, not one run
+
+Suites `25`–`30` each declare a profile, and four of them cannot be measured under `default`.
+Run **one file per invocation and one profile per invocation**; bring the stack to each
+profile with `up --profile <p>` and re-`eval` the env between them, because `restart-api`
+re-derives the profile from `state.env` rather than taking it as an argument.
+
+```bash
+# from the repo root, once per profile
+bash scripts/e2e-stack.sh up --profile default        # then: 25, 28, 29, 10, 11
+bash scripts/e2e-stack.sh up --profile scheduler-on   # then: 26   (EB-SCH-6 lives here)
+bash scripts/e2e-stack.sh up --profile scheduler-fast # then: 26   (EB-SCH-3b lives here)
+bash scripts/e2e-stack.sh up --profile auth           # then: 27
+bash scripts/e2e-stack.sh up --profile hooks-off      # then: 28   (second reading)
+bash scripts/e2e-stack.sh up --profile llm-on         # then: 30   (needs RUN_E2E_LLM=1)
+
+# after each `up`, from packages/core
+eval "$(bash ../../scripts/e2e-stack.sh env)"
+bun test --max-concurrency 1 src/__tests__/e2e/26.scheduler.test.ts
+
+# the llm-on suite is double-gated and never enters the default aggregate
+RUN_E2E_LLM=1 bun test --max-concurrency 1 src/__tests__/e2e/30.llm-features.test.ts
+```
+
+Quote every result as `gate vector + triple`, never a bare triple, and hold the skip
+population constant when comparing two runs — a failure that became a skip is a regression
+wearing a fix's clothes, and the aggregate alone cannot tell the two apart.
 
 `RUN_E2E=1` is already exported by `e2e-stack.sh env`, which is why the commands above no
 longer repeat it. When you are done:

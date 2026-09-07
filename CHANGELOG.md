@@ -23,9 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The only automated provisioning of PostgreSQL :5433 / Ollama :11435 / Tools API :3334 lived
   inside `packages/core/src/__tests__/e2e/23.owned-destructive.test.ts`, reachable only by
   running that one suite; every other E2E file assumed a stack started by hand. `up`,
-  `down`, `status`, `restart-api` and `env` now own it, with five profiles (`default`,
-  `auth`, `hooks-off`, `scheduler-on`, `llm-on`) because a suite attached to a process it did
-  not start cannot test restart or an environment swap. `env` emits all four pins the
+  `down`, `status`, `restart-api` and `env` now own it, with six profiles (`default`,
+  `auth`, `hooks-off`, `scheduler-on`, `scheduler-fast`, `llm-on`) because a suite attached to
+  a process it did not start cannot test restart or an environment swap. `env` emits all four pins the
   suite's fail-closed guard requires together — emitting a subset makes every guarded suite
   throw before its first HTTP call. Three behaviours are load-bearing rather than
   defensive: it refuses to touch a port whose listener it does not own, it re-runs database
@@ -33,6 +33,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   otherwise stays half-provisioned forever), and it asserts after startup that the dedicated
   API is really pointed at :11435 and `massa_ai_test` on :5433 rather than at the
   developer's own stack.
+- **Six new Tier-A live-stack suites, covering the surfaces the battery could not reach.**
+  `25.observability` recovers the scope of `12.observability.test.ts`, deleted in `5d43a96f`
+  and unowned since; `26.scheduler` runs as a two-profile matrix; `27.auth-config-cache`
+  closes the declared skip at `15.nfr.test.ts:716`; `28.hooks-handoffs-proposals` runs under
+  both `default` and `hooks-off`; `29.audit-repairs` covers scenarios an audit found missing
+  behind rows already marked OK; and `30.llm-features` sits behind its own `RUN_E2E_LLM=1`
+  gate on top of `RUN_E2E`, so it never enters the default aggregate — proven rather than
+  asserted, by observing 0 pass / 13 skip with the gate unset. Every declared skip in the six
+  carries a stated reason, and each reason names either a measurement or a source location;
+  none is a silent pass.
+- **A sixth stack profile, `scheduler-fast`, so a scheduled job actually fires inside a suite
+  run.** The scheduler's concurrency cap had been a permanent `describe.skipIf(true)` whose
+  stated reason — that no profile could configure a short enough interval — was wrong about
+  the product: `MASSA_AI_SCHEDULER_<KIND>_INTERVAL_MS` sits at the top of the precedence
+  chain (`scheduler-defaults.ts:297-301`), outranking the ≥30 min clamp in `applySafeDefaults`,
+  which only supplies the fallback. The objection underneath it was sound, and is answered by
+  choosing which kinds shorten rather than shortening everything: `checkpoint-purge` is a
+  bounded DELETE of already-expired rows and `observation-bridge` returns `noop` at its first
+  gate with the LLM off, while consolidation and decay stay off because both run the full
+  decay-prune-merge cycle over every memory in `massa_ai_test`.
+- **`scripts/verify-harness-install.ts` can tell an absent host from a broken install.** It
+  emitted 24 rows — 4 hosts × 6 artifacts — with no detection concept, so a host simply not
+  present on the machine produced six `missing` rows indistinguishable from a host whose
+  install had failed. Every row now carries `detected`, mirroring `installer_host_detected`
+  (`installer-shared.sh:225-241`) so a host this tool calls undetected is exactly one
+  `install-harness.sh` would skip. Additive: the same scratch `--home` gives 24 rows and
+  identical `{host, artifact, status}` triples before and after. The exit code is deliberately
+  unchanged — this tool reports what is installed, not what ought to be — so a caller wanting
+  host-aware pass/fail filters on `detected` itself. It also gains its first test; it had
+  none, and no CI reference either.
+- **Tier B: `scripts/__tests__/harness-e2e.test.ts` grades a real harness install per host.**
+  Runs the shipping `install-harness.sh --all` into a scratch HOME and reads the oracle's
+  JSON, never the installer's exit code — the plugin phase acts only on detected hosts, so
+  that code moves for reasons unrelated to the subject. It seeds the four config directories
+  rather than relying on `command -v`, because under a scratch HOME detection otherwise finds
+  three or four hosts on a dev box and zero in CI, inverting the same assertion between them.
+  Measured: 1796 files installed, 24 of 24 rows `ok`, 18 of 18 sub-agents on every host.
+- **Root `install.sh` is executed rather than only grepped.** The two suites that named it
+  read it as text. `scripts/tests/test-root-install-live-exec.sh` runs it behind recording
+  `git`/`curl`/`bun` stubs shadowing PATH, and the evidence that it stops at the network
+  boundary is the exit code itself: 17, the git-clone stub's deliberate sentinel. It covers
+  the three `/dev/tty` reads that have environment seams, and guards the read count so a
+  seventh prompt fails a test instead of appearing unnoticed. The three unseamed post-install
+  menu reads are recorded as not covered, with the measured reason in-file.
+- **`ToolError` is on `@massa-ai/core`'s public surface**, for the same reason
+  `ProposalPayloadValidationError` already was: a transport has to tell an invalid-parameter
+  rejection from a server fault with `instanceof` rather than by comparing `error.name`.
+  Without it, any route delegating to a tool turned a 400 into a 500.
 
 ### Fixed
 
@@ -123,6 +171,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   separate `MASSA_AI_READ_ONLY_MODE`. The same section still described the Admin Portal as
   read-only and named SQLite's `FTS5` in a PostgreSQL-only product, and the table of contents
   omitted the Subagent Skills section entirely.
+- **`list_projects` answered two different shapes depending on transport.** REST returned
+  `{"total":N}` and the embedded MCP client `{"total":N,"filter":"all"}`, contradicting the
+  contract stated at `embedded-api-client.ts:10-16` — that the mapping "mirrors the tools-api
+  REST routes exactly so a tool call yields the same result shape in both modes". The embedded
+  path delegates to the core tool while `GET /api/v1/workspace/list` hand-rolled a second
+  projection beside it, and the two drifted. The divergence was wider than the live-stack
+  sensor could see: it compares with `dropKeys: ["workspaces"]`, so it caught only the missing
+  `filter`, while the route also dropped per-workspace `createdAt`/`updatedAt` and performed
+  no validation of `status` at all — `?status=bogus` reached `listWorkspaces`, which filters
+  on equality, and answered 200 with an empty list. Adding `filter` to the route would have
+  turned the sensor green and left a second projection in place to drift again, so the route
+  now delegates to the tool: one projection where there were two, and an unknown status is a
+  400 naming every valid value rather than a silent empty result.
+- **The scheduler's only black-box health surface reported every job as never-succeeded and
+  never-failed.** `dashboard.ts` wrote `lastSuccessAt: null` and `consecutiveFailures: 0` as
+  literals, so over HTTP a job failing every tick was indistinguishable from a healthy one.
+  The literals were not the root: `fireJob` maintains and persists four Wave 5 FR-13 fields
+  (`scheduler.ts:489-500`) and `Scheduler.status()` carried none of them outward, leaving the
+  route nothing to read. Measured at one instant with both kinds having fired, HTTP said
+  `"lastSuccessAt":null` while SQL said `last_success_at=1788787737541`. The snapshot now
+  projects all four, required rather than optional and normalised with `?? null` / `?? 0`, so
+  a consumer never has to tell "field absent" from "never succeeded" — the ambiguity that let
+  the literals read as reasonable.
+- **`nextRunAt` did not survive an API restart**, despite `index.ts` claiming since the
+  scheduler landed that registration "preserves nextRunAt/lastRunAt across restarts so the
+  schedule resumes on boot". It came back recomputed as `now + intervalMs`, and the measured
+  drift equalled the restart duration itself, 20702 ms. `registerOrResumeJob` is correct — it
+  preserves the persisted value whenever the schedule is unchanged — but it decides by
+  comparing against a *synchronous* `store.get()`, and `PgScheduledJobStore` serves that read
+  from a mirror it hydrates asynchronously (`scheduler-store-pg.ts:246-249` kicks hydration
+  off fire-and-forget). At boot the mirror is empty, so every persisted job looked new. That
+  is the same shape as the `workspaces`-row race fixed earlier in this release: an unawaited
+  promise beside a synchronous requirement. The store gains an optional `ready()`, implemented
+  only by the PostgreSQL backend, and the boot sequence awaits it before registering — inside
+  the existing guard, so a hydration failure still degrades to serving without a scheduler
+  rather than taking the process down. Reads stay synchronous: the tick loop must not await
+  inside a scheduling decision.
+- **`bun run generate:artifacts --check` checked only half of what it claimed to.** The script
+  was `bun a.ts && bun b.ts`, and a package script appends the caller's arguments to the end
+  of the whole string, so `--check` reached only the second generator while the skill-artifacts
+  half ran in write mode — a drift gate regenerating its own subject cannot fail on it.
+  Measured on the old form: the skill-bundle "No drift" marker absent, its "Emitted N files"
+  marker present. `CONTRIBUTING.md` Step 3 names this class directly. A single entrypoint now
+  forwards argv to every generator by direct call, and runs all of them rather than stopping
+  at the first non-zero, so one `--check` reports every drifted subtree instead of the first.
+  CI was never exposed — it runs the skill drift gate as its own explicit step and the
+  sub-agent half through `subagent-parity.test.ts` — so this removes a trap for the documented
+  local form rather than closing a live hole.
 
 ## [1.55.0] - 2026-08-20
 
