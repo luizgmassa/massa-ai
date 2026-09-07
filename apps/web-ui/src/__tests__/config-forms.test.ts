@@ -80,9 +80,14 @@ const SAMPLE_CONFIG_DATA = {
 describe("renderConfig — 15 sectioned forms (CFG-01)", () => {
   const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
 
-  it("renders all 16 sections", () => {
+  // 17, not 16, since a3ba8a6e: `config-sections.ts`'s `CONFIG_SECTIONS_BY_KEY`
+  // is a mapped type over every `ConfigSectionKey`, so adding
+  // `MassaAiConfig.bootstrap` made `tsc` require a matching `bootstrap` section
+  // here. The count is exact on purpose — an inequality would stop sensing a
+  // section that silently disappears.
+  it("renders all 17 sections", () => {
     const sectionCount = (html.match(/class="config-section"/g) || []).length;
-    expect(sectionCount).toBe(16);
+    expect(sectionCount).toBe(17);
   });
 
   it("renders Database section with typed fields", () => {
@@ -375,10 +380,10 @@ describe("renderConfig — scheduler section (SCH-08)", () => {
 });
 
 describe("renderConfig — empty config", () => {
-  it("renders all 16 sections even when config is empty", () => {
+  it("renders all 17 sections even when config is empty", () => {
     const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
     const sectionCount = (html.match(/class="config-section"/g) || []).length;
-    expect(sectionCount).toBe(16);
+    expect(sectionCount).toBe(17);
   });
 });
 
@@ -458,7 +463,7 @@ describe("renderConfig — per-section field guides (CFG-03)", () => {
   it("renders a details field guide per section", () => {
     const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
     const guideCount = (html.match(/class="config-field-guide"/g) || []).length;
-    expect(guideCount).toBe(16);
+    expect(guideCount).toBe(17);
   });
 
   it("field guide summary is 'Field guide'", () => {
@@ -569,9 +574,12 @@ describe("renderConfig — inherited defaults are shown and marked (WUT-18 T43, 
 });
 
 describe("resolveConfigFieldValue — the unresolved-field sweep (WUT-18 T43, AC5)", () => {
-  /** Every declared `{section.key}.{field.name}` across the Config tab's 16
+  /** Every declared `{section.key}.{field.name}` across the Config tab's 17
    *  sections — the same population `config-section-coverage.test.ts` sizes
-   *  at the section level; this sweep is the field-level version. */
+   *  at the section level; this sweep is the field-level version.
+   *
+   *  16 → 17 sections and 104 → 105 fields at a3ba8a6e, which added the single
+   *  `bootstrap.rules` json field. */
   function declaredFieldPaths(): string[] {
     const paths: string[] = [];
     for (const section of CONFIG_SECTIONS as { key: string; fields: { name: string }[] }[]) {
@@ -580,12 +588,12 @@ describe("resolveConfigFieldValue — the unresolved-field sweep (WUT-18 T43, AC
     return paths;
   }
 
-  it("the declared population is 104 fields across 16 sections", () => {
-    expect(CONFIG_SECTIONS.length).toBe(16);
-    expect(declaredFieldPaths().length).toBe(104);
+  it("the declared population is 105 fields across 17 sections", () => {
+    expect(CONFIG_SECTIONS.length).toBe(17);
+    expect(declaredFieldPaths().length).toBe(105);
   });
 
-  it("measures the unresolved-field count against a fixture with only synapse.enabled persisted: 5 of 104, named", () => {
+  it("measures the unresolved-field count against a fixture with only synapse.enabled persisted: 5 of 105, named", () => {
     const persisted: Record<string, unknown> = { synapse: { enabled: true } };
     const defaults = defaultMassaAiConfig as unknown as Record<string, unknown>;
     const unresolved: string[] = [];

@@ -20,6 +20,21 @@
  *   MASSA_AI_WRITE_GOLDEN=1 bun test src/__tests__/render-golden.test.ts
  *
  * A diff here after a move means the move changed output. That is the signal.
+ *
+ * ── Deliberate regenerations (append one entry per rebase of the baseline) ───
+ *
+ * 1. a3ba8a6e — `renderConfig/read` and `renderConfig/write` moved because a
+ *    17th Config section, `bootstrap`, was added to
+ *    `src/static/views/config-sections.ts`. `CONFIG_SECTIONS_BY_KEY` there is a
+ *    mapped type over every `ConfigSectionKey`, so `MassaAiConfig.bootstrap`
+ *    (added by the bootstrap-file-and-rule-toggles feature) made `tsc` require
+ *    a matching section, and the fixture then carried 16 sections against a
+ *    renderer emitting 17. The delta is **additive and confined to that one
+ *    section**: both cases gained exactly one trailing
+ *    `<div class="config-section" data-section="bootstrap">` block — plus, in
+ *    write mode, its `data-action="config-save"` button — and no byte before it
+ *    changed. Every other case in the fixture is byte-untouched, so the
+ *    pre-split-behavior guarantee still holds for all of them.
  */
 
 import { describe, it, expect } from "bun:test";
@@ -138,7 +153,7 @@ const CONFIG = {
     // capturePolicy deliberately absent — exercises the "not configured" note
     // and the `json` field's undefined-renders-empty branch.
   },
-  // T43 (WUT-18 AC5): a deliberately small default set, not the full ~104-field
+  // T43 (WUT-18 AC5): a deliberately small default set, not the full ~105-field
   // defaultMassaAiConfig blob — enough to exercise the inherited-field marking
   // across text/number/boolean field types (embedding.baseURL not persisted
   // above; the whole llm section absent above) without a golden diff too large
