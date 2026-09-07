@@ -709,10 +709,19 @@ contract_path() { printf '%s/MASSA-AI.md' "$(platform_root "$1")"; }
 # marker pair so bootstrap_op can take the file as its body argument. Warnings
 # (an unreadable config.json degrading to registry defaults, BST-10 AC-10b) and
 # errors reach stderr from the renderer itself, already named.
+#
+# --host-root is platform_root, the same expression contract_path uses above, so
+# the pointer names the file this script is about to write instead of one the
+# renderer re-derived. Not cosmetic on Codex: the renderer's own per-host map
+# hardcodes .codex, so on a ~/.config/codex machine the contract landed in the
+# fallback root while the pointer named a ~/.codex file that does not exist —
+# and the toggle engine probed the same wrong path (BST-04 AC-6, T26). The
+# ~/.codex-vs-~/.config/codex resolution stays at :139-145 and nowhere else.
 bootstrap_render() {
   "$RENDER_RUNNER" "$REPO_ROOT/scripts/render-bootstrap.ts" \
     --target-home "$TARGET_HOME" \
     --host "$1" \
+    --host-root "$(platform_root "$1")" \
     --source "$AGENTS_SOURCE" \
     --repo-root "$REPO_ROOT" \
     --contract-out "$2" \

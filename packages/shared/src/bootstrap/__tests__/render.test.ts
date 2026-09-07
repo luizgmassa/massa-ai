@@ -419,6 +419,60 @@ describe("pointer template (BST-04 AC-6, AC-7)", () => {
       }
     }
   });
+
+  // T26 / BST-04 AC-6. `HOST_CONFIG_DIR` is not the only resolver of a host's
+  // root: `install-skills.sh:139-145` prefers `~/.codex` but falls back to
+  // `~/.config/codex`, and `contract_path` (`:705`) writes to whichever it
+  // resolved. AC-6 says the pointer names "the absolute path of that host's
+  // MASSA-AI.md" — the file that was written — so the writer's own root is an
+  // input to this render rather than something it re-derives.
+  describe("hostRoot override (T26, BST-04 AC-6)", () => {
+    const CODEX_FALLBACK = `${TARGET_HOME}/.config/codex`;
+
+    test("bootstrapContractPath places the contract under the supplied root", () => {
+      expect(bootstrapContractPath("codex", TARGET_HOME, CODEX_FALLBACK)).toBe(
+        `${CODEX_FALLBACK}/MASSA-AI.md`,
+      );
+    });
+
+    test("the pointer names the supplied root and no path under the default one", () => {
+      const { pointer } = renderBootstrap({
+        source: REAL_SOURCE,
+        state: DEFAULTS,
+        host: "codex",
+        targetHome: TARGET_HOME,
+        hostRoot: CODEX_FALLBACK,
+      });
+      expect(pointer).toContain(`${CODEX_FALLBACK}/MASSA-AI.md`);
+      expect(pointer).not.toContain(`${TARGET_HOME}/.codex/`);
+    });
+
+    // Both directions in one describe on purpose: a fix that swapped one
+    // hardcoded branch for another would pass the two cases above.
+    test("omitting it leaves every host on the default map", () => {
+      for (const host of HOSTS) {
+        expect(bootstrapContractPath(host, TARGET_HOME, undefined)).toBe(
+          EXPECTED_CONTRACT_PATH[host],
+        );
+        expect(render(DEFAULTS, host).pointer).toContain(EXPECTED_CONTRACT_PATH[host]);
+      }
+    });
+
+    test("supplying a host's default root explicitly renders byte-identically", () => {
+      for (const host of HOSTS) {
+        const explicit = renderBootstrap({
+          source: REAL_SOURCE,
+          state: DEFAULTS,
+          host,
+          targetHome: TARGET_HOME,
+          hostRoot: path.dirname(EXPECTED_CONTRACT_PATH[host]),
+        });
+        const implicit = render(DEFAULTS, host);
+        expect(explicit.pointer).toBe(implicit.pointer);
+        expect(explicit.contract).toBe(implicit.contract);
+      }
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -746,5 +800,22 @@ describe("refusals", () => {
       "TargetHomeNotAbsoluteError",
     );
     expect(caught(() => bootstrapStateFilePath("home")).name).toBe("TargetHomeNotAbsoluteError");
+  });
+
+  // T26. The engine reads `hostRoot` out of `install-state.json`, a file a user
+  // can edit. Every path this module produces is scoped to `targetHome` by
+  // construction, and an override is the one way that could stop being true —
+  // so a root that is not a directory *inside* the home is refused rather than
+  // followed, and the refusal is named like every other one here.
+  test.each([
+    ["a sibling of the home", "/tmp/massa-ai-render-suite-elsewhere"],
+    ["an escape through ..", `${TARGET_HOME}/../elsewhere`],
+    ["the home itself", TARGET_HOME],
+    ["a relative root", ".codex"],
+    ["an empty root", ""],
+  ])("bootstrapContractPath refuses a hostRoot that is %s", (_label, hostRoot) => {
+    expect(caught(() => bootstrapContractPath("codex", TARGET_HOME, hostRoot)).name).toBe(
+      "HostRootOutsideTargetHomeError",
+    );
   });
 });

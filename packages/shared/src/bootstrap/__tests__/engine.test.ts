@@ -802,3 +802,119 @@ describe("source seam", () => {
     expect(contract).not.toContain("<!-- massa-ai:rule:");
   });
 });
+
+// ---------------------------------------------------------------------------
+// AC-10 — the ~/.config/codex layout (T26, BST-04 AC-6, BST-10 AC-10)
+// ---------------------------------------------------------------------------
+
+/**
+ * Codex is the one host whose root is not a fixed suffix of the home:
+ * `install-skills.sh:139-145` prefers `$TARGET_HOME/.codex` and falls back to
+ * `$TARGET_HOME/.config/codex`, and it records whichever it resolved as
+ * `platforms.codex.root`. Before T26 this engine derived every path from the
+ * `.codex` map instead, so on the fallback layout a toggle wrote a stray
+ * `~/.codex/MASSA-AI.md`, never touched the contract the host loads, and
+ * reported `written-not-wired` — a no-op that reports failure, with every gate
+ * green over it.
+ *
+ * Both layouts are asserted here, so a fix that swapped one hardcoded branch
+ * for another fails the preferred-layout case.
+ */
+describe("codex home resolution follows install-state (T26)", () => {
+  function codexRoot(fallback: boolean): string {
+    return fallback ? path.join(home, ".config", "codex") : path.join(home, ".codex");
+  }
+
+  /** Record codex alone, with `root` set to `rootValue` (or omitted entirely
+   *  when it is `undefined`, the pre-v2-installer shape). */
+  function seedCodexState(rootValue: string | undefined): void {
+    const record: Record<string, unknown> = { skills: ["massa-ai"], skillsOwner: "repo" };
+    if (rootValue !== undefined) record.root = rootValue;
+    write(
+      installStatePath(),
+      `${JSON.stringify({ version: 2, platforms: { codex: record } }, null, 2)}\n`,
+    );
+  }
+
+  /** The pointer block `install-skills.sh` delivers into `<root>/AGENTS.md`,
+   *  naming the contract that root holds. */
+  function seedCodexWiring(root: string): void {
+    write(
+      path.join(root, "AGENTS.md"),
+      `## massa-ai Startup Contract\n\nBefore substantive work in this session, read\n\`${path.join(root, "MASSA-AI.md")}\`\nwith your Read tool and follow it.\n`,
+    );
+  }
+
+  test.each([
+    ["fallback ~/.config/codex", true],
+    ["preferred ~/.codex", false],
+  ])("%s: the contract lands in the recorded root and reports written", (_label, fallback) => {
+    const root = codexRoot(fallback as boolean);
+    const other = codexRoot(!(fallback as boolean));
+    seedCodexState(root);
+    seedCodexWiring(root);
+
+    const report = apply();
+
+    expect(statusByHost(report.rows)).toEqual({ codex: "written" });
+    expect(fs.existsSync(path.join(root, "MASSA-AI.md"))).toBe(true);
+    // The whole point: nothing is created under the root this home does not use.
+    expect(fs.existsSync(path.join(other, "MASSA-AI.md"))).toBe(false);
+  });
+
+  test("a second toggle pass re-renders the contract the host loads, not a stray one", () => {
+    const root = codexRoot(true);
+    seedCodexState(root);
+    seedCodexWiring(root);
+
+    seedRuleState({ "code-comments": true });
+    expect(statusByHost(apply().rows)).toEqual({ codex: "written" });
+    const afterFirst = fs.readFileSync(path.join(root, "MASSA-AI.md"), "utf-8");
+
+    seedRuleState({ "code-comments": false });
+    expect(statusByHost(apply().rows)).toEqual({ codex: "written" });
+    const afterSecond = fs.readFileSync(path.join(root, "MASSA-AI.md"), "utf-8");
+
+    expect(afterSecond).not.toBe(afterFirst);
+    expect(fs.existsSync(path.join(home, ".codex"))).toBe(false);
+
+    // Idempotent third pass: the same state now reports `skipped`, never
+    // `written-not-wired`.
+    expect(statusByHost(apply().rows)).toEqual({ codex: "skipped" });
+  });
+
+  test("the pointer probe reads the recorded root's AGENTS.md, not the default one", () => {
+    const root = codexRoot(true);
+    seedCodexState(root);
+    // Wiring parked in the *default* root, which this home does not use.
+    seedCodexWiring(path.join(home, ".codex"));
+
+    const report = apply();
+
+    expect(statusByHost(report.rows)).toEqual({ codex: "written-not-wired" });
+    expect(reasonFor(report.rows, "codex")).toContain(path.join(root, "AGENTS.md"));
+  });
+
+  test("a record with no root at all keeps the default map, so nothing regresses", () => {
+    seedCodexState(undefined);
+    seedWiring("codex");
+
+    expect(statusByHost(apply().rows)).toEqual({ codex: "written" });
+    expect(fs.existsSync(bootstrapContractPath("codex", home))).toBe(true);
+  });
+
+  test("a recorded root outside the target home fails that host and writes nothing", () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-bootstrap-outside-"));
+    try {
+      seedCodexState(outside);
+
+      const report = apply();
+
+      expect(statusByHost(report.rows)).toEqual({ codex: "failed" });
+      expect(reasonFor(report.rows, "codex")).toContain(outside);
+      expect(fs.readdirSync(outside)).toEqual([]);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});

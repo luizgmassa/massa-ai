@@ -139,6 +139,21 @@ H10="$ROOT/h10"; mkdir -p "$H10/.config/codex"
 bash "$INSTALLER" --apply --platform codex --target "$H10" --repo-root "$PROJECT_ROOT" --yes >/dev/null 2>&1
 assert_file "fallback codex home used" "$H10/.config/codex/AGENTS.md"
 assert_no_file "primary codex home not created" "$H10/.codex/AGENTS.md"
+# Existence alone is not the criterion. BST-04 AC-6 requires the pointer to name
+# "the absolute path of that host's MASSA-AI.md", and on this layout the two
+# halves have different resolvers: the contract is written to platform_root
+# (install-skills.sh:705, the $CODEX_HOME resolved at :139-145) while the pointer
+# text comes from the TypeScript renderer. The rows below assert they agree, and
+# that nothing lands under the ~/.codex this home does not have — the defect the
+# two assertions above stayed green over.
+H10_AGENTS="$(cat "$H10/.config/codex/AGENTS.md")"
+assert_file "contract written into the fallback codex home" "$H10/.config/codex/MASSA-AI.md"
+assert_contains "pointer names the contract that was actually written (BST-04 AC-6)" \
+  "$H10_AGENTS" "$H10/.config/codex/MASSA-AI.md"
+assert_not_contains "pointer names no path under the absent ~/.codex (BST-04 AC-6)" \
+  "$H10_AGENTS" "$H10/.codex/"
+assert_eq "no stray ~/.codex is created anywhere by the apply" \
+  "$([ -e "$H10/.codex" ] && echo present || echo absent)" "absent"
 
 echo ""
 echo "Scenario 11: scratch-HOME install survives the source repo checkout disappearing (PDO-08 AC4)"

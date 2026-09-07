@@ -319,6 +319,62 @@ describe("rendering for the installer", () => {
     expect(result.contract).not.toContain("## Plan Challenge Policy");
   });
 
+  // T26 / BST-04 AC-6. `install-skills.sh` writes the contract to
+  // `platform_root` (`:705`), which for Codex is the `$CODEX_HOME` resolved at
+  // `:139-145` — `~/.codex` preferred, `~/.config/codex` fallback. This bridge
+  // is where that resolved answer reaches the renderer; without it the pointer
+  // named a `~/.codex` file the fallback layout does not have.
+  test("--host-root moves the path the pointer names, and only that", async () => {
+    const home = scratch("render-hostroot");
+    const fallbackRoot = path.join(home, ".config", "codex");
+    const request = {
+      repoRoot: REPO_ROOT,
+      targetHome: home,
+      host: "codex",
+      sourcePath: AGENTS_SOURCE,
+      hasBun: true,
+      onWarning: () => {},
+    } as const;
+
+    const withRoot = await renderBootstrapForInstaller({ ...request, hostRoot: fallbackRoot });
+    const withoutRoot = await renderBootstrapForInstaller(request);
+
+    expect(withRoot.pointer).toContain(path.join(fallbackRoot, "MASSA-AI.md"));
+    expect(withRoot.pointer).not.toContain(path.join(home, ".codex", "MASSA-AI.md"));
+    // Omitting it is still the old default, so this is a thread-through rather
+    // than a swap of one hardcoded root for another.
+    expect(withoutRoot.pointer).toContain(path.join(home, ".codex", "MASSA-AI.md"));
+    // The contract body is host-independent (assumption A4) and must not move.
+    expect(withRoot.contract).toBe(withoutRoot.contract);
+  });
+
+  test("main forwards --host-root through to the pointer", async () => {
+    const home = scratch("cli-hostroot");
+    const fallbackRoot = path.join(home, ".config", "codex");
+    const pointerOut = path.join(home, "out", "pointer.block");
+
+    const code = await main(
+      [
+        "--target-home",
+        home,
+        "--host",
+        "codex",
+        "--host-root",
+        fallbackRoot,
+        "--source",
+        AGENTS_SOURCE,
+        "--pointer-out",
+        pointerOut,
+      ],
+      REPO_ROOT,
+    );
+
+    expect(code).toBe(0);
+    const pointer = fs.readFileSync(pointerOut, "utf-8");
+    expect(pointer).toContain(path.join(fallbackRoot, "MASSA-AI.md"));
+    expect(pointer).not.toContain(path.join(home, ".codex", "MASSA-AI.md"));
+  });
+
   test("an unreadable source is refused by name, not rendered from defaults", async () => {
     const home = scratch("render-nosource");
     await expect(

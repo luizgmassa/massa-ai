@@ -51,12 +51,13 @@ import path from "path";
 
 import { ConfigParseError, writeFileAtomically } from "../config/config-loader";
 import { HOSTS, type Host } from "../profile-switch/hosts";
-import { readInstallState } from "../profile-switch/state";
+import { readInstallState, type PlatformRecord } from "../profile-switch/state";
 import {
   CONTRACT_FILENAME,
   bootstrapContractPath,
   bootstrapStateFilePath,
   renderBootstrap,
+  resolveHostRoot,
   wrapBootstrapBlock,
 } from "./render";
 import {
@@ -181,7 +182,14 @@ export function applyBootstrapState(options: BootstrapApplyOptions): BootstrapRe
   const source = readSource(options);
 
   const rows: BootstrapRenderResult[] = installed.map((host) =>
-    applyHost({ host, source, state: resolved.state, targetHome, dryRun }),
+    applyHost({
+      host,
+      source,
+      state: resolved.state,
+      targetHome,
+      hostRoot: recordedHostRoot(host, platforms[host]),
+      dryRun,
+    }),
   );
 
   return buildBootstrapReport({
@@ -189,6 +197,48 @@ export function applyBootstrapState(options: BootstrapApplyOptions): BootstrapRe
     dryRun,
     ignoredStateKeys: resolved.ignoredStateKeys,
   });
+}
+
+/**
+ * Hosts whose config root is **not** a fixed suffix of the home, and whose
+ * recorded `platforms[host].root` this engine therefore has to follow.
+ *
+ * Exactly one qualifies. `scripts/install-skills.sh:139-145` resolves
+ * `$CODEX_HOME` as `$TARGET_HOME/.codex` when that exists and
+ * `$TARGET_HOME/.config/codex` otherwise, `platform_root` (`:162-169`) returns
+ * it, and `contract_path` (`:705`) writes the contract there — so on the
+ * fallback layout the `.codex` default in `HOST_CONFIG_DIR` names a directory
+ * that does not exist. Before T26 this engine wrote a stray
+ * `~/.codex/MASSA-AI.md` there, never touched the contract the host loads, and
+ * reported `written-not-wired`: every toggle a no-op that reports failure
+ * (BST-04 AC-6, BST-10 AC-10).
+ *
+ * The other three roots have one legal value each, so following a recorded root
+ * for them could only ever honour a wrong one. The set is the "do not
+ * generalise the mechanism past what Codex needs" boundary made structural
+ * rather than left to a comment — and the `~/.codex` vs `~/.config/codex`
+ * resolution itself stays in bash, in one place (design.md R3): what crosses
+ * the boundary is the resolved answer, not a second implementation of it.
+ */
+const HOSTS_WITH_A_RESOLVED_ROOT: ReadonlySet<Host> = new Set<Host>(["codex"]);
+
+/**
+ * The root `install-skills.sh` recorded for this host, when this engine is
+ * allowed to follow it.
+ *
+ * The installer is the sole writer of `platforms[host].root` and always sets it
+ * to its own `platform_root` (`scripts/install-skills.sh:860`, `:970`) — the
+ * very directory it wrote `MASSA-AI.md` and the wiring artifact into. An absent
+ * or empty `root` falls back to the default map, which is what a migrated v1
+ * state file and any non-installer writer produce. `resolveHostRoot`
+ * (`render.ts`) refuses a value outside `targetHome`, so a hand-edited record
+ * cannot widen where a pass writes; that refusal becomes one host's `failed`
+ * row, never a write.
+ */
+function recordedHostRoot(host: Host, record: PlatformRecord | undefined): string | undefined {
+  if (!HOSTS_WITH_A_RESOLVED_ROOT.has(host)) return undefined;
+  const root = record?.root;
+  return typeof root === "string" && root.length > 0 ? root : undefined;
 }
 
 /**
@@ -276,6 +326,8 @@ interface ApplyHostInput {
   readonly source: string;
   readonly state: BootstrapState;
   readonly targetHome: string;
+  /** See {@link recordedHostRoot}. `undefined` keeps the default map. */
+  readonly hostRoot: string | undefined;
   readonly dryRun: boolean;
 }
 
@@ -285,8 +337,7 @@ interface ApplyHostInput {
  * `scripts/install-skills.sh:571-579` already uses.
  */
 function applyHost(input: ApplyHostInput): BootstrapRenderResult {
-  const { host, source, state, targetHome, dryRun } = input;
-  const contractPath = bootstrapContractPath(host, targetHome);
+  const { host, source, state, targetHome, hostRoot, dryRun } = input;
 
   // The document, not the body. `renderBootstrap` returns `contract` with every
   // marker stripped (render.ts:19-26), and the marker pair in the written file
@@ -294,18 +345,26 @@ function applyHost(input: ApplyHostInput): BootstrapRenderResult {
   // here, once, and both the write and the up-to-date comparison below read the
   // same bytes. Comparing the body against a marker-delimited file on disk would
   // never match, making every pass report `written` for an unchanged host.
+  //
+  // `contractPath` is resolved inside the same try as the render because both
+  // validate `hostRoot`: a record naming a root outside `targetHome` becomes
+  // this host's `failed` row rather than an exception escaping the pass.
+  let contractPath: string;
   let document: string;
   try {
-    document = wrapBootstrapBlock(renderBootstrap({ source, state, host, targetHome }).contract);
+    contractPath = bootstrapContractPath(host, targetHome, hostRoot);
+    document = wrapBootstrapBlock(
+      renderBootstrap({ source, state, host, targetHome, hostRoot }).contract,
+    );
   } catch (error) {
     return { host, status: "failed", reason: (error as Error).message };
   }
 
-  const wired = isWired(host, targetHome);
+  const wired = isWired(host, targetHome, hostRoot);
   const notWired = (): BootstrapRenderResult => ({
     host,
     status: "written-not-wired",
-    reason: notWiredReason(host, targetHome),
+    reason: notWiredReason(host, targetHome, hostRoot),
   });
 
   if (readFileOrNull(contractPath) === document) {
@@ -358,25 +417,24 @@ interface WiringArtifact {
  *     member is always a JSON string, which distinguishes it from the same path
  *     mentioned in a comment of a `.jsonc` config.
  *
- * The four config directories mirror `installer_host_config_dir`
- * (`scripts/lib/installer-shared.sh:192-200`) through
- * `bootstrapContractPath` (`render.ts:94-105`), so this module holds no second
- * copy of that map.
+ * Every host's directory comes from `resolveHostRoot` (`render.ts`), the same
+ * resolution `bootstrapContractPath` uses, so the probe reads the wiring file
+ * that sits beside the contract this pass wrote. Re-joining `targetHome` here
+ * instead is what made the Codex probe read `~/.codex/AGENTS.md` on a
+ * `~/.config/codex` machine and report `written-not-wired` against wiring that
+ * was present all along (T26).
  */
-function wiringArtifact(host: Host, targetHome: string): WiringArtifact {
-  const contractPath = bootstrapContractPath(host, targetHome);
+function wiringArtifact(host: Host, targetHome: string, hostRoot?: string): WiringArtifact {
+  const root = resolveHostRoot(host, targetHome, hostRoot);
+  const contractPath = path.join(root, CONTRACT_FILENAME);
   switch (host) {
     case "claude":
-      return {
-        file: path.join(targetHome, ".claude", "CLAUDE.md"),
-        token: `@${CONTRACT_FILENAME}`,
-      };
+      return { file: path.join(root, "CLAUDE.md"), token: `@${CONTRACT_FILENAME}` };
     case "codex":
-      return { file: path.join(targetHome, ".codex", "AGENTS.md"), token: contractPath };
     case "cursor":
-      return { file: path.join(targetHome, ".cursor", "AGENTS.md"), token: contractPath };
+      return { file: path.join(root, "AGENTS.md"), token: contractPath };
     case "opencode":
-      return { file: openCodeConfigPath(targetHome), token: `"${contractPath}"` };
+      return { file: openCodeConfigPath(root), token: `"${contractPath}"` };
   }
 }
 
@@ -393,11 +451,10 @@ function wiringArtifact(host: Host, targetHome: string): WiringArtifact {
  * a `.jsonc`-only entry shadowed by a `.json` that redeclares `instructions`
  * reads as not-wired, and the remedy that names is idempotent.
  */
-function openCodeConfigPath(targetHome: string): string {
-  const dir = path.join(targetHome, ".config", "opencode");
-  const json = path.join(dir, "opencode.json");
+function openCodeConfigPath(root: string): string {
+  const json = path.join(root, "opencode.json");
   if (fs.existsSync(json)) return json;
-  return path.join(dir, "opencode.jsonc");
+  return path.join(root, "opencode.jsonc");
 }
 
 /**
@@ -409,15 +466,15 @@ function openCodeConfigPath(targetHome: string): string {
  * false `written` is exactly the silent-wrong-state this probe exists to
  * prevent (design.md:248-253).
  */
-function isWired(host: Host, targetHome: string): boolean {
-  const artifact = wiringArtifact(host, targetHome);
+function isWired(host: Host, targetHome: string, hostRoot?: string): boolean {
+  const artifact = wiringArtifact(host, targetHome, hostRoot);
   const text = readFileOrNull(artifact.file);
   return text !== null && text.includes(artifact.token);
 }
 
 /** The `written-not-wired` reason: what is missing, where, and the remedy. */
-function notWiredReason(host: Host, targetHome: string): string {
-  const artifact = wiringArtifact(host, targetHome);
+function notWiredReason(host: Host, targetHome: string, hostRoot?: string): string {
+  const artifact = wiringArtifact(host, targetHome, hostRoot);
   return `contract written, but ${host} has no artifact that loads it — expected ${artifact.token} in ${artifact.file}; run ${WIRING_REMEDY} to add the wiring`;
 }
 

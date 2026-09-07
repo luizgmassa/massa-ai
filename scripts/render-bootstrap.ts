@@ -140,6 +140,7 @@ export interface BootstrapApi {
     state: Readonly<Record<string, boolean>>;
     host: string;
     targetHome: string;
+    hostRoot?: string;
   }): { contract: string; pointer: string };
   wrapBootstrapBlock(body: string): string;
   bootstrapStateFilePath(targetHome: string): string;
@@ -242,6 +243,15 @@ export interface RenderRequest {
    *  installer already extracted from it. Either carries exactly one bootstrap
    *  marker pair, which is all `renderBootstrap` reads. */
   readonly sourcePath: string;
+  /**
+   * The directory the caller writes this host's `MASSA-AI.md` into —
+   * `install-skills.sh`'s `platform_root`. Threaded rather than re-derived
+   * because only bash resolves Codex's `~/.codex` vs `~/.config/codex` split
+   * (`install-skills.sh:139-145`), and the pointer must name the file that was
+   * actually written (BST-04 AC-6, T26). Omitted leaves the renderer on its
+   * default per-host map.
+   */
+  readonly hostRoot?: string;
   readonly hasBun?: boolean;
   readonly onWarning?: (message: string) => void;
 }
@@ -293,6 +303,7 @@ export async function renderBootstrapForInstaller(
     state: resolved.state,
     host: request.host,
     targetHome: request.targetHome,
+    hostRoot: request.hostRoot,
   });
 
   return {
@@ -307,6 +318,7 @@ export async function renderBootstrapForInstaller(
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
 const USAGE = `Usage: render-bootstrap.ts --target-home <dir> --host <host> --source <file>
+                            [--host-root <dir>]
                             [--contract-out <file>] [--pointer-out <file>]
                             [--repo-root <dir>]`;
 
@@ -314,6 +326,8 @@ export interface ParsedArgs {
   readonly targetHome: string;
   readonly host: string;
   readonly sourcePath: string;
+  /** See {@link RenderRequest.hostRoot}. */
+  readonly hostRoot?: string;
   readonly contractOut?: string;
   readonly pointerOut?: string;
   readonly repoRoot: string;
@@ -348,6 +362,7 @@ export function parseArgs(argv: readonly string[], defaultRepoRoot: string): Par
     targetHome: values["--target-home"] as string,
     host: values["--host"] as string,
     sourcePath: values["--source"] as string,
+    hostRoot: values["--host-root"],
     contractOut: values["--contract-out"],
     pointerOut: values["--pointer-out"],
     repoRoot: values["--repo-root"] ?? defaultRepoRoot,
@@ -370,6 +385,7 @@ export async function main(argv: readonly string[], defaultRepoRoot: string): Pr
       targetHome: args.targetHome,
       host: args.host,
       sourcePath: args.sourcePath,
+      hostRoot: args.hostRoot,
     });
   } catch (error) {
     process.stderr.write(`ERROR: ${(error as Error).message}\n`);

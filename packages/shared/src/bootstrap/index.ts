@@ -57,6 +57,7 @@ export {
   ruleMarker,
   BootstrapRenderError,
   bootstrapContractPath,
+  resolveHostRoot,
   bootstrapStateFilePath,
   type RenderBootstrapOptions,
   type BootstrapRender,

@@ -128,9 +128,23 @@ export class BootstrapRenderError extends Error {
 }
 
 /**
- * Each host's user config directory relative to the target home, mirroring
- * `installer_host_config_dir` (`scripts/lib/installer-shared.sh:192-200`),
- * which is the installer's own destination map for exactly these four hosts.
+ * Each host's user config directory relative to the target home — the
+ * **default** only, used when no caller supplies the root it actually wrote to.
+ *
+ * It is deliberately no longer described as mirroring
+ * `installer_host_config_dir` (`scripts/lib/installer-shared.sh:192-200`).
+ * `scripts/install-skills.sh` has never used that map: `platform_root`
+ * (`:162-169`) returns the `$CODEX_HOME` resolved at `:139-145`, which prefers
+ * `$TARGET_HOME/.codex` but falls back to `$TARGET_HOME/.config/codex` — and
+ * `contract_path` (`:705`) writes the contract to whichever it resolved. A
+ * pointer rendered from the table below therefore named `~/.codex/MASSA-AI.md`
+ * on a `~/.config/codex` machine, a file that does not exist (T26; the
+ * installer half of this divergence was fixed at `:705`, this half was not).
+ *
+ * The resolution itself stays in bash, in one place. The writers pass their own
+ * root in as {@link RenderBootstrapOptions.hostRoot}; nothing here probes the
+ * filesystem, so this module remains pure and two implementations of "which
+ * Codex home" never exist (design.md R3).
  */
 const HOST_CONFIG_DIR: Readonly<Record<Host, readonly string[]>> = {
   claude: [".claude"],
@@ -139,10 +153,45 @@ const HOST_CONFIG_DIR: Readonly<Record<Host, readonly string[]>> = {
   opencode: [".config", "opencode"],
 };
 
-/** Absolute path of `host`'s `MASSA-AI.md` under `targetHome` (BST-01 AC-1). */
-export function bootstrapContractPath(host: Host, targetHome: string): string {
+/**
+ * The directory holding `host`'s `MASSA-AI.md`: `hostRoot` when the caller
+ * supplied the root it writes to, the default map otherwise.
+ *
+ * A supplied root must be an absolute directory *inside* `targetHome`. Every
+ * path this module produces is scoped to `targetHome` by construction, and an
+ * override is the one thing that could break that — `applyBootstrapState` reads
+ * it from `install-state.json`, a file a user can edit. Refusing is loud and
+ * costs one host a `failed` row; following it would let a render write outside
+ * the home the caller scoped the pass to.
+ */
+export function resolveHostRoot(host: Host, targetHome: string, hostRoot?: string): string {
   requireAbsoluteTargetHome(targetHome);
-  return path.join(targetHome, ...HOST_CONFIG_DIR[host], CONTRACT_FILENAME);
+  if (hostRoot === undefined) return path.join(targetHome, ...HOST_CONFIG_DIR[host]);
+
+  const relative = path.relative(targetHome, hostRoot);
+  if (
+    !path.isAbsolute(hostRoot) ||
+    relative === "" ||
+    relative.startsWith("..") ||
+    path.isAbsolute(relative)
+  ) {
+    throw new BootstrapRenderError(
+      "HostRootOutsideTargetHomeError",
+      `hostRoot must be an absolute directory inside targetHome, got "${hostRoot}" for targetHome "${targetHome}"`,
+      [hostRoot, targetHome],
+    );
+  }
+  return hostRoot;
+}
+
+/** Absolute path of `host`'s `MASSA-AI.md` under `targetHome` (BST-01 AC-1),
+ *  or under `hostRoot` when the caller supplies the root it wrote to. */
+export function bootstrapContractPath(
+  host: Host,
+  targetHome: string,
+  hostRoot?: string,
+): string {
+  return path.join(resolveHostRoot(host, targetHome, hostRoot), CONTRACT_FILENAME);
 }
 
 /**
@@ -176,6 +225,15 @@ export interface RenderBootstrapOptions {
   /** Absolute home the install is scoped to — `install-skills.sh`'s
    *  `TARGET_HOME`. */
   readonly targetHome: string;
+  /**
+   * The directory this host's `MASSA-AI.md` is written to, when the caller
+   * knows it — `install-skills.sh`'s `platform_root`, or the
+   * `platforms[<host>].root` the installer recorded. Omitted falls back to
+   * {@link HOST_CONFIG_DIR}, which is correct for the three hosts whose root is
+   * a fixed suffix of the home and wrong for Codex on a `~/.config/codex`
+   * machine (BST-04 AC-6, T26). Must be inside `targetHome`.
+   */
+  readonly hostRoot?: string;
 }
 
 export interface BootstrapRender {
@@ -200,7 +258,8 @@ export interface BootstrapRender {
  * resolved rule state.
  *
  * @throws {BootstrapRenderError} `TargetHomeNotAbsoluteError` when
- * `targetHome` is relative; `IncompleteBootstrapStateError` when a registry id
+ * `targetHome` is relative; `HostRootOutsideTargetHomeError` when `hostRoot` is
+ * not an absolute directory inside it; `IncompleteBootstrapStateError` when a registry id
  * has no entry in `state`; `BootstrapSourceError` when the source carries
  * anything but exactly one well-formed bootstrap block;
  * `MissingRuleSpanError` when a registry id has no well-formed span;
@@ -208,7 +267,7 @@ export interface BootstrapRender {
  * inverted; `UnknownRuleMarkerError` when a marker survives the rule loop.
  */
 export function renderBootstrap(options: RenderBootstrapOptions): BootstrapRender {
-  const { source, state, host, targetHome } = options;
+  const { source, state, host, targetHome, hostRoot } = options;
 
   requireAbsoluteTargetHome(targetHome);
   requireTotalState(state);
@@ -216,7 +275,7 @@ export function renderBootstrap(options: RenderBootstrapOptions): BootstrapRende
   const body = applyRuleState(extractBootstrapBlock(source), state);
   const contract = `${renderHeader(state, targetHome)}\n\n${body}`;
 
-  return { contract, pointer: renderPointer(host, targetHome) };
+  return { contract, pointer: renderPointer(host, targetHome, hostRoot) };
 }
 
 function requireAbsoluteTargetHome(targetHome: string): void {
@@ -478,12 +537,12 @@ function renderHeader(state: BootstrapState, targetHome: string): string {
  * (spec.md assumption A1) — so the load here is an instruction the model
  * follows, which is why it names the tool and the timing explicitly.
  */
-function renderPointer(host: Host, targetHome: string): string {
+function renderPointer(host: Host, targetHome: string, hostRoot?: string): string {
   return [
     "## massa-ai Startup Contract",
     "",
     "Before substantive work in this session, read",
-    `\`${bootstrapContractPath(host, targetHome)}\``,
+    `\`${bootstrapContractPath(host, targetHome, hostRoot)}\``,
     "with your Read tool and follow it. This block is a pointer only: it states no",
     "rule of its own, and massa-ai overwrites it on the next install.",
     "",
