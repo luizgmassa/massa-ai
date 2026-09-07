@@ -137,6 +137,46 @@ note_failure() {
   err "${what} failed (exit ${code})"
 }
 
+# ── Build (BST-01) ──────────────────────────────────────────────────────────
+# install-skills.sh renders the bootstrap contract through
+# scripts/render-bootstrap.ts, whose ladder takes the TypeScript barrel under
+# bun and the built packages/shared/dist barrel otherwise. A checkout driven
+# through this harness has never been built, so the ladder's second branch does
+# not exist yet. This is the same step install.sh:1026 runs after its clone, and
+# it leaves both branches reachable instead of only the first.
+#
+# The scope of this step is the BUN branch, stated rather than implied. It does
+# NOT repair a node-only machine, and a comment implying otherwise would be
+# wrong: packages/shared/src/bootstrap/{state,render,engine}.ts import their
+# siblings with extensionless relative specifiers, which bun resolves and node's
+# ESM loader does not, so `import(packages/shared/dist/bootstrap/index.js)`
+# fails ERR_MODULE_NOT_FOUND *with the build present*. Such a machine keeps the
+# ladder's named error, which is the designed outcome — never a default render.
+# Repointing those specifiers spans five modules this feature does not own; it
+# is recorded as FU-1 in .specs/features/bootstrap-file-and-rule-toggles/tasks.md.
+#
+# Three preconditions, each for its own reason. bun absent: there is no runtime
+# to build with, and the ladder's own branch order keys on the same
+# `command -v bun` (install-skills.sh:148-152). dry-run or uninstall: a preview
+# writes nothing and a removal renders nothing. No renderer source in this tree:
+# nothing here can produce the built barrel — the path tested is
+# render-bootstrap.ts's own BOOTSTRAP_SOURCE_ENTRY, so the precondition names
+# the same file the ladder looks for.
+if [ "$DO_SKILLS" = "1" ] && [ "$DRY_RUN" != "1" ] && [ "$UNINSTALL" != "1" ]; then
+  if [ ! -f "$REPO_ROOT/packages/shared/src/bootstrap/index.ts" ]; then
+    vinfo "no bootstrap renderer source in $REPO_ROOT — skipping the build"
+  elif ! command -v bun >/dev/null 2>&1; then
+    vinfo "bun is not on PATH — skipping the build; the bootstrap render falls back to the ladder's dist branch"
+  else
+    compact_phase "Building the workspace (bootstrap renderer)..."
+    set +e
+    (cd "$REPO_ROOT" && bun run build)
+    rc=$?
+    set -e
+    [ "$rc" -eq 0 ] || note_failure "$rc" "bun run build"
+  fi
+fi
+
 # ── Skills ──────────────────────────────────────────────────────────────────
 if [ "$DO_SKILLS" = "1" ]; then
   compact_phase "Installing skills (platform: ${PLATFORM})..."

@@ -617,10 +617,37 @@ neutralised → 2; M5 the opencode wiring probe neutralised → 2.
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] A fresh clone with no build reaches a successful render, or fails with the named `bun run build` message — never a default render
-- [ ] The step is skipped when `bun` is absent, matching the ladder's own branch order
-- [ ] Covered by a scenario in `scripts/tests/test-install-skills-bootstrap-file.sh`
-- [ ] **PC-T15 — the scope of this step is the bun branch only; state that, do not widen it.** T12 measured the ladder's node branch dead: `packages/shared/dist/bootstrap/state.js` imports `../config/config-loader` with no extension, so `node -e "import('packages/shared/dist/bootstrap/index.js')"` fails `ERR_MODULE_NOT_FOUND` **even with a completed build**. The cause is pre-existing and not this feature's: 33 non-test relative imports across `packages/shared/src/bootstrap/` and `packages/shared/src/config/` carry no `.js`, while `profile-switch/` does, and `packages/shared/tsconfig.json` sets `moduleResolution: bundler`, which lets `tsc` emit them verbatim. Nothing had noticed because no unbundled node consumer of `packages/shared/dist/**` existed before T12 — both published CLIs are `#!/usr/bin/env bun` built with `bun build --target=bun`, and `apps/mcp-client/src/index.ts`, which *is* `#!/usr/bin/env node`, has `@massa-ai/shared` bundled into it. So this step makes the **bun** branch's built path reliable and matches `install.sh:1026`; a node-only machine still reaches the named error, by design (`design.md:99-105`). Record that limitation in the step's own comment rather than implying the build repairs it. The import repointing is FU-1 below, deliberately not absorbed here
+- [x] A fresh clone with no build reaches a successful render, or fails with the named `bun run build` message — never a default render
+- [x] The step is skipped when `bun` is absent, matching the ladder's own branch order
+- [x] Covered by a scenario in `scripts/tests/test-install-skills-bootstrap-file.sh` — scenario 13, 9 assertions, `bootstrap-file` 99 → 108
+- [x] **PC-T15 — the scope of this step is the bun branch only; state that, do not widen it.** T12 measured the ladder's node branch dead: `packages/shared/dist/bootstrap/state.js` imports `../config/config-loader` with no extension, so `node -e "import('packages/shared/dist/bootstrap/index.js')"` fails `ERR_MODULE_NOT_FOUND` **even with a completed build**. The cause is pre-existing and not this feature's: 33 non-test relative imports across `packages/shared/src/bootstrap/` and `packages/shared/src/config/` carry no `.js`, while `profile-switch/` does, and `packages/shared/tsconfig.json` sets `moduleResolution: bundler`, which lets `tsc` emit them verbatim. Nothing had noticed because no unbundled node consumer of `packages/shared/dist/**` existed before T12 — both published CLIs are `#!/usr/bin/env bun` built with `bun build --target=bun`, and `apps/mcp-client/src/index.ts`, which *is* `#!/usr/bin/env node`, has `@massa-ai/shared` bundled into it. So this step makes the **bun** branch's built path reliable and matches `install.sh:1026`; a node-only machine still reaches the named error, by design (`design.md:99-105`). Record that limitation in the step's own comment rather than implying the build repairs it. The import repointing is FU-1 below, deliberately not absorbed here
+
+**Confirmed absent before the edit**: `git grep -c "bun run build" -- scripts/install-harness.sh`
+returned 0, so the step was genuinely missing rather than already present under another name.
+
+**The step carries three preconditions, not one, and the third was nearly shipped on a false
+premise.** bun absent and dry-run/uninstall are the two the task text implies. The third — skip
+when `packages/shared/src/bootstrap/index.ts` is absent, which is render-bootstrap.ts's own
+`BOOTSTRAP_SOURCE_ENTRY` — was added on the assumption that it protected the three sibling suites
+that copy `install-harness.sh` into a shadow tree. **That assumption was wrong and the mutation
+proved it**: removing the precondition left `test-install-harness-cli.sh` 34/0 and
+`test-harness-single-generation.sh` 13/0, because neither asserts the harness exit code on that
+path. Measured directly instead: an unguarded step in such a tree emits
+`error: Script not found "build"` and turns the whole run **exit 1**. The precondition is
+therefore load-bearing and was, until scenario 13d, sensed by nothing at all.
+
+**Discrimination: 5 mutations, 5 killed**, all in `install-harness.sh`, all restored from a
+`/tmp` copy and hash-verified. N1 dry-run precondition dropped → 2; N2 uninstall precondition
+dropped → 1; N3 bun precondition dropped → 2; N4 the build call itself replaced by `true` → 1;
+N5 the renderer-source precondition dropped → **survived on first run**, killed by 3 after 13d
+was added.
+
+**One measurement correction worth recording**: `install-harness.sh` has no `--repo-root` flag.
+The first draft of scenario 13 passed one, so every harness invocation exited 2 at the unknown-flag
+branch and three assertions passed vacuously — including "`--dry-run` runs no build", which was
+true only because nothing ran at all. Caught by reading the pre-change red rather than the
+post-change green: the red showed the *contract file* missing too, which a mere absence of the
+build step cannot cause.
 
 **Tests**: shell suite
 **Gate**: full — `bun run test:scripts && bun run test:plugins`

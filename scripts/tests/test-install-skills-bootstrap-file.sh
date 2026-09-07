@@ -626,6 +626,103 @@ assert_not_contains "no bootstrap drift is reported for a plugin-owned host (PC-
   "$OUT12P" "$H12P/.cursor/MASSA-AI.md"
 
 echo ""
+echo "Scenario 13: install-harness.sh builds before rendering the contract"
+# BST-01. The render ladder (scripts/render-bootstrap.ts) takes the TypeScript
+# barrel under bun and the built packages/shared/dist barrel otherwise, so a
+# harness-driven install of a never-built checkout leaves the second branch
+# missing. install-harness.sh had zero occurrences of the build command before
+# this scenario.
+#
+# The build itself is intercepted rather than run: a real `bun run build` is a
+# six-package turbo build, and what is under test is whether the harness invokes
+# it, not whether turbo works. The shim delegates every other bun call to the
+# real binary, so the render inside install-skills.sh still runs for real and
+# 13a's contract assertion is not vacuous.
+HARNESS="$PROJECT_ROOT/scripts/install-harness.sh"
+REAL_BUN="$(command -v bun 2>/dev/null || true)"
+if [ -n "$REAL_BUN" ]; then
+  SHIM_BIN="$ROOT/shim-bin"; mkdir -p "$SHIM_BIN"
+  BUILD_LOG="$ROOT/build-invocations.log"; : > "$BUILD_LOG"
+  cat > "$SHIM_BIN/bun" <<SHIM
+#!/usr/bin/env bash
+if [ "\$1" = "run" ] && [ "\$2" = "build" ]; then
+  printf 'build in %s\n' "\$PWD" >> "$BUILD_LOG"
+  exit 0
+fi
+exec "$REAL_BUN" "\$@"
+SHIM
+  chmod +x "$SHIM_BIN/bun"
+
+  # 13a — bun present: the build runs, in the repo root, before the render.
+  H13="$ROOT/h13"; mkdir -p "$H13"
+  PATH="$SHIM_BIN:$PATH" bash "$HARNESS" --skills --platform claude \
+    --target "$H13" --yes >/dev/null 2>&1 || true
+  assert_contains "the harness runs the build before rendering (BST-01)" \
+    "$(cat "$BUILD_LOG" 2>/dev/null)" "build in $PROJECT_ROOT"
+  assert_file "the contract still renders after the build step (BST-01)" \
+    "$H13/.claude/MASSA-AI.md"
+
+  # 13b — the build is skipped for the two actions that render nothing, so a
+  # preview stays a preview and a removal does not rebuild the workspace.
+  : > "$BUILD_LOG"
+  H13B="$ROOT/h13b"; mkdir -p "$H13B"
+  PATH="$SHIM_BIN:$PATH" bash "$HARNESS" --skills --platform claude \
+    --target "$H13B" --dry-run >/dev/null 2>&1 || true
+  assert_eq "--dry-run runs no build (BST-01)" "$(cat "$BUILD_LOG" 2>/dev/null)" ""
+  PATH="$SHIM_BIN:$PATH" bash "$HARNESS" --skills --platform claude \
+    --target "$H13" --uninstall --yes >/dev/null 2>&1 || true
+  assert_eq "--uninstall runs no build (BST-01)" "$(cat "$BUILD_LOG" 2>/dev/null)" ""
+else
+  fail "bun is required for the harness build scenario and is not on PATH"
+fi
+
+# 13c — bun absent: the step is skipped, matching the ladder's own branch order,
+# and the run is not aborted by it. Asserted on the skip decision rather than on
+# the harness exit code, because a node-only machine legitimately goes on to
+# fail the render — BootstrapRendererUnloadableError, the ladder's named error —
+# and a completed build would not have changed that (FU-1). This scenario must
+# not be read as a claim that the build repairs a node-only machine.
+NODE_BIN="$(command -v node 2>/dev/null || true)"
+if [ -n "$NODE_BIN" ]; then
+  NO_BUN_BIN="$ROOT/no-bun-bin"; mkdir -p "$NO_BUN_BIN"
+  ln -sf "$NODE_BIN" "$NO_BUN_BIN/node"
+  H13C="$ROOT/h13c"; mkdir -p "$H13C"
+  OUT13C="$(PATH="$NO_BUN_BIN:/usr/bin:/bin" bash "$HARNESS" --skills --platform claude \
+    --target "$H13C" --verbose --yes 2>&1 || true)"
+  assert_contains "a machine without bun skips the build (BST-01)" \
+    "$OUT13C" "bun is not on PATH — skipping the build"
+  assert_not_contains "the skipped build does not abort the harness (BST-01)" \
+    "$OUT13C" "bun run build failed"
+else
+  fail "node is required for the bun-absent branch and is not on PATH"
+fi
+
+# 13d — a tree with no renderer source to build. install-harness.sh is copied
+# into shadow trees by three sibling suites and by anyone vendoring it, and such
+# a tree has a package.json with no `build` script: an unguarded step there emits
+# `error: Script not found "build"` and turns the whole harness run non-zero
+# (measured — exit 1). No sibling suite asserts that exit code, so this is the
+# only place the precondition is sensed. The condition names
+# render-bootstrap.ts's own BOOTSTRAP_SOURCE_ENTRY, so "nothing to build" and
+# "nothing for the ladder to load" stay the same question.
+if [ -n "$REAL_BUN" ]; then
+  SHADOW13="$ROOT/shadow13"; mkdir -p "$SHADOW13/scripts/lib" "$SHADOW13/home"
+  cp "$HARNESS" "$SHADOW13/scripts/install-harness.sh"
+  cp "$PROJECT_ROOT/scripts/banner.sh" "$SHADOW13/scripts/banner.sh"
+  cp "$PROJECT_ROOT/scripts/lib/installer-shared.sh" "$SHADOW13/scripts/lib/installer-shared.sh"
+  printf '{\n  "name": "shadow",\n  "version": "0.0.0"\n}\n' > "$SHADOW13/package.json"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$SHADOW13/scripts/install-skills.sh"
+  chmod +x "$SHADOW13/scripts/install-skills.sh"
+  OUT13D="$(bash "$SHADOW13/scripts/install-harness.sh" --skills \
+    --target "$SHADOW13/home" --verbose --yes 2>&1)"; RC13D=$?
+  assert_eq "a tree with no renderer source still exits 0 (BST-01)" "$RC13D" "0"
+  assert_not_contains "no build is attempted where there is nothing to build (BST-01)" \
+    "$OUT13D" "bun run build failed"
+  assert_contains "the skipped build names its reason (BST-01)" \
+    "$OUT13D" "no bootstrap renderer source"
+fi
+
+echo ""
 echo "Scenario 9: the developer's real home was never touched"
 assert_eq "the real home's contract paths are unchanged" "$(real_home_probe)" "$REAL_PROBE_BEFORE"
 
