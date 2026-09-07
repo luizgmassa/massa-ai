@@ -61,6 +61,18 @@ assertE2ePrefix(SHARED_PID);
 // has real edges to follow.
 const TRACE_SEED = "ContextualSearchRLM"; // exported class, services/search/
 const TRACE_SEED_CENTRALITY = "computePageRank"; // exported fn, services/symbol/
+/**
+ * Outbound `trace_path` seed. It must be a **function or method**, not a class:
+ * call edges are attributed to the symbol that contains the call site, so a
+ * class node resolves as a seed and then walks to nothing. D2 used to seed on
+ * `ContextualSearchRLM` under the comment "a central class has callees" and
+ * asserted `nodeCount >= 2`; measured against the E2E fixture that returns
+ * seeds=1, nodeCount=1, edgeCount=0. `searchProject` resolves to exactly one
+ * seed and walks 13 nodes over 26 edges, so it exercises the BFS instead of
+ * the empty case. The class behaviour is asserted explicitly below rather than
+ * left as a silent premise.
+ */
+const TRACE_SEED_CALLER = "searchProject";
 
 describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
   let mcp: McpHandle;
@@ -211,7 +223,7 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
     async () => {
       const mcpRes = await mcpCall(mcp.client, "trace_path", {
         projectId: pid,
-        function_name: TRACE_SEED,
+        function_name: TRACE_SEED_CALLER,
         direction: "outbound",
         mode: "calls",
         depth: 3,
@@ -219,17 +231,22 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
       expect(mcpRes?.success).toBe(true);
       const data = mcpRes?.data ?? {};
       expect(data.projectId).toBe(pid);
-      expect(data.symbol).toBe(TRACE_SEED);
+      expect(data.symbol).toBe(TRACE_SEED_CALLER);
       expect(data.direction).toBe("outbound");
       expect(data.mode).toBe("calls");
       // mode:calls → edgeTypes resolved to ["call"] (TracePathService mode map).
       expect(Array.isArray(data.edgeTypes)).toBe(true);
       expect(data.edgeTypes).toContain("call");
-      // Seeds resolved (the class exists in the index).
+      // Seeds resolved (the symbol exists in the index).
       expect(Array.isArray(data.seeds)).toBe(true);
       expect(data.seeds.length).toBeGreaterThan(0);
-      // A central class has callees → nodeCount ≥ 2 (seed + ≥1 reached node).
+      // A function that calls others reaches ≥1 node beyond its own seed.
       expect(typeof data.nodeCount).toBe("number");
+      console.log(
+        `[T11b:D2] ${TRACE_SEED_CALLER}: seeds=${data.seeds.length} ` +
+          `nodeCount=${data.nodeCount} edgeCount=${data.edgeCount} ` +
+          `chains=${(data.chains ?? []).length}`,
+      );
       expect(data.nodeCount).toBeGreaterThanOrEqual(2);
       expect(Array.isArray(data.nodes)).toBe(true);
       expect(data.nodes.length).toBe(data.nodeCount);
@@ -246,6 +263,34 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
       // nodeCount === edgeCount is not required, but a depth-2+ walk produces
       // at least one multi-hop chain OR a single-hop chain. Assert chains exist.
       expect(data.chains.length).toBeGreaterThan(0);
+    },
+    30_000,
+  );
+
+  test(
+    "D2: a class seed resolves but walks to nothing — call edges belong to its methods",
+    async () => {
+      // Documents the attribution rule that made the previous D2 seed wrong.
+      // Not a tolerated failure: the seed MUST resolve (the class is indexed)
+      // and the walk MUST be empty (a class contains no call site of its own).
+      // If either half changes — the class stops resolving, or class nodes
+      // start aggregating their methods' calls — this test fails and says so.
+      const res = await mcpCall(mcp.client, "trace_path", {
+        projectId: pid,
+        function_name: TRACE_SEED,
+        direction: "outbound",
+        mode: "calls",
+        depth: 3,
+      });
+      expect(res?.success).toBe(true);
+      const data = res?.data ?? {};
+      expect(data.seeds.length).toBeGreaterThan(0);
+      console.log(
+        `[T11b:D2] class seed ${TRACE_SEED}: seeds=${data.seeds.length} ` +
+          `nodeCount=${data.nodeCount} edgeCount=${data.edgeCount}`,
+      );
+      expect(data.nodeCount).toBe(1);
+      expect(data.edgeCount).toBe(0);
     },
     30_000,
   );
@@ -431,6 +476,27 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
   // file-import graph is richly connected → packages/entryPoints/hotspots/
   // communities are expected. routes/layers are heuristic and may be sparse;
   // asserted defensively.
+  //
+  // "Present only when non-empty" is the literal product contract:
+  // `symbol-graph.service.ts:521-527` sets all six D4 fields to `undefined`
+  // when their array is empty, and the response type declares all six
+  // optional. This block used to open each field with
+  // `expect(Array.isArray(map.X)).toBe(true)` and then iterate `map.X ?? []` —
+  // the `?? []` conceding what the assertion above denied. It passed only
+  // because the full repository happened to produce six non-empty analyzers;
+  // on a sparser corpus `routes` is absent and the test fails on a contract it
+  // never meant to enforce. `expectOptionalArray` states the real contract:
+  // absent, or an array.
+
+  /** Absent (the documented empty case) or an array — never anything else. */
+  const expectOptionalArray = (value: unknown, field: string): unknown[] => {
+    if (value === undefined) {
+      console.log(`[T11b:D4] ${field} absent — the documented empty-analyzer case`);
+      return [];
+    }
+    expect(Array.isArray(value)).toBe(true);
+    return value as unknown[];
+  };
 
   test(
     "D4: project_map enriched fields — packages, entryPoints, hotspots, communities",
@@ -445,8 +511,8 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
 
       // packages: monorepo boundary detection. This IS a packages/* + apps/*
       // monorepo → packages must be non-empty and each carries the shape.
-      expect(Array.isArray(map.packages)).toBe(true);
-      if ((map.packages ?? []).length > 0) {
+      const packages = expectOptionalArray(map.packages, "packages");
+      if (packages.length > 0) {
         const p0 = map.packages[0];
         expect(typeof p0.name).toBe("string");
         expect(Array.isArray(p0.files)).toBe(true);
@@ -456,8 +522,8 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
 
       // entryPoints: bootstrap candidates (high in-degree, low out-degree or
       // known entry naming). A server monorepo has real entry points.
-      expect(Array.isArray(map.entryPoints)).toBe(true);
-      if ((map.entryPoints ?? []).length > 0) {
+      const entryPoints = expectOptionalArray(map.entryPoints, "entryPoints");
+      if (entryPoints.length > 0) {
         const e0 = map.entryPoints[0];
         expect(typeof e0.file).toBe("string");
         expect(typeof e0.inDegree).toBe("number");
@@ -467,8 +533,8 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
 
       // hotspots: most-depended-on files (centrality + in-degree + symbol
       // count). Guaranteed on a connected graph.
-      expect(Array.isArray(map.hotspots)).toBe(true);
-      if ((map.hotspots ?? []).length > 0) {
+      const hotspots = expectOptionalArray(map.hotspots, "hotspots");
+      if (hotspots.length > 0) {
         const h0 = map.hotspots[0];
         expect(typeof h0.file).toBe("string");
         expect(typeof h0.inDegree).toBe("number");
@@ -477,8 +543,8 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
       // communities: Louvain community detection over the file-import graph.
       // Non-empty where the graph is connected (this one is). Each community
       // carries { id, label, size, cohesion, topFiles }.
-      expect(Array.isArray(map.communities)).toBe(true);
-      if ((map.communities ?? []).length > 0) {
+      const communities = expectOptionalArray(map.communities, "communities");
+      if (communities.length > 0) {
         const c0 = map.communities[0];
         expect(typeof c0.id).toBe("number");
         expect(typeof c0.label).toBe("string");
@@ -499,7 +565,7 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
 
       // layers: de-facto layer inference from community structure. Heuristic;
       // may be empty. Assert shape only when present.
-      expect(Array.isArray(map.layers)).toBe(true);
+      expectOptionalArray(map.layers, "layers");
       for (const l of map.layers ?? []) {
         expect(["entry", "api", "core", "service", "leaf", "unknown"]).toContain(
           l.layer,
@@ -510,7 +576,7 @@ describe.skipIf(!READY)("T11b Phase-4 graph features", () => {
 
       // routes: HTTP route discovery. Heuristic (from http_call edges or
       // definition names); may be empty. Assert shape only when present.
-      expect(Array.isArray(map.routes)).toBe(true);
+      expectOptionalArray(map.routes, "routes");
       for (const r of map.routes ?? []) {
         expect(typeof r.path).toBe("string");
       }

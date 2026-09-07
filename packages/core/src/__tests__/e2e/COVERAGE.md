@@ -120,10 +120,15 @@ fixture built by `scripts/prepare-e2e-fixture.ts` (70 tracked files, commit
 profile that is actually installed — **`qwen3-embedding:4b` at 2560 dimensions**, not the
 `qwen3-embedding:8b`/4096 the 2026-07-13 ledger below pins.
 
-**223 pass / 5 fail / 4 skip, 232 tests across 16 files, 641.19 s, exit 1.**
+**Before repairs: 223 pass / 5 fail / 4 skip, 232 tests across 16 files, 641.19 s, exit 1.**
+**After repairs: 232 pass / 0 fail / 3 skip, 235 tests across 16 files, 356.68 s, exit 0.**
+(The second run is faster because the shared index was already warm; the test count grew by
+three because two repairs split a premise into its own case.)
 
 The five failures are the value of the run: none of them was reachable before, because the
-suite had never been executed against a *different* embedding profile with auth on.
+suite had never been executed against a *different* embedding profile with auth on. A sixth,
+`T15`, surfaced only once the first five were fixed and the shared index reached a genuinely
+warm state.
 
 | Test | Cause |
 | --- | --- |
@@ -132,6 +137,12 @@ suite had never been executed against a *different* embedding profile with auth 
 | `T9 N5` concurrent same-project index | Three concurrent `index()` calls on one projectId finished `failed, completed, failed`. `N6` (distinct projectIds) passed 3/3, so it is the same-projectId serialization path specifically. Not yet root-caused. |
 | `T11b D2` trace_path outbound | Reached `nodeCount=1`, expected `>= 2`. Corpus density: the sparse fixture has a thinner call graph than the whole repository. The same file already reports the *inbound* case as "a graph-density limitation, not worked around" — only the outbound side is unguarded. |
 | `T11b D4` project_map enriched fields | `Array.isArray(map.routes)` is false. The comment two lines above says routes "may be empty. Assert shape only when present", and then the assertion runs unconditionally — so an absent field on a corpus with no HTTP routes fails a test that documents itself as tolerant. |
+| `T15` shared-index identity *(surfaced after the other five)* | The `beforeAll` seeds SHARED_PID at a deliberately wrong root, then asserts warmth with `isSharedIndexWarm`, whose probes name canonical-corpus symbols absent from that root. It could only pass when the reindex failed to clear the previous corpus. |
+
+All six are repaired; see the CHANGELOG entry for what each now asserts instead. The three
+remaining skips are the pre-existing self-reported ones (search-internals with no public
+introspection, graph density on the inbound BFS, `impact_analysis` with no committed diff in
+the fixture) — none is a silent skip.
 
 Relevance held on the new corpus: `14.needles.test.ts` passed, with N01 @1, N03 @1, N07 @1,
 N04/N06/N08 @2, N02 @3, N05 @5.

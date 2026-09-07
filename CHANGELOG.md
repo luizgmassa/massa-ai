@@ -36,6 +36,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Six live-stack E2E tests asserted contracts the product no longer has.** They were
+  invisible because the suite had only ever been run against one embedding profile with auth
+  off, on the whole repository as its corpus. Measured on the scripted stack: 223 pass / 5
+  fail before, **232 pass / 0 fail / 3 skip after** (235 tests, 356.68 s).
+  - `N19` asserted `AUTH_REQUIRED === false` and `N18` was a static skip whose text said
+    exercising 401 "would require restarting tools-api with a key (destructive)". AD-011
+    deleted the no-key pass-through and made auth non-configurable, so no supported
+    configuration could satisfy N19. Both are now real: 401 without a key, 401 with a
+    whitespace-only key (HTTP strips it to empty), 200 with the configured key, and `/health`
+    public.
+  - `N5` asserted that three concurrent `index()` calls on one projectId all reach
+    `completed`, citing a queue mutex that a `managed_runs` lease has since replaced — the
+    lease *refuses* the losers with `indexing_busy:<runId>` (FR-09 / AC-7). It now asserts
+    the property that actually matters and is stronger than the old one: exactly one winner,
+    every loser refused **for that documented reason**, every job terminal, final state
+    searchable.
+  - `N15` named `vector_documents_4096d` literally, so it only passed under
+    `qwen3-embedding:8b`; under any other profile it read an empty table. It now discovers
+    which dimension table holds the project, asserts exactly one does — which also catches a
+    project split across two profiles, something naming one table never could — and
+    cross-checks each row's real width against the width its table name claims. It also
+    separates the per-project `_metadata:<projectId>` sentinel, whose embedding is a zero
+    vector, so `embedding <=> embedding` is NaN for it and no whole-project cosine assertion
+    can hold.
+  - `D4` opened each of the six additive architecture fields with
+    `expect(Array.isArray(map.X)).toBe(true)` and then iterated `map.X ?? []` — the `?? []`
+    conceding what the line above denied. `symbol-graph.service.ts:521-527` sets all six to
+    `undefined` when empty and the response type declares them optional, so the assertion
+    contradicted the product contract and passed only because the full repository filled all
+    six.
+  - `D2` seeded `trace_path` on a class under the comment "a central class has callees".
+    Call edges are attributed to the symbol containing the call site, so a class resolves as
+    a seed and then walks to nothing: measured seeds=1, nodeCount=1, edgeCount=0. It now
+    seeds a method with a real 13-node / 26-edge walk, and the class behaviour is asserted
+    explicitly rather than left as a silent premise.
+  - `T15` seeded the shared index at a deliberately wrong root and then asserted warmth with
+    the *canonical* corpus's probe queries, none of whose symbols exist in the corpus it had
+    just indexed. It could only pass when the reindex failed to clear the previous corpus —
+    green for the opposite of the reason it claimed.
 - **`turbo.json` `passThroughEnv` was missing three E2E variables.** `RUN_OWNED_DESTRUCTIVE`
   and `MASSA_AI_E2E_PROJECT_PATH` are read by the live-stack suites but were absent, so they
   arrived `undefined` under `bun run test` while working under a direct `bun test` (AD-010).
