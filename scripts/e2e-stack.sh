@@ -164,7 +164,28 @@ profile_env() {
       printf 'MASSA_AI_API_KEY=\nHOOKS_ENABLED=false\n'
       ;;
     scheduler-on)
+      # The preset alone is not enough here, and the reason is measured rather
+      # than defensive. `registerDefaultJobs` resolves each job as
+      # `envBool(perJobEnv, configJson.scheduler.jobs[kind].enabled,
+      # presetDefault)` (scheduler-defaults.ts:296), so config.json outranks the
+      # preset by design. The API materializes a COMPLETE config.json on boot —
+      # the minimal file `write_config_json` writes came back with all 17
+      # sections, including `scheduler.jobs.*.enabled=false` for all five kinds —
+      # and it does so before `registerDefaultJobs` reads the file. Result,
+      # observed: `MASSA_AI_SCHEDULER_ENABLED=true` +
+      # `MASSA_AI_SCHEDULER_SAFE_DEFAULTS=true` produced `running:true` with
+      # every job `enabled:false`, i.e. a scheduler that ticks and does nothing,
+      # and three scenarios that cannot be measured against it.
+      #
+      # The per-job envs are the top of the documented precedence chain, so they
+      # hold regardless of what the API writes into the scratch config. They name
+      # exactly the two kinds the preset itself enables (consolidation + decay,
+      # scheduler-defaults.ts:195-216) — auto-improve, observation-bridge and
+      # checkpoint-purge stay off, which keeps the profile's shape identical to
+      # the preset's. The preset's own wiring keeps its unit sensor at
+      # packages/core/src/__tests__/scheduler-safe-defaults.test.ts.
       printf 'MASSA_AI_API_KEY=\nMASSA_AI_SCHEDULER_ENABLED=true\nMASSA_AI_SCHEDULER_SAFE_DEFAULTS=true\n'
+      printf 'MASSA_AI_SCHEDULER_CONSOLIDATION_ENABLED=true\nMASSA_AI_SCHEDULER_DECAY_ENABLED=true\n'
       ;;
     llm-on)
       printf 'MASSA_AI_API_KEY=\nMASSA_AI_LLM_ENABLED=true\n'
@@ -319,7 +340,29 @@ start_ollama() {
 start_api() {
   local profile="$1"; shift
   refuse_if_foreign_listener "$API_PORT" api
-  if [[ -n "$(listener_pid "$API_PORT")" ]]; then log "api already up"; return 0; fi
+  # An "already up" early return that ignores the requested profile is the worst
+  # failure this script can have, because it is silent and it inverts the whole
+  # point of Tier A being a profile matrix. Measured: with the stack on
+  # `default`, `up --profile scheduler-on` exited 0 and printed
+  # "e2e-stack up (profile: scheduler-on)" while `status` still read
+  # `profile default` and /api/v1/scheduler/status still reported
+  # `running:false`. Every profile-gated suite then skips itself with a
+  # reasoned line naming the profile it wanted — so a five-profile matrix
+  # reports green having executed one profile five times.
+  #
+  # The early return is kept for the case it exists for (a repeated `up` under
+  # the same profile must not restart the server), and only for that case.
+  # Per-invocation overrides always force a restart: they cannot be applied to
+  # a process that is already running.
+  if [[ -n "$(listener_pid "$API_PORT")" ]]; then
+    local running_profile; running_profile="$(state_get profile)"
+    if [[ "$running_profile" == "$profile" && $# -eq 0 ]]; then
+      log "api already up (profile: ${profile})"
+      return 0
+    fi
+    log "api is up under profile '${running_profile:-unknown}'; restarting into '${profile}'"
+    stop_one api "$API_PORT"
+  fi
 
   local -a env_args=()
   local line
