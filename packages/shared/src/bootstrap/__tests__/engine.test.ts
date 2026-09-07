@@ -31,6 +31,7 @@ import { applyBootstrapState, BootstrapEngineError } from "../engine";
 import {
   BOOTSTRAP_BLOCK_END,
   BOOTSTRAP_BLOCK_START,
+  CONTRACT_FILENAME,
   bootstrapContractPath,
   bootstrapStateFilePath,
   renderBootstrap,
@@ -64,17 +65,54 @@ function installStatePath(): string {
   return path.join(home, ".config", "massa-ai", "install-state.json");
 }
 
+/**
+ * The root `scripts/install-skills.sh` really records for each host, read out
+ * of its `platform_root` (`:162-169`) rather than guessed from the host name.
+ *
+ * Three of the four are `$TARGET_HOME/.<host>`; **opencode is
+ * `$TARGET_HOME/.config/opencode`**, and this fixture recorded `.opencode` for
+ * its whole life. That was inert only because the engine ignored the recorded
+ * root for every host but codex — so the defect and the constraint that hid it
+ * kept each other alive, and T26 scoped root consumption to codex because
+ * widening it broke four opencode cases that were themselves wrong.
+ *
+ * Codex is resolved at install time (`~/.codex` preferred,
+ * `~/.config/codex` as the fallback, `install-skills.sh:139-145`). `.codex` is
+ * what `platform_root` yields when neither directory exists, which is this
+ * fixture's state; the two-layout cases below seed their own record instead of
+ * using this helper.
+ */
+const INSTALLER_PLATFORM_ROOT: Readonly<Record<Host, readonly string[]>> = {
+  claude: [".claude"],
+  codex: [".codex"],
+  cursor: [".cursor"],
+  opencode: [".config", "opencode"],
+};
+
 /** Record `hosts` as installed, in the shape `install-state.json` v2 uses. */
 function seedInstallState(hosts: readonly Host[]): void {
   const platforms: Record<string, unknown> = {};
   for (const host of hosts) {
     platforms[host] = {
-      root: path.join(home, `.${host}`),
+      root: path.join(home, ...INSTALLER_PLATFORM_ROOT[host]),
       skills: ["massa-ai"],
       skillsOwner: "repo",
     };
   }
   write(installStatePath(), `${JSON.stringify({ version: 2, platforms }, null, 2)}\n`);
+}
+
+/** One host recorded with an explicit `root`, for the cases that ask what the
+ *  engine does with a root that is *not* the default map's value. */
+function seedInstallStateWithRoot(host: Host, root: string): void {
+  write(
+    installStatePath(),
+    `${JSON.stringify(
+      { version: 2, platforms: { [host]: { root, skills: ["massa-ai"], skillsOwner: "repo" } } },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 /** Seed `config.json` with exact bytes, so a malformed document survives. */
@@ -917,4 +955,69 @@ describe("codex home resolution follows install-state (T26)", () => {
       fs.rmSync(outside, { recursive: true, force: true });
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// AC-10 — a recorded root is followed for EVERY host (T29)
+// ---------------------------------------------------------------------------
+
+/**
+ * T26 made the engine follow `platforms[host].root` for codex alone, through a
+ * `HOSTS_WITH_A_RESOLVED_ROOT` set; T29 removed the set. This block exists
+ * because that removal is otherwise unobservable, which was measured rather
+ * than argued: with the set restored and `seedInstallState` already corrected,
+ * `bun test src/bootstrap` was **362 pass / 0 fail**. The codex cases above
+ * pass because codex stays in the set, and every other host's recorded root now
+ * agrees with `HOST_CONFIG_DIR`, so no case can tell the two implementations
+ * apart. A green suite would have made the widening look like a refactor.
+ *
+ * So each case here records a root the default map could never produce, and
+ * asks where the contract actually landed. That value is not one the installer
+ * writes today for these three hosts — the subject is the engine's contract,
+ * which after T29 is "the installer names the directory it wrote into, and this
+ * engine writes there", with `resolveHostRoot`'s containment check rather than a
+ * host allowlist as the guarantee that a hand-edited record cannot widen where
+ * a pass writes.
+ */
+describe("a recorded root is followed for every host (T29, BST-10 AC-10)", () => {
+  test.each(HOSTS)(
+    "%s: the contract lands in the recorded root, never in the default one",
+    (host) => {
+      const recorded = path.join(home, ".config", `${host}-recorded-root`);
+      seedInstallStateWithRoot(host, recorded);
+
+      const report = apply();
+
+      expect(fs.existsSync(path.join(recorded, CONTRACT_FILENAME))).toBe(true);
+      expect(fs.existsSync(bootstrapContractPath(host, home))).toBe(false);
+      // The wiring probe follows the same root rather than re-deriving one:
+      // nothing wires this scratch directory, so the row must name that root's
+      // own artifact. A probe still reading the default map would name a path
+      // under `.<host>`, and this is the assertion that says so.
+      expect(statusByHost(report.rows)).toEqual({ [host]: "written-not-wired" });
+      expect(reasonFor(report.rows, host)).toContain(recorded);
+    },
+  );
+
+  test.each(HOSTS)(
+    "%s: a recorded root outside the target home fails that host and writes nothing",
+    (host) => {
+      // The containment guard, asserted over the whole host population rather
+      // than only the one host that used to be allowed to carry a root. It is
+      // now the only thing between a hand-edited `install-state.json` and a
+      // write outside `targetHome`.
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-bootstrap-outside-"));
+      try {
+        seedInstallStateWithRoot(host, outside);
+
+        const report = apply();
+
+        expect(statusByHost(report.rows)).toEqual({ [host]: "failed" });
+        expect(reasonFor(report.rows, host)).toContain(outside);
+        expect(fs.readdirSync(outside)).toEqual([]);
+      } finally {
+        fs.rmSync(outside, { recursive: true, force: true });
+      }
+    },
+  );
 });

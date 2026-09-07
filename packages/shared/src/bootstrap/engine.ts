@@ -187,7 +187,7 @@ export function applyBootstrapState(options: BootstrapApplyOptions): BootstrapRe
       source,
       state: resolved.state,
       targetHome,
-      hostRoot: recordedHostRoot(host, platforms[host]),
+      hostRoot: recordedHostRoot(platforms[host]),
       dryRun,
     }),
   );
@@ -200,43 +200,40 @@ export function applyBootstrapState(options: BootstrapApplyOptions): BootstrapRe
 }
 
 /**
- * Hosts whose config root is **not** a fixed suffix of the home, and whose
- * recorded `platforms[host].root` this engine therefore has to follow.
- *
- * Exactly one qualifies. `scripts/install-skills.sh:139-145` resolves
- * `$CODEX_HOME` as `$TARGET_HOME/.codex` when that exists and
- * `$TARGET_HOME/.config/codex` otherwise, `platform_root` (`:162-169`) returns
- * it, and `contract_path` (`:705`) writes the contract there — so on the
- * fallback layout the `.codex` default in `HOST_CONFIG_DIR` names a directory
- * that does not exist. Before T26 this engine wrote a stray
- * `~/.codex/MASSA-AI.md` there, never touched the contract the host loads, and
- * reported `written-not-wired`: every toggle a no-op that reports failure
- * (BST-04 AC-6, BST-10 AC-10).
- *
- * The other three roots have one legal value each, so following a recorded root
- * for them could only ever honour a wrong one. The set is the "do not
- * generalise the mechanism past what Codex needs" boundary made structural
- * rather than left to a comment — and the `~/.codex` vs `~/.config/codex`
- * resolution itself stays in bash, in one place (design.md R3): what crosses
- * the boundary is the resolved answer, not a second implementation of it.
- */
-const HOSTS_WITH_A_RESOLVED_ROOT: ReadonlySet<Host> = new Set<Host>(["codex"]);
-
-/**
- * The root `install-skills.sh` recorded for this host, when this engine is
- * allowed to follow it.
+ * The root `install-skills.sh` recorded for this host.
  *
  * The installer is the sole writer of `platforms[host].root` and always sets it
  * to its own `platform_root` (`scripts/install-skills.sh:860`, `:970`) — the
- * very directory it wrote `MASSA-AI.md` and the wiring artifact into. An absent
- * or empty `root` falls back to the default map, which is what a migrated v1
- * state file and any non-installer writer produce. `resolveHostRoot`
- * (`render.ts`) refuses a value outside `targetHome`, so a hand-edited record
- * cannot widen where a pass writes; that refusal becomes one host's `failed`
- * row, never a write.
+ * very directory it wrote `MASSA-AI.md` and the wiring artifact into. So the
+ * recorded root is the answer to "where does this host's contract live" for
+ * every host, and this engine follows it for every host. An absent or empty
+ * `root` falls back to `render.ts`'s default map, which is what a migrated v1
+ * state file and any non-installer writer produce.
+ *
+ * Codex is why it matters today: `install-skills.sh:139-145` resolves
+ * `$CODEX_HOME` as `$TARGET_HOME/.codex` when that exists and
+ * `$TARGET_HOME/.config/codex` otherwise, so on the fallback layout the
+ * `.codex` default names a directory that does not exist. Before T26 this
+ * engine derived every path from that default: it wrote a stray
+ * `~/.codex/MASSA-AI.md`, never touched the contract the host loads, and
+ * reported `written-not-wired` — every toggle a no-op that reports failure
+ * (BST-04 AC-6, BST-10 AC-10).
+ *
+ * T26 scoped the fix to codex through a `HOSTS_WITH_A_RESOLVED_ROOT` set, on
+ * the grounds that the other three roots have exactly one legal value so
+ * following a record could only honour a wrong one. That reasoning rested on a
+ * broken fixture: `engine.test.ts`'s `seedInstallState` recorded
+ * `<home>/.opencode`, where the installer writes `<home>/.config/opencode`, and
+ * uniform consumption "broke" four opencode cases that were themselves wrong
+ * (T29). With the fixture corrected the argument for the set disappears, and a
+ * set is a worse guarantee than the containment check it stood in for:
+ * `resolveHostRoot` (`render.ts`) refuses any root outside `targetHome`, so a
+ * hand-edited record cannot widen where a pass writes — the refusal becomes one
+ * host's `failed` row, never a write. The `~/.codex` vs `~/.config/codex`
+ * resolution itself still lives only in bash (design.md R3): what crosses the
+ * boundary is the resolved answer, never a second implementation of it.
  */
-function recordedHostRoot(host: Host, record: PlatformRecord | undefined): string | undefined {
-  if (!HOSTS_WITH_A_RESOLVED_ROOT.has(host)) return undefined;
+function recordedHostRoot(record: PlatformRecord | undefined): string | undefined {
   const root = record?.root;
   return typeof root === "string" && root.length > 0 ? root : undefined;
 }
