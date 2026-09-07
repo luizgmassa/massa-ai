@@ -22,7 +22,8 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 | 4 | T7, T8 | Complete | `0316ad84`, `0a0ceb78` | Two commits, one per task, both implemented by a delegated builder and re-measured by the parent rather than taken from its report. Four additions beyond the literal task text, each because the stated contract made a required behavior unreachable: `buildBootstrapReport` (T7), because "restartRequired is true only for a non-dry-run with at least one written row" is otherwise a comment on a field and any test of it would assert its own construction; and `source?`/`sourcePath?`/`onWarning?` (T8), because `{targetHome, dryRun?}` cannot reach the marked-up source at all and `BootstrapReport` has no warnings channel for AC-10b. `skipped` had no defined trigger and now means a byte-identical re-apply whose wiring is present. **`defaultStatePath` does not exist where `design.md:455` says it does** — it is private and duplicated at `profile-switch/engine.ts:60` and `variant-sync.ts:70`, exported from neither, verified absent from `state.ts`; the path is derived from `path.dirname(bootstrapStateFilePath(targetHome))` instead. Gates: `packages/shared` 815 pass / 0 fail across 35 files, oxlint exit 0, and the real home verified untouched by hand (no `MASSA-AI.md` under `~/.claude`, `~/.codex`, `~/.cursor`, `~/.config/opencode`; `~/.config/massa-ai/config.json` still at its 2026-08-18 mtime). 16 discrimination mutations across the two tasks, all killed, all anchor-counted before replacement, all restored from `/tmp` copies and hash-verified. |
 | 5 | T9, T10, T11 | Complete | `f9d8bbea`, `c0599829`, `34158aa5`, `efe9876c`, `fed7becb` | Five commits for three tasks. T9 is committed **red on purpose** (22 passed / 39 failed) — a green red-first sensor would mean it asserts what the installer already does. It immediately found a defect in already-merged code: `MASSA-AI.md` had two writers disagreeing byte-for-byte, `engine.ts:310` writing the raw body while `bootstrap_op` writes the marker pair, breaking `spec.md:96`, `design.md:475` (the pair *is* the ownership proof) and `spec.md:118`. Fixed in `c0599829` by wrapping at the writer, verified against the installer's own extract/plan heredocs sliced verbatim out of `install-skills.sh`; the pre-fix state made `extract` exit 2, "Bootstrap block not found". The engine fix is one variable, not one call site — `document` feeds both the write and the up-to-date comparison, and fixing only the write would have made every host report `written` on an unchanged pass. T10 took the sensor to 26/35 and scoped rather than inverted `is_owned_target`'s symlink comment (different subjects: `rm -rf` of a node under `skills/` versus write-through into a file's bytes). Two of T10's five behaviours had **no committed sensor** — the symlink refusal and temp-file atomicity survived the whole suite untouched — closed in `efe9876c`, +16 assertions, 121 insertions and 0 deletions, sensor 42/35 with the failed count unmoved. T11's plan mode senses **absence of an fs call**, not absence of a change: a read-only compare-then-skip leaves bytes identical and passes a bytes-after sensor, so the test wraps all 96 writable function properties of the `fs` namespace with a delegating counter. Two design clauses could not be implemented literally and are commented at their call sites: `design.md:449` (`writeConfig` itself gaining the mode contract — impossible, a zero-contact plan needs the current document and both live call sites pass only the desired one) and `design.md:272` (the superseded compare-then-skip, overturned by `:449` and `:477`). 25 mutations across the three tasks, all killed. Gates: artifact drift `--check` exit 0 under a scratch `XDG_CONFIG_HOME`, mirror byte-identical, oxlint 0, installer siblings rc=0. **`bun run test:scripts` cannot reach any `.sh` suite** — `package.json:38` chains `bun test … && for f in …`, and two pre-existing `pyts golden: lessons` failures abort the bun phase first, so the whole shell battery is unreachable through the documented command and was run directly. |
 | 6 | T12, T13 | Complete | `4e641c1a`, `392082d4` | Two commits, one per task. **PC-B1 was real and wider than stated**: the bootstrap module had no export surface at all, and none of the six suites could see it because every one of them imports relatively while the shell suite imports the absolute source path. The barrel and the root re-export land in T12; `ConfigParseError` is re-exported from the bootstrap barrel because `setBootstrapRuleEnabled` throws it, and omitted from the root re-export because the config block already exports it there. Two facts were measured that no artifact recorded. **The dist branch of the R1 ladder does not load under node**: `packages/shared/src/bootstrap/{state,render,engine}.ts` import their siblings with extensionless relative specifiers, so `node -e "import('dist/bootstrap/index.js')"` fails `ERR_MODULE_NOT_FOUND` on `dist/config/config-loader` — repointing them spans five modules outside this phase's write set, so `loadBootstrapApi` turns the failure into a named `BootstrapRendererUnloadableError` instead of a raw resolution stack, and T15's `bun run build` step will not by itself make a node-only machine work. **`appendBlock`'s blank separator line was not invertible**: no rule distinguishes our separator from a blank line the user already had, and the migration fixture is exactly that shape, so `removeBlock`'s `before.endsWith("\n\n")` trim ate one user byte — the separator is dropped and the pair is now exactly invertible, verified in both directions. Sensor movement 42/35 → **76 passed / 1 failed**; the last assertion is unsatisfiable by construction and is reported above rather than edited, together with seven sibling-suite assertions that BST-05 AC-8 supersedes. Gates re-measured by the implementer: `test:scripts` 1873/2 across 83 files (the two documented pre-existing cases, no third failure), `test:plugins` 142/0, artifact `--check` exit 0 under a scratch `XDG_CONFIG_HOME`, oxlint 0, `bash -n` 0, siblings uninstall 16/0, state 21/0, check 23/0. Six discrimination mutations across the two tasks, all killed, all restored from `/tmp` copies and hash-verified. Real home verified untouched by hand: no `MASSA-AI.md` under `~/.claude`, `~/.codex`, `~/.cursor`, `~/.config/opencode`; `~/.claude/CLAUDE.md` still 19 bytes at its 2026-07-26 mtime with zero massa-ai markers; `~/.config/massa-ai/config.json` still at 2026-08-18. **Two macOS-only measurement traps**: `TMPDIR` ends in `/` here, so `mktemp -d` yields a `T//` path that `path.join` normalizes and two BST-04 pointer assertions compare literally — run this suite with `TMPDIR=/tmp` or read CI; and a real `claude` binary beside `node` in `~/.local/bin` defeats `test-install-skills-cli.sh`'s empty-PATH premise at baseline. |
-| 7–11 | T14–T25 | Pending | — | Plan Challenge run before the first Phase 6 mutation — see below. |
+| 6 | T13a | Pending | — | Added after T13, by user ruling. Seven committed sibling assertions sense the `AGENTS.md` shape BST-05 AC-8 retires, and `bootstrap-file.sh:385` expects a status unreachable in its own scenario. Neither was owned by any task. |
+| 7–11 | T14, T15, T15a, T16–T25 | Pending | — | T15a added by user ruling: AC-9c (`spec.md:106`, name retained backups in the uninstall report) was specified and owned by no task. Plan Challenge run before the first Phase 6 mutation — see below. |
 
 **Plan Challenge, Phases 6–11 (2026-09-07).** A read-only `massa-ai-plan-critic` pass was run
 against T12–T25 before any Phase 6 edit, then every finding was re-measured at its own line by
@@ -126,11 +127,11 @@ T9 → T10 → T11
 
 ### Phase 6: Render entry point and per-host delivery
 
-T12 → T13
+T12 → T13 → T13a
 
-### Phase 7: Drift branch and harness build
+### Phase 7: Drift branch, harness build and backup reporting
 
-T14 → T15
+T14 → T15 → T15a
 
 ### Phase 8: Shared formatting and the two CLIs
 
@@ -509,6 +510,50 @@ are assertions in committed suites, so they are reported rather than edited.
 
 ---
 
+### T13a: Repoint the installer suites at the delivered contract
+
+**Task ID**: TASK-013A
+
+**What**: Rewrite every committed assertion that senses the retired `AGENTS.md` bootstrap block so it senses the delivered per-host contract instead, and correct one assertion whose expected status is unreachable by construction.
+**Where**: `scripts/tests/test-install-skills-apply.sh`, `scripts/tests/test-install-skills-cli.sh`, `scripts/tests/test-install-skills-bootstrap-file.sh`
+**Depends on**: T13
+**Reuses**: the assertion helpers in `scripts/tests/lib/installer-test-helpers.sh`; the per-host delivery assertions T9 already wrote in `test-install-skills-bootstrap-file.sh` as the shape to mirror
+**Requirement**: BST-02, BST-03, BST-05, BST-12
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why this task exists.** T13 delivered BST-05 AC-8, which forbids leaving a bootstrap
+marker pair in `AGENTS.md` on `claude` or `opencode`. Seven committed assertions in two
+sibling suites sense exactly that retired shape, so they went red on correct behaviour.
+No task owned them: the Tasks artifact tracked the three suites T9 authored and never
+enumerated the suites T13's contract change would invalidate. Deleting them is not an
+option — `CONTRIBUTING.md` Step 6 requires retiring a compatibility boundary to assert
+**both** directions.
+
+**Measured baselines, all with `TMPDIR=/tmp`** (this machine's default `TMPDIR` ends in
+`/`, so `mktemp -d` yields a `T//` path that `path.join` normalizes and two BST-04
+pointer assertions compare literally):
+
+| Suite | at `7a51d7aa` | after T13 |
+| --- | --- | --- |
+| `test-install-skills-apply.sh` | 31 / 0 | 26 / 5 |
+| `test-install-skills-cli.sh` | 40 / 2 | 38 / 4 |
+| `test-install-skills-bootstrap-file.sh` | 42 / 35 | 76 / 1 |
+
+**Done when**:
+- [ ] The 5 `apply` failures and the 2 new `cli` failures assert the **delivered** contract: `claude` → a managed block in `~/.claude/CLAUDE.md` containing `@MASSA-AI.md`; `opencode` → the absolute `MASSA-AI.md` path in the `instructions` array; `codex`/`cursor` → the pointer block. No assertion is deleted; each suite's total assertion count is greater than or equal to its baseline
+- [ ] **Both directions (`CONTRIBUTING.md` Step 6).** Each rewritten site also asserts the retired path has **zero effect** — no bootstrap marker pair remains in `~/.claude/AGENTS.md` or `~/.config/opencode/AGENTS.md` (BST-05 AC-8). Asserting only that the new path works would leave the migration itself unsensed
+- [ ] `test-install-skills-bootstrap-file.sh:385` asserts `'"status":"skipped"'`, not `'"status":"written"'`, with an inline comment naming T8's trigger definition — a byte-identical re-apply whose wiring is present — and why `written` is unreachable there: the scenario's own `:377` already ran the engine and wrote byte-identical bytes, and `:383`'s `--apply` adds wiring without changing rule state. `:387`'s `assert_not_contains '"status":"written-not-wired"'` stays; it already carries the scenario's real intent
+- [ ] The `written` path is **not** re-asserted in the shell suite. It is already covered one layer down at `packages/shared/src/bootstrap/__tests__/engine.test.ts:424-431`, which asserts `{codex: "written", cursor: "written-not-wired"}` from one real engine run, and at `:441` (`apply().restartRequired === true`), with `report.test.ts:170-176` sweeping every status against its expected `restartRequired`. Execute's Check C forbids duplicating an assertion at another layer for the same scenario
+- [ ] The 2 **pre-existing** `cli` failures are not touched and not chased: `no tools exits 2` (`got='1' want='2'`) and `reason is reported` fail identically at `7a51d7aa`, caused by a real `claude` binary in `~/.local/bin` defeating that suite's empty-PATH premise. They are environment-caused, not branch-caused
+- [ ] Final, with `TMPDIR=/tmp`: `apply` 31/0, `cli` 40/2, `bootstrap-file` 77/0
+
+**Tests**: shell suite
+**Gate**: full — `bun run test:scripts && bun run test:plugins`
+**Commit**: `test(installer): repoint the installer suites at the delivered contract`
+
+---
+
 ### T14: Bootstrap drift branch in `--check`
 
 **Task ID**: TASK-014
@@ -549,10 +594,40 @@ are assertions in committed suites, so they are reported rather than edited.
 - [ ] A fresh clone with no build reaches a successful render, or fails with the named `bun run build` message — never a default render
 - [ ] The step is skipped when `bun` is absent, matching the ladder's own branch order
 - [ ] Covered by a scenario in `scripts/tests/test-install-skills-bootstrap-file.sh`
+- [ ] **PC-T15 — the scope of this step is the bun branch only; state that, do not widen it.** T12 measured the ladder's node branch dead: `packages/shared/dist/bootstrap/state.js` imports `../config/config-loader` with no extension, so `node -e "import('packages/shared/dist/bootstrap/index.js')"` fails `ERR_MODULE_NOT_FOUND` **even with a completed build**. The cause is pre-existing and not this feature's: 33 non-test relative imports across `packages/shared/src/bootstrap/` and `packages/shared/src/config/` carry no `.js`, while `profile-switch/` does, and `packages/shared/tsconfig.json` sets `moduleResolution: bundler`, which lets `tsc` emit them verbatim. Nothing had noticed because no unbundled node consumer of `packages/shared/dist/**` existed before T12 — both published CLIs are `#!/usr/bin/env bun` built with `bun build --target=bun`, and `apps/mcp-client/src/index.ts`, which *is* `#!/usr/bin/env node`, has `@massa-ai/shared` bundled into it. So this step makes the **bun** branch's built path reliable and matches `install.sh:1026`; a node-only machine still reaches the named error, by design (`design.md:99-105`). Record that limitation in the step's own comment rather than implying the build repairs it. The import repointing is FU-1 below, deliberately not absorbed here
 
 **Tests**: shell suite
 **Gate**: full — `bun run test:scripts && bun run test:plugins`
 **Commit**: `fix(installer): build before rendering the bootstrap contract`
+
+---
+
+### T15a: Name retained backups in the uninstall report
+
+**Task ID**: TASK-015A
+
+**What**: Have uninstall name every `*.massa-ai.bak-<timestamp>` it leaves in place.
+**Where**: `scripts/install-skills.sh`
+**Depends on**: T13
+**Reuses**: `uninstall_platform`'s existing `record` calls; `installer_backup_file` (`scripts/lib/installer-shared.sh:52`), whose only production call site is `bootstrap_op` (`:627-643`)
+**Requirement**: BST-05 (AC-9c)
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why this task exists.** `spec.md:106` (AC-9c) requires uninstall to leave a backup in
+place **and name it in the uninstall report**. The "leave in place" half is satisfied;
+the "name it" half is implemented nowhere and is named in no task's done-when. It would
+otherwise reach the verification gate as an uncovered acceptance criterion.
+
+**Done when**:
+- [ ] **Observed RED first** — the assertion fails against `uninstall_platform` as it stands before the change
+- [ ] A backup created by an install is left in place on uninstall **and** named in the uninstall report (AC-9c, `spec.md:106`)
+- [ ] The round-trip fingerprint's exclusion list is **unchanged**: `*.massa-ai.bak-*` and nothing else. `design.md:419-424` freezes it deliberately so that widening it later reads as a spec change rather than a test edit. Every other post-uninstall difference is a defect in the subject, not the sensor
+- [ ] Covered in `scripts/tests/test-install-skills-uninstall.sh`, which is 16/0 at the start of this task
+
+**Tests**: shell suite
+**Gate**: full — `bun run test:scripts && bun run test:plugins`
+**Commit**: `fix(installer): name retained backups in the uninstall report`
 
 ---
 
@@ -809,8 +884,8 @@ Phase 2:   T3 ──→ T4
 Phase 3:   T5 ──→ T6
 Phase 4:   T7 ──→ T8
 Phase 5:   T9 ──→ T10 ──→ T11
-Phase 6:   T12 ──→ T13
-Phase 7:   T14 ──→ T15
+Phase 6:   T12 ──→ T13 ──→ T13a
+Phase 7:   T14 ──→ T15 ──→ T15a
 Phase 8:   T16 ──→ T17 ──→ T18
 Phase 9:   T19 ──→ T20 ──→ T21
 Phase 10:  T22 ──→ T23
@@ -840,8 +915,10 @@ Execution is strictly sequential — there is no intra-phase parallelism.
 | T11 | 1 module | ✅ Granular |
 | T12 | 1 script | ✅ Granular |
 | T13 | 2 functions in 1 file, one concern | ✅ Granular |
+| T13a | 8 assertions across 3 suites, one concern (repoint sensors at the delivered contract) | ✅ Granular |
 | T14 | 1 function in 1 file | ✅ Granular |
 | T15 | 1 step in 1 file | ✅ Granular |
+| T15a | 1 record call in 1 function | ✅ Granular |
 | T16 | 1 module | ✅ Granular |
 | T17 | 1 subcommand in 1 file | ✅ Granular |
 | T18 | 1 subcommand in 1 file | ✅ Granular |
@@ -872,8 +949,10 @@ Execution is strictly sequential — there is no intra-phase parallelism.
 | T11 | T9 | T10 → T11 (order) | ✅ Match |
 | T12 | T6, T8 | prior phases | ✅ Match |
 | T13 | T10, T11, T12 | T12 → T13 | ✅ Match |
+| T13a | T13 | T13 → T13a | ✅ Match |
 | T14 | T13 | prior phase | ✅ Match |
 | T15 | T12 | prior phase | ✅ Match |
+| T15a | T13 | prior phase | ✅ Match |
 | T16 | T7 | prior phase | ✅ Match |
 | T17 | T8, T16 | T16 → T17 | ✅ Match |
 | T18 | T17 | T17 → T18 | ✅ Match |
@@ -906,8 +985,10 @@ No dependency points forward into a later phase.
 | T11 | Bash installer behaviour | shell suite | shell suite | ✅ OK |
 | T12 | Repo script | unit | unit | ✅ OK |
 | T13 | Bash installer behaviour | shell suite | shell suite | ✅ OK |
+| T13a | Bash installer behaviour | shell suite | shell suite | ✅ OK |
 | T14 | Bash installer behaviour | shell suite | shell suite | ✅ OK |
 | T15 | Bash installer behaviour | shell suite | shell suite | ✅ OK |
+| T15a | Bash installer behaviour | shell suite | shell suite | ✅ OK |
 | T16 | shared domain module | unit | unit | ✅ OK |
 | T17 | Published CLI subcommand | unit | unit | ✅ OK |
 | T18 | Published CLI subcommand | unit | unit | ✅ OK |
@@ -923,8 +1004,47 @@ No dependency points forward into a later phase.
 
 ---
 
+## Follow-up Findings — deliberately not absorbed by this feature
+
+Recorded here so they are not lost, and explicitly out of scope. Each names why absorbing
+it would widen this feature past its spec.
+
+**FU-1 — `packages/shared/dist` is not loadable by an unbundled node consumer.** 33
+non-test relative imports across `packages/shared/src/bootstrap/` and
+`packages/shared/src/config/` carry no `.js` extension, while `profile-switch/` uses it;
+`packages/shared/tsconfig.json` sets `moduleResolution: bundler`, so `tsc` typechecks and
+emits both forms verbatim. Measured:
+`node -e "import('packages/shared/dist/index.js')"` → `ERR_MODULE_NOT_FOUND: Cannot find
+module '…/dist/config/config-loader' imported from …/dist/config/index.js`. This predates
+the feature and had no consumer: both published CLIs are `#!/usr/bin/env bun` built with
+`bun build --target=bun`, and `apps/mcp-client/src/index.ts` — the one `#!/usr/bin/env
+node` entry — has `@massa-ai/shared` bundled into it by the same build. T12's ladder is
+the first unbundled node consumer in the repository. **Consequence to state plainly:**
+after T13, `scripts/install-skills.sh` on a machine without `bun` aborts every host with a
+named error, where before this feature it needed neither `bun` nor a build. Fixing it
+means repointing a module this feature does not otherwise own, for no other beneficiary.
+See T15's `PC-T15` bullet.
+
+**FU-2 — `package.json:31` swallows `--check` for the first generator.**
+`"generate:artifacts"` is an `&&` chain, so `bun run generate:artifacts --check` appends
+the flag only to the second generator while the first runs in write mode and repairs the
+drift it was meant to report. `spec.md:204` (P2 AC-1) names the broken form; `design.md`
+and this artifact both override it with the direct form, and CI already uses the direct
+form (`.github/workflows/ci.yml:238`). `scripts/worktree-verify.sh:286` still uses the
+broken one. Repo-wide argument forwarding is the real fix.
+
+**FU-3 — `massa-ai-config set` still round-trips through `loadConfig`.**
+`apps/mcp-client/src/config-cli.ts:205-215` reads with the permissive loader that returns
+defaults on a parse failure, then writes the whole document — the same defect
+`readRawConfigStrict` was introduced to close on the toggle path. A malformed
+`config.json` would be overwritten with defaults, destroying `security.apiKey` and
+`database.url`. Recorded at Design time (`design.md:437`) and deliberately not fixed
+inside this feature.
+
+---
+
 ## Artifact-Store Evidence
 
 - **Active artifact key:** `.specs/features/bootstrap-file-and-rule-toggles/tasks.md`
-- **Version:** 1 (initial write)
+- **Version:** 3 (initial write; +Plan Challenge amendments; +T13a/T15a by user ruling)
 - **Checksum:** recorded in the Tasks completion report after write (`shasum -a 256`).
