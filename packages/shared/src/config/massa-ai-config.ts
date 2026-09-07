@@ -195,6 +195,18 @@ export interface MassaAiConfig {
   // SCH-06) exactly like every other section — this comment records the
   // reversal rather than silently deleting the prior decision.
   scheduler?: SchedulerConfig;
+  // Bootstrap rule toggle state (BST-10). Persisted under `bootstrap.rules`,
+  // one boolean per registry id in `packages/shared/src/bootstrap/rules.ts`.
+  // Optional and late-added, same precedent as `scheduler` above: an install
+  // whose config.json predates this section has no persisted overrides, and
+  // the renderer resolves that absence against the registry's own defaults
+  // (T5) rather than requiring every install to carry a full rules map. A
+  // key present here but absent from the registry is intentionally not
+  // rejected at this type level — the state resolver reports and ignores it
+  // (BST-10 AC-12) rather than failing config load entirely.
+  bootstrap?: {
+    rules?: Record<string, boolean>;
+  };
 }
 
 /**
@@ -498,4 +510,12 @@ export const defaultMassaAiConfig: MassaAiConfig = {
   // otherwise showed the Admin Portal's Scheduler tab with no fields at all.
   // These are the same literals `config/index.ts` resolves against.
   scheduler: DEFAULT_SCHEDULER_CONFIG,
+  // Present, not absent, same reasoning as `scheduler` above. Empty rather
+  // than pre-populated with every registry id's default: this section holds
+  // only the user's *overrides* of `bootstrap/rules.ts`'s registry defaults
+  // (BST-10), and `massa-ai-config.ts` deliberately does not import that
+  // module — the rule registry's own defaults are what an absent/empty
+  // override map resolves against (T5's `resolveBootstrapState`), not a
+  // second copy of them duplicated into this file.
+  bootstrap: { rules: {} },
 };
