@@ -10,7 +10,7 @@ import type { ScheduledJob } from "./scheduler-types.js";
  * depends on persisted state.
  *
  * EB-SCH-6: without it, `PgScheduledJobStore.get()` answered from a cold mirror
- * at boot (`scheduler-store-pg.ts:246-249` calls `ensureHydrated()`
+ * at boot (`scheduler-store-pg.ts:262-265` calls `ensureHydrated()`
  * fire-and-forget), so `registerOrResumeJob` saw no existing row and recomputed
  * `nextRunAt` as `now + intervalMs` — the schedule silently restarted on every
  * API restart. The measured drift equalled the restart duration, 20702 ms.

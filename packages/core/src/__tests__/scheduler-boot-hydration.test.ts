@@ -5,7 +5,7 @@
  * by comparing against a SYNCHRONOUS `store.get(id)`. `PgScheduledJobStore`
  * serves that read from an in-memory mirror it fills asynchronously —
  * `get()` calls `ensureHydrated()` fire-and-forget and answers immediately
- * (`scheduler-store-pg.ts:246-249`). At boot the mirror is still empty, so every
+ * (`scheduler-store-pg.ts:262-265`). At boot the mirror is still empty, so every
  * persisted job looked new and had its schedule reset to `now + intervalMs`.
  * Measured on the live stack: the drift equalled the restart duration, 20702 ms.
  *

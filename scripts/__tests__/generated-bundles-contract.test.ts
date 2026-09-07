@@ -45,9 +45,21 @@ describe("generation pre-script wiring (UGB-17)", () => {
     // actually run.
     expect(scripts["generate:artifacts"]).toBe("bun scripts/generate-artifacts.ts");
 
+    // Asserted against the wrapper's RESOLVED generator list, not against its
+    // file text. The first version of this check used `toContain` on the source
+    // and was vacuous: the wrapper's own docblock quotes the old `&&` form,
+    // including both generator filenames, so removing a real import left the
+    // check green. A comment describing the defect satisfied the guard against
+    // the defect — comments are source to a text search.
     const wrapper = readFileSync(path.join(repoRoot, "scripts", "generate-artifacts.ts"), "utf8");
-    expect(wrapper).toContain("generate-skill-artifacts.ts");
-    expect(wrapper).toContain("generate-subagent-artifacts.ts");
+    const imports = [...wrapper.matchAll(/^import\s+\{[^}]*\}\s+from\s+"\.\/(generate-[a-z-]+\.ts)";$/gm)]
+      .map((m) => m[1] as string);
+    expect(imports.sort()).toEqual(["generate-skill-artifacts.ts", "generate-subagent-artifacts.ts"]);
+
+    // …and that each imported generator is actually wired into GENERATORS,
+    // since an import alone runs nothing.
+    const wired = [...wrapper.matchAll(/name:\s*"(generate-[a-z-]+)"/g)].map((m) => `${m[1] as string}.ts`);
+    expect(wired.sort()).toEqual(imports.sort());
   });
 
   test("opencode package pretest chains both generators (turbo test path)", () => {

@@ -983,24 +983,33 @@ describe.skipIf(!MCP_READY)("EB-MCP — stdout hygiene, cursor, embedded parity"
         const viaEmbedded = await mcpCall(embedded.client, "list_projects", {
           status: "all",
         });
-        // KNOWN RED — a real parity break, kept rather than masked. Measured:
+        // WAS KNOWN RED — FIXED 2026-09-07 in `34bbee58`. Kept as the regression
+        // sensor for the class, with its history, because the divergence was
+        // invisible to every unit test on either side.
+        //
+        // MEASURED before the fix:
         //   http (MCP over REST): {"success":true,"data":{"total":26}}
         //   mcp  (embedded):      {"success":true,"data":{"total":26,"filter":"all"}}
-        // Same tool, same arguments, two transports, two shapes. The mechanism is
-        // that the two modes reach different code: embedded delegates to the core
-        // tool, `listProjectsTool().handle({status})`
-        // (apps/mcp-client/src/embedded-api-client.ts:463-464), and that tool's
-        // envelope carries `filter`; the REST route hand-rolls its own projection
-        // and never emits it (apps/tools-api/src/routes/workspace.ts:110-128).
-        // Which side is wrong is a product decision — the route could delegate to
-        // the tool, or the tool's extra field could be dropped from the mapping —
-        // but the divergence itself contradicts the stated contract at
-        // embedded-api-client.ts:10-16, that the mapping "mirrors the tools-api
-        // REST routes exactly so a tool call yields the same result shape in both
+        // Same tool, same arguments, two transports, two shapes. The two modes
+        // reached different code: embedded delegates to the core tool,
+        // `listProjectsTool().handle({status})`
+        // (apps/mcp-client/src/embedded-api-client.ts:463-464), whose envelope
+        // carries `filter`, while the REST route hand-rolled its own projection
+        // and never emitted it. That contradicted the contract stated at
+        // embedded-api-client.ts:10-16 — the mapping "mirrors the tools-api REST
+        // routes exactly so a tool call yields the same result shape in both
         // modes (parity contract, T19)".
         //
-        // Adding `filter` to dropKeys would make this green and delete the only
-        // sensor for the class, so it stays red until the product picks a side.
+        // THE PRODUCT PICKED A SIDE: the route delegates to the tool, so there is
+        // one projection where there were two. That mattered beyond this
+        // assertion, because the divergence was WIDER than this sensor can see —
+        // `dropKeys: ["workspaces"]` hides the per-workspace fields, and the
+        // route was also dropping `createdAt`/`updatedAt` and validating `status`
+        // not at all, answering 200 with an empty list for `?status=bogus`.
+        //
+        // Adding `filter` to dropKeys would have made this green while deleting
+        // the only sensor for the class. It was not done then and must not be
+        // done later; the repair belongs in the product, which is where it went.
         assertMatrix(
           viaHttpMcp,
           viaEmbedded,

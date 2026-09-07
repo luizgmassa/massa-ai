@@ -88,19 +88,33 @@ interface GeneratorScript {
   readonly name: string;
 }
 
-/** The two generator filenames `generate:artifacts` names today (AC-03.6).
+/** The two generator filenames `generate:artifacts` reaches today (AC-03.6).
  *  Deliberately literal, not derived from any parse — `assertGeneratorBackstop`
  *  exists precisely so a bug in the parser below cannot agree with itself and
- *  ship a short list unnoticed. A future third generator only needs adding
- *  here if the backstop should widen with it; until then the check is a
- *  floor ("at least these two"), not a ceiling. */
+ *  ship a short list unnoticed.
+ *
+ *  Since `generate:artifacts` became a single wrapper this literal is no longer
+ *  only a floor: on the wrapper path it IS the spawn list, so shortening it
+ *  changes what runs rather than merely relaxing a check. That is why the
+ *  wrapper's own `GENERATORS` is pinned against this array by
+ *  `scripts/__tests__/generate-artifacts-argv.test.ts` — a third generator must
+ *  be added in both places, and a test fails until it is. On a legacy
+ *  `&&`-chained script the old floor semantics still apply. */
 const KNOWN_GENERATOR_FILENAMES = ["generate-skill-artifacts.ts", "generate-subagent-artifacts.ts"] as const;
 
 /**
  * Derives the ordered list of generator scripts this route must spawn from
- * `package.json`'s own `generate:artifacts` script (AC-03.1, AC-03.4) —
- * never a hardcoded list, so a future third generator is picked up by
- * construction. THROWS (never returns a short or empty list, AC-03.5) on
+ * `package.json`'s own `generate:artifacts` script (AC-03.1, AC-03.4).
+ *
+ * "Picked up by construction" held while that script was an `&&` chain naming
+ * each generator. It no longer does: the script is now one wrapper, and the
+ * wrapper path below expands to `KNOWN_GENERATOR_FILENAMES`. A third generator
+ * is therefore NOT picked up automatically — it must be added to the wrapper's
+ * `GENERATORS` and to that literal, and `generate-artifacts-argv.test.ts` fails
+ * until both agree. That is a deliberate trade: the wrapper exists because a
+ * package script appends the caller's argv to the END of an `&&` chain, so
+ * `--check` reached only the last command and half the drift gate ran in write
+ * mode. THROWS (never returns a short or empty list, AC-03.5) on
  * any shape this cannot parse: an unreadable `package.json`, invalid JSON,
  * a missing or non-string `generate:artifacts`, or a `&&`-joined segment
  * that does not match the `bun <script.ts>` shape every entry currently

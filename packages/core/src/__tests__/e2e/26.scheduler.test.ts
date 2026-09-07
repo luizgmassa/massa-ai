@@ -18,7 +18,7 @@
  *   EB-SCH-2  SAFE_DEFAULTS: the preset enables consolidation + decay and
  *             leaves auto-improve, observation-bridge and checkpoint-purge off.
  *   EB-SCH-3  The concurrency cap.        (profile `scheduler-fast` — see below)
- *   EB-SCH-3b A product defect that profile exposed.       (KNOWN RED — see below)
+ *   EB-SCH-3b A product defect that profile exposed.   (FIXED 2026-09-07 — see below)
  *   EB-SCH-4  Catch-up is bounded to a single tick.        (partial — see below)
  *   EB-SCH-5  The scheduler never triggers an index.
  *   EB-SCH-6  nextRunAt survives an API restart.
@@ -56,10 +56,11 @@
  *      EB-SCH-1's negative control runs in exactly that case instead.
  *   3. EB-SCH-2, interval half — NOT ASSERTED. `applySafeDefaults`
  *      (scheduler-defaults.ts:189-219) also pins consolidation to >= 30 min and
- *      decay to >= 60 min, but the dashboard route projects only
- *      id/name/jobKind/enabled/nextRunAt/lastRunAt/due/currentlyRunning
- *      (dashboard.ts:32-43) — there is no `schedule`/`intervalMs` field on any
- *      HTTP surface, so the magnitude of the interval has no black-box sensor.
+ *      decay to >= 60 min, but the dashboard route projects no schedule shape:
+ *      id/name/jobKind/enabled/nextRunAt/lastRunAt/due/currentlyRunning, plus
+ *      the four health fields added with the EB-SCH-3b fix — and still no
+ *      `schedule`/`intervalMs` on any HTTP surface, so the magnitude of the
+ *      interval has no black-box sensor.
  *      The enable pattern, which is the half the preset exists for, IS asserted.
  *   4. EB-SCH-3 — CLOSED (was `describe.skipIf(true)`, a hardcoded permanent
  *      skip). The old reason said the guard needed either an on-demand fire
@@ -78,27 +79,33 @@
  *      off) at 5 s on a 1 s tick, and leaves consolidation and decay OFF.
  *      What the block asserts, and why `currentlyRunning` is NOT the sensor,
  *      is documented at the block itself.
- *   5. EB-SCH-4, missed-job half — STILL A SKIP, and the reason is now the
- *      measured one rather than the assumed one. The old reason said producing
- *      a past-due nextRunAt "requires a >30 minute wait or a write surface for
- *      nextRunAt". With `scheduler-fast` the wait is 15 seconds, so that is no
- *      longer the blocker — but the scenario is still unreachable, and it is
- *      blocked by the EB-SCH-6 PRODUCT DEFECT this file already reports as a
- *      known red. Measured 2026-09-07 on `scheduler-fast` (tick 1 s, interval
+ *   5. EB-SCH-4, missed-job half — STILL A SKIP, but its recorded blocker is
+ *      GONE and the reason has narrowed twice.
+ *
+ *      The ORIGINAL reason said producing a past-due nextRunAt "requires a >30
+ *      minute wait or a write surface for nextRunAt". `scheduler-fast` cut the
+ *      wait to 15 seconds, so that stopped being true.
+ *
+ *      The SECOND reason blamed the EB-SCH-6 product defect: every job's
+ *      nextRunAt was recomputed from `now` on each boot, so nothing could ever
+ *      be past-due. Measured 2026-09-07 on `scheduler-fast` (tick 1 s, interval
  *      5 s), stopping the scheduler for 15 s and restarting:
  *          before  checkpoint-purge nextRunAt=1788787618332
  *          frozen  checkpoint-purge nextRunAt=1788787622743  (= boot + 5000)
  *          after   checkpoint-purge nextRunAt=1788787639376  (= boot + 5000)
- *      Every job's nextRunAt — including the three the profile leaves disabled
- *      — was recomputed from `now` on each boot, so nothing was ever past-due
- *      and `catchUpMissedJobs` (scheduler.ts:339-368) found nothing to catch
- *      up. `/tmp/massa-ai-e2e-stack/logs/api.log` carried zero "catch-up" lines
- *      across all three boots. WHAT IT NEEDS: the EB-SCH-6 defect fixed, i.e.
- *      `registerOrResumeJob`'s preserve-nextRunAt branch (scheduler.ts:216-229)
- *      actually reached from `registerDefaultJobs`. Until then a missed job
- *      cannot exist at boot by construction. WHAT IS ASSERTED instead is the
- *      same predicate's other branch: across a real restart, catch-up fires
- *      ZERO ticks for jobs that were not missed.
+ *      with zero "catch-up" lines in `/tmp/massa-ai-e2e-stack/logs/api.log`
+ *      across all three boots. That reason is now FALSE: EB-SCH-6 was fixed in
+ *      `a83e4f5d`. `apps/tools-api/src/index.ts` awaits the store's hydration
+ *      before `registerDefaultJobs`, and `registerOrResumeJob`
+ *      (scheduler.ts:216-229) preserves a past-due nextRunAt deliberately so
+ *      `catchUpMissedJobs` (scheduler.ts:339-368) can identify what was missed.
+ *
+ *      WHAT IS ACTUALLY LEFT is only the setup cost: producing a genuinely
+ *      past-due PERSISTED job across a restart needs the API down for longer
+ *      than the job's interval, and no current profile makes that cheap — the
+ *      restart itself is faster than the shortest interval on offer.
+ *      WHAT IS ASSERTED instead is the same predicate's other branch: across a
+ *      real restart, catch-up fires ZERO ticks for jobs that were not missed.
  *   6. EB-SCH-6 — skipped with a printed reason when the stack's own state file
  *      does not attest that THIS script started the API under the
  *      `scheduler-on` profile. Without that attestation `restart-api` either
@@ -771,32 +778,36 @@ describe.skipIf(!SCHEDULER_FAST)("EB-SCH-3 concurrency cap", () => {
 
 // ── EB-SCH-3b — a product defect the `scheduler-fast` profile exposed ───────
 //
-// KNOWN RED — this reports a product defect, not a test defect. It became
-// findable only once jobs actually fired: before `scheduler-fast` no scheduled
-// job had ever executed on any E2E profile, so no health field had a value to
-// be wrong about.
+// WAS KNOWN RED — FIXED 2026-09-07 in `8710e568`. Kept as a regression sensor,
+// with the history, because the defect is the kind that reads as reasonable in
+// review. It became findable only once jobs actually fired: before
+// `scheduler-fast` no scheduled job had ever executed on any E2E profile, so no
+// health field had a value to be wrong about.
 //
-// MECHANISM: apps/tools-api/src/routes/dashboard.ts:39-40 writes
+// MECHANISM (historical): apps/tools-api/src/routes/dashboard.ts wrote
 // `lastSuccessAt: null` and `consecutiveFailures: 0` as LITERALS into every job
-// of the `/api/v1/scheduler/status` payload. It has nothing else to write —
-// `Scheduler.status()` (packages/core/src/services/scheduler/scheduler.ts:519-536)
-// does not project either field. Both are nevertheless maintained by `fireJob`
-// (scheduler.ts:489-500) and really are persisted.
+// of the `/api/v1/scheduler/status` payload. It had nothing else to write —
+// `Scheduler.status()` did not project either field, though both were
+// maintained and persisted by `fireJob` (scheduler.ts:489-500).
 //
-// MEASURED 2026-09-07 on the `scheduler-fast` profile, same instant, both kinds
-// having fired successfully several times:
+// MEASURED 2026-09-07 on the `scheduler-fast` profile, before the fix, same
+// instant, both kinds having fired successfully several times:
 //   HTTP  GET /api/v1/scheduler/status → "lastSuccessAt":null, "consecutiveFailures":0
 //   SQL   SELECT last_run_at, last_success_at FROM scheduled_jobs
 //         scheduled-checkpoint-purge   → 1788787737541, 1788787737541
 //         scheduled-observation-bridge → 1788787738542, 1788787738542
 //
-// IMPACT: the only black-box health surface the scheduler has reports every job
-// as never-succeeded and never-failed. A job failing on every single tick is
-// indistinguishable over HTTP from a perfectly healthy one, which is the exact
+// IMPACT, which is why it was worth a product change rather than a skip: the
+// only black-box health surface the scheduler has reported every job as
+// never-succeeded and never-failed. A job failing on every single tick was
+// indistinguishable over HTTP from a perfectly healthy one — the exact
 // discrimination `consecutiveFailures` exists to provide.
 //
-// Not masked, not weakened, and not fixed here: production source is out of
-// this suite's write set.
+// THE FIX: `Scheduler.status()` now projects lastSuccessAt, lastFailureAt,
+// consecutiveFailures and lastError, and the route passes them through instead
+// of writing constants. On the snapshot they are required rather than optional,
+// so a consumer never has to tell "field absent" from "never succeeded" — that
+// ambiguity is what let the literals read as reasonable in the first place.
 describe.skipIf(!SCHEDULER_FAST)("EB-SCH-3b scheduler health fields are reported", () => {
   test(
     "EB-SCH-3b: a job that has succeeded reports a non-null lastSuccessAt",
@@ -1013,7 +1024,7 @@ describe.skipIf(!RESTART_READY)("EB-SCH-4/EB-SCH-6 restart survival", () => {
         // duration (1788749118946 -> 1788749139648, 20702 ms), i.e. recomputed
         // as now + intervalMs. `PgScheduledJobStore.get()` is synchronous and
         // answers from an in-memory mirror, firing `void this.ensureHydrated()`
-        // fire-and-forget (scheduler-store-pg.ts:246-249). `registerDefaultJobs`
+        // fire-and-forget (scheduler-store-pg.ts:262-265). `registerDefaultJobs`
         // ran at boot before that hydration could resolve, so `existing` was
         // null for every job and registerOrResumeJob took its "New job" branch.
         // Hydration's overlay then kept the local value over the DB row

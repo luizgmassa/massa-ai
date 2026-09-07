@@ -65,7 +65,7 @@ whole repository as its corpus. Three consequences, all measured rather than inf
     (`workspace.ts:111-127`) that diverges from `ListProjectsTool` (`list_projects.ts:44-64`)
     on `filter`, on per-workspace `createdAt`/`updatedAt`, and on `status` validation. This
     contradicts the parity contract stated at `embedded-api-client.ts:10-16`.
-  - `EB-SCH-3b`: `Scheduler.status()` (`scheduler.ts:519-536`) drops four fields that
+  - `EB-SCH-3b`: `Scheduler.status()` (`scheduler.ts:535-561`) drops four fields that
     `fireJob` (`:489-500`) maintains and persists, and `dashboard.ts:39-40` then writes
     `lastSuccessAt: null` / `consecutiveFailures: 0` as literals. A job failing every tick is
     indistinguishable over HTTP from a healthy one.

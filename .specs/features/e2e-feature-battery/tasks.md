@@ -63,7 +63,7 @@ defects and fixed none of them.
 | T1b.3 | `EB-SCH-6` | `nextRunAt` is recomputed as `now + intervalMs` across an API restart, because `PgScheduledJobStore.get()` answers from an unhydrated mirror before `registerDefaultJobs` runs. | third, after T1b.2 |
 
 **T1b.2 and T1b.3 cannot be parallelised.** They collide in the product
-(`scheduler.ts:519-536` vs `:210-229`) and in the test (`26.scheduler.test.ts:768-795` vs
+(`scheduler.ts:535-561` vs `:210-229`) and in the test (`26.scheduler.test.ts:768-795` vs
 `:995-1027`) — the same two files. One atomic commit each is unreachable from two concurrent
 workers.
 

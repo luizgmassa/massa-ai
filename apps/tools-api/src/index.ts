@@ -290,7 +290,7 @@ try {
   // `registerOrResumeJob`, which chooses between preserving and recomputing
   // `nextRunAt` by comparing against a SYNCHRONOUS `store.get()`. The
   // PostgreSQL store serves that read from a mirror it hydrates asynchronously
-  // (scheduler-store-pg.ts:246-249 kicks hydration off fire-and-forget), so
+  // (scheduler-store-pg.ts:262-265 kicks hydration off fire-and-forget), so
   // registering before hydration made every persisted job look new and reset
   // its schedule. Measured drift equalled the restart duration, 20702 ms.
   await scheduler.ready();

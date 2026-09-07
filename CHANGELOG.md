@@ -200,7 +200,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drift equalled the restart duration itself, 20702 ms. `registerOrResumeJob` is correct — it
   preserves the persisted value whenever the schedule is unchanged — but it decides by
   comparing against a *synchronous* `store.get()`, and `PgScheduledJobStore` serves that read
-  from a mirror it hydrates asynchronously (`scheduler-store-pg.ts:246-249` kicks hydration
+  from a mirror it hydrates asynchronously (`scheduler-store-pg.ts:262-265` kicks hydration
   off fire-and-forget). At boot the mirror is empty, so every persisted job looked new. That
   is the same shape as the `workspaces`-row race fixed earlier in this release: an unawaited
   promise beside a synchronous requirement. The store gains an optional `ready()`, implemented
