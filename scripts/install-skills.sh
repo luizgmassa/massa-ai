@@ -457,17 +457,43 @@ state_delete() {
 }
 
 # ── Bootstrap block edit (plan | apply | remove-plan | remove-apply) ────────
-bootstrap_op() {
-  "$RUNNER" - "$1" "$2" "$BOOTSTRAP_FILE" "$BOOTSTRAP_START" "$BOOTSTRAP_END" <<'NODE'
+#
+# bootstrap_engine MODE TARGET BODY_FILE
+#   plan          — would the block change? touches no file
+#   apply         — write the block, creating or amending TARGET
+#   remove-plan   — is the block present? touches no file
+#   remove-apply  — drop the block, unlinking TARGET when nothing else remains
+#
+# The block body is a positional argument rather than the global
+# $BOOTSTRAP_FILE, so one engine serves AGENTS.md, CLAUDE.md and the whole-file
+# MASSA-AI.md instead of three copies of the marker arithmetic (design.md:268).
+#
+# stdout is "change" or "nochange". Exit 2 = duplicated or incomplete markers;
+# exit 4 = refused to write through a foreign symlink. bootstrap_op_error maps
+# both, so the two are never reported as each other.
+bootstrap_engine() {
+  "$RUNNER" - "$1" "$2" "$3" "$BOOTSTRAP_START" "$BOOTSTRAP_END" <<'NODE'
 const fs = require("fs");
 const path = require("path");
 const [, , mode, target, blockFile, START, END] = process.argv;
-const desired = fs.readFileSync(blockFile, "utf8");
+// Trailing newlines are stripped so the block on disk is always
+// START + "\n" + body + "\n" + END + "\n" whatever the body file ended with.
+// That is the exact form wrapBootstrapBlock produces
+// (packages/shared/src/bootstrap/render.ts:95-97), and the two writers must
+// stay byte-identical or a file written by one reads as drift to the other.
+// The final newline sits outside the block, which is why the idempotency
+// comparison below can compare marker-to-marker slices directly.
+const desired = fs.readFileSync(blockFile, "utf8").replace(/\n+$/, "");
+
+// lstat, not stat: the symlink node itself is the subject of the write-through
+// policy below, and readFileSync would silently resolve it away.
+let isLink = false;
+try { isLink = fs.lstatSync(target).isSymbolicLink(); } catch { /* no file yet */ }
 
 let text = "";
 try {
   text = fs.readFileSync(target, "utf8");
-} catch { /* no file yet */ }
+} catch { /* no file yet, or a dangling link */ }
 
 const starts = text.split(START).length - 1;
 const ends = text.split(END).length - 1;
@@ -476,25 +502,76 @@ if (starts !== ends || starts > 1) {
   process.exit(2);
 }
 
-function replaceBlock() {
-  if (starts === 1) {
-    const s = text.indexOf(START);
-    const e = text.indexOf(END, s) + END.length;
-    return text.slice(0, s) + desired + text.slice(e);
-  }
-  if (!text.trim()) return desired + "\n";
-  return text.trimEnd() + "\n\n" + desired + "\n";
+// Write-through policy (design.md:453, :478). The common shape here is
+// ~/.claude/CLAUDE.md -> ~/dotfiles/claude/CLAUDE.md, and writing through it
+// edits a file the user manages elsewhere, usually under git. The resolved
+// target counts as massa-ai-owned only once it already carries our marker pair
+// — the ownership proof this feature chose for these files (design.md
+// "Ownership proof for MASSA-AI.md"). This is the opposite of is_owned_target's
+// rule for skill directories, deliberately: see the comment there
+// (scripts/install-skills.sh:665-680). Removal is exempt because a link with no
+// block of ours is already "nochange" below, and refusing there would break
+// uninstall on a machine that merely symlinks its AGENTS.md.
+if (isLink && starts === 0 && (mode === "plan" || mode === "apply")) {
+  console.error(`Refusing to write through symlink: ${target}`);
+  process.exit(4);
 }
 
-function removeBlock() {
-  if (starts === 0) return text;
+// Where the bytes actually land. Renaming onto the link node would replace it
+// with a regular file and silently break the user's dotfiles indirection, so a
+// symlink we do own is followed to its resolved path.
+const writeTarget = isLink ? fs.realpathSync(target) : target;
+
+// fs.writeFileSync truncates in place: a kill or ENOSPC mid-write leaves the
+// file holding a start marker with no end marker, which the check above turns
+// into a hard exit 2 on every later run for every host (design.md:454). Temp
+// file plus rename makes the swap atomic — the same discipline
+// writeFileAtomically applies to config.json.
+function writeAtomic(file, contents) {
+  const dir = path.dirname(file);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = path.join(dir, `.${path.basename(file)}.massa-ai.tmp-${process.pid}`);
+  fs.writeFileSync(tmp, contents);
+  // rename() installs the temp file's inode, so an existing file's mode would
+  // be lost — carry it forward rather than widening a 0600 CLAUDE.md to 0644.
+  try { fs.chmodSync(tmp, fs.statSync(file).mode & 0o777); } catch { /* new file */ }
+  try {
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    try { fs.unlinkSync(tmp); } catch { /* best effort */ }
+    throw err;
+  }
+}
+
+function replaceBlock() {
   const s = text.indexOf(START);
   const e = text.indexOf(END, s) + END.length;
-  const before = text.slice(0, s);
+  return text.slice(0, s) + desired + text.slice(e);
+}
+
+// Append-only: every byte the file already holds survives verbatim. The old
+// `text.trimEnd()` rewrote the user's trailing whitespace, which is exactly
+// what BST-02 AC-4's byte-identical criterion forbids.
+function appendBlock() {
+  if (text === "") return desired + "\n";
+  let head = text;
+  if (!head.endsWith("\n")) head += "\n";  // terminate an unterminated last line
+  return head + "\n" + desired + "\n";     // exactly one blank separator line
+}
+
+// The inverse of appendBlock: the block owns its own line terminator and the
+// single blank line appendBlock writes before it. `before` is shortened only
+// when it really ends in a blank line, so a hand-placed block sitting directly
+// against user text never costs the user a byte. The old `.trim()` instead ate
+// every leading and trailing blank line in the whole file.
+function removeBlock() {
+  const s = text.indexOf(START);
+  const e = text.indexOf(END, s) + END.length;
+  let before = text.slice(0, s);
   let after = text.slice(e);
-  if (before.endsWith("\n\n") && after.startsWith("\n")) after = after.slice(1);
-  const result = (before + after).trim();
-  return result ? result + "\n" : "";
+  if (after.startsWith("\n")) after = after.slice(1);
+  if (before.endsWith("\n\n")) before = before.slice(0, -1);
+  return before + after;
 }
 
 if (mode === "plan" || mode === "apply") {
@@ -509,8 +586,7 @@ if (mode === "plan" || mode === "apply") {
     process.stdout.write("change");
     process.exit(0);
   }
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, replaceBlock());
+  writeAtomic(writeTarget, starts === 1 ? replaceBlock() : appendBlock());
   process.stdout.write("change");
   process.exit(0);
 }
@@ -524,9 +600,56 @@ if (mode === "remove-plan") {
   process.stdout.write("change");
   process.exit(0);
 }
-fs.writeFileSync(target, removeBlock());
+const remaining = removeBlock();
+if (remaining === "" && !isLink) {
+  // BST-05 AC-9a/AC-9b: the managed block was the file's entire content, so
+  // writing "" would leave a 0-byte MASSA-AI.md — or a wiring file this
+  // installer created — as uninstall residue. Unlink instead. A symlink is
+  // excluded: dropping the node would strand our block inside the file it
+  // points at, and deleting that file is deleting a path the user chose to
+  // manage elsewhere.
+  fs.unlinkSync(target);
+} else {
+  writeAtomic(writeTarget, remaining);
+}
 process.stdout.write("change");
 NODE
+}
+
+# bootstrap_op MODE TARGET BODY_FILE [BACKUP_ON_CHANGE]
+# Policy layer over bootstrap_engine. With BACKUP_ON_CHANGE=1 an existing TARGET
+# is copied to TARGET.massa-ai.bak-<ts> before a mutating mode that would really
+# change it — a hand-edited MASSA-AI.md must survive the --apply that overwrites
+# it (design.md:452). The would-change guard is load-bearing: an unguarded
+# backup drops a second copy on every re-apply, including the ones that change
+# nothing. installer_backup_file (scripts/lib/installer-shared.sh:56) had no
+# production call site before this one.
+bootstrap_op() {
+  local mode="$1" target="$2" body_file="$3" backup="${4:-0}"
+  local plan_mode="" plan_verdict=""
+  if [ "$backup" = "1" ] && [ -f "$target" ]; then
+    case "$mode" in
+      apply) plan_mode="plan" ;;
+      remove-apply) plan_mode="remove-plan" ;;
+    esac
+    if [ -n "$plan_mode" ]; then
+      plan_verdict="$(bootstrap_engine "$plan_mode" "$target" "$body_file")" || return $?
+      if [ "$plan_verdict" = "change" ]; then
+        installer_backup_file "$target" >/dev/null
+      fi
+    fi
+  fi
+  bootstrap_engine "$mode" "$target" "$body_file"
+}
+
+# bootstrap_op_error RC TARGET — the engine's two failure modes read as
+# themselves. Mapping both onto the marker message would report a refused
+# symlink write as a corrupted file.
+bootstrap_op_error() {
+  case "$1" in
+    4) integration_error "Refusing to write through symlink: $2 — its target carries no massa-ai managed block" ;;
+    *) integration_error "Managed markers are incomplete or duplicated in $2" ;;
+  esac
 }
 
 # Marker file for a copied skill: "$skills_dir/.massa-ai-owned-<name>". Lives
@@ -541,9 +664,18 @@ skill_marker_path() { # skill_marker_path SKILLS_DIR NAME
 
 # is_owned_target PLATFORM NAME TARGET SKILLS_DIR — 0 if massa-ai already owns
 # whatever currently occupies TARGET, 1 if it is foreign (never overwritten).
-#   - a symlink is always ours to replace: removing a symlink node never
-#     touches whatever it pointed to, and a symlink here is exactly the
-#     pre-copy (pre-migration) install shape.
+# Scope: skill *directories* under $root/skills/, and nothing else.
+#   - a symlink is always ours to replace, in this scope only: the caller's
+#     only action on an owned target is `rm -rf` of the node (:731), and
+#     removing a symlink node never touches whatever it pointed to, so the
+#     user's data is unreachable from here. A symlink at a skill path is also
+#     exactly the pre-copy (pre-migration) install shape.
+#   - bootstrap_engine holds the opposite rule and is not a contradiction of
+#     this one, because it does the one thing this scope never does: write
+#     through the link into the target's own bytes. There it refuses any
+#     symlink whose resolved target does not already carry our marker pair
+#     (:504-517, design.md:453/:478). Two policies, two subjects — replacing a
+#     node versus editing a file.
 #   - a name this run's state already tracks for the platform is ours.
 #   - a marker file for NAME is ours (state-loss safety net).
 is_owned_target() {
@@ -651,7 +783,7 @@ apply_platform() {
   local mode="apply" bootstrap_changed=0
   [ "$DRY_RUN" = "1" ] && mode="plan"
   local verdict
-  verdict="$(bootstrap_op "$mode" "$agents_md")" || integration_error "Managed markers are incomplete or duplicated in $agents_md"
+  verdict="$(bootstrap_op "$mode" "$agents_md" "$BOOTSTRAP_FILE")" || bootstrap_op_error $? "$agents_md"
   if [ "$verdict" = "change" ]; then
     bootstrap_changed=1
     if [ "$DRY_RUN" = "1" ]; then
@@ -751,7 +883,7 @@ uninstall_platform() {
     local mode="remove-apply"
     [ "$DRY_RUN" = "1" ] && mode="remove-plan"
     local verdict
-    verdict="$(bootstrap_op "$mode" "$agents_md")" || integration_error "Managed markers are incomplete or duplicated in $agents_md"
+    verdict="$(bootstrap_op "$mode" "$agents_md" "$BOOTSTRAP_FILE")" || bootstrap_op_error $? "$agents_md"
     if [ "$verdict" = "change" ]; then
       bootstrap_changed=1
       if [ "$DRY_RUN" = "1" ]; then
