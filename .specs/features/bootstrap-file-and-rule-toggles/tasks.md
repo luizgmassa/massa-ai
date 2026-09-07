@@ -467,16 +467,40 @@ T24 → T25
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] Claude gets a managed block holding `@MASSA-AI.md` in `~/.claude/CLAUDE.md`, created when absent, with all content outside the markers byte-identical (BST-02)
-- [ ] OpenCode gets the absolute path in `instructions`; Codex and Cursor get the pointer block (BST-03, BST-04)
-- [ ] Migration leaves no bootstrap marker pair holding policy text in `AGENTS.md` on claude or opencode (BST-05 AC-8)
-- [ ] The Cursor warning is reworded to name `MASSA-AI.md` — it is at `scripts/install-skills.sh:800-808` (comment `:800-804`, the three `warn` lines `:806-808`), **not** the `:673-677` this task and `design.md:211` originally cited; that span drifted across the Phase 1–5 commits and now sits between `skill_marker_path` (`:661`) and `is_owned_target` (`:681`). Locate it by content, never by the old line number (PC-B4)
+- [x] Claude gets a managed block holding `@MASSA-AI.md` in `~/.claude/CLAUDE.md`, created when absent, with all content outside the markers byte-identical (BST-02)
+- [x] OpenCode gets the absolute path in `instructions`; Codex and Cursor get the pointer block (BST-03, BST-04)
+- [x] Migration leaves no bootstrap marker pair holding policy text in `AGENTS.md` on claude or opencode (BST-05 AC-8)
+- [x] The Cursor warning is reworded to name `MASSA-AI.md` — it is at `scripts/install-skills.sh:800-808` (comment `:800-804`, the three `warn` lines `:806-808`), **not** the `:673-677` this task and `design.md:211` originally cited; that span drifted across the Phase 1–5 commits and now sits between `skill_marker_path` (`:661`) and `is_owned_target` (`:681`). Locate it by content, never by the old line number (PC-B4)
 - [ ] Every remaining T9 assertion turns green, and the full suite shows no third failure beyond the two documented pre-existing ones
 
 **Amendments after the Phase 6 Plan Challenge** (anchors only — no done-when outcome is weakened):
 
 - **PC-B3 — the destination map is `platform_root`, not `installer_host_config_dir`.** `git grep -c installer_host_config_dir -- scripts/install-skills.sh` returns **zero uses**; this script has always had its own map. The two disagree on Codex: `installer-shared.sh:195` hardcodes a home-relative `.codex`, while `platform_root` (`:150`) returns the absolute `$CODEX_HOME` resolved at `:139-145`, which prefers `~/.codex` but falls back to `~/.config/codex`. Following the original cite writes `MASSA-AI.md` to `~/.codex/` on a `~/.config/codex` machine — a silently unwired host, exactly the `written-not-wired` class this feature exists to detect.
 - **PC-B5 — wire OpenCode's `instructions` through `instructionsOp`, never `writeConfig`.** `design.md:449` describes `writeConfig` itself gaining the four-mode contract. T11 could not implement that literally (log `:23`) and layered it instead: `instructionsOp(mode, targetPath, cfg, entry)` at `scripts/lib/opencode-config.cjs:268`. `writeConfig` at `:174` still takes exactly `(targetPath, cfg)` — a third `mode` argument is silently ignored by JS and the config is written unconditionally, defeating T11's plan mode with every gate green.
+
+**Open after T13 — three test-side items this task's write set cannot close.** All three
+are assertions in committed suites, so they are reported rather than edited.
+
+1. `scripts/tests/test-install-skills-bootstrap-file.sh:385` asserts `"status":"written"`
+   after `--apply`, which is unsatisfiable by construction: the scenario's own first step
+   (`run_engine`, `:377`) already wrote a byte-identical `MASSA-AI.md`, so the second
+   engine pass correctly reports `skipped` — T8's defined trigger, "a byte-identical
+   re-apply whose wiring is present" (log `:22`), and the status `engine.ts:311-318`
+   documents as the one that must not raise `restartRequired` for a no-op. The scenario's
+   stated intent is already carried by `:387`'s `assert_not_contains "written-not-wired"`,
+   which passes. Measured directly: run 1 `written-not-wired`, run 2 `skipped`.
+2. `scripts/tests/test-install-skills-apply.sh` (5 assertions) and
+   `test-install-skills-cli.sh:101-102` (2) require `~/.claude/AGENTS.md` and
+   `~/.config/opencode/AGENTS.md` to carry the bootstrap marker pair. BST-05 AC-8 now
+   forbids exactly that. Baseline at `7a51d7aa`: apply 31/0, cli 40/2. After T13: apply
+   26/5, cli 38/4 — the two extra cli failures are the same superseded pair, and cli's
+   other 2 are pre-existing and environment-caused (a real `claude` binary beside `node`
+   on this machine defeats the suite's empty-PATH premise, `got='0' want='2'` at
+   baseline).
+3. `test-install-skills-check.sh:135` was closed inside this task rather than reported:
+   the installer keeps its existing "bootstrap block" record vocabulary for the contract
+   file, which is accurate — `MASSA-AI.md` is the bootstrap block, it is simply no longer
+   a section of `AGENTS.md`.
 
 **Tests**: shell suite
 **Gate**: full — `bun run test:scripts && bun run test:plugins`
