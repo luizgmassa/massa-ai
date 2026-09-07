@@ -11,6 +11,9 @@
  * file contains no occurrence of `rtk` in any form (case-insensitive), which
  * is also how the deleted `### Conditional RTK Rules` section is guarded.
  *
+ * It also owns the prose-side source contracts the toggles depend on: the
+ * `references/code-annotation.md` toggle-scope statement (TASK-022, BST-08).
+ *
  * Every assertion reads the file once as a single string and scans that
  * string directly (`matchAll` / `indexOf`), never by splitting into lines
  * first — a line-oriented scan cannot see a claim spanning a newline, and
@@ -25,6 +28,13 @@ import path from "path";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const AGENTS_MD = path.join(REPO_ROOT, "skills", "AGENTS.md");
+const CODE_ANNOTATION_MD = path.join(
+  REPO_ROOT,
+  "skills",
+  "massa-ai",
+  "references",
+  "code-annotation.md",
+);
 
 /** The 9 registry rule ids, in fixed render order (design.md § Rule registry). */
 const RULE_IDS = [
@@ -216,5 +226,76 @@ describe("bootstrap source contract: no rule leaks outside every span", () => {
     const ACTIVATION_NAMES = ["`caveman full`", "`massa-ai`", "`persona-router`"];
     const nameLeaks = ACTIVATION_NAMES.filter((name) => residue.includes(name));
     expect(nameLeaks).toEqual([]);
+  });
+});
+
+/**
+ * Splits markdown prose into whitespace-normalized sentences, in one pass over
+ * the whole string. Newlines collapse to single spaces *before* the split, so
+ * a claim wrapped across two source lines is still one sentence here — the
+ * same line-oriented blind spot this file's header calls out.
+ */
+function normalizedSentences(text: string): string[] {
+  return text
+    .replace(/\s+/g, " ")
+    .split(/(?<=\.)\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * Toggle-scope contract for `references/code-annotation.md` (TASK-022,
+ * BST-08 AC-5/AC-6, spec AC-5 at `spec.md:188`).
+ *
+ * The reference mandates doc blocks and rationale comments on its own
+ * authority (design assumption A6), so a `code-comments` toggle that only
+ * omitted bootstrap text would leave the reference winning and the toggle
+ * reading as broken. These assertions pin *both* halves of the asymmetry —
+ * §1/§2 gated on the rule and its off default, §3 explicitly outside the
+ * gate — so neither half can drift out of the prose while the other stays.
+ */
+describe("bootstrap source contract: code-annotation.md toggle scope", () => {
+  test("a single sentence gates §1 and §2 on `code-comments` and names its off default", async () => {
+    const content = await read(CODE_ANNOTATION_MD);
+    const sentences = normalizedSentences(content);
+
+    const gating = sentences.filter(
+      (s) => s.includes("§1") && s.includes("§2") && s.includes("`code-comments`"),
+    );
+    const qualified = gating.filter((s) => /\benabled\b/.test(s) && /\boff\b/.test(s));
+
+    const defects: string[] = [];
+    if (gating.length === 0) {
+      defects.push(
+        `no sentence names §1, §2 and \`code-comments\` together (scanned ${sentences.length} sentences)`,
+      );
+    } else if (qualified.length === 0) {
+      defects.push(
+        `gating sentence(s) name neither "enabled" nor the "off" default: ${gating.join(" | ")}`,
+      );
+    }
+    expect(defects).toEqual([]);
+    expect(qualified.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("§3 is stated to sit outside the gate and apply unconditionally", async () => {
+    const content = await read(CODE_ANNOTATION_MD);
+    const sentences = normalizedSentences(content);
+
+    const exclusion = sentences.filter(
+      (s) => s.includes("§3") && /\boutside\b/.test(s) && /\bunconditional/.test(s),
+    );
+
+    const defects: string[] = [];
+    if (exclusion.length === 0) {
+      const mentioning = sentences.filter((s) => s.includes("§3"));
+      defects.push(
+        `no sentence places §3 outside the gate unconditionally; §3 sentences: ${
+          mentioning.length === 0 ? "(none)" : mentioning.join(" | ")
+        }`,
+      );
+    }
+    expect(defects).toEqual([]);
+    expect(exclusion.length).toBeGreaterThanOrEqual(1);
   });
 });

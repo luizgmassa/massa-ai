@@ -958,10 +958,10 @@ set and a behaviour change — it stays a finding for the verifier, recorded as 
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] The gating sentence names the rule id and the default (off)
-- [ ] §3 is explicitly excluded from the gate
-- [ ] A scripted assertion in the source-contract suite covers both statements, so the wording cannot drift out
-- [ ] Regenerated bundles stay in sync — `bun scripts/generate-skill-artifacts.ts --check` passes
+- [x] The gating sentence names the rule id and the default (off)
+- [x] §3 is explicitly excluded from the gate
+- [x] A scripted assertion in the source-contract suite covers both statements, so the wording cannot drift out
+- [x] Regenerated bundles stay in sync — `bun scripts/generate-skill-artifacts.ts --check` passes
 
 **Tests**: contract
 **Gate**: full — `bun run test:scripts && bun run test:plugins`
