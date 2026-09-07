@@ -9,9 +9,22 @@
 | C | Admin Portal | real browser | `@playwright/test` under `apps/web-ui/e2e/` |
 | D | Claude Code CLI + evals | CLI into a scratch `CLAUDE_CONFIG_DIR` | `apps/claude-plugin/__tests__/` |
 
-Tier A is a **profile matrix**, not one run. `e2e-stack.sh`'s five profiles differ only in the
+Tier A is a **profile matrix**, not one run. `e2e-stack.sh`'s six profiles differ only in the
 Tools API environment, so a suite that needs `hooks-off` or `scheduler-on` states that in its
 own header rather than mutating global state at runtime.
+
+The sixth profile, `scheduler-fast`, was added by `e652b914` and is the one design decision
+Phase 1 added to this document. `EB-SCH-3` had been a permanent `describe.skipIf(true)` whose
+stated reason was that no profile could configure an interval short enough for a job to fire
+inside a suite. That reason was wrong about the product:
+`MASSA_AI_SCHEDULER_<KIND>_INTERVAL_MS` sits at the **top** of the precedence chain
+(`envNum(def.intervalEnvVar, …)`, `scheduler-defaults.ts:297-301`), outranking the ≥30 min
+clamp in `applySafeDefaults`, which only supplies the fallback. The objection underneath it
+was sound and is answered by choosing *which* kinds shorten rather than by shortening
+everything: `checkpoint-purge` is a bounded DELETE of already-expired rows, and
+`observation-bridge` returns `noop` at its first gate with the LLM off
+(`observation-consolidation-job.ts:157-163`). Consolidation and decay stay off — both run the
+full decay + prune + merge cycle over every memory in `massa_ai_test`.
 
 ## Decisions
 
@@ -79,15 +92,80 @@ architecture fields with `expect(Array.isArray(map.X))` and then iterated `map.X
 `undefined` when empty and the type declares them optional, so the assertion contradicted the
 product and passed only because the full repository filled all six.
 
+## Phase 1b repairs — the shape of the three defects
+
+All three are **product** defects, and all three were already asserted correctly by a live
+sensor before any fix existed. That ordering is the design point: the battery found them, the
+suites kept asserting the contract rather than the observed behaviour, and the repair happens
+at the source. No KNOWN RED block is rewritten, and no `dropKeys` list grows —
+`29.audit-repairs.test.ts:1002-1003` records in-file why widening that list would delete the
+only sensor for its class.
+
+They fall into two classes.
+
+**Two projections that dropped what the layer beneath them already had.** `EB-SCH-3b` and
+`EB-MCP-3` are the same defect twice, in two subsystems. `fireJob` maintains and persists
+`lastSuccessAt`, `lastFailureAt`, `consecutiveFailures` and `lastError`
+(`scheduler.ts:489-500`), and `Scheduler.status()` (`:519-536`) simply does not carry them
+outward, so `dashboard.ts:39-40` had nothing to read and wrote `null` / `0` as literals. The
+consequence is worse than a missing field: the scheduler's only black-box health surface
+reports a job failing every tick identically to a healthy one. Measured at one instant with
+both kinds having fired, HTTP said `"lastSuccessAt":null` while SQL said
+`last_success_at=1788787737541`.
+
+`EB-MCP-3` is the same shape across a transport boundary. `GET /api/v1/workspace/list`
+hand-rolls its own projection (`workspace.ts:111-127`) beside the core tool's
+(`list_projects.ts:44-64`), and the two drifted. The recorded divergence was one field; the
+measured divergence is three — `filter`, per-workspace `createdAt`/`updatedAt`, and `status`
+validation, which the route does not perform at all. Adding `filter` to the route would close
+the sensor without closing the class, because a second hand-rolled projection would still be
+there to drift again. **The route delegates to the tool**, leaving one projection where there
+were two.
+
+**One lifecycle defect.** `EB-SCH-6` is not a projection: `nextRunAt` is genuinely recomputed
+as `now + intervalMs` across an API restart, because `PgScheduledJobStore.get()` answers from
+an unhydrated mirror before `registerDefaultJobs` runs. The measured drift equalled the
+restart duration — 20702 ms — which is the signature that distinguishes it from a schedule
+that legitimately advanced.
+
+Each fix carries a deterministic sensor that runs with **no live stack**: for the two
+projection defects that is a test over object literals, whose red-verifying mutation is a
+one-line literal swap. Deliberately narrow — a scheduler-behaviour test would exercise a path
+that already works, and would pass with the defect present.
+
 ## Constraints
 
 - The live-stack suite stays local and opt-in. CI has no Ollama, no dedicated cluster, and no
   API key, and is not a target of this feature.
 - Tier C adds a dependency (`@playwright/test`). Its version must be chosen so the required
   chromium revision is the one already cached; otherwise the first execution downloads a
-  browser and the offline constraint stops holding.
+  browser and the offline constraint stops holding. Measured 2026-09-07: revisions 1208, 1217
+  and 1228 are cached, mapping to `1.58.2`, `1.59.1` and `1.61.1`. All three cache owners live
+  outside this repository, so the reuse premise is true today and unguaranteed tomorrow.
+- **Tier C cannot be added without touching two shared gate surfaces**, and that is why it is
+  deferred rather than squeezed in. `bunfig.toml:15` `testMatch` discovers `*.spec.ts`
+  anywhere, and `apps/web-ui`'s `test` script is a plain `bun test`, so Playwright specs enter
+  the `bun run test` gate under a 5000 ms timeout and die on their own import. The same
+  collision reaches `scripts/check-coverage.ts:260-265`, which defines `apps/web-ui` as an
+  unscoped coverage group feeding the blocking `coverage.yml`.
 - Tier B cannot assert on `install-harness.sh`'s exit code. `installer_host_detected`
   (`scripts/lib/installer-shared.sh:225-241`) detects a host by config directory **or**
   binary on `PATH`, so on a machine without `cursor-agent` a clean `HOME` skips that host and
   the exit code turns 1 for a reason unrelated to the code under test. The expected host set
   is explicitly seeded input, and the assertion is per host, line by line.
+- **Tier B's oracle cannot express the distinction the tier depends on.**
+  `verify-harness-install.ts` emits 24 fixed rows (4 hosts × 6 artifacts,
+  `:314-315`) with no detection field, so an undetected host and a broken install produce the
+  same six `missing` rows. Under a scratch `HOME` detection collapses to `command -v` — four
+  hosts here, zero in CI — so an assertion written against today's oracle inverts between the
+  two environments. The oracle gains a detection field before it arbitrates anything, and it
+  gains its first test at the same time: it has none today.
+- **Tier B's installer writes into the repository, not only into the scratch `HOME`.**
+  `install-harness.sh:197-204` runs both artifact generators against `$REPO_ROOT` on every
+  non-dry run, regenerating ~5 MB of gitignored bundles in the worktree the test runs from. A
+  scratch `HOME` isolates the install destination and nothing else — not the repository, not
+  PostgreSQL, not the ports. Tier B therefore cannot overlap a live-stack measurement.
+- Tier D spends no API credits in this delivery. `--max-cost-usd` exists only on
+  `claude plugin eval`; the top-level equivalent is `--max-budget-usd` and it is print-mode
+  only, so the credentialed group as originally specified had no ceiling at all. It is
+  deferred until it does.
