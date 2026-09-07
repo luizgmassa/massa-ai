@@ -1006,10 +1006,13 @@ set and a behaviour change — it stays a finding for the verifier, recorded as 
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] Filed under `### Changed` and `### Added`, so the release derives a minor bump
-- [ ] Names the Claude fix explicitly — the contract has never loaded on Claude
-- [ ] Names the `code-comments` default-off behaviour change
-- [ ] The skip-ci marker is never written literally anywhere in the entry, the commit body, or the PR body
+- [x] Filed under `### Changed` and `### Added`, so the release derives a minor bump. `[Unreleased]` was empty before this entry; both headings carry bullets, and `CONTRIBUTING.md:145` makes minor win when a minor-class and a patch-class heading both have content — no `### Fixed` heading was added, so the derivation is unambiguous
+- [x] Names the Claude fix explicitly — first bullet under `### Changed`, stated as the measured premise behind the change rather than a side effect: Claude documents reading `CLAUDE.md` and not `AGENTS.md`, and no installer here wrote `~/.claude/CLAUDE.md`, so the block was inert on Claude unless hand-imported
+- [x] Names the `code-comments` default-off behaviour change, together with why omission alone was insufficient (`references/code-annotation.md` mandates both obligations on its own) and the §3 carve-out
+- [x] The skip-ci marker is never written literally anywhere in the entry, the commit body, or the PR body — the entry contains no bracketed CI directive of any kind
+- [x] Two user-facing limits are stated rather than left for a user to discover: rendering now requires `bun` on `PATH` (FU-1, the dist fallback cannot load under plain Node), and `--target` scopes the render but never the persisted preference (FU-5)
+
+**Gate evidence (build level, run in full):** `oxlint` exit 0; `bunx turbo run type-check --force` **6 successful, 6 total**; `bun run build` **6 successful, 6 total**; `bun run test:scripts` **1909 pass / 2 fail across 84 files** (the two documented pre-existing `pyts golden: lessons` cases — exit 1 comes from those and nothing else); `bun run test:plugins` **142 / 0 across 10 files**. Working tree carried only `CHANGELOG.md` after the build, so the build produced no untracked drift.
 
 **Tests**: none — the coverage matrix assigns no test type to a changelog entry; the CI merge gate is the sensor
 **Gate**: build
