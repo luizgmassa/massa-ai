@@ -256,7 +256,15 @@ start_postgres() {
       >"${LOG_DIR}/postgres.log" 2>&1 &
     local pid=$!
     state_set postgres_pid "$pid"
-    wait_for "postgres :${PG_PORT}" 30 test -n "$(listener_pid "$PG_PORT")"
+    # 90s, not 30s, and the number is measured rather than padded. A cold start
+    # on a box at load 5.17 aborted here with "timed out after 30s waiting for
+    # postgres :5433" while the postmaster was in fact starting: `status` run
+    # immediately afterwards reported that same PID healthy. A budget that
+    # expires while the service is coming up turns a slow machine into a
+    # bring-up failure, and the failure lands three services early — ollama and
+    # the API never start, so the operator sees "down" for services that were
+    # never attempted. The API below already waits 90s for the same reason.
+    wait_for "postgres :${PG_PORT}" 90 test -n "$(listener_pid "$PG_PORT")"
   fi
 
   # Provisioning runs on every `up`, including when the server was already
@@ -273,7 +281,7 @@ start_postgres() {
     "$CREATEDB_BIN" -h 127.0.0.1 -p "$PG_PORT" -U test massa_ai_test >>"${LOG_DIR}/postgres.log" 2>&1 || true
     "$PSQL_BIN" "$DB_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector' >>"${LOG_DIR}/postgres.log" 2>&1
   fi
-  wait_for "postgres accepting queries" 30 pg_healthy
+  wait_for "postgres accepting queries" 60 pg_healthy
 
   # `migrate deploy` is idempotent: it applies only migrations the database has
   # not recorded, so running it on every `up` costs one query on a warm cluster
