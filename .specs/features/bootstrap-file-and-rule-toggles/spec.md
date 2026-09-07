@@ -201,11 +201,25 @@ own gates, so that a later edit cannot silently break delivery on one host.
 
 **Acceptance Criteria**:
 
-1. WHEN `bun run generate:artifacts --check` runs after a source change under `skills/bootstrap/` THEN it SHALL exit non-zero until the bundles are regenerated. <!-- BST-12 -->
+1. WHEN a drift check runs after a source change under `skills/bootstrap/` THEN it SHALL exit non-zero until the bundles are regenerated — for **both** `bun scripts/generate-skill-artifacts.ts --check` (the direct form, which `.github/workflows/ci.yml:238` uses) and `bun run generate:artifacts --check`. <!-- BST-12 -->
 2. The `scripts/tests/` directory SHALL contain a shell suite that installs to a scratch home, asserts the per-host delivery shape of BST-01..BST-04, and asserts the uninstall reversal of BST-05. <!-- BST-12 -->
 3. The `scripts/__tests__/` directory SHALL contain a suite asserting the renderer's rule set, defaults, determinism, unknown-id handling, and the `code-comments` negative directive. <!-- BST-12 -->
 4. WHEN a rule id is added to or removed from the registry without updating the skill's documented id list THEN a test SHALL fail naming the divergent ids. <!-- BST-12 -->
 5. The `CHANGELOG.md` file SHALL carry an entry under `[Unreleased]` describing the delivery change. <!-- BST-12 -->
+
+> **AC-1 amended after the verification gate (user ruling).** It originally named
+> `bun run generate:artifacts --check` alone, and the verifier measured that command
+> **exiting 0 under real drift**: `package.json:31` is
+> `bun scripts/generate-skill-artifacts.ts && bun scripts/generate-subagent-artifacts.ts`,
+> so the flag reaches only the *second* generator while the first runs in write mode and
+> repairs the drift it was supposed to report. Planting an unmanaged file in
+> `skills/bootstrap/` gave exit **1** from the direct form and exit **0** from the named one.
+> The criterion was unsatisfiable as written, not merely inconvenient. Rather than narrow the
+> AC to the form that already worked, `package.json:31` is fixed to forward arguments to both
+> generators, and the AC now requires both forms to discriminate — so the documented command
+> and the CI command agree instead of one being a trap. `scripts/worktree-verify.sh:286` uses
+> the previously broken form and is covered by the same fix. Recorded as FU-2 at design time
+> and deliberately deferred then; the user's ruling brings it into scope now.
 
 **Independent Test**: Delete one rule from the registry and confirm the parity test reddens naming that id.
 

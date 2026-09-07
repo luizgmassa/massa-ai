@@ -190,7 +190,10 @@ T22 → T23
 
 ### Phase 11b: Verification fixes
 
-T26 → re-verify
+T26 → T27 → T28 → T29 → re-verify
+
+Iteration 1: T26 (blocking Gap 1). Iteration 2: T27, T28, T29 — the three sensor gaps, the
+argument-forwarding fix, and the fixture correction, all by user ruling after the gate.
 
 > Added after the independent verification gate returned **FAIL**. The fix→re-verify loop is
 > bounded to 3 iterations (`references/verification-ladder.md`); this is iteration 1. T25
@@ -1077,6 +1080,94 @@ renderer.
 **Tests**: unit + shell suite
 **Gate**: full — `bun run test:scripts && bun run test:plugins`, plus `cd packages/shared && bun test src/bootstrap` and the shell battery run directly with `TMPDIR=/tmp`
 **Commit**: `fix(bootstrap): honour the resolved Codex home when rendering`
+
+---
+
+### T27: Close the three sensor gaps the verifier could falsify
+
+**Task ID**: TASK-027 — **verification fix, iteration 2**
+
+**What**: Give BST-04 AC-7, BST-05 AC-9a and BST-03 AC-11 sensors that fail when the behaviour they name breaks. Test-only; no production change is expected.
+**Where**: `scripts/tests/test-install-skills-bootstrap-file.sh`, `scripts/tests/test-install-skills-uninstall.sh`, and whichever suite currently re-implements the AC-11 loop
+**Depends on**: T26
+**Requirement**: BST-03 AC-11, BST-04 AC-7, BST-05 AC-9a
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Done when**:
+- [ ] **BST-04 AC-7 senses authoring, not just copying.** The verifier added a *real, new* policy sentence to the pointer block and **318 assertions across three suites stayed green** — today's guards check that known policy strings were not copied in, which cannot see policy that was written fresh. Assert a property of the block instead: it is at most 10 lines (already required by AC-6), and beyond naming the contract path and instructing the agent to read it, it carries no directive-shaped content. Observe red by adding a novel policy sentence
+- [ ] **BST-05 AC-9a has a fixture.** Uninstall must unlink an installer-created `CLAUDE.md` whose managed block was its entire content, rather than leaving a 0-byte file. Correct today, sensed by nothing. Observe red by making the writer emit `""` instead of unlinking
+- [ ] **BST-03 AC-11 is asserted against the real installer.** `grep -rn "could not be parsed"` over both test trees returns **zero**: the "sibling hosts still run after an unparseable OpenCode config" claim is tested against a loop the test itself defines, not `scripts/install-skills.sh:1003-1011`. Point it at the installer, so the assertion can fail when the installer changes
+- [ ] Each new sensor observed red before its subject is trusted, with the failing line quoted
+- [ ] No existing assertion is deleted or weakened; every suite's count is greater than or equal to its baseline
+
+**Tests**: shell suite
+**Gate**: full — `bun run test:scripts && bun run test:plugins`, plus the touched suites run directly with `TMPDIR=/tmp`
+**Commit**: `test(installer): sense authored pointer policy, the CLAUDE.md unlink and the parse abort`
+
+---
+
+### T28: Make `generate:artifacts` forward its arguments
+
+**Task ID**: TASK-028 — **verification fix, iteration 2**
+
+**What**: Fix `package.json:31` so both generators receive `--check`, making the documented command discriminate as the spec now requires.
+**Where**: `package.json`, `scripts/worktree-verify.sh`, plus a sensor
+**Depends on**: T26
+**Requirement**: BST-12 AC-1 (as amended — see the note under `spec.md`'s P2 acceptance criteria)
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: `package.json:31` is
+`bun scripts/generate-skill-artifacts.ts && bun scripts/generate-subagent-artifacts.ts`, so
+`bun run generate:artifacts --check` appends the flag to the **end of the chain**: only the
+second generator sees it, the first runs in write mode and repairs the drift it should
+report, and a follow-up manual check then also passes. Measured by the verifier with an
+unmanaged file planted in `skills/bootstrap/` — direct form exit **1**, named form exit
+**0**. This was FU-2, deferred at design time; the user brought it into scope after the gate.
+
+**Done when**:
+- [ ] **Observed RED first**: a committed sensor that runs `bun run generate:artifacts --check` against deliberately planted drift and requires a non-zero exit. It must fail against `package.json` as it stands — a sensor written after the fix proves nothing here
+- [ ] Both generators receive forwarded arguments; a plain `bun run generate:artifacts` (no flag) still regenerates both, since `pretest:scripts`, `pretest:plugins`, `pretest:coverage` and the opencode package's `pretest` all depend on that behaviour
+- [ ] `scripts/worktree-verify.sh:286` uses the fixed form and is verified to discriminate
+- [ ] The direct form `bun scripts/generate-skill-artifacts.ts --check` keeps working unchanged — it is what `.github/workflows/ci.yml:238` runs
+- [ ] Plant drift in a **generated** location and restore it from a `/tmp` copy; never leave a bundle dirty
+
+**Tests**: unit or contract, in `scripts/__tests__/`
+**Gate**: full — `bun run test:scripts && bun run test:plugins`, plus both `--check` forms run by hand under a scratch `XDG_CONFIG_HOME`
+**Commit**: `fix(build): forward arguments to both artifact generators`
+
+---
+
+### T29: Correct the install-state fixture and widen root consumption
+
+**Task ID**: TASK-029 — **verification fix, iteration 2**
+
+**What**: Fix the opencode root in `engine.test.ts`'s `seedInstallState`, then let the engine consume a recorded root for every host rather than codex alone.
+**Where**: `packages/shared/src/bootstrap/__tests__/engine.test.ts`, `packages/shared/src/bootstrap/engine.ts`
+**Depends on**: T26
+**Requirement**: BST-10 AC-10
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: `engine.test.ts:68-76`'s `seedInstallState` records `root: <home>/.<host>` for all four
+hosts, which is **wrong for opencode** — the installer records `<home>/.config/opencode`. It is
+inert today, and it is the *sole* reason T26 scoped engine-side root consumption to codex via
+`HOSTS_WITH_A_RESOLVED_ROOT`: uniform consumption broke 4 committed opencode cases that were
+themselves wrong. A structural constraint resting on a broken fixture is a trap for whoever
+touches this next.
+
+**Done when**:
+- [ ] `seedInstallState` records the root the installer actually writes for each host — verified against `install-skills.sh`'s `platform_root`, not assumed
+- [ ] The 4 opencode cases that would have broken are shown to pass against the corrected fixture, or are shown to be asserting something genuinely different
+- [ ] `HOSTS_WITH_A_RESOLVED_ROOT` is removed and the engine consumes a recorded root for every host, with `resolveHostRoot`'s containment guard (`HostRootOutsideTargetHomeError`) still refusing a root outside `targetHome`
+- [ ] Both Codex layouts still behave as T26 left them — re-run that reproduction, do not assume
+- [ ] Observed red: with the fixture corrected and consumption widened, reverting the widening must fail something
+- [ ] If widening turns out to break a case that is *correctly* asserted, **stop and report** rather than adjusting the assertion
+
+**Tests**: unit
+**Gate**: quick — `cd packages/shared && bun test src/bootstrap`, then full
+**Commit**: `fix(bootstrap): consume each host's recorded root and correct the test fixture`
 
 ---
 
