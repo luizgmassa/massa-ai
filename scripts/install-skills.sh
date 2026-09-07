@@ -1154,6 +1154,34 @@ uninstall_platform() {
   fi
   bootstrap_changed="$BOOTSTRAP_CHANGED"
 
+  # ── Retained backups (BST-05 AC-9c) ───────────────────────────────────────
+  # A backup is the user's copy of bytes an install overwrote, so uninstall
+  # leaves every one of them exactly where it is: deleting them here would
+  # destroy the one artifact the overwrite existed to preserve. But a file left
+  # silently is a file the user never finds, which is why spec.md:106 makes
+  # naming it the other half of the criterion rather than an extra.
+  #
+  # Both writers put their copy beside the file they backed up, directly under
+  # $root — installer_backup_file (scripts/lib/installer-shared.sh:56) for
+  # MASSA-AI.md, and opencode-config.cjs's writeConfig for the OpenCode config —
+  # so `-maxdepth 1` is the whole population rather than a sample of it, and it
+  # also keeps this scan off the installed skills tree.
+  #
+  # `retained` is its own status deliberately. Nothing changed, and the JSON
+  # summary derives its top-level "changed" from exactly the `changed` and
+  # `would-change` tokens, so reusing one of those would make an uninstall that
+  # removed nothing still read as a mutation. It is not gated on ownership
+  # either: a retained backup is a fact about the filesystem, not a claim about
+  # who owns the platform.
+  local backup
+  while IFS= read -r backup; do
+    [ -n "$backup" ] || continue
+    vinfo "Left in place: $backup"
+    record "retained" "$p" "$backup" "Left in place: $backup"
+  done <<RETAINED_BACKUPS
+$(find "$root" -maxdepth 1 -name "*${MASSA_AI_BACKUP_SUFFIX}-*" 2>/dev/null | LC_ALL=C sort)
+RETAINED_BACKUPS
+
   # Only drop the platform record when this installer actually owns it —
   # dropping a plugin-owned record here would let a subsequent apply overwrite
   # a tarball install this run never touched.

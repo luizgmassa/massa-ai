@@ -24,6 +24,11 @@ export PATH="$(make_mock_agents "$ROOT/bin"):$PATH"
 RUNNER="node"; command -v node >/dev/null 2>&1 || RUNNER="bun"
 
 BOOTSTRAP_START="$(grep -m1 '^BOOTSTRAP_START=' "$INSTALLER" | cut -d'"' -f2)"
+BOOTSTRAP_END="$(grep -m1 '^BOOTSTRAP_END=' "$INSTALLER" | cut -d'"' -f2)"
+# The backup suffix comes from the installer's own shared library rather than
+# being restated here, so a rename of the literal reddens this suite instead of
+# silently making its glob match nothing.
+BACKUP_SUFFIX="$(grep -m1 '^MASSA_AI_BACKUP_SUFFIX=' "${PROJECT_ROOT}/scripts/lib/installer-shared.sh" | cut -d'"' -f2)"
 
 apply()     { bash "$INSTALLER" --apply --platform claude --target "$1" --repo-root "$PROJECT_ROOT" --yes --verbose 2>&1; }
 uninstall() { bash "$INSTALLER" --uninstall --platform claude --target "$1" --repo-root "$PROJECT_ROOT" --yes --verbose 2>&1; }
@@ -125,5 +130,61 @@ process.stdout.write(s.platforms.claude && s.platforms.claude.skillsOwner === "p
 NODE
 )"
 assert_eq "plugin-owned record survives (not dropped by the repo uninstaller)" "$HAS_CLAUDE8" "yes"
+
+echo ""
+echo "Scenario 9: a backup an install left behind is retained AND named (BST-05 AC-9c)"
+# spec.md:106. The "leave it in place" half already holds; the "name it in the
+# uninstall report" half is what this scenario senses, and it was implemented
+# nowhere — a backup left silently is a backup the user never finds.
+#
+# A first install creates no backup at all: bootstrap_op's guard is
+# `[ "$backup" = "1" ] && [ -f "$target" ]`, and MASSA-AI.md does not exist yet.
+# So the fixture is the real shape the backup exists for — a hand-edited
+# MASSA-AI.md that a later --apply overwrites (design.md:452).
+H9="$ROOT/h9"; mkdir -p "$H9"
+apply "$H9" >/dev/null
+printf '%s\nhand-edited\n%s\n' "$BOOTSTRAP_START" "$BOOTSTRAP_END" > "$H9/.claude/MASSA-AI.md"
+apply "$H9" >/dev/null
+BAK9="$(find "$H9/.claude" -maxdepth 1 -name "*${BACKUP_SUFFIX}-*" 2>/dev/null | LC_ALL=C sort | head -n1)"
+assert_ne "the overwrite really left a backup to report" "$BAK9" ""
+BAK9_SHA="$(shasum -a 256 "$BAK9" 2>/dev/null | cut -d' ' -f1)"
+OUT9="$(uninstall "$H9")"
+assert_file "the backup is left in place (BST-05 AC-9c)" "$BAK9"
+assert_eq "the retained backup keeps the bytes it saved (BST-05 AC-9c)" \
+  "$(shasum -a 256 "$BAK9" 2>/dev/null | cut -d' ' -f1)" "$BAK9_SHA"
+assert_contains "the uninstall report names the retained backup (BST-05 AC-9c)" \
+  "$OUT9" "$BAK9"
+# The machine-readable half of the same report. `record` is what puts the path
+# into --json's `results`; `vinfo` prints to the console only, so a text-only
+# assertion is satisfied by the vinfo alone and leaves the JSON report silent
+# (observed: dropping the `record` call left this suite 22/0 without it).
+# Asserted on a second uninstall of the same home, which is also the state a
+# user reaches by re-running: the backup is still retained and still named.
+JSON9="$(bash "$INSTALLER" --uninstall --platform claude --target "$H9" \
+  --repo-root "$PROJECT_ROOT" --yes --json 2>/dev/null)"
+assert_contains "the JSON uninstall report names the retained backup (BST-05 AC-9c)" \
+  "$JSON9" "$BAK9"
+assert_file "the backup survives a repeated uninstall (BST-05 AC-9c)" "$BAK9"
+
+echo ""
+echo "Scenario 10: an uninstall with no backup reports none"
+# The complementary direction. Without it, a branch that printed a retained-backup
+# line unconditionally — naming a path that does not exist — would pass scenario 9.
+H10="$ROOT/h10"; mkdir -p "$H10"
+apply "$H10" >/dev/null
+assert_eq "a first install leaves no backup" \
+  "$(find "$H10/.claude" -maxdepth 1 -name "*${BACKUP_SUFFIX}-*" 2>/dev/null | wc -l | tr -d ' ')" "0"
+OUT10="$(uninstall "$H10")"
+assert_not_contains "no retained-backup line without a backup (BST-05 AC-9c)" \
+  "$OUT10" "$BACKUP_SUFFIX-"
+# And no row at all, not merely no path. An empty `find` result still feeds one
+# empty line through the reader, so a scan without its empty-line guard emits
+# `"target": "", "message": "Left in place: "` on every uninstall that retained
+# nothing — a report entry for an artifact that does not exist. The text
+# assertion above cannot see that, because an empty path contains no suffix.
+JSON10="$(bash "$INSTALLER" --uninstall --platform claude --target "$H10" \
+  --repo-root "$PROJECT_ROOT" --yes --json 2>/dev/null)"
+assert_not_contains "no retained row at all without a backup (BST-05 AC-9c)" \
+  "$JSON10" '"status": "retained"'
 
 summary "install-skills --uninstall"
