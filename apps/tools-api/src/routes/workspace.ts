@@ -13,6 +13,8 @@
 
 import {
   IndexProjectTool,
+  ListProjectsTool,
+  ToolError,
   GraphController,
   symbolGraphService,
   toSymbolIdentityResolution,
@@ -31,6 +33,15 @@ function getIndexProjectTool(): IndexProjectTool {
     indexProjectTool = new IndexProjectTool();
   }
   return indexProjectTool;
+}
+
+let listProjectsTool: ListProjectsTool | null = null;
+
+function getListProjectsTool(): ListProjectsTool {
+  if (!listProjectsTool) {
+    listProjectsTool = new ListProjectsTool();
+  }
+  return listProjectsTool;
 }
 
 /**
@@ -102,32 +113,14 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
 
   .get(
     "/workspace/list",
-    async ({ query }) => {
+    async ({ query, set }) => {
       try {
-        const status = (query.status as string) || "all";
-        const workspaces = await workspaceManager.listWorkspaces(
-          status as "all",
-        );
-        return {
-          success: true,
-          data: {
-            workspaces: workspaces.map((w) => ({
-              projectId: w.project_id,
-              projectPath: w.project_path,
-              displayName: w.display_name,
-              status: w.status,
-              lastIndexedAt: w.last_indexed_at
-                ? new Date(w.last_indexed_at).toISOString()
-                : null,
-              lastError: w.last_error,
-              filesCount: w.files_count,
-              chunksCount: w.chunks_count,
-              symbolsCount: w.symbols_count,
-            })),
-            total: workspaces.length,
-          },
-        };
+        return await getListProjectsTool().handle({ status: query.status });
       } catch (error) {
+        if (error instanceof ToolError) {
+          set.status = error.statusCode;
+          return { success: false, error: error.message };
+        }
         return { success: false, error: (error as Error).message };
       }
     },
@@ -136,7 +129,9 @@ export const workspaceRoutes = new Elysia({ prefix: "/api/v1" })
         tags: ["workspace"],
         summary: "List all indexed workspaces",
         description:
-          "Returns all registered projects with their indexing status and statistics.",
+          "Returns all registered projects with their indexing status and statistics. " +
+          "Delegates to the `list_projects` tool, so the HTTP and embedded MCP " +
+          "transports return one identical shape.",
       },
     },
   )
