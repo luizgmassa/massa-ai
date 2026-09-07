@@ -10,7 +10,15 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 
 **Design**: `.specs/features/bootstrap-file-and-rule-toggles/design.md`
 **Spec**: `.specs/features/bootstrap-file-and-rule-toggles/spec.md`
-**Status**: Draft
+**Status**: In Progress
+
+## Execution Log
+
+| Phase | Tasks | Status | Commits | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | T1, T2 | Complete | `0491fcb3`, `46fa6d8a`, `4b63251f`, `2582cc8d` | Two extra commits beyond the two planned tasks. Orchestrator review found a defect the planned sensor could not see: the activation stack named all three of `caveman`, `massa-ai` and `persona-router` from outside every rule span, so a disabled rule's section vanished while the contract still instructed the agent to activate it — the same class the design solved for `code-comments` with an off-text, never generalized. `4b63251f` widened the sensor and was observed red (`idLeaks` returned `["caveman", "persona-router"]`); `2582cc8d` rewrote the intro to enumerate nothing. The sensor is deliberately scoped to the residue outside *every* span rather than per-rule, because distinguishing a load-bearing cross-rule instruction from incidental same-domain prose is not mechanically expressible from the markup; that narrowing is documented inline in the test. |
+| 2 | T3, T4 | Complete | `1eebd587`, `aeca60dd`, `a3ba8a6e` | One extra commit. Adding `bootstrap` to `MassaAiConfig` fired two pre-existing enforced contracts the design had not surfaced: `apps/web-ui/src/static/views/config-sections.ts` declares its section map as a mapped type over every `ConfigSectionKey`, and `installer-config-template.test.ts` requires a matching installer-template entry. What shipped is one read-only `json` field, not a per-rule toggle UI — recorded as spec assumption A12 with the reason, and the out-of-scope row narrowed to "a Web UI **toggle** surface" rather than left contradicting the artifact. Both-directions evidence for T3 is structural, not just a differing return value: `loadConfig` is proven to reach its catch-and-degrade branch via a `console.error` spy that actually fires, while `readRawConfigStrict` on the identical malformed file throws `ConfigParseError` and never calls it. Measured independently: `packages/shared` 281 pass / 0 fail across 15 files. |
+| 3–11 | T5–T25 | Pending | — | — |
 
 ---
 

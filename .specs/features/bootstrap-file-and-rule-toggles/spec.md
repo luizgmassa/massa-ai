@@ -44,7 +44,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | Per-host divergent toggle state | One global state applied to every installed host (see assumption A4). |
 | Changing what any rule *says* beyond the RTK removal and the two new rules | This feature changes delivery and switchability, not the wording of existing policies. |
 | Turning off test-coverage requirements | `references/code-annotation.md` §3 (Tests) is load-bearing for the spec-driven Execution Contract; the comment toggle never reaches it (BST-08). |
-| A Web UI surface for the toggles | The requested surface is a host command. The portal is a separate delivery. |
+| A Web UI **toggle** surface | The requested surface is a host command. The portal is a separate delivery. A read-only inspection field is not excluded — see the amendment below. |
 
 ---
 
@@ -65,6 +65,15 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 | A9 — Fold of non-rule prose | `Contract Ownership`, `Runtime Contract Pointer` and the `massa-ai` line of `Skill Summary` render as part of the `massa-ai-router` rule | They exist only to point at the router; as standalone toggles they would be prose with no behavior to switch. | n |
 | A10 — `MASSA-AI.md` with every rule off | Still written, carrying a header stating that every rule is disabled | An absent file is indistinguishable from a failed install; a stated empty contract is not. | n |
 | A11 — OpenCode config path | Resolved through the existing `scripts/lib/opencode-config.cjs` (`opencode.jsonc` → `opencode.json` → create), never a hardcoded filename | That module is already the single resolve/parse/write contract for both OpenCode installers and tolerates JSONC. | n |
+| A12 — Admin Portal section for `bootstrap` | One read-only `json` field showing the persisted override map, whose guide directs the user to `massa-ai-config bootstrap enable\|disable <id>` | Forced by a pre-existing enforced contract, not chosen: `apps/web-ui/src/static/views/config-sections.ts` declares `CONFIG_SECTIONS_BY_KEY` as a mapped type over every `ConfigSectionKey`, and `installer-config-template.test.ts` requires a matching installer-template entry. Adding `bootstrap` to `MassaAiConfig` — which the design requires — makes both fire. The three options were: add the section, leave the config key untyped, or weaken the enforcing tests. The third is forbidden and the second contradicts the design, so the first is the only one left. | n |
+
+> **Amended during Execute, Phase 2 (T4).** The out-of-scope row above originally
+> excluded "a Web UI surface for the toggles" without qualification. That was written
+> before the type-level consumer contract was known. What ships is deliberately **not**
+> a toggle surface — there is no boolean field per rule id, because the nine ids live in
+> `packages/shared/src/bootstrap/rules.ts` and a per-id field list would have to be
+> hand-synced with that registry forever. A per-rule Web UI toggle remains out of scope
+> and is still a separate delivery.
 
 **Open questions:** none — all resolved or logged above.
 
