@@ -3,8 +3,14 @@
  *
  * `applyBootstrapState` is the one path a toggle takes to disk: read which
  * hosts are recorded in `install-state.json`, resolve the rule state, render
- * the contract once per host, write it, and probe that host's wiring artifact
- * before it is allowed to call the result `written`.
+ * the contract once per host, wrap it in the managed marker pair, write it, and
+ * probe that host's wiring artifact before it is allowed to call the result
+ * `written`.
+ *
+ * The wrap is `wrapBootstrapBlock` (`render.ts`) rather than a local template:
+ * `MASSA-AI.md`'s other writer is `bootstrap_op` in
+ * `scripts/install-skills.sh:460-487`, the two must produce identical bytes, and
+ * a second copy of the composition here is exactly how they would drift.
  *
  * Three properties are load-bearing here and each is asserted by the
  * co-located suite rather than left to review:
@@ -51,6 +57,7 @@ import {
   bootstrapContractPath,
   bootstrapStateFilePath,
   renderBootstrap,
+  wrapBootstrapBlock,
 } from "./render";
 import {
   buildBootstrapReport,
@@ -281,9 +288,15 @@ function applyHost(input: ApplyHostInput): BootstrapRenderResult {
   const { host, source, state, targetHome, dryRun } = input;
   const contractPath = bootstrapContractPath(host, targetHome);
 
-  let contract: string;
+  // The document, not the body. `renderBootstrap` returns `contract` with every
+  // marker stripped (render.ts:19-26), and the marker pair in the written file
+  // is what proves massa-ai owns it (design.md:475) — so the wrap is applied
+  // here, once, and both the write and the up-to-date comparison below read the
+  // same bytes. Comparing the body against a marker-delimited file on disk would
+  // never match, making every pass report `written` for an unchanged host.
+  let document: string;
   try {
-    contract = renderBootstrap({ source, state, host, targetHome }).contract;
+    document = wrapBootstrapBlock(renderBootstrap({ source, state, host, targetHome }).contract);
   } catch (error) {
     return { host, status: "failed", reason: (error as Error).message };
   }
@@ -295,7 +308,7 @@ function applyHost(input: ApplyHostInput): BootstrapRenderResult {
     reason: notWiredReason(host, targetHome),
   });
 
-  if (readFileOrNull(contractPath) === contract) {
+  if (readFileOrNull(contractPath) === document) {
     // Already byte-identical, so nothing changed and no session needs a
     // restart for this host — reporting `written` would make
     // `buildBootstrapReport` raise `restartRequired` for a no-op, which is the
@@ -307,7 +320,7 @@ function applyHost(input: ApplyHostInput): BootstrapRenderResult {
 
   if (!dryRun) {
     try {
-      writeFileAtomically(contractPath, contract);
+      writeFileAtomically(contractPath, document);
     } catch (error) {
       return {
         host,

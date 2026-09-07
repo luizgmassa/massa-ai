@@ -50,6 +50,7 @@ import {
   bootstrapStateFilePath,
   renderBootstrap,
   ruleMarker,
+  wrapBootstrapBlock,
 } from "../render";
 
 // ---------------------------------------------------------------------------
@@ -541,6 +542,129 @@ describe("output shape", () => {
     );
     expect(fence.length).toBeGreaterThan(20);
     expect(render(ALL_ON).contract).toContain(fence);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The written document — wrapBootstrapBlock (BST-01 AC-2, BST-01 AC-10)
+// ---------------------------------------------------------------------------
+
+/**
+ * `bootstrap_op`'s three cited operations, reproduced here because the
+ * byte-identity claim is between *two writers* and only one of them is
+ * TypeScript. Each is a transcription of the named line, not a paraphrase:
+ *
+ *   - `opExtract` — `scripts/install-skills.sh:231-233`, which writes
+ *     `text.slice(s, e)` to `$BOOTSTRAP_FILE`; that slice is what
+ *     `bootstrap_op` later reads as `desired` (`:465`).
+ *   - `opWriteWholeFile` — the `!text.trim()` branch of `replaceBlock`
+ *     (`:485`), the branch a `MASSA-AI.md` that does not exist yet takes.
+ *   - `opCurrent` — the idempotency slice compared against `desired`
+ *     (`:501-504`), which is what makes `--check` after `--apply` exit 0.
+ */
+function opExtract(text: string): string {
+  const s = text.indexOf(BOOTSTRAP_BLOCK_START);
+  const e = text.indexOf(BOOTSTRAP_BLOCK_END, s) + BOOTSTRAP_BLOCK_END.length;
+  expect(s).toBeGreaterThanOrEqual(0);
+  expect(e).toBeGreaterThan(s);
+  return text.slice(s, e);
+}
+
+function opWriteWholeFile(desired: string): string {
+  return `${desired}\n`;
+}
+
+function opCurrent(text: string): string {
+  const s = text.indexOf(BOOTSTRAP_BLOCK_START);
+  return text.slice(s, text.indexOf(BOOTSTRAP_BLOCK_END, s) + BOOTSTRAP_BLOCK_END.length);
+}
+
+describe("wrapBootstrapBlock (BST-01 AC-2, BST-01 AC-10)", () => {
+  for (const [label, state] of [
+    ["defaults", DEFAULTS],
+    ["all enabled", ALL_ON],
+    ["all disabled", ALL_OFF],
+  ] as const) {
+    test(`the document opens with the start marker and closes with the end marker — ${label}`, () => {
+      const document = wrapBootstrapBlock(render(state).contract);
+      const lines = document.split("\n");
+
+      expect(lines[0]).toBe(BOOTSTRAP_BLOCK_START);
+      // One trailing newline and one only, so the last *content* line is the
+      // end marker — the shape `tail -n1` reads in
+      // scripts/tests/test-install-skills-bootstrap-file.sh:185-186.
+      expect(lines[lines.length - 1]).toBe("");
+      expect(lines[lines.length - 2]).toBe(BOOTSTRAP_BLOCK_END);
+      expect(document.endsWith(`${BOOTSTRAP_BLOCK_END}\n`)).toBe(true);
+      expect(document.endsWith("\n\n")).toBe(false);
+    });
+
+    test(`the body between the markers is exactly the render — ${label}`, () => {
+      const { contract } = render(state);
+      const document = wrapBootstrapBlock(contract);
+      const inner = document.slice(
+        document.indexOf(BOOTSTRAP_BLOCK_START) + BOOTSTRAP_BLOCK_START.length + 1,
+        document.lastIndexOf(BOOTSTRAP_BLOCK_END),
+      );
+
+      expect(inner).toBe(contract);
+      // Exactly one marker pair: wrapping never doubles what the render
+      // already stripped (render.ts's module doc, design.md:193-197).
+      expect(document.split(BOOTSTRAP_BLOCK_START).length - 1).toBe(1);
+      expect(document.split(BOOTSTRAP_BLOCK_END).length - 1).toBe(1);
+    });
+
+    test(`bootstrap_op writing the same block reproduces these bytes — ${label}`, () => {
+      // The fixed-point property the two writers must share: extract the block
+      // back out of the engine's document, hand it to bootstrap_op's whole-file
+      // branch, and the file it writes is byte-identical to the engine's.
+      // Fails on a missing marker, on a marker out of order, and on any byte
+      // after the end marker other than exactly one newline.
+      const document = wrapBootstrapBlock(render(state).contract);
+
+      expect(opWriteWholeFile(opExtract(document))).toBe(document);
+    });
+
+    test(`bootstrap_op reports nochange over these bytes — ${label}`, () => {
+      // `--check` after a successful `--apply` with no source change exits 0
+      // (BST-01 AC-10): `current === desired` at install-skills.sh:504.
+      const document = wrapBootstrapBlock(render(state).contract);
+
+      expect(opCurrent(document)).toBe(opExtract(document));
+    });
+  }
+
+  test("the block boundaries match the real skills/AGENTS.md block", () => {
+    // The separator form is derived from the source the installer extracts,
+    // not chosen: the start marker is followed by a newline, the end marker is
+    // preceded by one, and the extracted block carries no trailing newline of
+    // its own (install-skills.sh:233).
+    const fromSource = opExtract(REAL_SOURCE);
+    const fromRender = opExtract(wrapBootstrapBlock(render(DEFAULTS).contract));
+
+    for (const block of [fromSource, fromRender]) {
+      expect(block.startsWith(`${BOOTSTRAP_BLOCK_START}\n`)).toBe(true);
+      expect(block.endsWith(`\n${BOOTSTRAP_BLOCK_END}`)).toBe(true);
+      expect(block.endsWith("\n")).toBe(false);
+    }
+  });
+
+  test("a trailing-newline difference in the body does not reach the document", () => {
+    // Normalization is what makes "the last line is the end marker" a property
+    // of the wrap rather than of every caller.
+    const body = "# Contract\n\nText.";
+
+    expect(wrapBootstrapBlock(`${body}\n`)).toBe(wrapBootstrapBlock(body));
+    expect(wrapBootstrapBlock(`${body}\n\n\n`)).toBe(wrapBootstrapBlock(body));
+    expect(wrapBootstrapBlock(body)).toBe(
+      `${BOOTSTRAP_BLOCK_START}\n${body}\n${BOOTSTRAP_BLOCK_END}\n`,
+    );
+  });
+
+  test("two wraps of one state are byte-identical (BST-10 AC-7)", () => {
+    expect(wrapBootstrapBlock(render(DEFAULTS).contract)).toBe(
+      wrapBootstrapBlock(render(DEFAULTS).contract),
+    );
   });
 });
 

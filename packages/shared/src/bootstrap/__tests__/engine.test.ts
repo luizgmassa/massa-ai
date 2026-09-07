@@ -33,10 +33,13 @@ import {
   BOOTSTRAP_BLOCK_START,
   bootstrapContractPath,
   bootstrapStateFilePath,
+  renderBootstrap,
   ruleMarker,
+  wrapBootstrapBlock,
 } from "../render";
 import { bootstrapReportSucceeded, type BootstrapRenderResult } from "../report";
 import { BOOTSTRAP_RULES, type BootstrapRuleId } from "../rules";
+import { resolveBootstrapState } from "../state";
 
 // ---------------------------------------------------------------------------
 // Scratch home
@@ -648,6 +651,123 @@ describe("failures", () => {
     write(installStatePath(), "{ not json");
 
     expect(() => apply()).toThrow(/install-state\.json/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The bytes on disk (BST-01 AC-2, BST-01 AC-10)
+// ---------------------------------------------------------------------------
+
+/**
+ * These assert on the **file**, never on a return value. The defect they exist
+ * for was invisible to every status assertion above: the engine wrote
+ * `renderBootstrap(...).contract` raw, so the file it produced carried no
+ * marker pair while `bootstrap_op` (`scripts/install-skills.sh:460-487`) writes
+ * one — two writers of one path disagreeing byte-for-byte. That breaks three
+ * things at once: BST-01 AC-2 (the file's own marker pair is the ownership
+ * proof, design.md:475), BST-01 AC-10 (`--check` after `--apply` exits 0), and
+ * marker-based uninstall, which cannot find a block that is not there.
+ */
+describe("the written file is the marker-delimited document (BST-01 AC-2)", () => {
+  /** The contract body the engine renders for `host` with no rule state
+   *  seeded — the registry defaults, resolved the same way the engine does. */
+  function expectedBody(host: Host): string {
+    return renderBootstrap({
+      source: SOURCE,
+      state: resolveBootstrapState({}).state,
+      host,
+      targetHome: home,
+    }).contract;
+  }
+
+  for (const host of HOSTS) {
+    test(`${host}: first line is the start marker, last content line is the end marker`, () => {
+      seedInstallState([host]);
+      seedWiring(host);
+
+      apply();
+
+      const lines = fs.readFileSync(bootstrapContractPath(host, home), "utf-8").split("\n");
+      expect(lines[0]).toBe(BOOTSTRAP_BLOCK_START);
+      expect(lines[lines.length - 2]).toBe(BOOTSTRAP_BLOCK_END);
+      expect(lines[lines.length - 1]).toBe("");
+    });
+
+    test(`${host}: the body between the markers is the render, and the file is the wrap of it`, () => {
+      seedInstallState([host]);
+      seedWiring(host);
+
+      apply();
+
+      const written = fs.readFileSync(bootstrapContractPath(host, home), "utf-8");
+      const body = expectedBody(host);
+      const inner = written.slice(
+        written.indexOf(BOOTSTRAP_BLOCK_START) + BOOTSTRAP_BLOCK_START.length + 1,
+        written.lastIndexOf(BOOTSTRAP_BLOCK_END),
+      );
+
+      expect(inner).toBe(body);
+      // The whole file, not only its interior: this is what pins the separator
+      // and the single trailing newline that `bootstrap_op`'s whole-file branch
+      // (install-skills.sh:485) produces.
+      expect(written).toBe(wrapBootstrapBlock(body));
+      expect(written.split(BOOTSTRAP_BLOCK_START).length - 1).toBe(1);
+      expect(written.split(BOOTSTRAP_BLOCK_END).length - 1).toBe(1);
+    });
+  }
+
+  test("a re-write over a deleted file reproduces the same bytes", () => {
+    // Determinism of the write, which is what `--check` compares against
+    // (BST-01 AC-10). Deleting the file first defeats the up-to-date skip, so
+    // the second pass really writes rather than reporting `skipped`.
+    seedInstallState([...HOSTS]);
+    seedAllWiring();
+
+    apply();
+    const first = HOSTS.map((host) => fs.readFileSync(bootstrapContractPath(host, home), "utf-8"));
+    for (const host of HOSTS) fs.rmSync(bootstrapContractPath(host, home));
+    const report = apply();
+
+    expect(statusByHost(report.rows)).toEqual(
+      Object.fromEntries(HOSTS.map((host) => [host, "written"])),
+    );
+    expect(HOSTS.map((host) => fs.readFileSync(bootstrapContractPath(host, home), "utf-8"))).toEqual(
+      first,
+    );
+  });
+
+  test("a second pass over the written file is skipped and leaves it byte-identical", () => {
+    // The `--check`-after-`--apply` property from the other side: the engine's
+    // own up-to-date comparison must read the same bytes it wrote. Comparing an
+    // unwrapped body against a wrapped file never matches, so this reddens for
+    // a writer that wraps but a comparison that does not.
+    seedInstallState([...HOSTS]);
+    seedAllWiring();
+
+    apply();
+    const before = fingerprint(home);
+    const report = apply();
+
+    expect(fingerprint(home)).toEqual(before);
+    expect(statusByHost(report.rows)).toEqual(
+      Object.fromEntries(HOSTS.map((host) => [host, "skipped"])),
+    );
+    expect(report.restartRequired).toBe(false);
+  });
+
+  test("the real skills/AGENTS.md is delivered marker-delimited too", () => {
+    // The synthetic source proves the wrap; this proves it against the text the
+    // installer reads, which is the one the shell sensor's head -n1 / tail -n1
+    // rows observe (scripts/tests/test-install-skills-bootstrap-file.sh:183-186).
+    seedInstallState(["claude"]);
+    seedWiring("claude");
+
+    applyBootstrapState({ targetHome: home, sourcePath: REAL_SOURCE_PATH });
+
+    const written = fs.readFileSync(bootstrapContractPath("claude", home), "utf-8");
+    expect(written.startsWith(`${BOOTSTRAP_BLOCK_START}\n`)).toBe(true);
+    expect(written.endsWith(`\n${BOOTSTRAP_BLOCK_END}\n`)).toBe(true);
+    expect(written).toContain("massa-ai-config bootstrap enable");
   });
 });
 

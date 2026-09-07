@@ -20,7 +20,10 @@
  *     every marker comment stripped: the installer's `bootstrap_op` re-adds
  *     the `massa-ai:bootstrap` pair when it writes the file (design.md:193-197,
  *     tasks.md T10 promotes the block body to that engine's third argument),
- *     so emitting them here would double them.
+ *     so emitting them here would double them. The body is not what lands on
+ *     disk, though — {@link wrapBootstrapBlock} is the one place that turns it
+ *     into the marker-delimited document both writers must produce
+ *     byte-for-byte, and every TypeScript writer goes through it.
  *   - **The header region is emitted in every state.** With `massa-ai-router`
  *     disabled the rendered file is the only place a user can still read how to
  *     switch it back on, so the recovery command and the state file path are
@@ -54,6 +57,44 @@ export const BOOTSTRAP_BLOCK_END = "<!-- massa-ai:bootstrap:end -->";
 
 /** The per-host contract file name (BST-01 AC-1). */
 export const CONTRACT_FILENAME = "MASSA-AI.md";
+
+/**
+ * Wrap a rendered body in the managed marker pair, producing the exact bytes
+ * `bootstrap_op` writes for a whole-file artifact (BST-01 AC-2, BST-01 AC-10).
+ *
+ * `MASSA-AI.md` has two writers — this module's consumers and the installer's
+ * `bootstrap_op` — and the marker pair in the file *is* the ownership proof
+ * (design.md:475), so the two must agree byte for byte or a `--check` after a
+ * successful `--apply` reports permanent drift and marker-based uninstall
+ * cannot find the block at all. The shape below is derived, not chosen:
+ *
+ *   - `desired` is `text.slice(s, e)` over the source
+ *     (`scripts/install-skills.sh:233`), which runs from the first byte of the
+ *     start marker to the last byte of the end marker — so it opens with
+ *     {@link BOOTSTRAP_BLOCK_START}, closes with {@link BOOTSTRAP_BLOCK_END},
+ *     and carries **no** trailing newline of its own.
+ *   - Both markers sit on their own line in the source, so the body is joined
+ *     with exactly one `\n` on each side.
+ *   - For a whole-file artifact `replaceBlock` returns `desired + "\n"`
+ *     (`scripts/install-skills.sh:485`) — one trailing newline outside the end
+ *     marker, and one only.
+ *
+ * That last newline is outside the block on purpose: `bootstrap_op`'s
+ * idempotency comparison slices `START`…`END` back out and tests it against
+ * `desired` (`scripts/install-skills.sh:501-504`), so bytes after the end
+ * marker never enter the comparison and a re-run over this output reports
+ * `nochange`.
+ *
+ * Trailing newlines on `body` are normalized rather than trusted. A caller
+ * passing `renderBootstrap(...).contract` already supplies exactly one
+ * (`normalizeBlankLines` ends every render with `trimEnd() + "\n"`), so this is
+ * a no-op on the real path; making it unconditional is what keeps "the last
+ * line is the end marker" a property of this function instead of a property of
+ * its callers.
+ */
+export function wrapBootstrapBlock(body: string): string {
+  return `${BOOTSTRAP_BLOCK_START}\n${body.replace(/\n+$/, "")}\n${BOOTSTRAP_BLOCK_END}\n`;
+}
 
 /** Marker suffixes a rule span can carry. `off`/`off-end` bound the text
  *  rendered when the rule is disabled. */
