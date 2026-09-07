@@ -435,3 +435,89 @@ describe("bootstrap source contract: naming-standards.md §Language ownership", 
     expect(worst.score).toBeLessThan(DUPLICATION_THRESHOLD);
   });
 });
+
+/**
+ * BST-07 AC-3 and AC-4 — what the `english-code` rule actually says
+ * (TASK-033, spec.md:186-187).
+ *
+ * Until this block existed the rule's text was guarded by nothing. The
+ * verifier replaced the entire span body with its inverse — "Use whatever
+ * language feels natural for the code you generate." — deleting both the AC-3
+ * enumeration and the AC-4 conversational-replies clause, and measured
+ * `packages/shared/src/bootstrap` 370/0, this file plus its two siblings 47/0,
+ * `test-install-skills-bootstrap-file.sh` 124/0 and the full
+ * `bun test scripts/__tests__` 1867/2 — byte-identical to the unmutated
+ * baseline (validation.md, ranked gap 3).
+ *
+ * The reason the existing suites cannot see it is worth stating, because it
+ * looks like coverage: `render.test.ts:495-509`'s per-rule "enabled renders its
+ * whole span" derives its expectation from `skills/AGENTS.md` at runtime, via
+ * `signatureLines(spanLines(rule.id).on)`. Rewriting the rule body rewrites the
+ * expectation with it, so that assertion is tautological for content — it
+ * senses delivery, never wording.
+ *
+ * So the literals below are owned by this file and deliberately not re-derived
+ * from any source the rule is rendered from. AC-3 and AC-4 are separate tests
+ * on purpose: AC-4's clause is a single sentence at the end of the rule and is
+ * the one a well-meaning tightening edit is likeliest to drop, and folded into
+ * one test its loss would be reported as "the English rule changed" rather than
+ * as itself.
+ */
+const ENGLISH_CODE_SUBJECTS: ReadonlyArray<readonly [string, RegExp]> = [
+  ["generated code", /\bgenerated code\b/i],
+  ["identifiers", /\bidentifiers\b/i],
+  ["comments", /\bcomments\b/i],
+  ["commit-facing code artifacts", /\bcommit-facing\b/i],
+  ["code documentation", /\bcode documentation\b/i],
+];
+
+/**
+ * The rule body with its hard-wrapped newlines collapsed to single spaces.
+ * Required, not cosmetic: the shipped rule wraps mid-clause — "This rule does\n
+ * not change the language of the agent's conversational replies" — so a pattern
+ * matching the clause as written finds nothing against the raw body. This file's
+ * own header states the rule (a scan that cannot see a claim spanning a newline
+ * has shipped silently here before); AC-4's first draft broke it and was caught
+ * only because the assertion was observed red for the wrong reason first.
+ */
+function flatRuleBody(content: string, id: string): string {
+  return ruleBody(content, id).replace(/\s+/g, " ").trim();
+}
+
+describe("bootstrap source contract: the `english-code` rule states its own contract", () => {
+  test("BST-07 AC-3: names every English-only subject and the regardless-of-user-language clause", async () => {
+    const rule = flatRuleBody(await read(AGENTS_MD), "english-code");
+    // A missing span returns "" from ruleBody, and every check below would then
+    // report as a content defect rather than as the structural one it is.
+    expect(rule.trim().length).toBeGreaterThan(0);
+
+    const defects: string[] = [];
+    for (const [label, re] of ENGLISH_CODE_SUBJECTS) {
+      if (!re.test(rule)) defects.push(`the rule no longer names ${label}`);
+    }
+    if (!/\bin English\b/i.test(rule)) {
+      defects.push("the rule no longer says the subjects are written in English");
+    }
+    if (!/regardless of the language the user\b/i.test(rule)) {
+      defects.push("the rule no longer holds regardless of the language the user writes in");
+    }
+    expect(defects).toEqual([]);
+  });
+
+  test("BST-07 AC-4: states that it does not change the agent's conversational replies", async () => {
+    const rule = flatRuleBody(await read(AGENTS_MD), "english-code");
+    expect(rule.trim().length).toBeGreaterThan(0);
+
+    const defects: string[] = [];
+    if (!/\bconversational replies\b/i.test(rule)) {
+      defects.push("the rule no longer mentions the agent's conversational replies");
+    }
+    // The negation and its object in one match, not two independent substring
+    // hits: "does not change" somewhere and "conversational replies" somewhere
+    // else is also satisfied by a rule that says the opposite of AC-4.
+    if (!/does not change[^.]*conversational replies/i.test(rule)) {
+      defects.push("the rule no longer exempts conversational replies from the English-only scope");
+    }
+    expect(defects).toEqual([]);
+  });
+});

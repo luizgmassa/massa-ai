@@ -33,6 +33,37 @@ BACKUP_SUFFIX="$(grep -m1 '^MASSA_AI_BACKUP_SUFFIX=' "${PROJECT_ROOT}/scripts/li
 apply()     { bash "$INSTALLER" --apply --platform claude --target "$1" --repo-root "$PROJECT_ROOT" --yes --verbose 2>&1; }
 uninstall() { bash "$INSTALLER" --uninstall --platform claude --target "$1" --repo-root "$PROJECT_ROOT" --yes --verbose 2>&1; }
 
+# Scenario 11's runners. Kept separate from the two above rather than adding a
+# platform argument to them, for two reasons: the claude scenarios' environment
+# is part of what they measure and must not move, and these two additionally
+# redirect HOME and XDG_CONFIG_HOME at a scratch dir so a --target regression
+# still could not reach the developer's real ~/.config/opencode.
+OC_SCRATCH="$ROOT/oc-scratch-home"; mkdir -p "$OC_SCRATCH/.config"
+oc_apply() {
+  env HOME="$OC_SCRATCH" XDG_CONFIG_HOME="$OC_SCRATCH/.config" \
+    bash "$INSTALLER" --apply --platform opencode --target "$1" --repo-root "$PROJECT_ROOT" --yes 2>&1
+}
+oc_uninstall() {
+  env HOME="$OC_SCRATCH" XDG_CONFIG_HOME="$OC_SCRATCH/.config" \
+    bash "$INSTALLER" --uninstall --platform opencode --target "$1" --repo-root "$PROJECT_ROOT" --yes 2>&1
+}
+
+# Read the resolved OpenCode config through the installer's own resolution and
+# JSONC parser. Guessing between `opencode.json` and `opencode.jsonc` here would
+# make the assertions below depend on which name the installer happens to pick;
+# resolveConfigPath is the only thing that knows. Shape shared with
+# test-install-skills-bootstrap-file.sh:239-248.
+opencode_cfg() { # opencode_cfg HOME EXPR   (EXPR evaluated with `s` bound to the doc)
+  "$RUNNER" - "$PROJECT_ROOT/scripts/lib/opencode-config.cjs" "$1/.config/opencode" "$2" <<'NODE'
+const fs = require("fs");
+const [, , modulePath, dir, expr] = process.argv;
+const { resolveConfigPath, parseJsonc } = require(modulePath);
+const resolved = resolveConfigPath(dir);
+const s = fs.existsSync(resolved.path) ? parseJsonc(fs.readFileSync(resolved.path, "utf8")) : {};
+process.stdout.write(String(eval(expr)));
+NODE
+}
+
 echo "Scenario 1: uninstall removes every repo-owned symlink and the block"
 H1="$ROOT/h1"; mkdir -p "$H1"
 apply "$H1" >/dev/null
@@ -186,5 +217,62 @@ JSON10="$(bash "$INSTALLER" --uninstall --platform claude --target "$H10" \
   --repo-root "$PROJECT_ROOT" --yes --json 2>/dev/null)"
 assert_not_contains "no retained row at all without a backup (BST-05 AC-9c)" \
   "$JSON10" '"status": "retained"'
+
+echo ""
+echo "Scenario 11: uninstall removes the OpenCode instructions entry (BST-05 AC-9)"
+# BST-05 AC-9 names three things uninstall must remove: the host's MASSA-AI.md,
+# its managed block in AGENTS.md/CLAUDE.md, and its `instructions` entry. The
+# first two were strongly sensed; the third was sensed nowhere, and the verifier
+# proved it by changing the guard at scripts/install-skills.sh:1149 from
+# `[ "$p" = "opencode" ]` to a never-matching literal — disabling the removal
+# outright — with this suite at 25/0, test-install-skills-bootstrap-file.sh at
+# 124/0, test-install-skills-apply.sh at 42/0 and
+# scripts/__tests__/opencode-config.test.ts at 42/0 (validation.md, ranked gap 4).
+# That last suite is why the hole is easy to miss: it exercises
+# `instructionsOp("remove-apply", …)` directly and never reaches the installer
+# branch that calls it, so the module is covered while its only caller is not.
+#
+# Structurally this is iteration 1's gap 4 on the sibling branch of the same
+# `if`: the CLAUDE.md unlink case got scenario 14 in the bootstrap-file suite,
+# the instructions case got nothing.
+H11="$ROOT/h11"; mkdir -p "$H11/.config/opencode"
+cat > "$H11/.config/opencode/opencode.jsonc" <<'JSONC'
+{
+  // a user comment, so the fixture exercises the jsonc path
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["~/my-notes.md", "~/team-conventions.md"]
+}
+JSONC
+oc_apply "$H11" >/dev/null
+CONTRACT11="$H11/.config/opencode/MASSA-AI.md"
+# Precondition, asserted rather than assumed: without it a removal assertion
+# reading 0 would pass just as happily against an install that never wrote.
+assert_eq "the install put the contract into instructions (fixture precondition)" \
+  "$(opencode_cfg "$H11" "(s.instructions||[]).filter(x => x === '$CONTRACT11').length")" "1"
+oc_uninstall "$H11" >/dev/null
+assert_eq "uninstall removed the contract from instructions (BST-05 AC-9)" \
+  "$(opencode_cfg "$H11" "(s.instructions||[]).filter(x => x === '$CONTRACT11').length")" "0"
+assert_eq "both of the user's own instructions entries survive (BST-05 AC-9)" \
+  "$(opencode_cfg "$H11" "['~/my-notes.md','~/team-conventions.md'].filter(x => (s.instructions||[]).includes(x)).length")" "2"
+
+# The other half of the same clause: when the removal empties the array, the key
+# is deleted rather than left as `"instructions": []`. A config carrying an empty
+# array is residue of an uninstall, and the assertion above cannot see it — an
+# empty array filters to 0 exactly like an absent key.
+H12="$ROOT/h12"; mkdir -p "$H12/.config/opencode"
+cat > "$H12/.config/opencode/opencode.jsonc" <<'JSONC'
+{
+  "$schema": "https://opencode.ai/config.json"
+}
+JSONC
+oc_apply "$H12" >/dev/null
+CONTRACT12="$H12/.config/opencode/MASSA-AI.md"
+assert_eq "the contract is the sole instructions entry (fixture precondition)" \
+  "$(opencode_cfg "$H12" "JSON.stringify(s.instructions||[])")" "[\"$CONTRACT12\"]"
+oc_uninstall "$H12" >/dev/null
+assert_eq "the emptied instructions array is deleted, not left as [] (BST-05 AC-9)" \
+  "$(opencode_cfg "$H12" "'instructions' in s ? 'present' : 'absent'")" "absent"
+assert_eq "the rest of the user's config survives the key deletion (BST-05 AC-9)" \
+  "$(opencode_cfg "$H12" "s['\$schema'] || 'gone'")" "https://opencode.ai/config.json"
 
 summary "install-skills --uninstall"
