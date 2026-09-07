@@ -203,9 +203,17 @@ own gates, so that a later edit cannot silently break delivery on one host.
 
 1. WHEN a drift check runs after a source change under `skills/bootstrap/` THEN it SHALL exit non-zero until the bundles are regenerated — for **both** `bun scripts/generate-skill-artifacts.ts --check` (the direct form, which `.github/workflows/ci.yml:238` uses) and `bun run generate:artifacts --check`. <!-- BST-12 -->
 2. The `scripts/tests/` directory SHALL contain a shell suite that installs to a scratch home, asserts the per-host delivery shape of BST-01..BST-04, and asserts the uninstall reversal of BST-05. <!-- BST-12 -->
-3. The `scripts/__tests__/` directory SHALL contain a suite asserting the renderer's rule set, defaults, determinism, unknown-id handling, and the `code-comments` negative directive. <!-- BST-12 -->
+3. A committed unit suite SHALL assert the renderer's rule set, defaults, determinism, unknown-id handling, and the `code-comments` negative directive, co-located with the module under test per this repository's convention — which places the renderer's own assertions in `packages/shared/src/bootstrap/__tests__/` and the entry point's in `scripts/__tests__/`. <!-- BST-12 -->
 4. WHEN a rule id is added to or removed from the registry without updating the skill's documented id list THEN a test SHALL fail naming the divergent ids. <!-- BST-12 -->
 5. The `CHANGELOG.md` file SHALL carry an entry under `[Unreleased]` describing the delivery change. <!-- BST-12 -->
+
+> **AC-3 amended after the verification gate (user ruling).** It named
+> `scripts/__tests__/` as the sole location, which the verifier measured as false: the
+> determinism assertion and the `code-comments` negative-directive assertion live in
+> `packages/shared/src/bootstrap/__tests__/render.test.ts:210,238`, beside the module they
+> test, which is this repository's own convention. The substance was always delivered; the
+> AC's location clause was wrong and would have forced a correct suite to move to satisfy a
+> sentence. The criterion now requires the assertions and names both real homes.
 
 > **AC-1 amended after the verification gate (user ruling).** It originally named
 > `bun run generate:artifacts --check` alone, and the verifier measured that command

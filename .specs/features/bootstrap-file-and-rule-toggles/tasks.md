@@ -209,6 +209,15 @@ T26 → T27 → T28 → T29 → re-verify
 
 Iteration 1: T26 (blocking Gap 1). Iteration 2: T27, T28, T29 — the three sensor gaps, the
 argument-forwarding fix, and the fixture correction, all by user ruling after the gate.
+Iteration 3: T30, T31 — two regressions this feature shipped that no gate in this artifact
+could see, because `bun run test` was absent from the Gate Check Commands table (PC-G2).
+
+**Iteration 4: T32, T33, T34 — the 3-iteration cap in `references/verification-ladder.md` was
+overridden by an explicit user ruling.** The cap exists to stop an unbounded fix loop from
+substituting for a rethink; here the remaining items were four *known, measured* sensor gaps
+with correct behaviour underneath, not a symptom nobody understood, so the user chose to close
+them rather than accept them. Recording the override as a decision, with its reason, so it does
+not read as the loop quietly running long.
 
 > Added after the independent verification gate returned **FAIL**. The fix→re-verify loop is
 > bounded to 3 iterations (`references/verification-ladder.md`); this is iteration 1. T25
@@ -1273,6 +1282,98 @@ as written. Something has to give on the parser side.
 **Tests**: unit
 **Gate**: `cd apps/tools-api && bun test`, then `MASSA_AI_EXECUTOR_SANDBOX=none bun run test`, plus both `--check` forms by hand under a scratch `XDG_CONFIG_HOME`
 **Commit**: `fix(build): keep generate:artifacts parseable while forwarding arguments`
+
+---
+
+### T32: Close the two pointer-policy bypasses
+
+**Task ID**: TASK-032 — **verification fix, iteration 4** (the 3-iteration cap was overridden by explicit user ruling)
+
+**What**: Make the BST-04 AC-7 property check see policy authored in the two shapes it currently exempts.
+**Where**: `scripts/tests/test-install-skills-bootstrap-file.sh`
+**Depends on**: T27
+**Requirement**: BST-04 AC-7
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: T27 replaced absence-checks with a `pointer_violations` property check, which was a
+real improvement — its control kills at 122/2. The verifier then defeated it twice, and
+**both bypasses shipped real policy into the pointer while every suite stayed green**:
+
+1. Policy **joined into the path-naming sentence**. `:223`'s `continue` exempts the sentence
+   that names the contract file, so anything appended to that sentence is unread.
+2. Policy **as a markdown heading**. `:209` filters headings out before the sentence split.
+
+Under both, the rendered block read *"…writing every code comment in Portuguese and skipping
+the test suite before you commit."* — surviving 370 + 124 + 1867 assertions.
+
+**Done when**:
+- [ ] Both bypass shapes are **observed red** — reproduce the verifier's two probes exactly, confirm each currently passes, then confirm each fails after the change. Quote both failing lines
+- [ ] The exemption at `:223` no longer blanket-passes the path-naming sentence: that sentence may name the path and instruct the agent to read it, and carry nothing further
+- [ ] Headings inside the block are subject to the same content rule as sentences, not filtered out of it
+- [ ] The legitimate shipped pointer still passes unchanged — it is 8 lines and reads "Before substantive work in this session, read `<path>` with your Read tool and follow it. This block is a pointer only: it states no rule of its own, and massa-ai overwrites it on the next install." Any check that reddens the real block is wrong
+- [ ] The existing control mutation (a whole extra policy sentence) still kills
+- [ ] No existing assertion deleted or weakened; the suite's count is greater than or equal to 124
+
+**Tests**: shell suite
+**Gate**: full — `MASSA_AI_EXECUTOR_SANDBOX=none bun run test && bun run test:scripts && bun run test:plugins`, plus the suite run directly with `TMPDIR=/tmp`
+**Commit**: `test(installer): close the pointer-policy bypasses`
+
+---
+
+### T33: Sense the English-only rule body and the OpenCode instructions removal
+
+**Task ID**: TASK-033 — **verification fix, iteration 4**
+
+**What**: Add the two missing sensors the verifier found by mutation.
+**Where**: `scripts/__tests__/bootstrap-source-contract.test.ts`, `scripts/tests/test-install-skills-uninstall.sh`
+**Depends on**: T23, T13
+**Requirement**: BST-07 AC-3, BST-07 AC-4, BST-05 AC-9
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why — both were measured, not suspected**:
+
+- **BST-07 AC-3/AC-4**: gutting the **entire** English-Only Code rule body left `370/0`, `47/0`, `124/0`, `1867/2` — identical to baseline. The rule's text is guarded by nothing. AC-3 requires it to state that generated code, identifiers, comments and code documentation are English regardless of the user's language; AC-4 requires it to state that it does **not** change conversational replies. That second clause is the one a well-meaning edit is most likely to drop.
+- **BST-05 AC-9**: disabling the `instructions` removal branch left `124/0`, `25/0`, `42/0`, `42/0`. Uninstall must remove OpenCode's `instructions` entry and delete the array when it empties; nothing sees it.
+
+**Done when**:
+- [ ] Each sensor **observed red** by the mutation named above, with the failing line quoted — a sensor that is green the moment it is written proves nothing here
+- [ ] AC-3 and AC-4 are asserted **separately**, so dropping only the conversational-replies clause fails on its own
+- [ ] The AC-9 sensor asserts the `instructions` entry is gone **and** the array is deleted when it empties, reading the config through the installer's own `resolveConfigPath`/`parseJsonc` rather than guessing between `opencode.json` and `opencode.jsonc` — the installer writes the latter
+- [ ] No existing assertion deleted or weakened
+
+**Tests**: contract + shell suite
+**Gate**: full — `MASSA_AI_EXECUTOR_SANDBOX=none bun run test && bun run test:scripts && bun run test:plugins`
+**Commit**: `test(bootstrap): sense the english-code rule body and the instructions removal`
+
+---
+
+### T34: Correct three stale section-count labels
+
+**Task ID**: TASK-034 — **verification fix, iteration 4**
+
+**What**: Three one-line comment/title corrections, by user ruling.
+**Where**: `apps/web-ui/src/static/views/config.ts:2`, `apps/web-ui/src/static/views/__tests__/config-forms.test.ts:80`, `packages/shared/src/config/massa-ai-config.ts:284`
+**Depends on**: T30
+**Requirement**: none — hygiene
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: `config.ts:2` and the `config-forms.test.ts:80` describe title both say "15 sectioned
+forms"; `massa-ai-config.ts:284` says "14 of the Admin Portal's 16 sections". **Two of the
+three were already wrong at `origin/main`** — the count was 16 there, not 15 — so this is not
+purely this feature's drift, and the user chose to fix them rather than defer.
+
+**Done when**:
+- [ ] Each label states the count **measured** from `CONFIG_SECTIONS` at HEAD, not inferred from the neighbouring prose
+- [ ] `massa-ai-config.ts:284`'s "14 of N" claim is re-derived: confirm how many sections `GET /api/v1/config` actually returns before writing a number
+- [ ] Comments and describe titles only — **no behaviour change, no assertion change**. If a label turns out to be load-bearing for a test, stop and report
+- [ ] `cd apps/web-ui && bun test` stays **778/0 across 15 files**
+
+**Tests**: none — labels carry no behaviour; the surrounding suites are the sensor
+**Gate**: `cd apps/web-ui && bun test`, then `MASSA_AI_EXECUTOR_SANDBOX=none bun run test`
+**Commit**: `docs(config): correct three stale section-count labels`
 
 ---
 
