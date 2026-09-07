@@ -514,6 +514,22 @@ export class Scheduler {
     })();
   }
 
+  /**
+   * Resolve once the store's synchronous reads reflect persisted state.
+   *
+   * EB-SCH-6: `registerOrResumeJob` decides whether to preserve or recompute
+   * `nextRunAt` by comparing against `store.get(id)`. On a PostgreSQL-backed
+   * store that read is served from a mirror hydrated asynchronously, so calling
+   * it at boot before hydration made every persisted job look new and silently
+   * restarted the schedule. Await this before registering; the tick loop must
+   * not, and does not.
+   *
+   * A store with no `ready()` is authoritative in memory and already ready.
+   */
+  async ready(): Promise<void> {
+    await this.store.ready?.();
+  }
+
   // ── Status (optional debug endpoint) ──────────────────────────────────────
 
   status(now: number = Date.now()): SchedulerStatus {
