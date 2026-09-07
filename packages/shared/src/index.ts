@@ -112,3 +112,52 @@ export {
 } from "./profile-switch/report.js";
 export { syncGeneratedVariants, type VariantSyncHostResult, type VariantSyncOptions } from "./profile-switch/variant-sync.js";
 export { findRepoRootWithMarker } from "./profile-switch/repo-root.js";
+
+// Bootstrap rule toggles. Root re-export, no new `exports` subpath — the same
+// shape profile-switch uses above. `ConfigParseError` is deliberately absent:
+// `./bootstrap/index.js` re-exports it for its own consumers, but the config
+// block above already exports it here and a second export of one name is a
+// compile error, not a convenience.
+export {
+  BOOTSTRAP_RULE_IDS,
+  type BootstrapRuleId,
+  isBootstrapRuleId,
+  type BootstrapRuleDefinition,
+  BOOTSTRAP_RULES,
+  getBootstrapRuleDefinition,
+  bootstrapRuleDefaults,
+  BootstrapRuleError,
+  UnknownRuleError,
+  assertKnownRuleId,
+  BootstrapRuleValidationError,
+  validateRuleIds,
+  type BootstrapState,
+  BOOTSTRAP_STATE_KEY,
+  BOOTSTRAP_RULES_KEY,
+  BOOTSTRAP_STATE_PATH,
+  type ResolvedBootstrapState,
+  resolveBootstrapState,
+  type SetBootstrapRuleResult,
+  setBootstrapRuleEnabled,
+  BOOTSTRAP_BLOCK_START,
+  BOOTSTRAP_BLOCK_END,
+  CONTRACT_FILENAME,
+  wrapBootstrapBlock,
+  type RuleMarkerSuffix,
+  ruleMarker,
+  BootstrapRenderError,
+  bootstrapContractPath,
+  bootstrapStateFilePath,
+  type RenderBootstrapOptions,
+  type BootstrapRender,
+  renderBootstrap,
+  BOOTSTRAP_RENDER_STATUSES,
+  type BootstrapRenderStatus,
+  type BootstrapRenderResult,
+  type BootstrapReport,
+  bootstrapReportSucceeded,
+  buildBootstrapReport,
+  BootstrapEngineError,
+  type BootstrapApplyOptions,
+  applyBootstrapState,
+} from "./bootstrap/index.js";
