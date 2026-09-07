@@ -748,10 +748,10 @@ exit code — `--check` keys on `drift` and every action keys on `error`.
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] `list` output names every rule id, its default, its current state, and a one-line description (BST-11 AC-3)
-- [ ] The report formatter renders `written-not-wired` distinctly and prints the restart notice when required (BST-11 AC-5)
-- [ ] **PC-Q2 — all four statuses are rendered, not two.** `BootstrapRenderResult.status` is `written | written-not-wired | skipped | failed` (`design.md:331`), and T7 gave `skipped` a definition the design lacked: a byte-identical re-apply whose wiring is present (log `:22`). The original done-when named only `written-not-wired`, leaving `skipped` and `failed`-with-reason unspecified for the formatter. Cover every arm, and render `failed`'s and `skipped`'s `reason` — BST-10 AC-10 requires each host's outcome to be reported with its reason
-- [ ] Tests co-located at `packages/shared/src/bootstrap/__tests__/format.test.ts`
+- [x] `list` output names every rule id, its default, its current state, and a one-line description (BST-11 AC-3)
+- [x] The report formatter renders `written-not-wired` distinctly and prints the restart notice when required (BST-11 AC-5)
+- [x] **PC-Q2 — all four statuses are rendered, not two.** `BootstrapRenderResult.status` is `written | written-not-wired | skipped | failed` (`design.md:331`), and T7 gave `skipped` a definition the design lacked: a byte-identical re-apply whose wiring is present (log `:22`). The original done-when named only `written-not-wired`, leaving `skipped` and `failed`-with-reason unspecified for the formatter. Cover every arm, and render `failed`'s and `skipped`'s `reason` — BST-10 AC-10 requires each host's outcome to be reported with its reason
+- [x] Tests co-located at `packages/shared/src/bootstrap/__tests__/format.test.ts`
 
 **Tests**: unit
 **Gate**: quick — `cd packages/shared && bun test src/bootstrap`

@@ -160,4 +160,6 @@ export {
   BootstrapEngineError,
   type BootstrapApplyOptions,
   applyBootstrapState,
+  formatBootstrapInventory,
+  formatBootstrapReport,
 } from "./bootstrap/index.js";

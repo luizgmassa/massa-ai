@@ -78,4 +78,6 @@ export {
   applyBootstrapState,
 } from "./engine.js";
 
+export { formatBootstrapInventory, formatBootstrapReport } from "./format.js";
+
 export { ConfigParseError } from "../config/config-loader.js";
