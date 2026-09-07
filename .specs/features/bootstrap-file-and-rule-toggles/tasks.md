@@ -80,7 +80,7 @@ Guidelines were found, so the Coverage Expectation below conforms to them rather
 | --- | --- | --- | --- | --- |
 | `packages/shared` domain module (registry, state, render, engine, report, format) | unit | All branches; 1:1 to spec ACs; every listed edge case; ≥90% per file | `packages/shared/src/bootstrap/__tests__/*.test.ts` | `cd packages/shared && bun test src/bootstrap` |
 | `packages/shared` config seam (strict read/write) | unit | Both directions per CONTRIBUTING Step 6: the strict path throws on malformed input AND the old permissive composition is not reachable from the toggle path | `packages/shared/src/config/__tests__/*.test.ts` | `cd packages/shared && bun test src/config` |
-| Published CLI subcommand | unit | Dispatch, argument validation, unknown-id error, persistence, `--target`, `--dry-run` | `apps/<app>/src/__tests__/config-cli-bootstrap.test.ts` | `cd apps/mcp-client && bun scripts/run-tests-isolated.ts --filter='config-cli-bootstrap'` |
+| Published CLI subcommand | unit | Dispatch, argument validation, unknown-id error, persistence, `--target`, `--dry-run` | `apps/<app>/src/__tests__/config-cli-bootstrap.test.ts` | `cd apps/mcp-client && bun test src/__tests__/config-cli-bootstrap.test.ts` (see PC-G1) |
 | Repo script (`scripts/*.ts`) | unit | All branches of the resolution ladder and the degrade-to-defaults path | `scripts/__tests__/*.test.ts` | `bun test scripts/__tests__/<file>` |
 | Bash installer behaviour | shell suite | One scenario per acceptance criterion in BST-01..BST-05, plus the no-write proof against deliberate drift | `scripts/tests/test-*.sh` | `bash scripts/tests/<file>.sh` |
 | Harness source content (`skills/**/*.md`) | contract | Guarded by a scripted source-contract assertion, never by review | `scripts/__tests__/*.test.ts` | `bun test scripts/__tests__/<file>` |
@@ -98,7 +98,33 @@ Guidelines were found, so the Coverage Expectation below conforms to them rather
 
 **The artifact gate is `bun scripts/generate-skill-artifacts.ts --check`, never `bun run generate:artifacts --check`.** `package.json:31` is an `&&` chain, so the flag reaches only the second generator while the first runs in write mode and repairs the drift it should report. CI uses the direct form (`.github/workflows/ci.yml:238`).
 
-**Baseline to beat, measured at `09e9a597` after `bun run build`:** `test:scripts` 1821 pass / 2 fail across 81 files. The two failures are `pyts golden: lessons > list --status all …` and `… list --query filter …`, and both reproduce at `origin/main` — they are pre-existing and out of scope. Any third failure is this feature's.
+**Baseline to beat, measured at `09e9a597` after `bun run build`:** `test:scripts` 1821 pass / 2 fail across 81 files. The two failures are `pyts golden: lessons > list --status all …` and `… list --query filter …`, and both reproduce at `origin/main` — they are pre-existing and out of scope. Any third failure is this feature's. Re-measured at `9cd23199` (Phase 7 complete): **1873 pass / 2 fail across 83 files**, same two failures.
+
+**PC-G1 — two gate commands this artifact named do not run, and a third env fact.** Found by
+executing them before Phase 8 rather than at dispatch time.
+
+1. **`apps/mcp-client`'s isolation runner takes no arguments.** The documented
+   `bun scripts/run-tests-isolated.ts --filter='config-cli-bootstrap'` exits with
+   `Unknown argument(s): --filter=config-cli-bootstrap`. `--filter` and `--unit` belong to
+   **core's** runner; the mcp-client wrapper is a 46-line shim that passes `packageRoot`,
+   `testsRoot`, `isolationReason` and `labels` to `runIsolatedTests` and forwards no CLI
+   surface at all. The correct quick gate for one file is
+   `cd apps/mcp-client && bun test src/__tests__/config-cli-bootstrap.test.ts` — that file
+   uses `mock.module`, and running it alone already gives it its own process, which is the
+   isolation the runner exists to provide.
+2. **`cd apps/opencode-plugin && bun test` exits 2 and reports no summary.** From that
+   package root, `bun test` collects the **generated skill bundle** — `skills/massa-ai/scripts/`
+   is gitignored build output (AD-016) — and executes `validate_spec.ts` as if it were a
+   test, which prints `validate_spec: could not locate a spec.md` and fails the run. This is
+   why the plugin packages deliberately declare no `test` script and `bun run test:plugins`
+   is their runner. Scope it: `bun test src/__tests__/` → **104 pass / 0 fail across 6 files**,
+   exit 0.
+3. **`apps/mcp-client`'s runner needs `DATABASE_URL` exported locally.** Without it, 7 of 12
+   groups fail with `# Unhandled error between tests` at the `DATABASE_URL` resolution site
+   while each file passes when run alone — a wrapper reporting its own exit code, not a test
+   failure. With
+   `DATABASE_URL=postgresql://massa_ai:massa_ai_password@localhost:5432/massa_ai` exported,
+   **all 12 groups pass**. CI sets this; a local shell does not.
 
 ---
 
@@ -713,7 +739,7 @@ exit code — `--check` keys on `drift` and every action keys on `error`.
 
 **Task ID**: TASK-016
 
-**What**: `formatBootstrapInventory` and `formatBootstrapReport`, so both CLIs call one implementation instead of duplicating ~106 lines each.
+**What**: `formatBootstrapInventory` and `formatBootstrapReport`, so both CLIs call one implementation instead of duplicating the profile formatters' shape a second time. (The original "~106 lines each" had no anchor and is wrong: the duplicated pair is `apps/mcp-client/src/config-cli.ts:105-142` against `apps/opencode-plugin/src/config-cli.ts:111-148`, **38 lines**, byte-identical. The reuse argument stands; the figure did not.)
 **Where**: `packages/shared/src/bootstrap/format.ts`
 **Depends on**: T7
 **Reuses**: the output conventions of `formatProfileInventory` / `formatSwitchReport`, which are byte-identical across the two CLIs today and are exactly the duplication this task refuses to repeat
@@ -753,7 +779,7 @@ exit code — `--check` keys on `drift` and every action keys on `error`.
 - [ ] Tests at `apps/mcp-client/src/__tests__/config-cli-bootstrap.test.ts`, following the `config-cli-profile.test.ts` seam order: pre-resolve `require("@massa-ai/shared")` before `mock.module`, then `await import("../config-cli.js")`
 
 **Tests**: unit
-**Gate**: quick — `cd apps/mcp-client && bun scripts/run-tests-isolated.ts --filter='config-cli-bootstrap'`
+**Gate**: quick — `cd apps/mcp-client && bun test src/__tests__/config-cli-bootstrap.test.ts` (see PC-G1)
 **Commit**: `feat(cli): add the bootstrap subcommand to massa-ai-config`
 
 ---
@@ -773,7 +799,7 @@ exit code — `--check` keys on `drift` and every action keys on `error`.
 **Done when**:
 - [ ] Behaviour is identical to T17 except the documented `__dirname` difference
 - [ ] Tests at `apps/opencode-plugin/src/__tests__/config-cli-bootstrap.test.ts`
-- [ ] `cd apps/opencode-plugin && bun test` passes
+- [ ] `cd apps/opencode-plugin && bun test src/__tests__/` passes — **not** bare `bun test` (see PC-G1)
 
 **Tests**: unit
 **Gate**: quick — `cd apps/opencode-plugin && bun test src/__tests__/config-cli-bootstrap.test.ts`
