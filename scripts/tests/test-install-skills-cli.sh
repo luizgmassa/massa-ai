@@ -24,6 +24,24 @@ export PATH="$(make_mock_agents "$ROOT/bin"):$PATH"
 
 rc_of() { "$@" >/dev/null 2>&1; echo $?; }
 
+BOOTSTRAP_START="$(grep -m1 '^BOOTSTRAP_START=' "$INSTALLER" | cut -d'"' -f2)"
+RUNNER="node"; command -v node >/dev/null 2>&1 || RUNNER="bun"
+
+# The OpenCode config read through the installer's own path resolution and JSONC
+# parser, so scenario 9 asks about the file the installer actually wrote rather
+# than guessing between opencode.json and opencode.jsonc. Shape copied from
+# test-install-skills-bootstrap-file.sh:140-149.
+opencode_cfg() { # opencode_cfg HOME EXPR   (EXPR evaluated with `s` bound to the doc)
+  "$RUNNER" - "$PROJECT_ROOT/scripts/lib/opencode-config.cjs" "$1/.config/opencode" "$2" <<'NODE'
+const fs = require("fs");
+const [, , modulePath, dir, expr] = process.argv;
+const { resolveConfigPath, parseJsonc } = require(modulePath);
+const resolved = resolveConfigPath(dir);
+const s = fs.existsSync(resolved.path) ? parseJsonc(fs.readFileSync(resolved.path, "utf8")) : {};
+process.stdout.write(String(eval(expr)));
+NODE
+}
+
 echo "Scenario 1: --help exits 0 and documents the flags"
 HELP="$(bash "$INSTALLER" --help 2>&1)"
 assert_eq "--help exits 0" "$(rc_of bash "$INSTALLER" --help)" "0"
@@ -95,13 +113,25 @@ assert_eq "no symlink exists anywhere under the installed skills tree" \
   "$(find "$H8/.cursor/skills" -type l | wc -l | tr -d ' ')" "0"
 
 echo ""
-echo "Scenario 9: --platform all covers the four platform roots"
+echo "Scenario 9: --platform all wires each of the four platform roots"
 H9="$ROOT/h9"; mkdir -p "$H9"
 bash "$INSTALLER" --apply --platform all --target "$H9" --repo-root "$PROJECT_ROOT" --yes >/dev/null 2>&1
-assert_file "claude root" "$H9/.claude/AGENTS.md"
+# T13 split the four hosts across three wiring surfaces, so "covers the root"
+# is now a per-host question. claude and opencode moved off AGENTS.md entirely;
+# each of their rows asserts both directions of that migration in one value
+# (CONTRIBUTING.md Step 6) — the delivered wiring is present AND the retired
+# AGENTS.md block has zero effect. codex and cursor still wire through their own
+# AGENTS.md (BST-04 AC-6), so those two rows are unchanged.
+CLAUDE_IMPORTS="$(grep -c -- '@MASSA-AI.md' "$H9/.claude/CLAUDE.md" 2>/dev/null)"
+CLAUDE_RETIRED="$(grep -c -- "$BOOTSTRAP_START" "$H9/.claude/AGENTS.md" 2>/dev/null)"
+assert_eq "claude root: CLAUDE.md imports the contract, AGENTS.md carries no block (BST-02 AC-3, BST-05 AC-8)" \
+  "${CLAUDE_IMPORTS:-0}/${CLAUDE_RETIRED:-0}" "1/0"
 assert_file "codex root" "$H9/.codex/AGENTS.md"
 assert_file "cursor root" "$H9/.cursor/AGENTS.md"
-assert_file "opencode root" "$H9/.config/opencode/AGENTS.md"
+OPENCODE_WIRED="$(opencode_cfg "$H9" "(s.instructions||[]).filter(x => x === '$H9/.config/opencode/MASSA-AI.md').length")"
+OPENCODE_RETIRED="$(grep -c -- "$BOOTSTRAP_START" "$H9/.config/opencode/AGENTS.md" 2>/dev/null)"
+assert_eq "opencode root: instructions holds the absolute contract path, AGENTS.md carries no block (BST-03 AC-5, BST-05 AC-8)" \
+  "${OPENCODE_WIRED:-0}/${OPENCODE_RETIRED:-0}" "1/0"
 
 echo ""
 echo "Scenario 10: ~/.config/codex is used when ~/.codex is absent"

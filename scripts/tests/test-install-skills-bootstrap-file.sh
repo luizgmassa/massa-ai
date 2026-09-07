@@ -382,8 +382,18 @@ if command -v bun >/dev/null 2>&1; then
     "$OUT8" "scripts/install-skills.sh --apply"
   apply "$H8" cursor >/dev/null
   OUT8B="$(run_engine "$H8")"
+  # `skipped`, not `written`. T8 defines `written` as a contract file whose bytes
+  # this run changed on a host that is wired, and that trigger cannot fire here:
+  # :377's run_engine already wrote MASSA-AI.md, and :383's --apply adds the
+  # AGENTS.md wiring without changing the contract's bytes — so this second
+  # engine run sees a wired host whose contract file is already up to date.
+  # `skipped` still carries this scenario's claim, because an unwired host
+  # reports `written-not-wired` (:379-380): a host that reports `skipped` is
+  # necessarily wired. The `written` path is asserted one layer down, at
+  # packages/shared/src/bootstrap/__tests__/engine.test.ts:422-431, from one real
+  # engine run — re-asserting it here would duplicate coverage across layers.
   assert_contains "after --apply the same host is wired (BST-04, BST-10 AC-10a)" \
-    "$OUT8B" '"status":"written"'
+    "$OUT8B" '"status":"skipped"'
   assert_not_contains "no host is left unwired after --apply" \
     "$OUT8B" '"status":"written-not-wired"'
 else

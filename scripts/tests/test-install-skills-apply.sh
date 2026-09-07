@@ -2,8 +2,8 @@
 # ================================================================
 # scripts/tests/test-install-skills-apply.sh
 #
-# scripts/install-skills.sh --apply: real-copy creation, idempotence, the
-# AGENTS.md bootstrap block, and the foreign-conflict abort.
+# scripts/install-skills.sh --apply: real-copy creation, idempotence, claude's
+# CLAUDE.md bootstrap wiring, and the foreign-conflict abort.
 #
 # Everything runs against a mktemp fake home; the real $HOME is never touched.
 #
@@ -25,6 +25,15 @@ MOCK_BIN="$(make_mock_agents "$ROOT/bin")"
 export PATH="$MOCK_BIN:$PATH"
 
 BOOTSTRAP_START="$(grep -m1 '^BOOTSTRAP_START=' "$INSTALLER" | cut -d'"' -f2)"
+BOOTSTRAP_END="$(grep -m1 '^BOOTSTRAP_END=' "$INSTALLER" | cut -d'"' -f2)"
+
+# The managed block of FILE, markers included; empty when the file has none.
+# sed rather than the node helper at
+# test-install-skills-bootstrap-file.sh:120-132, because this suite has no
+# $RUNNER; neither marker literal contains a `/`, so the default sed delimiter
+# is safe. Asserting inside the block — not over the whole file — is what keeps
+# "the import is present" from passing on an import a user wrote themselves.
+managed_block() { sed -n "/$BOOTSTRAP_START/,/$BOOTSTRAP_END/p" "$1" 2>/dev/null; }
 
 run_apply() { # run_apply HOME [extra args...]
   local home="$1"; shift
@@ -48,8 +57,16 @@ for d in "$PROJECT_ROOT"/skills/*/; do
   check "ownership marker written for $name" "$([ -f "$H1/.claude/skills/.massa-ai-owned-$name" ] && echo 0 || echo 1)"
 done
 check "at least one skill was discovered" "$([ "$SKILL_COUNT" -gt 0 ] && echo 0 || echo 1)"
-assert_file "AGENTS.md written" "$H1/.claude/AGENTS.md"
-assert_contains "AGENTS.md carries the bootstrap marker" "$(cat "$H1/.claude/AGENTS.md")" "$BOOTSTRAP_START"
+# T13 moved claude's load wiring off AGENTS.md and into ~/.claude/CLAUDE.md
+# (BST-02 AC-3). Both directions of that migration are asserted, per
+# CONTRIBUTING.md Step 6: the delivered import must be present, AND the retired
+# AGENTS.md block must have zero effect (BST-05 AC-8). Asserting only the first
+# would leave the migration itself unsensed. Shapes mirror
+# test-install-skills-bootstrap-file.sh:213-214 and :283-284.
+assert_contains "CLAUDE.md managed block imports the contract (BST-02 AC-3)" \
+  "$(managed_block "$H1/.claude/CLAUDE.md")" "@MASSA-AI.md"
+assert_not_contains "claude AGENTS.md keeps no bootstrap marker pair (BST-05 AC-8)" \
+  "$(cat "$H1/.claude/AGENTS.md" 2>/dev/null)" "$BOOTSTRAP_START"
 
 echo ""
 echo "Scenario 2: re-running is a byte-for-byte no-op"
@@ -67,15 +84,26 @@ run_apply "$H2" >/dev/null
 CONTENT="$(cat "$H2/.claude/AGENTS.md")"
 assert_contains "user heading survives" "$CONTENT" "# My notes"
 assert_contains "user body survives" "$CONTENT" "keep me"
-assert_contains "bootstrap block appended" "$CONTENT" "$BOOTSTRAP_START"
+# The user's AGENTS.md is left entirely to the user now; the wiring this run
+# adds lands in CLAUDE.md instead (BST-02 AC-3). The retired direction for this
+# home is asserted in scenario 4 below, which re-applies against the same $H2.
+assert_contains "an existing home still gets the CLAUDE.md import (BST-02 AC-3)" \
+  "$(managed_block "$H2/.claude/CLAUDE.md")" "@MASSA-AI.md"
 
 echo ""
-echo "Scenario 4: a stale bootstrap block is replaced, not duplicated"
-MARKS="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/AGENTS.md")"
+echo "Scenario 4: a stale managed block is replaced, not duplicated"
+# T13 moved the block to CLAUDE.md, so CLAUDE.md is where duplication can now
+# happen and where the idempotence claim belongs. The AGENTS.md count is the
+# other direction of the same migration: a re-apply must never re-create the
+# retired block there (BST-05 AC-8).
+MARKS="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/CLAUDE.md" 2>/dev/null)"
 run_apply "$H2" >/dev/null
-MARKS2="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/AGENTS.md")"
-assert_eq "exactly one start marker before" "$MARKS" "1"
-assert_eq "exactly one start marker after" "$MARKS2" "1"
+MARKS2="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/CLAUDE.md" 2>/dev/null)"
+AGENTS_MARKS="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/AGENTS.md" 2>/dev/null)"
+assert_eq "exactly one start marker in CLAUDE.md, before and after a re-apply" \
+  "${MARKS:-none}/${MARKS2:-none}" "1/1"
+assert_eq "the retired AGENTS.md block is never re-created (BST-05 AC-8)" \
+  "${AGENTS_MARKS:-none}" "0"
 
 echo ""
 echo "Scenario 5: a symlink at a target is replaced with a real copy (migration off symlinks)"
