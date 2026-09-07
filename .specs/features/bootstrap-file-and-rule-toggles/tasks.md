@@ -772,11 +772,11 @@ exit code — `--check` keys on `drift` and every action keys on `error`.
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] An unknown rule id exits non-zero, names the id, lists the nine valid ones, and changes no state (BST-09 AC-8)
-- [ ] The command works with the massa-ai MCP server unreachable (BST-11 AC-4) — asserted, since this is the recovery path when `massa-ai-router` is disabled
-- [ ] `--target` is honoured so the suite never writes the developer's real home. **PC-Q2 — derive the state path the way T8 did**, `path.dirname(bootstrapStateFilePath(targetHome))`: `design.md:455` cites a `defaultStatePath` in `state.ts` that does not exist there — it is private and duplicated at `profile-switch/engine.ts:60` and `variant-sync.ts:70`, exported from neither (log `:22`). T18 inherits the same correction
-- [ ] Help text and examples list the new subcommand
-- [ ] Tests at `apps/mcp-client/src/__tests__/config-cli-bootstrap.test.ts`, following the `config-cli-profile.test.ts` seam order: pre-resolve `require("@massa-ai/shared")` before `mock.module`, then `await import("../config-cli.js")`
+- [x] An unknown rule id exits non-zero, names the id, lists the nine valid ones, and changes no state (BST-09 AC-8)
+- [x] The command works with the massa-ai MCP server unreachable (BST-11 AC-4) — asserted, since this is the recovery path when `massa-ai-router` is disabled
+- [x] `--target` is honoured so the suite never writes the developer's real home. **PC-Q2 — derive the state path the way T8 did**, `path.dirname(bootstrapStateFilePath(targetHome))`: `design.md:455` cites a `defaultStatePath` in `state.ts` that does not exist there — it is private and duplicated at `profile-switch/engine.ts:60` and `variant-sync.ts:70`, exported from neither (log `:22`). T18 inherits the same correction
+- [x] Help text and examples list the new subcommand
+- [x] Tests at `apps/mcp-client/src/__tests__/config-cli-bootstrap.test.ts`, following the `config-cli-profile.test.ts` seam order: pre-resolve `require("@massa-ai/shared")` before `mock.module`, then `await import("../config-cli.js")`
 
 **Tests**: unit
 **Gate**: quick — `cd apps/mcp-client && bun test src/__tests__/config-cli-bootstrap.test.ts` (see PC-G1)
