@@ -24,7 +24,8 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 | 6 | T12, T13 | Complete | `4e641c1a`, `392082d4` | Two commits, one per task. **PC-B1 was real and wider than stated**: the bootstrap module had no export surface at all, and none of the six suites could see it because every one of them imports relatively while the shell suite imports the absolute source path. The barrel and the root re-export land in T12; `ConfigParseError` is re-exported from the bootstrap barrel because `setBootstrapRuleEnabled` throws it, and omitted from the root re-export because the config block already exports it there. Two facts were measured that no artifact recorded. **The dist branch of the R1 ladder does not load under node**: `packages/shared/src/bootstrap/{state,render,engine}.ts` import their siblings with extensionless relative specifiers, so `node -e "import('dist/bootstrap/index.js')"` fails `ERR_MODULE_NOT_FOUND` on `dist/config/config-loader` — repointing them spans five modules outside this phase's write set, so `loadBootstrapApi` turns the failure into a named `BootstrapRendererUnloadableError` instead of a raw resolution stack, and T15's `bun run build` step will not by itself make a node-only machine work. **`appendBlock`'s blank separator line was not invertible**: no rule distinguishes our separator from a blank line the user already had, and the migration fixture is exactly that shape, so `removeBlock`'s `before.endsWith("\n\n")` trim ate one user byte — the separator is dropped and the pair is now exactly invertible, verified in both directions. Sensor movement 42/35 → **76 passed / 1 failed**; the last assertion is unsatisfiable by construction and is reported above rather than edited, together with seven sibling-suite assertions that BST-05 AC-8 supersedes. Gates re-measured by the implementer: `test:scripts` 1873/2 across 83 files (the two documented pre-existing cases, no third failure), `test:plugins` 142/0, artifact `--check` exit 0 under a scratch `XDG_CONFIG_HOME`, oxlint 0, `bash -n` 0, siblings uninstall 16/0, state 21/0, check 23/0. Six discrimination mutations across the two tasks, all killed, all restored from `/tmp` copies and hash-verified. Real home verified untouched by hand: no `MASSA-AI.md` under `~/.claude`, `~/.codex`, `~/.cursor`, `~/.config/opencode`; `~/.claude/CLAUDE.md` still 19 bytes at its 2026-07-26 mtime with zero massa-ai markers; `~/.config/massa-ai/config.json` still at 2026-08-18. **Two macOS-only measurement traps**: `TMPDIR` ends in `/` here, so `mktemp -d` yields a `T//` path that `path.join` normalizes and two BST-04 pointer assertions compare literally — run this suite with `TMPDIR=/tmp` or read CI; and a real `claude` binary beside `node` in `~/.local/bin` defeats `test-install-skills-cli.sh`'s empty-PATH premise at baseline. |
 | 6 | T13a | Complete | `f38fd2cc` | One commit. Added after T13, by user ruling. Seven committed sibling assertions sense the `AGENTS.md` shape BST-05 AC-8 retires, and `bootstrap-file.sh:385` expected a status unreachable in its own scenario; neither was owned by any task. All eight were rewritten, none deleted, and **every suite's total assertion count is unchanged** — apply 31, cli 42, bootstrap-file 77 — because each rewritten slot was made to carry both directions rather than adding a slot: `apply.sh:68` and `:105` are the retired-path-has-zero-effect half for claude, and `cli.sh:127`/`:133` compose both halves into one exact `"1/0"` value per host. That keeps the `>= baseline` constraint and the literal `31/0`, `40/2`, `77/0` targets true at the same time, which a rewrite that only asserted the new path could not have done. Two facts were measured rather than assumed. **`written` is unreachable at `bootstrap-file.sh:396` for the reason T13a states, confirmed by running the engine directly**: before `--apply` the scratch host reports `written-not-wired`, after it `skipped` with reason "already up to date" — so `skipped` still carries the scenario's wiring claim, because an unwired host reports `written-not-wired` (`:380`). A two-dialect sweep (`git grep -P`, `grep -E`) confirms the shell battery now asserts exactly 3 status literals, 1 `skipped` and 2 `written-not-wired`, and no bare `written`; the `written` path stays covered one layer down at `engine.test.ts:422-431`. The apply suite gained a local sed-based `managed_block` helper so its import assertions sit **inside** the marker pair rather than anywhere in the file, and the cli suite reads the OpenCode config through the installer's own `resolveConfigPath`/`parseJsonc` rather than guessing between `opencode.json` and `opencode.jsonc` — the installer writes the latter. Gates re-measured: `test:scripts` 1873/2 across 83 files (the two documented pre-existing `pyts golden: lessons` cases, no third failure), `test:plugins` 142/0, and every shell suite run directly with `TMPDIR=/tmp` — apply 31/0, cli 40/2, bootstrap-file 77/0, check 23/0, uninstall 16/0, state 21/0. The 2 residual `cli` failures are the pre-existing environment case (a real `claude` binary in `~/.local/bin` defeats that suite's empty-PATH premise) and were left untouched. Five discrimination mutations, all killed, all in `install-skills.sh` and all restored from a `/tmp` copy and hash-verified — `git checkout` was never used. The mutation set is what proves the both-directions half is load-bearing: M1 (claude wiring retargeted to `AGENTS.md`) kills only the delivered-path assertions, because the migration op that follows it removes the block it just wrote; M2 (claude's legacy migration replaced by a write) kills only the retired-path assertions. Either half alone would have left one of the two blind. Real home verified untouched: no `MASSA-AI.md` under `~/.claude`, `~/.codex`, `~/.cursor` or `~/.config/opencode`, `~/.claude/CLAUDE.md` still 19 bytes with zero massa-ai markers, `~/.config/massa-ai/config.json` unmodified. |
 | 7 | T14, T15, T15a | Complete | `3fc5e8c8`, `1ff1ba94`, `6f4e4a55` | Three commits, one per task. **Every `install-skills.sh` line citation in these three task bodies was stale**, including ones a previous Plan Challenge pass had "corrected"; all were re-measured by content before any edit and the anchors are recorded in T14. Two premises stated in the tasks were verified rather than assumed and both held: `check_platform` referenced `bootstrap_op` zero times (so BST-01 AC-10 passed vacuously), and `install-harness.sh` contained zero occurrences of `bun run build`. **Three sensors were added beyond the literal task text, each because a mutation proved the shipped line was otherwise unguarded**: T14's `drift_count` accumulation feeds only the quiet summary while the exit code is derived independently from `RESULTS_FILE`, so deleting it left every other assertion green; T15's renderer-source precondition was added on a *false* premise (that it protected the three shadow-tree suites — removing it left them 34/0 and 13/0) and turned out to be load-bearing for a different, measured reason (an unguarded step in such a tree emits `error: Script not found "build"` and exits 1); T15a's `record` call was invisible behind `vinfo` under `--verbose`, and its empty-line guard was invisible to a path-substring assertion. **One measurement defect caught in my own test rather than in the subject**: `install-harness.sh` has no `--repo-root` flag, so the first draft of scenario 13 exited 2 at the unknown-flag branch and three assertions passed vacuously — found by reading the pre-change red (it showed the contract file missing, which absence of a build step cannot cause), not the post-change green. 14 mutations across the three tasks, 14 killed after the added sensors, 3 having survived their first run; all restored from `/tmp` copies and hash-verified, `git checkout` never used. Suites re-measured with `TMPDIR=/tmp`: `bootstrap-file` 77 → **108/0**, `uninstall` 16 → **25/0**, `apply` 31/0, `cli` 40/2, `check` 23/0, `state` 21/0. Two `--check` suites outside the briefed baseline were also re-measured and are unmoved: `stale-apply` 25/0 and `check-double-surface` 14/0. Gates: `test:scripts` 1873/2 across 83 files (the two documented pre-existing `pyts golden: lessons` cases, no third failure), `test:plugins` 142/0, artifact `--check` exit 0 under a scratch `XDG_CONFIG_HOME`, `bash -n` 0 on both installers. Real home verified untouched: no `MASSA-AI.md` under `~/.claude`, `~/.codex`, `~/.cursor` or `~/.config/opencode`; `~/.claude/CLAUDE.md` still 19 bytes with zero massa-ai markers; `~/.config/massa-ai/config.json` unmodified. **A measurement trap worth the line**: `test:plugins` read 139/3 once, and the three cursor-plugin failures were caused by a `bun run build` I had started concurrently in the same worktree, not by any change here — re-run with nothing else in flight it is 142/0. Do not read a plugin-suite failure as a code failure without checking what else was writing the tree. **Orchestrator re-measurement (independent of the report):** every figure above reproduced. The whole 39-suite shell battery was then run rather than the six briefed rows, which surfaced a third failing suite the report omitted — `test-plugin-registry-registration.sh` at 43/4. It and `test-plugin-auto-install.sh` were measured against `origin/main` in a detached worktree: registry-registration is **43/4 there too**, identical assertions, and auto-install is **193/17 at `origin/main` versus 194/16 here**, i.e. one better on the branch. Both are the same `claude`-binary-on-`PATH` environment cause as `cli`'s 2. No shell regression is attributable to this feature. `oxlint` exit 0. |
-| 8 | T16, T17, T18 | Complete | `0e41d667`, `81811156`, and the commit carrying this row | Three commits, one per task. The two `case "bootstrap"` blocks are 122 lines each and differ on **exactly one line** — the `findRepoRootWithMarker` argument — measured line-by-line rather than reviewed; T18's block was spliced from T17's with a single unique-anchor substitution, so byte-identity is a property of how it was produced, not a claim. Three things were decided that no artifact specified, each recorded at its call site. **`setBootstrapRuleEnabled` cannot be pointed at `--target`**: it takes no path and writes `getConfigPath()`, which `config-loader.ts:8` freezes at module-eval time, so `--target` scopes the *render* (the four `MASSA-AI.md` files, which is the risk design.md:455/480 names) while the preference stays at the spec's own `~/.config/massa-ai/config.json` (BST-10 AC-11) — and when `bootstrapStateFilePath(targetHome)` is not that file the CLI names both paths on stderr instead of silently rendering from a state the toggle never touched. **PC-Q2's correction was defensive and its named expression is unused**: the CLI never needs a state path because `applyBootstrapState` derives both from `targetHome` internally; the value of the note was stopping a reach for the nonexistent `defaultStatePath`. **`--yes` is implemented** per design.md:358-363 and :481, which T17's done-when omits — a redirected `--target` is exactly `installer_consent_gate`'s case, and the gate is refused before either writer. `--dry-run` persists nothing at all, not even `config.json`, and says so; the engine cannot be handed an in-memory state, so a dry-run toggle previews delivery, not the toggle's effect. BST-09 AC-8's "changes no state" half is asserted directly (`config-cli-bootstrap.test.ts:143-144`, both mutating seams at zero calls) because an exit-code-only test passes over a CLI that wrote first and failed after. 24 discrimination mutations across the two tasks, 24 killed, every anchor population printed beside its verdict and every restore hash-verified against a `/tmp` copy — `git checkout` was never used. Gates: mcp-client `config-cli-bootstrap` 22/0, opencode `config-cli-bootstrap` 22/0, opencode `src/__tests__/` **104/0 → 126/0 across 7 files**, mcp-client isolation runner **13/13 groups** (12 before this file, which `mock.module` puts in its own child), `packages/shared` 860/0, `test:scripts` 1873/2 across 83 files (the two documented pre-existing `pyts golden: lessons` cases, no third failure), `test:plugins` 142/0, `oxlint` 0, `turbo run type-check --force` 6/6. **A pre-existing defect was triggered, not introduced, and it wrote the developer's real config**: `apps/mcp-client/src/__tests__/config-cli.test.ts` sets `XDG_CONFIG_HOME` in `beforeEach`, after its line-5 static import of `../config-cli.js` has already frozen `CONFIG_DIR`, so run **directly** it executes `use openai --api-key k` against `~/.config/massa-ai/config.json`. It is safe under `bun scripts/run-tests-isolated.ts`, whose `buildChildEnv` sets the child's `XDG_CONFIG_HOME` before the child starts, which is why it has never surfaced. The opencode twin already solves it with `src/__tests__/env-setup.ts` as a first import, and the new opencode suite here does the same — that import is the only difference between the two otherwise case-for-case test files. Every direct suite run after the discovery used a scratch `XDG_CONFIG_HOME` and the real `config.json` mtime was compared across each one. |
+| 8 | T16, T17, T18 | Complete | `0e41d667`, `81811156`, `3dd9d433` | Three commits, one per task. The two `case "bootstrap"` blocks are 122 lines each and differ on **exactly one line** — the `findRepoRootWithMarker` argument — measured line-by-line rather than reviewed; T18's block was spliced from T17's with a single unique-anchor substitution, so byte-identity is a property of how it was produced, not a claim. Three things were decided that no artifact specified, each recorded at its call site. **`setBootstrapRuleEnabled` cannot be pointed at `--target`**: it takes no path and writes `getConfigPath()`, which `config-loader.ts:8` freezes at module-eval time, so `--target` scopes the *render* (the four `MASSA-AI.md` files, which is the risk design.md:455/480 names) while the preference stays at the spec's own `~/.config/massa-ai/config.json` (BST-10 AC-11) — and when `bootstrapStateFilePath(targetHome)` is not that file the CLI names both paths on stderr instead of silently rendering from a state the toggle never touched. **PC-Q2's correction was defensive and its named expression is unused**: the CLI never needs a state path because `applyBootstrapState` derives both from `targetHome` internally; the value of the note was stopping a reach for the nonexistent `defaultStatePath`. **`--yes` is implemented** per design.md:358-363 and :481, which T17's done-when omits — a redirected `--target` is exactly `installer_consent_gate`'s case, and the gate is refused before either writer. `--dry-run` persists nothing at all, not even `config.json`, and says so; the engine cannot be handed an in-memory state, so a dry-run toggle previews delivery, not the toggle's effect. BST-09 AC-8's "changes no state" half is asserted directly (`config-cli-bootstrap.test.ts:143-144`, both mutating seams at zero calls) because an exit-code-only test passes over a CLI that wrote first and failed after. 24 discrimination mutations across the two tasks, 24 killed, every anchor population printed beside its verdict and every restore hash-verified against a `/tmp` copy — `git checkout` was never used. Gates: mcp-client `config-cli-bootstrap` 22/0, opencode `config-cli-bootstrap` 22/0, opencode `src/__tests__/` **104/0 → 126/0 across 7 files**, mcp-client isolation runner **13/13 groups** (12 before this file, which `mock.module` puts in its own child), `packages/shared` 860/0, `test:scripts` 1873/2 across 83 files (the two documented pre-existing `pyts golden: lessons` cases, no third failure), `test:plugins` 142/0, `oxlint` 0, `turbo run type-check --force` 6/6. **A pre-existing defect was triggered, not introduced, and it wrote the developer's real config**: `apps/mcp-client/src/__tests__/config-cli.test.ts` sets `XDG_CONFIG_HOME` in `beforeEach`, after its line-5 static import of `../config-cli.js` has already frozen `CONFIG_DIR`, so run **directly** it executes `use openai --api-key k` against `~/.config/massa-ai/config.json`. It is safe under `bun scripts/run-tests-isolated.ts`, whose `buildChildEnv` sets the child's `XDG_CONFIG_HOME` before the child starts, which is why it has never surfaced. The opencode twin already solves it with `src/__tests__/env-setup.ts` as a first import, and the new opencode suite here does the same — that import is the only difference between the two otherwise case-for-case test files. Every direct suite run after the discovery used a scratch `XDG_CONFIG_HOME` and the real `config.json` mtime was compared across each one. |
+| 8b | T18a | Pending | — | Added by user ruling after the Phase 8 config-overwrite. Placed as its own phase, not inside Phase 9, because Phase 9 already sits at the three-task worker budget. |
 | 9–11 | T19–T25 | Pending | — | T15a added by user ruling: AC-9c (`spec.md:106`, name retained backups in the uninstall report) was specified and owned by no task. Plan Challenge run before the first Phase 6 mutation — see below. |
 
 **Plan Challenge, Phases 6–11 (2026-09-07).** A read-only `massa-ai-plan-critic` pass was run
@@ -164,6 +165,16 @@ T14 → T15 → T15a
 ### Phase 8: Shared formatting and the two CLIs
 
 T16 → T17 → T18
+
+### Phase 8b: Test isolation guard
+
+T18a
+
+> The user's ruling was "a new task in Phase 9". It is placed as its own phase rather
+> than inside Phase 9 because Phase 9 already holds three tasks, which is the worker
+> budget's maximum, and `references/spec-driven/sub-agents.md` treats a phase over three
+> tasks as a Tasks-authoring defect to split rather than a dispatch-time problem to absorb.
+> Sequence is unchanged in substance: it runs immediately after Phase 8 and before Phase 9.
 
 ### Phase 9: Skill, generator, parity
 
@@ -808,6 +819,56 @@ exit code — `--check` keys on `drift` and every action keys on `error`.
 
 ---
 
+### T18a: Stop the mcp-client config CLI suite writing the developer's real home
+
+**Task ID**: TASK-018A
+
+**What**: Give `apps/mcp-client/src/__tests__/` the first-import env guard its opencode twin already has, so a direct `bun test` of that directory cannot write `~/.config/massa-ai/config.json`.
+**Where**: `apps/mcp-client/src/__tests__/env-setup.ts` (new), `apps/mcp-client/src/__tests__/config-cli.test.ts`
+**Depends on**: T17
+**Reuses**: `apps/opencode-plugin/src/__tests__/env-setup.ts` verbatim as the template, and the first-line `import "./env-setup";` convention its `config-cli.test.ts:1` already carries
+**Requirement**: BST-12 (the new surfaces are guarded)
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why this task exists — it fired, it is not hypothetical.** During Phase 8 a worker ran the
+documented single-file gate `bun test src/__tests__/config-cli.test.ts` and it **overwrote the
+developer's real `~/.config/massa-ai/config.json`**, replacing the `embedding` block
+(`ollama` / `qwen3-embedding:4b` / 2560 dims) with that suite's fixture
+(`openai` / `text-embedding-3-small` / `apiKey: "k"` / 1536 dims). `database.url` and
+`security.apiKey` survived. The live file's mtime moved to `2026-09-07T14:32:59`; the
+pre-damage state is preserved at `~/.config/massa-ai/config.json.bak`, 4681 bytes at
+`2026-08-18T15:18:31` — a size and mtime independently recorded as the *live* values in the
+Phase 4 and Phase 6 execution-log rows, which is what makes that backup trustworthy.
+
+**Mechanism, verified at source.** `config-cli.test.ts:13` sets `process.env.XDG_CONFIG_HOME`
+in `beforeEach`, but `:5`'s static `import { runCli, parseOptions } from "../config-cli.js"`
+hoists above it and has already frozen `CONFIG_DIR` at
+`packages/shared/src/config/config-loader.ts:8` (`const CONFIG_DIR = configDir("massa-ai")`).
+The env var arrives after the freeze. The suite is safe under
+`bun scripts/run-tests-isolated.ts`, whose `buildChildEnv` sets the child's `XDG_CONFIG_HOME`
+before the child starts — which is exactly why this has never surfaced in CI or in
+`bun run test`, and only bites a developer running the file directly. Pre-existing; not
+introduced by this feature.
+
+**Done when**:
+- [ ] **Observed RED first**, safely: prove the current file writes outside its scratch dir *without* touching the real home — point `HOME`/`XDG_CONFIG_HOME` at a scratch dir for the observation, or assert on the resolved `CONFIG_DIR`. **Never reproduce the defect against the real `~/.config/massa-ai/`**
+- [ ] `apps/mcp-client/src/__tests__/env-setup.ts` mirrors the opencode twin, and `config-cli.test.ts` imports it as its **first** line, above every other import, with the same explanatory comment naming the freeze
+- [ ] A sensor fails if that import is ever removed or demoted below another import — the ordering is the whole contract, and a plain "it works now" test cannot see a future reorder
+- [ ] `cd apps/mcp-client && bun test src/__tests__/config-cli.test.ts` leaves `~/.config/massa-ai/config.json` byte-identical, verified by hash before and after
+- [ ] The mcp-client isolation runner still reports all groups passing (13 groups at the start of this task)
+
+**Out of scope.** The same module-eval freeze underlies the T17/T18 deviation that
+`setBootstrapRuleEnabled` writes `getConfigPath()` and so cannot be redirected by `--target`.
+Fixing *that* means a `targetHome` parameter in `packages/shared`, which is a different write
+set and a behaviour change — it stays a finding for the verifier, recorded as FU-5.
+
+**Tests**: unit
+**Gate**: quick — `cd apps/mcp-client && bun test src/__tests__/config-cli.test.ts`, then the full runner with `DATABASE_URL` exported
+**Commit**: `test(mcp-client): stop the config CLI suite writing the real home`
+
+---
+
 ### T19: Cross-CLI parity guard for the subcommand
 
 **Task ID**: TASK-019
@@ -992,6 +1053,7 @@ Phase 5:   T9 ──→ T10 ──→ T11
 Phase 6:   T12 ──→ T13 ──→ T13a
 Phase 7:   T14 ──→ T15 ──→ T15a
 Phase 8:   T16 ──→ T17 ──→ T18
+Phase 8b:  T18a
 Phase 9:   T19 ──→ T20 ──→ T21
 Phase 10:  T22 ──→ T23
 Phase 11:  T24 ──→ T25
@@ -1027,6 +1089,7 @@ Execution is strictly sequential — there is no intra-phase parallelism.
 | T16 | 1 module | ✅ Granular |
 | T17 | 1 subcommand in 1 file | ✅ Granular |
 | T18 | 1 subcommand in 1 file | ✅ Granular |
+| T18a | 1 new guard file + 1 import line | ✅ Granular |
 | T19 | 1 test file | ✅ Granular |
 | T20 | 1 charter | ✅ Granular |
 | T21 | 2 list entries in 1 file + gitignore | ✅ Granular |
@@ -1061,6 +1124,7 @@ Execution is strictly sequential — there is no intra-phase parallelism.
 | T16 | T7 | prior phase | ✅ Match |
 | T17 | T8, T16 | T16 → T17 | ✅ Match |
 | T18 | T17 | T17 → T18 | ✅ Match |
+| T18a | T17 | own phase, after T18 | ✅ Match |
 | T19 | T18 | prior phase | ✅ Match |
 | T20 | T17 | prior phase | ✅ Match |
 | T21 | T20 | T20 → T21 | ✅ Match |
@@ -1097,6 +1161,7 @@ No dependency points forward into a later phase.
 | T16 | shared domain module | unit | unit | ✅ OK |
 | T17 | Published CLI subcommand | unit | unit | ✅ OK |
 | T18 | Published CLI subcommand | unit | unit | ✅ OK |
+| T18a | Published CLI subcommand (test harness) | unit | unit | ✅ OK |
 | T19 | Repo script (test) | unit | unit | ✅ OK |
 | T20 | Harness source content | contract | contract | ✅ OK |
 | T21 | Generated plugin bundles | contract | contract | ✅ OK |
@@ -1146,10 +1211,22 @@ defaults on a parse failure, then writes the whole document — the same defect
 `database.url`. Recorded at Design time (`design.md:437`) and deliberately not fixed
 inside this feature.
 
+**FU-5 — `setBootstrapRuleEnabled` cannot be redirected by `--target`.** It takes no path
+and writes `getConfigPath()`, frozen at module-eval time by
+`packages/shared/src/config/config-loader.ts:8`. So both CLIs' `--target` scopes the
+*render* — the four `MASSA-AI.md` files, which is the risk `design.md:455`/`:480` names —
+while the persisted preference always lands at `~/.config/massa-ai/config.json`, which is
+what BST-10 AC-11 specifies anyway. T17 mitigates rather than fixes: when
+`bootstrapStateFilePath(targetHome)` is not that file, the CLI names both paths on stderr
+instead of silently rendering from a state the toggle never touched. A real fix means a
+`targetHome` parameter on `setBootstrapRuleEnabled` in `packages/shared` — a different write
+set and a behaviour change. **This is the same module-eval freeze as T18a's subject**; one
+root cause, two symptoms, and T18a closes only the test-harness one.
+
 ---
 
 ## Artifact-Store Evidence
 
 - **Active artifact key:** `.specs/features/bootstrap-file-and-rule-toggles/tasks.md`
-- **Version:** 3 (initial write; +Plan Challenge amendments; +T13a/T15a by user ruling)
+- **Version:** 4 (initial write; +Plan Challenge amendments; +T13a/T15a; +T18a and FU-5 by user ruling)
 - **Checksum:** recorded in the Tasks completion report after write (`shasum -a 256`).
