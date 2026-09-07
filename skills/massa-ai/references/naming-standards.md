@@ -30,13 +30,18 @@ Code vocabulary is evidence, not truth. When business intent is inferred only fr
 
 ## Language
 
-All new or renamed identifiers, classes, methods, screens, components,
-attributes, and implementation-facing artifact names are written in English.
-Convert any non-English source term to English before implementing —
-Portuguese is the primary case, but the rule covers any non-English source
-language. Preserve existing public contracts, persisted fields, and external
-names unless compatibility handling is explicitly in scope, per the
-public-contract clause above.
+This section is normative for **identifier** naming only, per AD-019's
+one-normative-reference discipline. New or renamed identifiers, classes,
+methods, screens, components, attributes, and implementation-facing artifact
+names use English words. Convert any non-English source term to English before
+implementing — Portuguese is the primary case, but the rule covers any
+non-English source language. Preserve existing public contracts, persisted
+fields, and external names unless compatibility handling is explicitly in
+scope, per the public-contract clause above.
+
+Everything past an identifier is owned by the `english-code` bootstrap rule in
+the rendered `MASSA-AI.md` startup contract. Consult that rule there rather
+than this section; the wider contract is deliberately not restated here.
 
 ## Workflow Use
 

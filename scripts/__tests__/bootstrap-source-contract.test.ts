@@ -12,7 +12,9 @@
  * is also how the deleted `### Conditional RTK Rules` section is guarded.
  *
  * It also owns the prose-side source contracts the toggles depend on: the
- * `references/code-annotation.md` toggle-scope statement (TASK-022, BST-08).
+ * `references/code-annotation.md` toggle-scope statement (TASK-022, BST-08)
+ * and the `references/naming-standards.md` §Language ownership split against
+ * the `english-code` rule (TASK-023, BST-07).
  *
  * Every assertion reads the file once as a single string and scans that
  * string directly (`matchAll` / `indexOf`), never by splitting into lines
@@ -34,6 +36,13 @@ const CODE_ANNOTATION_MD = path.join(
   "massa-ai",
   "references",
   "code-annotation.md",
+);
+const NAMING_STANDARDS_MD = path.join(
+  REPO_ROOT,
+  "skills",
+  "massa-ai",
+  "references",
+  "naming-standards.md",
 );
 
 /** The 9 registry rule ids, in fixed render order (design.md § Rule registry). */
@@ -297,5 +306,132 @@ describe("bootstrap source contract: code-annotation.md toggle scope", () => {
     }
     expect(defects).toEqual([]);
     expect(exclusion.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+/**
+ * Returns the body of a top-level `## <heading>` markdown section, from just
+ * after its heading line to just before the next top-level heading (or EOF).
+ * Empty string when the heading is absent — callers assert on that.
+ */
+function markdownSection(content: string, heading: string): string {
+  const headingRe = new RegExp(`^##[ \\t]+${heading}[ \\t]*$`, "m");
+  const m = headingRe.exec(content);
+  if (!m) return "";
+  const rest = content.slice(m.index + m[0].length);
+  const next = /^##[ \t]+/m.exec(rest);
+  return next ? rest.slice(0, next.index) : rest;
+}
+
+/**
+ * Returns a rule's body from `skills/AGENTS.md` — the span between its
+ * `:start` and `:end` markers — with heading lines dropped, so only the
+ * rule's prose is compared.
+ */
+function ruleBody(content: string, id: string): string {
+  const startTag = `<!-- massa-ai:rule:${id}:start -->`;
+  const endTag = `<!-- massa-ai:rule:${id}:end -->`;
+  const start = content.indexOf(startTag);
+  const end = content.indexOf(endTag, start);
+  if (start === -1 || end === -1) return "";
+  return content
+    .slice(start + startTag.length, end)
+    .split("\n")
+    .filter((line) => !line.startsWith("#"))
+    .join("\n");
+}
+
+/** Content words of a sentence — lowercased, punctuation-stripped, 3+ chars. */
+function contentWords(sentence: string): Set<string> {
+  return new Set(
+    sentence
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2),
+  );
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  let intersection = 0;
+  for (const w of a) if (b.has(w)) intersection += 1;
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+/**
+ * One-normative-reference contract between `references/naming-standards.md`
+ * §Language and the `english-code` bootstrap rule (TASK-023, BST-07 AC-6,
+ * spec AC-6 at `spec.md:189`; design's "English rule ownership" row).
+ *
+ * §Language stays normative for *identifier* naming; the bootstrap rule owns
+ * the wider class (comments, code documentation, commit-facing artifacts).
+ * AD-019 forbids a second normative copy, so the two must cite rather than
+ * restate each other.
+ *
+ * The no-duplication half is asserted lexically, by token-set Jaccard over
+ * every cross-file sentence pair, because reading for a near-duplicate is
+ * exactly what this guards against. Threshold calibration, measured against
+ * the shipped rule body:
+ *
+ *   verbatim restatement of the rule's first sentence   1.00  (must fail)
+ *   light paraphrase dropping two enumerated nouns      0.71  (must fail)
+ *   restating the rule's conversational-replies clause  0.45  (must fail)
+ *   the pre-TASK-023 §Language text (scope overlap,
+ *     but not a sentence duplicate)                     0.19  (must pass)
+ *   the shipped §Language text                          0.13  (must pass)
+ *
+ * `DUPLICATION_THRESHOLD` sits at 0.40 — above the two legitimate readings
+ * with ~2x headroom, below all three restatement shapes. Limit worth stating:
+ * a heavy paraphrase sharing few content words (measured 0.27) is invisible
+ * to any token-overlap metric. The ownership half of this contract is carried
+ * by the citation assertion below, not by this one.
+ */
+const DUPLICATION_THRESHOLD = 0.4;
+
+describe("bootstrap source contract: naming-standards.md §Language ownership", () => {
+  test("§Language stays normative for identifier naming and cites the `english-code` rule", async () => {
+    const content = await read(NAMING_STANDARDS_MD);
+    const section = markdownSection(content, "Language");
+
+    const defects: string[] = [];
+    if (section.trim().length === 0) defects.push("no `## Language` section in naming-standards.md");
+    if (!section.includes("`english-code`")) {
+      defects.push("§Language does not cite the `english-code` bootstrap rule");
+    }
+    if (!/\bnormative\b/.test(section) || !/\bidentifier\b/i.test(section)) {
+      defects.push("§Language no longer claims to be normative for identifier naming");
+    }
+    expect(defects).toEqual([]);
+  });
+
+  test("no sentence in §Language duplicates a sentence of the `english-code` rule", async () => {
+    const section = markdownSection(await read(NAMING_STANDARDS_MD), "Language");
+    const rule = ruleBody(await read(AGENTS_MD), "english-code");
+
+    const sectionSentences = normalizedSentences(section);
+    const ruleSentences = normalizedSentences(rule);
+    // A vacuous pass here would be indistinguishable from a clean one, so the
+    // populations are asserted non-empty before the pairwise comparison.
+    expect(sectionSentences.length).toBeGreaterThan(0);
+    expect(ruleSentences.length).toBeGreaterThan(0);
+
+    let worst = { score: 0, section: "", rule: "" };
+    const duplicates: string[] = [];
+    for (const s of sectionSentences) {
+      for (const r of ruleSentences) {
+        const score = jaccard(contentWords(s), contentWords(r));
+        if (score > worst.score) worst = { score, section: s, rule: r };
+        if (score >= DUPLICATION_THRESHOLD) {
+          duplicates.push(`${score.toFixed(2)} :: "${s}" ~ "${r}"`);
+        }
+      }
+    }
+
+    expect({
+      pairs: sectionSentences.length * ruleSentences.length,
+      duplicates,
+    }).toEqual({ pairs: sectionSentences.length * ruleSentences.length, duplicates: [] });
+    expect(worst.score).toBeLessThan(DUPLICATION_THRESHOLD);
   });
 });

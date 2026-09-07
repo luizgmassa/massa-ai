@@ -976,15 +976,15 @@ set and a behaviour change — it stays a finding for the verifier, recorded as 
 **What**: Have §Language cite the `english-code` rule as the wider contract instead of restating it.
 **Where**: `skills/massa-ai/references/naming-standards.md`
 **Depends on**: T2
-**Reuses**: the existing §Language section (`:31-39`)
+**Reuses**: the existing §Language section (`:31-39` before this task; `:31-44` after)
 **Requirement**: BST-07
 
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] §Language stays normative for identifier naming and cites the bootstrap rule for the wider class, per AD-019's one-normative-reference discipline
-- [ ] No sentence is duplicated between the two
-- [ ] Covered by the source-contract assertion
+- [x] §Language stays normative for identifier naming and cites the bootstrap rule for the wider class, per AD-019's one-normative-reference discipline
+- [x] No sentence is duplicated between the two
+- [x] Covered by the source-contract assertion
 
 **Tests**: contract
 **Gate**: full — `bun run test:scripts && bun run test:plugins`
