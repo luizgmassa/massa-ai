@@ -800,6 +800,23 @@ bootstrap_note() {
   return 0
 }
 
+# check_bootstrap_note PLATFORM VERDICT TARGET MSG
+# One plan-mode verdict becomes one drift record for --check. A "change" verdict
+# means "what --apply would write differs from what is on disk", which is exactly
+# this report's definition of drift. It counts through the global
+# BOOTSTRAP_DRIFT for the same reason bootstrap_note counts through
+# BOOTSTRAP_CHANGED, and always returns 0 for the same reason too: a
+# `verdict && flag=1` idiom would make an already-up-to-date artifact the
+# function's exit status, and under `set -e` that aborts the whole run.
+BOOTSTRAP_DRIFT=0
+check_bootstrap_note() {
+  [ "$2" = "change" ] || return 0
+  BOOTSTRAP_DRIFT=$((BOOTSTRAP_DRIFT + 1))
+  vinfo "$4"
+  record "drift" "$1" "$3" "$4"
+  return 0
+}
+
 # Marker file for a copied skill: "$skills_dir/.massa-ai-owned-<name>". Lives
 # beside the skill directory, never inside it, so the copied tree stays a
 # byte-perfect mirror of $SKILLS_ROOT/$name (no injected file to exclude from
@@ -1225,6 +1242,62 @@ check_platform() {
         record "drift" "$p" "$target" "Stale copy: $name (skill no longer exists)"
       fi
     done
+
+    # ── Bootstrap contract and this host's wiring (BST-01 AC-10) ────────────
+    # Plan modes only. bootstrap_engine's "plan" and instructionsOp's "plan"
+    # make zero filesystem contact (T11), which is what lets --check compare
+    # against real drift and still write nothing — the T9 fingerprint assertion
+    # is the sensor for that (test-install-skills-bootstrap-file.sh scenario
+    # 12b), not the exit code.
+    #
+    # Inside the plugin-owned guard on purpose. No apps/*/install.sh has ever
+    # written a bootstrap block (design.md:242-246), so a plugin-owned host has
+    # never had the contract or any wiring; reporting that as drift would leave
+    # --check permanently red on every plugin install. That host is covered by
+    # the toggle engine's own wiring probe instead (design.md "Wiring probe").
+    #
+    # The engine's two failure exits — 2 for incomplete or duplicated markers,
+    # 4 for a foreign symlink — are drift here rather than the run-ending
+    # bootstrap_op_error --apply raises: a file whose markers are corrupted is
+    # not what --apply would produce, and --check's job is to say so for every
+    # host and keep going.
+    local massa_ai_md agents_md contract_file pointer_file verdict instr_out
+    massa_ai_md="$(contract_path "$p")"
+    agents_md="$root/AGENTS.md"
+    contract_file="$WORK_DIR/check-contract-$p.md"
+    pointer_file="$WORK_DIR/check-pointer-$p.md"
+    BOOTSTRAP_DRIFT=0
+    if ! bootstrap_render "$p" "$contract_file" "$pointer_file"; then
+      BOOTSTRAP_DRIFT=1
+      vinfo "Could not render the bootstrap contract to compare against $massa_ai_md"
+      record "drift" "$p" "$massa_ai_md" "Could not render the bootstrap contract to compare against $massa_ai_md"
+    else
+      verdict="$(bootstrap_engine "plan" "$massa_ai_md" "$contract_file")" || verdict="change"
+      check_bootstrap_note "$p" "$verdict" "$massa_ai_md" \
+        "Bootstrap contract differs from the rendered source: $massa_ai_md"
+      case "$p" in
+        claude)
+          verdict="$(bootstrap_engine "plan" "$root/CLAUDE.md" "$CLAUDE_IMPORT_FILE")" || verdict="change"
+          check_bootstrap_note "$p" "$verdict" "$root/CLAUDE.md" \
+            "Contract import missing or altered: $root/CLAUDE.md"
+          ;;
+        codex|cursor)
+          verdict="$(bootstrap_engine "plan" "$agents_md" "$pointer_file")" || verdict="change"
+          check_bootstrap_note "$p" "$verdict" "$agents_md" \
+            "Contract pointer missing or altered: $agents_md"
+          ;;
+        opencode)
+          if instr_out="$(opencode_instructions_op "plan" "$root" "$massa_ai_md")"; then
+            verdict="$(printf '%s' "$instr_out" | head -n1)"
+          else
+            verdict="change"
+          fi
+          check_bootstrap_note "$p" "$verdict" "$root" \
+            "Contract path missing from the OpenCode instructions array: $massa_ai_md"
+          ;;
+      esac
+    fi
+    drift_count=$((drift_count + BOOTSTRAP_DRIFT))
   fi
 
   # Double-surface probe (PRT-08, claude only): a repo-owned skills install

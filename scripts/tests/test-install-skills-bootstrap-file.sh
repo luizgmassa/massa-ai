@@ -96,6 +96,38 @@ sha_prefix() { # sha_prefix FILE BYTES
 
 count_backups() { find "$1" -name '*.massa-ai.bak-*' 2>/dev/null | wc -l | tr -d ' '; }
 
+# Replace the body inside the managed marker pair, leaving every byte outside the
+# pair alone. A hand-edit of exactly this shape is what --check has to notice, and
+# it is the only shape that reads as drift: the engine compares marker-to-marker
+# slices (scripts/install-skills.sh:604-607), so an edit *outside* the pair is
+# correctly "nochange" and would make a drift assertion pass for the wrong reason.
+tamper_block() { # tamper_block FILE
+  "$RUNNER" - "$1" "$BOOTSTRAP_START" "$BOOTSTRAP_END" <<'NODE'
+const fs = require("fs");
+const [, , file, START, END] = process.argv;
+const t = fs.readFileSync(file, "utf8");
+const s = t.indexOf(START);
+const e = t.indexOf(END, s) + END.length;
+fs.writeFileSync(file, `${t.slice(0, s)}${START}\nhand-edited\n${END}${t.slice(e)}`);
+NODE
+}
+
+# Drop the contract path from the OpenCode `instructions` array — the drift shape
+# for the one host whose wiring is not a marker pair. Written through the
+# installer's own resolver/parser so the fixture edits the file the installer
+# reads.
+drop_instruction() { # drop_instruction HOME
+  "$RUNNER" - "$PROJECT_ROOT/scripts/lib/opencode-config.cjs" "$1/.config/opencode" "$1/.config/opencode/MASSA-AI.md" <<'NODE'
+const fs = require("fs");
+const [, , modulePath, dir, entry] = process.argv;
+const { resolveConfigPath, parseJsonc } = require(modulePath);
+const resolved = resolveConfigPath(dir);
+const cfg = parseJsonc(fs.readFileSync(resolved.path, "utf8"));
+cfg.instructions = (cfg.instructions || []).filter((x) => x !== entry);
+fs.writeFileSync(resolved.path, `${JSON.stringify(cfg, null, 2)}\n`);
+NODE
+}
+
 # Regular files that are not massa-ai backups — the residue an uninstall is
 # allowed to leave is none of them (BST-05 AC-9a, AC-9b).
 residue_files() { find "$1" -type f -not -name '*.massa-ai.bak-*' 2>/dev/null | LC_ALL=C sort; }
@@ -504,6 +536,94 @@ assert_eq "the pre-existing file's mode is carried forward (design.md:454)" \
   "$(file_stat "$HD/.cursor/AGENTS.md" mode)" "$MODE_BEFORE"
 assert_eq "the write leaves no temp-file residue (design.md:454)" \
   "$(find "$HD/.cursor" -name '.*massa-ai.tmp-*' 2>/dev/null | LC_ALL=C sort)" ""
+
+echo ""
+echo "Scenario 12: --check reports bootstrap contract and wiring drift"
+# BST-01 AC-10. Before T14, `check_platform` referenced bootstrap_op zero times,
+# so AC-10's exit-0 half passed vacuously — nothing in --check could ever have
+# reported a bootstrap difference, and a mutated MASSA-AI.md was invisible to it.
+# Every 12a/12c assertion below therefore fails against the pre-T14 installer.
+H12="$ROOT/h12"; mkdir -p "$H12"
+apply "$H12" >/dev/null
+run_check "$H12" >/dev/null; RC12=$?
+assert_eq "a clean --apply leaves --check at exit 0 (BST-01 AC-10)" "$RC12" "0"
+
+# 12a — the contract file. One host checked at a time, so the reported path is
+# the mutated one and not a sibling's.
+for pair in "claude:$H12/.claude" "codex:$H12/.codex" \
+            "cursor:$H12/.cursor" "opencode:$H12/.config/opencode"; do
+  HOST="${pair%%:*}"; HOST_ROOT="${pair#*:}"
+  tamper_block "$HOST_ROOT/MASSA-AI.md"
+  OUT12A="$(run_check "$H12" "$HOST")"; RC12A=$?
+  assert_eq "$HOST contract drift exits 1 (BST-01 AC-10)" "$RC12A" "1"
+  assert_contains "$HOST drift report names the contract file (BST-01 AC-10)" \
+    "$OUT12A" "$HOST_ROOT/MASSA-AI.md"
+done
+
+# The quiet summary line has to agree with the exit code. --check sets verbose,
+# and only a --quiet after it resets that (scripts/install-skills.sh:96-97), so
+# this is the one path that reaches the summary at all: a run that exits 1 while
+# printing "up to date" reports the drift it just found as its own absence.
+OUT12Q="$(bash "$INSTALLER" --check --quiet --platform claude \
+  --target "$H12" --repo-root "$PROJECT_ROOT" 2>&1)"
+assert_contains "the quiet summary counts bootstrap drift (BST-01 AC-10)" \
+  "$OUT12Q" "issues found"
+assert_not_contains "a drifted host is not summarised as up to date (BST-01 AC-10)" \
+  "$OUT12Q" "up to date"
+
+# 12b — the read-only contract holds against real drift, not just against a clean
+# home. This is T9's fingerprint sensor: the whole scratch home hashed before and
+# after a --check that really does find something. tree_fingerprint, not the
+# backup-excluding variant, so a repair-on-check would also be caught by the
+# backup it would drop.
+BEFORE12="$(tree_fingerprint "$H12")"
+run_check "$H12" >/dev/null
+assert_eq "--check against bootstrap drift wrote nothing (T9 sensor)" \
+  "$(tree_fingerprint "$H12")" "$BEFORE12"
+
+# 12c — each host's wiring artifact, on a home whose contracts are untouched, so
+# the only thing that can report drift is the wiring branch itself.
+H12W="$ROOT/h12w"; mkdir -p "$H12W"
+apply "$H12W" >/dev/null
+for pair in "claude:$H12W/.claude/CLAUDE.md" \
+            "codex:$H12W/.codex/AGENTS.md" \
+            "cursor:$H12W/.cursor/AGENTS.md"; do
+  HOST="${pair%%:*}"; WIRING="${pair#*:}"
+  tamper_block "$WIRING"
+  OUT12C="$(run_check "$H12W" "$HOST")"; RC12C=$?
+  assert_eq "$HOST wiring drift exits 1 (BST-01 AC-10)" "$RC12C" "1"
+  assert_contains "$HOST drift report names the wiring file (BST-01 AC-10)" \
+    "$OUT12C" "$WIRING"
+done
+# OpenCode's wiring is an `instructions` entry, not a marker pair, so it is named
+# by the array it went missing from rather than by a file path.
+drop_instruction "$H12W"
+OUT12D="$(run_check "$H12W" opencode)"; RC12D=$?
+assert_eq "opencode wiring drift exits 1 (BST-01 AC-10)" "$RC12D" "1"
+assert_contains "opencode drift report names the instructions array (BST-01 AC-10)" \
+  "$OUT12D" "OpenCode instructions array"
+
+# 12d — PC-B2: a plugin-owned platform is NOT bootstrap-drift-checked. No
+# apps/*/install.sh has ever written a bootstrap block (design.md:242-246), so a
+# plugin-owned host has never had the contract or any wiring, and reporting that
+# as drift would leave --check permanently red on every plugin install. The
+# design covers that host through the toggle engine's wiring probe instead, which
+# is why the branch sits INSIDE the `[ "$owner" != "plugin" ]` guard rather than
+# after it. Placed after it, this scenario exits 1.
+H12P="$ROOT/h12p"; mkdir -p "$H12P/.config/massa-ai" "$H12P/.cursor"
+cat > "$H12P/.config/massa-ai/install-state.json" <<EOF
+{
+  "version": 2,
+  "repository": "$PROJECT_ROOT",
+  "platforms": {
+    "cursor": { "root": "$H12P/.cursor", "skills": ["massa-ai"], "skillsOwner": "plugin" }
+  }
+}
+EOF
+OUT12P="$(run_check "$H12P" cursor)"; RC12P=$?
+assert_eq "a plugin-owned host with no contract is not drift (PC-B2)" "$RC12P" "0"
+assert_not_contains "no bootstrap drift is reported for a plugin-owned host (PC-B2)" \
+  "$OUT12P" "$H12P/.cursor/MASSA-AI.md"
 
 echo ""
 echo "Scenario 9: the developer's real home was never touched"

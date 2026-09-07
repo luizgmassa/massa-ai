@@ -569,10 +569,34 @@ pointer assertions compare literally):
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] **Observed RED first** by mutating a written `MASSA-AI.md` in the scratch home and confirming the branch reports drift — `check_platform` contains zero references to `bootstrap_op` today, so BST-01 AC-10 would otherwise pass vacuously
-- [ ] **PC-B2 — placed INSIDE the plugin-owned guard, before its `fi`, not after it.** The original wording ("after the plugin-owned early return (`:792-803`)") is wrong twice and its literal reading inverts the intent. `check_platform` is `scripts/install-skills.sh:924-1031` and contains **zero `return` statements**; `:792-803` is inside `apply_platform`, a different function. The plugin-owned guard is a wrapping conditional, `if [ "$owner" != "plugin" ]; then … fi` at `:935-987`. "After the early return" therefore resolves to "after the `fi` at `:987`", which runs the bootstrap drift check **for plugin-owned platforms** — the opposite of what `design.md:255-258` states. Place the branch before `:987`, so the plugin-owned case stays covered by the engine's wiring probe as designed
-- [ ] `--check` still writes nothing, proven by the T9 fingerprint assertion
-- [ ] Exit 0 after a clean `--apply` with no source change (BST-01 AC-10)
+- [x] **Observed RED first** by mutating a written `MASSA-AI.md` in the scratch home and confirming the branch reports drift — `check_platform` contains zero references to `bootstrap_op` today, so BST-01 AC-10 would otherwise pass vacuously. Measured: `bootstrap-file` went 77/0 → **81 passed / 16 failed (97 total)** with the scenario committed and the installer untouched; shortest decisive line `claude contract drift exits 1 (BST-01 AC-10) → got='0' want='1'`. The clean-run half of AC-10 passed before the change, which is the vacuity this observation exists to expose
+- [x] **PC-B2 — placed INSIDE the plugin-owned guard, before its `fi`, not after it.** The original wording ("after the plugin-owned early return (`:792-803`)") is wrong twice and its literal reading inverts the intent. `check_platform` is `scripts/install-skills.sh:924-1031` and contains **zero `return` statements**; `:792-803` is inside `apply_platform`, a different function. The plugin-owned guard is a wrapping conditional, `if [ "$owner" != "plugin" ]; then … fi` at `:935-987`. "After the early return" therefore resolves to "after the `fi` at `:987`", which runs the bootstrap drift check **for plugin-owned platforms** — the opposite of what `design.md:255-258` states. Place the branch before `:987`, so the plugin-owned case stays covered by the engine's wiring probe as designed
+- [x] `--check` still writes nothing, proven by the T9 fingerprint assertion — scenario 12b hashes the whole scratch home before and after a `--check` that really does find drift, with `tree_fingerprint` rather than the backup-excluding variant, so a repair-on-check would also be caught by the backup it would drop. The branch uses only `bootstrap_engine`'s `plan` and `instructionsOp`'s `plan`, the two modes T11 proved make zero filesystem contact
+- [x] Exit 0 after a clean `--apply` with no source change (BST-01 AC-10)
+
+**Anchors re-measured at `3768f94a` before the edit** (every `install-skills.sh` cite in this
+task body was stale; located by content, never by line): `check_platform` `:1165`, its
+plugin-owned guard `:1176`, that guard's `fi` `:1228`, `bootstrap_op` `:653`, `contract_path`
+`:705`, `platform_root` `:162`. The guard is a wrapping conditional and `check_platform` still
+contains zero `return` statements, so "before the `fi` at `:987`" resolves to "inside the
+`if [ "$owner" != "plugin" ]` block" and nothing else.
+
+**Two additions beyond the literal task text, each closing something otherwise unsensed.**
+`check_bootstrap_note` counts drift through the global `BOOTSTRAP_DRIFT` and the branch adds it
+back into `drift_count`; that accumulation feeds only the quiet summary line, and the `--check`
+exit code is computed independently from `RESULTS_FILE`, so deleting the accumulation left every
+other assertion green. Two assertions on `--check --quiet` now sense it — that flag pair is the
+only path that reaches the summary, since `--check` sets verbose and only a following `--quiet`
+resets it. And the plugin-owned case is asserted directly (a plugin-owned host with no contract
+must exit 0), because it is the single observable difference between the correct placement and
+the literal reading PC-B2 corrected.
+
+**Discrimination: 5 mutations, 5 killed**, all in `install-skills.sh`, all restored from a
+`/tmp` copy and hash-verified (`git checkout` never used). M1 the branch moved after the guard's
+`fi` → killed only by the two PC-B2 assertions, which is what proves the placement itself is
+sensed; M2 the verdict test inverted to `nochange` → 8 killed; M3 the `drift_count` accumulation
+deleted → killed only by the two new quiet-summary assertions; M4 the claude wiring probe
+neutralised → 2; M5 the opencode wiring probe neutralised → 2.
 
 **Tests**: shell suite
 **Gate**: full — `bun run test:scripts && bun run test:plugins`
