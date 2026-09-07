@@ -21,7 +21,32 @@ Implement these tasks with the `massa-ai` skill: **activate it by name and follo
 | 3 | T5, T6 | Complete | `ca526646`, `5bd748cb` | Two commits, one per task. T5 widened `ignoredStateKeys` beyond the one member BST-10 AC-12 names: a known id holding a non-boolean value falls back to its default and is named there, as does a `bootstrap`/`bootstrap.rules` value that is not a plain object. `BootstrapReport` carries no second channel for either, and coercing `"false"` or `0` would disable rules the user never disabled. T6 had to decide blank-line handling, which no artifact specified — the source spaces spans inconsistently (`skills/AGENTS.md:48-49` adjacent, `:112-114` separated), so a rule's rendered whitespace would otherwise depend on its neighbours' states; runs collapse and one blank line precedes each heading, fence-aware so the four fenced policy blocks pass through byte-for-byte. Both tasks were re-measured by the parent rather than taken from the implementing agent's report: `packages/shared` 740 pass / 0 fail across 33 files, oxlint exit 0, and the rendered output inspected directly (0 surviving markers, 0 `rtk`, 7-line pointer, all-off header carrying the recovery command). 15 discrimination mutations across the two tasks, all killed; both restored from `/tmp` copies and hash-verified, because `git checkout` on an untracked new file deletes it rather than restoring it. |
 | 4 | T7, T8 | Complete | `0316ad84`, `0a0ceb78` | Two commits, one per task, both implemented by a delegated builder and re-measured by the parent rather than taken from its report. Four additions beyond the literal task text, each because the stated contract made a required behavior unreachable: `buildBootstrapReport` (T7), because "restartRequired is true only for a non-dry-run with at least one written row" is otherwise a comment on a field and any test of it would assert its own construction; and `source?`/`sourcePath?`/`onWarning?` (T8), because `{targetHome, dryRun?}` cannot reach the marked-up source at all and `BootstrapReport` has no warnings channel for AC-10b. `skipped` had no defined trigger and now means a byte-identical re-apply whose wiring is present. **`defaultStatePath` does not exist where `design.md:455` says it does** — it is private and duplicated at `profile-switch/engine.ts:60` and `variant-sync.ts:70`, exported from neither, verified absent from `state.ts`; the path is derived from `path.dirname(bootstrapStateFilePath(targetHome))` instead. Gates: `packages/shared` 815 pass / 0 fail across 35 files, oxlint exit 0, and the real home verified untouched by hand (no `MASSA-AI.md` under `~/.claude`, `~/.codex`, `~/.cursor`, `~/.config/opencode`; `~/.config/massa-ai/config.json` still at its 2026-08-18 mtime). 16 discrimination mutations across the two tasks, all killed, all anchor-counted before replacement, all restored from `/tmp` copies and hash-verified. |
 | 5 | T9, T10, T11 | Complete | `f9d8bbea`, `c0599829`, `34158aa5`, `efe9876c`, `fed7becb` | Five commits for three tasks. T9 is committed **red on purpose** (22 passed / 39 failed) — a green red-first sensor would mean it asserts what the installer already does. It immediately found a defect in already-merged code: `MASSA-AI.md` had two writers disagreeing byte-for-byte, `engine.ts:310` writing the raw body while `bootstrap_op` writes the marker pair, breaking `spec.md:96`, `design.md:475` (the pair *is* the ownership proof) and `spec.md:118`. Fixed in `c0599829` by wrapping at the writer, verified against the installer's own extract/plan heredocs sliced verbatim out of `install-skills.sh`; the pre-fix state made `extract` exit 2, "Bootstrap block not found". The engine fix is one variable, not one call site — `document` feeds both the write and the up-to-date comparison, and fixing only the write would have made every host report `written` on an unchanged pass. T10 took the sensor to 26/35 and scoped rather than inverted `is_owned_target`'s symlink comment (different subjects: `rm -rf` of a node under `skills/` versus write-through into a file's bytes). Two of T10's five behaviours had **no committed sensor** — the symlink refusal and temp-file atomicity survived the whole suite untouched — closed in `efe9876c`, +16 assertions, 121 insertions and 0 deletions, sensor 42/35 with the failed count unmoved. T11's plan mode senses **absence of an fs call**, not absence of a change: a read-only compare-then-skip leaves bytes identical and passes a bytes-after sensor, so the test wraps all 96 writable function properties of the `fs` namespace with a delegating counter. Two design clauses could not be implemented literally and are commented at their call sites: `design.md:449` (`writeConfig` itself gaining the mode contract — impossible, a zero-contact plan needs the current document and both live call sites pass only the desired one) and `design.md:272` (the superseded compare-then-skip, overturned by `:449` and `:477`). 25 mutations across the three tasks, all killed. Gates: artifact drift `--check` exit 0 under a scratch `XDG_CONFIG_HOME`, mirror byte-identical, oxlint 0, installer siblings rc=0. **`bun run test:scripts` cannot reach any `.sh` suite** — `package.json:38` chains `bun test … && for f in …`, and two pre-existing `pyts golden: lessons` failures abort the bun phase first, so the whole shell battery is unreachable through the documented command and was run directly. |
-| 6–11 | T12–T25 | Pending | — | — |
+| 6–11 | T12–T25 | Pending | — | Plan Challenge run before the first Phase 6 mutation — see below. |
+
+**Plan Challenge, Phases 6–11 (2026-09-07).** A read-only `massa-ai-plan-critic` pass was run
+against T12–T25 before any Phase 6 edit, then every finding was re-measured at its own line by
+the orchestrator rather than accepted from the report. Six blocking findings, all confirmed,
+all now amended into the task bodies as `PC-*` bullets: **PC-B1** the bootstrap module is not
+exported at all (`packages/shared/package.json:11-28` closes `exports` to four subpaths, root
+`index.ts` names no bootstrap symbol, `dist/index.js` holds 0 occurrences) — invisible to every
+gate because all six suites import relatively and the shell suite imports the absolute source
+path; **PC-B2** T14's anchor named a `return` that does not exist in `check_platform`
+(`:924-1031`, zero returns) and its literal reading would have shipped an inverted guard;
+**PC-B3** T13's destination map cited a helper with zero uses in this script that disagrees with
+the real one on Codex home resolution; **PC-B4** the Cursor-warning cite drifted `:673-677` →
+`:800-808`; **PC-B5** `design.md:449`'s contract would have had T13 pass a third argument to a
+two-parameter `writeConfig`, silently defeating T11's plan mode; **PC-B6** T25 declared
+completion before the mandatory verification gate that writes `validation.md`, and its own
+`check_specs_delivered.ts` gate cannot catch that because `validation.md` is in
+`FEATURE_OPTIONAL` (`:47`).
+
+The generalizable rule the pass found: **every stale cite lands in one of the two files Phases
+1–5 rewrote** (`scripts/install-skills.sh`, `scripts/lib/opencode-config.cjs`); every cite into a
+file those phases did not touch is still exact. Re-verify cites by file, not by artifact.
+
+No done-when outcome was weakened by these amendments; each corrects an anchor, a citation, or
+an ordering the workflow contract already required. Hand every `PC-*` bullet to the verifier as
+a question.
 
 ---
 
@@ -408,7 +433,7 @@ T24 → T25
 **Task ID**: TASK-012
 
 **What**: A bun entry point that resolves rule state, renders per host, and degrades to registry defaults with a named warning when the state cannot be read.
-**Where**: `scripts/render-bootstrap.ts`
+**Where**: `scripts/render-bootstrap.ts`, `packages/shared/src/bootstrap/index.ts`, `packages/shared/src/index.ts`
 **Depends on**: T6, T8
 **Reuses**: `renderBootstrap` and `resolveBootstrapState` from `packages/shared/src/bootstrap/`
 **Requirement**: BST-01, BST-10
@@ -420,6 +445,8 @@ T24 → T25
 - [ ] An unreadable `config.json` renders defaults, emits a warning naming the file and the parse error, and writes nothing to `config.json` (BST-10 AC-10b)
 - [ ] Neither bun nor a build reachable → a named error quoting `bun run build`, never a default render
 - [ ] Tests at `scripts/__tests__/render-bootstrap.test.ts` cover all three ladder branches and the degrade path
+- [ ] **PC-B1 — the module is exported before its first consumer.** `packages/shared/src/bootstrap/index.ts` does not exist and `packages/shared/src/index.ts` names no bootstrap symbol; `packages/shared/package.json:11-28` closes `exports` to `.`, `./types`, `./utils`, `./config`, so a `@massa-ai/shared/bootstrap` deep specifier is blocked too. Measured: `dist/index.js` holds 0 occurrences of `bootstrap`. Add the barrel `design.md:142` already names, and re-export it from the root `index.ts` the way `profile-switch/` is exported (root re-export, **no** new subpath — that is the in-repo precedent and what T17/T18 will import). Every existing bootstrap suite imports relatively (`../engine`, `../render`, …) and the shell suite imports the absolute *source* path, which is why `packages/shared` 815/0 and the 42/35 shell suite both pass with the export surface entirely absent
+- [ ] **PC-Q2 — the parse warning reaches a channel a caller can surface.** T8 added `onWarning?` to `applyBootstrapState` (log `:22`); the design had no warnings channel. Route AC-10b's warning through it, not a bare stderr write — T16's formatter and T17's CLI can only surface what the callback carries
 
 **Tests**: unit
 **Gate**: quick — `bun test scripts/__tests__/render-bootstrap.test.ts`
@@ -434,7 +461,7 @@ T24 → T25
 **What**: Rewrite `apply_platform` and `uninstall_platform` to write `MASSA-AI.md` plus each host's own load wiring, migrate the old block out of `AGENTS.md`, and reverse all of it on uninstall.
 **Where**: `scripts/install-skills.sh`
 **Depends on**: T10, T11, T12
-**Reuses**: `installer_host_config_dir` (`scripts/lib/installer-shared.sh:192-200`) as the destination map; the foreign-conflict per-host abort shape (`scripts/install-skills.sh:571-579`)
+**Reuses**: `platform_root` (`scripts/install-skills.sh:147-154`) as the destination map — see PC-B3; the foreign-conflict per-host abort shape (`scripts/install-skills.sh:571-579`)
 **Requirement**: BST-01, BST-02, BST-03, BST-04, BST-05
 
 **Tools**: MCP: NONE. Skill: NONE.
@@ -443,8 +470,13 @@ T24 → T25
 - [ ] Claude gets a managed block holding `@MASSA-AI.md` in `~/.claude/CLAUDE.md`, created when absent, with all content outside the markers byte-identical (BST-02)
 - [ ] OpenCode gets the absolute path in `instructions`; Codex and Cursor get the pointer block (BST-03, BST-04)
 - [ ] Migration leaves no bootstrap marker pair holding policy text in `AGENTS.md` on claude or opencode (BST-05 AC-8)
-- [ ] The Cursor warning at `:673-677` is reworded to name `MASSA-AI.md`
+- [ ] The Cursor warning is reworded to name `MASSA-AI.md` — it is at `scripts/install-skills.sh:800-808` (comment `:800-804`, the three `warn` lines `:806-808`), **not** the `:673-677` this task and `design.md:211` originally cited; that span drifted across the Phase 1–5 commits and now sits between `skill_marker_path` (`:661`) and `is_owned_target` (`:681`). Locate it by content, never by the old line number (PC-B4)
 - [ ] Every remaining T9 assertion turns green, and the full suite shows no third failure beyond the two documented pre-existing ones
+
+**Amendments after the Phase 6 Plan Challenge** (anchors only — no done-when outcome is weakened):
+
+- **PC-B3 — the destination map is `platform_root`, not `installer_host_config_dir`.** `git grep -c installer_host_config_dir -- scripts/install-skills.sh` returns **zero uses**; this script has always had its own map. The two disagree on Codex: `installer-shared.sh:195` hardcodes a home-relative `.codex`, while `platform_root` (`:150`) returns the absolute `$CODEX_HOME` resolved at `:139-145`, which prefers `~/.codex` but falls back to `~/.config/codex`. Following the original cite writes `MASSA-AI.md` to `~/.codex/` on a `~/.config/codex` machine — a silently unwired host, exactly the `written-not-wired` class this feature exists to detect.
+- **PC-B5 — wire OpenCode's `instructions` through `instructionsOp`, never `writeConfig`.** `design.md:449` describes `writeConfig` itself gaining the four-mode contract. T11 could not implement that literally (log `:23`) and layered it instead: `instructionsOp(mode, targetPath, cfg, entry)` at `scripts/lib/opencode-config.cjs:268`. `writeConfig` at `:174` still takes exactly `(targetPath, cfg)` — a third `mode` argument is silently ignored by JS and the config is written unconditionally, defeating T11's plan mode with every gate green.
 
 **Tests**: shell suite
 **Gate**: full — `bun run test:scripts && bun run test:plugins`
@@ -459,14 +491,14 @@ T24 → T25
 **What**: A drift branch in `check_platform` covering `MASSA-AI.md` and each host's wiring artifact.
 **Where**: `scripts/install-skills.sh`
 **Depends on**: T13
-**Reuses**: the existing drift-record conventions in `check_platform` (`:792-899`)
+**Reuses**: the existing drift-record conventions in `check_platform` (`:924-1031`)
 **Requirement**: BST-01
 
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
 - [ ] **Observed RED first** by mutating a written `MASSA-AI.md` in the scratch home and confirming the branch reports drift — `check_platform` contains zero references to `bootstrap_op` today, so BST-01 AC-10 would otherwise pass vacuously
-- [ ] Placed after the plugin-owned early return (`:792-803`), deliberately, with the plugin-owned case covered by the engine's wiring probe instead
+- [ ] **PC-B2 — placed INSIDE the plugin-owned guard, before its `fi`, not after it.** The original wording ("after the plugin-owned early return (`:792-803`)") is wrong twice and its literal reading inverts the intent. `check_platform` is `scripts/install-skills.sh:924-1031` and contains **zero `return` statements**; `:792-803` is inside `apply_platform`, a different function. The plugin-owned guard is a wrapping conditional, `if [ "$owner" != "plugin" ]; then … fi` at `:935-987`. "After the early return" therefore resolves to "after the `fi` at `:987`", which runs the bootstrap drift check **for plugin-owned platforms** — the opposite of what `design.md:255-258` states. Place the branch before `:987`, so the plugin-owned case stays covered by the engine's wiring probe as designed
 - [ ] `--check` still writes nothing, proven by the T9 fingerprint assertion
 - [ ] Exit 0 after a clean `--apply` with no source change (BST-01 AC-10)
 
@@ -514,6 +546,7 @@ T24 → T25
 **Done when**:
 - [ ] `list` output names every rule id, its default, its current state, and a one-line description (BST-11 AC-3)
 - [ ] The report formatter renders `written-not-wired` distinctly and prints the restart notice when required (BST-11 AC-5)
+- [ ] **PC-Q2 — all four statuses are rendered, not two.** `BootstrapRenderResult.status` is `written | written-not-wired | skipped | failed` (`design.md:331`), and T7 gave `skipped` a definition the design lacked: a byte-identical re-apply whose wiring is present (log `:22`). The original done-when named only `written-not-wired`, leaving `skipped` and `failed`-with-reason unspecified for the formatter. Cover every arm, and render `failed`'s and `skipped`'s `reason` — BST-10 AC-10 requires each host's outcome to be reported with its reason
 - [ ] Tests co-located at `packages/shared/src/bootstrap/__tests__/format.test.ts`
 
 **Tests**: unit
@@ -537,7 +570,7 @@ T24 → T25
 **Done when**:
 - [ ] An unknown rule id exits non-zero, names the id, lists the nine valid ones, and changes no state (BST-09 AC-8)
 - [ ] The command works with the massa-ai MCP server unreachable (BST-11 AC-4) — asserted, since this is the recovery path when `massa-ai-router` is disabled
-- [ ] `--target` is honoured so the suite never writes the developer's real home
+- [ ] `--target` is honoured so the suite never writes the developer's real home. **PC-Q2 — derive the state path the way T8 did**, `path.dirname(bootstrapStateFilePath(targetHome))`: `design.md:455` cites a `defaultStatePath` in `state.ts` that does not exist there — it is private and duplicated at `profile-switch/engine.ts:60` and `variant-sync.ts:70`, exported from neither (log `:22`). T18 inherits the same correction
 - [ ] Help text and examples list the new subcommand
 - [ ] Tests at `apps/mcp-client/src/__tests__/config-cli-bootstrap.test.ts`, following the `config-cli-profile.test.ts` seam order: pre-resolve `require("@massa-ai/shared")` before `mock.module`, then `await import("../config-cli.js")`
 
@@ -728,10 +761,12 @@ T24 → T25
 **Tools**: MCP: NONE. Skill: NONE.
 
 **Done when**:
-- [ ] `HANDOFF.md` is **rotated**, not replaced: rename the current section to Previous first, then prepend, then assert the section count grew
-- [ ] `FEATURES.json` records the feature complete with all four phases true
+- [ ] `HANDOFF.md` is **rotated**, not replaced: rename the current section to Previous first, then prepend, then assert the section count grew. Note the current `HANDOFF.md` body is still `installer-prune-and-test-scoping` (2026-08-17) — this feature has never appeared in it
+- [ ] `FEATURES.json` records the feature complete with all four phases true. **PC-A1 — three of those fields have been wrong for the feature's whole life**: `:1454-1457` still reads `design: false, tasks: false, execute: false` while both artifacts are written and 13 commits have landed
+- [ ] `.specs/project/STATE.md` gains this feature's entry — it currently has **zero** occurrences of the slug across 4320 lines, so the feature is invisible to a resume that reads state from `.specs/` as the workflow requires
 - [ ] `bun skills/massa-ai/scripts/check_specs_delivered.ts bootstrap-file-and-rule-toggles --root .` exits 0
-- [ ] No commit lands between this one and PR creation
+- [ ] **PC-B6 — the order is T24 → independent verification → T25, and this task commits `validation.md` with the rest.** The original "No commit lands between this one and PR creation" contradicted the workflow's own mandatory final gate: `workflows/spec-driven.md:117` has the verification-agent always run automatically at the end of Execute and write `.specs/features/<slug>/validation.md`, i.e. after T24. T25 must therefore land last, carrying that report. `FEATURES.json:1465` already declares a `validation.md` path for a file that does not exist, and **T25's own gate cannot catch it** — `check_specs_delivered.ts:47` lists `validation.md` in `FEATURE_OPTIONAL`, so the gate exits 0 with the file absent. Verify the file exists by reading it, not by the gate's exit code
+- [ ] No commit lands between this one and PR creation. Any fix task the verifier's ranked gaps produce lands **before** T25, and T25 is then re-run
 
 **Tests**: none — the coverage matrix assigns no test type to spec artifacts; `check_specs_delivered.ts` is the sensor
 **Gate**: build
