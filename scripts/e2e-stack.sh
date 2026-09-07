@@ -337,6 +337,42 @@ start_ollama() {
   wait_for "ollama :${OLLAMA_PORT}" 60 ollama_healthy
 }
 
+# The embedding provider must be PROVEN to answer at the pinned width before the
+# API boots, and the reason is a measured silent-degradation path rather than
+# caution.
+#
+# Observed on this stack while the llm-on profile had all three models resident
+# (qwen3-embedding:4b + qwen2.5:7b-instruct + qwen2.5-coder:7b, 13.8 GB on a
+# 24 GB box): Ollama answered `500 Internal Server Error` to embedQuery three
+# times, the API's provider auto-selection fell back to
+# `transformers / Xenova/all-MiniLM-L6-v2` at 384 dimensions, and the vector
+# store bound `vector_documents_384d` — which is EMPTY. Every project then reads
+# as unindexed. The API's own log names it exactly: "Orphaned chunks detected:
+# vector_documents_2560d has data for projects not in vector_documents_384d.
+# Embedding model likely changed from 2560d → 384d."
+#
+# Nothing about that is loud. `/health` stays ok, `status` stays green, and the
+# suite reports PROJECT_NOT_INDEXED as if it were product behaviour — three
+# scenarios in 30.llm-features.test.ts were misread as product defects before
+# this was traced. EMBEDDING_PROVIDER=ollama is already pinned in
+# common_service_env and did not prevent the fallback.
+#
+# The probe both warms the model and fails closed on the wrong width, so a boot
+# that would have degraded silently now refuses loudly instead.
+embedding_width_ok() {
+  local got
+  got="$(curl -fsS -m 120 "${OLLAMA_ORIGIN}/api/embeddings" \
+    -H 'content-type: application/json' \
+    -d "{\"model\":\"${EMBED_MODEL}\",\"prompt\":\"e2e-stack embedding width probe\"}" \
+    | "$BUN_BIN" -e 'const j=await Bun.stdin.json();process.stdout.write(String((j.embedding||[]).length));' 2>/dev/null)" || return 1
+  [[ "$got" == "$EMBED_DIMS" ]]
+}
+
+assert_embedding_width() {
+  wait_for "${EMBED_MODEL} to answer at ${EMBED_DIMS}d on :${OLLAMA_PORT}" 300 embedding_width_ok
+  log "embedding width verified: ${EMBED_MODEL} → ${EMBED_DIMS}d"
+}
+
 start_api() {
   local profile="$1"; shift
   refuse_if_foreign_listener "$API_PORT" api
@@ -477,6 +513,7 @@ cmd_up() {
   write_config_json
   start_postgres
   start_ollama
+  assert_embedding_width
   start_api "$profile"
   log "shared stack after:  $(assert_shared_untouched | tr '\n' ' ')"
 
