@@ -17,6 +17,7 @@ Every feature in massa-ai, what it does, why it exists, and how to use it.
 - [Passive Capture (Hooks)](#passive-capture-hooks)
 - [Plugins (4-Tool Parity)](#plugins-4-tool-parity)
 - [Workflow Commands (Generated Slash Commands)](#workflow-commands-generated-slash-commands)
+- [Subagent Skills (18 Specialists)](#subagent-skills-18-specialists)
 - [Model Profile Switching](#model-profile-switching)
 - [Workflow Tools (52-Tool Adoption)](#workflow-tools-52-tool-adoption)
 - [Bootstrap](#bootstrap)
@@ -660,7 +661,7 @@ With LLM off: degrades to rule-based minimal seeds (README first paragraph + git
 
 ## Cross-session Handoffs
 
-**What:** Session A leaves a structured "pass this forward" record (summary, open questions, next steps, files, target agent) that a later Session B discovers and accepts. State machine: `open → accepted` (via accept) or `open → expired` (via cancel). On `begin`, the service dual-writes a searchable `conversation`-type memory (FTS5, level=PROJECT, importance 0.7) so the handoff is discoverable by `recall`/`search` independently of the handoff table.
+**What:** Session A leaves a structured "pass this forward" record (summary, open questions, next steps, files, target agent) that a later Session B discovers and accepts. State machine: `open → accepted` (via accept) or `open → expired` (via cancel). On `begin`, the service dual-writes a searchable `conversation`-type memory (PostgreSQL full-text search, level=PROJECT, importance 0.7) so the handoff is discoverable by `recall`/`search` independently of the handoff table. (`FTS5` is SQLite's name for that index; there is no SQLite path in this product.)
 
 **Why:** When work spans multiple sessions or agents, context is lost at the boundary. Handoffs provide a structured way to pass forward exactly what the next session needs — not the entire conversation, but the distilled state.
 
@@ -817,10 +818,28 @@ The `pre-compact` hook subcommand automatically triggers this via a dual-POST (o
 
 ## Web UI & Dashboard
 
-**What:** Two read-only surfaces served by the Tools API at `http://localhost:3333/ui`:
+**What:** The **Admin Portal**, served by the Tools API at `http://localhost:3333/ui`
+(`apps/web-ui`, title `massa-ai — Admin Portal`). Eleven hash-routed views:
+`projects`, `memory`, `search`, `handoffs`, `proposals`, `checkpoints`, `dashboard`,
+`logs`, `config`, `profiles`, and `model-registry` (reachable only by typing the hash —
+it is surfaced as a sub-tab inside Profiles). Markdown rendering (`marked` + `DOMPurify`
+with XSS prevention) + dark-mode toggle.
 
-- **Web UI** (Phase 8): read-only HTML/CSS/JS browser over memories, FTS5 search, handoffs, checkpoints, and indexed projects. Markdown rendering (`marked` + `DOMPurify` with XSS prevention) + dark-mode toggle. Optional write-mode (`MASSA_AI_WEB_WRITE_MODE=true`) gates edit/delete/approve/reject buttons.
-- **Dashboard** (Wave 6 N28): `#/dashboard` hash route rendering scheduler status, hook queue depth, Synapse sessions, and system metrics. Read-only, degrades gracefully.
+- **Dashboard** (Wave 6 N28): the `#/dashboard` view renders scheduler status, hook queue
+  depth, Synapse sessions, and system metrics. Read-only, degrades gracefully.
+
+**Write mode is a browser-side setting, not a server environment variable.**
+`isWriteModeEnabled` (`apps/web-ui/src/static/lib/api-client.ts:49-65`) resolves, in order:
+an explicit `globalThis.MASSA_AI_WEB_WRITE_MODE === false` opt-out, then
+`localStorage["massa-ai-write-mode"] === "false"`, then **the presence of the injected
+`<meta name="massa-ai-api-key">` tag — which turns write mode ON**, then the `true` forms of
+the same two escape hatches. So a page loaded from loopback is already in write mode with
+nothing configured. `MASSA_AI_WEB_WRITE_MODE` is read off `globalThis`, never off
+`process.env`, and it is deliberately absent from `.env.example`.
+
+The server-side gate is separate and independent: `MASSA_AI_READ_ONLY_MODE=true`
+(`apps/tools-api/src/middleware/write-mode.ts:59`) makes `writeModeMiddleware` reject every
+non-GET, non-public, non-classified-read-only route with 403. It is off by default.
 
 **Why:** Not every interaction needs to go through an agent. The Web UI lets you browse memories, search code, and inspect handoffs/checkpoints directly. The Dashboard gives you operational visibility into the scheduler and hook queue.
 
@@ -835,7 +854,10 @@ bun run dev:api
 
 Disable with `WEB_UI_ENABLED=false`.
 
-**Read-only guarantee:** static scan of the JS bundle verifies no mutating endpoint is called. Optional write-mode gates UI buttons but does not enable backend writes.
+**Gating guarantee:** write mode gates which controls the renderers emit — forms, action
+columns, per-section Save, Restart Server, profile Switch, and every editable control in the
+Model Catalog. It does not open a backend that the API's own auth and
+`MASSA_AI_READ_ONLY_MODE` would otherwise close.
 
 **Spec:** `.specs/features/phase-8-web-ui/`, `.specs/features/wave-6-architecture-features/` (N28)
 

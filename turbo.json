@@ -55,6 +55,7 @@
         "MASSA_AI_CO_RETRIEVAL_HOOK",
         "MASSA_AI_DATA_DIR",
         "MASSA_AI_EMBEDDED",
+        "MASSA_AI_E2E_PROJECT_PATH",
         "MASSA_AI_JOB_REAPER_INTERVAL_MS",
         "MASSA_AI_JOB_STALE_MS",
         "MASSA_AI_LOG_BUFFER_SIZE",
@@ -93,6 +94,8 @@
         "MASSA_AI_WRITE_GOLDEN",
         "RUN_E2E",
         "RUN_E2E_DESTRUCTIVE",
+        "RUN_E2E_LLM",
+        "RUN_OWNED_DESTRUCTIVE",
         "RUN_POSTGRES_TESTS"
       ]
     }

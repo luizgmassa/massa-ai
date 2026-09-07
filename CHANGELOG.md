@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`scripts/prepare-e2e-fixture.ts` — the sparse E2E corpus generator that was documented
+  but never committed.** `.specs/features/close-maintenance-next-steps-2026-07-13/final-verification-evidence.md`
+  invokes `scripts/prepare-qwen-e2e-fixture.ts`; that file has no history in any revision,
+  which is why the commit-locked fixture the runbook depends on was not reproducible. The
+  replacement builds a git repository from a declared manifest, commits it with a fixed
+  identity so the SHA is a pure function of content (the live-stack suite mixes that SHA
+  into its shared-index identity), and fails closed on two self-checks: every path a suite
+  addresses by name must exist, and every needle anchor must resolve to exactly one location
+  — the resolver throws on both zero and two-or-more matches, so a fixture that drops or
+  duplicates an anchor file fails the relevance gate for a reason unrelated to retrieval.
+- **`scripts/e2e-stack.sh` — the dedicated live-stack environment, as an executable runbook.**
+  The only automated provisioning of PostgreSQL :5433 / Ollama :11435 / Tools API :3334 lived
+  inside `packages/core/src/__tests__/e2e/23.owned-destructive.test.ts`, reachable only by
+  running that one suite; every other E2E file assumed a stack started by hand. `up`,
+  `down`, `status`, `restart-api` and `env` now own it, with five profiles (`default`,
+  `auth`, `hooks-off`, `scheduler-on`, `llm-on`) because a suite attached to a process it did
+  not start cannot test restart or an environment swap. `env` emits all four pins the
+  suite's fail-closed guard requires together — emitting a subset makes every guarded suite
+  throw before its first HTTP call. Three behaviours are load-bearing rather than
+  defensive: it refuses to touch a port whose listener it does not own, it re-runs database
+  provisioning on every `up` (a run that created the cluster and died before `createdb`
+  otherwise stays half-provisioned forever), and it asserts after startup that the dedicated
+  API is really pointed at :11435 and `massa_ai_test` on :5433 rather than at the
+  developer's own stack.
+
+### Fixed
+
+- **`turbo.json` `passThroughEnv` was missing three E2E variables.** `RUN_OWNED_DESTRUCTIVE`
+  and `MASSA_AI_E2E_PROJECT_PATH` are read by the live-stack suites but were absent, so they
+  arrived `undefined` under `bun run test` while working under a direct `bun test` (AD-010).
+  `RUN_E2E_LLM` is added with them for the LLM-gated suite.
+- **`packages/core/src/__tests__/e2e/COVERAGE.md` listed two files that do not exist.**
+  `12.observability.test.ts` and `backend-attestation.test.ts` were deleted in commit
+  `5d43a96f`; their rows survived, including inside the runnable command block, so the
+  documented standard sequence could not execute as written. The tool count in that file
+  also still said 52 where `00.harness.smoke.test.ts` asserts 59.
+- **`FEATURES.md` documented web write-mode as a server environment variable.** It is
+  resolved in the browser (`apps/web-ui/src/static/lib/api-client.ts:49-65`), and the
+  injected API-key meta tag turns it on — so a page loaded from loopback is already in write
+  mode with nothing configured. `MASSA_AI_WEB_WRITE_MODE` is read off `globalThis`, never
+  `process.env`, and is deliberately absent from `.env.example`; the server-side gate is the
+  separate `MASSA_AI_READ_ONLY_MODE`. The same section still described the Admin Portal as
+  read-only and named SQLite's `FTS5` in a PostgreSQL-only product, and the table of contents
+  omitted the Subagent Skills section entirely.
+
 ## [1.55.0] - 2026-08-20
 
 ### Fixed
