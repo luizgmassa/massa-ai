@@ -505,3 +505,64 @@ not bookkeeping, and this is the measurement it excluded.
 - The three `main`-red shell suites (17 assertions) have a root cause nobody has traced.
 - AC-03's 16-file sequence, AC-01 and AC-04 are carried from Phase 0 and were not re-derived
   this session.
+
+---
+
+# Second independent pass — verdict FAIL (narrow), and its closure (`121f0f92`)
+
+A second verifier, who wrote none of the repairs, re-checked the five findings. Verdict
+**FAIL**, explicitly narrow: nothing runtime-blocking or CI-blocking.
+
+**Confirmed closed, adversarially rather than by observing green:**
+
+- **F1** — seven fault injections against the wrapper, `package.json` and the route literal,
+  each restored by file copy; every one caught by at least one sensor. Deleting exactly the
+  21-line expansion block reproduces the reported signature, **10 pass / 22 fail**, closing
+  the causal loop. `assertGeneratorBackstop` is not weakened into a tautology: its
+  `scripts.length < 2` floor still fires, proven by the shortened-literal injection.
+- **F3** — 3 pass / 0 fail; guard sensitivity proven by removing one of the four names
+  (2 pass / 1 fail).
+- **F5** — the "cannot change CI's verdict" claim was tested, not accepted: an exhaustive
+  16-cell matrix over `bunHalf ∈ {0,1,2,130}` × four suite patterns found **0 verdict
+  divergences**. Exit *values* change (2→1, 130→1); the sole consumer, `ci.yml:273`, tests
+  zero/non-zero only.
+- **The aggregate** — `Tasks: 12 successful, 12 total`, `Cached: 0 cached, 12 total`, exit 0,
+  zero `(fail)` lines, at load 5.05. Non-vacuous: 7198 tests across 435 files, 213
+  `[test-isolation] PASS` / 0 FAIL.
+
+**F5's attribution came back stronger than recorded.** All three shell suites are byte-identical
+between the trees and `main`'s CI is green at `d32fce58` — and the old form *does* run the loop
+when the bun half passes, so those suites demonstrably pass in CI. The local redness is an
+**ANSI escape leaking into the compared value** (`got='<esc>[0m<esc>[33m7<esc>[0m' want='7'`),
+which is why the failure output reads as `got='7' want='7'`. They cannot redden CI.
+
+**Two findings stood, and both are closed in `121f0f92`:**
+
+- **F2 was vacuous.** `expect(wrapper).toContain("generate-subagent-artifacts.ts")` was
+  satisfied by the wrapper's own docblock quoting the old `&&` form. Removing the real import
+  *and* its `GENERATORS` entry left it 24 pass / 0 fail. It now asserts the resolved import
+  list cross-checked against the wired `GENERATORS`; re-measured on the same mutation, **23
+  pass / 1 fail** with the docblock mention still present.
+- **F4 was not closed, and the first repair introduced a new wrong citation.**
+  `scheduler-store-pg.ts:246-247` was repointed to `:246-249` by delta; `a83e4f5d` had
+  inserted `ready()` above `get()`, so that range is now `ready()`'s JSDoc and the cited
+  method is at `:262-265`. Re-found by content, which turned up **five** sites carrying it,
+  not the one the verifier saw. Two sibling blocks in `26.scheduler.test.ts` were also still
+  falsified — the named instance had been fixed and its class never enumerated.
+
+**Three more were found by sweeping for the claim rather than the line, and neither pass named
+them:** the `EB-MCP-3` block in `29.audit-repairs.test.ts` still read `KNOWN RED` and "stays
+red until the product picks a side" (`34bbee58` picked one); the header's `EB-SCH-2` note still
+listed the eight fields the dashboard route projects, now twelve; and two docblocks in
+`model-registry-stream.ts` were falsified by `e2199bba` without being touched by it.
+
+## What is still owed after this pass
+
+- **A third verification is not scheduled and is not obviously worth it.** The second pass
+  found no behavioural defect — every finding was a sensor or a comment. That is worth
+  stating plainly rather than treating FAIL as a uniform verdict.
+- 35 of 38 shell suites were unmeasured by the second pass; it ran 3.
+- `bun run test:plugins`, `test:coverage` were implementer-reported and not re-run.
+- The five `main`-red suites (3 shell + 2 `pyts golden`) still have no traced root cause,
+  though the ANSI-leak finding above is a strong lead for the three shell ones.
+- AC-03's 16-file sequence, AC-01 and AC-04 remain carried from Phase 0.
