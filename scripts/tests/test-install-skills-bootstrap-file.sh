@@ -163,6 +163,73 @@ process.stdout.write(t.slice(s, e + END.length));
 NODE
 }
 
+# The bytes of FILE that lie outside the managed marker pair, trimmed. Empty
+# exactly when the managed block is the file's entire content — the precondition
+# BST-05 AC-9a names ("a file this installer created, whose managed block was
+# its only content"), asserted rather than assumed. `<absent>` rather than an
+# empty string for a missing file, so "no file" and "no content outside the
+# block" can never be read as each other.
+outside_block() { # outside_block FILE
+  "$RUNNER" - "$1" "$BOOTSTRAP_START" "$BOOTSTRAP_END" <<'NODE'
+const fs = require("fs");
+const [, , file, START, END] = process.argv;
+let t = "";
+try { t = fs.readFileSync(file, "utf8"); } catch { process.stdout.write("<absent>"); process.exit(0); }
+const s = t.indexOf(START);
+if (s < 0) { process.stdout.write(t.trim()); process.exit(0); }
+const e = t.indexOf(END, s) + END.length;
+process.stdout.write((t.slice(0, s) + t.slice(e)).trim());
+NODE
+}
+
+# The pointer block's own claims, reduced to a list of violations (BST-04 AC-7).
+# Empty output means the block claims nothing of its own.
+#
+# The three `assert_not_contains` in scenario 4 name three policy *headings* of
+# the contract, so they sense a copy of the contract and nothing else. The
+# verifier added the sentence "Always run the plan-challenge gate before coding."
+# to the pointer template (packages/shared/src/bootstrap/render.ts:540) and 318
+# assertions across three suites stayed green (validation.md, Gap 5). Freshly
+# authored policy matches no absence list, because such a list can only name
+# text that already exists — which is why this asserts a property instead.
+#
+# The property: a pointer makes exactly two claims, where the contract is and
+# that this block is only a pointer. So with the marker pair and the heading
+# dropped, the body is at most two sentences; exactly one names the contract
+# file; and any sentence that does not name it must be about the block itself
+# and must carry no normative modal. A rule authored here fails as a third
+# sentence that is about neither, whatever words it chooses — the failure does
+# not depend on recognising the policy.
+pointer_violations() { # pointer_violations BLOCK CONTRACT_PATH
+  "$RUNNER" - "$1" "$2" "$BOOTSTRAP_START" "$BOOTSTRAP_END" <<'NODE'
+const [, , block, contractPath, START, END] = process.argv;
+const body = block
+  .split("\n")
+  .filter((line) => !line.includes(START) && !line.includes(END))
+  .filter((line) => !/^\s*#{1,6}\s/.test(line))
+  .join(" ")
+  .replace(/\s+/g, " ")
+  .trim();
+const sentences = body.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+const naming = sentences.filter((s) => s.includes(contractPath));
+// Normative modals, not topic words: the question is whether a sentence tells
+// the agent to do something, never whether it mentions a subject we happen to
+// recognise. A topic list would be an absence list again.
+const MODAL = /\b(must|shall|should|always|never|only ever|do not|don't|ensure|prefer|avoid|require[ds]?|first run|instead of)\b/i;
+const out = [];
+if (sentences.length > 2) out.push(`sentence count ${sentences.length} exceeds 2`);
+if (naming.length !== 1) out.push(`sentences naming the contract path: ${naming.length}, want exactly 1`);
+for (const s of sentences) {
+  if (s.includes(contractPath)) continue;
+  if (!/\bthis block\b|\bpointer\b/i.test(s)) {
+    out.push(`sentence is about neither the contract path nor this block: ${s}`);
+  }
+  if (MODAL.test(s)) out.push(`sentence carries a normative modal: ${s}`);
+}
+process.stdout.write(out.join("\n"));
+NODE
+}
+
 # Read the resolved OpenCode config through the installer's own resolution and
 # JSONC parser, so a `.jsonc` fixture with comments is read the way the
 # installer reads it. Shape copied from test-install-skills-state.sh:31-37;
@@ -297,6 +364,12 @@ for pair in "codex:$H1/.codex" "cursor:$H1/.cursor"; do
     "$BLOCK" "Plan Challenge Policy"
   assert_not_contains "$HOST pointer carries no indexing policy (BST-04 AC-7)" \
     "$BLOCK" "Indexing / Context Hygiene"
+  # The three assertions above are an absence list, and an absence list cannot
+  # see policy that was authored rather than copied — measured: a novel policy
+  # sentence added to the pointer template left 318 assertions green
+  # (validation.md, Gap 5). This is the property half; see pointer_violations.
+  assert_eq "$HOST pointer makes only its two pointer claims (BST-04 AC-7)" \
+    "$(pointer_violations "$BLOCK" "$HOST_ROOT/MASSA-AI.md")" ""
 done
 
 echo ""
@@ -721,6 +794,77 @@ if [ -n "$REAL_BUN" ]; then
   assert_contains "the skipped build names its reason (BST-01)" \
     "$OUT13D" "no bootstrap renderer source"
 fi
+
+echo ""
+echo "Scenario 14: uninstall unlinks a CLAUDE.md this installer created (BST-05 AC-9a)"
+# AC-9a's named subject is "a file this installer created, whose managed block
+# was its only content". Scenario 6 proves it for MASSA-AI.md and, through the
+# -size -1c sweep, for the codex/cursor AGENTS.md — but never for CLAUDE.md:
+# scenario 2a creates it and never uninstalls, and scenario 6 gives it
+# pre-existing content, so it is never empty after removal. The behaviour is
+# correct today and was sensed by nothing (validation.md, Gap 3).
+#
+# The precondition is asserted, not assumed: if a later change made the
+# installer write anything else into CLAUDE.md, this stops being AC-9a's case
+# and `outside_block` says so instead of the unlink assertion passing for the
+# wrong reason.
+H14="$ROOT/h14"; mkdir -p "$H14"
+assert_no_file "no CLAUDE.md before the install (BST-05 AC-9a precondition)" \
+  "$H14/.claude/CLAUDE.md"
+apply "$H14" claude >/dev/null
+assert_file "the installer created CLAUDE.md (BST-05 AC-9a precondition)" \
+  "$H14/.claude/CLAUDE.md"
+assert_eq "the managed block is CLAUDE.md's entire content (BST-05 AC-9a precondition)" \
+  "$(outside_block "$H14/.claude/CLAUDE.md")" ""
+uninstall "$H14" claude >/dev/null
+# The decisive one. `assert_no_file`, not a 0-byte sweep: writing "" leaves a
+# file that a size sweep scoped to another directory would never look at, and
+# the whole point of AC-9a is that no file is left behind at all.
+assert_no_file "uninstall unlinked the CLAUDE.md it created (BST-05 AC-9a)" \
+  "$H14/.claude/CLAUDE.md"
+assert_eq "the uninstalled claude root holds no residue (BST-05 AC-9a)" \
+  "$(residue_files "$H14/.claude")" ""
+
+echo ""
+echo "Scenario 15: an unparseable OpenCode config aborts that host only (BST-03 AC-11)"
+# BST-03 AC-11 was proven only at the unit layer, against a hand-written
+# try/catch/continue loop in scripts/__tests__/opencode-config.test.ts:502-514
+# that calls resolveConfigPath/parseJsonc/instructionsOp directly. That loop is
+# a copy of the intended shape, not the bash that ships: `grep -rn "could not be
+# parsed" scripts/tests/*.sh scripts/__tests__/*.ts` returned zero
+# (validation.md, Gap 4). This runs the shipped caller —
+# scripts/install-skills.sh:1013-1017 — so the claim fails when the installer
+# changes.
+#
+# --json rather than the default output because `record` writes to
+# $RESULTS_FILE (:202) and only --json or --verbose renders it; --json also
+# carries the run status, so "aborted" and "reported as an error" are separable.
+H15="$ROOT/h15"; mkdir -p "$H15/.config/opencode"
+BAD15="$H15/.config/opencode/opencode.json"
+printf '{\n  "instructions": [ this is not JSON\n' > "$BAD15"
+BAD15_SHA="$(sha_file "$BAD15")"
+BAK15="$(count_backups "$H15/.config/opencode")"
+OUT15="$(bash "$INSTALLER" --apply --platform all --target "$H15" \
+  --repo-root "$PROJECT_ROOT" --yes --json 2>/dev/null)"; RC15=$?
+assert_contains "the installer names the parse failure (BST-03 AC-11)" \
+  "$OUT15" "OpenCode config could not be parsed"
+assert_contains "the run reports it as an error (BST-03 AC-11)" \
+  "$OUT15" '"status": "error"'
+assert_eq "the run exits non-zero (BST-03 AC-11)" \
+  "$([ "$RC15" -ne 0 ] && echo nonzero || echo zero)" "nonzero"
+assert_eq "the unparseable config is byte-identical (BST-03 AC-11)" \
+  "$(sha_file "$BAD15")" "$BAD15_SHA"
+assert_eq "no backup of the unparseable config was written (BST-03 AC-11)" \
+  "$(count_backups "$H15/.config/opencode")" "$BAK15"
+# The continuation half: the aborted host must not take its siblings down with
+# it. `record` + `return 0` at :1015-1017, never `exit`.
+for pair in "claude:$H15/.claude" "codex:$H15/.codex" "cursor:$H15/.cursor"; do
+  HOST="${pair%%:*}"; HOST_ROOT="${pair#*:}"
+  assert_file "$HOST still received its contract after the sibling abort (BST-03 AC-11)" \
+    "$HOST_ROOT/MASSA-AI.md"
+done
+assert_file "claude is still wired after the sibling abort (BST-03 AC-11)" \
+  "$H15/.claude/CLAUDE.md"
 
 echo ""
 echo "Scenario 9: the developer's real home was never touched"
