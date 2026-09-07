@@ -529,6 +529,15 @@ export class Scheduler {
         enabled: j.enabled,
         nextRunAt: j.nextRunAt,
         lastRunAt: j.lastRunAt,
+        // EB-SCH-3b. `fireJob` maintains and persists all four of these; until
+        // they were carried here the only HTTP health surface reported every
+        // job as never-succeeded and never-failed. `?? null` / `?? 0` normalise
+        // the optional persisted shape, so a snapshot consumer never has to
+        // tell "field absent" from "never succeeded".
+        lastSuccessAt: j.lastSuccessAt ?? null,
+        lastFailureAt: j.lastFailureAt ?? null,
+        consecutiveFailures: j.consecutiveFailures ?? 0,
+        lastError: j.lastError ?? null,
         due: j.enabled && j.nextRunAt <= now,
         currentlyRunning: this.running.has(j.jobKind),
       })),

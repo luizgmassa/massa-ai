@@ -36,8 +36,15 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/v1" })
             enabled: j.enabled,
             nextRunAt: j.nextRunAt,
             lastRunAt: j.lastRunAt,
-            lastSuccessAt: null,
-            consecutiveFailures: 0,
+            // EB-SCH-3b: these two were `null` and `0` literals, so this
+            // endpoint — the scheduler's only black-box health surface —
+            // reported a job failing every tick identically to a healthy one.
+            // Measured at one instant with both kinds having fired, HTTP said
+            // lastSuccessAt=null while SQL said last_success_at=1788787737541.
+            lastSuccessAt: j.lastSuccessAt,
+            lastFailureAt: j.lastFailureAt,
+            consecutiveFailures: j.consecutiveFailures,
+            lastError: j.lastError,
             due: j.due,
             currentlyRunning: j.currentlyRunning,
           })),
