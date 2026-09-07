@@ -15,6 +15,14 @@ import {
   syncGeneratedVariants,
   findRepoRootWithMarker,
   isHost,
+  applyBootstrapState,
+  assertKnownRuleId,
+  bootstrapReportSucceeded,
+  bootstrapStateFilePath,
+  formatBootstrapInventory,
+  formatBootstrapReport,
+  resolveBootstrapState,
+  setBootstrapRuleEnabled,
   type Host,
   type ProfileInventory,
   type SwitchReport,
@@ -79,6 +87,13 @@ Commands:
   profile set <name> [--host <h>] [--dry-run]
                     Switch installed agents to a profile (restart required after)
 
+  bootstrap list    List every startup-contract rule: state, default, description
+  bootstrap show    Same as 'bootstrap list'
+  bootstrap enable <rule-id> [--target <dir> --yes] [--dry-run]
+  bootstrap disable <rule-id> [--target <dir> --yes] [--dry-run]
+                    Toggle one rule and re-render MASSA-AI.md for every
+                    recorded host (restart required after)
+
 Examples:
   massa-ai-config init
   massa-ai-config init --mistral your-api-key
@@ -87,6 +102,8 @@ Examples:
   massa-ai-config set embedding.dimensions 1024
   massa-ai-config agents install --user
   massa-ai-config profile set work --dry-run
+  massa-ai-config bootstrap list
+  massa-ai-config bootstrap disable caveman
 `);
 }
 
@@ -383,6 +400,128 @@ export async function runCli(argv: string[]): Promise<number> {
     }
 
     console.error("Usage: massa-ai-config profile <list|show|set> ...");
+    return 1;
+  }
+
+  /*
+   * `bootstrap list|show|enable <id>|disable <id>` (T17/T18, BST-09, BST-11).
+   * This block is byte-identical in `apps/mcp-client/src/config-cli.ts` and
+   * `apps/opencode-plugin/src/config-cli.ts` except for the one
+   * `import.meta.dirname` / `__dirname` line, the same single divergence the
+   * `profile` block above already carries.
+   *
+   * Every branch here is a thin front over `@massa-ai/shared`: the registry
+   * validates the id, the engine renders and delivers, and the two shared
+   * formatters (T16) produce the text. Nothing in this block re-implements a
+   * rule, a default, a status literal or a message the module already owns —
+   * that is what keeps the two CLIs from drifting apart (design.md:446).
+   *
+   * BST-11 AC-4 / BST-11.5: nothing on this path opens a socket. The whole
+   * point of the CLI front is that it still works when the massa-ai MCP server
+   * is unreachable, because that is the state a user is in after disabling
+   * `massa-ai-router` — the rule that loads the router which would otherwise
+   * drive the toggle. No `bootstrap_*` MCP tool exists, deliberately
+   * (design.md "MCP front | Not built").
+   */
+  case "bootstrap": {
+    const subcommand = args[1];
+
+    if (subcommand === "list" || subcommand === "show") {
+      try {
+        // Reads through the strict seam, so a malformed config.json surfaces
+        // as a named ConfigParseError instead of silently listing defaults
+        // that are not what is persisted.
+        console.log(formatBootstrapInventory(resolveBootstrapState().state));
+      } catch (e) {
+        console.error(`Error: ${(e as Error).message}`);
+        return 1;
+      }
+      return 0;
+    }
+
+    if (subcommand === "enable" || subcommand === "disable") {
+      const ruleId = args[2];
+      if (!ruleId) {
+        console.error(
+          "Usage: massa-ai-config bootstrap <enable|disable> <rule-id> [--target <dir> --yes] [--dry-run]",
+        );
+        return 1;
+      }
+
+      // BST-09 AC-8: validated here, before anything is read or written, so an
+      // unknown id can never be the reason a file was touched. `setBootstrapRuleEnabled`
+      // asserts the same thing internally (state.ts:165) — doing it again at the
+      // dispatch boundary is what makes "changes no state" observable, since a
+      // command that reached the writer at all has already reached its file.
+      try {
+        assertKnownRuleId(ruleId);
+      } catch (e) {
+        console.error(`Error: ${(e as Error).message}`);
+        return 1;
+      }
+
+      const targetOpt = typeof options.target === "string" ? options.target : undefined;
+      const targetHome = targetOpt === undefined ? os.homedir() : path.resolve(targetOpt);
+
+      // design.md:358-363: the typed command naming the mutation is the consent
+      // against the resolved home, but a redirected target is the case
+      // `installer_consent_gate` (scripts/install-skills.sh:133) already exists
+      // for. Refused before the writer, so an unconfirmed target changes nothing.
+      if (targetHome !== os.homedir() && options.yes !== true) {
+        console.error(
+          `Error: --target ${targetHome} is not your home (${os.homedir()}) — pass --yes to confirm writing there`,
+        );
+        return 1;
+      }
+
+      const dryRun = options["dry-run"] === true;
+
+      try {
+        if (dryRun) {
+          // A dry run writes nothing at all, config.json included, so the
+          // persisted flag is left alone and only the delivery plan is shown.
+          console.log(
+            `bootstrap ${subcommand} ${ruleId}: dry run — ${getConfigPath()} was not written`,
+          );
+        } else {
+          setBootstrapRuleEnabled(ruleId, subcommand === "enable");
+        }
+
+        // The preference is process-scoped (spec BST-10 AC-11 fixes it at
+        // ~/.config/massa-ai/config.json and `setBootstrapRuleEnabled` takes no
+        // path), while the engine resolves the state it renders from under
+        // `--target`. Those are the same file in the ordinary run and different
+        // files under a redirected target or a moved XDG_CONFIG_HOME, so the
+        // divergence is named rather than left to surprise the caller with a
+        // render that ignored the flag it just set.
+        const stateFile = bootstrapStateFilePath(targetHome);
+        if (stateFile !== getConfigPath()) {
+          console.error(
+            `Warning: the rule state is persisted to ${getConfigPath()}, but --target renders from ${stateFile} — set XDG_CONFIG_HOME to move the persisted state`,
+          );
+        }
+
+        // `skills/AGENTS.md` is the only marked-up copy of the contract and it
+        // exists only in a checkout; a rendered MASSA-AI.md cannot serve because
+        // the render strips every marker (render.ts:19-23). Outside a checkout
+        // this stays undefined and the engine raises its own named
+        // BootstrapSourceUnavailableError (engine.ts:265-270) rather than
+        // rendering from a guessed source.
+        const repoRoot = findRepoRootWithMarker(__dirname, GENERATOR_MARKER, GENERATOR_MARKER_MAX_LEVELS);
+        const report = applyBootstrapState({
+          targetHome,
+          dryRun,
+          sourcePath: repoRoot === null ? undefined : path.join(repoRoot, "skills", "AGENTS.md"),
+        });
+        console.log(formatBootstrapReport(report));
+        return bootstrapReportSucceeded(report) ? 0 : 1;
+      } catch (e) {
+        console.error(`Error: ${(e as Error).message}`);
+        return 1;
+      }
+    }
+
+    console.error("Usage: massa-ai-config bootstrap <list|show|enable|disable> ...");
     return 1;
   }
 
