@@ -1,7 +1,9 @@
+import { TEST_CONFIG_HOME } from "./env-setup.js"; // FIRST import — freezes scratch XDG_CONFIG_HOME before ../config-cli.js pins CONFIG_DIR
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync } from "fs";
+import { readFileSync, mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
+import { getConfigPath } from "@massa-ai/shared/config";
 import { runCli, parseOptions } from "../config-cli.js";
 
 const BASE_TMP = tmpdir();
@@ -181,5 +183,24 @@ describe("config-cli runCli", () => {
     const r = await captureConsole(() => runCli(["frobnicate"]));
     expect(r.code).toBe(1);
     expect(r.err).toContain("Unknown command");
+  });
+});
+
+/**
+ * Neither fact below is implied by the rest of this suite passing: before
+ * ./env-setup.js existed, every case above was green while `runCli` wrote the
+ * developer's real ~/.config/massa-ai/config.json. The `beforeEach` scratch dir
+ * is set after the CONFIG_DIR freeze, so it redirects nothing.
+ */
+describe("env-setup import guard", () => {
+  test("the pinned config path is env-setup's scratch dir, not the real home", () => {
+    expect(getConfigPath()).toBe(path.join(TEST_CONFIG_HOME, "massa-ai", "config.json"));
+  });
+
+  test("./env-setup.js is this file's first import", () => {
+    const source = readFileSync(import.meta.path, "utf8");
+    const firstImportAt = source.search(/^import\b/m);
+    const firstSpecifier = source.slice(firstImportAt).match(/["']([^"']+)["']/)?.[1];
+    expect(firstSpecifier).toBe("./env-setup.js");
   });
 });
