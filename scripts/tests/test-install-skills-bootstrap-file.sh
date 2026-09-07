@@ -100,6 +100,22 @@ count_backups() { find "$1" -name '*.massa-ai.bak-*' 2>/dev/null | wc -l | tr -d
 # allowed to leave is none of them (BST-05 AC-9a, AC-9b).
 residue_files() { find "$1" -type f -not -name '*.massa-ai.bak-*' 2>/dev/null | LC_ALL=C sort; }
 
+# One stat field of a path, read through $RUNNER rather than stat(1): `stat -f`
+# is BSD and `stat -c` is GNU, and this suite runs on both macOS and the Linux
+# CI runner. lstat, not stat — scenario 10 asks these questions about symlink
+# nodes as well as regular files.
+#   ino   — the inode number, the sensor for a rename-based write (design.md:454)
+#   mode  — the permission bits, octal, no type bits
+file_stat() { # file_stat PATH ino|mode
+  "$RUNNER" - "$1" "$2" <<'NODE'
+const fs = require("fs");
+const [, , target, field] = process.argv;
+let st;
+try { st = fs.lstatSync(target); } catch { process.stdout.write("absent"); process.exit(0); }
+process.stdout.write(field === "ino" ? String(st.ino) : (st.mode & 0o777).toString(8));
+NODE
+}
+
 # The managed block of FILE, markers included; empty when the file has none.
 managed_block() { # managed_block FILE
   "$RUNNER" - "$1" "$BOOTSTRAP_START" "$BOOTSTRAP_END" <<'NODE'
@@ -373,6 +389,111 @@ if command -v bun >/dev/null 2>&1; then
 else
   fail "bun is required for the written-not-wired scenario and is not on PATH"
 fi
+
+echo ""
+echo "Scenario 10: a symlinked wiring file is written through only when we own it"
+# Numbering runs 8 → 10 → 11 → 9 deliberately. Scenario 9 re-reads the real home
+# and has to stay the last thing this suite does, so a scenario appended after it
+# would escape that check; renumbering it would leave the header comment above
+# (line 16) naming a scenario that no longer exists.
+#
+# Policy under test: bootstrap_engine's write-through refusal
+# (scripts/install-skills.sh:504-518), mandated by design.md:453 and decided,
+# with its reasoning, at design.md:478. The shape is the one the design names —
+# ~/.cursor/AGENTS.md is a link into a dotfiles repo, usually under git — and
+# `cursor` is the host used throughout because its AGENTS.md is written by this
+# feature both before T13 (the whole contract) and after it (the pointer block),
+# so the scenario senses the same engine either way.
+#
+# The exit code alone would pass a guard that refuses *after* writing, so the
+# assertion carrying the weight is the byte-identity of the linked-to file.
+
+# 10a — the resolved file carries no marker pair of ours: refuse, write nothing.
+HA="$ROOT/h10a"; mkdir -p "$HA/.cursor" "$HA/dotfiles"
+printf '# dotfiles AGENTS.md\n\nNever rebase.\n' > "$HA/dotfiles/AGENTS.md"
+ln -s "$HA/dotfiles/AGENTS.md" "$HA/.cursor/AGENTS.md"
+FOREIGN_SHA="$(sha_file "$HA/dotfiles/AGENTS.md")"
+OUT10A="$(apply "$HA" cursor)"; RC10A=$?
+assert_eq "--apply through a foreign symlink exits non-zero (design.md:453)" \
+  "$([ "$RC10A" -ne 0 ] && echo nonzero || echo zero)" "nonzero"
+assert_contains "the refusal names itself on stderr (design.md:478)" \
+  "$OUT10A" "Refusing to write through symlink"
+assert_contains "the refusal names the path it refused (design.md:478)" \
+  "$OUT10A" "$HA/.cursor/AGENTS.md"
+assert_eq "the linked-to file is byte-identical after the refusal (design.md:453)" \
+  "$(sha_file "$HA/dotfiles/AGENTS.md")" "$FOREIGN_SHA"
+assert_symlink_to "the symlink node survives the refusal, pointing where it did" \
+  "$HA/.cursor/AGENTS.md" "$HA/dotfiles/AGENTS.md"
+
+# 10b — the complementary direction. The resolved file already carries our marker
+# pair, so it is massa-ai-owned by this feature's ownership proof and must be
+# written through: a refusal that also blocked this case would break every
+# machine whose AGENTS.md was installed via the legacy symlink path. The planted
+# block is stale, not current, so the run really has to write.
+HB="$ROOT/h10b"; mkdir -p "$HB/.cursor" "$HB/dotfiles"
+OWNED_HEAD=$'# dotfiles AGENTS.md\n\nNever rebase.\n\n'
+STALE_BODY="a stale body from an older install"
+STALE_BLOCK="$(printf '%s\n%s\n%s' "$BOOTSTRAP_START" "$STALE_BODY" "$BOOTSTRAP_END")"
+{ printf '%s' "$OWNED_HEAD"; printf '%s\n' "$STALE_BLOCK"; } > "$HB/dotfiles/AGENTS.md"
+OWNED_HEAD_BYTES="$(printf '%s' "$OWNED_HEAD" | wc -c | tr -d ' ')"
+OWNED_HEAD_SHA="$(printf '%s' "$OWNED_HEAD" | shasum -a 256 | cut -d' ' -f1)"
+ln -s "$HB/dotfiles/AGENTS.md" "$HB/.cursor/AGENTS.md"
+apply "$HB" cursor >/dev/null; RC10B=$?
+assert_eq "--apply through a symlink whose target carries our markers succeeds" \
+  "$RC10B" "0"
+assert_symlink_to "the link node survives the write-through, not replaced by a file" \
+  "$HB/.cursor/AGENTS.md" "$HB/dotfiles/AGENTS.md"
+assert_ne "the resolved file's managed block was replaced, not left stale" \
+  "$(managed_block "$HB/dotfiles/AGENTS.md")" "$STALE_BLOCK"
+assert_eq "the user's own bytes ahead of the block survive the write-through" \
+  "$(sha_prefix "$HB/dotfiles/AGENTS.md" "$OWNED_HEAD_BYTES")" "$OWNED_HEAD_SHA"
+
+# 10c — removal is exempt by design (install-skills.sh:512-514): a link whose
+# target holds no block of ours is already "nochange", and refusing there would
+# break uninstall on a machine that merely symlinks its AGENTS.md. Asserted so a
+# later tightening of the guard reddens here instead of in a user's uninstall.
+HC="$ROOT/h10c"; mkdir -p "$HC/.cursor" "$HC/dotfiles"
+printf '# dotfiles AGENTS.md\n\nNever rebase.\n' > "$HC/dotfiles/AGENTS.md"
+ln -s "$HC/dotfiles/AGENTS.md" "$HC/.cursor/AGENTS.md"
+EXEMPT_SHA="$(sha_file "$HC/dotfiles/AGENTS.md")"
+OUT10C="$(uninstall "$HC" cursor)"; RC10C=$?
+assert_eq "--uninstall through a foreign symlink succeeds — removal is exempt" \
+  "$RC10C" "0"
+assert_not_contains "the uninstall raises no write-through refusal" \
+  "$OUT10C" "Refusing to write through symlink"
+assert_eq "the linked-to file is byte-identical after the uninstall" \
+  "$(sha_file "$HC/dotfiles/AGENTS.md")" "$EXEMPT_SHA"
+assert_symlink_to "the symlink node survives the uninstall" \
+  "$HC/.cursor/AGENTS.md" "$HC/dotfiles/AGENTS.md"
+
+echo ""
+echo "Scenario 11: the block write is a temp-file-plus-rename swap"
+# design.md:454. fs.writeFileSync truncates in place, so a kill or ENOSPC
+# mid-write leaves the file holding a start marker with no end marker — which
+# every later run, for every host, turns into a hard exit 2
+# (scripts/install-skills.sh:498-503). writeAtomic
+# (scripts/install-skills.sh:530-544) is what makes the swap all-or-nothing.
+#
+# A new inode is what proves rename() ran; the carried-forward mode is what
+# proves the rename did not widen a 0600 CLAUDE.md to 0644; the absent temp file
+# is what proves nothing was left behind on the way.
+HD="$ROOT/h11"; mkdir -p "$HD/.cursor"
+{ printf '# team AGENTS.md\n\n'; printf '%s\n' "$STALE_BLOCK"; } > "$HD/.cursor/AGENTS.md"
+chmod 640 "$HD/.cursor/AGENTS.md"
+MODE_BEFORE="$(file_stat "$HD/.cursor/AGENTS.md" mode)"
+# Read the reference inode immediately before the run being measured, with no
+# edit in between: `perl -0pi`, `sed -i` and every other rewrite-in-place tool
+# installs a new inode itself, so a reference taken before one of those would be
+# satisfied by any writer at all — including the plain in-place writeFileSync
+# this assertion exists to reject.
+INO_BEFORE="$(file_stat "$HD/.cursor/AGENTS.md" ino)"
+apply "$HD" cursor >/dev/null
+assert_ne "a real overwrite installs a new inode (design.md:454)" \
+  "$(file_stat "$HD/.cursor/AGENTS.md" ino)" "$INO_BEFORE"
+assert_eq "the pre-existing file's mode is carried forward (design.md:454)" \
+  "$(file_stat "$HD/.cursor/AGENTS.md" mode)" "$MODE_BEFORE"
+assert_eq "the write leaves no temp-file residue (design.md:454)" \
+  "$(find "$HD/.cursor" -name '.*massa-ai.tmp-*' 2>/dev/null | LC_ALL=C sort)" ""
 
 echo ""
 echo "Scenario 9: the developer's real home was never touched"
