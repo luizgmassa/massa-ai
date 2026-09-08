@@ -568,9 +568,35 @@ describe("no marker comment survives into the render", () => {
   // and writes it whole, producing a `MASSA-AI.md` with 2 START markers and 1
   // END, after which `install-skills.sh` refuses in BOTH directions — `--apply`
   // rc 2 and `--uninstall` rc 2 — so the user cannot uninstall out of it.
+  // T46 — WHICH HALF OF THE SWEEP THESE CASES ACTUALLY EXERCISE, and a bound.
+  // The three cases below are named for `targetHome`, and that is where the
+  // marker is injected — but with `hostRoot` omitted, `renderPointer`
+  // interpolates `path.join(targetHome, ".codex")`, so the marker lands in the
+  // POINTER and the pointer half of the sweep alone satisfies them. Measured:
+  // deleting the `contract` half of the sweep leaves **376/0 here, 147/0 in the
+  // shell suite and 28/0 in render-bootstrap** — killed by no test in the repo.
+  //
+  // It is an EQUIVALENT mutation today, not a live hole, and that was falsified
+  // rather than assumed: `resolveHostRoot` forces `hostRoot` to be a descendant
+  // of `targetHome` and returns it verbatim, so a marker in `targetHome`
+  // necessarily reaches the pointer too. Over 256 marker-carrying cases (4
+  // marker families × 4 home shapes × 4 hosts × 4 hostRoot shapes), HEAD and the
+  // contract-half-deleted variant both refuse **256/256**. There is no input
+  // that reaches the contract carrying a marker while the pointer does not.
+  //
+  // The bound is worth recording because `applyHost` writes **only** the
+  // contract. Its protection is therefore incidental — inherited from a pointer
+  // that is always rendered. `render.ts` names the alternative design (making
+  // the pointer optional per host); if that ever happened, the unsensed contract
+  // half would be the only guard left, and nothing here would notice its
+  // removal. Closing this needs a contract-only interpolation site to exist
+  // first; there is none, so the case cannot be written honestly today.
   describe("an interpolated path cannot carry a marker into the output (T45)", () => {
     for (const marker of [BOOTSTRAP_BLOCK_START, BOOTSTRAP_BLOCK_END, ruleMarker("caveman", "start")]) {
-      test(`targetHome containing ${marker.slice(0, 28)}… is refused`, () => {
+      // Named for the pointer, because that is the half this exercises — see the
+      // T46 note above. The injection site is `targetHome`, the sensing site is
+      // the pointer.
+      test(`a marker in targetHome reaches the pointer and is refused — ${marker.slice(0, 28)}…`, () => {
         expect(() =>
           renderBootstrap({
             source: REAL_SOURCE,
