@@ -63,6 +63,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A host session restart is required** before a toggle takes effect; the command says so
   rather than implying the change is live.
 
+### Fixed
+
+- **The installer no longer writes a managed block carrying a duplicated marker.** Its
+  duplicate-marker guard counted markers in the *existing target file* only, never in the
+  block being written, so on a fresh home the first `--apply` wrote such a block and exited
+  0 — only the second run refused, with `Managed markers are incomplete or duplicated`. The
+  block was therefore detected after delivery rather than instead of it: a machine installed
+  once carried it, while every later run for that host hard-failed. The engine now validates
+  the block it is about to write as well as the file it is writing into.
+
 Two limits worth knowing. Rendering requires `bun` on `PATH`: the installer's fallback to a
 built `packages/shared/dist` cannot load under plain Node, so a machine without `bun` now
 aborts each host with a named error instead of rendering, where the installer previously
