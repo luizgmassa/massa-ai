@@ -224,6 +224,17 @@ so anything iteration 5 cannot close is recorded as an open gap, not as an accep
 explicitly allowed to conclude that the lexicon-composition bypass should not be closed, provided
 it records the bound.
 
+**Iteration 6: T40, T41 — one phase, opened after the final verification returned FAIL.** The
+verifier confirmed **46/46 ACs match** and every gate green, so both gaps are in what *guards* the
+feature, not in what ships. **T40 closes V-1**, a fourth pointer-bypass class the verifier found by
+being asked to hunt for one: an all-symbol token vanishes before the whitelist, so a legible
+English directive in circled Latin ships at 131/0. It is a different class from T36's bound and is
+closable, which is why the user ruled it fixed rather than bounded. **T41 finishes T37's A12
+amendment**, which landed where the contradiction was found and missed three sibling clauses.
+**T36 stays BOUNDED-AND-RECORDED by explicit user ruling** — the verifier independently verified
+C3's multiset identity (38 tokens, equal counts, inverted meaning), which is what makes both
+proposed strengthenings provably useless, so there is nothing for another iteration to try.
+
 **Iteration 4: T32, T33, T34 — the 3-iteration cap in `references/verification-ladder.md` was
 overridden by an explicit user ruling.** The cap exists to stop an unbounded fix loop from
 substituting for a rethink; here the remaining items were four *known, measured* sensor gaps
@@ -1547,6 +1558,91 @@ run.
 **Tests**: shell suite
 **Gate**: full, as T35
 **Commit**: `test(installer): sense the uninstall stale pointer block`
+
+---
+
+### T40: Close the all-symbol token bypass (V-1)
+
+**Task ID**: TASK-040 — **verification fix, iteration 6**
+
+**What**: Make a token that is entirely symbol-category characters count as a foreign token instead of vanishing.
+**Where**: `scripts/tests/test-install-skills-bootstrap-file.sh`
+**Depends on**: T35, T36
+**Requirement**: BST-04 AC-7
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: found by the final verifier and reproduced independently by the orchestrator. `EDGE_PUNCT`
+(`:331`) trims `\p{S}` as well as `\p{P}` and `\p{C}`, and `tokensOf` ends in `.filter(Boolean)`, so
+a token composed **entirely** of symbol-category characters trims to `""` and is dropped before the
+whitelist ever sees it. Enclosed Alphanumerics (`ⓐ` U+24D0), Parenthesized Latin (`⒜`), Squared
+Latin (`🄰`), Negative Circled (`🅐`) and Regional Indicators are all `So`. Measured directly:
+`tokensOf("ⓐⓛⓦⓐⓨⓢ ⓦⓡⓘⓣⓔ ⓒⓞⓓⓔ …")` returns `[]` where `tokensOf("всегда пишите")` correctly
+returns two tokens. Planted end to end in `renderPointer`, a fully legible English directive in
+circled Latin ships at **131/0 exit 0**, with the unit suites green as well (28/0, 370/0).
+
+**This is not a T35 regression** — it is green under the pre-T35 tokeniser too. It is a residual
+instance of the same S3 mechanism (a whitelist matching vacuously on zero tokens) that T35 claimed
+to have closed *by construction*, and it falsifies the universal claim the fix rests on at
+`:321-323`: "Every codepoint a future author could type is inside that definition unless it is
+whitespace or punctuation, and neither of those can carry a directive on its own." Symbols are
+neither whitespace nor punctuation, they are trimmed, and they do carry a directive.
+
+**It is a different class from T36's recorded bound and it is closable**, which is why it is being
+fixed rather than bounded: T36's C3 has a token multiset provably identical to the legitimate
+pointer's, so no whitelist-strengthening can catch it; V-1 is simply a token the tokeniser throws
+away before any comparison happens.
+
+**Done when**:
+- [ ] **Observed red first** with the circled-Latin directive planted in `render.ts`, failing line quoted
+- [ ] The fix keeps the subtractive approach — trim edge punctuation only when the trim leaves a non-empty remainder, and count an all-trimmed non-empty run as **one** foreign token. That is the same "interior oddities are deliberately kept" reasoning the docblock already applies to a zero-width splice, extended to the all-symbol case. Do not switch to an enumerated `\p{L}\p{N}` class; T35 rejected enumeration for a reason that still holds
+- [ ] The docblock's universal claim at `:321-323` is **corrected**, not left standing — it is the sentence V-1 falsifies, and a false claim of exhaustiveness is worse than no claim
+- [ ] A frozen probe lands in scenario 4b **beside** the S1/S2/S3 cases, so this class has a committed sensor rather than a hand-check. State which of the five measured symbol families it covers and why one probe is enough for the class
+- [ ] Check the fix does not now falsely catch legitimate pointer content: the contract path is stripped before tokenising, `massa-ai` survives its interior hyphen, and `only:` / `own,` / `install.` still trim to lexicon members. Both real hosts stay clean
+- [ ] T35's two non-Latin cases and T32's two Latin controls **still kill**; T36's `KNOWN BOUND` case stays green (V-1 is not the composition class and closing it must not disturb that record)
+- [ ] Suite count grows from 131; no assertion weakened
+
+**Tests**: shell suite
+**Gate**: full, as T35
+**Commit**: `test(installer): count all-symbol tokens as foreign`
+
+---
+
+### T41: Finish the A12 amendment across the artifacts
+
+**Task ID**: TASK-041 — **verification fix, iteration 6**
+
+**What**: Reach the three clauses T37's amendment left contradicting it.
+**Where**: `.specs/features/bootstrap-file-and-rule-toggles/spec.md`, `.specs/features/bootstrap-file-and-rule-toggles/tasks.md`
+**Depends on**: T37
+**Requirement**: assumption A12
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: T37 amended A12 to state the field ships **editable**, with the CLI guide text as the
+mitigation, and that amendment is correct on its merits — `collectConfigSectionFields`
+(`apps/web-ui/src/static/views/config.ts:296-306`) reads `el.value` off every `[data-section=…]`
+element with no regard for `readonly`, so a bare `readonly` attribute would still be collected by
+Save and persisted. But the amendment did not reach every clause that asserts the old promise.
+`spec.md:47` still describes the shipped surface as "A read-only inspection field is not excluded"
+— it does append "— see the amendment below", so the contradiction is signposted rather than
+silent, but the sentence as written is now false. `tasks.md:20` ("What shipped is one read-only
+`json` field") and `tasks.md:1246` (the Phase 2 acceptance checkbox) carry the same stale claim.
+`design.md` is clean; its `readonly` hits are all TypeScript modifiers, verified.
+
+This is the recurring class this artifact has hit repeatedly: an amendment lands where the
+contradiction was found and misses its siblings. Enumerate from a sweep, not from the lines the
+verifier happened to name.
+
+**Done when**:
+- [ ] A two-dialect sweep (`git grep -P` alongside `grep -E`) over `.specs/features/bootstrap-file-and-rule-toggles/` for `read-only` / `readonly` reports both counts, and **every** hit is classified as corrected, still-true, or a TypeScript modifier — do not fix only the three lines named above if the sweep finds more
+- [ ] `spec.md:47` states what ships, and the out-of-scope row forbidding a per-rule **toggle** UI stays true and is re-checked
+- [ ] Both `tasks.md` claims are corrected in place with the reason, in the artifact's established style — historical rows are annotated rather than rewritten to hide that the claim was once made
+- [ ] `bun skills/massa-ai/scripts/validate_spec.ts` (or the repo's spec validator) still passes, and no AC text is altered — A12 is an assumption, not an AC
+
+**Tests**: none — artifact text
+**Gate**: `bun run test:scripts`
+**Commit**: `docs(specs): finish the A12 editable-field amendment`
 
 ---
 
