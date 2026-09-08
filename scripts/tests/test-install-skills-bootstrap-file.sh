@@ -371,14 +371,29 @@ const POINTER_LEXICON = new Set([
 //   the same line + " <!-- massa-ai:bootstrap:start -->"  -> ""
 //
 // It is bounded OUTSIDE this file, which is why it is recorded rather than
-// closed: any such payload duplicates a marker, and `bootstrap_engine`
-// (`scripts/install-skills.sh:513-516`, and `:236-238` on the extract path)
-// refuses `starts !== ends || starts > 1` with "Managed markers are incomplete
-// or duplicated", rc 2 — on apply, re-apply and uninstall alike. So the block
-// cannot be delivered, and scenario 6's round-trip assertions redden if it is
-// attempted. Closing it here instead would mean filtering the marker off the
-// line and keeping the remainder, which is a second parser of the marker format
-// living in the test rather than in the installer that owns it.
+// closed here: closing it here would mean filtering the marker off the line and
+// keeping the remainder — a second parser of the marker format living in the
+// test rather than in the installer that owns it. The bound rests on
+// `bootstrap_engine` refusing to write such a block at all
+// (`scripts/install-skills.sh`, the `wantStarts`/`wantEnds` check).
+//
+// T44 — THIS JUSTIFICATION WAS FALSE WHEN FIRST WRITTEN, and the repair belonged
+// in the installer rather than in this paragraph. T43 claimed the engine
+// "refuses … rc 2 — on apply, re-apply and uninstall alike. So the block cannot
+// be delivered." The guard it cited counted markers in the EXISTING TARGET FILE
+// only, never in the block being written, so on a fresh home `starts === ends
+// === 0` and it passed. Measured end to end against the shipped installer:
+//
+//   apply1 rc=0   <- payload DELIVERED, 2 START markers in .codex/AGENTS.md
+//   apply2 rc=2   <- "Managed markers are incomplete or duplicated"
+//
+// Detected after delivery, not instead of it: a machine installed once shipped
+// the directive, then hard-failed every later run for that host. The installer
+// now validates `desired` as well as `text`, so the first apply refuses too and
+// the claim above is true rather than aspirational. This was the third time in
+// this feature that a docblock asserted a property measured against the wrong
+// subject (D-1, then F-3), which is why the measurement is quoted here instead
+// of only the conclusion.
 //
 // The case at the end of scenario 4b freezes this, green-on-a-hole, the same way
 // T36's bound is frozen. If someone closes it, that line reddens, and the right
@@ -721,6 +736,16 @@ assert_contains "the heading lexicon catches plain-ASCII policy (BST-04 AC-7)" \
   "$(pv_of "Write code comments in Portuguese" "$PV_TAIL_LEGIT")" \
   "heading carries words the pointer does not use"
 
+# T44 — the heading COUNT branch, which had never had a committed probe. It is
+# not redundant with the lexicon: it is the only branch bounding T36's recorded
+# composition class to a single heading, so a second heading built entirely from
+# POINTER_LEXICON words trips nothing else at all. Mutation before this case:
+# neutering `headings.length > 1` left the suite at 140/0.
+assert_contains "a second heading is caught even when both are lexicon-only (BST-04 AC-7)" \
+  "$(pv_of "massa-ai Startup Contract" "$PV_TAIL_LEGIT
+## Read this contract only")" \
+  "heading count 2 exceeds 1"
+
 # KNOWN BOUND (T43) — a payload sharing a line with a marker literal. See the
 # `T43 — THE SECOND BOUND` paragraph in the docblock for the mechanism, the
 # measurement, and why it is bounded outside this file rather than closed here.
@@ -986,6 +1011,63 @@ assert_eq "the pre-existing file's mode is carried forward (design.md:454)" \
   "$(file_stat "$HD/.cursor/AGENTS.md" mode)" "$MODE_BEFORE"
 assert_eq "the write leaves no temp-file residue (design.md:454)" \
   "$(find "$HD/.cursor" -name '.*massa-ai.tmp-*' 2>/dev/null | LC_ALL=C sort)" ""
+
+echo ""
+echo "Scenario 11b: the engine refuses to WRITE a block carrying a duplicated marker"
+# T44. This is the check the recorded marker-line bound (scenario 4b) rests on,
+# and it had no sensor until this scenario: neutering the `wantStarts`/`wantEnds`
+# branch left the suite at 141/0.
+#
+# The guard it complements counts markers in the EXISTING TARGET FILE, which on a
+# fresh home is zero of each — so before T44 the first `--apply` wrote such a
+# block at rc 0 and only the SECOND run refused. Measured end to end at the time:
+# `apply1 rc=0` with two START markers in `.codex/AGENTS.md`, `apply2 rc=2`.
+#
+# `bootstrap_engine` is extracted by line range and driven directly rather than
+# through `--apply`, because the renderer refuses to emit a stray marker at all
+# (`render.ts`'s ANY_MASSA_AI_MARKER sweep) — so the only way to present the
+# engine with this input is to hand it the block file. The range is resolved from
+# the source here, not hardcoded, so the extraction cannot silently drift onto
+# the wrong function.
+#
+# The end anchor is the heredoc terminator, NOT the first `^}$`: the function
+# body is a `<<'NODE'` block of JavaScript whose own braces sit at column 0, so
+# a `^}$` scan stops 22 lines early, inside the JS. That produced rc 127 on the
+# first draft of this scenario — caught by the control below, which is exactly
+# what the control is for.
+ENGINE_START="$(grep -n '^bootstrap_engine()' "$INSTALLER" | cut -d: -f1)"
+ENGINE_END="$(awk -v s="$ENGINE_START" 'NR>s && /^NODE$/{print NR + 1; exit}' "$INSTALLER")"
+assert_ne "the engine's line range resolved (T44)" "$ENGINE_END" ""
+assert_eq "the extracted range ends at the function's closing brace (T44)" \
+  "$(sed -n "${ENGINE_END}p" "$INSTALLER")" "}"
+H11B="$ROOT/h11b"; mkdir -p "$H11B"
+BAD_BLOCK="$H11B/bad-block.md"
+GOOD_BLOCK="$H11B/good-block.md"
+printf '%s\n## massa-ai Startup Contract\n\nA pointer only.\n%s\n' \
+  "$BOOTSTRAP_START" "$BOOTSTRAP_END" > "$GOOD_BLOCK"
+printf '%s\n## massa-ai Startup Contract\n\nA pointer only. %s\n%s\n' \
+  "$BOOTSTRAP_START" "$BOOTSTRAP_START" "$BOOTSTRAP_END" > "$BAD_BLOCK"
+engine_write() { # engine_write TARGET BLOCKFILE
+  (
+    RUNNER="$RUNNER"
+    BOOTSTRAP_START="$BOOTSTRAP_START"
+    BOOTSTRAP_END="$BOOTSTRAP_END"
+    eval "$(sed -n "${ENGINE_START},${ENGINE_END}p" "$INSTALLER")"
+    bootstrap_engine apply "$1" "$2" 2>&1
+  )
+}
+# The control comes first: a well-formed block must be written, or the refusal
+# below could be the extraction failing rather than the guard firing.
+engine_write "$H11B/good.md" "$GOOD_BLOCK" >/dev/null 2>&1; RC11B_OK=$?
+assert_eq "control: a well-formed block is written (T44)" \
+  "$([ "$RC11B_OK" -eq 0 ] && [ -f "$H11B/good.md" ] && echo written || echo "rc=$RC11B_OK")" "written"
+OUT11B="$(engine_write "$H11B/bad.md" "$BAD_BLOCK")"; RC11B=$?
+assert_eq "a block with a duplicated start marker is refused (T44)" "$RC11B" "2"
+assert_contains "the refusal names itself (T44)" "$OUT11B" "Managed markers are incomplete or duplicated"
+# The exit code alone would pass a guard that refuses *after* writing — the same
+# reasoning scenario 10 records for the symlink refusal.
+assert_eq "the refused block leaves no file behind (T44)" \
+  "$([ -e "$H11B/bad.md" ] && echo exists || echo absent)" "absent"
 
 echo ""
 echo "Scenario 12: --check reports bootstrap contract and wiring drift"

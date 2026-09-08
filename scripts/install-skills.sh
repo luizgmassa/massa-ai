@@ -510,6 +510,30 @@ try {
   text = fs.readFileSync(target, "utf8");
 } catch { /* no file yet, or a dangling link */ }
 
+// `desired` is validated as well as `text`, and the omission was a real hole
+// rather than a tidiness point. This guard used to read the EXISTING FILE only,
+// so on a fresh home `starts === ends === 0`, it passed, and a block carrying a
+// duplicated marker was written unvalidated. Measured before this check existed:
+// the first `--apply` onto a scratch home returned **rc 0** with two `START`
+// markers in `.codex/AGENTS.md`, and only the SECOND apply returned rc 2. The
+// block was therefore detected after delivery rather than instead of it — a
+// machine installed once shipped it, then hard-failed every later run for that
+// host.
+//
+// It matters beyond self-consistency because a marker sharing a body line is the
+// one shape `pointer_violations` cannot see at all: it drops any line containing
+// a marker literal whole, so such a payload escapes the character gate, the
+// lexicon and the sentence count alike. That bound is recorded in scenario 4b of
+// `scripts/tests/test-install-skills-bootstrap-file.sh`, and this check is what
+// makes it true — the test cannot see such a block, and this refuses to write
+// one.
+const wantStarts = desired.split(START).length - 1;
+const wantEnds = desired.split(END).length - 1;
+if (wantStarts !== 1 || wantEnds !== 1) {
+  console.error("Managed markers are incomplete or duplicated");
+  process.exit(2);
+}
+
 const starts = text.split(START).length - 1;
 const ends = text.split(END).length - 1;
 if (starts !== ends || starts > 1) {
