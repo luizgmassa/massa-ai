@@ -275,4 +275,67 @@ assert_eq "the emptied instructions array is deleted, not left as [] (BST-05 AC-
 assert_eq "the rest of the user's config survives the key deletion (BST-05 AC-9)" \
   "$(opencode_cfg "$H12" "s['\$schema'] || 'gone'")" "https://opencode.ai/config.json"
 
+echo ""
+echo "Scenario 12: uninstall leaves no stale pointer block on codex or cursor (BST-05 AC-9)"
+# Disabling the AGENTS.md removal at scripts/install-skills.sh:1131 outright —
+# `if [ -f "$agents_md" ] || [ -L "$agents_md" ]` rewritten to `if false` —
+# leaves a live stale pointer block in codex's and cursor's AGENTS.md. This
+# suite, the one anyone changing uninstall actually runs, stayed **31/0**
+# through that mutation before this scenario existed.
+#
+# It stayed green for a specific reason worth writing down, because it is not
+# obvious from reading it: scenarios 1 and 3 do assert `$BOOTSTRAP_START` is
+# absent from an AGENTS.md, but they run against **claude**, and claude has no
+# AGENTS.md pointer block to remove. Claude is wired through
+# `~/.claude/CLAUDE.md`'s `@MASSA-AI.md` import instead — measured: after
+# `--apply --platform claude`, `~/.claude/AGENTS.md` does not exist at all and
+# CLAUDE.md carries the marker. So both of those rows are true of a file the
+# removal branch never had to touch, and they hold whether it works or not.
+# Codex and cursor are the only hosts whose AGENTS.md carries the block, and
+# neither was exercised here.
+PTR_SCRATCH="$ROOT/ptr-scratch-home"; mkdir -p "$PTR_SCRATCH/.config"
+# Same scratch-HOME reasoning as scenario 11's runners: a --target regression
+# still could not reach the developer's real ~/.codex or ~/.cursor.
+ptr_run() { # ptr_run MODE PLATFORM TARGET
+  env HOME="$PTR_SCRATCH" XDG_CONFIG_HOME="$PTR_SCRATCH/.config" \
+    bash "$INSTALLER" "$1" --platform "$2" --target "$3" --repo-root "$PROJECT_ROOT" --yes 2>&1
+}
+# `grep -c` exits 1 on zero matches, so the `|| true` is what keeps a legitimate
+# "0" from being swallowed; the absent-file arm returns 0 explicitly rather than
+# letting grep's exit-2 produce an empty string that no numeric assertion could
+# read.
+marker_hits() { # marker_hits FILE MARKER
+  [ -f "$1" ] || { echo 0; return 0; }
+  grep -cF -- "$2" "$1" 2>/dev/null || true
+}
+for pair in "codex:.codex" "cursor:.cursor"; do
+  HOST="${pair%%:*}"; HOST_DIR="${pair#*:}"
+  HP="$ROOT/h-ptr-$HOST"; mkdir -p "$HP/$HOST_DIR"
+  # Pre-existing user content, so the removal is proven surgical rather than
+  # satisfied by the whole file being deleted.
+  printf '# Team conventions\n\nAlways rebase.\n' > "$HP/$HOST_DIR/AGENTS.md"
+  ptr_run --apply "$HOST" "$HP" >/dev/null
+  PTR_AGENTS="$HP/$HOST_DIR/AGENTS.md"
+  # Precondition, asserted and not assumed: every "it is gone" check below
+  # reads 0 just as happily against an install that never wrote a block.
+  assert_file "$HOST AGENTS.md exists after apply (fixture precondition)" "$PTR_AGENTS"
+  assert_eq "$HOST AGENTS.md carries a pointer block before uninstall (fixture precondition)" \
+    "$(marker_hits "$PTR_AGENTS" "$BOOTSTRAP_START")" "1"
+  ptr_run --uninstall "$HOST" "$HP" >/dev/null
+  # The assertion the hole needed. On the marker itself, not on the file having
+  # changed: a removal that rewrote the block into a different shape, or left
+  # one half of the pair behind, still leaves an agent reading a dead pointer.
+  assert_eq "$HOST AGENTS.md keeps no bootstrap start marker after uninstall (BST-05 AC-9)" \
+    "$(marker_hits "$PTR_AGENTS" "$BOOTSTRAP_START")" "0"
+  assert_eq "$HOST AGENTS.md keeps no bootstrap end marker after uninstall (BST-05 AC-9)" \
+    "$(marker_hits "$PTR_AGENTS" "$BOOTSTRAP_END")" "0"
+  # Wider than the one file, so a pointer left in a path this scenario did not
+  # think to name is still caught.
+  assert_eq "no start marker survives anywhere under the $HOST home (BST-05 AC-9)" \
+    "$(grep -rlF "$BOOTSTRAP_START" "$HP" 2>/dev/null | wc -l | tr -d ' ')" "0"
+  # Surgical, not wholesale.
+  assert_contains "$HOST AGENTS.md user content survives the removal (BST-05 AC-9)" \
+    "$(cat "$PTR_AGENTS" 2>/dev/null)" "Always rebase."
+done
+
 summary "install-skills --uninstall"
