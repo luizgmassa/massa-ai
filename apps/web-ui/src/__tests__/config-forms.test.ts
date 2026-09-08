@@ -77,7 +77,7 @@ const SAMPLE_CONFIG_DATA = {
   restartNeededSections: ["database", "llm", "security"],
 };
 
-describe("renderConfig — 15 sectioned forms (CFG-01)", () => {
+describe("renderConfig — 17 sectioned forms (CFG-01)", () => {
   const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
 
   // 17, not 16, since a3ba8a6e: `config-sections.ts`'s `CONFIG_SECTIONS_BY_KEY`

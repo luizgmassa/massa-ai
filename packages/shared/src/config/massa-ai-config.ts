@@ -280,10 +280,14 @@ export const MAX_IGNORE_PATTERNS = 1_024;
  * `packages/core/src/services/search/capture-policy.ts`, which now re-exports
  * this (`core` depends on `shared`, never the reverse).
  *
- * It is a REAL default, not `undefined`. Leaving it absent made
- * `GET /api/v1/config` return 14 of the Admin Portal's 16 sections, so the
- * Capture Policy tab rendered "not configured" while these 30 rules were the
- * ones actually dropping files from every index.
+ * It is a REAL default, not `undefined`. `GET /api/v1/config` returns a
+ * section only when the merged config carries a value for it, so leaving this
+ * absent made the Capture Policy tab render "not configured" while these 30
+ * rules were the ones actually dropping files from every index. The portal
+ * declared 16 sections then and the endpoint resolved 14 of them (Scheduler
+ * was the other); measured at HEAD it declares 17 — `CONFIG_SECTIONS` in
+ * `apps/web-ui/src/static/views/config-sections.ts` — and all 17 resolve
+ * against an empty scratch home.
  *
  * Content-identical to the previous core-side literal, which is what keeps
  * this a disclosure rather than a behavior change: `getActivePolicy()` used to
