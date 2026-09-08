@@ -72,6 +72,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block was therefore detected after delivery rather than instead of it: a machine installed
   once carried it, while every later run for that host hard-failed. The engine now validates
   the block it is about to write as well as the file it is writing into.
+- **A home directory whose own path contains a massa-ai marker no longer corrupts the
+  contract.** `renderHeader` and the pointer template both interpolate the target home after
+  the renderer's marker sweep, which runs on the rule body — so such a path was carried
+  straight into the emitted text, and `massa-ai-config bootstrap enable|disable` wrote a
+  `MASSA-AI.md` with unbalanced markers. The installer then refused in *both* directions,
+  leaving no way to uninstall out of it. The renderer now refuses up front with
+  `MarkerInInterpolatedPathError`, which covers both writers.
 
 Two limits worth knowing. Rendering requires `bun` on `PATH`: the installer's fallback to a
 built `packages/shared/dist` cannot load under plain Node, so a machine without `bun` now

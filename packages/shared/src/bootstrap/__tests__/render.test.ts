@@ -557,6 +557,74 @@ describe("no marker comment survives into the render", () => {
     expect(contract).not.toContain("Text outside the block");
     expect(contract).toContain("Intro paragraph.");
   });
+
+  // T45. The cases above sweep a render whose `targetHome` is a plain path, so
+  // every one of them passed while an interpolated path could still carry a
+  // marker into the output. `renderHeader` and `renderPointer` both interpolate
+  // `targetHome` *after* `applyRuleState`'s own sweep, which runs on the body —
+  // and the body is not what either writer puts on disk.
+  //
+  // The consequence was not cosmetic: `applyHost` (`engine.ts`) wraps `contract`
+  // and writes it whole, producing a `MASSA-AI.md` with 2 START markers and 1
+  // END, after which `install-skills.sh` refuses in BOTH directions — `--apply`
+  // rc 2 and `--uninstall` rc 2 — so the user cannot uninstall out of it.
+  describe("an interpolated path cannot carry a marker into the output (T45)", () => {
+    for (const marker of [BOOTSTRAP_BLOCK_START, BOOTSTRAP_BLOCK_END, ruleMarker("caveman", "start")]) {
+      test(`targetHome containing ${marker.slice(0, 28)}… is refused`, () => {
+        expect(() =>
+          renderBootstrap({
+            source: REAL_SOURCE,
+            state: DEFAULTS,
+            host: "codex",
+            targetHome: `/home/x${marker}y`,
+          }),
+        ).toThrow(/rendered output carries a massa-ai marker/);
+      });
+    }
+
+    // The error NAME is asserted, not just the message: a caller branching on
+    // `err.name` must be able to tell this apart from `UnknownRuleMarkerError`,
+    // whose remedy is to edit `skills/AGENTS.md` rather than to install from a
+    // different home.
+    test("the refusal is named for its own cause, not the source-markup one", () => {
+      let caught: { name?: string; details?: readonly string[] } = {};
+      try {
+        renderBootstrap({
+          source: REAL_SOURCE,
+          state: DEFAULTS,
+          host: "codex",
+          targetHome: `/home/x${BOOTSTRAP_BLOCK_START}y`,
+        });
+      } catch (err) {
+        caught = err as { name?: string; details?: readonly string[] };
+      }
+      expect(caught.name).toBe("MarkerInInterpolatedPathError");
+      expect(caught.details?.length).toBeGreaterThan(0);
+    });
+
+    // The other direction, so the refusal cannot pass by being uniformly
+    // hostile: the same render with an ordinary home still succeeds.
+    test("an ordinary targetHome still renders", () => {
+      const { contract, pointer } = render(DEFAULTS);
+      expect(contract).not.toContain(BOOTSTRAP_BLOCK_START);
+      expect(pointer).not.toContain(BOOTSTRAP_BLOCK_START);
+    });
+
+    // The pointer is a separate interpolation site from the header, and it also
+    // takes `hostRoot`. Without covering it, a fix that swept only `contract`
+    // would pass every case above.
+    test("the pointer's own hostRoot interpolation is swept too", () => {
+      expect(() =>
+        renderBootstrap({
+          source: REAL_SOURCE,
+          state: DEFAULTS,
+          host: "codex",
+          targetHome: TARGET_HOME,
+          hostRoot: `${TARGET_HOME}/x${BOOTSTRAP_BLOCK_END}y`,
+        }),
+      ).toThrow(/rendered output carries a massa-ai marker/);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

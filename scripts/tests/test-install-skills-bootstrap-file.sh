@@ -389,11 +389,28 @@ const POINTER_LEXICON = new Set([
 //
 // Detected after delivery, not instead of it: a machine installed once shipped
 // the directive, then hard-failed every later run for that host. The installer
-// now validates `desired` as well as `text`, so the first apply refuses too and
-// the claim above is true rather than aspirational. This was the third time in
-// this feature that a docblock asserted a property measured against the wrong
-// subject (D-1, then F-3), which is why the measurement is quoted here instead
-// of only the conclusion.
+// now validates `desired` as well as `text`, so the first apply refuses too.
+//
+// T45 — AND THE CLASS HAS TWO SHAPES, WITH TWO DIFFERENT GUARDS. The claim above
+// was still wider than what it measured, because a marker-COUNT check only sees
+// the shape that duplicates a marker:
+//
+//   shape A  payload plus a second START on the line   STARTs=2 ENDs=1  -> rc 2
+//   shape B  payload on the block's own single         STARTs=1 ENDs=1  -> would
+//            opening marker line                                          be written
+//
+// Shape B is unreachable because `wrapBootstrapBlock` emits `START + "\n"`, so
+// the marker is alone on its line and no body text can share it. That is not
+// merely true, it is pinned: `render.test.ts`'s wrapBootstrapBlock cases assert
+// `lines[0]` and `lines[length - 2]` by **exact equality** against the marker
+// constants, in three toggle states, so any change that appended content to a
+// marker line reddens them.
+//
+// So shape A is refused by the installer and shape B is prevented by the wrapper
+// and sensed in the unit suite. Both halves are named because "the engine
+// refuses such a block" covered only the first — the fourth time in this feature
+// that a docblock asserted a property measured against a narrower subject than
+// its claim (D-1, F-3, T43's own justification, and this).
 //
 // The case at the end of scenario 4b freezes this, green-on-a-hole, the same way
 // T36's bound is frozen. If someone closes it, that line reddens, and the right

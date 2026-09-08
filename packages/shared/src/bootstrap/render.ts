@@ -274,8 +274,47 @@ export function renderBootstrap(options: RenderBootstrapOptions): BootstrapRende
 
   const body = applyRuleState(extractBootstrapBlock(source), state);
   const contract = `${renderHeader(state, targetHome)}\n\n${body}`;
+  const pointer = renderPointer(host, targetHome, hostRoot);
 
-  return { contract, pointer: renderPointer(host, targetHome, hostRoot) };
+  // The rule loop's own sweep (`assertNoSurvivingMarkers`) runs on the BODY, and
+  // the body is not what either writer puts on disk. `renderHeader` and
+  // `renderPointer` both interpolate `targetHome` — and `renderPointer` the
+  // resolved host root — *after* that sweep, so a home directory whose own path
+  // contains a marker literal carried one straight through into the emitted
+  // text. Measured before this check: a `targetHome` of
+  // `/home/x<!-- massa-ai:bootstrap:start -->y` produced a wrapped document with
+  // **2 START markers and 1 END**.
+  //
+  // That is not a theoretical path. `applyHost` (`engine.ts`) wraps `contract`
+  // and writes it whole, and `bootstrap_op` writes the same bytes from bash, so
+  // the result is a `MASSA-AI.md` whose markers are unbalanced — and the
+  // installer then refuses in BOTH directions, `--apply` rc 2 *and* `--uninstall`
+  // rc 2, leaving the user unable to uninstall out of it.
+  //
+  // The check lives here rather than in each writer because this function is the
+  // single producer both of them consume, including the bash path via
+  // `scripts/render-bootstrap.ts`. `install-skills.sh` keeps its own
+  // `wantStarts`/`wantEnds` refusal: that one guards the bytes actually being
+  // written, whatever produced them, and this one guards what this module emits.
+  // Two writers, one producer, and neither guard subsumes the other.
+  // A distinct error name from `UnknownRuleMarkerError`: that one means the
+  // SOURCE marks up an id the registry does not carry, and its remedy is to edit
+  // `skills/AGENTS.md`. This one means an interpolated path carried a marker,
+  // and its remedy is to install from a different home — so a caller branching
+  // on `err.name` must be able to tell them apart.
+  const emitted = [
+    ...contract.split("\n").filter((line) => ANY_MASSA_AI_MARKER.test(line)),
+    ...pointer.split("\n").filter((line) => ANY_MASSA_AI_MARKER.test(line)),
+  ].map((line) => line.trim());
+  if (emitted.length > 0) {
+    throw new BootstrapRenderError(
+      "MarkerInInterpolatedPathError",
+      `rendered output carries a massa-ai marker, which can only have come from an interpolated path: ${emitted.join(", ")}`,
+      emitted,
+    );
+  }
+
+  return { contract, pointer };
 }
 
 function requireAbsoluteTargetHome(targetHome: string): void {
