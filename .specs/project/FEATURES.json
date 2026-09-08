@@ -1448,13 +1448,13 @@
       "id": "bootstrap-file-and-rule-toggles",
       "slug": "bootstrap-file-and-rule-toggles",
       "title": "Startup contract moves to MASSA-AI.md per host, loaded by each host, with all 9 bootstrap rules individually switchable",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
-        "design": false,
-        "tasks": false,
-        "execute": false
+        "design": true,
+        "tasks": true,
+        "execute": true
       },
       "branch": "feat/bootstrap-file-and-rule-toggles",
       "created": "2026-09-06",
@@ -1463,7 +1463,7 @@
       "design": ".specs/features/bootstrap-file-and-rule-toggles/design.md",
       "tasks": ".specs/features/bootstrap-file-and-rule-toggles/tasks.md",
       "validation": ".specs/features/bootstrap-file-and-rule-toggles/validation.md",
-      "notes": "Specify complete 2026-09-06: 12 requirements (BST-01..BST-12), 5 stories, validate_spec 0 errors 0 warnings. Four user decisions closed: (1) Codex and Cursor get a short managed pointer block rather than the pasted body, because neither host has an import directive -- Codex project_doc_fallback_filenames renames the searched file rather than including a second one, and Cursor publishes no user-level global rules path; (2) the command surface is a per-host skill, with the massa-ai-config CLI kept as the always-reachable front; (3) the code-comments toggle gates references/code-annotation.md sections 1 and 2 only, never section 3 Tests; (4) all 9 rules are switchable with no protected id, including massa-ai-router. Measured premise behind the whole feature: Claude Code documents reading CLAUDE.md and not AGENTS.md, and no installer in this repository writes ~/.claude/CLAUDE.md, so the bootstrap contract has never loaded on Claude except where a user hand-added the import."
+      "notes": "Specify complete 2026-09-06: 12 requirements (BST-01..BST-12), 5 stories, validate_spec 0 errors 0 warnings. Four user decisions closed: (1) Codex and Cursor get a short managed pointer block rather than the pasted body, because neither host has an import directive -- Codex project_doc_fallback_filenames renames the searched file rather than including a second one, and Cursor publishes no user-level global rules path; (2) the command surface is a per-host skill, with the massa-ai-config CLI kept as the always-reachable front; (3) the code-comments toggle gates references/code-annotation.md sections 1 and 2 only, never section 3 Tests; (4) all 9 rules are switchable with no protected id, including massa-ai-router. Measured premise behind the whole feature: Claude Code documents reading CLAUDE.md and not AGENTS.md, and no installer in this repository writes ~/.claude/CLAUDE.md, so the bootstrap contract has never loaded on Claude except where a user hand-added the import. EXECUTE COMPLETE 2026-09-08: 45 tasks across 11 phases plus 11 verification-fix iterations; final independent gate PASS at 46/46 ACs with three recorded bounds (T36 lexicon composition, T43/T45 marker-line payload, T46 the sweep's contract half) -- see validation.md. Two shipped-behaviour defects were found by the gate rather than by the suite and are in CHANGELOG under Fixed: the installer wrote a managed block carrying a duplicated marker because its guard read the existing target file rather than the block being written, and a home directory whose own path contains a massa-ai marker corrupted the contract because the renderer's marker sweep runs on the rule body while the header and pointer interpolate the path after it. Assumption A12 was amended rather than satisfied: the portal field ships editable, the Config form layer having no read-only mechanism, with the CLI guide text as the mitigation. Unpushed; push and PR are the user's call."
     }
   ],
   "active_feature": "bootstrap-file-and-rule-toggles"

@@ -1,4 +1,45 @@
-## Current — Installer prune and test-scoping (**VALIDATED 2026-08-17** — 13 commits, 7 parallel batch workers partitioned by file plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
+## Current — Bootstrap file and rule toggles (**VALIDATED 2026-09-08** — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs with three recorded bounds; every gate green; unpushed, push/PR is the user's call)
+
+Branch `feat/bootstrap-file-and-rule-toggles` off `main@d32fce58`, worktree
+`~/Projects/massa-ai-wt-bootstrap-toggles`. Full account in `.specs/HANDOFF.md`
+and `.specs/features/bootstrap-file-and-rule-toggles/validation.md`.
+
+**The measured premise.** Claude Code documents reading `CLAUDE.md` and not
+`AGENTS.md`, and no installer here wrote `~/.claude/CLAUDE.md` — so unless a user
+had hand-added the import, every policy in the bootstrap block had been **inert on
+Claude**. The startup contract now lives in its own `MASSA-AI.md` per host, with
+each host wired to load it, and all nine rules are individually switchable with no
+protected id.
+
+**Read this before touching the pointer checker.** Three bounds are recorded and
+frozen as executable green-on-a-hole cases: T36 (a directive composed only from
+`POINTER_LEXICON` words is not caught — both strengthenings were rejected against a
+counter-example whose token multiset is byte-for-byte the legitimate pointer's),
+T43/T45 (a payload sharing a line with a marker literal is invisible to the whole
+checker, bounded by the installer's `desired` validation and by
+`wrapBootstrapBlock`'s marker-alone-on-its-line form), and T46 (the `contract` half
+of the render sweep is killed by no test — falsified as an equivalent mutation,
+256/256). If one of those cases reddens, the bound was closed: delete the case and
+its docblock paragraph together, never restore the hole.
+
+**Two shipped-behaviour defects were found by the verification gate rather than by
+the suite**, both the same shape — a guard reading the existing target file instead
+of the block being written, and a marker sweep running on the rule body while the
+header and pointer interpolate the path after it. Both in `CHANGELOG.md` under
+`### Fixed`.
+
+**The generalizable finding.** Six of this loop's findings were one class: **a
+correct check applied to the wrong subject** — sound checks pointed at the wrong
+value. The pointer-bypass sequence is the same lesson in miniature; three bypasses
+were each closed by naming the category the previous fix forgot, and it ended only
+when the approach inverted to a codepoint allowlist that names no categories.
+
+**Live-config hazard (FU-5, unfixed, out of scope).** `setBootstrapRuleEnabled`
+writes `getConfigPath()`, frozen at module-eval time, so `massa-ai-config bootstrap
+enable|disable` **cannot be redirected by `--target`** and always writes the real
+`~/.config/massa-ai/config.json`. Never invoke it as a real process while testing.
+
+## Previous — Installer prune and test-scoping (**VALIDATED 2026-08-17** — 13 commits, 7 parallel batch workers partitioned by file plus an independent verification pass; every gate green; unpushed, push/PR is the user's call)
 
 Two briefed defects, both wider than briefed.
 
