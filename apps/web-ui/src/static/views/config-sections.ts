@@ -238,8 +238,17 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
       // `packages/shared/src/bootstrap/rules.ts`, not here, and this section
       // would otherwise need to stay hand-synced with that registry every
       // time a rule is added or removed. `massa-ai-config bootstrap` is the
-      // supported way to flip one rule; this field is read-only inspection
-      // of the persisted override map.
+      // supported way to flip one rule.
+      //
+      // The field is EDITABLE, and the guide below is the only thing steering
+      // users to the CLI instead (spec A12, amended by T37). It is not marked
+      // read-only because this layer has no read-only mechanism: `ConfigField`
+      // above declares no editability member, `config.ts`'s `renderConfigField`
+      // emits no `readonly`/`disabled` on any of its six input shapes, and
+      // `writeMode` gates only the Save/Restart buttons, never an input. A bare
+      // `readonly` attribute here would also be a lie — `collectConfigSectionFields`
+      // (`config.ts:296`) reads `el.value` regardless of it, so Save would still
+      // collect and write this field.
       { name: "rules", type: "json", label: "Rule Overrides (JSON)", guide: "Persisted overrides of the bootstrap rule registry's defaults, one boolean per rule id. Manage individual rules with `massa-ai-config bootstrap enable|disable <id>` rather than editing this field directly." },
     ],
   },

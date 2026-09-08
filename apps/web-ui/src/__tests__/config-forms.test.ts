@@ -680,3 +680,80 @@ describe("renderConfig + Save — Synapse Save does not clobber inherited defaul
     expect(get(ATTENTION_FIELD)).toBe(false);
   });
 });
+
+// ── T37 (spec A12, amended): the bootstrap section ships EDITABLE ───────────
+
+/**
+ * A12 originally promised a "read-only `json` field". It ships editable, and
+ * T37 amended the assumption rather than the code, because this layer has no
+ * read-only mechanism to use (`ConfigField` declares no editability member,
+ * `renderConfigField` emits `readonly`/`disabled` on none of its six input
+ * shapes, and `writeMode` gates only the Save/Restart buttons). The mitigation
+ * is the guide text steering users to the CLI.
+ *
+ * These are property checks, not a golden. `render-golden.json` already
+ * contains the guide string, but it fires on any reword of any of the 105
+ * fields and says nothing about *why* that sentence matters — it answers "did
+ * the template change?", not "is the mitigation still present?". These cases
+ * answer the second, and they fail in BOTH directions: delete the CLI pointer
+ * from the guide and the mitigation case reddens; make the field genuinely
+ * read-only and the editability case reddens, pointing whoever did it back at
+ * A12 to re-amend it. Neither drift can land silently.
+ */
+describe("bootstrap section — the amended A12 contract (T37)", () => {
+  const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
+
+  /** Just the `bootstrap` section's markup — sliced by its own
+   *  `data-section` marker rather than assumed to be last, so reordering
+   *  `CONFIG_SECTIONS_BY_KEY` cannot make these assertions read a neighbour's
+   *  fields and pass for the wrong reason. */
+  function bootstrapSectionHtml(): string {
+    const start = html.indexOf('<div class="config-section" data-section="bootstrap">');
+    expect(start).toBeGreaterThan(-1);
+    const next = html.indexOf('<div class="config-section" data-section="', start + 1);
+    return next === -1 ? html.slice(start) : html.slice(start, next);
+  }
+
+  const bootstrapSection = () =>
+    (CONFIG_SECTIONS as { key: string; fields: { name: string; type: string; guide: string }[] }[])
+      .find((s) => s.key === "bootstrap");
+
+  it("declares exactly one field, `rules`, of type json — still not a per-rule toggle surface", () => {
+    // The out-of-scope row forbidding a per-rule toggle UI, re-checked
+    // mechanically: nine boolean fields would be the shape it forbids, and
+    // editability is not that shape — the user still hand-edits one
+    // serialised map, with no per-rule control rendered.
+    const section = bootstrapSection();
+    expect(section).toBeDefined();
+    expect(section!.fields.length).toBe(1);
+    expect(section!.fields[0].name).toBe("rules");
+    expect(section!.fields[0].type).toBe("json");
+  });
+
+  it("the guide names the CLI command — this is A12's stated mitigation", () => {
+    // Looked up by name, not read off `fields[0]`. A positional read also
+    // reddens when a field is merely *prepended* to the section — reporting a
+    // missing mitigation that is in fact still present. Caught in review: the
+    // per-rule-toggle mutation made an earlier draft of this case fail for
+    // exactly that wrong reason, which would have read as two sensors agreeing
+    // when only one had seen anything.
+    const field = bootstrapSection()!.fields.find((f) => f.name === "rules");
+    expect(field).toBeDefined();
+    expect(field!.guide).toContain("massa-ai-config bootstrap enable|disable <id>");
+    expect(field!.guide).toContain("rather than editing this field directly");
+  });
+
+  it("renders the override map as an editable textarea, carrying no readonly or disabled", () => {
+    const section = bootstrapSectionHtml();
+    // Positive first: the input exists at all, so the negatives below cannot
+    // pass vacuously against a section that renders no input.
+    expect(section).toContain('data-field="rules"');
+    expect(section).toContain('data-type="json"');
+    expect(section).toContain("<textarea");
+    // The amended truth. If either of these ever reddens, the field became
+    // non-editable and spec A12's T37 amendment needs re-amending — do not
+    // relax the assertion.
+    expect(section).not.toContain("readonly");
+    expect(section).not.toContain("disabled");
+  });
+});

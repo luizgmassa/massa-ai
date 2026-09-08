@@ -65,7 +65,7 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 | A9 — Fold of non-rule prose | `Contract Ownership`, `Runtime Contract Pointer` and the `massa-ai` line of `Skill Summary` render as part of the `massa-ai-router` rule | They exist only to point at the router; as standalone toggles they would be prose with no behavior to switch. | n |
 | A10 — `MASSA-AI.md` with every rule off | Still written, carrying a header stating that every rule is disabled | An absent file is indistinguishable from a failed install; a stated empty contract is not. | n |
 | A11 — OpenCode config path | Resolved through the existing `scripts/lib/opencode-config.cjs` (`opencode.jsonc` → `opencode.json` → create), never a hardcoded filename | That module is already the single resolve/parse/write contract for both OpenCode installers and tolerates JSONC. | n |
-| A12 — Admin Portal section for `bootstrap` | One read-only `json` field showing the persisted override map, whose guide directs the user to `massa-ai-config bootstrap enable\|disable <id>` | Forced by a pre-existing enforced contract, not chosen: `apps/web-ui/src/static/views/config-sections.ts` declares `CONFIG_SECTIONS_BY_KEY` as a mapped type over every `ConfigSectionKey`, and `installer-config-template.test.ts` requires a matching installer-template entry. Adding `bootstrap` to `MassaAiConfig` — which the design requires — makes both fire. The three options were: add the section, leave the config key untyped, or weaken the enforcing tests. The third is forbidden and the second contradicts the design, so the first is the only one left. | n |
+| A12 — Admin Portal section for `bootstrap` | One **editable** `json` field showing the persisted override map, whose guide directs the user to `massa-ai-config bootstrap enable\|disable <id>` — that guide text is the mitigation, not a read-only attribute; see the amendment below | Forced by a pre-existing enforced contract, not chosen: `apps/web-ui/src/static/views/config-sections.ts` declares `CONFIG_SECTIONS_BY_KEY` as a mapped type over every `ConfigSectionKey`, and `installer-config-template.test.ts` requires a matching installer-template entry. Adding `bootstrap` to `MassaAiConfig` — which the design requires — makes both fire. The three options were: add the section, leave the config key untyped, or weaken the enforcing tests. The third is forbidden and the second contradicts the design, so the first is the only one left. | n |
 
 > **Amended during Execute, Phase 2 (T4).** The out-of-scope row above originally
 > excluded "a Web UI surface for the toggles" without qualification. That was written
@@ -74,6 +74,44 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 > `packages/shared/src/bootstrap/rules.ts` and a per-id field list would have to be
 > hand-synced with that registry forever. A per-rule Web UI toggle remains out of scope
 > and is still a separate delivery.
+
+> **Amended during Execute, Phase 11b iteration 5 (T37).** A12 originally promised a
+> **read-only** `json` field. It ships **editable**, and the assumption — not the code —
+> is what moves, because **the Config form layer has no read-only mechanism to use**.
+> Measured across the whole layer: `readonly` occurs **0** times in
+> `apps/web-ui/src/static/views/config-sections.ts` (the field schema — its `ConfigField`
+> interface declares `name`/`type`/`label`/`sensitive?`/`enum?`/`guide` and no
+> editability member), **0** times in `apps/web-ui/src/static/views/config.ts` (the
+> renderer — `renderConfigField` emits all six input shapes, `boolean`/`enum`/`number`/
+> `string[]`/`json`/`text`, none carrying `readonly` or `disabled`), and **0** times in
+> `apps/web-ui/src/static/lib/forms.ts`. The nearest relative is `writeMode`, which
+> suppresses the **Save** and **Restart Server** buttons section-wide
+> (`config.ts:159`, `config.ts:195`) and never touches an input; the per-input
+> `disabled` idiom exists only in `views/registry.ts`, a different tab.
+> *(Note: the path `apps/web-ui/src/static/views/config-forms.ts` cited in T37's `Where`
+> does not exist — the suite is `apps/web-ui/src/__tests__/config-forms.test.ts`, the
+> same class of spec-path error `CLAUDE.md` records for `services/symbol/`.)*
+>
+> Building one was rejected as new capability inside a verification-fix iteration, and
+> because the cheap version would be **false**: `collectConfigSectionFields`
+> (`config.ts:296-306`) reads `el.value` off every `[data-section=…]` element with no
+> regard for `readonly`, so a bare `readonly` attribute on the textarea would still be
+> collected by Save and written back through `buildConfigSectionBody`. An honest
+> read-only field needs a schema flag, a renderer branch, a collect-path exclusion, and
+> Save-button suppression for an all-read-only section — four coupled changes to a shared
+> layer, to gate one field.
+>
+> **The mitigation is the guide text**, which ships and directs the user to
+> `massa-ai-config bootstrap enable|disable <id>` rather than to the textarea. It is
+> pinned by a property assertion in `config-forms.test.ts` (not only by the
+> `render-golden.json` fixture, which would also fire on a benign reword), so the
+> mitigation cannot silently disappear and the field cannot silently become read-only
+> without this amendment being revisited.
+>
+> The out-of-scope row forbidding a per-rule **toggle** UI is **re-checked and still
+> true**: `bootstrap` remains exactly one `json` field, not nine booleans. Editability
+> is not a toggle surface — the user still edits a serialised override map by hand, with
+> no per-rule control rendered.
 
 **Open questions:** none — all resolved or logged above.
 
