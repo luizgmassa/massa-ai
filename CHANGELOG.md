@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.56.0] - 2026-09-08
+
 ### Added
 
 - **The startup contract is now its own file, `MASSA-AI.md`, and every host is wired to load
