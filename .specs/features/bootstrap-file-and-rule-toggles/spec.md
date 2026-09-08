@@ -44,7 +44,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | Per-host divergent toggle state | One global state applied to every installed host (see assumption A4). |
 | Changing what any rule *says* beyond the RTK removal and the two new rules | This feature changes delivery and switchability, not the wording of existing policies. |
 | Turning off test-coverage requirements | `references/code-annotation.md` §3 (Tests) is load-bearing for the spec-driven Execution Contract; the comment toggle never reaches it (BST-08). |
-| A Web UI **toggle** surface | The requested surface is a host command. The portal is a separate delivery. A read-only inspection field is not excluded — see the amendment below. |
+| A Web UI **toggle** surface | The requested surface is a host command. The portal is a separate delivery. What ships instead is a single **editable** `json` field whose guide text directs the user to the CLI — an inspection field, not a per-rule toggle UI, so this row still holds. The word *read-only* stood here until iteration 6; see A12's amendment for why the field is editable. |
 
 ---
 
