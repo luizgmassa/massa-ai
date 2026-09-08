@@ -10,7 +10,33 @@
 #
 # Provides ok/fail counters, assertions, a scratch root with EXIT cleanup, and
 # mock agent binaries so install-skills.sh's PATH detection is deterministic.
+#
+# TRAILING-SLASH TMPDIR. Every suite builds its scratch root as
+# `mktemp -d "${TMPDIR:-/tmp}/name.XXXXXX"`. On macOS the default TMPDIR ends in
+# `/`, so that template yields `…/T//name` and `mktemp` returns the double slash
+# intact. Node's `path.join` normalises it away inside rendered output, so an
+# assertion comparing a path literally sees `T//…` on one side and `T/…` on the
+# other and fails — 4 failures in the bootstrap-file suite, 3 in the cli suite,
+# on macOS only.
+#
+# It stayed invisible because `bun run test:scripts` chains
+# `bun test … && for f in scripts/tests/*.sh`, and two unrelated bun failures
+# aborted that chain before any shell suite ran. The battery was only ever
+# reached by hand, with an explicit `TMPDIR=/tmp`. With the bun phase green the
+# whole battery now runs in CI, and a gate should not depend on a caller
+# convention.
+#
+# Normalised here once rather than at 26 call sites: every suite that uses this
+# template sources this helper *before* calling `mktemp`, verified by comparing
+# the two line numbers across `scripts/tests/*.sh`. Two suites source no helper
+# (`test-installer-env-race-safety.sh`, `test-setup-local-first-api-key.sh`);
+# neither compares a path literally, and both are green either way.
 # ================================================================
+
+if [ -n "${TMPDIR:-}" ]; then
+  TMPDIR="${TMPDIR%/}"
+  export TMPDIR
+fi
 
 PASS=0
 FAIL=0

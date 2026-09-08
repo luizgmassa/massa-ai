@@ -26,6 +26,8 @@ INSTALLER="${PROJECT_ROOT}/scripts/install-skills.sh"
 # shellcheck source=scripts/tests/lib/installer-test-helpers.sh
 source "${SCRIPT_DIR}/lib/installer-test-helpers.sh"
 
+# TMPDIR is normalised by the helper sourced above — see its header for why a
+# trailing slash reddened four assertions in this suite on macOS.
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/massa-ai-bootstrap-file.XXXXXX")"
 trap 'rm -rf "$ROOT"' EXIT
 export PATH="$(make_mock_agents "$ROOT/bin"):$PATH"

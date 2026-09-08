@@ -72,6 +72,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block was therefore detected after delivery rather than instead of it: a machine installed
   once carried it, while every later run for that host hard-failed. The engine now validates
   the block it is about to write as well as the file it is writing into.
+- **`bun run test:scripts` now reaches the shell battery, and CI enforces it.** The script
+  chains `bun test … && for f in scripts/tests/*.sh`, and two golden cases in
+  `pyts-golden.test.ts` had rotted on a calendar — the lessons fixture carries absolute
+  `last_seen` dates while `autoPrune` measures them against `window_days` (45) and
+  `Date.now()`, so entries aged out and the goldens went red around 2026-09-06, aborting the
+  chain before any `.sh` suite ran. The fixture is now anchored to the run instead of the
+  calendar. Two further defects surfaced once the battery was reachable: the fixture dates
+  must omit milliseconds, because `parseDate` matches `…:SSZ` exactly and **returns the
+  current time when it does not match**, which silently disables the pruning the fixture
+  exists to exercise; and a `TMPDIR` ending in `/` produced `…/T//name` scratch roots, which
+  `path.join` normalises away inside rendered output, reddening every assertion that
+  compares a path literally. `TMPDIR` is normalised once in the shared test helper.
 - **A home directory whose own path contains a massa-ai marker no longer corrupts the
   contract.** `renderHeader` and the pointer template both interpolate the target home after
   the renderer's marker sweep, which runs on the rule body — so such a path was carried
