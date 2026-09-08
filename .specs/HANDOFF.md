@@ -1,4 +1,86 @@
-# Handoff — installer-prune-and-test-scoping (EXECUTE COMPLETE 2026-08-17 — 13 commits, 4 Phases / 10 Tasks, 7 parallel batch workers plus independent verification; every gate green; unpushed, push/PR is the user's call)
+# Handoff — bootstrap-file-and-rule-toggles (EXECUTE COMPLETE 2026-09-08 — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs; every gate green; unpushed, push/PR is the user's call)
+
+**Branch:** `feat/bootstrap-file-and-rule-toggles`, off `main@d32fce58`. Worktree
+`~/Projects/massa-ai-wt-bootstrap-toggles`.
+
+**What shipped.** The startup contract moved out of each host's `AGENTS.md` into its own
+`MASSA-AI.md` per host, and every host is now wired to load it: a managed `@MASSA-AI.md`
+import block in `~/.claude/CLAUDE.md`, the absolute path in OpenCode's `instructions`
+array, and a policy-free pointer block of at most 10 lines in Codex's and Cursor's
+`AGENTS.md`. All nine bootstrap rules are individually switchable with no protected id,
+persisted under `bootstrap.rules`, driven by `massa-ai-config bootstrap
+list|show|enable|disable` in both CLIs plus a `bootstrap` skill in all four plugin
+bundles. RTK is gone from the contract; `english-code` and `code-comments` are new, the
+latter defaulting **off** — a behaviour change, so the render carries an explicit negative
+directive rather than relying on omission. `--check` now consults the bootstrap surface,
+which it previously never did, so its clean exit had proved nothing.
+
+**The measured premise.** Claude Code documents reading `CLAUDE.md` and not `AGENTS.md`,
+and no installer in this repository wrote `~/.claude/CLAUDE.md` — so unless a user had
+hand-added the import, every policy in that block had been **inert on Claude**. That is
+what the feature exists to fix, not a side effect of it.
+
+**Verification: PASS, with three recorded bounds.** The gate ran eleven times. Read
+`validation.md` before touching the pointer checker — the bounds are T36 (a directive
+composed only from `POINTER_LEXICON` words is not caught; both available strengthenings
+were rejected against a counter-example whose token multiset is byte-for-byte the
+legitimate pointer's), T43/T45 (a payload sharing a line with a marker literal is invisible
+to the whole checker, bounded in two halves by the installer's `desired` validation and by
+`wrapBootstrapBlock`'s marker-alone-on-its-line form), and T46 (the `contract` half of the
+render sweep is killed by no test, falsified as an equivalent mutation at 256/256). Each is
+frozen as an executable green-on-a-hole case. **If one of those cases reddens, the bound was
+closed — delete the case and its docblock paragraph together, never restore the hole.**
+
+**Two shipped-behaviour defects were found by the gate, not by the suite**, and are in
+`CHANGELOG.md` under `### Fixed`. Both are the same shape: `bootstrap_engine`'s
+duplicate-marker guard counted markers in the *existing target file* rather than in the
+block being written, so the first `--apply` delivered a corrupt block at rc 0 and only the
+second refused; and `renderBootstrap`'s marker sweep runs on the rule *body* while the
+header and pointer interpolate `targetHome`/`hostRoot` after it, so a home path containing
+a marker was emitted straight through — after which the installer refused in **both**
+directions and the user could not uninstall out of it.
+
+**The generalizable finding, and the reason this loop ran eleven times.** Six findings were
+one class: **a correct check applied to the wrong subject.** Not a missing check — a sound
+one pointed at the wrong value. The pointer-bypass sub-sequence is the same lesson in
+miniature: three bypasses (non-Latin script, symbol-script Latin, invisible Unicode tag
+characters) were each closed by naming the category the previous fix forgot, each time with
+a docblock asserting the class was closed. It ended only when the approach **inverted** —
+from category subtraction to an explicit codepoint allowlist, which names no categories and
+so cannot forget one.
+
+**Assumption A12 was amended, not satisfied.** The portal's `bootstrap` field ships
+**editable**: `collectConfigSectionFields` reads `el.value` off every `[data-section=…]`
+element with no regard for `readonly`, so a bare `readonly` attribute would still be
+collected by Save and persisted. A field that looks non-editable and writes anyway is worse
+than one honestly editable. The guide text pointing at the CLI is the mitigation.
+
+**Two measurement traps confirmed here, both worth carrying.** Running `turbo run test` and
+`bun run test:plugins` concurrently drives the same installer suite against shared state and
+produces a false red with real-looking `(fail)` lines naming real suites — run gates
+serially. And the `EmbeddedApiClient` 5001 ms phantom does **not** track load average: it
+failed at 1-minute load 3.36 and passed at 11.39 in consecutive runs. The tell is wall
+clock, ~24 s bailing against ~77 s complete.
+
+**Live-config hazard, unfixed and out of scope (FU-5).** `setBootstrapRuleEnabled` writes
+`getConfigPath()`, frozen at module-eval time, so `massa-ai-config bootstrap
+enable|disable` **cannot be redirected by `--target`** and always writes the real
+`~/.config/massa-ai/config.json`. Never invoke it as a real process while testing. `--target`
+scopes the render only.
+
+**Gates at HEAD.** `bunx turbo run test --force` 12/12 exit 0, 0 cached, 77 s wall;
+`test:scripts` 1916/2 across 85 (the 2 are pre-existing `pyts golden: lessons`);
+`test:plugins` 142/0; oxlint 0; `generate:artifacts --check` 0 with "No drift" twice; the
+38-suite shell battery with exactly the 3 pre-existing environment failures (`cli` 44/2,
+`plugin-auto-install` 194/16, `plugin-registry-registration` 43/4, each identical at
+`origin/main`); `bootstrap-file` 147/0; `uninstall` 43/0; `packages/shared/src/bootstrap`
+376/0; `apps/web-ui` 784/0.
+
+**Next step.** Push and open the PR — that is the user's call and was explicitly not
+authorized during execution. The CHANGELOG carries `### Added`, `### Changed` and `###
+Fixed` under `[Unreleased]`, so the release bump derives as **minor**.
+
+## Previous handoff — installer-prune-and-test-scoping (EXECUTE COMPLETE 2026-08-17 — 13 commits, 4 Phases / 10 Tasks, 7 parallel batch workers plus independent verification; every gate green; unpushed, push/PR is the user's call)
 
 **Branch:** `fix/installer-prune-and-test-scoping`, off `main@89909051`. Worktree
 `~/Projects/massa-ai-wt-prune`. Shares no source file with PR #107 or

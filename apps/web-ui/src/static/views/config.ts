@@ -1,5 +1,5 @@
 /**
- * Config tab — the 15 sectioned forms, per-section save, secret reveal, and the
+ * Config tab — the 17 sectioned forms, per-section save, secret reveal, and the
  * server restart action.
  *
  * `CONFIG_SECTIONS` is the declarative field schema the whole tab is generated

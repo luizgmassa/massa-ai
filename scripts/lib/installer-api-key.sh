@@ -188,11 +188,14 @@ POLICYEOF
 #
 # Every *_ENABLED default below is the literal this template used to hardcode,
 # so a caller that sets none of them writes the same config.json as before.
-# The two exceptions are deliberate and new: `scheduler`, which no install had
+# Three exceptions are deliberate and new: `scheduler`, which no install had
 # at all (leaving the Admin Portal's Scheduler tab blank and periodic jobs
-# unreachable without setting process env vars), and `capturePolicy`, written
+# unreachable without setting process env vars); `capturePolicy`, written
 # explicitly so the rules dropping files from the index are visible rather
-# than implicit.
+# than implicit; and `bootstrap`, an empty override map — a fresh install has
+# no rule overrides yet, so the bootstrap rule registry's own defaults
+# (packages/shared/src/bootstrap/rules.ts) are what an absent entry resolves
+# against, exactly as `defaultMassaAiConfig.bootstrap` does.
 #
 # Lives here rather than inline in setup-local-first.sh so the provisioning
 # contract can be executed by scripts/tests/test-setup-local-first-api-key.sh
@@ -331,6 +334,9 @@ installer_write_config() {
         "intervalMs": 3600000
       }
     }
+  },
+  "bootstrap": {
+    "rules": {}
   },
 $(installer_capture_policy_block)
   "dataDir": "${DATA_DIR}",

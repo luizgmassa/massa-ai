@@ -397,7 +397,7 @@ install_bundled_skills() {
   # authoritative constant (D6/IPT-05) — not derived by scanning the bundle's
   # skills/ directory, which would install 49 on cursor (every workflow skill
   # ships as its own directory here).
-  for name in massa-ai persona-router profile; do
+  for name in massa-ai persona-router profile bootstrap; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -426,7 +426,7 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile"] };
+data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile", "bootstrap"] };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. installRoute (T9) is installer-owned but
 // written by a LATER step of this same install (record_plugin_version), so it
@@ -472,7 +472,7 @@ NODE
   )"
   [[ "$raw_owner" == "plugin" ]] && {
     local name
-    for name in massa-ai persona-router profile; do
+    for name in massa-ai persona-router profile bootstrap; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
     rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
@@ -680,15 +680,17 @@ vecho "  + .cursor-plugin/plugin.json"
 
 # Copy the host-command skills (each in a subdirectory: skills/<name>/SKILL.md),
 # quick + generated workflow commands alike. massa-ai/, persona-router/,
-# agents/, and profile/ are the PDO-06 harness bundle, not a Cursor command
-# skill — they are installed separately, into the shared harness skills
+# agents/, profile/ and bootstrap/ are the PDO-06 harness bundle, not a Cursor
+# command skill — they are installed separately, into the shared harness skills
 # directory (see "Skills bundling" below), not into this plugin-cache
 # skills/ tree. `profile` was missing from this exclusion pre-fix, which
-# leaked it into the command-skill cache mislabeled as `/profile`.
+# leaked it into the command-skill cache mislabeled as `/profile`; `bootstrap`
+# (T21) is the same class, and is excluded here in the same commit that
+# teaches the generator to emit it, so it never has a release where it leaks.
 for src in "$SCRIPT_DIR/skills/"*/SKILL.md; do
   name="$(basename "$(dirname "$src")")"
   case "$name" in
-    massa-ai|persona-router|agents|profile) continue ;;
+    massa-ai|persona-router|agents|profile|bootstrap) continue ;;
   esac
   mkdir -p "$PLUGIN_DIR/skills/$name"
   cp "$src" "$PLUGIN_DIR/skills/$name/SKILL.md"

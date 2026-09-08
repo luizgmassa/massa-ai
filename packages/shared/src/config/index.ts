@@ -1266,6 +1266,12 @@ export {
   initConfig,
   getConfigForEnv,
   migrateDataDirOnce,
+  writeFileAtomically,
+  readRawConfigStrict,
+  writeRawConfig,
+  ConfigParseError,
+  ConfigWriteConflictError,
+  type WriteRawConfigOptions,
 } from "./config-loader";
 
 export { savePartialConfig, maskSensitive, restartNeededSections, changedRestartSections } from "./config-writer";

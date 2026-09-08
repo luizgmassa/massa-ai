@@ -283,6 +283,13 @@ if [ "$QUICK" -eq 0 ]; then
   run_gate "tools-api suites"  db   'cd apps/tools-api && bun scripts/run-tests-isolated.ts'
   run_gate "core vector suites" db  "cd packages/core && bun scripts/run-tests-isolated.ts --unit --filter='vector|postgres|store'"
   run_gate "root scripts suites" nodb 'bun run test:scripts'
+  # The named form, deliberately: BST-12 AC-1 requires it and the direct form
+  # CI runs to agree. It reported clean over real drift until `package.json`'s
+  # `generate:artifacts` was made to forward its arguments — `bun run` appends
+  # them to the end of the command string, so an `&&` chain gave `--check` to
+  # the second generator only while the first ran in write mode and deleted the
+  # drift. Re-verified here: exit 1 with a stale file planted in a bundle root,
+  # exit 0 clean. Reverting that script reverts this gate to a no-op.
   run_gate "generated artifacts" nodb 'bun run generate:artifacts --check'
 fi
 

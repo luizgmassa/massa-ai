@@ -389,7 +389,7 @@ install_bundled_skills() {
   fi
 
   local installed=0 name src dest
-  for name in massa-ai persona-router profile; do
+  for name in massa-ai persona-router profile bootstrap; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -418,7 +418,7 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile"] };
+data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile", "bootstrap"] };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. modelProfile (T10, MPS-03 round-trip
 // obligation) is engine-owned; installRoute is installer-owned but written by
@@ -465,7 +465,7 @@ NODE
   )"
   [[ "$raw_owner" == "plugin" ]] && {
     local name
-    for name in massa-ai persona-router profile; do
+    for name in massa-ai persona-router profile bootstrap; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
     rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true

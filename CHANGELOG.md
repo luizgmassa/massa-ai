@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The startup contract is now its own file, `MASSA-AI.md`, and every host is wired to load
+  it.** `scripts/install-skills.sh --apply` writes the rendered contract to
+  `~/.claude/MASSA-AI.md`, `$CODEX_HOME/MASSA-AI.md`, `~/.cursor/MASSA-AI.md` and
+  `~/.config/opencode/MASSA-AI.md`, then adds each host's own load wiring: a managed block
+  holding `@MASSA-AI.md` in `~/.claude/CLAUDE.md`, the absolute path in OpenCode's
+  `instructions` array, and a pointer block of at most 10 lines — carrying no policy text of
+  its own — in Codex's and Cursor's `AGENTS.md`. Uninstall reverses all of it, unlinking
+  rather than leaving an empty file behind where the managed block was the whole content.
+- **All nine bootstrap rules are individually switchable**, with no protected id:
+  `caveman`, `massa-ai-router`, `persona-router`, `dedupe-guardrails`, `plan-challenge`,
+  `conversation-feedback`, `indexing-hygiene`, `english-code` and `code-comments`. Disabling
+  a rule omits its block from the next render; state persists under `bootstrap.rules` in
+  `~/.config/massa-ai/config.json`, and only non-default entries need to be present.
+- **A `bootstrap` command surface in all four hosts** — `massa-ai-config bootstrap
+  list|show|enable <id>|disable <id>`, in both the mcp-client and opencode-plugin CLIs, plus
+  a `bootstrap` skill shipped into every plugin bundle. The CLI is deliberately the
+  always-reachable front: it works with the massa-ai MCP server unreachable, which is the
+  recovery path for a user who has just disabled `massa-ai-router`. Applying a toggle
+  re-renders every host recorded in `install-state.json` and reports each one as `written`,
+  `written-not-wired`, `skipped` or `failed`. A host whose contract file was written but
+  which has no artifact that loads it is reported `written-not-wired` and names
+  `scripts/install-skills.sh --apply` as the remedy, rather than being silently counted as
+  delivered. An unknown rule id exits non-zero, names the id, lists the nine valid ones and
+  changes no state.
+- **`--check` reports drift on the bootstrap surface.** It previously never consulted the
+  bootstrap block at all, so its clean exit proved nothing about the contract.
+
+### Changed
+
+- **The bootstrap contract had never loaded on Claude Code at all, and now does.** Claude
+  documents reading `CLAUDE.md` and not `AGENTS.md`, and no installer in this repository
+  wrote `~/.claude/CLAUDE.md` — so unless a user had hand-added the import themselves, every
+  policy in that block was inert on Claude. That is the measured premise behind this whole
+  change, not a side effect of it.
+- **`code-comments` defaults to off, which is a behaviour change**: generated code no longer
+  gets API doc blocks or rationale comments unless you enable the rule. Because
+  `references/code-annotation.md` mandates both on its own, omission alone would have left
+  the reference winning and the toggle reading as broken, so the rendered contract carries an
+  explicit negative directive while the rule is disabled. Its §3 (Tests) is unconditional and
+  unaffected in every toggle state.
+- **The contract no longer carries RTK.** The `Conditional RTK Rules` section and its command
+  examples are gone from the source and from every rendered output.
+- **A new `english-code` rule** states that generated code, identifiers, comments and code
+  documentation are written in English regardless of the language you write in — and states
+  explicitly that it does not change the language of conversational replies.
+  `references/naming-standards.md` §Language now cites that rule for the wider class instead
+  of restating it.
+- **Migration is automatic**: an `--apply` against a host whose `AGENTS.md` still carries the
+  pre-migration full bootstrap block replaces it with that host's new shape, leaving no
+  bootstrap marker pair holding policy text in `AGENTS.md` on `claude` or `opencode`, and
+  every line outside the managed markers byte-identical.
+- **A host session restart is required** before a toggle takes effect; the command says so
+  rather than implying the change is live.
+
+### Fixed
+
+- **The installer no longer writes a managed block carrying a duplicated marker.** Its
+  duplicate-marker guard counted markers in the *existing target file* only, never in the
+  block being written, so on a fresh home the first `--apply` wrote such a block and exited
+  0 — only the second run refused, with `Managed markers are incomplete or duplicated`. The
+  block was therefore detected after delivery rather than instead of it: a machine installed
+  once carried it, while every later run for that host hard-failed. The engine now validates
+  the block it is about to write as well as the file it is writing into.
+- **`bun run test:scripts` now reaches the shell battery, and CI enforces it.** The script
+  chains `bun test … && for f in scripts/tests/*.sh`, and two golden cases in
+  `pyts-golden.test.ts` had rotted on a calendar — the lessons fixture carries absolute
+  `last_seen` dates while `autoPrune` measures them against `window_days` (45) and
+  `Date.now()`, so entries aged out and the goldens went red around 2026-09-06, aborting the
+  chain before any `.sh` suite ran. The fixture is now anchored to the run instead of the
+  calendar. Two further defects surfaced once the battery was reachable: the fixture dates
+  must omit milliseconds, because `parseDate` matches `…:SSZ` exactly and **returns the
+  current time when it does not match**, which silently disables the pruning the fixture
+  exists to exercise; and a `TMPDIR` ending in `/` produced `…/T//name` scratch roots, which
+  `path.join` normalises away inside rendered output, reddening every assertion that
+  compares a path literally. `TMPDIR` is normalised once in the shared test helper.
+- **A home directory whose own path contains a massa-ai marker no longer corrupts the
+  contract.** `renderHeader` and the pointer template both interpolate the target home after
+  the renderer's marker sweep, which runs on the rule body — so such a path was carried
+  straight into the emitted text, and `massa-ai-config bootstrap enable|disable` wrote a
+  `MASSA-AI.md` with unbalanced markers. The installer then refused in *both* directions,
+  leaving no way to uninstall out of it. The renderer now refuses up front with
+  `MarkerInInterpolatedPathError`, which covers both writers.
+
+Two limits worth knowing. Rendering requires `bun` on `PATH`: the installer's fallback to a
+built `packages/shared/dist` cannot load under plain Node, so a machine without `bun` now
+aborts each host with a named error instead of rendering, where the installer previously
+needed neither `bun` nor a build. And `--target` scopes the render only — the persisted
+preference is always written to `~/.config/massa-ai/config.json`, which is where the spec
+places it; when the two differ the CLI names both paths rather than rendering from a state
+the toggle never touched.
+
 ## [1.55.0] - 2026-08-20
 
 ### Fixed

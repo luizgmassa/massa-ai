@@ -77,12 +77,17 @@ const SAMPLE_CONFIG_DATA = {
   restartNeededSections: ["database", "llm", "security"],
 };
 
-describe("renderConfig — 15 sectioned forms (CFG-01)", () => {
+describe("renderConfig — 17 sectioned forms (CFG-01)", () => {
   const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
 
-  it("renders all 16 sections", () => {
+  // 17, not 16, since a3ba8a6e: `config-sections.ts`'s `CONFIG_SECTIONS_BY_KEY`
+  // is a mapped type over every `ConfigSectionKey`, so adding
+  // `MassaAiConfig.bootstrap` made `tsc` require a matching `bootstrap` section
+  // here. The count is exact on purpose — an inequality would stop sensing a
+  // section that silently disappears.
+  it("renders all 17 sections", () => {
     const sectionCount = (html.match(/class="config-section"/g) || []).length;
-    expect(sectionCount).toBe(16);
+    expect(sectionCount).toBe(17);
   });
 
   it("renders Database section with typed fields", () => {
@@ -375,10 +380,10 @@ describe("renderConfig — scheduler section (SCH-08)", () => {
 });
 
 describe("renderConfig — empty config", () => {
-  it("renders all 16 sections even when config is empty", () => {
+  it("renders all 17 sections even when config is empty", () => {
     const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
     const sectionCount = (html.match(/class="config-section"/g) || []).length;
-    expect(sectionCount).toBe(16);
+    expect(sectionCount).toBe(17);
   });
 });
 
@@ -458,7 +463,7 @@ describe("renderConfig — per-section field guides (CFG-03)", () => {
   it("renders a details field guide per section", () => {
     const html = renderConfig({ config: {}, restartNeededSections: [] }, { writeMode: true });
     const guideCount = (html.match(/class="config-field-guide"/g) || []).length;
-    expect(guideCount).toBe(16);
+    expect(guideCount).toBe(17);
   });
 
   it("field guide summary is 'Field guide'", () => {
@@ -569,9 +574,12 @@ describe("renderConfig — inherited defaults are shown and marked (WUT-18 T43, 
 });
 
 describe("resolveConfigFieldValue — the unresolved-field sweep (WUT-18 T43, AC5)", () => {
-  /** Every declared `{section.key}.{field.name}` across the Config tab's 16
+  /** Every declared `{section.key}.{field.name}` across the Config tab's 17
    *  sections — the same population `config-section-coverage.test.ts` sizes
-   *  at the section level; this sweep is the field-level version. */
+   *  at the section level; this sweep is the field-level version.
+   *
+   *  16 → 17 sections and 104 → 105 fields at a3ba8a6e, which added the single
+   *  `bootstrap.rules` json field. */
   function declaredFieldPaths(): string[] {
     const paths: string[] = [];
     for (const section of CONFIG_SECTIONS as { key: string; fields: { name: string }[] }[]) {
@@ -580,12 +588,12 @@ describe("resolveConfigFieldValue — the unresolved-field sweep (WUT-18 T43, AC
     return paths;
   }
 
-  it("the declared population is 104 fields across 16 sections", () => {
-    expect(CONFIG_SECTIONS.length).toBe(16);
-    expect(declaredFieldPaths().length).toBe(104);
+  it("the declared population is 105 fields across 17 sections", () => {
+    expect(CONFIG_SECTIONS.length).toBe(17);
+    expect(declaredFieldPaths().length).toBe(105);
   });
 
-  it("measures the unresolved-field count against a fixture with only synapse.enabled persisted: 5 of 104, named", () => {
+  it("measures the unresolved-field count against a fixture with only synapse.enabled persisted: 5 of 105, named", () => {
     const persisted: Record<string, unknown> = { synapse: { enabled: true } };
     const defaults = defaultMassaAiConfig as unknown as Record<string, unknown>;
     const unresolved: string[] = [];
@@ -670,5 +678,160 @@ describe("renderConfig + Save — Synapse Save does not clobber inherited defaul
     }
     expect(get("metacognition.enabled")).toBe(true);
     expect(get(ATTENTION_FIELD)).toBe(false);
+  });
+});
+
+// ── T37 (spec A12, amended): the bootstrap section ships EDITABLE ───────────
+
+/**
+ * A12 originally promised a "read-only `json` field". It ships editable, and
+ * T37 amended the assumption rather than the code, because this layer has no
+ * read-only mechanism to use (`ConfigField` declares no editability member,
+ * `renderConfigField` emits `readonly`/`disabled` on none of its six input
+ * shapes, and `writeMode` gates only the Save/Restart buttons). The mitigation
+ * is the guide text steering users to the CLI.
+ *
+ * These are property checks, not a golden. `render-golden.json` already
+ * contains the guide string, but it fires on any reword of any of the 105
+ * fields and says nothing about *why* that sentence matters — it answers "did
+ * the template change?", not "is the mitigation still present?". These cases
+ * answer the second, and they fail in BOTH directions: delete the CLI pointer
+ * from the guide and the mitigation case reddens; make the field genuinely
+ * read-only and the editability case reddens, pointing whoever did it back at
+ * A12 to re-amend it. Neither drift can land silently.
+ */
+describe("bootstrap section — the amended A12 contract (T37)", () => {
+  const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
+
+  /** Just the `bootstrap` section's markup — sliced by its own
+   *  `data-section` marker rather than assumed to be last, so reordering
+   *  `CONFIG_SECTIONS_BY_KEY` cannot make these assertions read a neighbour's
+   *  fields and pass for the wrong reason. */
+  function bootstrapSectionHtml(): string {
+    const start = html.indexOf('<div class="config-section" data-section="bootstrap">');
+    expect(start).toBeGreaterThan(-1);
+    const next = html.indexOf('<div class="config-section" data-section="', start + 1);
+    return next === -1 ? html.slice(start) : html.slice(start, next);
+  }
+
+  const bootstrapSection = () =>
+    (CONFIG_SECTIONS as { key: string; fields: { name: string; type: string; guide: string }[] }[])
+      .find((s) => s.key === "bootstrap");
+
+  it("declares exactly one field, `rules`, of type json — still not a per-rule toggle surface", () => {
+    // The out-of-scope row forbidding a per-rule toggle UI, re-checked
+    // mechanically: nine boolean fields would be the shape it forbids, and
+    // editability is not that shape — the user still hand-edits one
+    // serialised map, with no per-rule control rendered.
+    const section = bootstrapSection();
+    expect(section).toBeDefined();
+    expect(section!.fields.length).toBe(1);
+    expect(section!.fields[0].name).toBe("rules");
+    expect(section!.fields[0].type).toBe("json");
+  });
+
+  it("the guide names the CLI command — this is A12's stated mitigation", () => {
+    // Looked up by name, not read off `fields[0]`. A positional read also
+    // reddens when a field is merely *prepended* to the section — reporting a
+    // missing mitigation that is in fact still present. Caught in review: the
+    // per-rule-toggle mutation made an earlier draft of this case fail for
+    // exactly that wrong reason, which would have read as two sensors agreeing
+    // when only one had seen anything.
+    const field = bootstrapSection()!.fields.find((f) => f.name === "rules");
+    expect(field).toBeDefined();
+    expect(field!.guide).toContain("massa-ai-config bootstrap enable|disable <id>");
+    expect(field!.guide).toContain("rather than editing this field directly");
+  });
+
+  it("renders the override map as an editable textarea, carrying no readonly or disabled", () => {
+    const section = bootstrapSectionHtml();
+    // Positive first: the input exists at all, so the negatives below cannot
+    // pass vacuously against a section that renders no input.
+    expect(section).toContain('data-field="rules"');
+    expect(section).toContain('data-type="json"');
+    expect(section).toContain("<textarea");
+    // The amended truth. If either of these ever reddens, the field became
+    // non-editable and spec A12's T37 amendment needs re-amending — do not
+    // relax the assertion.
+    expect(section).not.toContain("readonly");
+    expect(section).not.toContain("disabled");
+  });
+});
+
+
+// ── T38: one name, one subject — the Bootstrap label collision ─────────────
+
+/**
+ * `memory.bootstrap` (memory seeding: "Bootstrap Enabled", "Bootstrap Max
+ * Seeds", "Bootstrap Centrality Limit", "Bootstrap Git Log Limit", "Bootstrap
+ * Refresh") predates this feature and lives in the **Memory** section. This
+ * feature added a top-level `bootstrap` config key whose section was also
+ * labelled "Bootstrap", so the Config tab showed two unrelated Bootstrap
+ * surfaces and neither name identified its subject. The section `key` stays
+ * `bootstrap` — it is the persisted path `bootstrap.rules` (BST-10 AC-11),
+ * already written on real machines — and only the display `label` moved.
+ *
+ * The assertion below is the **whole measured collision set**, not a check
+ * scoped to `bootstrap`. Scoping it to `bootstrap` would go green on the one
+ * case it was written for and stay blind to the next label that collides; and
+ * an exact set, rather than a count, is what forces a reviewer to say whether
+ * a new entry is two related surfaces or two unrelated ones. Measured before
+ * the fix: 7 collisions, 5 of them `Bootstrap`. After: 2.
+ *
+ * The 2 that remain are accepted, not overlooked. The Memory section against
+ * the Scheduler's "Memory Consolidation …" fields is one subject named
+ * consistently in two places — the scheduler job really does consolidate
+ * memory — which is the opposite of the Bootstrap case, where two unrelated
+ * subjects shared a word. Do not "fix" them by loosening this assertion; if a
+ * later change makes them genuinely ambiguous, rename them and shrink the set.
+ */
+describe("Config tab section labels — no unrelated surface shares a name (T38)", () => {
+  interface LabelledSection { key: string; label: string; fields: { label: string }[] }
+
+  /** Every (section label, foreign field label) pair where the field label is
+   *  the section's label verbatim or that label followed by a space — the
+   *  shape a user reads as "this field belongs to that section". */
+  function labelCollisions(): string[] {
+    const sections = CONFIG_SECTIONS as unknown as LabelledSection[];
+    const found: string[] = [];
+    for (const section of sections) {
+      for (const other of sections) {
+        if (other.key === section.key) continue;
+        for (const field of other.fields) {
+          if (field.label === section.label || field.label.startsWith(section.label + " ")) {
+            found.push(`${section.label}|${field.label}|${other.key}`);
+          }
+        }
+      }
+    }
+    return found.sort();
+  }
+
+  it("the bootstrap section is labelled 'Startup Contract', matching the CLI's own words", () => {
+    const section = (CONFIG_SECTIONS as unknown as LabelledSection[]).find((s) => s.key === "bootstrap");
+    expect(section).toBeDefined();
+    // The key is the persisted config path and must not move with the label.
+    expect(section!.key).toBe("bootstrap");
+    expect(section!.label).toBe("Startup Contract");
+    // `config-cli.ts:86` lists "every startup-contract rule"; a user arriving
+    // from `massa-ai-config bootstrap list` meets the same words here.
+    expect(section!.label).not.toBe("Bootstrap");
+  });
+
+  it("renders 'Startup Contract' as the section heading while Memory keeps its Bootstrap fields", () => {
+    const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
+    expect(html).toContain('<h3 class="config-section-header">Startup Contract</h3>');
+    expect(html).not.toContain('<h3 class="config-section-header">Bootstrap</h3>');
+    // The other side of the collision is untouched — this ends the ambiguity
+    // by renaming the newcomer, not by hiding the incumbent.
+    expect(html).toContain('data-field="bootstrap.maxSeedMemories"');
+    expect(html).toContain("Bootstrap Max Seeds");
+  });
+
+  it("the full label-collision set is exactly the 2 accepted Memory/Scheduler pairs", () => {
+    expect(labelCollisions()).toEqual([
+      "Memory|Memory Consolidation Enabled|scheduler",
+      "Memory|Memory Consolidation Interval (ms)|scheduler",
+    ]);
   });
 });

@@ -135,6 +135,21 @@ fi
 
 RUNNER="$(installer_require_runner "installer state")"
 
+# The bootstrap render runs under bun when bun exists, and under $RUNNER
+# otherwise. Keyed on `command -v bun` directly and never on
+# installer_detect_runner: that helper returns "node" first whenever node is on
+# PATH (scripts/lib/installer-shared.sh:23-33), and node is always on PATH in
+# this repository as the node-gyp build helper — so a $RUNNER-keyed choice would
+# start the renderer under node on every machine, including the ones that have
+# bun, and take the ladder's dist branch there. render-bootstrap.ts's own ladder
+# reads the same fact from the runtime it was started with, so the two halves
+# cannot disagree (design.md R1, scripts/render-bootstrap.ts:100-130).
+if command -v bun >/dev/null 2>&1; then
+  RENDER_RUNNER="bun"
+else
+  RENDER_RUNNER="$RUNNER"
+fi
+
 # ── Codex home resolution (~/.codex preferred, ~/.config/codex fallback) ────
 if [ -d "$TARGET_HOME/.codex" ]; then
   CODEX_HOME="$TARGET_HOME/.codex"
@@ -457,17 +472,67 @@ state_delete() {
 }
 
 # ── Bootstrap block edit (plan | apply | remove-plan | remove-apply) ────────
-bootstrap_op() {
-  "$RUNNER" - "$1" "$2" "$BOOTSTRAP_FILE" "$BOOTSTRAP_START" "$BOOTSTRAP_END" <<'NODE'
+#
+# bootstrap_engine MODE TARGET BODY_FILE
+#   plan          — would the block change? touches no file
+#   apply         — write the block, creating or amending TARGET
+#   remove-plan   — is the block present? touches no file
+#   remove-apply  — drop the block, unlinking TARGET when nothing else remains
+#
+# The block body is a positional argument rather than the global
+# $BOOTSTRAP_FILE, so one engine serves AGENTS.md, CLAUDE.md and the whole-file
+# MASSA-AI.md instead of three copies of the marker arithmetic (design.md:268).
+#
+# stdout is "change" or "nochange". Exit 2 = duplicated or incomplete markers;
+# exit 4 = refused to write through a foreign symlink. bootstrap_op_error maps
+# both, so the two are never reported as each other.
+bootstrap_engine() {
+  "$RUNNER" - "$1" "$2" "$3" "$BOOTSTRAP_START" "$BOOTSTRAP_END" <<'NODE'
 const fs = require("fs");
 const path = require("path");
 const [, , mode, target, blockFile, START, END] = process.argv;
-const desired = fs.readFileSync(blockFile, "utf8");
+// Trailing newlines are stripped so the block on disk is always
+// START + "\n" + body + "\n" + END + "\n" whatever the body file ended with.
+// That is the exact form wrapBootstrapBlock produces
+// (packages/shared/src/bootstrap/render.ts:95-97), and the two writers must
+// stay byte-identical or a file written by one reads as drift to the other.
+// The final newline sits outside the block, which is why the idempotency
+// comparison below can compare marker-to-marker slices directly.
+const desired = fs.readFileSync(blockFile, "utf8").replace(/\n+$/, "");
+
+// lstat, not stat: the symlink node itself is the subject of the write-through
+// policy below, and readFileSync would silently resolve it away.
+let isLink = false;
+try { isLink = fs.lstatSync(target).isSymbolicLink(); } catch { /* no file yet */ }
 
 let text = "";
 try {
   text = fs.readFileSync(target, "utf8");
-} catch { /* no file yet */ }
+} catch { /* no file yet, or a dangling link */ }
+
+// `desired` is validated as well as `text`, and the omission was a real hole
+// rather than a tidiness point. This guard used to read the EXISTING FILE only,
+// so on a fresh home `starts === ends === 0`, it passed, and a block carrying a
+// duplicated marker was written unvalidated. Measured before this check existed:
+// the first `--apply` onto a scratch home returned **rc 0** with two `START`
+// markers in `.codex/AGENTS.md`, and only the SECOND apply returned rc 2. The
+// block was therefore detected after delivery rather than instead of it — a
+// machine installed once shipped it, then hard-failed every later run for that
+// host.
+//
+// It matters beyond self-consistency because a marker sharing a body line is the
+// one shape `pointer_violations` cannot see at all: it drops any line containing
+// a marker literal whole, so such a payload escapes the character gate, the
+// lexicon and the sentence count alike. That bound is recorded in scenario 4b of
+// `scripts/tests/test-install-skills-bootstrap-file.sh`, and this check is what
+// makes it true — the test cannot see such a block, and this refuses to write
+// one.
+const wantStarts = desired.split(START).length - 1;
+const wantEnds = desired.split(END).length - 1;
+if (wantStarts !== 1 || wantEnds !== 1) {
+  console.error("Managed markers are incomplete or duplicated");
+  process.exit(2);
+}
 
 const starts = text.split(START).length - 1;
 const ends = text.split(END).length - 1;
@@ -476,25 +541,87 @@ if (starts !== ends || starts > 1) {
   process.exit(2);
 }
 
-function replaceBlock() {
-  if (starts === 1) {
-    const s = text.indexOf(START);
-    const e = text.indexOf(END, s) + END.length;
-    return text.slice(0, s) + desired + text.slice(e);
-  }
-  if (!text.trim()) return desired + "\n";
-  return text.trimEnd() + "\n\n" + desired + "\n";
+// Write-through policy (design.md:453, :478). The common shape here is
+// ~/.claude/CLAUDE.md -> ~/dotfiles/claude/CLAUDE.md, and writing through it
+// edits a file the user manages elsewhere, usually under git. The resolved
+// target counts as massa-ai-owned only once it already carries our marker pair
+// — the ownership proof this feature chose for these files (design.md
+// "Ownership proof for MASSA-AI.md"). This is the opposite of is_owned_target's
+// rule for skill directories, deliberately: see the comment there
+// (scripts/install-skills.sh:665-680). Removal is exempt because a link with no
+// block of ours is already "nochange" below, and refusing there would break
+// uninstall on a machine that merely symlinks its AGENTS.md.
+if (isLink && starts === 0 && (mode === "plan" || mode === "apply")) {
+  console.error(`Refusing to write through symlink: ${target}`);
+  process.exit(4);
 }
 
+// Where the bytes actually land. Renaming onto the link node would replace it
+// with a regular file and silently break the user's dotfiles indirection, so a
+// symlink we do own is followed to its resolved path.
+const writeTarget = isLink ? fs.realpathSync(target) : target;
+
+// fs.writeFileSync truncates in place: a kill or ENOSPC mid-write leaves the
+// file holding a start marker with no end marker, which the check above turns
+// into a hard exit 2 on every later run for every host (design.md:454). Temp
+// file plus rename makes the swap atomic — the same discipline
+// writeFileAtomically applies to config.json.
+function writeAtomic(file, contents) {
+  const dir = path.dirname(file);
+  fs.mkdirSync(dir, { recursive: true });
+  const tmp = path.join(dir, `.${path.basename(file)}.massa-ai.tmp-${process.pid}`);
+  fs.writeFileSync(tmp, contents);
+  // rename() installs the temp file's inode, so an existing file's mode would
+  // be lost — carry it forward rather than widening a 0600 CLAUDE.md to 0644.
+  try { fs.chmodSync(tmp, fs.statSync(file).mode & 0o777); } catch { /* new file */ }
+  try {
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    try { fs.unlinkSync(tmp); } catch { /* best effort */ }
+    throw err;
+  }
+}
+
+function replaceBlock() {
+  const s = text.indexOf(START);
+  const e = text.indexOf(END, s) + END.length;
+  return text.slice(0, s) + desired + text.slice(e);
+}
+
+// Append-only: every byte the file already holds survives verbatim. The old
+// `text.trimEnd()` rewrote the user's trailing whitespace, which is exactly
+// what BST-02 AC-4's byte-identical criterion forbids.
+//
+// No blank separator line is inserted, and that is a decision rather than an
+// omission. A separator has to be taken back on removal, and no rule can tell
+// our separator from a blank line the user already had: the migration fixture
+// (BST-05 AC-8) hands this engine a file whose user text ends in a blank line
+// with the block placed directly after it, and a `before.endsWith("\n\n")` trim
+// on removal eats that blank line — one byte the user wrote. Keeping the
+// separator therefore costs a real user byte on every migration, while dropping
+// it costs one blank line of markdown cosmetics in a generated section. The
+// byte wins. What remains is exactly invertible: this function adds a
+// terminator only when the last line lacks one, and removeBlock takes back only
+// the newline the block itself owns.
+function appendBlock() {
+  if (text === "") return desired + "\n";
+  let head = text;
+  if (!head.endsWith("\n")) head += "\n";  // terminate an unterminated last line
+  return head + desired + "\n";
+}
+
+// The exact inverse of appendBlock: the block owns its own trailing line
+// terminator and nothing else. Every byte before the start marker is the
+// caller's and survives untouched, so a hand-placed block sitting against user
+// text — the migration case — costs the user nothing. The old `.trim()` instead
+// ate every leading and trailing blank line in the whole file.
 function removeBlock() {
-  if (starts === 0) return text;
   const s = text.indexOf(START);
   const e = text.indexOf(END, s) + END.length;
   const before = text.slice(0, s);
   let after = text.slice(e);
-  if (before.endsWith("\n\n") && after.startsWith("\n")) after = after.slice(1);
-  const result = (before + after).trim();
-  return result ? result + "\n" : "";
+  if (after.startsWith("\n")) after = after.slice(1);
+  return before + after;
 }
 
 if (mode === "plan" || mode === "apply") {
@@ -509,8 +636,7 @@ if (mode === "plan" || mode === "apply") {
     process.stdout.write("change");
     process.exit(0);
   }
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, replaceBlock());
+  writeAtomic(writeTarget, starts === 1 ? replaceBlock() : appendBlock());
   process.stdout.write("change");
   process.exit(0);
 }
@@ -524,9 +650,204 @@ if (mode === "remove-plan") {
   process.stdout.write("change");
   process.exit(0);
 }
-fs.writeFileSync(target, removeBlock());
+const remaining = removeBlock();
+if (remaining === "" && !isLink) {
+  // BST-05 AC-9a/AC-9b: the managed block was the file's entire content, so
+  // writing "" would leave a 0-byte MASSA-AI.md — or a wiring file this
+  // installer created — as uninstall residue. Unlink instead. A symlink is
+  // excluded: dropping the node would strand our block inside the file it
+  // points at, and deleting that file is deleting a path the user chose to
+  // manage elsewhere.
+  fs.unlinkSync(target);
+} else {
+  writeAtomic(writeTarget, remaining);
+}
 process.stdout.write("change");
 NODE
+}
+
+# bootstrap_op MODE TARGET BODY_FILE [BACKUP_ON_CHANGE]
+# Policy layer over bootstrap_engine. With BACKUP_ON_CHANGE=1 an existing TARGET
+# is copied to TARGET.massa-ai.bak-<ts> before a mutating mode that would really
+# change it — a hand-edited MASSA-AI.md must survive the --apply that overwrites
+# it (design.md:452). The would-change guard is load-bearing: an unguarded
+# backup drops a second copy on every re-apply, including the ones that change
+# nothing. installer_backup_file (scripts/lib/installer-shared.sh:56) had no
+# production call site before this one.
+bootstrap_op() {
+  local mode="$1" target="$2" body_file="$3" backup="${4:-0}"
+  local plan_mode="" plan_verdict=""
+  if [ "$backup" = "1" ] && [ -f "$target" ]; then
+    case "$mode" in
+      apply) plan_mode="plan" ;;
+      remove-apply) plan_mode="remove-plan" ;;
+    esac
+    if [ -n "$plan_mode" ]; then
+      plan_verdict="$(bootstrap_engine "$plan_mode" "$target" "$body_file")" || return $?
+      if [ "$plan_verdict" = "change" ]; then
+        installer_backup_file "$target" >/dev/null
+      fi
+    fi
+  fi
+  bootstrap_engine "$mode" "$target" "$body_file"
+}
+
+# bootstrap_op_error RC TARGET — the engine's two failure modes read as
+# themselves. Mapping both onto the marker message would report a refused
+# symlink write as a corrupted file.
+bootstrap_op_error() {
+  case "$1" in
+    4) integration_error "Refusing to write through symlink: $2 — its target carries no massa-ai managed block" ;;
+    *) integration_error "Managed markers are incomplete or duplicated in $2" ;;
+  esac
+}
+
+# ── Bootstrap contract delivery ─────────────────────────────────────────────
+#
+# The contract body moved out of AGENTS.md and into a first-class per-host
+# MASSA-AI.md (BST-01), and each host is wired to load it through its own real
+# mechanism (BST-02..BST-04, design.md:204-209):
+#
+#   claude    ~/.claude/MASSA-AI.md            + an @MASSA-AI.md managed block
+#                                                in ~/.claude/CLAUDE.md, because
+#                                                Claude Code reads CLAUDE.md and
+#                                                never AGENTS.md
+#   codex     $CODEX_HOME/MASSA-AI.md          + a pointer block in AGENTS.md
+#   cursor    ~/.cursor/MASSA-AI.md            + a pointer block in AGENTS.md
+#   opencode  ~/.config/opencode/MASSA-AI.md   + the absolute path in the
+#                                                config's `instructions` array
+#
+# The destination is platform_root (:147-154), not installer_host_config_dir:
+# `git grep -c installer_host_config_dir -- scripts/install-skills.sh` returns
+# zero, this script has always carried its own map, and the two disagree on
+# Codex — installer-shared.sh:195 hardcodes a home-relative .codex while
+# platform_root returns the $CODEX_HOME resolved at :139-145, which prefers
+# ~/.codex but falls back to ~/.config/codex. Following the other one would
+# write the contract to ~/.codex on a ~/.config/codex machine: a silently
+# unwired host, the exact class the toggle engine's wiring probe exists to
+# detect.
+contract_path() { printf '%s/MASSA-AI.md' "$(platform_root "$1")"; }
+
+# bootstrap_render PLATFORM CONTRACT_OUT POINTER_OUT
+# Renders both documents for one host, each already wrapped in the managed
+# marker pair so bootstrap_op can take the file as its body argument. Warnings
+# (an unreadable config.json degrading to registry defaults, BST-10 AC-10b) and
+# errors reach stderr from the renderer itself, already named.
+#
+# --host-root is platform_root, the same expression contract_path uses above, so
+# the pointer names the file this script is about to write instead of one the
+# renderer re-derived. Not cosmetic on Codex: the renderer's own per-host map
+# hardcodes .codex, so on a ~/.config/codex machine the contract landed in the
+# fallback root while the pointer named a ~/.codex file that does not exist —
+# and the toggle engine probed the same wrong path (BST-04 AC-6, T26). The
+# ~/.codex-vs-~/.config/codex resolution stays at :139-145 and nowhere else.
+bootstrap_render() {
+  "$RENDER_RUNNER" "$REPO_ROOT/scripts/render-bootstrap.ts" \
+    --target-home "$TARGET_HOME" \
+    --host "$1" \
+    --host-root "$(platform_root "$1")" \
+    --source "$AGENTS_SOURCE" \
+    --repo-root "$REPO_ROOT" \
+    --contract-out "$2" \
+    --pointer-out "$3"
+}
+
+# The CLAUDE.md wiring block. Claude resolves `@` imports relative to the
+# containing file, so the bare relative form is what loads ~/.claude/MASSA-AI.md
+# from ~/.claude/CLAUDE.md — and it is the token the engine's wiring probe looks
+# for (packages/shared/src/bootstrap/engine.ts:369-373). Deliberately three
+# lines of wiring and no policy: the contract lives in MASSA-AI.md, and a second
+# copy here is what BST-04 AC-7 forbids for the pointer hosts for the same
+# reason.
+CLAUDE_IMPORT_FILE="$WORK_DIR/claude-import.md"
+{
+  printf '%s\n' "$BOOTSTRAP_START"
+  printf '## massa-ai Startup Contract\n\n'
+  printf '@MASSA-AI.md\n'
+  printf '%s\n' "$BOOTSTRAP_END"
+} > "$CLAUDE_IMPORT_FILE"
+
+# opencode_instructions_op MODE ROOT ENTRY
+# The `instructions` half of OpenCode's wiring, layered over
+# scripts/lib/opencode-config.cjs's instructionsOp (:268). instructionsOp, never
+# writeConfig: writeConfig takes exactly (targetPath, cfg) (:174), so a third
+# `mode` argument would be silently ignored by JS and the config written
+# unconditionally — defeating the plan modes with every gate green.
+#
+# stdout is "change" or "nochange", the same vocabulary bootstrap_engine uses.
+# Line 2 onward of stdout carries the notes instructionsOp returned, so the
+# caller can put the orphan-entry limitation into its report. Exit 5 = the
+# config is not parseable (BST-03 AC-11): the caller records that host and
+# returns, so sibling hosts still run and no partial change is written.
+opencode_instructions_op() {
+  "$RUNNER" - "$SCRIPT_DIR/lib/opencode-config.cjs" "$1" "$2" "$3" <<'NODE'
+const fs = require("fs");
+const [, , modulePath, mode, dir, entry] = process.argv;
+const { resolveConfigPath, parseJsonc, instructionsOp } = require(modulePath);
+
+const resolved = resolveConfigPath(dir);
+if (resolved.both) {
+  // spec.md edge case: OpenCode core merges opencode.json OVER opencode.jsonc,
+  // so editing the losing file would be a silent no-op. Edit the winner and say
+  // which one is shadowed.
+  console.error(`WARNING: both opencode.json and opencode.jsonc exist in ${dir}; editing ${resolved.path} — the other is shadowed`);
+}
+
+let cfg = {};
+if (!resolved.created && fs.existsSync(resolved.path)) {
+  try {
+    cfg = parseJsonc(fs.readFileSync(resolved.path, "utf8"));
+  } catch (err) {
+    console.error(`${resolved.path} is ${err.message}; refusing to overwrite it`);
+    process.exit(5);
+  }
+  if (typeof cfg !== "object" || cfg === null || Array.isArray(cfg)) {
+    console.error(`${resolved.path} is not a JSON object; refusing to overwrite it`);
+    process.exit(5);
+  }
+}
+
+const out = instructionsOp(mode, resolved.path, cfg, entry);
+process.stdout.write(out.result);
+for (const note of out.notes) process.stdout.write(`\n${note}`);
+NODE
+}
+
+# bootstrap_note PLATFORM VERDICT TARGET DONE_MSG WOULD_MSG
+# Turns one engine verdict into the run's record, and raises BOOTSTRAP_CHANGED
+# for the summary line. Always returns 0: a `verdict && flag=1` idiom would make
+# an unchanged last step the function's exit status, and under `set -e` that
+# aborts the whole run for every remaining host.
+BOOTSTRAP_CHANGED=0
+bootstrap_note() {
+  local p="$1" verdict="$2" target="$3" done_msg="$4" would_msg="$5"
+  [ "$verdict" = "change" ] || return 0
+  BOOTSTRAP_CHANGED=1
+  if [ "$DRY_RUN" = "1" ]; then
+    vinfo "$would_msg"
+    record "would-change" "$p" "$target" "$would_msg"
+  else
+    vinfo "$done_msg"
+    record "changed" "$p" "$target" "$done_msg"
+  fi
+  return 0
+}
+
+# check_bootstrap_note PLATFORM VERDICT TARGET MSG
+# One plan-mode verdict becomes one drift record for --check. A "change" verdict
+# means "what --apply would write differs from what is on disk", which is exactly
+# this report's definition of drift. It counts through the global
+# BOOTSTRAP_DRIFT for the same reason bootstrap_note counts through
+# BOOTSTRAP_CHANGED, and always returns 0 for the same reason too: a
+# `verdict && flag=1` idiom would make an already-up-to-date artifact the
+# function's exit status, and under `set -e` that aborts the whole run.
+BOOTSTRAP_DRIFT=0
+check_bootstrap_note() {
+  [ "$2" = "change" ] || return 0
+  BOOTSTRAP_DRIFT=$((BOOTSTRAP_DRIFT + 1))
+  vinfo "$4"
+  record "drift" "$1" "$3" "$4"
+  return 0
 }
 
 # Marker file for a copied skill: "$skills_dir/.massa-ai-owned-<name>". Lives
@@ -541,9 +862,18 @@ skill_marker_path() { # skill_marker_path SKILLS_DIR NAME
 
 # is_owned_target PLATFORM NAME TARGET SKILLS_DIR — 0 if massa-ai already owns
 # whatever currently occupies TARGET, 1 if it is foreign (never overwritten).
-#   - a symlink is always ours to replace: removing a symlink node never
-#     touches whatever it pointed to, and a symlink here is exactly the
-#     pre-copy (pre-migration) install shape.
+# Scope: skill *directories* under $root/skills/, and nothing else.
+#   - a symlink is always ours to replace, in this scope only: the caller's
+#     only action on an owned target is `rm -rf` of the node (:731), and
+#     removing a symlink node never touches whatever it pointed to, so the
+#     user's data is unreachable from here. A symlink at a skill path is also
+#     exactly the pre-copy (pre-migration) install shape.
+#   - bootstrap_engine holds the opposite rule and is not a contradiction of
+#     this one, because it does the one thing this scope never does: write
+#     through the link into the target's own bytes. There it refuses any
+#     symlink whose resolved target does not already carry our marker pair
+#     (:504-517, design.md:453/:478). Two policies, two subjects — replacing a
+#     node versus editing a file.
 #   - a name this run's state already tracks for the platform is ours.
 #   - a marker file for NAME is ours (state-loss safety net).
 is_owned_target() {
@@ -648,31 +978,91 @@ apply_platform() {
     done
   fi
 
-  local mode="apply" bootstrap_changed=0
-  [ "$DRY_RUN" = "1" ] && mode="plan"
-  local verdict
-  verdict="$(bootstrap_op "$mode" "$agents_md")" || integration_error "Managed markers are incomplete or duplicated in $agents_md"
-  if [ "$verdict" = "change" ]; then
-    bootstrap_changed=1
-    if [ "$DRY_RUN" = "1" ]; then
-      vinfo "Would write bootstrap block"
-      record "would-change" "$p" "$agents_md" "Would write bootstrap block"
-    else
-      vinfo "Bootstrap block written"
-      record "changed" "$p" "$agents_md" "Bootstrap block written"
-    fi
+  # ── Bootstrap contract and this host's load wiring ────────────────────────
+  # Two writes per host, never one. The contract file is the same on every host
+  # (assumption A4: one global rule state); the wiring is host-specific, and a
+  # contract written without it is a file no session ever loads — the
+  # `written-not-wired` state the toggle engine reports and this branch exists
+  # to avoid producing.
+  local mode="apply" remove_mode="remove-apply" bootstrap_changed=0
+  if [ "$DRY_RUN" = "1" ]; then mode="plan"; remove_mode="remove-plan"; fi
+  BOOTSTRAP_CHANGED=0
+
+  local verdict massa_ai_md contract_file pointer_file claude_md instr_out instr_verdict
+  massa_ai_md="$(contract_path "$p")"
+  contract_file="$WORK_DIR/contract-$p.md"
+  pointer_file="$WORK_DIR/pointer-$p.md"
+
+  # A render failure is this host's failure, not the run's: the per-host abort
+  # shape (:571-579) keeps sibling hosts running. It is never a default render —
+  # render-bootstrap.ts refuses by name rather than falling back to the registry
+  # defaults, because a contract that silently ignored every toggle would look
+  # exactly like a working install.
+  if ! bootstrap_render "$p" "$contract_file" "$pointer_file"; then
+    record "error" "$p" "$massa_ai_md" "Could not render the bootstrap contract — see the named error above"
+    state_replace "$p" "$root" "$installed" "repo"
+    return 0
   fi
+
+  # 1. The contract file (BST-01 AC-1, AC-2). Backed up first when an overwrite
+  #    would really differ, so a hand-edited MASSA-AI.md survives the --apply
+  #    that replaces it (design.md:452).
+  #    The record keeps the installer's existing "bootstrap block" vocabulary
+  #    rather than inventing a new one: MASSA-AI.md *is* the bootstrap block, it
+  #    is simply no longer a section of AGENTS.md, and
+  #    scripts/tests/test-install-skills-check.sh:135 reads that phrase as the
+  #    dry-run preview's sensor.
+  verdict="$(bootstrap_op "$mode" "$massa_ai_md" "$contract_file" 1)" || bootstrap_op_error $? "$massa_ai_md"
+  bootstrap_note "$p" "$verdict" "$massa_ai_md" "Bootstrap block written: $massa_ai_md" "Would write bootstrap block: $massa_ai_md"
+
+  # 2. The wiring, plus the migration of the pre-migration full block out of
+  #    AGENTS.md on the two hosts whose wiring lives elsewhere (BST-05 AC-8).
+  case "$p" in
+    claude)
+      # Claude Code reads CLAUDE.md and never AGENTS.md, which is why the
+      # contract has never loaded there at all (BST-02 AC-3).
+      claude_md="$root/CLAUDE.md"
+      verdict="$(bootstrap_op "$mode" "$claude_md" "$CLAUDE_IMPORT_FILE")" || bootstrap_op_error $? "$claude_md"
+      bootstrap_note "$p" "$verdict" "$claude_md" "Wired the contract into $claude_md" "Would wire the contract into $claude_md"
+      verdict="$(bootstrap_op "$remove_mode" "$agents_md" "$BOOTSTRAP_FILE")" || bootstrap_op_error $? "$agents_md"
+      bootstrap_note "$p" "$verdict" "$agents_md" "Migrated the legacy block out of $agents_md" "Would migrate the legacy block out of $agents_md"
+      ;;
+    codex|cursor)
+      # Neither host has an import directive, so the pointer block replaces the
+      # full block in place (BST-04 AC-6, AC-7; assumption A1).
+      verdict="$(bootstrap_op "$mode" "$agents_md" "$pointer_file")" || bootstrap_op_error $? "$agents_md"
+      bootstrap_note "$p" "$verdict" "$agents_md" "Wrote the contract pointer: $agents_md" "Would write the contract pointer: $agents_md"
+      ;;
+    opencode)
+      # BST-03 AC-11: an unparseable config aborts this host with a named error
+      # and writes no partial change to it. `record` and return, never `exit` —
+      # sibling hosts still run.
+      if ! instr_out="$(opencode_instructions_op "$mode" "$root" "$massa_ai_md")"; then
+        record "error" "$p" "$root" "OpenCode config could not be parsed — no change was written to it"
+        state_replace "$p" "$root" "$installed" "repo"
+        return 0
+      fi
+      instr_verdict="$(printf '%s' "$instr_out" | head -n1)"
+      bootstrap_note "$p" "$instr_verdict" "$root" "Wired the contract into the OpenCode instructions array" "Would wire the contract into the OpenCode instructions array"
+      verdict="$(bootstrap_op "$remove_mode" "$agents_md" "$BOOTSTRAP_FILE")" || bootstrap_op_error $? "$agents_md"
+      bootstrap_note "$p" "$verdict" "$agents_md" "Migrated the legacy block out of $agents_md" "Would migrate the legacy block out of $agents_md"
+      ;;
+  esac
+  bootstrap_changed="$BOOTSTRAP_CHANGED"
 
   state_replace "$p" "$root" "$installed" "repo"
 
-  # Cursor reads no global rules file: ~/.cursor/AGENTS.md is written for
-  # forward-compatibility (a global AGENTS.md is an open Cursor feature
-  # request), but Cursor 3.x applies global rules only from Cursor Settings →
-  # Rules, and auto-reads AGENTS.md per project root. Without this warning
-  # the bootstrap silently never reaches any Cursor session.
+  # Cursor reads no global rules file: ~/.cursor/MASSA-AI.md and the pointer
+  # block in ~/.cursor/AGENTS.md are written for forward-compatibility (a global
+  # AGENTS.md is an open Cursor feature request), but Cursor 3.x applies global
+  # rules only from Cursor Settings → Rules, and auto-reads AGENTS.md per
+  # project root. Without this warning the contract silently never reaches any
+  # Cursor session. Out of scope for this feature per the spec; the warning is
+  # the whole mitigation, so it has to name the file that now holds the
+  # contract.
   if [ "$p" = "cursor" ] && [ "$DRY_RUN" != "1" ] && [ "$JSON_OUT" = "0" ]; then
     warn "Cursor does not read ~/.cursor/AGENTS.md — it has no global rules file."
-    warn "  Global: paste the bootstrap block from ~/.cursor/AGENTS.md into Cursor Settings → Rules."
+    warn "  Global: paste the contract from ~/.cursor/MASSA-AI.md into Cursor Settings → Rules."
     warn "  Per project: Cursor auto-reads AGENTS.md at the project root."
   fi
 
@@ -746,23 +1136,84 @@ uninstall_platform() {
     [ "$DRY_RUN" = "1" ] || rmdir "$skills_dir" 2>/dev/null || true
   fi
 
+  # ── Bootstrap contract and wiring: the exact inverse of apply ─────────────
+  # Every artifact this feature can create is removed, and every other line of
+  # the files holding them is left alone (BST-05 AC-9). Where the managed block
+  # was a file's entire content the engine unlinks it rather than writing "",
+  # which is what keeps a 0-byte MASSA-AI.md — or a CLAUDE.md this installer
+  # created — off the uninstall residue (AC-9a, AC-9b).
   local bootstrap_changed=0
-  if [ -f "$agents_md" ]; then
-    local mode="remove-apply"
-    [ "$DRY_RUN" = "1" ] && mode="remove-plan"
-    local verdict
-    verdict="$(bootstrap_op "$mode" "$agents_md")" || integration_error "Managed markers are incomplete or duplicated in $agents_md"
-    if [ "$verdict" = "change" ]; then
-      bootstrap_changed=1
-      if [ "$DRY_RUN" = "1" ]; then
-        vinfo "Would remove bootstrap block"
-        record "would-change" "$p" "$agents_md" "Would remove bootstrap block"
-      else
-        vinfo "Bootstrap block removed"
-        record "changed" "$p" "$agents_md" "Bootstrap block removed"
-      fi
+  local mode="remove-apply"
+  [ "$DRY_RUN" = "1" ] && mode="remove-plan"
+  BOOTSTRAP_CHANGED=0
+
+  local verdict massa_ai_md claude_md instr_out instr_verdict instr_notes
+  massa_ai_md="$(contract_path "$p")"
+
+  # One removal covers both AGENTS.md shapes: the pre-migration full block on
+  # claude/opencode and the pointer block on codex/cursor use the same pair.
+  if [ -f "$agents_md" ] || [ -L "$agents_md" ]; then
+    verdict="$(bootstrap_op "$mode" "$agents_md" "$BOOTSTRAP_FILE")" || bootstrap_op_error $? "$agents_md"
+    bootstrap_note "$p" "$verdict" "$agents_md" "Removed the managed block from $agents_md" "Would remove the managed block from $agents_md"
+  fi
+
+  if [ -f "$massa_ai_md" ] || [ -L "$massa_ai_md" ]; then
+    verdict="$(bootstrap_op "$mode" "$massa_ai_md" "$BOOTSTRAP_FILE")" || bootstrap_op_error $? "$massa_ai_md"
+    bootstrap_note "$p" "$verdict" "$massa_ai_md" "Bootstrap block removed: $massa_ai_md" "Would remove bootstrap block: $massa_ai_md"
+  fi
+
+  if [ "$p" = "claude" ]; then
+    claude_md="$root/CLAUDE.md"
+    if [ -f "$claude_md" ] || [ -L "$claude_md" ]; then
+      verdict="$(bootstrap_op "$mode" "$claude_md" "$CLAUDE_IMPORT_FILE")" || bootstrap_op_error $? "$claude_md"
+      bootstrap_note "$p" "$verdict" "$claude_md" "Removed the contract import from $claude_md" "Would remove the contract import from $claude_md"
     fi
   fi
+
+  if [ "$p" = "opencode" ]; then
+    # An `instructions` entry is a bare string with nowhere to carry an
+    # ownership marker, so removal matches the exact absolute path this install
+    # wrote and says so — instructionsOp returns that limitation as a note and
+    # it is carried into the report rather than left implicit (design.md:440).
+    if instr_out="$(opencode_instructions_op "$mode" "$root" "$massa_ai_md")"; then
+      instr_verdict="$(printf '%s' "$instr_out" | head -n1)"
+      instr_notes="$(printf '%s' "$instr_out" | tail -n +2 | tr '\n' ';')"
+      bootstrap_note "$p" "$instr_verdict" "$root" \
+        "Removed the contract from the OpenCode instructions array — $instr_notes" \
+        "Would remove the contract from the OpenCode instructions array — $instr_notes"
+    else
+      record "error" "$p" "$root" "OpenCode config could not be parsed — its instructions entry was left in place"
+    fi
+  fi
+  bootstrap_changed="$BOOTSTRAP_CHANGED"
+
+  # ── Retained backups (BST-05 AC-9c) ───────────────────────────────────────
+  # A backup is the user's copy of bytes an install overwrote, so uninstall
+  # leaves every one of them exactly where it is: deleting them here would
+  # destroy the one artifact the overwrite existed to preserve. But a file left
+  # silently is a file the user never finds, which is why spec.md:106 makes
+  # naming it the other half of the criterion rather than an extra.
+  #
+  # Both writers put their copy beside the file they backed up, directly under
+  # $root — installer_backup_file (scripts/lib/installer-shared.sh:56) for
+  # MASSA-AI.md, and opencode-config.cjs's writeConfig for the OpenCode config —
+  # so `-maxdepth 1` is the whole population rather than a sample of it, and it
+  # also keeps this scan off the installed skills tree.
+  #
+  # `retained` is its own status deliberately. Nothing changed, and the JSON
+  # summary derives its top-level "changed" from exactly the `changed` and
+  # `would-change` tokens, so reusing one of those would make an uninstall that
+  # removed nothing still read as a mutation. It is not gated on ownership
+  # either: a retained backup is a fact about the filesystem, not a claim about
+  # who owns the platform.
+  local backup
+  while IFS= read -r backup; do
+    [ -n "$backup" ] || continue
+    vinfo "Left in place: $backup"
+    record "retained" "$p" "$backup" "Left in place: $backup"
+  done <<RETAINED_BACKUPS
+$(find "$root" -maxdepth 1 -name "*${MASSA_AI_BACKUP_SUFFIX}-*" 2>/dev/null | LC_ALL=C sort)
+RETAINED_BACKUPS
 
   # Only drop the platform record when this installer actually owns it —
   # dropping a plugin-owned record here would let a subsequent apply overwrite
@@ -852,6 +1303,62 @@ check_platform() {
         record "drift" "$p" "$target" "Stale copy: $name (skill no longer exists)"
       fi
     done
+
+    # ── Bootstrap contract and this host's wiring (BST-01 AC-10) ────────────
+    # Plan modes only. bootstrap_engine's "plan" and instructionsOp's "plan"
+    # make zero filesystem contact (T11), which is what lets --check compare
+    # against real drift and still write nothing — the T9 fingerprint assertion
+    # is the sensor for that (test-install-skills-bootstrap-file.sh scenario
+    # 12b), not the exit code.
+    #
+    # Inside the plugin-owned guard on purpose. No apps/*/install.sh has ever
+    # written a bootstrap block (design.md:242-246), so a plugin-owned host has
+    # never had the contract or any wiring; reporting that as drift would leave
+    # --check permanently red on every plugin install. That host is covered by
+    # the toggle engine's own wiring probe instead (design.md "Wiring probe").
+    #
+    # The engine's two failure exits — 2 for incomplete or duplicated markers,
+    # 4 for a foreign symlink — are drift here rather than the run-ending
+    # bootstrap_op_error --apply raises: a file whose markers are corrupted is
+    # not what --apply would produce, and --check's job is to say so for every
+    # host and keep going.
+    local massa_ai_md agents_md contract_file pointer_file verdict instr_out
+    massa_ai_md="$(contract_path "$p")"
+    agents_md="$root/AGENTS.md"
+    contract_file="$WORK_DIR/check-contract-$p.md"
+    pointer_file="$WORK_DIR/check-pointer-$p.md"
+    BOOTSTRAP_DRIFT=0
+    if ! bootstrap_render "$p" "$contract_file" "$pointer_file"; then
+      BOOTSTRAP_DRIFT=1
+      vinfo "Could not render the bootstrap contract to compare against $massa_ai_md"
+      record "drift" "$p" "$massa_ai_md" "Could not render the bootstrap contract to compare against $massa_ai_md"
+    else
+      verdict="$(bootstrap_engine "plan" "$massa_ai_md" "$contract_file")" || verdict="change"
+      check_bootstrap_note "$p" "$verdict" "$massa_ai_md" \
+        "Bootstrap contract differs from the rendered source: $massa_ai_md"
+      case "$p" in
+        claude)
+          verdict="$(bootstrap_engine "plan" "$root/CLAUDE.md" "$CLAUDE_IMPORT_FILE")" || verdict="change"
+          check_bootstrap_note "$p" "$verdict" "$root/CLAUDE.md" \
+            "Contract import missing or altered: $root/CLAUDE.md"
+          ;;
+        codex|cursor)
+          verdict="$(bootstrap_engine "plan" "$agents_md" "$pointer_file")" || verdict="change"
+          check_bootstrap_note "$p" "$verdict" "$agents_md" \
+            "Contract pointer missing or altered: $agents_md"
+          ;;
+        opencode)
+          if instr_out="$(opencode_instructions_op "plan" "$root" "$massa_ai_md")"; then
+            verdict="$(printf '%s' "$instr_out" | head -n1)"
+          else
+            verdict="change"
+          fi
+          check_bootstrap_note "$p" "$verdict" "$root" \
+            "Contract path missing from the OpenCode instructions array: $massa_ai_md"
+          ;;
+      esac
+    fi
+    drift_count=$((drift_count + BOOTSTRAP_DRIFT))
   fi
 
   # Double-surface probe (PRT-08, claude only): a repo-owned skills install
