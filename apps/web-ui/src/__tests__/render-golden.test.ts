@@ -35,6 +35,17 @@
  *    write mode, its `data-action="config-save"` button — and no byte before it
  *    changed. Every other case in the fixture is byte-untouched, so the
  *    pre-split-behavior guarantee still holds for all of them.
+ *
+ * 2. T38 — the same two cases moved again because the `bootstrap` section's
+ *    **label** changed from "Bootstrap" to "Startup Contract", ending a
+ *    collision with the Memory section's pre-existing "Bootstrap …" fields
+ *    (`memory.bootstrap`, memory seeding — unrelated). The section `key` and
+ *    the persisted `bootstrap.rules` path are untouched; this is display text.
+ *    The delta was measured, not assumed: the case list is identical (88
+ *    before and after), exactly 2 cases differ, each by +7 bytes, and
+ *    substituting `>Startup Contract<` back to `>Bootstrap<` reproduces the
+ *    previous string **byte-for-byte** in both — so the change is that one
+ *    substitution and nothing else, and the other 86 cases are untouched.
  */
 
 import { describe, it, expect } from "bun:test";

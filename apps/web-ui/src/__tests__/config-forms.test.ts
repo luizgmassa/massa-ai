@@ -757,3 +757,81 @@ describe("bootstrap section — the amended A12 contract (T37)", () => {
     expect(section).not.toContain("disabled");
   });
 });
+
+
+// ── T38: one name, one subject — the Bootstrap label collision ─────────────
+
+/**
+ * `memory.bootstrap` (memory seeding: "Bootstrap Enabled", "Bootstrap Max
+ * Seeds", "Bootstrap Centrality Limit", "Bootstrap Git Log Limit", "Bootstrap
+ * Refresh") predates this feature and lives in the **Memory** section. This
+ * feature added a top-level `bootstrap` config key whose section was also
+ * labelled "Bootstrap", so the Config tab showed two unrelated Bootstrap
+ * surfaces and neither name identified its subject. The section `key` stays
+ * `bootstrap` — it is the persisted path `bootstrap.rules` (BST-10 AC-11),
+ * already written on real machines — and only the display `label` moved.
+ *
+ * The assertion below is the **whole measured collision set**, not a check
+ * scoped to `bootstrap`. Scoping it to `bootstrap` would go green on the one
+ * case it was written for and stay blind to the next label that collides; and
+ * an exact set, rather than a count, is what forces a reviewer to say whether
+ * a new entry is two related surfaces or two unrelated ones. Measured before
+ * the fix: 7 collisions, 5 of them `Bootstrap`. After: 2.
+ *
+ * The 2 that remain are accepted, not overlooked. The Memory section against
+ * the Scheduler's "Memory Consolidation …" fields is one subject named
+ * consistently in two places — the scheduler job really does consolidate
+ * memory — which is the opposite of the Bootstrap case, where two unrelated
+ * subjects shared a word. Do not "fix" them by loosening this assertion; if a
+ * later change makes them genuinely ambiguous, rename them and shrink the set.
+ */
+describe("Config tab section labels — no unrelated surface shares a name (T38)", () => {
+  interface LabelledSection { key: string; label: string; fields: { label: string }[] }
+
+  /** Every (section label, foreign field label) pair where the field label is
+   *  the section's label verbatim or that label followed by a space — the
+   *  shape a user reads as "this field belongs to that section". */
+  function labelCollisions(): string[] {
+    const sections = CONFIG_SECTIONS as unknown as LabelledSection[];
+    const found: string[] = [];
+    for (const section of sections) {
+      for (const other of sections) {
+        if (other.key === section.key) continue;
+        for (const field of other.fields) {
+          if (field.label === section.label || field.label.startsWith(section.label + " ")) {
+            found.push(`${section.label}|${field.label}|${other.key}`);
+          }
+        }
+      }
+    }
+    return found.sort();
+  }
+
+  it("the bootstrap section is labelled 'Startup Contract', matching the CLI's own words", () => {
+    const section = (CONFIG_SECTIONS as unknown as LabelledSection[]).find((s) => s.key === "bootstrap");
+    expect(section).toBeDefined();
+    // The key is the persisted config path and must not move with the label.
+    expect(section!.key).toBe("bootstrap");
+    expect(section!.label).toBe("Startup Contract");
+    // `config-cli.ts:86` lists "every startup-contract rule"; a user arriving
+    // from `massa-ai-config bootstrap list` meets the same words here.
+    expect(section!.label).not.toBe("Bootstrap");
+  });
+
+  it("renders 'Startup Contract' as the section heading while Memory keeps its Bootstrap fields", () => {
+    const html = renderConfig(SAMPLE_CONFIG_DATA, { writeMode: true });
+    expect(html).toContain('<h3 class="config-section-header">Startup Contract</h3>');
+    expect(html).not.toContain('<h3 class="config-section-header">Bootstrap</h3>');
+    // The other side of the collision is untouched — this ends the ambiguity
+    // by renaming the newcomer, not by hiding the incumbent.
+    expect(html).toContain('data-field="bootstrap.maxSeedMemories"');
+    expect(html).toContain("Bootstrap Max Seeds");
+  });
+
+  it("the full label-collision set is exactly the 2 accepted Memory/Scheduler pairs", () => {
+    expect(labelCollisions()).toEqual([
+      "Memory|Memory Consolidation Enabled|scheduler",
+      "Memory|Memory Consolidation Interval (ms)|scheduler",
+    ]);
+  });
+});

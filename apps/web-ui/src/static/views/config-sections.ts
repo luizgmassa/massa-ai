@@ -232,7 +232,23 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
   },
   bootstrap: {
     key: "bootstrap",
-    label: "Bootstrap",
+    // Label, not key. The key is the persisted config path `bootstrap.rules`
+    // (spec BST-10 AC-11) and is already written on real machines, so moving
+    // it would need a spec amendment plus a migration; `CONFIG_SECTIONS_BY_KEY`
+    // is a mapped type over `ConfigSectionKey` besides. Display text is where
+    // the collision actually was: `memory.bootstrap` predates this section and
+    // surfaces in the Memory section as "Bootstrap Enabled", "Bootstrap Max
+    // Seeds", "Bootstrap Centrality Limit", "Bootstrap Git Log Limit" and
+    // "Bootstrap Refresh" — memory seeding, unrelated to these rule toggles.
+    // Two "Bootstrap" surfaces in one tab meant neither name identified its
+    // subject.
+    //
+    // "Startup Contract" is not invented here: `config-cli.ts:86` already
+    // describes this exact registry as "every startup-contract rule", and
+    // CLAUDE.md calls `AGENTS.md` "the canonical agent startup contract". So a
+    // user arriving from `massa-ai-config bootstrap list` meets the same words,
+    // and the label shares none with Memory's "Bootstrap …" fields.
+    label: "Startup Contract",
     fields: [
       // `json`, not one boolean field per rule id: the nine ids live in
       // `packages/shared/src/bootstrap/rules.ts`, not here, and this section
