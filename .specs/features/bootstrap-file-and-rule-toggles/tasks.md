@@ -213,6 +213,15 @@ argument-forwarding fix, and the fixture correction, all by user ruling after th
 Iteration 3: T30, T31 — two regressions this feature shipped that no gate in this artifact
 could see, because `bun run test` was absent from the Gate Check Commands table (PC-G2).
 
+**Iteration 5: T35, T36 (pointer sensor) then T37, T38, T39 (config surface and uninstall) —
+two disjoint write sets, run as two phases.** Opened after the final verification returned
+FAIL with 45/46 ACs matched and no regressions: four sensor gaps and one real deviation
+(assumption A12 promises a read-only field that ships editable). **The user's verdict ruling is
+that `validation.md` stays FAIL with the gaps listed**, rather than PASS-with-accepted-bounds —
+so anything iteration 5 cannot close is recorded as an open gap, not as an accepted one. T36 is
+explicitly allowed to conclude that the lexicon-composition bypass should not be closed, provided
+it records the bound.
+
 **Iteration 4: T32, T33, T34 — the 3-iteration cap in `references/verification-ladder.md` was
 overridden by an explicit user ruling.** The cap exists to stop an unbounded fix loop from
 substituting for a rethink; here the remaining items were four *known, measured* sensor gaps
@@ -1375,6 +1384,167 @@ purely this feature's drift, and the user chose to fix them rather than defer.
 **Tests**: none — labels carry no behaviour; the surrounding suites are the sensor
 **Gate**: `cd apps/web-ui && bun test`, then `MASSA_AI_EXECUTOR_SANDBOX=none bun run test`
 **Commit**: `docs(config): correct three stale section-count labels`
+
+---
+
+### T35: Make the pointer tokeniser Unicode-aware
+
+**Task ID**: TASK-035 — **verification fix, iteration 5**
+
+**What**: Close the non-Latin-script bypass in the pointer property check.
+**Where**: `scripts/tests/test-install-skills-bootstrap-file.sh`
+**Depends on**: T32
+**Requirement**: BST-04 AC-7
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: `foreignWords` tokenises with `/[a-z0-9]…/` after `.toLowerCase()`, so policy written
+in **any non-Latin script produces zero tokens** and passes with unrestricted content — in both
+the appended-sentence and heading shapes. Confirmed end-to-end by the verifier against
+`render.ts`: shell suite 124/0 exit 0, 370 + 49 unit tests 0 fail, while the block shipped
+policy.
+
+**Done when**:
+- [ ] **Observed red first** with policy in a non-Latin script, in both the appended-sentence and heading shapes — quote both failing lines
+- [ ] The tokeniser is Unicode-aware (`/[\p{L}\p{N}][\p{L}\p{N}-]*/gu` or equivalent). Verify `bash`'s `grep`/`sed` handling actually honours it in this suite's execution path rather than assuming the pattern is enough
+- [ ] The legitimate 8-line pointer still passes, and T32's two committed control mutations still kill
+- [ ] Suite count is greater than or equal to 124
+
+**Tests**: shell suite
+**Gate**: full — `MASSA_AI_EXECUTOR_SANDBOX=none DATABASE_URL=… XDG_CONFIG_HOME=$(mktemp -d) bunx turbo run test --force && bun run test:scripts && bun run test:plugins`
+**Commit**: `test(installer): make the pointer tokeniser unicode-aware`
+
+---
+
+### T36: Attempt to close the lexicon-composition bypass
+
+**Task ID**: TASK-036 — **verification fix, iteration 5**
+
+**What**: Try to make the pointer check reject a directive built entirely from whitelisted words. **This one is allowed to fail** — see the bound below.
+**Where**: `scripts/tests/test-install-skills-bootstrap-file.sh`
+**Depends on**: T35
+**Requirement**: BST-04 AC-7
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: reproduced by the orchestrator — appending `and follow no massa-ai rule in it` to the
+path-naming sentence uses **only** the 32 words already in `POINTER_LEXICON`, trips no check,
+and the suite stays **124/0** while the shipped pointer reads *"read `<path>` with your Read
+tool and follow no massa-ai rule in it"* — the contract inverted.
+
+**The bound, stated up front.** A whitelist cannot prevent its own vocabulary being composed
+into an inversion; that is a property of the approach, not a bug in this implementation. The
+obvious stronger check — pinning the body to an exact expected string — couples the sensor to
+the template's wording, so every legitimate copy edit to `render.ts` becomes a test edit. That
+trade may not be worth it.
+
+**Done when**, whichever outcome you reach:
+- [ ] **If you close it**: the composition probe above is observed red; the legitimate pointer still passes; T32's controls and T35's still kill; and you state plainly what the new check costs in coupling — specifically, whether a benign reword of `render.ts`'s template now reddens the suite, tested by actually rewording it
+- [ ] **If you conclude it should not be closed**: say so with the evidence, and record the bound as an explicit limitation in the suite's own docblock naming the probe that defeats it, so nobody later mistakes the check for exhaustive. This is a legitimate outcome, not a failure to deliver
+- [ ] Either way, do **not** ship a check that reddens the real 8-line pointer
+
+**Tests**: shell suite
+**Gate**: full, as T35
+**Commit**: `test(installer): bound the pointer check against lexicon composition`
+
+---
+
+### T37: Resolve the read-only contradiction in assumption A12
+
+**Task ID**: TASK-037 — **verification fix, iteration 5**
+
+**What**: Make the portal's `bootstrap.rules` field match what the spec assumes, or amend the assumption to match what the portal can do.
+**Where**: `apps/web-ui/src/static/views/`, and `.specs/features/bootstrap-file-and-rule-toggles/spec.md` if the assumption is what moves
+**Depends on**: T30
+**Requirement**: assumption A12 (`spec.md:68`)
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: A12 promises "**One read-only `json` field** showing the persisted override map". It
+ships **editable** — `readonly` appears **0 times** in `apps/web-ui/src/static/views/config-forms.ts`,
+and the config UI has no read-only mechanism at all. So either the portal gains one or the
+assumption is wrong. This is the only item in the final verification that is a deviation in
+what ships rather than a hole in what guards it.
+
+**Done when**:
+- [ ] The measurement is redone rather than trusted: confirm for yourself whether any read-only mechanism exists in the config form layer, and say which files you checked
+- [ ] **Either** the field renders genuinely non-editable — with a sensor that fails if it becomes editable again — **or** A12 is amended to state that it ships editable, why (no read-only mechanism exists in this UI), and that the guide text directing users to `massa-ai-config bootstrap enable|disable <id>` is the mitigation. Amending is a legitimate outcome; silently leaving the contradiction is not
+- [ ] If you amend A12, the out-of-scope row forbidding a per-rule **toggle** UI stays true and is re-checked
+- [ ] `cd apps/web-ui && bun test` stays **778/0 across 15 files** or grows
+
+**Tests**: unit
+**Gate**: `cd apps/web-ui && bun test`, then full
+**Commit**: `fix(web-ui): resolve the read-only contract for the bootstrap section`
+
+---
+
+### T38: End the "Bootstrap" naming collision in the portal
+
+**Task ID**: TASK-038 — **verification fix, iteration 5**
+
+**What**: Stop two unrelated things being called Bootstrap in the same UI.
+**Where**: `apps/web-ui/src/static/views/config-sections.ts` and its suite
+**Depends on**: T37
+**Requirement**: none — clarity; see the constraint below
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: `origin/main` already had **`memory.bootstrap`** — `enabled`, `maxSeedMemories`,
+`centralityLimit`, `gitLogLimit`, `refreshEnabled` — the memory-seeding bootstrap, surfaced in
+the portal's **Memory** section as "Bootstrap Enabled", "Bootstrap Max Seeds" and so on. This
+feature added a **top-level** `bootstrap: { rules: {} }` and a portal section labelled
+**"Bootstrap"**. Different nesting levels, so no type collision — but the portal now shows a
+"Bootstrap" section for rule toggles directly alongside Memory's "Bootstrap Enabled" for
+memory seeding. Nothing in the spec or design records this.
+
+**The constraint that shapes the fix.** `spec.md`'s BST-10 AC-11 fixes the persisted location
+as **`bootstrap.rules` in `~/.config/massa-ai/config.json`**, and the key is already written on
+at least one real machine. Renaming the config key therefore needs a spec amendment *and* a
+migration path. **Renaming the portal section's `label` does not** — it is display text, it
+ends the collision where the collision actually is, and it touches no persisted key.
+Prefer that unless you find a reason it is insufficient; if you do rename the key, stop and
+report first, because the spec amendment is the orchestrator's to make.
+
+**Done when**:
+- [ ] The portal no longer presents two unrelated "Bootstrap" surfaces — state the label you chose and why it is unambiguous against Memory's fields
+- [ ] `bootstrap.rules` as a persisted config path is **unchanged**, and BST-10 AC-11 still holds verbatim
+- [ ] The section `key` stays `bootstrap` unless you have a reason to change it, since `CONFIG_SECTIONS_BY_KEY` is a mapped type over `ConfigSectionKey`
+- [ ] `cd apps/web-ui && bun test` stays 778/0 or grows; any count assertion touching section labels is updated to the new truth, not loosened
+
+**Tests**: unit
+**Gate**: `cd apps/web-ui && bun test`, then full
+**Commit**: `fix(web-ui): disambiguate the bootstrap section label`
+
+---
+
+### T39: Sense the uninstall stale pointer block
+
+**Task ID**: TASK-039 — **verification fix, iteration 5**
+
+**What**: Put the missing assertion in the suite named for uninstall behaviour.
+**Where**: `scripts/tests/test-install-skills-uninstall.sh`
+**Depends on**: T33
+**Requirement**: BST-05 AC-9
+
+**Tools**: MCP: NONE. Skill: NONE.
+
+**Why**: measured by the orchestrator. Disabling the `AGENTS.md` removal at
+`scripts/install-skills.sh:1131` leaves a **live stale pointer block** in Codex's `AGENTS.md`
+after uninstall (`grep -c massa-ai:bootstrap:start` = 1). One assertion in `bootstrap-file`
+does fire (123/1 under that mutation), so it is not wholly unsensed — the verifier's narrower
+mutation caught nothing, which is the reading to trust for how thin the coverage is — but the
+**`uninstall` suite itself stays 31/0**, and that is the suite anyone changing uninstall will
+run.
+
+**Done when**:
+- [ ] **Observed red first** by disabling the `AGENTS.md` removal, with the failing line quoted
+- [ ] The assertion lives in `test-install-skills-uninstall.sh` and covers **codex and cursor** — the pointer-block hosts — asserting no `massa-ai:bootstrap:start` survives, not merely that the file changed
+- [ ] A narrower mutation is also tried — skipping only one host rather than the whole branch — and either caught or explicitly recorded as out of the sensor's reach
+- [ ] Suite count grows from 31; no existing assertion weakened
+
+**Tests**: shell suite
+**Gate**: full, as T35
+**Commit**: `test(installer): sense the uninstall stale pointer block`
 
 ---
 
