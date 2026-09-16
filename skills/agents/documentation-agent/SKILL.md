@@ -3,7 +3,7 @@ name: documentation-agent
 description: Engineering documentation agent. Generate README, ADR, RFC, changelog, KDoc, and architecture documentation. Default read-only; writes only doc files when explicitly scoped with a disjoint write set. Triggers when a workflow needs documentation artifacts. Never modifies implementation.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: light
   permission: write

@@ -3,7 +3,7 @@ name: massa-ai
 description: Default memory-backed workflow router for every coding, planning-before-coding, debugging, code review, refactoring, or implementation conversation. Always load it once per new coding session, select specialized workflows first, and use the general fallback otherwise. Handles massa-ai recall/search, durable memory, context compaction, handoff, audits, specs, ADR/RFC/TDD, and evidence gates. Do NOT use for generic non-coding chat or bulk-loading every workflow/reference.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
 ---
 

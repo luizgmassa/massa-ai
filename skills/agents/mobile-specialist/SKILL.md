@@ -3,7 +3,7 @@ name: mobile-specialist
 description: Conditional mobile expertise agent. Provide Android, Kotlin, Compose, KMP, Swift, iOS, Gradle, CocoaPods, performance, lifecycle, and offline-sync guidance. Invoked only when the workflow detects a mobile-related project. Read-only. Triggers on mobile detection signals; refuses non-mobile targets.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only

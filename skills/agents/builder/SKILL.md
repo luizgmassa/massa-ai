@@ -3,7 +3,7 @@ name: builder
 description: Write-permitted implementation agent. Implement approved plans by modifying source code, creating files, and updating existing code while following project conventions. Triggers when a workflow has an approved plan or task with a disjoint write set. Never redesigns architecture, performs reviews, or generates implementation plans.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: standard
   permission: write

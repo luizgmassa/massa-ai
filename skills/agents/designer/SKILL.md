@@ -3,7 +3,7 @@ name: designer
 description: Screen implementation and design-conformance agent. Verify and implement user-facing screens against their design source, reading Figma through MCP when a link or node id is supplied. Default read-only; writes only UI-layer files when explicitly scoped with a disjoint write set. Triggers whenever a task creates or modifies a screen. Owns screen-vs-design conformance only; no production logic outside the UI layer.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: standard
   permission: write

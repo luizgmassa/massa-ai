@@ -3,7 +3,7 @@ name: architecture-specialist
 description: Read-only architecture guidance agent. Evaluate architecture, suggest boundaries, recommend abstractions, evaluate trade-offs, and suggest modularization. Folds the existing domain-mapper, coupling-auditor, and deepening-architect roles into one specialist. Triggers when a workflow needs architectural guidance before or during design. Never implements or rewrites code.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only

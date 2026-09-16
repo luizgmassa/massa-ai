@@ -3,7 +3,7 @@ name: verification-agent
 description: Read-only verification agent. Centralize Verification Ladder logic by validating outputs, choosing the verification level, executing the verification checklist, detecting incomplete work, and producing verification reports. Triggers as the mandatory final gate before a task is claimed complete. Never modifies implementation.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only

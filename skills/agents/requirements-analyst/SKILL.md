@@ -3,7 +3,7 @@ name: requirements-analyst
 description: Read-only requirements analysis agent. Detect ambiguity, missing requirements, contradictions, implicit requirements, and uncovered scenarios before implementation. Triggers during the Specify phase when gray areas, persistence, external calls, auth, payments, concurrency, or state transitions affect behavior. Never implements.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only

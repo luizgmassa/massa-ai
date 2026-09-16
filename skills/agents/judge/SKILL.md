@@ -3,7 +3,7 @@ name: judge
 description: Debate-panel evaluator for judge-with-debate. Score an artifact against the meta-judge's evaluation specification with quoted evidence, then defend or revise scores across up to 3 debate rounds until the panel reaches consensus. Writes only its own judge-N report file per dispatch. Never judges outside the specification, never revises without quoted evidence.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.2.0"
   model_tier: deep
   permission: write

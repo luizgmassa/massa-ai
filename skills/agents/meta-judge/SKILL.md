@@ -3,7 +3,7 @@ name: meta-judge
 description: Read-only evaluation-specification author for judge-with-debate. Generate the tailored rubric, criteria, weights, and checklists that a panel of judge agents uses to evaluate an artifact through independent analysis and multi-round debate. Runs exactly once per evaluation. Never scores the artifact, never edits the specification after emission.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.1.0"
   model_tier: deep
   permission: read-only

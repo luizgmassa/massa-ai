@@ -3,7 +3,7 @@ name: context-curator
 description: Read-only context preparation agent. Decide which files to open, retrieve memories, use Synapse when appropriate, apply Context Firewall rules, and produce a concise Context Packet consumed by other agents. Triggers when a workflow needs the minimum high-quality context before dispatching a planner, builder, or reviewer. Never implements, reviews, or plans.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only
