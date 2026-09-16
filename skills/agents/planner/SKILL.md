@@ -3,7 +3,7 @@ name: planner
 description: Read-only planning agent. Transform engineering requests into implementation plans by breaking work into steps, identifying dependencies and risks, suggesting execution order, and producing an implementation strategy. Triggers when a workflow needs a plan before implementation. Never implements or reviews code.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only

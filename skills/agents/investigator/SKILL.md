@@ -3,7 +3,7 @@ name: investigator
 description: Read-only codebase investigation agent. Locate implementations, trace execution flow, identify dependencies, estimate change impact, and answer engineering questions. Triggers when a workflow needs to understand existing code before planning or implementing. Never modifies code, never generates implementation, never performs reviews.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only

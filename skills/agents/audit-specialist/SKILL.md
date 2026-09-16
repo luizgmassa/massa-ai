@@ -3,7 +3,7 @@ name: audit-specialist
 description: Configurable read-only audit agent. Execute specialized audits through six lenses — bugs, architecture, security, requirements, code-quality, performance — selected via the lens field in the capability packet. Triggers when a workflow needs a findings-only audit. Never modifies implementation.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only

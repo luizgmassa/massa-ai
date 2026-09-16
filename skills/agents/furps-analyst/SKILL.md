@@ -3,7 +3,7 @@ name: furps-analyst
 description: Read-only FURPS+ dimension analyst. Analyze exactly one FURPS+ dimension (F, U, R, P, S, or X) of a PRD or ADR against its checklist section and return structured refinement findings. Triggers when the furps-refinement workflow fans out per-dimension analysis. Never analyzes other dimensions, never writes files, never mutates Atlassian issues.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only

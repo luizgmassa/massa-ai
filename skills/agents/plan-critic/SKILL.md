@@ -3,7 +3,7 @@ name: plan-critic
 description: Read-only plan-challenge agent. Stress-test a constructed plan, surface the assumption most likely to fail, name the deterministic check that would falsify success, and return a bounded critique for the lite or full Plan Challenge gate. Triggers after a concrete plan exists. Never edits the plan, never implements, never expands scope.
 license: MIT
 metadata:
-  author: S1LV4, luizgmassa
+  author: Luiz Massa
   version: "1.0.0"
   model_tier: deep
   permission: read-only
