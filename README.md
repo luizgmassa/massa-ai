@@ -129,7 +129,9 @@ File: `~/.config/opencode/opencode.json`
       "type": "local",
       "command": [
         "bunx",
-        "@massa-ai/mcp-client"
+        "-p",
+        "@massa-ai/mcp-client",
+        "massa-ai"
       ],
       "environment": {
         "MASSA_AI_API_URL": "http://localhost:3333"
@@ -152,7 +154,7 @@ File: `~/.config/opencode/opencode.json`
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "massa-ai": {
       "type": "local",
       "command": ["bun", "run", "/path/to/massa-ai/apps/mcp-client/src/index.ts"],
@@ -161,6 +163,10 @@ File: `~/.config/opencode/opencode.json`
   }
 }
 ```
+
+> OpenCode's MCP key is `mcp`, not `mcpServers`. Do not copy Claude's or
+> Cursor's shape here — `scripts/install-agents.sh --agent opencode` writes the
+> correct one for you.
 
 **Events wired (in-process, 6 lifecycle handlers):** `session.created`,
 `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`,
@@ -222,10 +228,12 @@ automated, copy this into `.git/hooks/post-merge` (and `chmod +x` it):
 cd "$(git rev-parse --show-toplevel)" && bun run generate:artifacts
 ```
 
-Standalone `massa-ai-config agents install` run against an ungenerated
-checkout fails (the source `agents/`/`agent-profiles/` directories it copies
-from do not exist yet) until `bun run generate:artifacts` has run at least
-once. Tarball installs are unaffected — they ship pre-generated.
+Standalone `massa-ai-config agents install` (the `@massa-ai/opencode-plugin`
+bin — the `@massa-ai/mcp-client` bin of the same name has no `agents`
+subcommand) run against an ungenerated checkout fails (the source
+`agents/`/`agent-profiles/` directories it copies from do not exist yet) until
+`bun run generate:artifacts` has run at least once. Tarball installs are
+unaffected — they ship pre-generated.
 
 On Claude Code the plugin ships its own hooks, so running `install.sh` after a
 plugin install skips the hook merge instead of double-firing. On Codex the two
@@ -259,8 +267,11 @@ Direct per-host installs (`apps/<host>-plugin/install.sh --user`) behave
 exactly as before, plus the same version recording.
 
 **Shared binary:** Claude Code, Codex, and Cursor all use the same
-`massa-ai-hook.ts` Bun binary from `apps/claude-plugin/hooks/`. Codex and
-Cursor symlink to it. OpenCode uses in-process handlers (no external hooks file).
+`massa-ai-hook.ts` Bun binary from `apps/claude-plugin/hooks/`. Codex and Cursor
+each ship a **generated real copy** at `hooks/massa-ai-hook` — not a symlink,
+because `npm pack` silently drops symlink entries and the hook would have been
+absent from every published tarball. OpenCode uses in-process handlers (no
+external hooks file).
 
 **MCP has exactly one writer.** `scripts/install-agents.sh` owns every host's
 MCP config; the plugin installers call it for you (`--agent claude-code` /
@@ -287,11 +298,21 @@ architecture-specialist, test-engineer, documentation-agent,
 audit-specialist, mobile-specialist, designer, plan-critic, furps-analyst,
 navigator, meta-judge, judge) as host-native subagent definitions, registered
 under the prefixed names `massa-ai-<role>`.
-Model + effort are pinned per host: Claude `effort: high` + aliases
-(haiku/sonnet/opus); Codex `model_reasoning_effort = "high"` + IDs
-(gpt-5.4-mini/gpt-5.6-terra/gpt-5.6-sol); Cursor/OpenCode
-`reasoningEffort: max` + charter model hints (DeepSeek V4 Pro / GLM-5.2 /
-MiniMax M3 / kimi-k3). See [FEATURES.md → Subagent Skills (18 Specialists)](./FEATURES.md#subagent-skills-18-specialists)
+
+Model + effort are pinned per host, resolved at build time from
+`skills/model-profiles.json` — the only hand-authored place that names a model
+or an effort level for any agent on any host. Under the default `balanced`
+profile: Claude `effort: high` + aliases (haiku/sonnet/opus); Codex
+`model_reasoning_effort = "high"` + IDs
+(gpt-5.4-mini/gpt-5.6-terra/gpt-5.6-sol); OpenCode `reasoningEffort: max` +
+`opencode-go/` IDs (deepseek-v4-pro / glm-5.2 / minimax-m3); **Cursor
+deliberately resolves every tier to `model: inherit`**, because Cursor
+publishes no display-name→ID mapping and its frontmatter schema carries no
+effort key at all. Seven profiles ship (`balanced`, `cheap`, `heavy`, `work`,
+`home`, plus OpenCode-only `open_models` and `local_models`) and an installed
+machine switches between them at runtime — see
+[FEATURES.md → Model Profile Switching](./FEATURES.md#model-profile-switching).
+See [FEATURES.md → Subagent Skills (18 Specialists)](./FEATURES.md#subagent-skills-18-specialists)
 for the full per-agent model/effort/permission tables, file locations, and
 the generator + parity-test contract.
 
@@ -306,18 +327,21 @@ tables and [FEATURES.md](./FEATURES.md#plugins-4-tool-parity) for details.
 
 ## Skills & Install System
 
-The repo ships a set of repo-local skills plus a unified installer that symlinks them into each tool's config directory. The per-plugin installers (above) handle hooks + MCP + subagent specialists; this installer handles skills and the bootstrap contract.
+The repo ships a set of repo-local skills plus a unified installer that copies them into each tool's config directory. The per-plugin installers (above) handle hooks + MCP + subagent specialists; this installer handles skills and the bootstrap contract.
 
 ### Included skills
 
 | Skill | Location | Purpose |
 |-------|----------|---------|
-| `massa-ai` | `skills/massa-ai/` | Workflow router (spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
+| `massa-ai` | `skills/massa-ai/` | Workflow router (40 workflows: spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
 | `persona-router` | `skills/persona-router/` | Automatic persona selection from catalog (`skills/massa-ai/personas/`) |
+| `profile` | `skills/profile/` | Switch the installed agents to a registry model profile, or report the active one |
+| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the nine startup-contract rules delivered by `MASSA-AI.md` |
+| `agents/<n>` | `skills/agents/` | The 18 sub-agent specialist charters |
 
 ### Unified skills installer
 
-Symlinks all `skills/*/SKILL.md` into each detected tool's config dir and writes the bootstrap contract block into the tool's `AGENTS.md`. Symlink-based — updates to the repo are immediately reflected without re-running.
+Installs every skill bundle into each detected tool's config dir and delivers the startup contract. Installs are **real copies, not symlinks** — nothing installed depends on this checkout staying where it was installed from, which also means a repo edit is only picked up by re-running `--apply`.
 
 ```bash
 # Install skills for all detected tools
@@ -329,16 +353,32 @@ bash scripts/install-skills.sh --apply --platform claude --yes
 # Preview changes (write nothing)
 bash scripts/install-skills.sh --dry-run --platform all
 
-# Check for drift (exit 1 if symlinks missing or pointing wrong)
+# Check for drift (exit 1 if an installed copy is missing or stale)
 bash scripts/install-skills.sh --check --platform all
 
-# Uninstall (remove only massa-ai-owned symlinks + bootstrap block)
+# Uninstall (remove only massa-ai-owned copies + the contract wiring)
 bash scripts/install-skills.sh --uninstall --platform all --yes
 ```
 
+**The startup contract is a file, not an inlined block.** The contract body lives
+in a per-host `MASSA-AI.md` at that host's config root; the host is then wired to
+load it through its own real mechanism:
+
+| Platform | Skills dir | Contract | Wiring |
+|----------|-----------|----------|--------|
+| Claude Code | `~/.claude/skills/<name>` | `~/.claude/MASSA-AI.md` | `@MASSA-AI.md` managed block in `~/.claude/CLAUDE.md` (Claude Code reads `CLAUDE.md`, never `AGENTS.md`) |
+| Codex | `$CODEX_HOME/skills/<name>` | `$CODEX_HOME/MASSA-AI.md` | pointer block in `AGENTS.md` |
+| Cursor | `~/.cursor/skills/<name>` | `~/.cursor/MASSA-AI.md` | pointer block in `AGENTS.md` |
+| OpenCode | `~/.config/opencode/skills/<name>` | `~/.config/opencode/MASSA-AI.md` | absolute path in the config's `instructions` array |
+
+Nine contract rules ship (`caveman`, `massa-ai-router`, `persona-router`,
+`dedupe-guardrails`, `plan-challenge`, `conversation-feedback`,
+`indexing-hygiene`, `english-code`, `code-comments`), each individually
+toggleable at runtime — `massa-ai-config bootstrap list|enable|disable`.
+
 **State:** `~/.config/massa-ai/install-state.json` (v2 format; v1 auto-migrates).
 
-**Safety:** aborts on non-symlink conflict (won't overwrite user files); `--dry-run` and `--check` write nothing; requires `--yes` for real `$HOME`.
+**Safety:** aborts on a foreign conflict at a target path (won't overwrite user files); `--dry-run` and `--check` write nothing; requires `--yes` for real `$HOME`.
 
 ### MCP registration
 
@@ -430,11 +470,18 @@ Migrated documentation for massa-ai workflows lives in `docs/`:
 | Maestro | `docs/massa-ai-maestro.md` |
 | Mobile Figma | `docs/massa-ai-mobile-figma.md` |
 | Context Slices | `docs/context-slices.md` |
+| Cheatsheet (commands, flags, tools, skills, agents) | `docs/CHEATSHEET.md` |
 | Onboarding (generated) | `docs/ONBOARDING.md` — see [Understanding the codebase](#understanding-the-codebase) |
+
+### Running the MCP server from Docker
+
+For a Docker deployment, point the host at the `mcp` compose service instead of a
+local checkout. OpenCode shape (`opencode.json`) shown; Claude/Cursor use
+`mcpServers` with a string `command` plus an `args` array:
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "massa-ai": {
       "type": "local",
       "command": ["docker", "compose", "run", "--rm", "-i", "mcp"],
@@ -563,7 +610,7 @@ materially benefit its flow — e.g. `spec-driven` and `long-session` use
 checkpoints for task save/resume; `debug` uses `trace_path` for call-path
 tracing and `execute_file` for large-file analysis; `architecture-audit` uses
 `impact_analysis` and `get_architecture`; `onboarding` uses `bootstrap`. See
-[FEATURES.md → Workflow Tools (52-Tool Adoption)](./FEATURES.md#workflow-tools-52-tool-adoption)
+[FEATURES.md → Workflow Tools (59-Tool Adoption)](./FEATURES.md#workflow-tools-59-tool-adoption)
 for the full tool-to-workflow adoption map.
 
 ---
@@ -631,8 +678,8 @@ polish, query understanding (rewrite + HyDE), LLM-judge rerank, and auto
 importance scoring. Set it `false` (the default) and every one of those silently
 falls back to its rule-based path.
 
-> **Per-task model routing (new 2026-07-09):** the 11 LLM call sites split by
-> task shape. The 8 NL-judgment sites (salience judge, consolidator,
+> **Per-task model routing:** the 10 LLM call sites split by
+> task shape. The 7 NL-judgment sites (salience judge, consolidator,
 > observation/auto-improve jobs, handoff summary, query rewrite, HyDE) use
 > `MASSA_AI_LLM_MODEL`; the 3 code-oriented sites (bootstrap `SeedMemoriesSchema`,
 > reranker, `code-compressor`) use `MASSA_AI_LLM_CODE_MODEL`. Routing is per-call via
@@ -903,8 +950,28 @@ curl -X POST http://localhost:3333/api/v1/proposal/list \
 ## Configuration
 
 Config file: `~/.config/massa-ai/config.json` (auto-created on first run).
-The canonical annotated reference for every environment variable is
+Precedence is env > `config.json` > literal defaults. The canonical annotated
+reference for every environment variable is
 [`.env.example`](./.env.example) — mirror it into `.env` and edit there.
+
+The `massa-ai-config` CLI (a bin of `@massa-ai/mcp-client`, and of
+`@massa-ai/opencode-plugin`) is the front for everything stored there:
+
+```bash
+massa-ai-config show                              # current configuration
+massa-ai-config path                              # config file path
+massa-ai-config init --mistral your-api-key       # or --ollama (default) / --openai <key>
+massa-ai-config use ollama --model qwen3-embedding:4b
+massa-ai-config set embedding.dimensions 1024
+massa-ai-config recover my-project --path /new/path   # re-associate a moved index
+massa-ai-config profile list                      # shipped profiles + per-host active one
+massa-ai-config profile set work --dry-run
+massa-ai-config bootstrap list                    # the nine startup-contract rules
+massa-ai-config bootstrap disable caveman
+```
+
+The two bins differ slightly: `recover` ships only on the `mcp-client` bin, and
+`agents install|uninstall` only on the `opencode-plugin` bin.
 
 **See [FEATURES.md](./FEATURES.md#configuration) for the complete environment
 variable table, search quality tuning, operational knobs, embedding providers,
@@ -922,11 +989,16 @@ and config CLI commands.**
 | `bun run dev:mcp` | MCP server with watch |
 | `bun run start:api` | Start REST API |
 | `bun run start:mcp` | Start MCP server |
-| `bun run test` | Run tests |
+| `bun run test` | Workspace tests (turbo — does **not** reach `scripts/` or the plugin suites) |
+| `bun run test:scripts` | Root-level suites: `scripts/__tests__` + `scripts/tests` |
+| `bun run test:plugins` | All four plugin `__tests__/` directories |
+| `bun run test:coverage` | The 90%-per-file coverage floor |
 | `bun run lint` | Lint code (oxlint, `correctness` rules — CI-enforced) |
 | `bun run lint:fix` | Apply oxlint's safe auto-fixes |
 | `bun run type-check` | Type checking |
+| `bun run generate:artifacts` | Regenerate the skill/agent/command bundles (add `--check` to diff only) |
 | `bun run diagnose` | Validate full stack (Ollama, database, embeddings) |
+| `bun run version:sync` | Bump root + workspace versions (all bumps go through this) |
 | `bun run bench:fixture` | Run the massa-ai retrieval fixture benchmark |
 
 > **`dev:ui` was removed.** Its target (`@massa-ai/ui-client`) did not exist.
