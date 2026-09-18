@@ -228,4 +228,3 @@ User asks: "Specify offline draft sync, design it, create tasks, implement it, a
 4. Include Tasks because execution has dependency complexity.
 5. Execute one approved task at a time.
 6. Finish Execute with independent validation, including the discrimination sensor, then write `validation.md`.
-<!-- validator anchors: .specs/ files | current repository source and approved .specs/ artifacts override stale memory | .specs/ directory missing | 3 verification iterations -->

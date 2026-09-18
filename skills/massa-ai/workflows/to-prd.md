@@ -187,4 +187,3 @@ To-PRD is done when every requirement has an ID, acceptance criteria are testabl
 - **Code analysis:** Use massa-ai tools first (`list_projects`, `search`, `project_map`, `optimized_context`) before `ast-grep`/`rg`/`grep` for the explore step. Current source overrides a stale index or memory (source-precedence rule).
 - **Memory:** Persist verified outcomes worth reusing with `remember`, tagging `project:<id>`, `session:<id>`, `workflow:to-prd`, `entity:<slug>`, `memory:working|episodic|semantic|procedural`.
 - **Validation:** Evidence-or-zero. Every requirement resolved and assumption logged is checked against current source.
-<!-- validator anchors: references/project-context.md | read-only workflow | no implementation-delivery/code-annotation/root-cause-scripts | no Isolation Gate | no Reuse Scan -->

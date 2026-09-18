@@ -10,6 +10,8 @@ Classify implementation size before editing:
 - Standard: <=10 files or <=500 changed LOC within one ownership area, or shared behavior/public API/test impact that still has clear acceptance criteria and no unresolved architecture decision.
 - Spec-driven: >10 files, >500 changed LOC, multiple ownership areas, unclear acceptance criteria, new dependency, migration, irreversible operation, security/privacy/auth, public compatibility, cross-service contract, or any unresolved architecture/product decision.
 
+Get the file and LOC halves from `bun skills/massa-ai/scripts/size_change.ts` (`--staged` for the index, `--range <a>..<b>` for a range) rather than counting a diff by eye. It reports changed files, changed LOC (added + deleted), and the resulting **size floor**. The qualitative half of each bullet above — acceptance criteria, dependencies, migrations, irreversible operations, security/privacy/auth, public compatibility, cross-service contracts, unresolved decisions — is invisible to a diff, so the script's answer is a lower bound: raise it when any of those applies, never lower it.
+
 Quick tasks can proceed inside the active workflow. Standard tasks need an explicit verification recipe before edits. Spec-driven tasks should route to `workflows/spec-driven.md` or be split into atomic tasks.
 
 ## Shared Reference Trigger Table

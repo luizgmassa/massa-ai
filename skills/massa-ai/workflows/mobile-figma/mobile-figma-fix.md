@@ -143,5 +143,3 @@ User asks: "Fix the shared KMP spacing finding and its iOS host mismatch."
 
 1. Re-detect the common Compose and iOS host surfaces, load KMP plus the matching UIKit or SwiftUI contract, and verify the report schema/freshness.
 2. Apply the shared fix first, then the host-specific fix only if the mismatch remains; rebuild Android/iOS rows affected by the shared change.
-
-<!-- validator anchors: Independent Verification Exception | surviving_mutant | Bounded Fix→Re-verify Loop | Fix Closure Report Contract | gate-command packet | satisfied-by-citation | graceful degradation preserved | Discrimination Sensor for Visual Parity -->

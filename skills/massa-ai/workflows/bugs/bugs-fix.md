@@ -131,6 +131,3 @@ User asks: "Fix BUG-2 from audits/bugs/2026-06-07 bugs-audit.md."
 1. Read the specified report and only execute `BUG-2`.
 2. Preserve other bug findings for later.
 3. Report evidence for `BUG-2` closure and residual risks.
-
-<!-- validator anchors: "Independent Verification Exception", "the divergence-point fix just applied", "audits/bugs/<YYYY-MM-DD bugs-fix-closure>.md", "check_fix_closure.ts <closure.md> --family bugs", "The red→green reproduction proves the regression test catches this bug", "Bounded Fix→Re-verify Loop" -->
-

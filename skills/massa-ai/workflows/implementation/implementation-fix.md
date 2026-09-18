@@ -132,6 +132,3 @@ User asks: "Fix Security/SEC-2 from audits/implementation/2026-06-15 implementat
 1. Read the exact report and validate `Security/SEC-2` against current source.
 2. Apply security-fix methods only to that finding.
 3. Preserve all other findings for later execution.
-
-<!-- validator anchors: "Fix Closure Report defined in `references/audit-report-io.md`", "audits/implementation/<YYYY-MM-DD implementation-fix-closure>.md", "bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family implementation", "discrimination sensor per `references/discrimination-sensor.md`", "surviving_mutant` lessons signal", "graceful degradation preserved", "Independent Verification Exception", "brownfield-mapping.md` (Minimum Bar only)" -->
-

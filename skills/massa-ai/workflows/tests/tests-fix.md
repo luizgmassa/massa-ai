@@ -135,5 +135,3 @@ User asks: "Use tests-fix to fix latest audit findings for report scheduling."
 3. Map each finding to missing coverage, weak assertions, fixture drift, flakiness, or missing sensor work.
 4. Add or repair deterministic tests without weakening validation assets.
 5. Run focused tests and report broader skipped checks when needed.
-
-<!-- validator anchors: references/discrimination-sensor.md | references/knowledge-verification-chain.md | references/brownfield-mapping.md (Minimum Bar's TESTING.md only) | Independent Verification Exception | mandatory per the verification-ladder's Independent Verification Mandate for any TST finding | discrimination sensor per references/discrimination-sensor.md (mutate the new/repaired test's subject; the test must kill it) | Sequence the TST proof in two passes | surviving_mutant lessons signal | Bounded Fix→Re-verify Loop | Fix Closure Report Contract | audits/tests/<YYYY-MM-DD tests-fix-closure>.md | bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family tests | graceful degradation preserved -->

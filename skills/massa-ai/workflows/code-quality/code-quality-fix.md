@@ -134,6 +134,3 @@ User asks: "Use code-quality-fix to fix latest findings for billing services."
 3. Execute confirmed non-suspect findings by severity and behavior risk.
 4. Prefer delete/inline/rename/extract before introducing new abstractions.
 5. Verify behavior and validation assets after each finding group.
-
-<!-- validator anchors: references/discrimination-sensor.md; references/knowledge-verification-chain.md; references/brownfield-mapping.md; Independent Verification Exception; Fix Closure Report Contract; check_fix_closure.ts --family code-quality; Bounded Fix→Re-verify Loop; Stage 3 delivery-authorization scope -->
-

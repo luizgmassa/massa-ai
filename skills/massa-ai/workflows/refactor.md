@@ -99,6 +99,3 @@ Before the first repository mutation, load `references/implementation-delivery.m
 
 - `.specs/refactors/<slug>/` unwritable: block the write per `references/artifact-persistence.md`; do not fall back to memory or chat as the record of characterization evidence.
 - Discrimination sensor mutation not safely reversible: mark the claim `Blocked` unless equivalent existing deterministic mutation evidence already proves the characterization tests discriminate for that moved code.
-
-<!-- validator anchors: massa-ai-verification-agent dispatch block; Independent Verification Mandate; Independent Verification Exception; discrimination sensor mutate the moved code; characterization tests must kill it; P0 payment/auth/data-integrity/public-contract; .specs/refactors/<slug>/CHARACTERIZATION.md; .specs/refactors/<slug>/SENSOR.md; check_specs_delivered.ts --kind refactor; check_specs_delivered.ts --kind quick; graceful degradation preserved; Stage 3 delivery authorization; Bounded Fix→Re-verify Loop; two-consecutive-failed-fix edit-attempt breaker; Brownfield Minimum Bar; knowledge-verification-chain.md -->
-

@@ -7,7 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Three deterministic harness scripts, replacing arithmetic and shell transcription the
+  workflows used to spell out in prose.** All Bun builtins, zero dependencies, same shape as
+  `check_commit.ts`. `size_change.ts` reads `git diff --numstat` and reports changed files,
+  changed LOC (added + deleted — a 100-line rewrite is 200, not 0) and the Verification
+  Ladder's **size floor**; it is deliberately a floor, since the ladder's other half
+  (migrations, auth, public compatibility, unresolved decisions) is invisible to a diff.
+  `resolve_scope.ts --scope modified|range|branch|files|whole` emits the shared audit scope
+  packet as JSON — type, target focus, resolution method, base, head, resolved files, applied
+  exclusions, freshness — and refuses rather than inventing a base when none resolves.
+  `ensure_worktree.ts` runs Stage 0–1 of the Implementation Delivery Protocol and prints the
+  worktree path and branch, applying the Stage 1 table's own failure rules: a taken branch
+  name is suffixed, and a taken worktree path is reused only when its branch matches. It can
+  emit exactly the two legal skip reasons and no third. Each is wired in from the one
+  reference that owns its rule, and covered by `scripts/__tests__/massa-ai-harness-scripts.test.ts`
+  (29 tests, boundaries probed on both sides).
+- **`workflow-anchors.json`, a fixture that makes the validator anchors mean something.** The
+  16 inline `<!-- validator anchors: ... -->` comments shipped in the agent-loaded workflow
+  bodies and nothing ever read them, so they went stale silently — two were already describing
+  prose that had been deleted. They move to `scripts/__tests__/workflow-anchors.json`, split
+  into 100 `present` entries (a literal substring, now asserted per file) and 34 `notes`
+  (paraphrases and claims of absence, which a substring check cannot express and which are
+  therefore carried, not asserted). Re-adding an inline comment fails the gate.
+
 ### Changed
+
+- **`workflows/commit.md` now runs `check_commit.ts` instead of describing what it checks.**
+  The script existed and was documented as implementing `commit.md` §8, but `commit.md` never
+  invoked it — its only caller was `references/spec-driven/execute.md`. Message shape, allowed
+  type, description casing, trailing period, the `[<KEY>] ` Jira prefix and the
+  `!`/`BREAKING CHANGE:` pairing are now a non-zero exit that blocks the commit. The rules the
+  script cannot decide (type precedence between two defensible types, the 50-character target,
+  body requirements, attribution) stay in prose, and one silent contradiction is resolved:
+  `commit.md` listed `revert` in its type precedence order while the script rejected it.
 
 - **The workflow corpus stops restating what its references already own.** Three families of
   per-workflow prose are deleted and resolved through the reference that is the single source:
@@ -23,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mandated uniformity and is untouched.
 
 ### Fixed
+
+- **`check_commit.ts` rejected `revert`**, a type `workflows/commit.md` §8 tells the agent to
+  pick from. Wiring the script in as a blocking gate would have made the workflow instruct a
+  message it then refused.
 
 - **Three dead references in `workflows/skill-architect.md`.** The validator invocation named
   `bun scripts/validate_skill.ts`, which resolves nowhere — every other scripted command in

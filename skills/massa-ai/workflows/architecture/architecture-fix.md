@@ -144,5 +144,3 @@ User asks: "Fix finding ARCH-2 from audits/architecture/2026-06-06 architecture-
 1. Read the specified report and only execute `ARCH-2`.
 2. Preserve unaffected architecture findings for later.
 3. Report evidence for `ARCH-2` closure and residual risks.
-
-<!-- validator anchors: Stage 3 delivery-authorization scope | Independent Verification Exception | surviving_mutant | Bounded Fix→Re-verify Loop | Fix Closure Report Contract | CONCERNS.md is satisfied by citation | graceful degradation preserved -->

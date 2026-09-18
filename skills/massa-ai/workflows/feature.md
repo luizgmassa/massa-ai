@@ -100,6 +100,3 @@ If verification fails, bound the retry with the Bounded Fix→Re-verify Loop cap
    - New patterns introduced via `remember` as scored `pattern` memories
    - Trade-offs accepted via `remember` as scored `conversation` memories
 15. Complete the Evidence Gate from `references/evidence-gate.md`
-
-<!-- validator anchors: massa-ai-verification-agent dispatch block; Independent Verification Mandate (Standard tier and above); Bounded Fix→Re-verify Loop cap (3 iterations); validate_state.ts <slug> deterministic backing; graceful degradation preserved; .specs/quick/NNN-slug/TASK.md and SUMMARY.md; .specs/features/<slug>/spec.md and validation.md; one feature-level delivery go-ahead across PR groups -->
-

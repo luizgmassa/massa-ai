@@ -134,6 +134,3 @@ User asks: "The login route returns 500 after deploy."
 6. Define the verification recipe: rerun the original route check, add or update regression coverage at the failing seam, and confirm validation assets were not weakened.
 7. If root cause is a missing `DATABASE_URL`, persist via `remember`: a semantic decision memory for the root cause and a procedural pattern memory for the deploy-env verification command.
 8. At Standard+ size, dispatch `massa-ai-verification-agent` to independently re-run the reproduction against the `DATABASE_URL` fix and confirm the regression test kills a mutant on the restored connection check before closing.
-
-<!-- validator anchors: brownfield Minimum Bar gate | references/knowledge-verification-chain.md | prove the coverage discriminates | Dispatch: `massa-ai-verification-agent` | Independent Verification Exception | Bounded Fix→Re-verify Loop | .specs/debug/<slug>/REPORT.md | check_specs_delivered.ts <slug> --kind debug | graceful degradation preserved | references/artifact-persistence.md | ## Failure Handling -->
-

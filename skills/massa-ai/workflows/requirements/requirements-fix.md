@@ -129,5 +129,3 @@ User asks: "Use requirements-fix to fix latest audit for checkout flow."
 3. Build a requirement traceability matrix.
 4. Fix mandatory gaps and contradictions before lower-severity docs/test issues.
 5. Verify against the cited requirement source.
-
-<!-- validator anchors: Linked .specs/ Requirement ID | Independent Verification Exception | audits/requirements/<YYYY-MM-DD requirements-fix-closure>.md | check_fix_closure.ts <closure.md> --family requirements | surviving_mutant | Bounded Fix→Re-verify Loop | Requirement Traceability Update | graceful degradation preserved -->

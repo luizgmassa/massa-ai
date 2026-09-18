@@ -131,6 +131,3 @@ User asks: "Use security-fix to fix latest audit findings for user routes."
 3. Fix critical/high exploit paths first.
 4. Add negative tests for denied access, invalid input, or redacted output.
 5. Run deterministic tests and report residual security risk.
-
-<!-- validator anchors: every SEC finding closed `fixed` — never optional, at every tier | guard-mutation discrimination sensor | Fix Closure Report Contract | security-fix-closure | consult it before working the finding | append any newly discovered security hotspot | Urgency does not expand delivery authorization | Bounded Fix→Re-verify Loop | graceful degradation preserved -->
-

@@ -1,0 +1,224 @@
+{
+  "architecture/architecture-fix.md": {
+    "present": [
+      "Stage 3 delivery-authorization scope",
+      "Independent Verification Exception",
+      "surviving_mutant",
+      "Bounded Fix→Re-verify Loop",
+      "Fix Closure Report Contract",
+      "CONCERNS.md is satisfied by citation",
+      "graceful degradation preserved"
+    ],
+    "notes": []
+  },
+  "bugs/bugs-fix.md": {
+    "present": [
+      "Independent Verification Exception",
+      "the divergence-point fix just applied",
+      "audits/bugs/<YYYY-MM-DD bugs-fix-closure>.md",
+      "check_fix_closure.ts <closure.md> --family bugs",
+      "The red→green reproduction proves the regression test catches this bug",
+      "Bounded Fix→Re-verify Loop"
+    ],
+    "notes": []
+  },
+  "code-quality/code-quality-fix.md": {
+    "present": [
+      "references/discrimination-sensor.md",
+      "references/knowledge-verification-chain.md",
+      "references/brownfield-mapping.md",
+      "Independent Verification Exception",
+      "Fix Closure Report Contract",
+      "Bounded Fix→Re-verify Loop",
+      "Stage 3 delivery-authorization scope"
+    ],
+    "notes": [
+      "check_fix_closure.ts --family code-quality"
+    ]
+  },
+  "debug.md": {
+    "present": [
+      "brownfield Minimum Bar gate",
+      "references/knowledge-verification-chain.md",
+      "prove the coverage discriminates",
+      "Dispatch: `massa-ai-verification-agent",
+      "Independent Verification Exception",
+      "Bounded Fix→Re-verify Loop",
+      ".specs/debug/<slug>/REPORT.md",
+      "check_specs_delivered.ts <slug> --kind debug",
+      "graceful degradation preserved",
+      "references/artifact-persistence.md",
+      "## Failure Handling"
+    ],
+    "notes": []
+  },
+  "feature.md": {
+    "present": [
+      "graceful degradation preserved"
+    ],
+    "notes": [
+      "massa-ai-verification-agent dispatch block",
+      "Independent Verification Mandate (Standard tier and above)",
+      "Bounded Fix→Re-verify Loop cap (3 iterations)",
+      "validate_state.ts <slug> deterministic backing",
+      ".specs/quick/NNN-slug/TASK.md and SUMMARY.md",
+      ".specs/features/<slug>/spec.md and validation.md",
+      "one feature-level delivery go-ahead across PR groups"
+    ]
+  },
+  "general.md": {
+    "present": [
+      "Independent Verification Mandate",
+      "risk-domain set named in step 3",
+      ".specs/quick/NNN-slug/SUMMARY.md",
+      "Minimum Bar sweep",
+      ".specs/project/onboarding/",
+      "Bounded Fix→Re-verify Loop"
+    ],
+    "notes": [
+      "massa-ai-verification-agent dispatch block",
+      "check_specs_delivered.ts --kind quick",
+      "Stage 3 delivery authorization"
+    ]
+  },
+  "implementation/implementation-fix.md": {
+    "present": [
+      "Fix Closure Report defined in `references/audit-report-io.md",
+      "audits/implementation/<YYYY-MM-DD implementation-fix-closure>.md",
+      "bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family implementation",
+      "discrimination sensor per `references/discrimination-sensor.md",
+      "surviving_mutant` lessons signal",
+      "graceful degradation preserved",
+      "Independent Verification Exception",
+      "brownfield-mapping.md` (Minimum Bar only)"
+    ],
+    "notes": []
+  },
+  "maestro/maestro-fix.md": {
+    "present": [
+      "references/discrimination-sensor.md",
+      "Discrimination Sensor (Flow Mutation)",
+      "first fix touching an unmapped Maestro workspace",
+      "Independent Verification Mandate",
+      "Bounded Fix→Re-verify Loop",
+      "Fix Closure Report Contract",
+      "audits/maestro/<YYYY-MM-DD maestro-fix-closure>.md",
+      "graceful degradation preserved"
+    ],
+    "notes": [
+      "references/brownfield-mapping.md (Minimum Bar only)",
+      "surviving_mutant lessons signal",
+      "check_fix_closure.ts --family maestro"
+    ]
+  },
+  "mobile-figma/mobile-figma-fix.md": {
+    "present": [
+      "Independent Verification Exception",
+      "surviving_mutant",
+      "Bounded Fix→Re-verify Loop",
+      "Fix Closure Report Contract",
+      "gate-command packet",
+      "satisfied-by-citation",
+      "graceful degradation preserved",
+      "Discrimination Sensor for Visual Parity"
+    ],
+    "notes": []
+  },
+  "pr-review.md": {
+    "present": [
+      "page to completion",
+      "two waves"
+    ],
+    "notes": [
+      "comment-only",
+      "added (+) diff lines"
+    ]
+  },
+  "refactor.md": {
+    "present": [
+      "Independent Verification Mandate",
+      "Independent Verification Exception",
+      ".specs/refactors/<slug>/SENSOR.md",
+      "graceful degradation preserved",
+      "Stage 3 delivery authorization",
+      "Bounded Fix→Re-verify Loop",
+      "Brownfield Minimum Bar",
+      "knowledge-verification-chain.md"
+    ],
+    "notes": [
+      "massa-ai-verification-agent dispatch block",
+      "discrimination sensor mutate the moved code",
+      "characterization tests must kill it",
+      "P0 payment/auth/data-integrity/public-contract",
+      ".specs/refactors/<slug>/CHARACTERIZATION.md",
+      "check_specs_delivered.ts --kind refactor",
+      "check_specs_delivered.ts --kind quick"
+    ]
+  },
+  "requirements/requirements-fix.md": {
+    "present": [
+      "Linked .specs/ Requirement ID",
+      "Independent Verification Exception",
+      "audits/requirements/<YYYY-MM-DD requirements-fix-closure>.md",
+      "check_fix_closure.ts <closure.md> --family requirements",
+      "surviving_mutant",
+      "Bounded Fix→Re-verify Loop",
+      "Requirement Traceability Update",
+      "graceful degradation preserved"
+    ],
+    "notes": []
+  },
+  "security/security-fix.md": {
+    "present": [
+      "every SEC finding closed `fixed` — never optional, at every tier",
+      "guard-mutation discrimination sensor",
+      "Fix Closure Report Contract",
+      "security-fix-closure",
+      "consult it before working the finding",
+      "append any newly discovered security hotspot",
+      "Urgency does not expand delivery authorization",
+      "Bounded Fix→Re-verify Loop",
+      "graceful degradation preserved"
+    ],
+    "notes": []
+  },
+  "spec-driven.md": {
+    "present": [],
+    "notes": [
+      ".specs/ files",
+      "current repository source and approved .specs/ artifacts override stale memory",
+      ".specs/ directory missing",
+      "3 verification iterations"
+    ]
+  },
+  "tests/tests-fix.md": {
+    "present": [
+      "references/discrimination-sensor.md",
+      "references/knowledge-verification-chain.md",
+      "Independent Verification Exception",
+      "mandatory per the verification-ladder's Independent Verification Mandate for any TST finding",
+      "Sequence the TST proof in two passes",
+      "Bounded Fix→Re-verify Loop",
+      "Fix Closure Report Contract",
+      "audits/tests/<YYYY-MM-DD tests-fix-closure>.md",
+      "bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family tests",
+      "graceful degradation preserved"
+    ],
+    "notes": [
+      "references/brownfield-mapping.md (Minimum Bar's TESTING.md only)",
+      "discrimination sensor per references/discrimination-sensor.md (mutate the new/repaired test's subject; the test must kill it)",
+      "surviving_mutant lessons signal"
+    ]
+  },
+  "to-prd.md": {
+    "present": [
+      "references/project-context.md"
+    ],
+    "notes": [
+      "read-only workflow",
+      "no implementation-delivery/code-annotation/root-cause-scripts",
+      "no Isolation Gate",
+      "no Reuse Scan"
+    ]
+  }
+}

@@ -113,6 +113,3 @@ User asks: "Fix MST-2 from audits/maestro/2026-06-29 maestro-audit.md."
 1. Read and validate the saved report.
 2. Reinspect current flow evidence and fix only the targeted Maestro flow/subflow/fixture surface.
 3. Run the report's Verification Suggestion or equivalent Maestro command and report the closure matrix.
-
-<!-- validator anchors: references/discrimination-sensor.md | Discrimination Sensor (Flow Mutation) | references/brownfield-mapping.md (Minimum Bar only) | first fix touching an unmapped Maestro workspace | Independent Verification Mandate | Bounded Fix→Re-verify Loop | surviving_mutant lessons signal | Fix Closure Report Contract | audits/maestro/<YYYY-MM-DD maestro-fix-closure>.md | check_fix_closure.ts --family maestro | graceful degradation preserved -->
-

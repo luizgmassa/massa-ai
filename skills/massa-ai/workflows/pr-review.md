@@ -243,4 +243,3 @@ with the metadata table intact.
   convention) with the required memory tags; do not fabricate memories.
 - Close with `references/evidence-gate.md`: counts posted vs deduped vs withheld,
   skipped dimensions/sensors with reasons, and the summary URL/reference.
-<!-- validator anchors: comment-only | added (+) diff lines | page to completion | two waves -->
