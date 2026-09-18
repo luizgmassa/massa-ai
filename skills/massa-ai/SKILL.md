@@ -297,6 +297,7 @@ Load only when a selected workflow asks for them:
 - `references/lessons.md`
 - `references/naming-standards.md`
 - `references/pr-task-fix.md`
+- `references/code-quality-lens.md`
 - `references/architecture-lenses.md`
 - `references/architecture-domain-lens.md`
 - `references/architecture-coupling-lens.md`

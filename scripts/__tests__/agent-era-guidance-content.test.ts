@@ -29,69 +29,104 @@ function norm(text: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// AEH-01/02: code-quality-audit.md split/size leads (T3)
+// AEH-01/02: the code quality lens (T3, T4)
+//
+// REPOINTED, not relaxed. These rules lived inline in code-quality-audit.md and
+// code-quality-fix.md, in three different phrasings of one criterion, and this
+// suite grepped each phrasing where it sat. They now live once in
+// `references/code-quality-lens.md`, so the assertions follow the content to
+// its new home rather than being deleted with the prose — repointed by content
+// identity, phrase by phrase, not by line delta.
+//
+// Two properties are asserted that a straight relocation of the greps would
+// lose, and they are the reason an extraction is not free:
+//
+//   1. Each workflow must still LOAD the lens. A rule extracted into a file
+//      nobody reads is a rule that stopped applying, and every assertion below
+//      would still pass.
+//   2. Neither workflow may re-inline the criterion. Two copies of a split rule
+//      that drift is the defect the extraction exists to prevent, and a
+//      presence-only check on the reference cannot see it.
 // ---------------------------------------------------------------------------
 
-describe("code-quality-audit.md: agent-read-aware split and file-size leads (AEH-01, AEH-02)", () => {
-  const content = readSkill("workflows/code-quality/code-quality-audit.md");
+describe("code-quality-lens.md: the split criterion and file-shape rule (AEH-01, AEH-02)", () => {
+  const content = readSkill("references/code-quality-lens.md");
 
   test("no remaining split-on-size-or-and-alone lead", () => {
     expect(content).not.toContain('if accurate description needs "and", recommend splitting');
   });
 
-  test("split lead cites the discoverability-or-change-risk criterion", () => {
-    expect(content).toContain(
-      "split only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk; never split on size or \"more than one thing\" alone.",
+  test("the canonical split criterion carries both halves, including the negative one", () => {
+    expect(norm(content)).toContain(
+      "Split only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk; never split on size or \"more than one thing\" alone.",
     );
   });
 
-  test("SRP lead requires the same criterion, not concern-count or size alone", () => {
+  test("the SRP row requires the same criterion, not concern-count or size alone", () => {
     expect(content).toContain("never on concern-count or size alone");
   });
 
-  test("static leads flag multi-subject files and files over ~600 lines", () => {
-    expect(content).toContain("flag multi-subject files");
+  test("the file-shape rule flags multi-subject files and files over ~600 lines", () => {
+    expect(content).toContain("Flag multi-subject files");
     expect(content).toContain("over ~600 lines");
   });
 
-  test("static leads SHALL NOT flag a single-subject file below the line-count bound", () => {
-    expect(content).toContain("Do NOT flag a single-subject file for line count alone below that bound.");
+  test("the file-shape rule SHALL NOT flag a single-subject file below the line-count bound", () => {
+    expect(norm(content)).toContain("Do NOT flag a single-subject file for line count alone below that bound.");
   });
 
-  test("KISS lead is preserved verbatim and gains a cross-reference to the criterion", () => {
-    expect(content).toContain(
+  test("KISS lead is preserved verbatim and cross-references the criterion", () => {
+    expect(norm(content)).toContain(
       "choose boring solutions unless complexity is justified (real variability, hard constraints, or measured bottlenecks).",
     );
-    expect(content).toContain(
-      "When weighing whether to split instead of inline, apply the same discoverability-or-change-risk criterion used for the split lead above.",
+    expect(norm(content)).toContain(
+      "When weighing whether to split instead of inline, apply the Split Criterion above unchanged",
     );
   });
-});
 
-// ---------------------------------------------------------------------------
-// AEH-01: code-quality-fix.md split directive (T4)
-// ---------------------------------------------------------------------------
-
-describe("code-quality-fix.md: discoverability-or-change-risk split criterion (AEH-01)", () => {
-  const content = readSkill("workflows/code-quality/code-quality-fix.md");
-
-  test("Clean Code split directive cites the same discoverability-or-change-risk criterion", () => {
+  test("the fix directions for SOLID and Clean Code keep the criterion in their own words", () => {
+    // The fix side used to carry these two sentences in code-quality-fix.md.
+    // They are directions ("separate", "split functions"), not detections, so
+    // they survive as the lens's Fix-direction column rather than collapsing
+    // into the detection sentence above.
+    expect(content).toContain(
+      "separate mixed responsibilities only when the split yields an externally-findable named unit (locatable by search or grep from outside the file) or reduces change risk",
+    );
     expect(content).toContain(
       "split functions only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk — never split on size or \"more than one thing\" alone",
     );
   });
 
-  test("SOLID split directive cites the discoverability-or-change-risk criterion", () => {
-    expect(content).toContain(
-      "separate mixed responsibilities only when the split yields an externally-findable named unit (locatable by search or grep from outside the file) or reduces change risk",
+  test("the architecture boundary survived the move", () => {
+    expect(norm(content)).toContain(
+      "Do not report, recommend, or introduce ports, adapters, bounded contexts, new service/module boundaries, or VSA-style folder migration from this lens.",
     );
   });
+});
 
-  test("KISS fix direction cross-references the split criterion", () => {
-    expect(content).toContain(
-      "When choosing whether to split instead of inline, apply the same discoverability-or-change-risk criterion used for the Clean Code split direction above.",
-    );
-  });
+describe("code quality workflows: both load the lens and neither re-inlines it", () => {
+  const WORKFLOWS = [
+    "workflows/code-quality/code-quality-audit.md",
+    "workflows/code-quality/code-quality-fix.md",
+  ] as const;
+
+  /**
+   * The clause every phrasing of the split criterion shares. Asserting on this
+   * fragment rather than a full sentence is deliberate: a re-inlined copy would
+   * almost certainly be reworded, and a full-sentence check would miss exactly
+   * the drift it exists to catch.
+   */
+  const CRITERION_FRAGMENT = "externally-findable named unit";
+
+  for (const rel of WORKFLOWS) {
+    test(`${rel} loads references/code-quality-lens.md`, () => {
+      expect(readSkill(rel)).toContain("references/code-quality-lens.md");
+    });
+
+    test(`${rel} does not restate the split criterion inline`, () => {
+      expect(readSkill(rel)).not.toContain(CRITERION_FRAGMENT);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------

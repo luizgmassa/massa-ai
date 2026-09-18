@@ -34,6 +34,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The code quality lens moves out of the two workflows that each carried a copy.**
+  `code-quality-audit.md` held ~20 lines of SOLID / Clean Code / KISS / YAGNI / DRY detection
+  rules and `code-quality-fix.md` held the matching fix directions, stating one split
+  criterion in three different phrasings. Both now load
+  `references/code-quality-lens.md`, which states that criterion once and splits each rule
+  into a Flag-when column (the audit's) and a Fix-direction column (the fix's) — the same
+  shape `architecture-audit.md` already used for its three lenses. The verbatim content
+  sensors in `agent-era-guidance-content.test.ts` are repointed to the new file phrase by
+  phrase, and gain two assertions a straight relocation would have lost: each workflow must
+  still load the lens, and neither may re-inline the criterion.
+- **`workflows/skill-architect.md` moves its non-procedural prose to
+  `references/skill-architect/authoring-principles.md`** — the five-point Core Philosophy, the
+  phase-sequence diagram, and the Conversation Style block, read once before Phase 1. The five
+  phases, their exit criteria, the frontmatter hard rules, the Important Boundaries and the
+  CC-BY-4.0 attribution stay in the workflow. 373 → 341 lines.
 - **`workflows/commit.md` now runs `check_commit.ts` instead of describing what it checks.**
   The script existed and was documented as implementing `commit.md` §8, but `commit.md` never
   invoked it — its only caller was `references/spec-driven/execute.md`. Message shape, allowed
