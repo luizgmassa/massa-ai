@@ -137,8 +137,6 @@ dispatch.
 
 Before adding a new reusable role, load `references/subagent-design.md` and write a bounded role charter. For one-off tasks, use an existing role plus the prompt contract below instead of inventing a new role.
 
-## Roles
-
 **The roster lives in one place: the Agent Table of `skills/AGENTS.md`**, which names
 every shipped specialist with its purpose, trigger, permission, and charter path. Do not
 restate it here. A second roster in this file is what let `judge` and `meta-judge` go

@@ -26,7 +26,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - `references/codebase-investigation.md` when the target area is unfamiliar
    - `references/mobile-context.md` when the feature touches KMP, iOS, Android, native bridges, mobile lifecycle, offline sync, permissions, push/background behavior, local persistence, or backend-mobile contracts
    - `references/verification-ladder.md` before Quick/Standard/Spec-driven sizing or edits
-   - `references/context-firewall.md` when source, logs, docs, or tool output meets its threshold table (a single source/log/doc block >200 lines, >20 KB, or >50 search hits)
+   - `references/context-firewall.md` when source, logs, docs, or tool output meets its threshold table
    - `references/naming-standards.md` before writing or renaming code identifiers, public contract fields, tests, fixtures, or implementation-facing design names
    - `references/pr-task-fix.md` when the verification ladder trigger table applies
    - `references/lessons.md` when `.specs/lessons.json` exists, to load confirmed project lessons before sizing
@@ -91,7 +91,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each AC against the diff and tests, and record the skipped-delegation reason
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-If verification fails, bound the retry with the Bounded Fix→Re-verify Loop cap from `references/verification-ladder.md`: at most 3 fix→re-verify iterations on the same PR group before reporting `Blocked`. This cap governs the post-implementation review/verify cycle and is distinct from the two-consecutive-failed-fixes trigger earlier in this file that loads `references/root-cause-scripts.md`, which fires on repeated failed attempts to fix one symptom during implementation itself.
+If verification fails, bound the retry with the Bounded Fix→Re-verify Loop cap from `references/verification-ladder.md`: at most 3 fix→re-verify iterations on the same PR group before reporting `Blocked`.
 
 13. Run the verification recipe and check outcomes against the captured acceptance criteria from step 11, not only against a generic verification recipe; report skipped checks explicitly. At Standard tier and above, back this with `bun skills/massa-ai/scripts/validate_state.ts <slug>` against the persisted `validation.md` — it must be real, report `PASS`, and cite `file:line` evidence per acceptance criterion. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved). If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`

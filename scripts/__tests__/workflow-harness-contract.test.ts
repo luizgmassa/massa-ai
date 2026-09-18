@@ -11,7 +11,7 @@
  *   3. Universal intake — every workflow on disk loads project-context. The set
  *      is derived from the filesystem, so a NEW workflow cannot skip it.
  *   4. Mutation-scoped references — exactly the 16 implementation workflows load
- *      the delivery/annotation/root-cause references, and the 19 read-only ones
+ *      the delivery/annotation/root-cause references, and the 24 read-only ones
  *      provably do NOT. Both directions are asserted; a one-line deletion in any
  *      single workflow flips exactly one assertion.
  *   5. Invariant correctness — not that the references EXIST, but that the

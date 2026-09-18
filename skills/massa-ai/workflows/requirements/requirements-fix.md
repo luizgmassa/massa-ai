@@ -108,7 +108,7 @@ Not for findings-only requirements review — route to `workflows/requirements/r
    - Apply the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check for each selected finding or coherent group.
    - Dispatch the verification-agent block above once a REQ finding reaches Standard+/Spec-driven size or high/critical severity; a Quick-tier finding instead runs the listed fallback self-check — the tier gate decides the hop, never the check itself.
    - A surviving mutant on the discrimination sensor blocks the row: mark the finding's Closure Matrix status `blocked` and log a `surviving_mutant` signal through `references/lessons.md`.
-   - `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop caps re-verify cycles per REQ finding at 3; exhausting it also lands `blocked`. That is a distinct counter from this file's own two-consecutive-failed-fixes breaker above, which trips inside one edit iteration rather than across re-verify cycles.
+   - `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop caps re-verify cycles per REQ finding at 3; exhausting it also lands `blocked`.
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.
    - Run the report's verification suggestion when available.
    - Run acceptance tests, targeted unit/integration tests, docs checks, type/build checks, or manual artifact inspection relevant to the requirement.

@@ -25,7 +25,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - `references/debug-diagnosis-loop.md`
    - `references/mobile-diagnosis.md` when the bug target involves KMP, iOS, Android, native bridges, devices, simulators/emulators, or mobile lifecycle
    - `references/verification-ladder.md` before Quick/Standard/Spec-driven sizing or applying fixes
-   - `references/context-firewall.md` before inspecting logs, traces, snapshots, or generated output that meet its threshold table (a single source/log/doc block >200 lines, >20 KB, or >50 search hits)
+   - `references/context-firewall.md` before inspecting logs, traces, snapshots, or generated output that meet its threshold table
    - `references/lessons.md` when `.specs/lessons.json` exists, to load confirmed project lessons before diagnosis
 3. `recall` → load prior debugging attempts for this entity
 4. IF prior attempts exist:
@@ -93,7 +93,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
 
 15. If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
-     Rerun the original feedback loop, run the verification recipe, and remove temporary instrumentation unless intentionally retained as observability. The fix → re-verify cycle is capped by `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; a reached cap stops the session `Blocked` with the evidence preserved. That cap counts re-verify cycles across the whole symptom and is a separate counter from the two-consecutive-failed-fixes breaker into `references/root-cause-scripts.md` named in this file's preamble — that breaker fires inside a single edit iteration and neither consumes nor resets the re-verify count.
+     Rerun the original feedback loop, run the verification recipe, and remove temporary instrumentation unless intentionally retained as observability. The fix → re-verify cycle is capped by `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; a reached cap stops the session `Blocked` with the evidence preserved.
 16. Use `references/agent-orchestration.md` for isolated investigation branches; the Standard+ verifier dispatch above is mandated by that reference's Independent Verification Exception, not merely loaded when it improves signal.
 17. IF fix found:
    - Persist the root cause via `remember` as a scored `decision` memory with `memory:semantic`

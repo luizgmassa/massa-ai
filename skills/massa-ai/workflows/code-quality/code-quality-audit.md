@@ -28,18 +28,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - `references/agent-orchestration.md` only for large scopes, explicit parallel/subagent requests, PR subagent invocation, or independent verification of high-impact findings
 3. `recall` -> load project style rules, ADRs, prior quality decisions, accepted extension points, repeated anti-patterns, and accepted exceptions for the target area.
    - Apply the Memory Freshness Gate from `references/audit-scope.md`; recalled exceptions are leads, not proof.
-4. Establish the investigation scope before proceeding:
-   - Modified files scope: use when the user says modified files, changed files, current changes, uncommitted changes, staged changes, or unstaged changes.
-   - Explicit files/globs scope: use when the user names files, directories, or globs.
-   - Commit range scope: use when the user provides commits/ranges or asks for commits made by me, my branch commits, or quality issues introduced by branch commits.
-   - Branch comparison scope: use when the user names base/head branches, refs, or a branch diff.
-   - Codebase area scope: use when the user names a path, module, package, feature area, service layer, or glob.
-   - Symbol/class/function scope: use when the user names public classes, functions, interfaces, helpers, or exported surfaces.
-   - Feature/flow scope: use when the user names a runtime flow or feature area.
-   - Whole-repo scope: use only when the user explicitly asks for a whole-repo code quality audit.
-   - Implementation parent scope: use only when `workflows/implementation/implementation-audit.md` invokes this workflow with a concrete implementation scope packet.
-   - If the target focus is missing, vague, or too broad, ask for a concrete target from the supported scope types in `references/audit-scope.md`.
-   - Build the shared scope packet from `references/audit-scope.md` and carry it into the report.
+4. Establish the investigation scope: select the scope type and build the shared scope packet per `references/audit-scope.md`, which owns the supported scope types, the ask-when-vague rule, and the packet fields. Carry the packet into the report.
 5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Code Quality row of Per-Lens Scope Deltas).
 6. Input rules:
    - SOLID inputs: non-test source files only.

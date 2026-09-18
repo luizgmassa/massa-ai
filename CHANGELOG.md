@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The workflow corpus stops restating what its references already own.** Three families of
+  per-workflow prose are deleted and resolved through the reference that is the single source:
+  the two-counters disambiguation clause (13 workflows → `references/verification-ladder.md`,
+  which already names all three counters), the 11-bullet "Establish the investigation scope"
+  enumeration (the 6 audit workflows → `references/audit-scope.md`, whose Lens Audit Scope
+  Resolution Procedure the very next step already loads), and the inline
+  `>200 lines, >20 KB, >50 search hits` threshold triple (`feature.md`, `debug.md`,
+  `refactor.md` → `references/context-firewall.md`). `skills/massa-ai/workflows/` goes from
+  4870 to 4802 lines; the duplication metric's excess drops from 494 to 474 at window 4,
+  measured differentially against a temp worktree of `main`. `EXCESS_CEILING` is lowered to
+  474 — the first time that ceiling moves down rather than up. Every earlier raise recorded
+  mandated uniformity and is untouched.
+
+### Fixed
+
+- **Three dead references in `workflows/skill-architect.md`.** The validator invocation named
+  `bun scripts/validate_skill.ts`, which resolves nowhere — every other scripted command in
+  the corpus carries the `skills/massa-ai/` prefix, and this one now does too. The Deliver
+  phase called a `present_files` tool that does not exist in any supported harness, and two
+  routes pointed at a `skill-creator` skill that is not in this repository
+  (`skills/` holds `agents`, `bootstrap`, `massa-ai`, `persona-router`, `profile`); both are
+  replaced with instructions that resolve against what actually ships.
+- **A duplicated `## Roles` heading in `references/agent-orchestration.md`**, which split the
+  role vocabulary across two sections carrying the same name.
+
 ## [1.56.0] - 2026-09-08
 
 ### Added

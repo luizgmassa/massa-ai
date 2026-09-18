@@ -271,7 +271,7 @@ Consult `references/skill-architect/examples.md` for the full anti-pattern list.
 ### 4.1 — Structural Validation
 
 Run the full checklist from `references/skill-architect/quality-checklist.md` and execute
-`bun scripts/validate_skill.ts <skill-folder>` against the generated skill to check:
+`bun skills/massa-ai/scripts/validate_skill.ts <skill-folder>` against the generated skill to check:
 
 - SKILL.md exists with correct casing
 - Frontmatter has required fields with correct format
@@ -281,7 +281,7 @@ Run the full checklist from `references/skill-architect/quality-checklist.md` an
 - Description includes trigger phrases
 
 IF the script cannot run (no code-execution tool available) THEN skip
-`scripts/validate_skill.ts` and run the
+`skills/massa-ai/scripts/validate_skill.ts` and run the
 `references/skill-architect/quality-checklist.md` checklist manually instead.
 
 ### 4.2 — Trigger Testing
@@ -335,7 +335,7 @@ Create the final skill folder structure in the project's skills directory.
 
 ### 5.2 — Present
 
-Use `present_files` to share the packaged skill. Include a brief summary:
+Present the created file tree (every path written, relative to the skill folder) and a brief summary:
 
 - What the skill does
 - How to install it in the user's preferred AI agent or IDE
@@ -347,7 +347,7 @@ Suggest:
 
 - Test with the suggested phrases
 - If results aren't right, bring the conversation back and iterate
-- For formal evaluation, use the `skill-creator` skill's eval and benchmark modes
+- For a formal re-check after edits, re-run Phase 4 against the changed skill
 
 ---
 
@@ -364,8 +364,8 @@ Suggest:
 
 ## Important Boundaries
 
-- This skill is for CREATING new skills. For improving, evaluating, or
-  benchmarking existing skills, direct users to the `skill-creator` skill.
+- This skill is for CREATING new skills. To improve or evaluate an existing
+  skill, run Phase 4 (Validate) against it directly instead of Phases 1-3.
 - Never generate a SKILL.md without completing Discovery and Architecture.
   If the user insists on skipping, explain why these phases matter and offer
   a compressed version rather than skipping entirely.

@@ -29,7 +29,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - `references/knowledge-verification-chain.md` when Design It Twice or an architecture-lens library-pattern investigation depends on external library/API behavior not already verified in this session
    - `references/mobile-context.md` when the refactor touches KMP, iOS, Android, native bridges, mobile lifecycle, offline sync, permissions, local persistence, or backend-mobile contracts
    - `references/verification-ladder.md` before Quick/Standard/Spec-driven sizing or edits
-   - `references/context-firewall.md` when source inspection or tool output meets its threshold table (a single source/log/doc block >200 lines, >20 KB, or >50 search hits)
+   - `references/context-firewall.md` when source inspection or tool output meets its threshold table
    - `references/pr-task-fix.md` when the verification ladder trigger table applies
    - `references/lessons.md` when `.specs/lessons.json` exists, to load confirmed project lessons before refactoring
 4. Size the refactor before editing:
@@ -90,7 +90,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the characterization evidence per PR group and record the skipped-delegation reason
 > - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-- The fix→re-verify cycle for a PR group is capped by the Bounded Fix→Re-verify Loop's 3-iteration limit in `references/verification-ladder.md` (cap reached → `Blocked`); that is distinct from the two-consecutive-failed-fix edit-attempt breaker in `references/root-cause-scripts.md`, which fires on repeated failed edits against one symptom while moving code and neither consumes nor resets the verify-cycle count.
+- The fix→re-verify cycle for a PR group is capped by the Bounded Fix→Re-verify Loop's 3-iteration limit in `references/verification-ladder.md` (cap reached → `Blocked`).
 
 13. Run the configured Plan Challenge Gate on the refactor plan before the first behavior-preserving edit. Low-risk refactor plans use the Plan Challenge lite gate first; full The Fool is reserved for explicit challenge, high-risk domains, plans touching more than 5 files/classes/modules, or lite escalation. Revise valid critical or high findings — for a refactor the assumption most worth challenging is that the existing tests actually pin the behavior being preserved.
 14. Complete the Evidence Gate from `references/evidence-gate.md`

@@ -87,8 +87,6 @@ On any tool/index/MCP failure, follow `references/graceful-degradation.md` (also
 - `.specs/` directory missing or not writable: block quick-artifact and onboarding-doc writes per `references/artifact-persistence.md`'s unwritable-→-block rule; do not fall back to memory or chat.
 - Verifier fix→re-verify loop reaches the cap in `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop: stop with `Blocked`, preserve the evidence collected, and ask the user for direction.
 
-**Disambiguation — two different counters:** the loop cap above counts *verification* iterations on the fallback change as a whole. It is separate from the two-consecutive-failed-fix trigger near the top of this workflow that loads `references/root-cause-scripts.md` — that one counts *edit attempts* on a single symptom inside one iteration. Neither counter resets or consumes the other.
-
 ## Output Contract
 
 - Goal and selected fallback workflow

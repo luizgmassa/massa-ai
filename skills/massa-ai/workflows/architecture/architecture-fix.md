@@ -114,7 +114,7 @@ Not for findings-only architecture review — route to `workflows/architecture/a
    - Apply the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check for each selected finding or coherent group.
    - Run the sensors at the mandate's own tier gate: dispatch the verification-agent block above at Standard+/Spec-driven size or high/critical severity; a Quick-tier finding runs its fallback fresh-eyes self-check instead — the hop is skippable, the check never is.
    - A surviving mutant on the discrimination sensor marks the finding's Closure Matrix row `blocked` and records a `surviving_mutant` signal via `references/lessons.md`.
-   - The fix→re-verify loop is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; exhausting it also marks the row `blocked`. That cap counts re-verify cycles across the whole finding and is a different counter from the two-consecutive-failed-fixes breaker in this file's preamble, which fires inside a single edit iteration.
+   - The fix→re-verify loop is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; exhausting it also marks the row `blocked`.
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.
    - Run the report's verification suggestion when available.
    - Add static checks for dependency direction/import cycles when feasible.

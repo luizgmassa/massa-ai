@@ -106,7 +106,7 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
    - Run the report's verification suggestion when available.
    - The red→green reproduction proves the regression test catches this bug; the discrimination sensor proves that same assertion would also discriminate against a future wrong implementation — complementary, and both required at Standard+.
    - At the tiers named in the verification-agent dispatch's trigger above, run the discrimination sensor per `references/discrimination-sensor.md` against the divergence-point fix; a surviving mutant marks the finding's closure row `blocked` and records the `surviving_mutant` lessons signal even when the reproduction test is green.
-   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; this is a separate counter from the two-consecutive-failed-fixes breaker into `references/root-cause-scripts.md` above, which fires inside one iteration and neither consumes nor resets the loop count.
+   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop.
    - Run focused regression tests first, then relevant lint/type/build/test commands when feasible.
    - Confirm validation assets were not weakened.
    - Record command/artifact, result, skipped reason or `none`, highest Verification Ladder level reached, validation assets protected, and residual risk.

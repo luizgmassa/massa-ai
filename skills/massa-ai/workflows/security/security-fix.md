@@ -111,7 +111,7 @@ Not for findings-only security review — route to `workflows/security/security-
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.
    - Run the report's verification suggestion when available.
    - At Standard+ size or high/critical severity, run the guard-mutation discrimination sensor per `references/discrimination-sensor.md`: invert the specific guard just added and confirm the negative test kills it; a surviving mutant marks the finding's Closure Matrix row `blocked` and records the `surviving_mutant` lessons signal even when the exploit-path test is green.
-   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop at 3 iterations; that counter is separate from the two-consecutive-failed-fixes breaker into `references/root-cause-scripts.md` named in this file's preamble, which fires inside a single edit iteration and neither consumes nor resets the loop count.
+   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop at 3 iterations.
    - Run targeted tests for negative and positive paths, plus lint/type/build checks relevant to touched files.
    - Inspect logs/config/errors when the finding involves data exposure.
    - Record command/artifact, result, skipped reason or `none`, highest Verification Ladder level reached, validation assets protected, and residual risk.
