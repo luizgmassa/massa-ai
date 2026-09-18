@@ -72,14 +72,12 @@ Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>`
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven finding size or high/critical severity per the Independent Verification Mandate in `references/verification-ladder.md`; at Quick size, device runs are expensive, so skip the dispatch and instead run the standalone fresh-eyes self-check named in the fallback line
 > - scope: the fixed flow/subflow/fixture's `MST-*` claim closure — selector/assertion changes, stable-flow design compliance, and the JUnit report/artifact evidence for the run
-> - permissions: read-only
 > - inputs: the `MST-*` finding, the applied flow/fixture diff, the report's Verification Suggestion, the JUnit report path, the artifact directory, and device/platform
 > - sensors: the report's Verification Suggestion or equivalent `maestro test` run; flow-mutation discrimination sensor per `references/maestro/patterns.md` (single lightweight selector/assertion perturbation)
 > - output: confirmed/disproven closure verdict for the `MST-*` row, with JUnit/artifact evidence cited
 > - firewall: JUnit XML, logs, screenshots, and recordings summarized, never dumped raw
 > - memory: suggest-only; main agent persists maestro-closure verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the MST closure rows and on-disk JUnit/artifact evidence, and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
@@ -90,8 +88,6 @@ Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>`
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 9. Use strict harness sensors:
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
@@ -101,7 +97,7 @@ Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>`
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted.
    - If verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.
    - At the tier gate that mandated the verifier dispatch above, also run the Discrimination Sensor from `references/verification-ladder.md` via the flow-mutation sensor in `references/maestro/patterns.md`; a surviving mutant on the fixed flow's selector/assertion means the finding's closure row is `blocked`, and record the `surviving_mutant` lessons signal.
-   - Cap the fix→re-verify cycle at 3 iterations per `MST-*` finding per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; after 3, stop with a `blocked` closure row and ask for direction. This is a verification-cycle counter, distinct from the two-consecutive-failed-fixes edit breaker above that routes to `references/root-cause-scripts.md` — neither resets or consumes the other.
+   - Cap the fix→re-verify cycle at 3 iterations per `MST-*` finding per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; after 3, stop with a `blocked` closure row and ask for direction.
 10. Persist the closure matrix as the Fix Closure Report per `references/audit-report-io.md`'s Fix Closure Report Contract, at `audits/maestro/<YYYY-MM-DD maestro-fix-closure>.md`: the standard Closure Matrix columns (`MST-*` ID, status, changed files, command/artifact, result, skipped reason, Discrimination Sensor, Independent Verifier, ladder level, validation assets protected, residual risk, next step) plus the maestro extras `JUnit Report`, `Artifact Directory`, and `Device/Platform`, appended after the standard set. Before the Propose/Evidence Gate, run `bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family maestro`; a non-zero exit blocks closure. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 11. Persist only durable Maestro fix patterns, flake root causes, selector/test-ID policy, setup/teardown recipes, device matrix constraints, or reusable verification commands after Importance Calibration. Use `workflow:maestro-fix` and required memory tags.
 12. Complete the Evidence Gate from `references/evidence-gate.md`.
@@ -113,6 +109,3 @@ User asks: "Fix MST-2 from audits/maestro/2026-06-29 maestro-audit.md."
 1. Read and validate the saved report.
 2. Reinspect current flow evidence and fix only the targeted Maestro flow/subflow/fixture surface.
 3. Run the report's Verification Suggestion or equivalent Maestro command and report the closure matrix.
-
-<!-- validator anchors: references/discrimination-sensor.md | Discrimination Sensor (Flow Mutation) | references/brownfield-mapping.md (Minimum Bar only) | first fix touching an unmapped Maestro workspace | Independent Verification Mandate | Bounded Fix→Re-verify Loop | surviving_mutant lessons signal | Fix Closure Report Contract | audits/maestro/<YYYY-MM-DD maestro-fix-closure>.md | check_fix_closure.ts --family maestro | graceful degradation preserved -->
-

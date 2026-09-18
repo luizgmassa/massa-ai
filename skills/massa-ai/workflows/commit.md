@@ -35,15 +35,15 @@ Not for Jira ticket creation, release notes, changelogs, PR descriptions, or his
    - any Markdown basename matching `*-audit.md`
    - If any excluded file is already staged, stop before committing and report the exact paths. Do not unstage user-selected files unless the user explicitly asks.
 7. Never stage everything through a shortcut, never commit all tracked modifications automatically, and never reset, checkout, amend, squash, rebase, or rewrite history unless the user separately requests that exact operation.
-8. Draft the commit message using caveman-commit rules:
-   - Conventional Commits format: `<type>(<scope>): <imperative summary>`, with scope optional.
-   - Type precedence when multiple apply: `fix`, `feat`, `perf`, `refactor`, `test`, `docs`, `build`, `ci`, `style`, `chore`, `revert`. Use `revert` only when the commit's primary purpose is reverting an earlier change.
-   - Subject is imperative, has no trailing period, targets 50 characters when practical, and has hard cap 72 characters including any Jira prefix.
+8. Draft the commit message in Conventional Commits format — `<type>(<scope>): <imperative summary>`, scope optional — then validate it deterministically:
+   - Shape, allowed type, description casing, trailing period, the optional `[<KEY>] ` Jira prefix, and the `!`/`BREAKING CHANGE:` pairing are all checked by `bun skills/massa-ai/scripts/check_commit.ts --message "<msg>"`. Run it on every drafted message. A non-zero exit blocks the commit; fix the message and re-run rather than committing past it.
+   - The script cannot choose between two defensible types, so type precedence stays a judgment call: `fix`, `feat`, `perf`, `refactor`, `test`, `docs`, `build`, `ci`, `style`, `chore`, `revert`. Use `revert` only when the commit's primary purpose is reverting an earlier change.
+   - The script's 72-character check is a warning; treat it as a hard cap including any Jira prefix, and target 50 characters when practical.
    - With a Jira key, prefix the subject exactly as `[<KEY>] `, for example `[SA-142] fix(auth): reject expired tokens`.
-   - Match existing project capitalization after the colon when current history or nearby commits make it clear.
+   - The description after the colon is lowercase — the script errors on an uppercase first letter, so this overrides any surrounding history that capitalizes.
    - Body is required for breaking changes, migrations, security fixes, reverts, linked issues, or rationale not inferable from the diff. Wrap body lines at 72 characters.
    - Do not include AI attribution unless the repository explicitly requires an attribution trailer.
-9. If committing, run the commit with the exact drafted message only after the final staged-path audit report exclusion check passes. If the commit fails, report the exact failure and leave staging untouched.
+9. If committing, run the commit with the exact drafted message only after `check_commit.ts` exits zero and the final staged-path audit report exclusion check passes. If the commit fails, report the exact failure and leave staging untouched.
 10. Complete `references/evidence-gate.md`, including branch key detection result, staged path policy, excluded audit Markdown paths, command outcome, skipped checks, memory outcome, and residual risk.
 
 ## Failure Handling

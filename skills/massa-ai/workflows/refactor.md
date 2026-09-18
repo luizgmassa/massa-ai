@@ -29,7 +29,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - `references/knowledge-verification-chain.md` when Design It Twice or an architecture-lens library-pattern investigation depends on external library/API behavior not already verified in this session
    - `references/mobile-context.md` when the refactor touches KMP, iOS, Android, native bridges, mobile lifecycle, offline sync, permissions, local persistence, or backend-mobile contracts
    - `references/verification-ladder.md` before Quick/Standard/Spec-driven sizing or edits
-   - `references/context-firewall.md` when source inspection or tool output meets its threshold table (a single source/log/doc block >200 lines, >20 KB, or >50 search hits)
+   - `references/context-firewall.md` when source inspection or tool output meets its threshold table
    - `references/pr-task-fix.md` when the verification ladder trigger table applies
    - `references/lessons.md` when `.specs/lessons.json` exists, to load confirmed project lessons before refactoring
 4. Size the refactor before editing:
@@ -75,22 +75,18 @@ Before the first repository mutation, load `references/implementation-delivery.m
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: Standard+ refactor sizing or any PR-group execution per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once reviewer fix items are resolved; Quick-sized refactors dispatch only when validation assets were touched, otherwise run the fresh-eyes fallback below and record the skip reason
 > - scope: the moved/transformed code across this refactor's PR groups and the characterization tests that must protect it
-> - permissions: read-only
 > - inputs: the characterization baseline from step 6 (and step 7 for mobile refactors), the diff of moved code per PR group, and the PR-group map from step 9
 > - sensors: confirm the characterization tests still pass against the moved code's preserved behavior; discrimination sensor per `references/discrimination-sensor.md` (mutate the moved code — never new code — in scratch, one PR group at a time; characterization tests must kill each mutant)
 > - output: a preserved/regressed verdict per PR group and any surviving-mutant findings, written to `.specs/refactors/<slug>/SENSOR.md`
 > - firewall: summarized per-group findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists refactor verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the characterization evidence per PR group and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-- The fix→re-verify cycle for a PR group is capped by the Bounded Fix→Re-verify Loop's 3-iteration limit in `references/verification-ladder.md` (cap reached → `Blocked`); that is distinct from the two-consecutive-failed-fix edit-attempt breaker in `references/root-cause-scripts.md`, which fires on repeated failed edits against one symptom while moving code and neither consumes nor resets the verify-cycle count.
+- The fix→re-verify cycle for a PR group is capped by the Bounded Fix→Re-verify Loop's 3-iteration limit in `references/verification-ladder.md` (cap reached → `Blocked`).
 
 13. Run the configured Plan Challenge Gate on the refactor plan before the first behavior-preserving edit. Low-risk refactor plans use the Plan Challenge lite gate first; full The Fool is reserved for explicit challenge, high-risk domains, plans touching more than 5 files/classes/modules, or lite escalation. Revise valid critical or high findings — for a refactor the assumption most worth challenging is that the existing tests actually pin the behavior being preserved.
 14. Complete the Evidence Gate from `references/evidence-gate.md`
@@ -99,6 +95,3 @@ Before the first repository mutation, load `references/implementation-delivery.m
 
 - `.specs/refactors/<slug>/` unwritable: block the write per `references/artifact-persistence.md`; do not fall back to memory or chat as the record of characterization evidence.
 - Discrimination sensor mutation not safely reversible: mark the claim `Blocked` unless equivalent existing deterministic mutation evidence already proves the characterization tests discriminate for that moved code.
-
-<!-- validator anchors: massa-ai-verification-agent dispatch block; Independent Verification Mandate; Independent Verification Exception; discrimination sensor mutate the moved code; characterization tests must kill it; P0 payment/auth/data-integrity/public-contract; .specs/refactors/<slug>/CHARACTERIZATION.md; .specs/refactors/<slug>/SENSOR.md; check_specs_delivered.ts --kind refactor; check_specs_delivered.ts --kind quick; graceful degradation preserved; Stage 3 delivery authorization; Bounded Fix→Re-verify Loop; two-consecutive-failed-fix edit-attempt breaker; Brownfield Minimum Bar; knowledge-verification-chain.md -->
-

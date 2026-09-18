@@ -88,7 +88,42 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
 //
 // The base measured 478, five under the previous 483 ceiling. This raise
 // consumes that pre-existing headroom rather than pretending it was not there.
-const EXCESS_CEILING = 498;
+//
+// 474 since the workflow-slimming Phase 2 dedup (.specs/plans/workflow-slimming.md
+// A1/A4/A6): the per-workflow restatements that the references already own are
+// deleted — the two-counters disambiguation clause in 13 workflows (canonical in
+// `references/verification-ladder.md`), the 11-bullet "Establish the
+// investigation scope" enumeration in the 6 audit workflows (canonical in
+// `references/audit-scope.md`), and the inline context-firewall threshold triple
+// in 3 workflows (canonical in `references/context-firewall.md`). This is the
+// first LOWERING of this ceiling: the four raises above are mandated uniformity
+// and stay; what leaves is prose drift and nothing else. Measured differentially
+// with `measure(<tree>/skills, 4)` against a temp worktree of main @ 95f752f1:
+// base excess 494, branch 474, delta −20; normalized lines 15329 → 15261.
+//
+// The base measured 494, four under the previous 498 ceiling. As with the 483 →
+// 498 raise, that pre-existing headroom is consumed here rather than banked: the
+// ceiling is set to the branch's own measurement, not to 494 − 20.
+//
+// 456 since the workflow-slimming Phase 7 role defaults: the dispatch-block
+// fields whose value is fixed for a role move to `references/agent-orchestration.md`'s
+// new Role Defaults section — the universal `persona` bullet (57 blocks), the
+// reviewer's `fallback` (15), the verification-agent's `permissions` (15), and
+// the designer's `trigger`/`sensors`/`inputs`/`firewall`/`memory` (5 × 7). That
+// directly retires the AEH-06 and DSG-05/06 rationale above: those raises
+// recorded mandated uniformity across 14 and 7 instantiated templates, and a
+// value stated once cannot be non-uniform. 121 block lines leave the tree.
+// Measured differentially with `measure(<tree>/skills, 4)` against a temp
+// worktree of main @ 95f752f1: base excess 494, branch 456; dispatch-block
+// lines 597 → 476; normalized lines 15329 → 15219.
+//
+// What this ceiling can no longer see is a block that OMITS a field it should
+// carry — the defaults made 8 of the 10 packet fields optional at the block
+// level. `skills-harness-integrity.test.ts`'s role-defaults group is what covers
+// that: it asserts the reference states each default, that no block restates
+// one, and that a designer block still carries the three fields the default does
+// not fix.
+const EXCESS_CEILING = 456;
 const CEILING_WINDOW = 4;
 
 let dir: string;

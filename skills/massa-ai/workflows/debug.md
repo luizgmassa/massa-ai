@@ -25,7 +25,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - `references/debug-diagnosis-loop.md`
    - `references/mobile-diagnosis.md` when the bug target involves KMP, iOS, Android, native bridges, devices, simulators/emulators, or mobile lifecycle
    - `references/verification-ladder.md` before Quick/Standard/Spec-driven sizing or applying fixes
-   - `references/context-firewall.md` before inspecting logs, traces, snapshots, or generated output that meet its threshold table (a single source/log/doc block >200 lines, >20 KB, or >50 search hits)
+   - `references/context-firewall.md` before inspecting logs, traces, snapshots, or generated output that meet its threshold table
    - `references/lessons.md` when `.specs/lessons.json` exists, to load confirmed project lessons before diagnosis
 3. `recall` → load prior debugging attempts for this entity
 4. IF prior attempts exist:
@@ -76,24 +76,20 @@ Before the first repository mutation, load `references/implementation-delivery.m
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven fix size, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`; a Quick-tier fix takes the fallback below instead
 > - scope: the fixed divergence point from step 13, its reproduction path, and the regression test added in step 14
-> - permissions: read-only
 > - inputs: the root cause, the reproduction evidence, the regression test, and the changed files — not spec acceptance criteria
 > - sensors: re-run of the reproduction/feedback loop confirming the original failure signal no longer reproduces; discrimination sensor per `references/discrimination-sensor.md` (mutate the fixed code; the regression test must kill it)
 > - output: confirmed/disproven root-cause-closure verdict with evidence
 > - firewall: raw reproduction transcripts and logs summarized, never raw dumps
 > - memory: suggest-only; main agent persists debug verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of root cause, reproduction, and regression coverage, and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 15. If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
-     Rerun the original feedback loop, run the verification recipe, and remove temporary instrumentation unless intentionally retained as observability. The fix → re-verify cycle is capped by `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; a reached cap stops the session `Blocked` with the evidence preserved. That cap counts re-verify cycles across the whole symptom and is a separate counter from the two-consecutive-failed-fixes breaker into `references/root-cause-scripts.md` named in this file's preamble — that breaker fires inside a single edit iteration and neither consumes nor resets the re-verify count.
+     Rerun the original feedback loop, run the verification recipe, and remove temporary instrumentation unless intentionally retained as observability. The fix → re-verify cycle is capped by `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; a reached cap stops the session `Blocked` with the evidence preserved.
 16. Use `references/agent-orchestration.md` for isolated investigation branches; the Standard+ verifier dispatch above is mandated by that reference's Independent Verification Exception, not merely loaded when it improves signal.
 17. IF fix found:
    - Persist the root cause via `remember` as a scored `decision` memory with `memory:semantic`
@@ -134,6 +130,3 @@ User asks: "The login route returns 500 after deploy."
 6. Define the verification recipe: rerun the original route check, add or update regression coverage at the failing seam, and confirm validation assets were not weakened.
 7. If root cause is a missing `DATABASE_URL`, persist via `remember`: a semantic decision memory for the root cause and a procedural pattern memory for the deploy-env verification command.
 8. At Standard+ size, dispatch `massa-ai-verification-agent` to independently re-run the reproduction against the `DATABASE_URL` fix and confirm the regression test kills a mutant on the restored connection check before closing.
-
-<!-- validator anchors: brownfield Minimum Bar gate | references/knowledge-verification-chain.md | prove the coverage discriminates | Dispatch: `massa-ai-verification-agent` | Independent Verification Exception | Bounded Fix→Re-verify Loop | .specs/debug/<slug>/REPORT.md | check_specs_delivered.ts <slug> --kind debug | graceful degradation preserved | references/artifact-persistence.md | ## Failure Handling -->
-

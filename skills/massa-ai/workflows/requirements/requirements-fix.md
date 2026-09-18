@@ -75,7 +75,6 @@ Not for findings-only requirements review — route to `workflows/requirements/r
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable requirements patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
@@ -86,20 +85,16 @@ Not for findings-only requirements review — route to `workflows/requirements/r
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven REQ-fix size or high/critical requirement severity, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`'s Mandatory Verification Fix Gate; a Quick-tier REQ finding takes the fallback below instead
 > - scope: the closed REQ row's Requirement Source alignment, acceptance evidence, and report claim closure
-> - permissions: read-only
 > - inputs: the finding, its Requirement Source and Requirement ID or Quote, the applied fix, the verification suggestion, and validation assets
 > - sensors: deterministic command (requirements-trace check, acceptance tests, doc/spec alignment) and report claim closure; discrimination sensor per `references/discrimination-sensor.md` (the code that now satisfies the Requirement Source)
 > - output: confirmed/disproven closure verdict against the Requirement Source, feeding the Fix Closure Report's Independent Verifier column
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists requirements verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each REQ closure row against its Requirement Source and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, traceability matrix, memory writes, final synthesis, and Evidence Gate.
 
 11. Verify each completed finding:
@@ -108,7 +103,7 @@ Not for findings-only requirements review — route to `workflows/requirements/r
    - Apply the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check for each selected finding or coherent group.
    - Dispatch the verification-agent block above once a REQ finding reaches Standard+/Spec-driven size or high/critical severity; a Quick-tier finding instead runs the listed fallback self-check — the tier gate decides the hop, never the check itself.
    - A surviving mutant on the discrimination sensor blocks the row: mark the finding's Closure Matrix status `blocked` and log a `surviving_mutant` signal through `references/lessons.md`.
-   - `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop caps re-verify cycles per REQ finding at 3; exhausting it also lands `blocked`. That is a distinct counter from this file's own two-consecutive-failed-fixes breaker above, which trips inside one edit iteration rather than across re-verify cycles.
+   - `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop caps re-verify cycles per REQ finding at 3; exhausting it also lands `blocked`.
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.
    - Run the report's verification suggestion when available.
    - Run acceptance tests, targeted unit/integration tests, docs checks, type/build checks, or manual artifact inspection relevant to the requirement.
@@ -129,5 +124,3 @@ User asks: "Use requirements-fix to fix latest audit for checkout flow."
 3. Build a requirement traceability matrix.
 4. Fix mandatory gaps and contradictions before lower-severity docs/test issues.
 5. Verify against the cited requirement source.
-
-<!-- validator anchors: Linked .specs/ Requirement ID | Independent Verification Exception | audits/requirements/<YYYY-MM-DD requirements-fix-closure>.md | check_fix_closure.ts <closure.md> --family requirements | surviving_mutant | Bounded Fix→Re-verify Loop | Requirement Traceability Update | graceful degradation preserved -->

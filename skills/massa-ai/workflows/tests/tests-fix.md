@@ -77,20 +77,16 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory per the verification-ladder's Independent Verification Mandate for any TST finding closed at Standard+/Spec-driven size or high/critical severity; at Quick size the subagent hop is skipped and the standalone fresh-eyes assertion re-check below runs instead
 > - scope: the fixed TST finding's assertion strength, fixture/mock boundary, coverage-execution-map row, and report claim closure
-> - permissions: read-only
 > - inputs: the finding, the applied test change, the coverage execution map row, the verification command, and validation assets
 > - sensors: deterministic command (focused test run, assertion inspection, fixture-not-weakened check) against the coverage execution map row; discrimination sensor per `references/discrimination-sensor.md` (mutate the new/repaired test's subject; the test must kill it)
 > - output: confirmed/disproven TST closure verdict with assertion evidence
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists tests-closure verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each TST closure row's assertion evidence and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 10. Use strict harness sensors:
    - Never rely on AI subjective evaluation.
@@ -103,7 +99,7 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
    - Record command/artifact, result, skipped reason or `none`, highest Verification Ladder level reached, validation assets protected, and residual risk.
    - Sequence the TST proof in two passes, in order: first reproduce the coverage execution map's `expected failure before fix` row red (the pre-fix run proves the assertion can fail); only then, at Standard+/Spec-driven size or high/critical severity, run the discrimination sensor from `references/discrimination-sensor.md` as the post-fix kill-check against the new/repaired test's subject code — Quick focused-assertion findings are exempt from the sensor pass but never from the pre-fix red check.
    - A surviving mutant means the TST claim is unproven: close that finding's row `blocked` rather than `fixed` and emit the `surviving_mutant` lessons signal via the recording command above.
-   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop (3 verification iterations, then `Blocked` with evidence preserved). That cap is a distinct counter from the "two consecutive failed fixes" breaker in the preamble above, which escalates a single stuck iteration to `references/root-cause-scripts.md` and neither consumes nor resets this cap.
+   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop (3 verification iterations, then `Blocked` with evidence preserved).
 11. Use agent orchestration only when it improves signal — except the verification-agent dispatch above, which `references/agent-orchestration.md`'s Independent Verification Exception mandates for TST closures at the sizes/severities its trigger names, regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
 
 > **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
@@ -115,7 +111,6 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
 > - output: implementation summary, test counts, commands run, deviations
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists reusable testing patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 12. Close out with the Fix Closure Report:
    - The coverage execution map from step 6, now filled in through step 10's discrimination sensor result column, is the pre-edit draft of the Closure Matrix — carry its rows forward rather than re-deriving them.
@@ -135,5 +130,3 @@ User asks: "Use tests-fix to fix latest audit findings for report scheduling."
 3. Map each finding to missing coverage, weak assertions, fixture drift, flakiness, or missing sensor work.
 4. Add or repair deterministic tests without weakening validation assets.
 5. Run focused tests and report broader skipped checks when needed.
-
-<!-- validator anchors: references/discrimination-sensor.md | references/knowledge-verification-chain.md | references/brownfield-mapping.md (Minimum Bar's TESTING.md only) | Independent Verification Exception | mandatory per the verification-ladder's Independent Verification Mandate for any TST finding | discrimination sensor per references/discrimination-sensor.md (mutate the new/repaired test's subject; the test must kill it) | Sequence the TST proof in two passes | surviving_mutant lessons signal | Bounded Fix→Re-verify Loop | Fix Closure Report Contract | audits/tests/<YYYY-MM-DD tests-fix-closure>.md | bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family tests | graceful degradation preserved -->

@@ -7,6 +7,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Three deterministic harness scripts, replacing arithmetic and shell transcription the
+  workflows used to spell out in prose.** All Bun builtins, zero dependencies, same shape as
+  `check_commit.ts`. `size_change.ts` reads `git diff --numstat` and reports changed files,
+  changed LOC (added + deleted — a 100-line rewrite is 200, not 0) and the Verification
+  Ladder's **size floor**; it is deliberately a floor, since the ladder's other half
+  (migrations, auth, public compatibility, unresolved decisions) is invisible to a diff.
+  `resolve_scope.ts --scope modified|range|branch|files|whole` emits the shared audit scope
+  packet as JSON — type, target focus, resolution method, base, head, resolved files, applied
+  exclusions, freshness — and refuses rather than inventing a base when none resolves.
+  `ensure_worktree.ts` runs Stage 0–1 of the Implementation Delivery Protocol and prints the
+  worktree path and branch, applying the Stage 1 table's own failure rules: a taken branch
+  name is suffixed, and a taken worktree path is reused only when its branch matches. It can
+  emit exactly the two legal skip reasons and no third. Each is wired in from the one
+  reference that owns its rule, and covered by `scripts/__tests__/massa-ai-harness-scripts.test.ts`
+  (29 tests, boundaries probed on both sides).
+- **A gate on the `massa-ai-reviewer` dispatch trigger, in both directions.** AEH-06 pinned
+  that block's header, `scope`, `fallback` and `persona` bullets verbatim across all 14
+  implementing/fix workflows and never touched `trigger:` — the bullet that states the
+  dispatch is mandatory. A change tiering the reviewer by Verification Ladder size would have
+  landed in 14 source workflows and 48 generated bundle copies with every gate green. The new
+  group asserts that all 14 triggers end in `— never optional` and match one of the two
+  sanctioned wordings (12 generic, 2 finding-scoped and enumerated as deliberate), plus a
+  negative control: `pr-review.md`'s reviewer dispatch is a different trigger and must stay
+  one, so a mutation pasting the mandatory wording everywhere fails instead of passing.
+- **`workflow-anchors.json`, a fixture that makes the validator anchors mean something.** The
+  16 inline `<!-- validator anchors: ... -->` comments shipped in the agent-loaded workflow
+  bodies and nothing ever read them, so they went stale silently — two were already describing
+  prose that had been deleted. They move to `scripts/__tests__/workflow-anchors.json`, split
+  into 100 `present` entries (a literal substring, now asserted per file) and 34 `notes`
+  (paraphrases and claims of absence, which a substring check cannot express and which are
+  therefore carried, not asserted). Re-adding an inline comment fails the gate.
+
+### Changed
+
+- **Dispatch blocks carry only what varies; fields fixed for a role move to Role Defaults.**
+  `references/agent-orchestration.md` gains a Role Defaults section, and the 57 dispatch
+  blocks stop restating the values it fixes: the universal `persona` bullet (57 copies), the
+  reviewer's `fallback` (15), the verification-agent's `permissions` (15), and the designer's
+  `trigger`, `sensors`, `inputs`, `firewall` and `memory` (5 × 7). Dispatch-block lines go
+  597 → 476. This is the trade it looks like: a block is no longer self-contained, and
+  reading one means reading the defaults beside it — in exchange, a shared value has exactly
+  one place it can be wrong. Three gates are rewritten to match: per-block `persona` emission
+  becomes "the default exists, claims universality, and no block restates it"; the designer's
+  byte-identical trigger becomes "the canonical trigger keeps its mandatory clause, and no
+  workflow re-inlines it"; and a new negative control asserts a designer block still carries
+  the three fields the defaults do not fix, so "no block restates a default" cannot be
+  satisfied by emptying the blocks. `EXCESS_CEILING` drops to 456, retiring the AEH-06 and
+  DSG-05/06 rationale — a value stated once cannot be non-uniform.
+- **The code quality lens moves out of the two workflows that each carried a copy.**
+  `code-quality-audit.md` held ~20 lines of SOLID / Clean Code / KISS / YAGNI / DRY detection
+  rules and `code-quality-fix.md` held the matching fix directions, stating one split
+  criterion in three different phrasings. Both now load
+  `references/code-quality-lens.md`, which states that criterion once and splits each rule
+  into a Flag-when column (the audit's) and a Fix-direction column (the fix's) — the same
+  shape `architecture-audit.md` already used for its three lenses. The verbatim content
+  sensors in `agent-era-guidance-content.test.ts` are repointed to the new file phrase by
+  phrase, and gain two assertions a straight relocation would have lost: each workflow must
+  still load the lens, and neither may re-inline the criterion.
+- **`workflows/skill-architect.md` moves its non-procedural prose to
+  `references/skill-architect/authoring-principles.md`** — the five-point Core Philosophy, the
+  phase-sequence diagram, and the Conversation Style block, read once before Phase 1. The five
+  phases, their exit criteria, the frontmatter hard rules, the Important Boundaries and the
+  CC-BY-4.0 attribution stay in the workflow. 373 → 341 lines.
+- **`workflows/commit.md` now runs `check_commit.ts` instead of describing what it checks.**
+  The script existed and was documented as implementing `commit.md` §8, but `commit.md` never
+  invoked it — its only caller was `references/spec-driven/execute.md`. Message shape, allowed
+  type, description casing, trailing period, the `[<KEY>] ` Jira prefix and the
+  `!`/`BREAKING CHANGE:` pairing are now a non-zero exit that blocks the commit. The rules the
+  script cannot decide (type precedence between two defensible types, the 50-character target,
+  body requirements, attribution) stay in prose, and one silent contradiction is resolved:
+  `commit.md` listed `revert` in its type precedence order while the script rejected it.
+
+- **The workflow corpus stops restating what its references already own.** Three families of
+  per-workflow prose are deleted and resolved through the reference that is the single source:
+  the two-counters disambiguation clause (13 workflows → `references/verification-ladder.md`,
+  which already names all three counters), the 11-bullet "Establish the investigation scope"
+  enumeration (the 6 audit workflows → `references/audit-scope.md`, whose Lens Audit Scope
+  Resolution Procedure the very next step already loads), and the inline
+  `>200 lines, >20 KB, >50 search hits` threshold triple (`feature.md`, `debug.md`,
+  `refactor.md` → `references/context-firewall.md`). `skills/massa-ai/workflows/` goes from
+  4870 to 4802 lines; the duplication metric's excess drops from 494 to 474 at window 4,
+  measured differentially against a temp worktree of `main`. `EXCESS_CEILING` is lowered to
+  474 — the first time that ceiling moves down rather than up. Every earlier raise recorded
+  mandated uniformity and is untouched.
+
+### Fixed
+
+- **`check_commit.ts` rejected `revert`**, a type `workflows/commit.md` §8 tells the agent to
+  pick from. Wiring the script in as a blocking gate would have made the workflow instruct a
+  message it then refused.
+
+- **Three dead references in `workflows/skill-architect.md`.** The validator invocation named
+  `bun scripts/validate_skill.ts`, which resolves nowhere — every other scripted command in
+  the corpus carries the `skills/massa-ai/` prefix, and this one now does too. The Deliver
+  phase called a `present_files` tool that does not exist in any supported harness, and two
+  routes pointed at a `skill-creator` skill that is not in this repository
+  (`skills/` holds `agents`, `bootstrap`, `massa-ai`, `persona-router`, `profile`); both are
+  replaced with instructions that resolve against what actually ships.
+- **A duplicated `## Roles` heading in `references/agent-orchestration.md`**, which split the
+  role vocabulary across two sections carrying the same name.
+
 ## [1.56.0] - 2026-09-08
 
 ### Added

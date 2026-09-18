@@ -10,8 +10,8 @@
  * requirement — no broad substring that would pass on unrelated prose.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -28,70 +28,122 @@ function norm(text: string): string {
   return text.replace(/\s+/g, " ");
 }
 
+/** Every workflow .md under skills/massa-ai/workflows/, relative to the skill root. */
+function listWorkflowFiles(): string[] {
+  const root = resolve(REPO_ROOT, "skills", "massa-ai", "workflows");
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith(".md")) {
+        out.push(`workflows/${relative(root, full).split(sep).join("/")}`);
+      }
+    }
+  };
+  walk(root);
+  return out.sort();
+}
+
 // ---------------------------------------------------------------------------
-// AEH-01/02: code-quality-audit.md split/size leads (T3)
+// AEH-01/02: the code quality lens (T3, T4)
+//
+// REPOINTED, not relaxed. These rules lived inline in code-quality-audit.md and
+// code-quality-fix.md, in three different phrasings of one criterion, and this
+// suite grepped each phrasing where it sat. They now live once in
+// `references/code-quality-lens.md`, so the assertions follow the content to
+// its new home rather than being deleted with the prose — repointed by content
+// identity, phrase by phrase, not by line delta.
+//
+// Two properties are asserted that a straight relocation of the greps would
+// lose, and they are the reason an extraction is not free:
+//
+//   1. Each workflow must still LOAD the lens. A rule extracted into a file
+//      nobody reads is a rule that stopped applying, and every assertion below
+//      would still pass.
+//   2. Neither workflow may re-inline the criterion. Two copies of a split rule
+//      that drift is the defect the extraction exists to prevent, and a
+//      presence-only check on the reference cannot see it.
 // ---------------------------------------------------------------------------
 
-describe("code-quality-audit.md: agent-read-aware split and file-size leads (AEH-01, AEH-02)", () => {
-  const content = readSkill("workflows/code-quality/code-quality-audit.md");
+describe("code-quality-lens.md: the split criterion and file-shape rule (AEH-01, AEH-02)", () => {
+  const content = readSkill("references/code-quality-lens.md");
 
   test("no remaining split-on-size-or-and-alone lead", () => {
     expect(content).not.toContain('if accurate description needs "and", recommend splitting');
   });
 
-  test("split lead cites the discoverability-or-change-risk criterion", () => {
-    expect(content).toContain(
-      "split only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk; never split on size or \"more than one thing\" alone.",
+  test("the canonical split criterion carries both halves, including the negative one", () => {
+    expect(norm(content)).toContain(
+      "Split only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk; never split on size or \"more than one thing\" alone.",
     );
   });
 
-  test("SRP lead requires the same criterion, not concern-count or size alone", () => {
+  test("the SRP row requires the same criterion, not concern-count or size alone", () => {
     expect(content).toContain("never on concern-count or size alone");
   });
 
-  test("static leads flag multi-subject files and files over ~600 lines", () => {
-    expect(content).toContain("flag multi-subject files");
+  test("the file-shape rule flags multi-subject files and files over ~600 lines", () => {
+    expect(content).toContain("Flag multi-subject files");
     expect(content).toContain("over ~600 lines");
   });
 
-  test("static leads SHALL NOT flag a single-subject file below the line-count bound", () => {
-    expect(content).toContain("Do NOT flag a single-subject file for line count alone below that bound.");
+  test("the file-shape rule SHALL NOT flag a single-subject file below the line-count bound", () => {
+    expect(norm(content)).toContain("Do NOT flag a single-subject file for line count alone below that bound.");
   });
 
-  test("KISS lead is preserved verbatim and gains a cross-reference to the criterion", () => {
-    expect(content).toContain(
+  test("KISS lead is preserved verbatim and cross-references the criterion", () => {
+    expect(norm(content)).toContain(
       "choose boring solutions unless complexity is justified (real variability, hard constraints, or measured bottlenecks).",
     );
-    expect(content).toContain(
-      "When weighing whether to split instead of inline, apply the same discoverability-or-change-risk criterion used for the split lead above.",
+    expect(norm(content)).toContain(
+      "When weighing whether to split instead of inline, apply the Split Criterion above unchanged",
     );
   });
-});
 
-// ---------------------------------------------------------------------------
-// AEH-01: code-quality-fix.md split directive (T4)
-// ---------------------------------------------------------------------------
-
-describe("code-quality-fix.md: discoverability-or-change-risk split criterion (AEH-01)", () => {
-  const content = readSkill("workflows/code-quality/code-quality-fix.md");
-
-  test("Clean Code split directive cites the same discoverability-or-change-risk criterion", () => {
+  test("the fix directions for SOLID and Clean Code keep the criterion in their own words", () => {
+    // The fix side used to carry these two sentences in code-quality-fix.md.
+    // They are directions ("separate", "split functions"), not detections, so
+    // they survive as the lens's Fix-direction column rather than collapsing
+    // into the detection sentence above.
+    expect(content).toContain(
+      "separate mixed responsibilities only when the split yields an externally-findable named unit (locatable by search or grep from outside the file) or reduces change risk",
+    );
     expect(content).toContain(
       "split functions only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk — never split on size or \"more than one thing\" alone",
     );
   });
 
-  test("SOLID split directive cites the discoverability-or-change-risk criterion", () => {
-    expect(content).toContain(
-      "separate mixed responsibilities only when the split yields an externally-findable named unit (locatable by search or grep from outside the file) or reduces change risk",
+  test("the architecture boundary survived the move", () => {
+    expect(norm(content)).toContain(
+      "Do not report, recommend, or introduce ports, adapters, bounded contexts, new service/module boundaries, or VSA-style folder migration from this lens.",
     );
   });
+});
 
-  test("KISS fix direction cross-references the split criterion", () => {
-    expect(content).toContain(
-      "When choosing whether to split instead of inline, apply the same discoverability-or-change-risk criterion used for the Clean Code split direction above.",
-    );
-  });
+describe("code quality workflows: both load the lens and neither re-inlines it", () => {
+  const WORKFLOWS = [
+    "workflows/code-quality/code-quality-audit.md",
+    "workflows/code-quality/code-quality-fix.md",
+  ] as const;
+
+  /**
+   * The clause every phrasing of the split criterion shares. Asserting on this
+   * fragment rather than a full sentence is deliberate: a re-inlined copy would
+   * almost certainly be reworded, and a full-sentence check would miss exactly
+   * the drift it exists to catch.
+   */
+  const CRITERION_FRAGMENT = "externally-findable named unit";
+
+  for (const rel of WORKFLOWS) {
+    test(`${rel} loads references/code-quality-lens.md`, () => {
+      expect(readSkill(rel)).toContain("references/code-quality-lens.md");
+    });
+
+    test(`${rel} does not restate the split criterion inline`, () => {
+      expect(readSkill(rel)).not.toContain(CRITERION_FRAGMENT);
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -343,23 +395,40 @@ describe("references/spec-driven/validate.md: post-validation metric snapshot re
 
 const REVIEWER_DISPATCH_HEADER =
   "> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`";
+/**
+ * The reviewer's `fallback` and the universal `persona` bullet used to be
+ * asserted here, per file, because each block carried them verbatim. Both are
+ * now Role Defaults in `references/agent-orchestration.md` — stated once,
+ * applying to every dispatch — so asserting them per block would assert their
+ * absence-by-design as a failure.
+ *
+ * They are not unguarded: `skills-harness-integrity.test.ts`'s role-defaults
+ * group asserts that the reference states each default, that the section claims
+ * universality, and that NO block restates one. What stays here is what is
+ * genuinely per-file — the header and the file's own `scope` sentence — plus
+ * the requirement that the defaults have actually moved rather than vanished.
+ */
 const REVIEWER_FALLBACK_CLAUSE =
-  "> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason";
-const REVIEWER_PERSONA_BULLET =
-  "> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed";
+  "`fallback`: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason";
 
 interface ReviewerDispatchTarget {
   file: string;
   scope: string;
 }
 
-/** Asserts one file carries the full reviewer dispatch block: header, scope, fallback, and the mandatory persona bullet. */
+/** Asserts one file carries its own half of the reviewer dispatch block: header and scope. */
 function expectReviewerDispatchBlock({ file, scope }: ReviewerDispatchTarget): void {
   const content = readSkill(file);
   expect(content).toContain(REVIEWER_DISPATCH_HEADER);
   expect(content).toContain(`> - scope: ${scope}`);
-  expect(content).toContain(REVIEWER_FALLBACK_CLAUSE);
-  expect(content).toContain(REVIEWER_PERSONA_BULLET);
+}
+
+/** The reviewer's fallback survived the move into the shared defaults. */
+function expectReviewerFallbackDefault(): void {
+  const body = readSkill("references/agent-orchestration.md");
+  const start = body.indexOf("### Role Defaults");
+  expect(start, "agent-orchestration.md has no Role Defaults section").toBeGreaterThan(-1);
+  expect(body.slice(start)).toContain(REVIEWER_FALLBACK_CLAUSE);
 }
 
 const IMPLEMENTING_WORKFLOW_TARGETS: ReviewerDispatchTarget[] = [
@@ -371,6 +440,10 @@ const IMPLEMENTING_WORKFLOW_TARGETS: ReviewerDispatchTarget[] = [
 ];
 
 describe("massa-ai-reviewer dispatch block: 5 implementing workflows (T15, AEH-06)", () => {
+  test("the reviewer's fallback clause survived the move into the shared role defaults", () => {
+    expectReviewerFallbackDefault();
+  });
+
   for (const target of IMPLEMENTING_WORKFLOW_TARGETS) {
     test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
       expectReviewerDispatchBlock(target);
@@ -437,5 +510,111 @@ describe("massa-ai-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)"
     expect(allTargets.length).toBe(14);
     const withBlock = allTargets.filter(({ file }) => readSkill(file).includes(REVIEWER_DISPATCH_HEADER));
     expect(withBlock.length).toBe(14);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The reviewer's trigger line, both directions.
+//
+// Written after a Plan Challenge pre-mortem found this line ungated in BOTH
+// directions: AEH-06 pinned the reviewer block's header, scope, fallback and
+// persona bullets verbatim in all 14 files and never touched `trigger:`, which
+// is the bullet that states the dispatch is mandatory. A proposal to tier the
+// reviewer by Verification Ladder size would therefore have landed silently in
+// 14 source workflows and 48 generated bundle copies with every gate green.
+//
+// The proposal was dropped — it removes no line from any workflow (the
+// `fallback:` bullet already covers an unavailable subagent, so tiering only
+// widens entry into a path that already exists), and at Quick size it would
+// leave zero dispatched independent readers, since
+// `references/verification-ladder.md`'s Independent Verification Mandate
+// already lets the VERIFIER skip its subagent hop there. The reviewer dispatch
+// is what keeps "author ≠ verifier" true at Quick.
+//
+// The gap it exposed is real either way, so this is the sensor. Shaped after
+// the designer group in workflow-harness-contract.test.ts (a byte-identical
+// trigger across a known set), but split by what is actually uniform rather
+// than asserting a uniformity that does not hold: 12 of the 14 share one
+// generic lead-in, and 2 carry a finding-specific one that is more precise, not
+// drifted. What ALL 14 share is the mandatory-ness claim, and that is the part
+// worth a gate.
+// ---------------------------------------------------------------------------
+
+describe("reviewer dispatch trigger: mandatory in all 14, and not by accident", () => {
+  const ALL_REVIEWER_TARGETS = [
+    ...IMPLEMENTING_WORKFLOW_TARGETS,
+    ...FIX_WORKFLOW_BATCH_1_TARGETS,
+    ...FIX_WORKFLOW_BATCH_2_TARGETS,
+  ];
+
+  /** The generic lead-in, shared byte-identically by 12 of the 14. */
+  const GENERIC_TRIGGER =
+    "> - trigger: implementation complete, before the verification gate — never optional";
+
+  /**
+   * The two workflows whose trigger names the unit of work instead of "the
+   * implementation", because they close one audit finding at a time rather than
+   * a whole change. Enumerated, not pattern-matched: "is this divergence
+   * deliberate?" is a judgment, and a regex permissive enough to accept these
+   * two would accept a drifted third.
+   */
+  const FINDING_SCOPED_TRIGGERS: Record<string, string> = {
+    "workflows/architecture/architecture-fix.md":
+      "> - trigger: implementation of the architecture finding complete, before the verification gate — never optional",
+    "workflows/code-quality/code-quality-fix.md":
+      "> - trigger: implementation of the CQ finding complete, before the verification gate — never optional",
+  };
+
+  /** The reviewer block's own `trigger:` line in a file, or undefined. */
+  function reviewerTrigger(file: string): string | undefined {
+    const lines = readSkill(file).split(/\r?\n/);
+    const headerIdx = lines.findIndex((l) => l.startsWith(REVIEWER_DISPATCH_HEADER));
+    if (headerIdx === -1) return undefined;
+    // Scan only this block: stop at the first non-blockquote line, so a later
+    // dispatch block's trigger can never be mistaken for the reviewer's.
+    for (let i = headerIdx + 1; i < lines.length && lines[i]!.startsWith(">"); i++) {
+      if (lines[i]!.startsWith("> - trigger:")) return lines[i];
+    }
+    return undefined;
+  }
+
+  for (const { file } of ALL_REVIEWER_TARGETS) {
+    test(`${file}'s reviewer trigger states the dispatch is never optional`, () => {
+      const trigger = reviewerTrigger(file);
+      expect(trigger, `${file} has no reviewer trigger line`).toBeDefined();
+      expect(trigger).toContain("— never optional");
+      // And it is one of the two sanctioned wordings, not a third.
+      expect(trigger).toBe(FINDING_SCOPED_TRIGGERS[file] ?? GENERIC_TRIGGER);
+    });
+  }
+
+  test("the 12 generic triggers are byte-identical to each other", () => {
+    const generic = ALL_REVIEWER_TARGETS
+      .map(({ file }) => file)
+      .filter((file) => !(file in FINDING_SCOPED_TRIGGERS))
+      .map((file) => reviewerTrigger(file));
+    expect(generic.length).toBe(12); // guard the guard: the split must stay 12/2
+    expect(new Set(generic).size).toBe(1);
+  });
+
+  test("pr-review.md's reviewer dispatch is deliberately NOT this trigger", () => {
+    // Negative control. Without it, a mutation that pasted the mandatory trigger
+    // into every reviewer block on disk would pass every assertion above, and
+    // the group would be measuring nothing.
+    const trigger = reviewerTrigger("workflows/pr-review.md");
+    expect(trigger).toBeDefined();
+    expect(trigger).not.toContain("never optional");
+    expect(trigger).toContain("pr-review Step 2, dimension row 6");
+  });
+
+  test("no workflow outside the 14 claims a never-optional reviewer dispatch", () => {
+    const sanctioned = new Set(ALL_REVIEWER_TARGETS.map(({ file }) => file));
+    const offenders: string[] = [];
+    for (const rel of listWorkflowFiles()) {
+      if (sanctioned.has(rel)) continue;
+      const trigger = reviewerTrigger(rel);
+      if (trigger?.includes("never optional")) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
   });
 });

@@ -80,7 +80,6 @@ and artifact paths. Model request: `kimi-k3` (see Step 0.5).
 > - output: the evaluation-specification YAML, returned verbatim for all rounds; nothing else
 > - firewall: no artifact body quotes beyond what the rubric anchors need; no raw dumps
 > - memory: suggest-only; main agent persists
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 This packet is a specialization of the canonical Capability Packet
 (`references/agent-orchestration.md`): the spec YAML is its `output` contract; the
@@ -120,7 +119,6 @@ the reply block:
 > - output: the YAML reply block below (strengths/weaknesses capped at ≤3 items); report file is the persisted channel — dual-channel rule, the chat return never carries the report body
 > - firewall: quoted evidence snippets only; no artifact or peer-report dumps in the reply
 > - memory: suggest-only; main agent persists
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 This packet is a specialization of the canonical Capability Packet
 (`references/agent-orchestration.md`); the per-round additions are its `inputs` deltas.

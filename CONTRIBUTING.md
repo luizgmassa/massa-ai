@@ -82,6 +82,18 @@ never silently violate an invariant.
 **Acceptance gate**: tests cover the happy path, error path, timeout path, and
 partial-failure path for each invariant. No invariant is silently violated.
 
+**Workflow prose invariants live in a fixture, not in the workflow.** A phrase
+another gate greps for used to be flagged inline with an
+`<!-- validator anchors: ... -->` comment in the workflow body. Those comments
+shipped into every agent's context and nothing read them, so they went stale
+silently. They now live in `scripts/__tests__/workflow-anchors.json`, split into
+`present` (a literal substring of the workflow, asserted by
+`scripts/__tests__/workflow-anchors.test.ts`) and `notes` (a paraphrase or a
+claim of absence, carried for the next editor and deliberately not asserted).
+Before rewording a line in `skills/massa-ai/workflows/`, check that file. Adding
+a new invariant means adding it there, not re-adding an inline comment — the
+gate fails on one.
+
 **Retiring a compatibility boundary** (an env-var prefix, a config key, a
 feature flag) is itself an invariant change and needs the same discipline. A
 suite that only checks the new name still passes if the old name was left

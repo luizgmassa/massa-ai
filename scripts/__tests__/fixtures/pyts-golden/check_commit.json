@@ -42,7 +42,7 @@
       "feature(auth): add email validation"
     ],
     "exitCode": 1,
-    "stdout": "  ERROR type 'feature' is not one of: feat, fix, refactor, docs, test, style, perf, build, ci, chore\n\ncheck_commit: FAIL - see https://www.conventionalcommits.org/en/v1.0.0/\n"
+    "stdout": "  ERROR type 'feature' is not one of: feat, fix, refactor, docs, test, style, perf, build, ci, chore, revert\n\ncheck_commit: FAIL - see https://www.conventionalcommits.org/en/v1.0.0/\n"
   },
   {
     "label": "uppercase description",

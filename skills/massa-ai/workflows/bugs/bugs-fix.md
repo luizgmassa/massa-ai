@@ -71,7 +71,6 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable bug patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
@@ -82,20 +81,16 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven bug-fix size or high/critical bug severity, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`
 > - scope: the fixed bug finding's repro path, regression tests, and report claim closure
-> - permissions: read-only
 > - inputs: the bug finding, the applied root-cause fix, the verification suggestion, and validation assets
 > - sensors: deterministic command (repro path, focused regression tests, inspection) and report claim closure; discrimination sensor per `references/discrimination-sensor.md` (the divergence-point fix just applied)
 > - output: confirmed/disproven bug-closure verdict with evidence
 > - firewall: raw repro transcripts and test/log output summarized
 > - memory: suggest-only; main agent persists bug-closure verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the bug-fix closure evidence against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 
 10. Verify each completed finding:
@@ -106,7 +101,7 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
    - Run the report's verification suggestion when available.
    - The red→green reproduction proves the regression test catches this bug; the discrimination sensor proves that same assertion would also discriminate against a future wrong implementation — complementary, and both required at Standard+.
    - At the tiers named in the verification-agent dispatch's trigger above, run the discrimination sensor per `references/discrimination-sensor.md` against the divergence-point fix; a surviving mutant marks the finding's closure row `blocked` and records the `surviving_mutant` lessons signal even when the reproduction test is green.
-   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; this is a separate counter from the two-consecutive-failed-fixes breaker into `references/root-cause-scripts.md` above, which fires inside one iteration and neither consumes nor resets the loop count.
+   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop.
    - Run focused regression tests first, then relevant lint/type/build/test commands when feasible.
    - Confirm validation assets were not weakened.
    - Record command/artifact, result, skipped reason or `none`, highest Verification Ladder level reached, validation assets protected, and residual risk.
@@ -131,6 +126,3 @@ User asks: "Fix BUG-2 from audits/bugs/2026-06-07 bugs-audit.md."
 1. Read the specified report and only execute `BUG-2`.
 2. Preserve other bug findings for later.
 3. Report evidence for `BUG-2` closure and residual risks.
-
-<!-- validator anchors: "Independent Verification Exception", "the divergence-point fix just applied", "audits/bugs/<YYYY-MM-DD bugs-fix-closure>.md", "check_fix_closure.ts <closure.md> --family bugs", "The red→green reproduction proves the regression test catches this bug", "Bounded Fix→Re-verify Loop" -->
-

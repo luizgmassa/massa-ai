@@ -29,7 +29,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - deepen into enriched search, symbols, or exact files only when needed
    - prefer `read_file` over native Read when symbol metadata + imports are useful (retrieval order per `references/mcp-tools.md`); use `symbol_snippet` for raw code snippets by file + line range
    - prefer current repository truth over stale or conflicting memories
-6. Execute the requested work using existing repository conventions. Load `references/naming-standards.md` before introducing or renaming identifiers, screens, components, attributes, or implementation-facing names (English-conversion rule applies). Tie verification depth to the Verification Ladder tier table in `references/verification-ladder.md`: Quick (<=3 files and <=200 changed LOC) runs static + file-integrity checks; Standard (<=10 files or <=500 changed LOC) adds a named verification recipe and behavioral checks; Spec-driven (>10 files, >500 changed LOC) escalates to `workflows/spec-driven.md`. Do not invent new thresholds; load specialized references only when the task needs their exact contracts.
+6. Execute the requested work using existing repository conventions. Load `references/naming-standards.md` before introducing or renaming identifiers, screens, components, attributes, or implementation-facing names (English-conversion rule applies). Tie verification depth to the Verification Ladder tier table in `references/verification-ladder.md`, sizing the change with `bun skills/massa-ai/scripts/size_change.ts`: Quick runs static + file-integrity checks; Standard adds a named verification recipe and behavioral checks; Spec-driven escalates to `workflows/spec-driven.md`. Do not invent new thresholds; load specialized references only when the task needs their exact contracts.
    - For analysis that benefits from running code (derived values, data inspection, bulk transforms), call `execute` with `language` and `code` or `batch_execute` with `commands`[] instead of loading raw data into context. Respect the local-dev-only trust model (no untrusted-client exposure).
    - When the chosen approach leans on an external library's or API's exact behavior, resolve it through the 5-step chain in `references/knowledge-verification-chain.md` (codebase, project docs, Context7, web, flag-uncertain) before committing to that approach — the trigger is the dependence itself, not the task's Quick/Standard/Spec-driven tier.
 7. Use `compress` only when accumulated source or conversation context is reducing execution quality; preserve decisions, constraints, current state, and next steps rather than raw history.
@@ -43,15 +43,9 @@ Before the first repository mutation, load `references/implementation-delivery.m
 **Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
 > **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
-> - trigger: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
-> - inputs: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
-> - sensors: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
-> - firewall: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
-> - memory: suggest-only; the main agent persists durable screen and design-token conventions
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
@@ -62,20 +56,16 @@ Before the first repository mutation, load `references/implementation-delivery.m
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: fallback work reaching Standard+ on the Verification Ladder, or any Quick-sized change inside the risk-domain set named in step 3 (public API, data loss, auth/PII, migrations, cross-service) — the Independent Verification Mandate in `references/verification-ladder.md` applies at that gate even when file/LOC counts stay Quick
 > - scope: the fallback change's diff surface plus the acceptance evidence gathered while executing step 6
-> - permissions: read-only
 > - inputs: diff, the General fallback preflight rationale, reviewer findings, recalled conventions
 > - sensors: independent outcome-vs-request re-check; discrimination sensor per `references/discrimination-sensor.md`, mutating the fallback change's own logic in scratch state
 > - output: PASS/FAIL verdict with per-check evidence recorded in `.specs/quick/NNN-slug/SUMMARY.md`
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists general-workflow verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the change against its acceptance evidence and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 9. At Standard+ size, persist `.specs/quick/NNN-slug/TASK.md` and `SUMMARY.md` using the templates in `references/artifact-persistence.md`, then run `bun skills/massa-ai/scripts/check_specs_delivered.ts <slug> --kind quick` before the Evidence Gate — a non-zero exit blocks completion. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 10. Complete the Evidence Gate from `references/evidence-gate.md` and report verification, changed artifacts, memory outcome, and residual risk.
@@ -87,8 +77,6 @@ On any tool/index/MCP failure, follow `references/graceful-degradation.md` (also
 - `.specs/` directory missing or not writable: block quick-artifact and onboarding-doc writes per `references/artifact-persistence.md`'s unwritable-→-block rule; do not fall back to memory or chat.
 - Verifier fix→re-verify loop reaches the cap in `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop: stop with `Blocked`, preserve the evidence collected, and ask the user for direction.
 
-**Disambiguation — two different counters:** the loop cap above counts *verification* iterations on the fallback change as a whole. It is separate from the two-consecutive-failed-fix trigger near the top of this workflow that loads `references/root-cause-scripts.md` — that one counts *edit attempts* on a single symptom inside one iteration. Neither counter resets or consumes the other.
-
 ## Output Contract
 
 - Goal and selected fallback workflow
@@ -98,6 +86,3 @@ On any tool/index/MCP failure, follow `references/graceful-degradation.md` (also
 - Verification performed and skipped checks
 - Memory written or intentionally skipped, with reason
 - Residual risk
-
-<!-- validator anchors: massa-ai-verification-agent dispatch block; Independent Verification Mandate; risk-domain set named in step 3; check_specs_delivered.ts --kind quick; .specs/quick/NNN-slug/SUMMARY.md; Minimum Bar sweep; .specs/project/onboarding/; Bounded Fix→Re-verify Loop; Disambiguation — two different counters; Stage 3 delivery authorization -->
-
