@@ -10,8 +10,8 @@
  * requirement — no broad substring that would pass on unrelated prose.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -26,6 +26,23 @@ function readAgentCharter(agentName: string): string {
 /** Collapses whitespace runs (including line wraps) to a single space, for phrases that may span a hard-wrapped source line. */
 function norm(text: string): string {
   return text.replace(/\s+/g, " ");
+}
+
+/** Every workflow .md under skills/massa-ai/workflows/, relative to the skill root. */
+function listWorkflowFiles(): string[] {
+  const root = resolve(REPO_ROOT, "skills", "massa-ai", "workflows");
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith(".md")) {
+        out.push(`workflows/${relative(root, full).split(sep).join("/")}`);
+      }
+    }
+  };
+  walk(root);
+  return out.sort();
 }
 
 // ---------------------------------------------------------------------------
@@ -472,5 +489,111 @@ describe("massa-ai-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)"
     expect(allTargets.length).toBe(14);
     const withBlock = allTargets.filter(({ file }) => readSkill(file).includes(REVIEWER_DISPATCH_HEADER));
     expect(withBlock.length).toBe(14);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The reviewer's trigger line, both directions.
+//
+// Written after a Plan Challenge pre-mortem found this line ungated in BOTH
+// directions: AEH-06 pinned the reviewer block's header, scope, fallback and
+// persona bullets verbatim in all 14 files and never touched `trigger:`, which
+// is the bullet that states the dispatch is mandatory. A proposal to tier the
+// reviewer by Verification Ladder size would therefore have landed silently in
+// 14 source workflows and 48 generated bundle copies with every gate green.
+//
+// The proposal was dropped — it removes no line from any workflow (the
+// `fallback:` bullet already covers an unavailable subagent, so tiering only
+// widens entry into a path that already exists), and at Quick size it would
+// leave zero dispatched independent readers, since
+// `references/verification-ladder.md`'s Independent Verification Mandate
+// already lets the VERIFIER skip its subagent hop there. The reviewer dispatch
+// is what keeps "author ≠ verifier" true at Quick.
+//
+// The gap it exposed is real either way, so this is the sensor. Shaped after
+// the designer group in workflow-harness-contract.test.ts (a byte-identical
+// trigger across a known set), but split by what is actually uniform rather
+// than asserting a uniformity that does not hold: 12 of the 14 share one
+// generic lead-in, and 2 carry a finding-specific one that is more precise, not
+// drifted. What ALL 14 share is the mandatory-ness claim, and that is the part
+// worth a gate.
+// ---------------------------------------------------------------------------
+
+describe("reviewer dispatch trigger: mandatory in all 14, and not by accident", () => {
+  const ALL_REVIEWER_TARGETS = [
+    ...IMPLEMENTING_WORKFLOW_TARGETS,
+    ...FIX_WORKFLOW_BATCH_1_TARGETS,
+    ...FIX_WORKFLOW_BATCH_2_TARGETS,
+  ];
+
+  /** The generic lead-in, shared byte-identically by 12 of the 14. */
+  const GENERIC_TRIGGER =
+    "> - trigger: implementation complete, before the verification gate — never optional";
+
+  /**
+   * The two workflows whose trigger names the unit of work instead of "the
+   * implementation", because they close one audit finding at a time rather than
+   * a whole change. Enumerated, not pattern-matched: "is this divergence
+   * deliberate?" is a judgment, and a regex permissive enough to accept these
+   * two would accept a drifted third.
+   */
+  const FINDING_SCOPED_TRIGGERS: Record<string, string> = {
+    "workflows/architecture/architecture-fix.md":
+      "> - trigger: implementation of the architecture finding complete, before the verification gate — never optional",
+    "workflows/code-quality/code-quality-fix.md":
+      "> - trigger: implementation of the CQ finding complete, before the verification gate — never optional",
+  };
+
+  /** The reviewer block's own `trigger:` line in a file, or undefined. */
+  function reviewerTrigger(file: string): string | undefined {
+    const lines = readSkill(file).split(/\r?\n/);
+    const headerIdx = lines.findIndex((l) => l.startsWith(REVIEWER_DISPATCH_HEADER));
+    if (headerIdx === -1) return undefined;
+    // Scan only this block: stop at the first non-blockquote line, so a later
+    // dispatch block's trigger can never be mistaken for the reviewer's.
+    for (let i = headerIdx + 1; i < lines.length && lines[i]!.startsWith(">"); i++) {
+      if (lines[i]!.startsWith("> - trigger:")) return lines[i];
+    }
+    return undefined;
+  }
+
+  for (const { file } of ALL_REVIEWER_TARGETS) {
+    test(`${file}'s reviewer trigger states the dispatch is never optional`, () => {
+      const trigger = reviewerTrigger(file);
+      expect(trigger, `${file} has no reviewer trigger line`).toBeDefined();
+      expect(trigger).toContain("— never optional");
+      // And it is one of the two sanctioned wordings, not a third.
+      expect(trigger).toBe(FINDING_SCOPED_TRIGGERS[file] ?? GENERIC_TRIGGER);
+    });
+  }
+
+  test("the 12 generic triggers are byte-identical to each other", () => {
+    const generic = ALL_REVIEWER_TARGETS
+      .map(({ file }) => file)
+      .filter((file) => !(file in FINDING_SCOPED_TRIGGERS))
+      .map((file) => reviewerTrigger(file));
+    expect(generic.length).toBe(12); // guard the guard: the split must stay 12/2
+    expect(new Set(generic).size).toBe(1);
+  });
+
+  test("pr-review.md's reviewer dispatch is deliberately NOT this trigger", () => {
+    // Negative control. Without it, a mutation that pasted the mandatory trigger
+    // into every reviewer block on disk would pass every assertion above, and
+    // the group would be measuring nothing.
+    const trigger = reviewerTrigger("workflows/pr-review.md");
+    expect(trigger).toBeDefined();
+    expect(trigger).not.toContain("never optional");
+    expect(trigger).toContain("pr-review Step 2, dimension row 6");
+  });
+
+  test("no workflow outside the 14 claims a never-optional reviewer dispatch", () => {
+    const sanctioned = new Set(ALL_REVIEWER_TARGETS.map(({ file }) => file));
+    const offenders: string[] = [];
+    for (const rel of listWorkflowFiles()) {
+      if (sanctioned.has(rel)) continue;
+      const trigger = reviewerTrigger(rel);
+      if (trigger?.includes("never optional")) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
   });
 });

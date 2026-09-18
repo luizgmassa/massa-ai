@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emit exactly the two legal skip reasons and no third. Each is wired in from the one
   reference that owns its rule, and covered by `scripts/__tests__/massa-ai-harness-scripts.test.ts`
   (29 tests, boundaries probed on both sides).
+- **A gate on the `massa-ai-reviewer` dispatch trigger, in both directions.** AEH-06 pinned
+  that block's header, `scope`, `fallback` and `persona` bullets verbatim across all 14
+  implementing/fix workflows and never touched `trigger:` — the bullet that states the
+  dispatch is mandatory. A change tiering the reviewer by Verification Ladder size would have
+  landed in 14 source workflows and 48 generated bundle copies with every gate green. The new
+  group asserts that all 14 triggers end in `— never optional` and match one of the two
+  sanctioned wordings (12 generic, 2 finding-scoped and enumerated as deliberate), plus a
+  negative control: `pr-review.md`'s reviewer dispatch is a different trigger and must stay
+  one, so a mutation pasting the mandatory wording everywhere fails instead of passing.
 - **`workflow-anchors.json`, a fixture that makes the validator anchors mean something.** The
   16 inline `<!-- validator anchors: ... -->` comments shipped in the agent-loaded workflow
   bodies and nothing ever read them, so they went stale silently — two were already describing
