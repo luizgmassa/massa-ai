@@ -395,23 +395,40 @@ describe("references/spec-driven/validate.md: post-validation metric snapshot re
 
 const REVIEWER_DISPATCH_HEADER =
   "> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`";
+/**
+ * The reviewer's `fallback` and the universal `persona` bullet used to be
+ * asserted here, per file, because each block carried them verbatim. Both are
+ * now Role Defaults in `references/agent-orchestration.md` — stated once,
+ * applying to every dispatch — so asserting them per block would assert their
+ * absence-by-design as a failure.
+ *
+ * They are not unguarded: `skills-harness-integrity.test.ts`'s role-defaults
+ * group asserts that the reference states each default, that the section claims
+ * universality, and that NO block restates one. What stays here is what is
+ * genuinely per-file — the header and the file's own `scope` sentence — plus
+ * the requirement that the defaults have actually moved rather than vanished.
+ */
 const REVIEWER_FALLBACK_CLAUSE =
-  "> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason";
-const REVIEWER_PERSONA_BULLET =
-  "> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed";
+  "`fallback`: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason";
 
 interface ReviewerDispatchTarget {
   file: string;
   scope: string;
 }
 
-/** Asserts one file carries the full reviewer dispatch block: header, scope, fallback, and the mandatory persona bullet. */
+/** Asserts one file carries its own half of the reviewer dispatch block: header and scope. */
 function expectReviewerDispatchBlock({ file, scope }: ReviewerDispatchTarget): void {
   const content = readSkill(file);
   expect(content).toContain(REVIEWER_DISPATCH_HEADER);
   expect(content).toContain(`> - scope: ${scope}`);
-  expect(content).toContain(REVIEWER_FALLBACK_CLAUSE);
-  expect(content).toContain(REVIEWER_PERSONA_BULLET);
+}
+
+/** The reviewer's fallback survived the move into the shared defaults. */
+function expectReviewerFallbackDefault(): void {
+  const body = readSkill("references/agent-orchestration.md");
+  const start = body.indexOf("### Role Defaults");
+  expect(start, "agent-orchestration.md has no Role Defaults section").toBeGreaterThan(-1);
+  expect(body.slice(start)).toContain(REVIEWER_FALLBACK_CLAUSE);
 }
 
 const IMPLEMENTING_WORKFLOW_TARGETS: ReviewerDispatchTarget[] = [
@@ -423,6 +440,10 @@ const IMPLEMENTING_WORKFLOW_TARGETS: ReviewerDispatchTarget[] = [
 ];
 
 describe("massa-ai-reviewer dispatch block: 5 implementing workflows (T15, AEH-06)", () => {
+  test("the reviewer's fallback clause survived the move into the shared role defaults", () => {
+    expectReviewerFallbackDefault();
+  });
+
   for (const target of IMPLEMENTING_WORKFLOW_TARGETS) {
     test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
       expectReviewerDispatchBlock(target);

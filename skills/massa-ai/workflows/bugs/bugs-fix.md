@@ -71,7 +71,6 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable bug patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
@@ -82,20 +81,16 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven bug-fix size or high/critical bug severity, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`
 > - scope: the fixed bug finding's repro path, regression tests, and report claim closure
-> - permissions: read-only
 > - inputs: the bug finding, the applied root-cause fix, the verification suggestion, and validation assets
 > - sensors: deterministic command (repro path, focused regression tests, inspection) and report claim closure; discrimination sensor per `references/discrimination-sensor.md` (the divergence-point fix just applied)
 > - output: confirmed/disproven bug-closure verdict with evidence
 > - firewall: raw repro transcripts and test/log output summarized
 > - memory: suggest-only; main agent persists bug-closure verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the bug-fix closure evidence against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 
 10. Verify each completed finding:

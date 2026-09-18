@@ -65,15 +65,9 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 **Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
 > **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
-> - trigger: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
-> - inputs: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
-> - sensors: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
-> - firewall: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
-> - memory: suggest-only; the main agent persists durable screen and design-token conventions
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: isolated finding with disjoint write set and concrete verification
@@ -84,7 +78,6 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     Never run parallel writers against shared files or contracts.
 
@@ -97,20 +90,16 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: an `Area/PREFIX-N` finding's closure meets the verification-ladder's Independent Verification Mandate tier gate — Standard+/Spec-driven size or any high/critical-severity finding
 > - scope: the closed `Area/PREFIX-N` finding's fix diff, its source-lens claim, and the validation assets the fix touches
-> - permissions: read-only
 > - inputs: the source-qualified finding ID, the applied fix diff, the report's Verification Suggestion, and the pending closure-matrix row
 > - sensors: the deterministic command/artifact named in the closure row for that lens; discrimination sensor per `references/discrimination-sensor.md` (the code under the closed finding's claim)
 > - output: confirmed/disproven closure verdict per `Area/PREFIX-N` row, ladder level reached, residual risk
 > - firewall: raw test/build output and diffs summarized to verdict plus evidence pointers
 > - memory: suggest-only; main agent persists implementation-closure verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each closed Area/PREFIX-N row against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 11. Verify each completed finding with the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check, then run focused tests, build, lint, type, static, or runtime checks relevant to the source lens. At the tiers the ladder's Independent Verification Mandate names, also run the Discrimination Sensor (`references/discrimination-sensor.md`) against the code under the closed finding's claim; a surviving mutant marks that closure row `blocked` (not `fixed`) and emits the `surviving_mutant` lessons signal. Reinspect tests, fixtures, snapshots, types, specs, public contracts, and touched identifiers so validation assets were not weakened and names follow `references/naming-standards.md`. A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason. The fix→re-verify cycle is capped at the ladder's 3-iteration limit per finding.
 12. Persist the closure evidence as the Fix Closure Report defined in `references/audit-report-io.md` (Fix Closure Report Contract), at `audits/implementation/<YYYY-MM-DD implementation-fix-closure>.md`, one row per selected finding keyed by its source-qualified `Area/PREFIX-N` ID: status (`fixed`, `deferred`, `blocked`, `skipped`), changed files, command/artifact, result, skipped reason or `none`, discrimination sensor verdict, independent verifier verdict, highest Verification Ladder level reached, validation assets protected, residual risk, and exact next step for deferred or blocked findings. Run `bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family implementation` before Propose/Evidence Gate; a non-zero exit blocks closure. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).

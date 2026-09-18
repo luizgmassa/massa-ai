@@ -62,18 +62,15 @@ Findings-only: do not edit code unless the user separately asks for fixes.
 > - output: findings with lens-specific evidence, provisional severity, tradeoff, and what would disprove it
 > - firewall: raw dependency graphs, generated reports, and broad search output summarized, not returned raw
 > - memory: suggest-only; main agent persists accepted constraints/rejected refactors
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: independent verification of a high-impact architecture finding
 > - scope: the specific finding's claimed evidence and affected boundary/module
-> - permissions: read-only
 > - inputs: the candidate finding, its source evidence, ADRs, accepted exceptions, and the verification suggestion
 > - sensors: deterministic command or artifact check that would falsify the finding
 > - output: confirmed/disproven verdict with evidence; skipped-check reason if the sensor cannot run
 > - firewall: raw logs/snapshots summarized
 > - memory: suggest-only; main agent persists reusable verification recipes
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 9. Severity rules (apply the countable threshold first, then the qualitative clause):
    - `critical`: architecture issue likely causes data loss, auth/privacy break, production outage, irreversible corruption, OR affects >10 files; otherwise use the qualitative clause below.
    - `high`: strong coupling with high volatility, boundary violation, dependency inversion break, or shallow module design likely to cause major change friction or regression.

@@ -77,20 +77,16 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory per the verification-ladder's Independent Verification Mandate for any TST finding closed at Standard+/Spec-driven size or high/critical severity; at Quick size the subagent hop is skipped and the standalone fresh-eyes assertion re-check below runs instead
 > - scope: the fixed TST finding's assertion strength, fixture/mock boundary, coverage-execution-map row, and report claim closure
-> - permissions: read-only
 > - inputs: the finding, the applied test change, the coverage execution map row, the verification command, and validation assets
 > - sensors: deterministic command (focused test run, assertion inspection, fixture-not-weakened check) against the coverage execution map row; discrimination sensor per `references/discrimination-sensor.md` (mutate the new/repaired test's subject; the test must kill it)
 > - output: confirmed/disproven TST closure verdict with assertion evidence
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists tests-closure verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each TST closure row's assertion evidence and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 10. Use strict harness sensors:
    - Never rely on AI subjective evaluation.
@@ -115,7 +111,6 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
 > - output: implementation summary, test counts, commands run, deviations
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists reusable testing patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 12. Close out with the Fix Closure Report:
    - The coverage execution map from step 6, now filled in through step 10's discrimination sensor result column, is the pre-edit draft of the Closure Matrix — carry its rows forward rather than re-deriving them.

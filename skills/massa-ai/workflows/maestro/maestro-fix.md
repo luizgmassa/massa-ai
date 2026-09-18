@@ -72,14 +72,12 @@ Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>`
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven finding size or high/critical severity per the Independent Verification Mandate in `references/verification-ladder.md`; at Quick size, device runs are expensive, so skip the dispatch and instead run the standalone fresh-eyes self-check named in the fallback line
 > - scope: the fixed flow/subflow/fixture's `MST-*` claim closure — selector/assertion changes, stable-flow design compliance, and the JUnit report/artifact evidence for the run
-> - permissions: read-only
 > - inputs: the `MST-*` finding, the applied flow/fixture diff, the report's Verification Suggestion, the JUnit report path, the artifact directory, and device/platform
 > - sensors: the report's Verification Suggestion or equivalent `maestro test` run; flow-mutation discrimination sensor per `references/maestro/patterns.md` (single lightweight selector/assertion perturbation)
 > - output: confirmed/disproven closure verdict for the `MST-*` row, with JUnit/artifact evidence cited
 > - firewall: JUnit XML, logs, screenshots, and recordings summarized, never dumped raw
 > - memory: suggest-only; main agent persists maestro-closure verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the MST closure rows and on-disk JUnit/artifact evidence, and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
@@ -90,8 +88,6 @@ Reject direct use without a saved `audits/maestro/<YYYY-MM-DD maestro-audit.md>`
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 9. Use strict harness sensors:
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:

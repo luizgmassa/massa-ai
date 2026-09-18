@@ -77,7 +77,6 @@ Not for findings-only security review — route to `workflows/security/security-
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable security patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
@@ -88,20 +87,16 @@ Not for findings-only security review — route to `workflows/security/security-
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: every SEC finding closed `fixed` — never optional, at every tier (verification-ladder Independent Verification Mandate, security-fix exception)
 > - scope: the fixed SEC finding's guard, exploit path, negative test, and report claim closure
-> - permissions: read-only
 > - inputs: the SEC finding, the applied guard, the verification suggestion, the exploit path, and validation assets
 > - sensors: deterministic command (negative-test re-run, guard/middleware-order inspection, redaction or crypto check) and report claim closure; guard-mutation discrimination sensor per `references/discrimination-sensor.md` (invert the specific guard just added; the negative test must kill it)
 > - output: confirmed/disproven SEC closure verdict with evidence, feeding the Fix Closure Report's Independent Verifier column
 > - firewall: raw exploit transcripts and test/log output summarized
 > - memory: suggest-only; main agent persists security verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each fixed SEC row's guard and negative test, and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 
 11. Verify each completed finding:

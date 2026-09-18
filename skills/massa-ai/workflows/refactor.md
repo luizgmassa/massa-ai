@@ -75,20 +75,16 @@ Before the first repository mutation, load `references/implementation-delivery.m
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: Standard+ refactor sizing or any PR-group execution per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once reviewer fix items are resolved; Quick-sized refactors dispatch only when validation assets were touched, otherwise run the fresh-eyes fallback below and record the skip reason
 > - scope: the moved/transformed code across this refactor's PR groups and the characterization tests that must protect it
-> - permissions: read-only
 > - inputs: the characterization baseline from step 6 (and step 7 for mobile refactors), the diff of moved code per PR group, and the PR-group map from step 9
 > - sensors: confirm the characterization tests still pass against the moved code's preserved behavior; discrimination sensor per `references/discrimination-sensor.md` (mutate the moved code — never new code — in scratch, one PR group at a time; characterization tests must kill each mutant)
 > - output: a preserved/regressed verdict per PR group and any surviving-mutant findings, written to `.specs/refactors/<slug>/SENSOR.md`
 > - firewall: summarized per-group findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists refactor verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the characterization evidence per PR group and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 - The fix→re-verify cycle for a PR group is capped by the Bounded Fix→Re-verify Loop's 3-iteration limit in `references/verification-ladder.md` (cap reached → `Blocked`).
 

@@ -57,15 +57,9 @@ Before the first repository mutation, load `references/implementation-delivery.m
 **Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
 > **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
-> - trigger: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
-> - inputs: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
-> - sensors: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
-> - firewall: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
-> - memory: suggest-only; the main agent persists durable screen and design-token conventions
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
@@ -76,20 +70,16 @@ Before the first repository mutation, load `references/implementation-delivery.m
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: Standard tier or above per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once every implemented PR group has cleared reviewer fix items; Quick tier substitutes the fallback below
 > - scope: the new code landed across this feature's PR groups from step 12, plus the tests and validation assets those groups touch
-> - permissions: read-only
 > - inputs: the 1-5 acceptance criteria captured in step 11 (or the referenced spec artifact) as the outcome source, the feature's diff surface across all PR groups, and its test suite
 > - sensors: check the diff and tests against each acceptance criterion; discrimination sensor per `references/discrimination-sensor.md` (mutate the feature's new code, one PR group at a time — covering tests must kill each mutant or that group is not verified)
 > - output: a pass/fail verdict per acceptance criterion, any surviving-mutant findings, and an overall verified/blocked verdict per PR group
 > - firewall: summarized per-AC and per-mutant findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists feature verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each AC against the diff and tests, and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 If verification fails, bound the retry with the Bounded Fix→Re-verify Loop cap from `references/verification-ladder.md`: at most 3 fix→re-verify iterations on the same PR group before reporting `Blocked`.
 

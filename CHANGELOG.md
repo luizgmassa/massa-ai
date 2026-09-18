@@ -43,6 +43,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Dispatch blocks carry only what varies; fields fixed for a role move to Role Defaults.**
+  `references/agent-orchestration.md` gains a Role Defaults section, and the 57 dispatch
+  blocks stop restating the values it fixes: the universal `persona` bullet (57 copies), the
+  reviewer's `fallback` (15), the verification-agent's `permissions` (15), and the designer's
+  `trigger`, `sensors`, `inputs`, `firewall` and `memory` (5 × 7). Dispatch-block lines go
+  597 → 476. This is the trade it looks like: a block is no longer self-contained, and
+  reading one means reading the defaults beside it — in exchange, a shared value has exactly
+  one place it can be wrong. Three gates are rewritten to match: per-block `persona` emission
+  becomes "the default exists, claims universality, and no block restates it"; the designer's
+  byte-identical trigger becomes "the canonical trigger keeps its mandatory clause, and no
+  workflow re-inlines it"; and a new negative control asserts a designer block still carries
+  the three fields the defaults do not fix, so "no block restates a default" cannot be
+  satisfied by emptying the blocks. `EXCESS_CEILING` drops to 456, retiring the AEH-06 and
+  DSG-05/06 rationale — a value stated once cannot be non-uniform.
 - **The code quality lens moves out of the two workflows that each carried a copy.**
   `code-quality-audit.md` held ~20 lines of SOLID / Clean Code / KISS / YAGNI / DRY detection
   rules and `code-quality-fix.md` held the matching fix directions, stating one split

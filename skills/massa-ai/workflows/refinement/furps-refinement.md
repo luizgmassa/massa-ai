@@ -52,7 +52,6 @@ Findings-only: do not edit the PRD/ADR unless the user separately asks.
 > - output: per check-item statuses, findings, and Open Questions / Suggestions / Insights / Risks / DoR-gap contributions — compact structured return, no document quotes beyond evidence snippets
 > - firewall: document bodies summarized; no raw section dumps in the return
 > - memory: suggest-only; main agent persists
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
    This packet is a specialization of the canonical Capability Packet (`references/agent-orchestration.md`); the per-dimension checklist section is its `scope` delta.
 6. Synthesis (main):

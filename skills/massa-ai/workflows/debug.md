@@ -76,20 +76,16 @@ Before the first repository mutation, load `references/implementation-delivery.m
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven fix size, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`; a Quick-tier fix takes the fallback below instead
 > - scope: the fixed divergence point from step 13, its reproduction path, and the regression test added in step 14
-> - permissions: read-only
 > - inputs: the root cause, the reproduction evidence, the regression test, and the changed files — not spec acceptance criteria
 > - sensors: re-run of the reproduction/feedback loop confirming the original failure signal no longer reproduces; discrimination sensor per `references/discrimination-sensor.md` (mutate the fixed code; the regression test must kill it)
 > - output: confirmed/disproven root-cause-closure verdict with evidence
 > - firewall: raw reproduction transcripts and logs summarized, never raw dumps
 > - memory: suggest-only; main agent persists debug verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of root cause, reproduction, and regression coverage, and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 15. If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`

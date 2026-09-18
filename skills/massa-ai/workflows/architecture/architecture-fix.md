@@ -82,7 +82,6 @@ Not for findings-only architecture review — route to `workflows/architecture/a
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable architecture patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation of the architecture finding complete, before the verification gate — never optional
@@ -93,20 +92,16 @@ Not for findings-only architecture review — route to `workflows/architecture/a
 > - output: ranked findings, blocking vs advisory; blocking findings become architecture fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists review outcomes for the architecture fix
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven-sized findings or high/critical severity, per the Independent Verification Mandate in `references/verification-ladder.md`'s Mandatory Verification Fix Gate; Quick-tier findings take the fallback below instead
 > - scope: the fixed finding's dependency direction, seam/adapter shape, tests, imports, and report claim closure
-> - permissions: read-only
 > - inputs: the finding, the applied fix, the verification suggestion, dependency-direction/import-cycle evidence, and validation assets
 > - sensors: deterministic command (targeted tests, import-cycle check, dependency-direction check), report claim closure check; discrimination sensor per `references/discrimination-sensor.md` (mutate the fixed dependency direction, seam, or boundary contract in a scratch worktree)
 > - output: confirmed/disproven closure verdict with evidence, feeding the Fix Closure Report's Independent Verifier column
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists architecture verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the architecture closure evidence against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 11. Verify each completed finding:
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:

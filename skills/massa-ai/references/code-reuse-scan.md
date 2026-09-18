@@ -39,7 +39,6 @@ implementation code is planned or written:
 > - output: the reuse map (below), evidence-or-zero when nothing reusable is found
 > - firewall: summarized candidates and pointers only, never raw file dumps
 > - memory: suggest-only; main agent persists durable reuse findings
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 Dispatch one subagent per coherent target area; dispatch more than one only
 when the areas are independent enough to scope separately.

@@ -161,7 +161,6 @@ share only the lens label, not a knowledge domain; they stay separate dispatches
 > - output: structured reply block — findings rows `{path, head-line, severity, marker type, title, body ≤ 6 lines, recommendation}` + exactly one positive highlight + files-swept-clean list; when uncertain a finding is real, withhold it (the source protocol's high-confidence bar, applied qualitatively)
 > - firewall: raw diff/log/search output summarized, never returned raw
 > - memory: suggest-only; the main agent persists durable outcomes
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: pr-review Step 2, dimension row 6 (regression & hallucination)
@@ -172,7 +171,6 @@ share only the lens label, not a knowledge domain; they stay separate dispatches
 > - output: structured reply block — findings rows tagged `{unrelated-deletion | phantom-reference | wrong-signature | duplicate | weakened-check | dead-code}` + one positive highlight + files-swept-clean list; withhold uncertain findings
 > - firewall: raw diff/log/search output summarized, never returned raw
 > - memory: suggest-only; the main agent persists durable outcomes
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 Severity labels (all dimensions): 🚨 Critical (bugs/logic errors that will fail) ·
 🔒 Security · ⚡ Performance · ⚠️ Warning (smells/maintainability) ·

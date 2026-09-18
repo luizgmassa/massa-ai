@@ -179,11 +179,50 @@ When dispatching a subagent, send a compact capability packet rather than a loos
 - `output`: the exact output contract
 - `firewall`: raw logs, diffs, snapshots, reports, or research that must be summarized
 - `memory`: whether the subagent may suggest memories and who persists them
-- `persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
+- `persona`: optional. The active route's cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt. Omit the field when no persona is routed.
 - `next_use`: what the main agent will do with the result
 - `lens`: conditional — `audit-specialist` dispatches only. One of `bugs | architecture | security | requirements | code-quality | performance`.
 
-The named dispatch block that workflows embed (the quoted block whose header carries the prefixed agent name and role) is the block projection of this packet: `role` and `purpose` live in the block's header line, and `next_use` defaults to "the main agent synthesizes and continues the workflow" when absent. The remaining eight fields — `trigger, scope, permissions, inputs, sensors, output, firewall, memory` — appear as the block's body lines. The optional `persona` field appears there too.
+The named dispatch block that workflows embed (the quoted block whose header carries the prefixed agent name and role) is the block projection of this packet: `role` and `purpose` live in the block's header line, and `next_use` defaults to "the main agent synthesizes and continues the workflow" when absent. The remaining eight fields — `trigger, scope, permissions, inputs, sensors, output, firewall, memory` — appear as the block's body lines, except where Role Defaults below already fix a field's value.
+
+### Role Defaults
+
+A dispatch block carries only what varies. Every line below is that field's value
+for **every** dispatch of the named role, supplied by this file rather than
+restated per workflow. A block that restates one has forked the contract, which
+is the failure these defaults exist to make impossible — the same field said
+twice is the same field free to disagree.
+
+Reading a workflow's dispatch block therefore means reading this section beside
+it. That is the trade: the block stops being self-contained in exchange for
+having exactly one place a shared value can be wrong.
+
+**Every role, every dispatch**
+
+- `persona` — as defined in the Capability Packet list above. It is never written
+  in a dispatch block; it applies to all of them.
+
+**`massa-ai-reviewer`**
+
+- `fallback`: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
+
+**`massa-ai-verification-agent`**
+
+- `permissions`: read-only
+
+**`massa-ai-designer`** — its dispatch is mandatory-on-condition, so its trigger is
+fixed here rather than per workflow; a block that reworded it would silently make
+the dispatch advisory in that one file.
+
+- `trigger`: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched
+- `sensors`: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
+- `inputs`: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
+- `firewall`: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
+- `memory`: suggest-only; the main agent persists durable screen and design-token conventions
+
+A designer block therefore carries only `scope`, `permissions` and `output` — the
+three fields that genuinely differ between an audit that may not write and an
+implementation workflow that may.
 
 ## Prompt Contract
 

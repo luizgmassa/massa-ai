@@ -826,20 +826,40 @@ describe("designer dispatch: exactly 7 workflows, one wording", () => {
     expect(extra).toEqual([]);
   });
 
-  test("the trigger line is byte-identical across all 7", async () => {
-    const seen = new Map<string, string[]>();
-    for (const rel of SCREEN_WORKFLOWS) {
-      const line = (await readWorkflow(rel))
-        .split(/\r?\n/)
-        .find((l) => l.startsWith(TRIGGER_PREFIX));
-      // A missing trigger line is its own failure, distinct from a divergent one.
-      expect(line, `${rel} has no designer trigger line`).toBeDefined();
-      const key = line!.trim();
-      seen.set(key, [...(seen.get(key) ?? []), rel]);
+  // The trigger was byte-identical across the 7 because DSG-06 required it:
+  // the trigger sentence is what states the dispatch is mandatory-on-condition,
+  // so one file drifting to weaker wording silently made it advisory there.
+  //
+  // Seven identical copies is one way to hold that property. Stating the
+  // sentence once is a stronger one — there is no second copy to drift. The
+  // designer's trigger is now a Role Default in `agent-orchestration.md`, so
+  // these two assertions replace the byte-identical check with the two
+  // properties it was standing in for: the sentence exists, in its one place,
+  // with the mandatory clause intact; and no workflow has re-inlined it.
+  //
+  // `skills-harness-integrity.test.ts`'s role-defaults group asserts the
+  // complement — that a designer block still carries the three fields the
+  // default does NOT fix — so "no trigger anywhere" cannot pass by the blocks
+  // having been emptied.
+
+  test("the canonical designer trigger lives in agent-orchestration.md with its mandatory clause", async () => {
+    const body = await readReference("agent-orchestration.md");
+    const line = body
+      .split(/\r?\n/)
+      .find((l) => l.includes("the task creates or modifies a user-facing screen"));
+    expect(line, "agent-orchestration.md has no canonical designer trigger").toBeDefined();
+    expect(line).toContain("mandatory once that condition holds");
+    expect(line).toContain("Screen Implementation Exception");
+    expect(line).toContain("it does not fire when no screen surface is touched");
+  });
+
+  test("no workflow re-inlines the designer trigger", async () => {
+    const offenders: string[] = [];
+    for (const rel of await listWorkflows()) {
+      const body = await readWorkflow(rel);
+      if (body.split(/\r?\n/).some((l) => l.startsWith(TRIGGER_PREFIX))) offenders.push(rel);
     }
-    // Guard the guard: 7 files must have been read, not 0.
-    expect([...seen.values()].flat().length).toBe(SCREEN_WORKFLOWS.length);
-    expect([...seen.keys()].length, `divergent trigger wording: ${JSON.stringify([...seen.entries()], null, 1)}`).toBe(1);
+    expect(offenders).toEqual([]);
   });
 });
 

@@ -71,7 +71,6 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable code-quality patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation of the CQ finding complete, before the verification gate — never optional
@@ -82,20 +81,16 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
 > - output: ranked findings, blocking vs advisory; blocking findings become CQ fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists review outcomes for the code-quality fix
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 > **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory per the verification-ladder's Independent Verification Mandate at Standard+/Spec-driven finding size or high/critical severity; at Quick size the subagent hop is skipped and the standalone fresh-eyes check below runs instead
 > - scope: the fixed finding's behavior-preservation claim over the moved/transformed code, its call sites/imports, and report claim closure
-> - permissions: read-only
 > - inputs: the finding, the applied fix, the verification suggestion, and validation assets
 > - sensors: deterministic command (behavior-preservation check, import graph, characterization tests); discrimination sensor per `references/discrimination-sensor.md` (mutate the pre-fix moved/transformed code the behavior-preservation claim protects, never newly introduced code)
 > - output: confirmed/disproven closure verdict with evidence
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists code-quality verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the code-quality closure evidence against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 
 11. Verify each completed finding:

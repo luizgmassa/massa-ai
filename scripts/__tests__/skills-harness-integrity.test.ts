@@ -669,11 +669,16 @@ describe("persona / sub-agent boundary", () => {
   });
 
   // PAB-01/AC3 — a third packet *definition* would fork the contract
-  // silently. Workflow dispatch blocks are packet *uses*, not definitions:
-  // every `Dispatch:` block also carries this clause (see the dispatch
-  // persona-emission describe block below), so this assertion strips
-  // blockquote (`> `) lines — the format every dispatch block uses
-  // exclusively — before scanning, isolating definitions from uses.
+  // silently. Workflow dispatch blocks are packet *uses*, not definitions, and
+  // this assertion strips blockquote (`> `) lines — the format every dispatch
+  // block uses exclusively — before scanning, isolating definitions from uses.
+  //
+  // That strip used to be load-bearing, because every `Dispatch:` block carried
+  // the clause verbatim. The persona field is now a role default stated once in
+  // `agent-orchestration.md` (see the role-defaults describe block below), so no
+  // block carries it and the strip currently removes nothing. It stays because
+  // the property it protects is unchanged: a use is not a definition, and a
+  // future block that quotes the clause must not be counted as a third copy.
   test("the canonical persona clause appears in exactly those two files, outside dispatch-block uses", async () => {
     const files = await skillMarkdownFiles();
     const found: string[] = [];
@@ -805,30 +810,111 @@ describe("persona / sub-agent boundary", () => {
 // no workflow `Dispatch:` block emitted it. See
 // .specs/features/persona-emit/spec.md.
 
-describe("dispatch persona emission: every Dispatch block emits the optional persona field", () => {
-  const PACKET_PERSONA_CLAUSE =
-    "advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions";
+describe("dispatch role defaults: shared field values live in exactly one place", () => {
+  /**
+   * The persona field used to be written into all 57 dispatch blocks, because
+   * the field had been DEFINED and never EMITTED and per-block emission was the
+   * fix. That property is now supplied by `agent-orchestration.md`'s Role
+   * Defaults section, which states the field applies to every dispatch, and the
+   * blocks carry it no more.
+   *
+   * This is a real trade and it is worth naming: per-block emission was
+   * self-contained — a reader of one workflow saw the field. The default is not.
+   * What replaces that guarantee is the pair of assertions below: the default
+   * must exist and must claim universality, AND no block may restate it. The
+   * second half is what the old check could not give, because 57 copies of a
+   * sentence are 57 chances for one to disagree.
+   */
+  const ROLE_DEFAULTS = path.join(
+    SKILLS_DIR,
+    "massa-ai",
+    "references",
+    "agent-orchestration.md",
+  );
 
-  test("every Dispatch block on disk emits the optional persona field", async () => {
+  /**
+   * Field values `agent-orchestration.md` fixes for a role. Keyed by the agent
+   * the default belongs to; `*` is every agent. A block restating any of these
+   * has forked the contract.
+   */
+  const DEFAULTED_FIELDS: Record<string, string[]> = {
+    "*": ["persona"],
+    "massa-ai-reviewer": ["fallback"],
+    "massa-ai-verification-agent": ["permissions"],
+    "massa-ai-designer": ["trigger", "sensors", "inputs", "firewall", "memory"],
+  };
+
+  test("agent-orchestration.md carries a Role Defaults section that claims universality", async () => {
+    const body = await read(ROLE_DEFAULTS);
+    expect(body).toContain("### Role Defaults");
+    // Presence of a heading proves nothing; the load-bearing claim is that the
+    // defaults apply to every dispatch and are not to be restated.
+    expect(body).toMatch(/A block that restates one has forked the contract/);
+    expect(body).toContain("**Every role, every dispatch**");
+    expect(body).toMatch(/It is never written\s+in a dispatch block; it applies to all of them\./);
+  });
+
+  test("every defaulted field is actually stated in the Role Defaults section", async () => {
+    // Guard the guard: a default removed from the reference while still absent
+    // from every block would leave the field defined nowhere, and the
+    // "no block restates it" assertion below would pass most loudly of all.
+    const body = await read(ROLE_DEFAULTS);
+    const start = body.indexOf("### Role Defaults");
+    expect(start).toBeGreaterThan(-1);
+    const section = body.slice(start);
+    const absent: string[] = [];
+    for (const [agent, fields] of Object.entries(DEFAULTED_FIELDS)) {
+      for (const field of fields) {
+        if (!section.includes(`\`${field}\``)) absent.push(`${agent}.${field}`);
+      }
+    }
+    expect(absent).toEqual([]);
+  });
+
+  test("no Dispatch block restates a field the role defaults already fix", async () => {
     const files = await skillMarkdownFiles();
     let total = 0;
-    const missing: string[] = [];
+    const offenders: string[] = [];
     for (const file of files) {
       const content = await read(file);
       const blocks = dispatchBlocks(content);
       total += blocks.length;
       for (const block of blocks) {
-        const hasPersonaBullet = /^> - persona:/m.test(block);
-        if (!hasPersonaBullet || !block.includes(PACKET_PERSONA_CLAUSE)) {
-          const m = /\*\*Dispatch: `([^`]+)`\*\*/.exec(block);
-          missing.push(`${path.relative(REPO_ROOT, file)} -> ${m?.[1] ?? "unknown"}`);
+        const agent = /\*\*Dispatch: `([^`]+)`\*\*/.exec(block)?.[1] ?? "unknown";
+        const fields = [...DEFAULTED_FIELDS["*"]!, ...(DEFAULTED_FIELDS[agent] ?? [])];
+        for (const field of fields) {
+          if (new RegExp(`^> - ${field}:`, "m").test(block)) {
+            offenders.push(`${path.relative(REPO_ROOT, file)} -> ${agent}: restates ${field}`);
+          }
         }
       }
     }
     // Guard the guard: the "dispatch resolution" describe block above already
     // requires >=20 blocks repo-wide; this parser must agree.
     expect(total).toBeGreaterThanOrEqual(20);
-    expect(missing).toEqual([]);
+    expect(offenders).toEqual([]);
+  });
+
+  test("a role's non-defaulted fields are still written in its blocks", async () => {
+    // Negative control for the assertion above. "No block restates a default"
+    // is trivially satisfied by a block with no bullets at all, or by deleting
+    // the blocks outright — so the fields that are NOT defaulted must still be
+    // present. Designer keeps exactly scope/permissions/output.
+    const files = await skillMarkdownFiles();
+    let designerBlocks = 0;
+    for (const file of files) {
+      for (const block of dispatchBlocks(await read(file))) {
+        if (!block.includes("**Dispatch: `massa-ai-designer`**")) continue;
+        designerBlocks += 1;
+        for (const field of ["scope", "permissions", "output"]) {
+          expect(
+            new RegExp(`^> - ${field}:`, "m").test(block),
+            `${path.relative(REPO_ROOT, file)} designer block is missing ${field}`,
+          ).toBe(true);
+        }
+      }
+    }
+    expect(designerBlocks).toBe(7);
   });
 });
 
