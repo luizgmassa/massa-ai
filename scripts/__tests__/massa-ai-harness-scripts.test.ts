@@ -89,6 +89,63 @@ function body(n: number, tag: string): string {
   return Array.from({ length: n }, (_, i) => `${tag} line ${i}`).join("\n") + "\n";
 }
 
+// ── portability: nothing is spawned that only exists on one runner ─────────
+
+describe("portability: no harness script spawns a shell builtin", () => {
+  /**
+   * `command`, `type` and `which` are POSIX shell builtins. macOS ALSO ships
+   * `/usr/bin/command`, so `Bun.spawnSync(["command", "-v", "gh"])` succeeds
+   * there and dies with ENOENT on Ubuntu — where the process exits 1 with an
+   * empty stdout and every downstream assertion reads as a logic failure.
+   *
+   * That shipped in `ensure_worktree.ts` and was caught only by CI's Linux
+   * runner, after the whole macOS suite went green. A per-platform sensor is
+   * not a sensor, so this asserts the class on the source instead: the
+   * portable spelling is `Bun.which`.
+   *
+   * Matched on the ARGV ARRAY, not on `Bun.spawnSync(` — the first version of
+   * this guard anchored on the call and stayed green against the very defect it
+   * was written for, because these scripts spawn through a local `run()`/`git()`
+   * wrapper and the builtin never sits next to `spawnSync`. The argv array is
+   * the thing that travels to the kernel, so it is the thing to check.
+   */
+  const SHELL_BUILTIN_SPAWN = /\[\s*["'](?:command|type|which|source|hash|eval|export)["']\s*,/;
+  const SCRIPT_FILES = [
+    "size_change.ts",
+    "resolve_scope.ts",
+    "ensure_worktree.ts",
+    "check_commit.ts",
+  ] as const;
+
+  for (const name of SCRIPT_FILES) {
+    test(`${name} spawns no shell builtin`, async () => {
+      const text = await Bun.file(path.join(SCRIPTS, name)).text();
+      expect(SHELL_BUILTIN_SPAWN.test(text)).toBe(false);
+    });
+  }
+
+  test("the pattern matches the spelling it bans, through a wrapper too", () => {
+    // Guard the guard: a regex that stopped matching would clear every file.
+    // The wrapper case is the one that matters — it is how the real defect was
+    // written, and how the first version of this guard missed it.
+    expect(SHELL_BUILTIN_SPAWN.test('const p = Bun.spawnSync(["command", "-v", "gh"]);')).toBe(true);
+    expect(SHELL_BUILTIN_SPAWN.test('const gh = run(args.root, ["command", "-v", "gh"]).ok;')).toBe(true);
+    expect(SHELL_BUILTIN_SPAWN.test('const p = git(root, ["status", "--porcelain"]);')).toBe(false);
+    expect(SHELL_BUILTIN_SPAWN.test('const gh = Bun.which("gh") !== null;')).toBe(false);
+  });
+
+  test("ensure_worktree still reports gh capability, by the portable route", () => {
+    initRepo();
+    const out = JSON.parse(
+      script("ensure_worktree.ts", dir, ["--branch", "feat/x", "--base", "main", "--path", path.join(dir, "wt-cap"), "--json"]).stdout,
+    );
+    // Whatever the runner has, the field must be a real boolean — not missing,
+    // which is what an aborted capability probe would leave behind.
+    expect(typeof out.capabilities.gh).toBe("boolean");
+    expect(typeof out.capabilities.ghAuthenticated).toBe("boolean");
+  });
+});
+
 // ── size_change: the tier boundary ─────────────────────────────────────────
 
 describe("size_change: tierFloor sits exactly on the ladder's bounds", () => {

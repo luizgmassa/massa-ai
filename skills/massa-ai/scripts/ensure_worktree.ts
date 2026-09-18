@@ -196,8 +196,10 @@ function worktreeBranchAt(root: string, dir: string): string | null {
 function ensure(args: Args): Result {
   const commands: string[] = [];
   const isRepo = git(args.root, ["rev-parse", "--is-inside-work-tree"]).ok;
-  const ghProbe = run(args.root, ["command", "-v", "gh"]);
-  const gh = ghProbe.ok || Bun.which("gh") !== null;
+  // `Bun.which`, never a spawned `command -v`: `command` is a shell builtin that
+  // macOS also ships as /usr/bin/command and Ubuntu does not, so spawning it
+  // succeeds on one CI runner and kills the process with ENOENT on the other.
+  const gh = Bun.which("gh") !== null;
   const ghAuthenticated = gh && run(args.root, ["gh", "auth", "status"]).ok;
   const capabilities = { gitRepo: isRepo, gh, ghAuthenticated };
 
