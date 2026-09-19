@@ -7,6 +7,7 @@
 
 import { parsePositiveIntEnv, loadConfigSafe, resolveEmbeddingDimensions } from "@massa-ai/shared/config";
 import { logger } from "@massa-ai/shared";
+import { LOCAL_INFERENCE_IDS } from "@massa-ai/shared/inference-providers";
 
 export interface EmbeddingProviderConfig {
   provider: "openai" | "google" | "cohere" | "ollama" | "mistral" | "vercel" | "custom" | "litellm" | string;
@@ -145,17 +146,30 @@ const fileFor = (provider: string) =>
   fileEmbedding?.provider === provider ? fileEmbedding : undefined;
 
 /**
- * Names an entry below can be selected by. A selection outside this set
- * (e.g. `provider: "cohere"` in config.json) would otherwise fall through
- * to the ollama default silently — the exact lie the file layer exists to
- * end — so it is warned once at module load. Logged to stderr (the shared
- * logger never writes stdout), safe under a stdio MCP server.
+ * API-only embedding providers writable to config.json. Mirrors
+ * `massa-ai-config.ts`'s `API_PROVIDER_IDS`; duplicated here rather than
+ * imported because this package only value-imports the seam's
+ * side-effect-free `inference-providers` subpath (which carries the
+ * local-inference half, `LOCAL_INFERENCE_IDS`) — reaching the shared
+ * package's config barrel from here would pull in `config/index.ts`.
+ * `scripts/__tests__/provider-list-parity.test.ts` asserts this stays in
+ * agreement with the shared package's copy.
  */
-const SELECTABLE_PROVIDERS = new Set([
-  "ollama",
-  "mistral",
-  "google",
-  "openai",
+const API_PROVIDER_IDS = ["mistral", "google", "openai", "cohere"] as const;
+
+/**
+ * Names an entry below can be selected by: `LOCAL_INFERENCE_IDS ∪
+ * API_PROVIDER_IDS` (config.json's writable set, LIP-01) ∪ the
+ * internal-only ids that never appear in config.json (`vercel`, `litellm`,
+ * `custom`, `transformers`, `local`). A selection outside this set (e.g. a
+ * typo) would otherwise fall through to the ollama default silently — the
+ * exact lie the file layer exists to end — so it is warned once at module
+ * load. Logged to stderr (the shared logger never writes stdout), safe
+ * under a stdio MCP server.
+ */
+export const SELECTABLE_PROVIDERS = new Set<string>([
+  ...LOCAL_INFERENCE_IDS,
+  ...API_PROVIDER_IDS,
   "vercel",
   "litellm",
   "custom",

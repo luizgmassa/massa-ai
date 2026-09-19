@@ -43,7 +43,7 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
     key: "embedding",
     label: "Embedding",
     fields: [
-      { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "mistral", "openai", "google", "cohere"], guide: "Which embedding provider to use. Ollama runs locally; others are cloud APIs." },
+      { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "lmstudio", "mistral", "openai", "google", "cohere"], guide: "Which embedding provider to use. Ollama and LM Studio run locally; others are cloud APIs." },
       { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., `qwen3-embedding:4b` for Ollama)." },
       { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically `http://localhost:11434`." },
       { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama. Changing this requires a restart." },
