@@ -188,6 +188,31 @@ describe("saveConfig / loadConfig (with file)", () => {
     expect(loaded.embedding.provider).toBe(defaultMassaAiConfig.embedding.provider);
   });
 
+  test("a config naming a non-default provider inherits none of the default block's provider-specific fields", () => {
+    // The default `embedding` block describes ollama — its baseURL is
+    // :11434 and its 2560 is qwen3-embedding:4b's width. Merging it under
+    // every provider leaked both into configs that never asked for them:
+    // a mistral config would carry ollama's URL and a 2560 width for a
+    // 1024-wide model, which is what picks the vector table.
+    const partial: any = { embedding: { provider: "mistral", model: "mistral-embed" } };
+    saveConfig(partial);
+    const loaded = loadConfig();
+    expect(loaded.embedding.provider).toBe("mistral");
+    expect(loaded.embedding.model).toBe("mistral-embed");
+    expect(loaded.embedding.baseURL).toBeUndefined();
+    expect(loaded.embedding.dimensions).toBeUndefined();
+  });
+
+  test("a config naming the default provider still inherits the default block", () => {
+    // The other half of the rule above: dropping the inheritance wholesale
+    // would silently strip baseURL and dimensions from every ollama user.
+    const partial: any = { embedding: { provider: "ollama", model: "qwen3-embedding:4b" } };
+    saveConfig(partial);
+    const loaded = loadConfig();
+    expect(loaded.embedding.baseURL).toBe(defaultMassaAiConfig.embedding.baseURL);
+    expect(loaded.embedding.dimensions).toBe(defaultMassaAiConfig.embedding.dimensions);
+  });
+
   test("loadConfig returns defaults on JSON parse error", () => {
     vfs.set(CONFIG_PATH, "{ invalid json");
     existing.add(CONFIG_PATH);
