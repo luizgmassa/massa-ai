@@ -28,6 +28,25 @@ import { defaultMassaAiConfig } from "../massa-ai-config";
 const CONFIG_PATH = getConfigPath();
 const CONFIG_DIR = getConfigDir();
 
+// Captured before any `spyOn(fs, "readFileSync")` runs (beforeEach only fires
+// per-test), so this stays the real implementation for reading a real
+// tracked file — the LIP-02 cross-package "emitted name is read by a named
+// consumer" check below needs the actual embeddings/config.ts source, not
+// the virtual fs the rest of this suite uses.
+const realReadFileSync = fs.readFileSync;
+const CORE_EMBEDDINGS_CONFIG = path.join(
+  import.meta.dir,
+  "..",
+  "..",
+  "..",
+  "..",
+  "core",
+  "src",
+  "services",
+  "embeddings",
+  "config.ts",
+);
+
 let existsSpy: ReturnType<typeof spyOn>;
 let readSpy: ReturnType<typeof spyOn>;
 let writeSpy: ReturnType<typeof spyOn>;
@@ -368,6 +387,62 @@ describe("getConfigForEnv", () => {
     const env = getConfigForEnv();
     expect(env.LOG_LEVEL).toBe("warn");
     expect(env.ENABLE_METRICS).toBe("true");
+  });
+
+  // LIP-02 — no silent-empty env projection.
+  test("lmstudio provider sets LMSTUDIO_* env vars (with dimensions)", () => {
+    const cfg = { ...defaultMassaAiConfig };
+    cfg.embedding = {
+      provider: "lmstudio",
+      model: "text-embedding-nomic-embed-text-v1.5",
+      baseURL: "http://localhost:1234/v1",
+      dimensions: 768,
+    };
+    saveConfig(cfg);
+    const env = getConfigForEnv();
+    expect(env.LMSTUDIO_EMBEDDING_MODEL).toBe("text-embedding-nomic-embed-text-v1.5");
+    expect(env.LMSTUDIO_BASE_URL).toBe("http://localhost:1234/v1");
+    expect(env.LMSTUDIO_EMBEDDING_DIMENSIONS).toBe("768");
+  });
+
+  test("lmstudio provider without baseURL defaults to localhost:1234/v1", () => {
+    const cfg = { ...defaultMassaAiConfig };
+    cfg.embedding = { provider: "lmstudio", model: "x" };
+    saveConfig(cfg);
+    const env = getConfigForEnv();
+    expect(env.LMSTUDIO_BASE_URL).toBe("http://localhost:1234/v1");
+  });
+
+  test("a provider with no env-projection branch fails by name instead of exporting an empty block", () => {
+    const cfg = { ...defaultMassaAiConfig };
+    cfg.embedding = { provider: "cohere", model: "embed-english-v3.0" };
+    saveConfig(cfg);
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const env = getConfigForEnv();
+      // No embedding-specific env var at all — only the two unconditional ones.
+      expect(Object.keys(env).sort()).toEqual(["ENABLE_METRICS", "LOG_LEVEL"]);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(String(errorSpy.mock.calls[0]![0])).toContain('"cohere"');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("every LMSTUDIO_* env name this function emits is read by a named consumer in embeddings/config.ts", () => {
+    // Text-read (not imported): embeddings/config.ts has module-scope side
+    // effects (loadConfigSafe(), env reads across every provider) that have
+    // no place contaminating this shared-package suite's virtual fs. Same
+    // technique scripts/__tests__/embedding-defaults-parity.test.ts already
+    // uses for this exact kind of cross-package/cross-dialect assertion.
+    const text = realReadFileSync(CORE_EMBEDDINGS_CONFIG, "utf8") as string;
+    for (const name of ["LMSTUDIO_EMBEDDING_MODEL", "LMSTUDIO_BASE_URL", "LMSTUDIO_EMBEDDING_DIMENSIONS"]) {
+      // Word-boundary regex, not `.toContain` — a plain substring match
+      // would false-pass `process.env.LMSTUDIO_BASE_URL_TYPO` as "containing"
+      // `process.env.LMSTUDIO_BASE_URL` (observed while proving this sensor;
+      // `_` is a \w character, so `\b` alone correctly rejects that suffix).
+      expect(text).toMatch(new RegExp(`process\\.env\\.${name}\\b`));
+    }
   });
 });
 

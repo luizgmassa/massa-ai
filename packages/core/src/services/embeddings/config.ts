@@ -7,7 +7,7 @@
 
 import { parsePositiveIntEnv, loadConfigSafe, resolveEmbeddingDimensions } from "@massa-ai/shared/config";
 import { logger } from "@massa-ai/shared";
-import { LOCAL_INFERENCE_IDS } from "@massa-ai/shared/inference-providers";
+import { LOCAL_INFERENCE_IDS, INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
 
 export interface EmbeddingProviderConfig {
   provider: "openai" | "google" | "cohere" | "ollama" | "mistral" | "vercel" | "custom" | "litellm" | string;
@@ -389,6 +389,45 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
       maxRetries: 1,
       maxChars: getMaxChars("TRANSFORMERS", model),
       rateLimits: getRateLimits("TRANSFORMERS"),
+    };
+  })(),
+
+  /**
+   * LM Studio — a thin alias over the `custom` OpenAI-compatible path
+   * (`provider: "custom"`, dispatched by `getEmbeddingModel()` exactly like
+   * any other `custom` entry; no new SDK adapter, no new switch case).
+   * Mirrors the `local` → `transformers` alias above: the object key
+   * ("lmstudio") is what `EMBEDDING_PROVIDER=lmstudio` / config.json's
+   * `embedding.provider: "lmstudio"` select against, while the inner
+   * `provider` field names the code path that actually runs it. Placed
+   * after `transformers`/`local` in this object (all three share fallback
+   * priority 100 and JS object/array sort is stable) so a priority tie only
+   * ever resolves to this new no-API-key-required local provider once every
+   * pre-existing fallback has already been tried.
+   */
+  lmstudio: (() => {
+    const file = fileFor("lmstudio");
+    const model =
+      process.env.LMSTUDIO_EMBEDDING_MODEL || file?.model || "text-embedding-nomic-embed-text-v1.5";
+    return {
+      provider: "custom",
+      model,
+      apiKey: process.env.LMSTUDIO_API_KEY || file?.apiKey,
+      baseURL:
+        process.env.LMSTUDIO_BASE_URL ||
+        file?.baseURL ||
+        INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+      dimensions: Number(
+        process.env.LMSTUDIO_EMBEDDING_DIMENSIONS ||
+          file?.dimensions ||
+          INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ||
+          768,
+      ),
+      priority: selectedProvider === "lmstudio" ? 1 : 100,
+      timeout: Number(process.env.LMSTUDIO_EMBEDDING_TIMEOUT || "60000"),
+      maxRetries: 3,
+      maxChars: getMaxChars("LMSTUDIO", model),
+      rateLimits: getRateLimits("LMSTUDIO"),
     };
   })(),
 
