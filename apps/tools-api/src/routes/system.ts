@@ -6,6 +6,8 @@
  * GET /api/v1/system/metrics      - Aggregate metrics
  * GET /api/v1/system/health/local - PostgreSQL/pgvector and local-service health
  * GET /api/v1/system/ollama       - Ollama status and available models
+ * GET /api/v1/system/inference    - Configured local inference provider status
+ *                                    (neutral name beside /ollama — LIP-10)
  */
 
 import { Elysia } from "elysia";
@@ -190,6 +192,32 @@ export const systemRoutes = new Elysia({ prefix: "/api/v1/system" })
         summary: "Ollama status",
         description:
           "Check Ollama availability, list installed models, and verify embedding model configuration.",
+      },
+    },
+  )
+  .get(
+    "/inference",
+    async () => {
+      const checker = getHealthChecker();
+      const status = await checker.checkInference();
+      const details = status.details as
+        | { provider?: string; url?: string; embeddingModel?: string; models?: string[] }
+        | undefined;
+
+      return {
+        ...status,
+        provider: details?.provider,
+        models: details?.models ?? [],
+        configuredModel: details?.embeddingModel,
+        baseUrl: details?.url,
+      };
+    },
+    {
+      detail: {
+        tags: ["system"],
+        summary: "Local inference provider status",
+        description:
+          "Check the configured local inference provider (Ollama or LM Studio), list available models, and verify the embedding model configuration. Neutral counterpart to /ollama.",
       },
     },
   );

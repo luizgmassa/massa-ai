@@ -11,18 +11,34 @@ const checkAll = mock(async (): Promise<any> => ({
   services: {
     vectorStore: { available: true, details: { pgvector: true } },
     ollama: { available: true },
+    inference: { available: true },
     dataDirectory: { available: true },
   },
 }));
 const checkOllama = mock(async () => ({ available: true, baseUrl: "http://x" }));
+const checkInference = mock(async () => ({
+  available: true,
+  details: {
+    provider: "lmstudio",
+    url: "http://localhost:1234/v1",
+    embeddingModel: "text-embedding-nomic-embed-text-v1.5",
+    models: ["text-embedding-nomic-embed-text-v1.5"],
+  },
+}));
 const getOllamaModels = mock(async () => ["qwen3-embedding:4b", "qwen2.5:7b-instruct"]);
 let dataDir: any = "/data";
 
+// Captured before `mock.module` registers the interception below: a nested
+// `require("@massa-ai/core")` taken from *inside* that factory resolves empty
+// the first time the module loads (nothing has required it yet to prime the
+// cache), so `...actual` would silently spread nothing. Pre-loading it here
+// keeps the spread real, which the new LocalHealthChecker test below relies on.
+const realCore = require("@massa-ai/core");
+
 mock.module("@massa-ai/core", () => {
-  const actual = require("@massa-ai/core");
   return {
-    ...actual,
-    getHealthChecker: () => ({ checkPostgres, checkAll, checkOllama, getOllamaModels }),
+    ...realCore,
+    getHealthChecker: () => ({ checkPostgres, checkAll, checkOllama, checkInference, getOllamaModels }),
   };
 });
 
@@ -131,5 +147,59 @@ describe("GET /api/v1/system/ollama", () => {
     expect(res.json.models).toEqual(["qwen3-embedding:4b", "qwen2.5:7b-instruct"]);
     expect(res.json.configuredModel).toBe("qwen3-embedding:4b");
     expect(res.json.baseUrl).toBe("http://localhost:11434");
+  });
+});
+
+// GET /api/v1/system/inference — neutral counterpart to /ollama (LIP-10). Beside
+// the existing route/tests above, never replacing them.
+describe("GET /api/v1/system/inference", () => {
+  test("returns the configured provider's status + models + configured model", async () => {
+    const res = await get("/api/v1/system/inference");
+    expect(res.json.available).toBe(true);
+    expect(res.json.provider).toBe("lmstudio");
+    expect(res.json.models).toEqual(["text-embedding-nomic-embed-text-v1.5"]);
+    expect(res.json.configuredModel).toBe("text-embedding-nomic-embed-text-v1.5");
+    expect(res.json.baseUrl).toBe("http://localhost:1234/v1");
+  });
+});
+
+// LocalHealthChecker.checkOllama — real class (not the route-level mock above),
+// reached via `@massa-ai/core`'s `...actual` spread, which the module mock at
+// the top of this file only overrides `getHealthChecker` on. Exercises the
+// real probeProvider-backed body-shape discrimination (LIP-10): the defect
+// this task fixes is `checkOllama` trusting `response.ok`, which reports
+// "Ollama healthy" against a server (LM Studio) that answers HTTP 200 with an
+// error body for every Ollama-shaped endpoint.
+describe("LocalHealthChecker.checkOllama — provider-aware probe (LIP-10)", () => {
+  test("LM Studio's 200-with-error body at the Ollama endpoint is reported unavailable, not healthy", async () => {
+    const { LocalHealthChecker } = require("@massa-ai/core");
+    const checker = new LocalHealthChecker();
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async () =>
+      new Response(
+        JSON.stringify({ error: "Unexpected endpoint or method. (GET /api/tags)" }),
+        { status: 200 },
+      );
+    try {
+      const status = await checker.checkOllama();
+      expect(status.available).toBe(false);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("a genuine Ollama /api/tags body is reported available with its models", async () => {
+    const { LocalHealthChecker } = require("@massa-ai/core");
+    const checker = new LocalHealthChecker();
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async () =>
+      new Response(JSON.stringify({ models: [{ name: "qwen3-embedding:4b" }] }), { status: 200 });
+    try {
+      const status = await checker.checkOllama();
+      expect(status.available).toBe(true);
+      expect(status.details?.models).toEqual(["qwen3-embedding:4b"]);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 });
