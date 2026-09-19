@@ -261,6 +261,78 @@ than the stamp.
 
 ---
 
+## Phase 4 landed (`27f0897d`, `6108843c`, `85a1ad07`) — two clauses amended, both with their reason
+
+**T08's "stamp inside the existing upsert" clause is amended; the structural
+requirement wins.** `upsertWorkspace`'s only production caller is
+`workspace-manager.ts:42`, inside `markIndexing`, whose own docblock says
+"called at the start of ETL" and which is reached from exactly one
+fire-and-forget site (`:156`). It therefore runs *before* full-vs-incremental
+is decided, so nothing passed there can honour "only from the clearing
+branch". The two clauses contradict each other. Shipped instead: two narrow
+single-column functions in the same file, `getEmbeddingFingerprint` and
+`stampEmbeddingFingerprint`, called from the clearing path.
+
+**The stamp's production site is `services/etl/pipeline.ts`'s `forceReindex`
+branch, not `ensureFreshIndex`.** Measured: `ensureFreshIndex`'s only
+production caller is `SearchController.handleAutoReindex`, which hardcodes
+`allowFullReindex: false` (`search-controller.ts:407`); every `true` in the
+repository is in a test. Its whole `needsFullReindex` branch — all four
+reasons, including this feature's new fingerprint arm — therefore has **zero
+production reachability**, and a stamp placed there is dead code. The
+reachable recovery is the one `EmbeddingIndexStaleError`'s own message names:
+`index_project` → `EtlPipeline.run({forceReindex: true})`, a wholly separate
+full-reindex mechanism that clears via `deleteByProject` (`pipeline.ts:218-224`)
+and never calls `ensureFreshIndex`. **Without this correction the gate was a
+permanent lock**: a mismatch blocked search, and the command the error told the
+user to run rebuilt every row without clearing the stale fingerprint. The
+`ensureFreshIndex` stamp is kept, correct and unit-tested, with a comment
+naming it presently unreachable; both sites call the identical primitive pair,
+so they can never disagree on the value written.
+
+**Ordering decision, stated rather than left half-wired.** Tier 1b (the read
+gate throw, `search-controller.ts:176`) stays **before** `handleAutoReindex`
+(`:193`). Reordering would change nothing — `allowFullReindex: false` defers
+the forced full reindex either way — and LIP-15 asks for an explicit,
+human-triggered recovery, not a silent rebuild racing a search call.
+
+**Measured, so the gate is not silently self-disabling:**
+`currentEmbeddingFingerprint()` resolves non-null — `ollama:qwen3-embedding:4b:2560`
+— under both the real `~/.config/massa-ai/config.json` and a scratch
+`XDG_CONFIG_HOME` on the development machine.
+
+**Gates re-measured by the orchestrator, not accepted from the builder:**
+`run-tests-isolated.ts --filter='fingerprint|project-indexer'` exit 0, 3
+groups, **17 pass / 0 fail** (12 unit + 1 PG call-site + 4 late-bind);
+`check-core-layering.ts` PASS, 0 violations across 1003 edges; `oxlint` exit 0.
+The call-site sensor was independently mutated (the `stampEmbeddingFingerprint`
+call neutralised in place) and observed RED — `Expected:
+"ollama:qwen3-embedding:4b:2560"` / `Received: "ollama:some-retired-model:2560"`
+— then restored by text edit with `git status --porcelain` empty and GREEN
+re-confirmed. `DATABASE_URL` is already in `turbo.json` `passThroughEnv:30`, and
+without it the PG suite reports **1 skip**, never a vacuous pass.
+
+### Bounded residuals, recorded not fixed
+
+1. **Three callers bypass the read gate entirely** by calling
+   `contextualSearch.search(...)` without `checkSearchAdmission`:
+   `search-warmup.ts:49`, `index-admin.ts:202`,
+   `packages/core/src/scripts/beir-benchmark.ts:317`. None returns rows to an
+   end user through a gated path, so they are judged out of scope for T09 — but
+   LIP-15's "search must fail loudly" is narrower than "every search-facing
+   caller fails loudly", and these are real uncovered exceptions.
+2. **An incremental `EtlPipeline.run` (no `forceReindex`) after a switch** does
+   not clear and does not stamp, so the table can hold two embedding spaces
+   while search stays blocked by the unchanged stale fingerprint. Safe, but it
+   is safety by refusal, not by repair.
+3. **Every existing install is `NULL`/legacy until its first full reindex**, and
+   the legacy branch warns without blocking (`design.md:225`). LIP-15 therefore
+   protects no existing project until one full reindex has stamped it. This is
+   the design's stated choice, not a defect — recorded because the feature's
+   day-one value depends on it.
+
+---
+
 ## Phase 5 — Installers (3 Tasks)
 
 ### T10 — bash probes stop trusting the status code
