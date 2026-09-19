@@ -10,8 +10,10 @@
  *  Tier 1 (pairs)   — every surface that writes a model+dims default must
  *                     carry exactly the runtime reference pair.
  *  Tier 2 (models)  — model-only surfaces must carry the reference model.
- *  Tier 3 (complete)— any tracked file assigning OLLAMA_EMBEDDING_* not in
- *                     the known-surface/allowlist sets fails by name: a new
+ *  Tier 3 (complete)— any tracked file assigning a `*_EMBEDDING_MODEL` or
+ *                     `*_EMBEDDING_DIMENSIONS` default (any provider prefix,
+ *                     not just OLLAMA_ — LIP-18/LIP-19b) not in the
+ *                     known-surface/allowlist sets fails by name: a new
  *                     surface must be added here, not silently shipped.
  *
  * Each extractor is per-dialect (ENV / bare KEY=VALUE / ${VAR:-default} /
@@ -40,9 +42,17 @@ function extractOne(surface: string, text: string, re: RegExp): string {
 // ── Reference pair: the runtime defaults, from both defining modules ────────
 function referencePair(): { model: string; dims: string } {
   const shared = read("packages/shared/src/config/massa-ai-config.ts");
-  // Two `embedding:` blocks exist (interface at :11, defaults at :225). The
-  // interface's provider is a type union (`"ollama" | "mistral" | …`), the
-  // defaults block a literal — the trailing comma is the discriminator.
+  // Two `embedding:` blocks exist (the `MassaAiConfig` interface, and
+  // `defaultMassaAiConfig`'s literal defaults). LIP-01 changed the
+  // interface's `provider` field from a hand-written string union to
+  // `(typeof EMBEDDING_PROVIDER_IDS)[number]` — a derived type reference,
+  // not a union of string literals — so the discriminator is no longer
+  // "literal vs. union". It still works: the interface's `embedding:` block
+  // never contains the literal substring `provider: "ollama",` (it names a
+  // type, not a value), so only `defaultMassaAiConfig`'s block — which
+  // assigns the literal default — can ever satisfy this pattern. Re-anchored
+  // on that literal-value match rather than on the now-nonexistent union
+  // (LIP-19b).
   const embeddingBlock = extractOne(
     "massa-ai-config.ts embedding defaults block",
     shared,
@@ -171,12 +181,40 @@ describe("embedding defaults parity (EDC-06)", () => {
     console.log(`[parity] width-only surfaces checked: ${DIMS_ONLY_SURFACES.length}`);
   });
 
-  test("no unlisted tracked file assigns an OLLAMA_EMBEDDING_* default", () => {
+  /**
+   * LIP-24 — the seam makes env readers invisible to literal scanners.
+   *
+   * `packages/core/src/services/health/local-health-checker.ts` used to read
+   * `process.env.OLLAMA_EMBEDDING_MODEL` directly, and this scan saw it. T05
+   * (Phase 3) replaced that with `process.env[spec.envNames.model]` — a
+   * dynamic lookup through the `inference-providers.ts` seam. The env var is
+   * still read at runtime (`spec.envNames.model` resolves to the literal
+   * `"OLLAMA_EMBEDDING_MODEL"` for the ollama spec), but the literal token no
+   * longer appears as text in the file, so this grep-based scan cannot see it
+   * — population measured at 25 on `main@d523f06f`, 27 after Phase 1 (the two
+   * new seam files), 26 after Phase 3 (this file left the token-visible set).
+   * Re-keying Tier 3 below to a provider-neutral token does not restore
+   * visibility here either, because the file names no provider prefix at
+   * all anymore.
+   *
+   * Not silently accepted: `resolveConfiguredEmbeddingModel`'s env-precedence
+   * behavior (env var wins over config.json, for the literal name
+   * `OLLAMA_EMBEDDING_MODEL`) is covered by a different, behavioral sensor —
+   * `packages/core/src/__tests__/health-checker-config.test.ts`'s "checkOllama
+   * prefers env OLLAMA_EMBEDDING_MODEL over config" — which exercises the
+   * real runtime read through the seam rather than grepping for it. That test
+   * file is itself excluded from this scan's population (`isTestFile`), which
+   * is why the two mechanisms do not overlap or double-count.
+   */
+  test("no unlisted tracked file assigns a *_EMBEDDING_MODEL/DIMENSIONS default", () => {
     const ls = Bun.spawnSync(["git", "ls-files"], { cwd: ROOT });
     const tracked = ls.stdout.toString().trim().split("\n");
-    // Assignment-shaped, not env READS (process.env.X) and not the
-    // passthrough allowlist (turbo.json is a bare name list, no "=").
-    const assignment = /OLLAMA_EMBEDDING_(MODEL|DIMENSIONS)\s*[=:]\s*["']?[\w.${:-]/;
+    // Provider-neutral token (LIP-18/LIP-19b): any prefix, not just OLLAMA_ —
+    // an LMSTUDIO_EMBEDDING_MODEL/DIMENSIONS pair must be as visible as the
+    // Ollama one. Assignment-shaped, not env READS (process.env.X) and not
+    // the passthrough allowlist (turbo.json is a bare name list, no "=").
+    const mentionsToken = /[A-Za-z][A-Za-z0-9]*_EMBEDDING_(MODEL|DIMENSIONS)/;
+    const assignment = /[A-Za-z][A-Za-z0-9]*_EMBEDDING_(MODEL|DIMENSIONS)\s*[=:]\s*["']?[\w.${:-]/;
     const known = new Set([
       ...PAIR_SURFACES.map((s) => s.file),
       ...MODEL_ONLY_SURFACES.map((s) => s.file),
@@ -184,6 +222,14 @@ describe("embedding defaults parity (EDC-06)", () => {
       "packages/shared/src/config/massa-ai-config.ts",
       "packages/core/src/services/embeddings/config.ts",
       "packages/shared/src/config/config-loader.ts", // seeds env FROM config.json
+      "packages/shared/src/config/inference-providers.ts", // the seam's own envNames map — names the var, assigns nothing
+      // The canonical model→width table (LIP-04). Under the re-keyed
+      // provider-neutral token, `KNOWN_EMBEDDING_DIMENSIONS: Readonly<...> =`
+      // and `DEFAULT_EMBEDDING_DIMENSIONS = 2560` both read as an
+      // "TOKEN[=:]value" assignment to the naive line scan below — a false
+      // offender, not a new surface. This file IS the reference table
+      // `referencePair()` reads at :64; it is reviewed, not unlisted.
+      "packages/shared/src/config/embedding-dimensions.ts",
     ]);
     const allowedPrefixes = [".specs/", "docs/", "CHANGELOG.md", "FEATURES.md", "README.md"];
     const isTestFile = (f: string) => /__tests__|\.test\.ts$/.test(f);
@@ -198,7 +244,7 @@ describe("embedding defaults parity (EDC-06)", () => {
       } catch {
         continue;
       }
-      if (!text.includes("OLLAMA_EMBEDDING_")) continue;
+      if (!mentionsToken.test(text)) continue;
       scanned++;
       if (known.has(f) || isTestFile(f) || allowedPrefixes.some((p) => f.startsWith(p))) continue;
       for (const line of text.split("\n")) {
@@ -209,7 +255,7 @@ describe("embedding defaults parity (EDC-06)", () => {
         }
       }
     }
-    console.log(`[parity] completeness scan population: ${scanned} tracked files mention OLLAMA_EMBEDDING_*`);
+    console.log(`[parity] completeness scan population: ${scanned} tracked files mention *_EMBEDDING_MODEL/DIMENSIONS`);
     expect(scanned).toBeGreaterThan(5); // the scan itself must see its subjects
     expect(offenders).toEqual([]);
   });
@@ -241,16 +287,36 @@ describe("embedding defaults parity (EDC-06)", () => {
     // no longer pins a literal at all — it derives the width from the model,
     // which is what closed the original defect, and is covered by executing
     // the template in scripts/__tests__/installer-config-template.test.ts.
+    //
+    // `packages/shared/src/config/inference-providers.ts` (T07/LIP-01's seam)
+    // is a FIFTH member, added here rather than collapsed away: its `ollama`
+    // spec derives `knownDimensions` from `embedding-dimensions.ts` (no
+    // second copy — the T07 collapse this scan originally asked to verify),
+    // but its `lmstudio` spec carries its own literal
+    // `{ "text-embedding-nomic-embed-text-v1.5": 768 }` table, because that
+    // model has no entry in the Ollama-only reference table. That is a real,
+    // reviewed width-writer the scan's original trigger could not see at all
+    // (measured: `writesEmbeddingBlock` never matches this file — it writes
+    // no `embedding:` field, only named `InferenceProviderSpec` objects), so
+    // the trigger below gained a second, narrowly-scoped alternative for the
+    // `knownDimensions: { "<model>": <n> }` shape.
     const KNOWN_WIDTH_WRITERS = [
       "apps/mcp-client/src/config-cli.ts",
       "apps/opencode-plugin/src/config-cli.ts",
       "packages/core/src/services/embeddings/config.ts",
+      "packages/shared/src/config/inference-providers.ts",
       "packages/shared/src/config/massa-ai-config.ts",
     ];
     const allowedPrefixes = [".specs/", "docs/", "CHANGELOG.md", "FEATURES.md", "README.md"];
     const isTestFile = (f: string) => /__tests__|\.test\.ts$/.test(f);
     const writesEmbeddingBlock = /embedding\s*[:=]|"embedding"\s*:|config\.embedding/;
     const literalWidth = /["']?dimensions["']?\s*[:=]\s*\d/;
+    // A literal `"<model>": <width>` entry inside a `knownDimensions: { … }`
+    // object — the shape `inference-providers.ts` uses instead of a
+    // `dimensions:`/`embedding:` field. Scoped to one `{ … }` body
+    // (`[^}]*`, no nested braces) so it cannot drift into matching an
+    // unrelated later line in the same file.
+    const knownDimensionsTable = /knownDimensions:\s*\{[^}]*:\s*\d+[^}]*\}/;
 
     const matched: string[] = [];
     for (const f of tracked) {
@@ -262,7 +328,9 @@ describe("embedding defaults parity (EDC-06)", () => {
       } catch {
         continue;
       }
-      if (!writesEmbeddingBlock.test(text) || !literalWidth.test(text)) continue;
+      const isWidthWriter =
+        (writesEmbeddingBlock.test(text) && literalWidth.test(text)) || knownDimensionsTable.test(text);
+      if (!isWidthWriter) continue;
       matched.push(f);
     }
 

@@ -620,6 +620,122 @@ unquotable as a sensor for that subject.
 
 ---
 
+## Phase 6 landed (`55e90cb1`, `0e5d5250`, this commit) — what it cost
+
+**T13.** Both `config-cli.ts` copy-forks widened `use <provider>` from 3
+members to the full writable set — `ollama, lmstudio, mistral, openai,
+google, cohere` — not just `lmstudio`, per design.md §6's "keeping them at 3
+was not a decision, it is drift." The `lmstudio` branch (and the new
+`init --lmstudio` flag) reuses `INFERENCE_PROVIDERS.lmstudio` from the shared
+seam for its base URL and known-width default rather than a third copy of
+those literals; `google`/`cohere` reuse the same default model/width literals
+`embeddings/config.ts` already carries. **Gates, measured in this worktree**
+(`DATABASE_URL` had to be exported by hand — this shell had none set,
+unrelated to the diff): `cd apps/mcp-client && DATABASE_URL=… bun run test` →
+**13/13 isolated groups pass**, `config-cli.test.ts` alone **32/0**.
+`cd apps/opencode-plugin && bun test src/__tests__` → **132/0**;
+`config-cli.test.ts` alone → **27/0**.
+
+**T14.** `config-sections.ts`'s five Ollama-only guide sentences (embedding
+model/baseURL/apiKey, llm baseUrl/apiKey) now name LM Studio too. This closes
+the known red carried since Phase 2: `render-golden.json` was regenerated
+once, after the prose, with `MASSA_AI_WRITE_GOLDEN=1`, and the diff is
+confined to exactly the two known entries — `renderConfig/read` and
+`renderConfig/write` (lines 23 and 54, 2 lines changed in the whole 406 KB
+file) — nothing else moved. `config-forms.test.ts` gained an `lmstudio`
+assertion on the rendered provider select;
+`config-section-coverage.test.ts` gained a case that an LM Studio-shaped
+installer config (T12's `installer_write_config` shape) still resolves every
+portal section; `config-get.json`'s example fixture now shows an LM
+Studio-configured install. **Gates:** `cd apps/web-ui && bun run test` →
+**784/0** across 15 files; `bun run type-check` → 6/6 tasks green.
+
+**T15.** Tier 3 of the parity gate re-keyed from the literal `OLLAMA_EMBEDDING_`
+to the provider-neutral `*_EMBEDDING_(MODEL|DIMENSIONS)`; the new population
+needed one addition to `known` (`embedding-dimensions.ts` — its
+`KNOWN_EMBEDDING_DIMENSIONS: Readonly<...> =` and
+`DEFAULT_EMBEDDING_DIMENSIONS = 2560` both read as a false
+"TOKEN[=:]value" offender to the naive line scan once caught by the wider
+token). `referencePair()`'s comment is rewritten to describe the current
+discriminator (the defaults block's literal `provider: "ollama",`, absent
+from the interface's now-derived `(typeof EMBEDDING_PROVIDER_IDS)[number]`
+field) rather than the deleted union it used to cite; the regex itself needed
+no change; it already only matched the literal block. The width-writer scan
+gained a fifth member, `inference-providers.ts` — its `ollama` spec derives
+`knownDimensions` from the shared table (no duplicate), but its `lmstudio`
+spec carries its own literal `{ "text-embedding-nomic-embed-text-v1.5": 768
+}` table, invisible to the old trigger (it writes no `embedding:` field) —
+closed with a second, narrowly-scoped `knownDimensions: { … }` trigger.
+`turbo.json`'s `passThroughEnv` gained `LMSTUDIO_BASE_URL`,
+`LMSTUDIO_EMBEDDING_MODEL`, `LMSTUDIO_EMBEDDING_DIMENSIONS` beside
+`OLLAMA_BASE_URL`; `.env.example` gained a documented `=== LM Studio (Local)
+===` section mirroring the Ollama one.
+
+**LIP-24 accounting (measured, not waved through).** Re-measured completeness
+population in this worktree, scratch `XDG_CONFIG_HOME`: **26** before this
+task's re-key (matches tasks.md's "after Phase 3" figure), **29** immediately
+after re-keying Tier 3 to the provider-neutral token, **30** after `.env.example`'s
+new LM Studio section (itself already `known`, so the population grows but
+offenders stay `[]`). Took the **enumerate-and-show-covered-elsewhere**
+branch for `local-health-checker.ts`: it left the token-visible population in
+Phase 3 because T05 replaced the literal `process.env.OLLAMA_EMBEDDING_MODEL`
+read with `process.env[spec.envNames.model]`, and re-keying Tier 3 to a wider
+token does not restore visibility — the file names no provider prefix at all
+anymore. Its env-precedence behavior (env wins over config.json, for the
+literal name `OLLAMA_EMBEDDING_MODEL`) is covered by a different, behavioral
+sensor instead of a text scan: `packages/core/src/__tests__/health-checker-config.test.ts`'s
+"checkOllama prefers env OLLAMA_EMBEDDING_MODEL over config" — itself outside
+this scan's population (`isTestFile`), so the two mechanisms never double-count.
+This accounting, and the reason the regex itself needed no change, are both
+recorded as comments in the test file, not only here.
+
+**Discriminating checks, both performed and reverted in this worktree.**
+(1) LIP-18/AC: appended `const LMSTUDIO_EMBEDDING_MODEL = "bogus-injected-model";`
+to `scripts/diagnose.ts` (an unlisted, non-test tracked file) — observed red:
+`offenders` = `["scripts/diagnose.ts: const LMSTUDIO_EMBEDDING_MODEL = ...bogus-injected-model...;"]`,
+then reverted (`git status --porcelain` empty, re-run green). (2) Width-writer
+scan: removed `inference-providers.ts` from `KNOWN_WIDTH_WRITERS` — observed
+red: `matched` (5, including `inference-providers.ts`) ≠ expected (4) with the
+scan's own diff naming the missing entry — then restored (green, 7/7).
+
+**Gates re-measured by this worker in this worktree:** `bun run test:scripts` →
+TypeScript half **2019 pass / 0 fail across 89 files**; shell half green
+across every suite except `test-install-skills-cli.sh`'s two cases
+(`no tools exits 2`, `reason is reported`) — the same pair Phase 5 baselined
+as detecting the real `claude` CLI on this machine, unmodified by this Phase.
+`bun run lint` exit 0.
+
+### Bounded residuals, recorded not fixed
+
+1. **T13's literal gate command, `cd apps/opencode-plugin && bun test` (no
+   `run`), is unstable in this environment for reasons wholly unrelated to
+   `config-cli.ts`.** `bun test src/__tests__` alone is clean (132/0) every
+   time; the package's default full discovery (`__tests__/install.test.ts` +
+   `__tests__/harness-skills-and-prune.test.ts`, both real end-to-end
+   installer round-trips via `spawnSync("bash", [INSTALL_SH, …])`, outside
+   this Phase's write set) intermittently crashes the whole `bun test`
+   process — observed as a bare exit 2 with no final summary, `killed 1
+   dangling process`, and a stray `skills/massa-ai/scripts/validate_spec.ts`
+   stderr fragment interleaved mid-run — or, on other runs, completes with a
+   clean summary and exactly one different 5000ms-timeout case each time
+   (`uninstall removes only a plugin-owned skills install…`, `plugin entry in
+   opencode.jsonc is idempotent…`, `uninstall removes only plugin entry and
+   agent symlinks…`). Different case failing each run is the signature of the
+   documented 5 s-global-budget class (`CLAUDE.md` "Running tests"), not a
+   deterministic defect — install.test.ts alone measured 70 s for 32 tests
+   under system load. Left unfixed: outside T13's write set, and a real fix
+   (raising a specific test's budget, or splitting the package's `test`
+   script the way the other three plugins already were per `CLAUDE.md`'s
+   `test:plugins` section) is a Phase 7/tooling decision, not a Phase 6 one.
+2. **LIP-24's `known` addition for `embedding-dimensions.ts` is a scan-level
+   fix, not a design change.** The file is the canonical reference table
+   `referencePair()` itself reads (`:74`); nothing about its content changed
+   in this Phase. Recorded because a future reader diffing this task's
+   changes against "what surface changed" would otherwise wonder why a table
+   file appears in a parity-gate commit.
+
+---
+
 ## Phase 7 — Docs, measurement, close-out (3 Tasks)
 
 ### T16 — README, FEATURES, CHEATSHEET
