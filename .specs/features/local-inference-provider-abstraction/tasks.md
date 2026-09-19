@@ -26,6 +26,31 @@ timeout.
 
 ---
 
+## Known red carried from Phase 2 until T14 — report web-ui failures BY NAME, never by count
+
+`cd apps/web-ui && bun run build && bun test` is **782 pass / 2 fail** from
+`7987443d` onward. The two failures are exactly:
+
+- `render golden fixture (pre-split behavior, frozen at 6a0b1c2d) > renderConfig/read renders byte-identically`
+- `render golden fixture (pre-split behavior, frozen at 6a0b1c2d) > renderConfig/write renders byte-identically`
+
+Cause: T03 added `lmstudio` to `config-sections.ts`'s enum, and the 406 KB
+`render-golden.json` is frozen at a commit deliberately
+(`render-golden.test.ts:11-14`). **T14 owns regenerating it**, and it is left
+red on purpose rather than regenerated twice, because T14 also edits that file's
+guide prose.
+
+**The hazard this creates is the point of this note.** A worker that reports
+"web-ui: 2 pre-existing failures" by count cannot tell this known pair from a
+third failure it just introduced. Phase 1 already made exactly that mistake in
+`packages/shared` — it reported a pre-existing 904/1 that did not exist, because
+its baseline was measured in the same broken state as its subject. So: quote the
+failing **test names**, and if any name outside the two above appears, it is
+yours. The paired baselines that settle it are main@d523f06f and this branch, run
+with a scratch `XDG_CONFIG_HOME`.
+
+---
+
 ## Phase 1 landed (`f5cb0956`, `4fca51e4`) — facts downstream tasks must not re-derive
 
 - **The model-listing endpoint path is `inference-probe.ts`'s private concern.**
