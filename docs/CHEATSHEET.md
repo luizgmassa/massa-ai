@@ -31,9 +31,12 @@ Environment overrides (export before piping):
 | `MASSA_AI_BRANCH` | `main` | Git branch (source/build mode) |
 | `MASSA_AI_NO_START` | unset | `1` skips starting services after install |
 
-`install.sh` always installs Ollama — it has no provider menu. To use LM
-Studio instead, run `scripts/setup-local-first.sh` (below) with
-`MASSA_AI_INFERENCE_PROVIDER=lmstudio`, or answer its interactive prompt.
+`install.sh` carries no provider logic of its own: in its default `source` mode
+it hands off to `scripts/setup-local-first.sh`, which is where both the provider
+prompt and the provider's own installer live. So the one-liner already offers
+LM Studio — set `MASSA_AI_INFERENCE_PROVIDER=lmstudio` to skip the prompt.
+`MASSA_AI_MODE=docker` and `MASSA_AI_MODE=build` do not run that wizard, so
+under those two you point massa-ai at a provider yourself.
 
 ### From source
 

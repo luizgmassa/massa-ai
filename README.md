@@ -50,8 +50,10 @@ bun install
 #   MASSA_AI_INFERENCE_PROVIDER=ollama|lmstudio to skip the prompt
 # - Ollama: pulls qwen3-embedding:4b (embeddings, 2560 dims), qwen2.5:7b-instruct
 #   (default LLM), and qwen2.5-coder:7b (code-oriented LLM sites)
-# - LM Studio: installs the `lms` CLI if missing, starts the server, and lets
-#   you pick an embedding + LLM model already loaded there
+# - LM Studio: installs the `lms` CLI if missing, starts the server, and fetches
+#   text-embedding-nomic-embed-text-v1.5 (embeddings, 768 dims) and
+#   qwen/qwen3-4b-2507 (both LLM slots) — override via LMSTUDIO_EMBEDDING_MODEL,
+#   MASSA_AI_LLM_MODEL, MASSA_AI_LLM_CODE_MODEL
 # - Creates .env with defaults
 # - Runs bun run diagnose to validate the stack
 
@@ -655,8 +657,10 @@ lms get -y <your-instruct-model>                   # chat model
 ```
 
 Or run `./scripts/setup-local-first.sh` with `MASSA_AI_INFERENCE_PROVIDER=lmstudio`
-(or answer the interactive prompt) — it drives this flow for you, including
-model selection and writing `.env`.
+(or answer the interactive prompt) — it drives this flow for you, fetching its
+own default models rather than offering a picker. Note where the settings land:
+it writes only `DATABASE_URL` into `.env`, while the provider, model and LLM
+settings go to `~/.config/massa-ai/config.json`.
 
 ### Validate the stack
 

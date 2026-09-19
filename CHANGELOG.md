@@ -26,8 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wedged server as healthy; `scripts/__tests__/probe-dialect-parity.test.ts` now pins the
   two dialects to the same verdict on the same fixture bodies.
 - **Provider-aware embedding width resolution.** `text-embedding-nomic-embed-text-v1.5`
-  resolves to 768 from the seam's table; an unknown *and* unreachable model throws rather
-  than silently defaulting to a width that would corrupt an index.
+  resolves to 768 from the seam's table. On the installer path specifically —
+  `resolveModelDimensions`, reached from `scripts/lib/installer-api-key.sh` — a model that
+  is both unknown to the table *and* unreachable for probing now throws instead of
+  defaulting to a width that would corrupt an index. The runtime paths are unchanged and
+  still fall back to 768 for an unknown LM Studio model (`embeddings/config.ts`, both
+  `config-cli.ts` copies), so `massa-ai-config use lmstudio --model <unknown>` still
+  writes 768 without complaint.
 - **An `embedding_fingerprint` read gate and write gate on `workspaces`.** A workspace
   indexed under one provider/model/width is no longer silently queried or appended to under
   another — the failure it prevents is a vector space quietly mixed with a different one.
@@ -41,7 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lmstudio`, `mistral`, `openai`, `google`, `cohere` — plus `init --lmstudio`. Keeping
   them at 3 was drift, not a decision.
 - **Docs**: `README.md`, `FEATURES.md` and `docs/CHEATSHEET.md` no longer present Ollama as
-  the only local option, across the 23 surfaces the spec enumerated.
+  the only local option. 17 of the 23 surfaces the spec enumerated changed; the other 6
+  were left Ollama-only on purpose, because they describe `bun run diagnose`, which really
+  is still Ollama-only.
 
 ### Changed
 

@@ -559,11 +559,25 @@ suite except three that are red at `HEAD` too, baselined by stashing:
    first), so the default install is unaffected — but an install with a custom
    embedding model now depends on the endpoint being up, and fails the install
    when it is not. That is LIP-04's stated intent, not a side effect.
-4. **`install.sh` was not given the provider menu.** T11 put the three
+4. ~~**`install.sh` was not given the provider menu.** T11 put the three
    selection functions in the shared library so it can, but `install.sh` still
    installs Ollama unconditionally; only `setup-local-first.sh` dispatches.
    LIP-12/13 name no installer, and the wizard is the documented local-first
-   path — recorded because a reader will expect both.
+   path — recorded because a reader will expect both.~~
+
+   **WRONG — corrected in Phase 7, after it had already reached a shipped doc.**
+   `install.sh` does not install Ollama in any mode: its only Ollama handling is
+   `check_ollama()` (`:265-276`), which *warns*, and the `ollama.com/install.sh`
+   curl lives at `scripts/setup-local-first.sh:162`. And it reaches the menu on
+   its **default** path — `MASSA_AI_MODE` defaults to `source` (`:10`, `:69`),
+   and `install_source()` (`:1032`) runs
+   `bash "${INSTALL_DIR}/scripts/setup-local-first.sh"` at `:1055`. So the
+   one-liner already prompts for a provider. The real bound is narrower: only
+   `install_docker()` (`:926`) and `install_build()` (`:980`) skip the wizard.
+   Two independent readers caught this — the T16 worker while checking the claim
+   before documenting it, and the Phase 7 reviewer — which is the argument for
+   both passes existing. Left struck through rather than deleted, because the
+   wrong text is what the Phase 7 docs were written against.
 
 ---
 
@@ -809,12 +823,22 @@ re-anchoring holds; and LIP-24's substitute sensor exists at
   `:1234`, so they are unexecutable here, not merely unmeasured. Every *other*
   changed command is executed once and its exit code transcribed. Writing the
   narrower AC down beats silently failing the wider one.
-- **`README.md:47` and `:49-53` are the `install.sh` quick start, and
-  `install.sh` has no provider menu** (Phase 5 bounded residual #4, `:563-567`:
-  only `setup-local-first.sh` dispatches; `install.sh` installs Ollama
-  unconditionally). Documenting a provider choice there would be false. Route
-  LM Studio selection to `setup-local-first.sh` or
-  `MASSA_AI_INFERENCE_PROVIDER` explicitly.
+- ~~**`README.md:47` and `:49-53` are the `install.sh` quick start, and
+  `install.sh` has no provider menu**~~ — **both halves withdrawn by the T16
+  worker and the Phase 7 reviewer, independently, and Phase 5 bounded residual
+  #4 (`:563-567`) is wrong with them.** Measured: (1) `README.md:47-53` is the
+  *Manual setup (from source)* block and it invokes `./scripts/setup-local-first.sh`
+  directly (`:48`) — the real one-line install sits at `README.md:13-29` and is
+  not one of LIP-17's 23 sites at all; (2) `install.sh` carries no provider
+  logic and installs no provider: its default `source` mode delegates to the
+  wizard (`install.sh:1055`, inside `install_source()` at `:1032`), and the
+  Ollama installer curl lives at `scripts/setup-local-first.sh:162`, not in
+  `install.sh`. `install.sh`'s only Ollama handling is `check_ollama()`
+  (`:265-276`), which warns. So the one-liner *does* reach the provider prompt.
+  The true bound is narrower and is what the docs now say: `MASSA_AI_MODE=docker`
+  (`:926`) and `=build` (`:980`) do not run the wizard. This claim reached a
+  shipped user-facing doc before it was caught — see the Phase 7 review-fix
+  commit.
 - **Do not claim stale-index protection without its qualifier.** Phase 3
   residual #3 (`:338-341`): every existing install is legacy/NULL until its
   first full reindex, so LIP-15 protects no existing project until then.
@@ -953,18 +977,27 @@ prompt: `qwen3-embedding:4b` → `embedding.length` **2560**, `nomic-embed-text`
 the returned vector length, so a tag resolving elsewhere, or an Ollama fallback
 to the already-loaded model, would have produced a plausible number at the wrong
 width. Reports: `benchmarks/needles/reports/massa-ai-t17-2560-results.json` and
-`…/massa-ai-lmstudio-width-768-results.json`; that directory is gitignored, so
-durable copies live at `/tmp/t17-needles-{2560,768}.json` and the table above is
-the record. Every figure here was re-read from those JSON files by the
-orchestrator, not transcribed from the worker's prose. No eviction thrash: the
-768 run was *faster* (its model is far smaller), the harness's retry counter
-fired zero on both runs.
+`…/massa-ai-lmstudio-width-768-results.json` — a **misleading filename**: that
+run went entirely through Ollama, and nothing in it touched LM Studio. That
+directory is gitignored, so durable copies live at
+`/tmp/t17-needles-{2560,768}.json` and the table above is the record. Every
+**score** here was re-read from those JSON files by the orchestrator rather than
+transcribed from the worker's prose. The two exceptions, stated because the
+claim would otherwise be wider than the artifact: the **wall clocks** and the
+zero-retry observation are the worker's, not re-derivable from the durable
+copies (which carry only `projectId, ranAt, model, config, aggregate, results`;
+summing per-result `latencyMs` gives 22 ms and 12 ms, not seconds). The wall
+clocks are consistent with the 45.6 s gap between the two `ranAt` stamps. No
+eviction thrash observed: the 768 run was *faster*, its model being far
+smaller.
 
 **The two-part bound. Both halves are the point; neither is a caveat.**
 
 (a) **Not the shipped path.** `run.ts:113-140` calls only
-`POST {OLLAMA_HOST}/api/embeddings`, truncates at 8000 chars (`:129`) and passes
-`options.num_ctx` (`:133-136`) — an Ollama-only knob with no counterpart on the
+`POST {OLLAMA_HOST}/api/embeddings`, truncates at 8000 chars (`:134` —
+`prompt: text.slice(0, 8000)`; an earlier draft of this note cited `:129`, which
+is the `content-type` header) and passes `options.num_ctx` (`:135`) — an
+Ollama-only knob with no counterpart on the
 OpenAI-shaped `/v1/embeddings` this feature actually ships. LM Studio was live
 on `:1234` serving `text-embedding-nomic-embed-text-v1.5` throughout and was
 never called. Both numbers are the same model *family* through a different
@@ -973,8 +1006,12 @@ server with different request shaping than production.
 (b) **Not the algorithm change — and biased in the direction that hides it.**
 `run.ts:5-16` is a self-contained in-process **exact-cosine** ranker; it never
 imports or constructs `packages/core/src/data/vector/postgres-vector-store.ts`,
-so neither the `dimensions > 2000` two-phase binary-quantization branch (`:233`,
-`:267`) nor the ≤2000 plain-HNSW branch runs on **either** arm. The delta above
+so neither the `dimensions > 2000` two-phase binary-quantization path nor the
+≤2000 plain-HNSW path runs on **either** arm. Cite the search itself, not only
+its setup: the two-phase search is `:616-621` (the `embedding_bq <~> $1::bit(N)`
+hamming prefilter); `:233` (`const hasBq = dimensions > 2000`, table DDL) and
+`:267` (index dispatch) are where the width decides the *schema*, which is why
+they were cited first and why the pointer was off-subject. The delta above
 therefore has the approximate-search component removed from both sides.
 
 So LIP-22's stated risk — that 768 leaves the binary-quantization path — remains

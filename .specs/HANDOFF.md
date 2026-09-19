@@ -62,10 +62,17 @@ exited **0 before T18 edited anything**, measured.
 2. **Existing installs are unprotected until their first full reindex.** The fingerprint
    gate reads legacy/`NULL` on every workspace indexed before the migration. Any claim of
    stale-index protection needs that qualifier.
-3. **`install.sh` still has no provider menu.** It *did* gain the body-shape probe (26
-   insertions over the feature range — an earlier claim in this session that it was absent
-   from the diff entirely was wrong), but provider choice lives only in
-   `scripts/setup-local-first.sh` and `MASSA_AI_INFERENCE_PROVIDER`.
+3. **Only `MASSA_AI_MODE=docker` and `=build` miss the provider prompt.** The claim that
+   stood here first — inherited from Phase 5 bounded residual #4 — was that `install.sh`
+   installs Ollama unconditionally and has no provider menu. **Both halves are false**, and
+   it reached a shipped user-facing doc before the Phase 7 reviewer caught it. `install.sh`
+   installs no provider at all (its only Ollama handling is `check_ollama()` at `:265-276`,
+   a warning; the `ollama.com/install.sh` curl is in `scripts/setup-local-first.sh:162`),
+   and its **default** `source` mode runs the wizard at `:1055`, so the one-liner already
+   prompts. Residual #4 is struck through and corrected in place in `tasks.md`. Worth
+   carrying as a pattern, not just a fact: a residual recorded in one phase was read as
+   established truth by the next and shipped — it took a worker checking the claim before
+   documenting it, plus the reviewer, to catch it.
 4. **The LM Studio install and daemon commands were never executed**, here or in Phase 5.
    `lms` is not on this host's `PATH` while the server itself runs on `:1234`, and T12
    forbids running the vendor installer. T16's "execute every changed command once" AC was
