@@ -11,13 +11,22 @@ Gate rule: one atomic commit per Task, after its gate passes. Never batch.
 |---|---|
 | Core unit (isolated runner — `bun test` over a directory cross-contaminates) | `cd packages/core && bun scripts/run-tests-isolated.ts --unit --filter='<regex>'` |
 | Single file | `bun test <path>` |
-| Shared / opencode-plugin | `bun test` (plain) |
+| Shared / opencode-plugin | `bun run test` — **not** bare `bun test` (see below) |
 | Root-level suites (NOT covered by `bun run test`) | `bun run test:scripts` |
 | Shell suites | `bash scripts/tests/<name>.sh` |
 | Type check | `bun run type-check` (4 pkgs) + `bun run build` (core, shared) |
 | Lint (real CI gate) | `bun run lint` — oxlint from repo root, once |
 | Plugins | `bun run test:plugins` |
 | Live LM Studio | `~/.lmstudio/bin/lms server start` then the task's curl/bun probe |
+
+**`apps/opencode-plugin` must be run as `bun run test`, never as bare `bun test`.**
+Its package script is scoped — `bun test __tests__ src/__tests__` — while a bare
+`bun test` has no path argument and walks the whole package, including the
+generated, gitignored `apps/opencode-plugin/skills/` bundle (AD-016 build
+output). That pulls `skills/massa-ai/scripts/*` into the run and exits 2 with no
+summary. Measured in this worktree at `018e1529`: bare `bun test` exit 2 on both
+of 2 runs; `bun run test` **166 pass / 0 fail across 9 files**, 36.9 s and 36.8 s,
+exit 0 on both. The failure is the command, not the package.
 
 **Config contamination trap:** a 5001 ms failure usually means the test reached
 a live provider through the developer's own `~/.config/massa-ai/config.json`.
@@ -705,34 +714,76 @@ across every suite except `test-install-skills-cli.sh`'s two cases
 as detecting the real `claude` CLI on this machine, unmodified by this Phase.
 `bun run lint` exit 0.
 
+### Orchestrator re-measurement at `018e1529` (every figure re-run, not accepted)
+
+`apps/web-ui` plain `bun test` **784/0 across 15 files**, exit 0 — the two
+Phase-2 goldens are closed and no other name failed. `bunx turbo run type-check
+--force` **6/6, 0 cached**, 13.8 s (the first run was FULL TURBO and did not
+count). `bun run lint` exit 0 and **proved live**: an injected duplicate
+declaration in a scratch `scripts/__oxlint_probe__.ts` was reported
+(`error: Identifier 'a' has already been declared`) and the probe removed —
+oxlint emits nothing at all on a clean tree, so its silence needed a sensor.
+`bun run test:scripts` TypeScript half **2019/0 across 89 files**; its shell
+half aborts at suite 16 of 39 (`for f … || exit 1`), so the remaining **23
+suites were run individually** and are green except the two environment reds
+that match main's recorded figures exactly — `test-plugin-auto-install.sh`
+194/16 and `test-plugin-registry-registration.sh` 43/4, beside
+`test-install-skills-cli.sh` 44/2. `apps/mcp-client` `bun run test` **342/0
+across 14 isolated groups**, exit 0. `bun run test:plugins` **142/0 across 10
+files**, exit 0.
+
+**LIP-18's discriminating red was re-induced by the orchestrator, not accepted
+from the worker.** Appending `const LMSTUDIO_EMBEDDING_MODEL = "bogus-injected-model";`
+to `scripts/diagnose.ts` (tracked, unlisted) produced
+`(fail) … > no unlisted tracked file assigns a *_EMBEDDING_MODEL/DIMENSIONS
+default`, 6 pass / 1 fail, naming the injected line as the offender. Restored
+from a file copy (never `git checkout`), `git status --porcelain` empty, re-run
+**7/0**. `turbo-passthrough-env.test.ts` **3/0** with all three `LMSTUDIO_*`
+names present at `turbo.json:41-43`.
+
+Both falsifiable claims the new comments make were checked against source:
+`massa-ai-config.ts` holds the literal `provider: "ollama",` **exactly once**
+(`:382`, the defaults block) while the interface field is
+`(typeof EMBEDDING_PROVIDER_IDS)[number]` (`:51`), so `referencePair()`'s
+re-anchoring holds; and LIP-24's substitute sensor exists at
+`packages/core/src/__tests__/health-checker-config.test.ts:51`.
+
 ### Bounded residuals, recorded not fixed
 
-1. **T13's literal gate command, `cd apps/opencode-plugin && bun test` (no
-   `run`), is unstable in this environment for reasons wholly unrelated to
-   `config-cli.ts`.** `bun test src/__tests__` alone is clean (132/0) every
-   time; the package's default full discovery (`__tests__/install.test.ts` +
-   `__tests__/harness-skills-and-prune.test.ts`, both real end-to-end
-   installer round-trips via `spawnSync("bash", [INSTALL_SH, …])`, outside
-   this Phase's write set) intermittently crashes the whole `bun test`
-   process — observed as a bare exit 2 with no final summary, `killed 1
-   dangling process`, and a stray `skills/massa-ai/scripts/validate_spec.ts`
-   stderr fragment interleaved mid-run — or, on other runs, completes with a
-   clean summary and exactly one different 5000ms-timeout case each time
-   (`uninstall removes only a plugin-owned skills install…`, `plugin entry in
-   opencode.jsonc is idempotent…`, `uninstall removes only plugin entry and
-   agent symlinks…`). Different case failing each run is the signature of the
-   documented 5 s-global-budget class (`CLAUDE.md` "Running tests"), not a
-   deterministic defect — install.test.ts alone measured 70 s for 32 tests
-   under system load. Left unfixed: outside T13's write set, and a real fix
-   (raising a specific test's budget, or splitting the package's `test`
-   script the way the other three plugins already were per `CLAUDE.md`'s
-   `test:plugins` section) is a Phase 7/tooling decision, not a Phase 6 one.
+1. **~~T13's opencode-plugin gate is unstable~~ — withdrawn by the orchestrator,
+   it was the command and not the package.** The worker recorded a flake class
+   here (intermittent exit 2, `killed 1 dangling process`, a stray
+   `skills/massa-ai/scripts/validate_spec.ts` stderr fragment, a different
+   5000 ms case each run) and attributed it to `__tests__/install.test.ts` +
+   `__tests__/harness-skills-and-prune.test.ts` under the 5 s global budget.
+   Re-measured: the package's `test` script is already scoped
+   (`bun test __tests__ src/__tests__`), and `bun run test` is **166/0 across
+   9 files**, exit 0, on both of 2 consecutive runs (36.9 s, 36.8 s) — those
+   two installer suites are inside that scope and passed both times. What the
+   worker ran was bare `bun test`, no path argument, which additionally walks
+   the generated, gitignored `apps/opencode-plugin/skills/` bundle and exits 2
+   with no summary. That stray `validate_spec.ts` line is the tell, and it is
+   reproducible, not intermittent: bare `bun test` exited 2 on both of my 2
+   runs. The proposed Phase 7 fix (splitting the package's `test` script) is a
+   no-op — it is already split. The tasks.md gate line was the defect and is
+   corrected above.
 2. **LIP-24's `known` addition for `embedding-dimensions.ts` is a scan-level
    fix, not a design change.** The file is the canonical reference table
    `referencePair()` itself reads (`:74`); nothing about its content changed
    in this Phase. Recorded because a future reader diffing this task's
    changes against "what surface changed" would otherwise wonder why a table
    file appears in a parity-gate commit.
+
+   **Orchestrator note on its cost.** `known` membership skips the file
+   *entirely*, not just its colliding lines — so a genuinely new, unreviewed
+   `*_EMBEDDING_(MODEL|DIMENSIONS)` default added to
+   `embedding-dimensions.ts` would now be invisible to Tier 3. The bound is
+   that `referencePair()` reads this exact file as its reference table, so a
+   changed reference value reddens Tier 1 on every other surface instead. It
+   is a real narrowing of one tier bought by a widening of another, and it is
+   recorded as such rather than as a clean fix. Closing it properly means
+   scanning the file line-wise with the table's own shape excluded, not
+   skipping the file.
 
 ---
 
