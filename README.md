@@ -2,7 +2,7 @@
 
 massa-ai is a local-first MCP server that indexes your codebase — semantic search, keyword search, and a symbol graph ranked by dependency centrality — and keeps a persistent, cross-session memory of decisions, patterns, and critical facts.
 
-Instead of loading whole files into context, your assistant retrieves just the relevant symbols, references, and memories, so it reads less, forgets nothing between sessions, and costs less to run. It runs on Ollama (free, offline), with optional LLM consolidation, rerank, and query understanding, and plugs into Claude Code, Codex, Cursor, and OpenCode via MCP plus passive-capture hooks.
+Instead of loading whole files into context, your assistant retrieves just the relevant symbols, references, and memories, so it reads less, forgets nothing between sessions, and costs less to run. It runs on a local inference provider — Ollama or LM Studio (free, offline) — with optional LLM consolidation, rerank, and query understanding, and plugs into Claude Code, Codex, Cursor, and OpenCode via MCP plus passive-capture hooks.
 
 > **[FEATURES.md](./FEATURES.md)** contains a complete reference for every feature — what it does, why it exists, and how to use it. This README covers installation, integration, and quick-start; FEATURES.md has the depth.
 
@@ -44,11 +44,14 @@ git clone https://github.com/luizgmassa/massa-ai.git
 cd massa-ai
 bun install
 
-# 2. Setup (100% offline with Ollama)
+# 2. Setup (100% offline — Ollama by default, or LM Studio)
 ./scripts/setup-local-first.sh
-# - Installs/starts Ollama
-# - Pulls qwen3-embedding:4b (embeddings, 2560 dims), qwen2.5:7b-instruct (default LLM),
-#   and qwen2.5-coder:7b (code-oriented LLM sites)
+# - Prompts for a local inference provider (Ollama or LM Studio), or set
+#   MASSA_AI_INFERENCE_PROVIDER=ollama|lmstudio to skip the prompt
+# - Ollama: pulls qwen3-embedding:4b (embeddings, 2560 dims), qwen2.5:7b-instruct
+#   (default LLM), and qwen2.5-coder:7b (code-oriented LLM sites)
+# - LM Studio: installs the `lms` CLI if missing, starts the server, and lets
+#   you pick an embedding + LLM model already loaded there
 # - Creates .env with defaults
 # - Runs bun run diagnose to validate the stack
 
@@ -615,13 +618,14 @@ for the full tool-to-workflow adoption map.
 
 ---
 
-## Local-first LLM (Ollama)
+## Local-first LLM (Ollama or LM Studio)
 
-All LLM-driven features run against a local Ollama instance and **default OFF**,
-degrading silently to rule-based behavior when disabled. Everything still works
-without an LLM — you just lose consolidation, polish, rerank, and query rewrite.
+All LLM-driven features run against a local inference provider — Ollama or
+LM Studio — and **default OFF**, degrading silently to rule-based behavior
+when disabled. Everything still works without an LLM — you just lose
+consolidation, polish, rerank, and query rewrite.
 
-### Prerequisites
+### Prerequisites (Ollama)
 
 ```bash
 # Install Ollama (if missing)
@@ -636,11 +640,31 @@ ollama pull qwen2.5:7b-instruct   # default LLM (consolidation, salience, handof
 ollama pull qwen2.5-coder:7b      # code-oriented LLM sites (bootstrap seed, reranker, code compression)
 ```
 
+### Prerequisites (LM Studio)
+
+```bash
+# Install LM Studio's CLI (if missing)
+curl -fsSL https://lmstudio.ai/install.sh | bash
+
+# Start the daemon
+lms daemon up
+
+# Download and load models (pick any instruct + embedding model you prefer)
+lms get -y text-embedding-nomic-embed-text-v1.5   # embeddings (768 dims)
+lms get -y <your-instruct-model>                   # chat model
+```
+
+Or run `./scripts/setup-local-first.sh` with `MASSA_AI_INFERENCE_PROVIDER=lmstudio`
+(or answer the interactive prompt) — it drives this flow for you, including
+model selection and writing `.env`.
+
 ### Validate the stack
 
 `bun run diagnose` (also auto-runs as `predev` / `predev:api` / `predev:mcp`)
 checks Ollama connectivity, database access, embedding generation, and migration
-status.
+status. It does not currently probe LM Studio — verify an LM Studio setup with
+`curl http://localhost:1234/v1/models` and `bun run start:api` +
+`curl http://localhost:3333/health` instead.
 
 > **Ran without a reachable embedding provider before? Re-index.** Earlier versions
 > silently substituted **random vectors** when no provider was available, and stored and
@@ -673,6 +697,13 @@ MASSA_AI_LLM_CODE_MODEL=qwen2.5-coder:7b      # code-oriented sites (bootstrap s
 # MASSA_AI_LLM_DISABLE_THINK=true             # best-effort thinking-disable (default true; safety net)
 ```
 
+On LM Studio, point the same variables at its OpenAI-compatible server instead
+(`MASSA_AI_LLM_BASE_URL=http://localhost:1234/v1`, any non-empty
+`MASSA_AI_LLM_API_KEY`, and the model ids loaded in LM Studio). LM Studio
+implements `response_format: {type:"json_schema"}` natively and needs neither
+the Ollama-only version probe nor the injected `think:false` flag — provider
+identity handles that automatically.
+
 With `MASSA_AI_LLM_ENABLED=true` you get: hook→memory consolidation, handoff-summary
 polish, query understanding (rewrite + HyDE), LLM-judge rerank, and auto
 importance scoring. Set it `false` (the default) and every one of those silently
@@ -697,7 +728,19 @@ falls back to its rule-based path.
 > `OLLAMA_EMBEDDING_MODEL` or config `embedding.model`, and move
 > `embedding.dimensions` with it — a width that disagrees with what the model
 > returns fails loudly rather than degrading. Switch to `bge-m3` for speed if
-> its recall quality is sufficient.
+> its recall quality is sufficient. On LM Studio, `LMSTUDIO_EMBEDDING_MODEL`
+> defaults to `text-embedding-nomic-embed-text-v1.5` (768d, resolved
+> automatically); override `LMSTUDIO_EMBEDDING_DIMENSIONS` alongside a
+> different model the same way.
+
+> **Switching providers:** changing `embedding.provider` or the embedding
+> model changes what future searches expect the stored vectors to look like.
+> massa-ai stamps a per-project embedding fingerprint and blocks search with a
+> named error until you run a full reindex (the reindex command above forces
+> one with `"force": true`). **This protects only projects that have been
+> fully reindexed since the fingerprint was introduced** — an existing project
+> with no stamped fingerprint is treated as legacy and is not blocked; it gets
+> protected starting from its next full reindex.
 
 ---
 
@@ -960,8 +1003,8 @@ The `massa-ai-config` CLI (a bin of `@massa-ai/mcp-client`, and of
 ```bash
 massa-ai-config show                              # current configuration
 massa-ai-config path                              # config file path
-massa-ai-config init --mistral your-api-key       # or --ollama (default) / --openai <key>
-massa-ai-config use ollama --model qwen3-embedding:4b
+massa-ai-config init --mistral your-api-key       # or --ollama (default) / --lmstudio / --openai <key>
+massa-ai-config use ollama --model qwen3-embedding:4b   # or: use lmstudio --model text-embedding-nomic-embed-text-v1.5
 massa-ai-config set embedding.dimensions 1024
 massa-ai-config recover my-project --path /new/path   # re-associate a moved index
 massa-ai-config profile list                      # shipped profiles + per-host active one
@@ -1028,7 +1071,7 @@ massa-ai/
 | **Semantic Search** | Hybrid vector + keyword with RRF ranking, `enriched` response mode |
 | **Synapse** | Post-retrieval cognitive modulation: task alignment, agent affinity, working-memory buffer |
 | **Symbol Graph** | PageRank-based centrality, definitions, references, go-to-definition |
-| **Embeddings** | Ollama (local) or Mistral/OpenAI API |
+| **Embeddings** | Ollama or LM Studio (local), or Mistral/OpenAI API |
 | **Compression** | Rule-based code structure extraction (target 70% reduction) |
 | **Memory** | Persistent PostgreSQL/pgvector storage across sessions |
 | **Cache** | Multi-level L1/L2 with TTL |
