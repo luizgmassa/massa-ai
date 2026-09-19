@@ -184,6 +184,42 @@ else
   fail "setup-local-first.sh does not assign LMSTUDIO_URL — lms_model_exists breaks at runtime"
 fi
 
+# ── lms_cli_path: the false negative that actually happened (LIP-14) ─────────
+# `lms` is not on PATH until LM Studio has bootstrapped it, so a detection that
+# asks `command -v lms` first reports absent on a machine that has it. Both
+# cases run against a scratch HOME; the real LM Studio installer is never run.
+CLI_SRC="$(extract lms_cli_path)" || CLI_SRC=""
+if [ -n "$CLI_SRC" ]; then
+  FAKE_HOME="${TMP_ROOT}/lmshome"
+  mkdir -p "${FAKE_HOME}/.lmstudio/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${FAKE_HOME}/.lmstudio/bin/lms"
+  chmod +x "${FAKE_HOME}/.lmstudio/bin/lms"
+
+  PATH_ONLY_HOME="${TMP_ROOT}/lmshome-empty"
+  PATH_STUB="${TMP_ROOT}/lmsbin"
+  mkdir -p "$PATH_ONLY_HOME" "$PATH_STUB"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${PATH_STUB}/lms"
+  chmod +x "${PATH_STUB}/lms"
+
+  cli_case() {
+    env -i PATH="$1" HOME="$2" bash -c "
+      $CLI_SRC
+      lms_cli_path
+    " 2>/dev/null
+  }
+
+  # PATH deliberately carries no `lms`: this is the machine the AC names.
+  check_eq "lms is found under ~/.lmstudio/bin when it is not on PATH" \
+    "${FAKE_HOME}/.lmstudio/bin/lms" "$(cli_case "/usr/bin:/bin" "$FAKE_HOME")"
+  check_eq "an on-PATH lms is still found when ~/.lmstudio is absent" \
+    "${PATH_STUB}/lms" "$(cli_case "${PATH_STUB}:/usr/bin:/bin" "$PATH_ONLY_HOME")"
+  # The bootstrapped copy wins: it is the one that matches the running daemon.
+  check_eq "~/.lmstudio/bin/lms is preferred over an on-PATH copy" \
+    "${FAKE_HOME}/.lmstudio/bin/lms" "$(cli_case "${PATH_STUB}:/usr/bin:/bin" "$FAKE_HOME")"
+  check_eq "no lms anywhere echoes nothing" \
+    "" "$(cli_case "/usr/bin:/bin" "$PATH_ONLY_HOME")"
+fi
+
 # ── installer_detect_provider (LIP-12) ───────────────────────
 # Every scenario gets its own bash and its own HOME: the selection functions
 # set globals by design, which makes cross-case bleed the obvious failure mode,
@@ -208,7 +244,11 @@ run_lib() {
 write_cfg() {
   local path="$1" provider="$2"
   mkdir -p "$(dirname "$path")"
-  printf '{ "embedding": { "provider": "%s", "model": "m", "dimensions": 1 } }\n' "$provider" > "$path"
+  # No `dimensions` key: a literal width inside an embedding block makes this
+  # fixture read as a width-writing surface to embedding-defaults-parity's
+  # Tier-3 completeness scan, and installer_detect_provider reads only
+  # `embedding.provider` anyway.
+  printf '{ "embedding": { "provider": "%s", "model": "m" } }\n' "$provider" > "$path"
 }
 
 CFG_OLLAMA="${TMP_ROOT}/cfg-ollama.json"; write_cfg "$CFG_OLLAMA" ollama

@@ -84,6 +84,14 @@ massa_ai_probe_provider() {
 # installer_detect_provider / installer_select_provider / migrate_provider live
 # in scripts/lib/installer-feature-prompts.sh so install.sh can reuse them and
 # so scripts/tests/test-lms-model-exists.sh can execute them.
+# Both providers' endpoint defaults live here rather than inside their own
+# setup function: ollama_model_exists and the Step 5 verification read
+# OLLAMA_URL / OLLAMA_HAS_CLI from installer scope whichever provider was
+# chosen, and moving those assignments into setup_ollama would leave them
+# unset on the LM Studio path.
+OLLAMA_URL="${OLLAMA_HOST:-http://localhost:11434}"
+OLLAMA_HAS_CLI=false
+OLLAMA_API_REACHABLE=false
 LMSTUDIO_URL="${LMSTUDIO_BASE_URL:-http://localhost:1234/v1}"
 DETECTED_PROVIDER="$(installer_detect_provider "${HOME}/.config/massa-ai/config.json")"
 installer_select_provider "$DETECTED_PROVIDER"
@@ -91,66 +99,109 @@ if [ -n "$INFERENCE_PROVIDER_FROM" ]; then
     migrate_provider "$INFERENCE_PROVIDER_FROM" "$INFERENCE_PROVIDER"
 fi
 
-# ---- Step 1: Check Ollama ----
-echo -e "${BOLD}[1/6] Checking Ollama...${NC}"
-
-OLLAMA_URL="${OLLAMA_HOST:-http://localhost:11434}"
-OLLAMA_HAS_CLI=false
-OLLAMA_API_REACHABLE=false
-
-# Check if Ollama CLI is available
-if command -v ollama &> /dev/null; then
-    OLLAMA_HAS_CLI=true
-    echo -e "  ${GREEN}✓${NC} Ollama CLI is installed"
-fi
-
-# Check if Ollama API is reachable (covers WSL -> Windows host, remote, etc.)
-if massa_ai_probe_provider "$OLLAMA_URL"; then
-    OLLAMA_API_REACHABLE=true
-    OLLAMA_VERSION=$(curl -s "${OLLAMA_URL}/api/version" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null || echo "unknown")
-    echo -e "  ${GREEN}✓${NC} Ollama API reachable at ${OLLAMA_URL} (v${OLLAMA_VERSION})"
-fi
-
-if [ "$OLLAMA_HAS_CLI" = false ] && [ "$OLLAMA_API_REACHABLE" = false ]; then
-    # Neither CLI nor API available - try to install
-    echo -e "  ${YELLOW}⚠${NC} Ollama not found. Installing..."
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        curl -fsSL https://ollama.com/install.sh | sh
-        OLLAMA_HAS_CLI=true
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo -e "  ${YELLOW}⚠${NC} On macOS, install Ollama first:"
-        echo -e "      brew install ollama   (then: brew services start ollama)"
-        echo -e "      or download from https://ollama.com/download"
-        echo -e "  ${YELLOW}⚠${NC} Then re-run this script."
-        exit 1
-    else
-        echo -e "  ${RED}✗${NC} Unsupported OS. Install Ollama manually: https://ollama.com"
-        exit 1
+# ---- Step 1: Check the selected provider ----
+# Echo the path to the lms CLI, or nothing. ~/.lmstudio/bin/lms is checked
+# BEFORE `command -v lms`: the CLI is not on PATH until LM Studio has
+# bootstrapped it, and that exact false negative happened during
+# investigation — `command -v lms` reported absent on a machine that had it.
+lms_cli_path() {
+    if [ -x "${HOME}/.lmstudio/bin/lms" ]; then
+        echo "${HOME}/.lmstudio/bin/lms"
+        return 0
     fi
-elif [ "$OLLAMA_HAS_CLI" = false ] && [ "$OLLAMA_API_REACHABLE" = true ]; then
-    # API reachable but no CLI (e.g. WSL with Ollama on Windows host)
-    echo -e "  ${GREEN}✓${NC} Using remote Ollama API (no local CLI needed)"
-fi
+    command -v lms 2>/dev/null
+}
 
-# If API is not reachable yet, try to start it
-if [ "$OLLAMA_API_REACHABLE" = false ]; then
-    if [ "$OLLAMA_HAS_CLI" = true ]; then
-        echo -e "  ${YELLOW}⚠${NC} Ollama API not responding. Starting..."
-        nohup ollama serve > /dev/null 2>&1 &
+setup_lmstudio() {
+    echo -e "${BOLD}[1/6] Checking LM Studio...${NC}"
+    LMSTUDIO_CLI="$(lms_cli_path)"
+
+    if [ -z "$LMSTUDIO_CLI" ]; then
+        echo -e "  ${YELLOW}⚠${NC} LM Studio CLI not found. Installing (headless)..."
+        curl -fsSL https://lmstudio.ai/install.sh | bash \
+            || die "LM Studio install failed. Install it manually: https://lmstudio.ai/download"
+        LMSTUDIO_CLI="$(lms_cli_path)"
+        [ -n "$LMSTUDIO_CLI" ] \
+            || die "LM Studio installed but no lms CLI at ~/.lmstudio/bin/lms or on PATH."
+    fi
+    echo -e "  ${GREEN}✓${NC} LM Studio CLI: ${LMSTUDIO_CLI}"
+
+    if ! massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio; then
+        echo -e "  ${YELLOW}⚠${NC} LM Studio server not responding. Starting..."
+        "$LMSTUDIO_CLI" daemon up >/dev/null 2>&1 || true
         sleep 2
+    fi
 
-        if massa_ai_probe_provider "$OLLAMA_URL"; then
-            OLLAMA_API_REACHABLE=true
-            echo -e "  ${GREEN}✓${NC} Ollama started successfully"
+    # Body-shape probe, never the status code: LM Studio answers 200 with
+    # {"error":...} for endpoints it does not implement.
+    massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio \
+        || die "LM Studio API not reachable at ${LMSTUDIO_URL}. Start it: ${LMSTUDIO_CLI} daemon up"
+    echo -e "  ${GREEN}✓${NC} LM Studio API reachable at ${LMSTUDIO_URL}"
+}
+
+setup_ollama() {
+    echo -e "${BOLD}[1/6] Checking Ollama...${NC}"
+
+    # Check if Ollama CLI is available
+    if command -v ollama &> /dev/null; then
+        OLLAMA_HAS_CLI=true
+        echo -e "  ${GREEN}✓${NC} Ollama CLI is installed"
+    fi
+
+    # Check if Ollama API is reachable (covers WSL -> Windows host, remote, etc.)
+    if massa_ai_probe_provider "$OLLAMA_URL"; then
+        OLLAMA_API_REACHABLE=true
+        OLLAMA_VERSION=$(curl -s "${OLLAMA_URL}/api/version" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null || echo "unknown")
+        echo -e "  ${GREEN}✓${NC} Ollama API reachable at ${OLLAMA_URL} (v${OLLAMA_VERSION})"
+    fi
+
+    if [ "$OLLAMA_HAS_CLI" = false ] && [ "$OLLAMA_API_REACHABLE" = false ]; then
+        # Neither CLI nor API available - try to install
+        echo -e "  ${YELLOW}⚠${NC} Ollama not found. Installing..."
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            curl -fsSL https://ollama.com/install.sh | sh
+            OLLAMA_HAS_CLI=true
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+            echo -e "  ${YELLOW}⚠${NC} On macOS, install Ollama first:"
+            echo -e "      brew install ollama   (then: brew services start ollama)"
+            echo -e "      or download from https://ollama.com/download"
+            echo -e "  ${YELLOW}⚠${NC} Then re-run this script."
+            exit 1
         else
-            echo -e "  ${RED}✗${NC} Failed to start Ollama. Please start it manually: ollama serve"
+            echo -e "  ${RED}✗${NC} Unsupported OS. Install Ollama manually: https://ollama.com"
             exit 1
         fi
-    else
-        echo -e "  ${RED}✗${NC} Ollama API not reachable at ${OLLAMA_URL}"
-        echo -e "      Set OLLAMA_HOST to point to your Ollama instance."
-        exit 1
+    elif [ "$OLLAMA_HAS_CLI" = false ] && [ "$OLLAMA_API_REACHABLE" = true ]; then
+        # API reachable but no CLI (e.g. WSL with Ollama on Windows host)
+        echo -e "  ${GREEN}✓${NC} Using remote Ollama API (no local CLI needed)"
     fi
+
+    # If API is not reachable yet, try to start it
+    if [ "$OLLAMA_API_REACHABLE" = false ]; then
+        if [ "$OLLAMA_HAS_CLI" = true ]; then
+            echo -e "  ${YELLOW}⚠${NC} Ollama API not responding. Starting..."
+            nohup ollama serve > /dev/null 2>&1 &
+            sleep 2
+
+            if massa_ai_probe_provider "$OLLAMA_URL"; then
+                OLLAMA_API_REACHABLE=true
+                echo -e "  ${GREEN}✓${NC} Ollama started successfully"
+            else
+                echo -e "  ${RED}✗${NC} Failed to start Ollama. Please start it manually: ollama serve"
+                exit 1
+            fi
+        else
+            echo -e "  ${RED}✗${NC} Ollama API not reachable at ${OLLAMA_URL}"
+            echo -e "      Set OLLAMA_HOST to point to your Ollama instance."
+            exit 1
+        fi
+    fi
+}
+
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    setup_lmstudio
+else
+    setup_ollama
 fi
 
 # Detect whether a named Ollama model is already pulled, without silently
@@ -243,24 +294,28 @@ inference_model_exists() {
     esac
 }
 
-# ---- Step 2: Pull embedding models ----
+# ---- Step 2: Pull models ----
 echo ""
-echo -e "${BOLD}[2/6] Pulling embedding models...${NC}"
+echo -e "${BOLD}[2/6] Pulling models...${NC}"
 
-EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:4b}"
-
-# Check if model is already available
-MODEL_EXISTS="$(inference_model_exists "$EMBEDDING_MODEL")"
-
-if [ "$MODEL_EXISTS" = "yes" ]; then
-    echo -e "  ${GREEN}✓${NC} Model ${EMBEDDING_MODEL} already available"
-else
-    echo -e "  Pulling ${EMBEDDING_MODEL}..."
-    if [ "$OLLAMA_HAS_CLI" = true ]; then
-        ollama pull "$EMBEDDING_MODEL"
+# One pull path, provider-dispatched. The three blocks this replaces were the
+# same twelve lines with the model variable and a parenthetical swapped, which
+# is how the Ollama-only `ollama pull` survived into a provider-neutral wizard.
+ensure_inference_model() {
+    local model="$1" note="$2"
+    if [ "$(inference_model_exists "$model")" = "yes" ]; then
+        echo -e "  ${GREEN}✓${NC} Model ${model} already available"
+        return 0
+    fi
+    echo -e "  Pulling ${model}${note}..."
+    if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+        "$LMSTUDIO_CLI" get -y "$model" \
+            || die "LM Studio could not fetch ${model}. Pull it from the app, then re-run this script."
+    elif [ "$OLLAMA_HAS_CLI" = true ]; then
+        ollama pull "$model"
     else
         # Pull via API (works for remote/WSL scenarios)
-        curl -s "${OLLAMA_URL}/api/pull" -d "{\"name\": \"${EMBEDDING_MODEL}\"}" | while IFS= read -r line; do
+        curl -s "${OLLAMA_URL}/api/pull" -d "{\"name\": \"${model}\"}" | while IFS= read -r line; do
             STATUS=$(echo "$line" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
             if [ -n "$STATUS" ]; then
                 printf "\r  %s" "$STATUS"
@@ -268,54 +323,28 @@ else
         done
         echo ""
     fi
-    echo -e "  ${GREEN}✓${NC} Model ${EMBEDDING_MODEL} pulled"
-fi
+    echo -e "  ${GREEN}✓${NC} Model ${model} pulled"
+}
 
-# Pull the local-first LLM model (consolidation, salience, query rewrite, HyDE).
-LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen2.5:7b-instruct}"
-LLM_EXISTS="$(inference_model_exists "$LLM_MODEL")"
-
-if [ "$LLM_EXISTS" = "yes" ]; then
-    echo -e "  ${GREEN}✓${NC} Model ${LLM_MODEL} already available"
+# Model ids are provider-specific — an Ollama tag is not an LM Studio id — so
+# the defaults are too. The LM Studio values are the ones measured for this
+# feature; the env overrides keep their existing names.
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
+    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen/qwen3-4b-2507}"
+    CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen/qwen3-4b-2507}"
 else
-    echo -e "  Pulling ${LLM_MODEL} (instruct model, ~4.7GB)..."
-    if [ "$OLLAMA_HAS_CLI" = true ]; then
-        ollama pull "$LLM_MODEL"
-    else
-        # Pull via API (works for remote/WSL scenarios)
-        curl -s "${OLLAMA_URL}/api/pull" -d "{\"name\": \"${LLM_MODEL}\"}" | while IFS= read -r line; do
-            STATUS=$(echo "$line" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
-            if [ -n "$STATUS" ]; then
-                printf "\r  %s" "$STATUS"
-            fi
-        done
-        echo ""
-    fi
-    echo -e "  ${GREEN}✓${NC} Model ${LLM_MODEL} pulled"
+    EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:4b}"
+    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen2.5:7b-instruct}"
+    CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
 fi
 
-# Pull the code-oriented LLM model (bootstrap seed, reranker, code compression).
-CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
-CODE_EXISTS="$(inference_model_exists "$CODE_MODEL")"
-
-if [ "$CODE_EXISTS" = "yes" ]; then
-    echo -e "  ${GREEN}✓${NC} Model ${CODE_MODEL} already available"
-else
-    echo -e "  Pulling ${CODE_MODEL} (code-oriented LLM, ~4.7GB)..."
-    if [ "$OLLAMA_HAS_CLI" = true ]; then
-        ollama pull "$CODE_MODEL"
-    else
-        # Pull via API (works for remote/WSL scenarios)
-        curl -s "${OLLAMA_URL}/api/pull" -d "{\"name\": \"${CODE_MODEL}\"}" | while IFS= read -r line; do
-            STATUS=$(echo "$line" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
-            if [ -n "$STATUS" ]; then
-                printf "\r  %s" "$STATUS"
-            fi
-        done
-        echo ""
-    fi
-    echo -e "  ${GREEN}✓${NC} Model ${CODE_MODEL} pulled"
+ensure_inference_model "$EMBEDDING_MODEL" ""
+ensure_inference_model "$LLM_MODEL" " (instruct model)"
+if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
+    ensure_inference_model "$CODE_MODEL" " (code-oriented LLM)"
 fi
+
 
 # ---- Step 3: Database selection ----
 echo ""
@@ -536,8 +565,14 @@ bunx prisma migrate deploy \
 echo ""
 echo -e "${BOLD}[5/6] Verifying setup...${NC}"
 
-# Check Ollama health
-if massa_ai_probe_provider "$OLLAMA_URL"; then
+# Check the selected provider's health
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    if massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio; then
+        echo -e "  ${GREEN}✓${NC} LM Studio: healthy at ${LMSTUDIO_URL}"
+    else
+        echo -e "  ${RED}✗${NC} LM Studio: not responding"
+    fi
+elif massa_ai_probe_provider "$OLLAMA_URL"; then
     MODELS=$(curl -s "${OLLAMA_URL}/api/tags" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data.get('models',[])))" 2>/dev/null || echo "?")
     echo -e "  ${GREEN}✓${NC} Ollama: healthy at ${OLLAMA_URL} (${MODELS} models)"
 else

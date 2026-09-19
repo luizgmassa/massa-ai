@@ -459,6 +459,103 @@ set and left alone.
 **Gate:** `bash scripts/tests/test-setup-local-first-api-key.sh` (existing
 contract must round-trip) · new case asserting an LM Studio write
 
+**Status: complete.** `installer_write_config` emits `embedding.provider`,
+`embedding.baseURL`, `llm.baseUrl`, `llm.apiKey` and `llm.disableThink` from
+globals seeded by a new `installer_provider_defaults`; the wizard gained
+`lms_cli_path`, `setup_lmstudio`, a `setup_ollama`/`setup_lmstudio` dispatch at
+Step 1, one provider-dispatched `ensure_inference_model`, and a
+provider-dispatched Step 5 health check. The LM Studio installer was **not**
+executed — only the code path was written and tested.
+
+**Amendment — three tests had to be edited, and none of them is in this task's
+write set.** T12 was scoped to two implementation files, but its own gate says
+"new case asserting an LM Studio write", and a task cannot ship a sensor with
+nowhere to put it. Edited: `scripts/tests/test-setup-local-first-api-key.sh`
+(LIP-06's own AC names this file), `scripts/tests/test-lms-model-exists.sh`
+(`lms_cli_path` cases — LIP-14's AC), and
+`scripts/__tests__/installer-config-template.test.ts` (below). All three gained
+cases; none lost one.
+
+**`installer_embedding_dimensions` keeps its `case` table; only the `*)` arm
+delegates.** The task says the function "delegates to T07's resolver", and a
+wholesale replacement would have been the literal reading — but
+`embedding-defaults-parity.test.ts:302-330` parses that table by
+`^\s*(model)\)\s*echo\s+(\d+)\s*;;` and asserts exact set equality against the
+TypeScript table plus `length > 2`. Replacing it would redden a gate **T15
+owns**, three tasks away, for no requirement: LIP-04's subject is the `*) →
+2560` catch-all, and that is what died. Same trap T07 recorded for
+`embedding-dimensions.ts`'s own regex, on the other side of the same gate.
+
+**One literal width survives in `installer-api-key.sh`, deliberately.** The
+degraded paths (no bun, no checkout, explicit override) collapse into a single
+`echo "${OLLAMA_EMBEDDING_DIMENSIONS:-2560}"`, because
+`embedding-defaults-parity.test.ts:167` extracts exactly that `${VAR:-N}` shape
+and requires **exactly one** match. The first draft removed it and the gate
+failed with `expected exactly 1 match … got 0 — extractor rotted or surface
+removed`, which is the extractor working as designed.
+
+**`installer-config-template.test.ts:116` asserted the behaviour LIP-04
+retires, and was repointed rather than deleted.** It read "an unrecognized
+model falls back to the reference default, never 4096" — the silent 2560
+catch-all. It now asserts the loud failure (`toThrow(/some-future-model/)`),
+plus a second case that an explicit `OLLAMA_EMBEDDING_DIMENSIONS` still wins.
+It also pointed at `http://localhost:11434`, so on a developer machine with a
+live Ollama it reached that server: the first red was
+`embedding dimensions unknown for model "some-future-model":
+http://localhost:11434/api/embed returned an unrecognized embedding response
+shape`. Both cases now point at a closed port.
+
+**A second sticky-global bug, caught by the new case.**
+`installer_provider_defaults` first derived its outputs with `${VAR:-…}`, so a
+value left from an earlier `installer_write_config` in the same shell won: the
+LM Studio case, which runs after an Ollama write, produced
+`provider: "ollama"` / `baseURL: "http://localhost:11434"`. Every assignment is
+unconditional now. The same fix corrected `llm.baseUrl`, which was the literal
+`http://localhost:11434/v1` regardless of `OLLAMA_URL` — a remote or WSL Ollama
+got a config pointing the LLM client at the local machine.
+
+**The three pull blocks became one `ensure_inference_model`.** They were the
+same twelve lines with the model variable and a parenthetical swapped, which is
+how `ollama pull` survived into a provider-neutral wizard. Model **defaults**
+are provider-specific too (an Ollama tag is not an LM Studio id), so they
+branch; the env override names are unchanged.
+
+---
+
+## Phase 5 landed (`73e3dac7`, `2cfa426d`, this commit) — what it cost
+
+**Gates, measured in this worktree.** `bun run test:scripts`: TypeScript half
+**2019 pass / 0 fail across 89 files**, exit 0; shell half green for every
+suite except three that are red at `HEAD` too, baselined by stashing:
+`test-install-skills-cli.sh` (`no tools exits 2`, `reason is reported`),
+`test-plugin-auto-install.sh` and `test-plugin-registry-registration.sh` (all
+`got='claude …' want='…'` — they detect the real `claude` CLI on this machine).
+`bun run lint` exit 0. `bash -n` exit 0 on all five edited shell files.
+`test-setup-ollama-model-exists.sh` **16/0 unmodified**,
+`test-setup-local-first-api-key.sh` **40/0**, `test-lms-model-exists.sh`
+**57/0**, `probe-dialect-parity.test.ts` **14/0**.
+
+### Bounded residuals, recorded not fixed
+
+1. **`lms daemon up`, `lms get -y` and `curl … lmstudio.ai/install.sh | bash`
+   were never executed.** The task forbids running the LM Studio installer, so
+   those three lines are written and syntax-checked but unmeasured. Only
+   `lms_cli_path` is behaviourally tested.
+2. **`scripts/tests/test-installer-feature-prompts.sh:129` carries the same
+   one-shot `script(1)` probe** that silently skipped 13 assertions here. It is
+   outside every Phase 5 write set and was left alone; it will under-report the
+   same way on a host where that probe returns 1.
+3. **The unknown-model path now makes a network call during `installer_write_config`.**
+   A known model never does (every provider's `knownDimensions` is consulted
+   first), so the default install is unaffected — but an install with a custom
+   embedding model now depends on the endpoint being up, and fails the install
+   when it is not. That is LIP-04's stated intent, not a side effect.
+4. **`install.sh` was not given the provider menu.** T11 put the three
+   selection functions in the shared library so it can, but `install.sh` still
+   installs Ollama unconditionally; only `setup-local-first.sh` dispatches.
+   LIP-12/13 name no installer, and the wizard is the documented local-first
+   path — recorded because a reader will expect both.
+
 ---
 
 ## Phase 6 — Surfaces and gates (3 Tasks)

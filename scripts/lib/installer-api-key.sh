@@ -106,14 +106,110 @@ installer_report_api_key() {
 # literal `OLLAMA_EMBEDDING_` and this file has never contained it.
 #
 # The pairs mirror .env.example's documented alternatives. An unrecognized
-# model falls back to the reference default rather than guessing.
+# model no longer guesses: it delegates to the shared resolver below.
 installer_embedding_dimensions() {
   case "$1" in
     qwen3-embedding:8b) echo 4096 ;;
     qwen3-embedding:4b) echo 2560 ;;
     qwen3-embedding:0.6b) echo 1024 ;;
     bge-m3) echo 1024 ;;
-    *) echo "${OLLAMA_EMBEDDING_DIMENSIONS:-2560}" ;;
+    *) installer_resolve_embedding_dimensions "$1" ;;
+  esac
+}
+
+# installer_resolve_embedding_dimensions <model>
+#
+# The unknown-model arm of the table above, which used to answer a literal
+# 2560 for every model outside those four. That is wrong for LM Studio's
+# measured default (768), and a wrong width is not cosmetic:
+# `createEmbeddingProvider` refuses to fall through on a dimension mismatch, so
+# every embedding path throws until someone hand-edits config.json.
+#
+# Delegates to `resolveModelDimensions`
+# (packages/shared/src/config/embedding-dimensions.ts): every local provider's
+# knownDimensions table first, then ONE real embed call against the configured
+# endpoint, reading the returned vector's own length. Importing the module is
+# possible here because the wizard runs from a checkout — install.sh's
+# pre-clone probes are not, which is why `massa_ai_probe_provider` exists as
+# bash instead.
+#
+# Degrades in two places rather than failing an install on a toolchain gap: an
+# explicit OLLAMA_EMBEDDING_DIMENSIONS still wins, and a machine with no bun or
+# no checkout keeps the old literal. A model the resolver cannot resolve at all
+# is fatal, by design — the resolver's own message names the model and the
+# endpoint it could not reach.
+installer_resolve_embedding_dimensions() {
+  local model="$1" repo_root
+  repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)" || repo_root=""
+
+  # One expression for both degradations, and the only literal width left in
+  # this file: an explicit operator override wins, and is also the answer when
+  # there is no bun or no checkout to run the resolver with.
+  # embedding-defaults-parity.test.ts extracts this exact `${VAR:-N}` shape.
+  if [ -n "${OLLAMA_EMBEDDING_DIMENSIONS:-}" ] \
+     || [ -z "$repo_root" ] \
+     || ! command -v bun >/dev/null 2>&1 \
+     || [ ! -f "${repo_root}/packages/shared/src/config/embedding-dimensions.ts" ]; then
+    echo "${OLLAMA_EMBEDDING_DIMENSIONS:-2560}"
+    return 0
+  fi
+
+  bun -e '
+    const [, root, model, providerId, baseUrlOverride] = process.argv;
+    const { resolveModelDimensions } = await import(root + "/packages/shared/src/config/embedding-dimensions.ts");
+    const { INFERENCE_PROVIDERS } = await import(root + "/packages/shared/src/config/inference-providers.ts");
+    const spec = INFERENCE_PROVIDERS[providerId] || INFERENCE_PROVIDERS.ollama;
+    // Merge every provider table: the installer may be resolving a width for a
+    // provider other than the one it is about to write, and a known width must
+    // never cost a live probe.
+    const knownDimensions = {};
+    for (const p of Object.values(INFERENCE_PROVIDERS)) Object.assign(knownDimensions, p.knownDimensions);
+    process.stdout.write(String(await resolveModelDimensions(model, {
+      knownDimensions,
+      baseUrl: baseUrlOverride || spec.defaultEmbeddingBaseUrl,
+      // Ollama embeds at /api/embed; an OpenAI-compatible endpoint already
+      // carries its own /v1 prefix on the base URL, so the path is relative
+      // to that.
+      embedPath: spec.id === "ollama" ? "/api/embed" : "/embeddings",
+    })));
+  ' "$repo_root" "$model" "${INFERENCE_PROVIDER:-ollama}" "${EMBEDDING_BASE_URL:-}"
+}
+
+# installer_provider_defaults
+#
+# Derives the provider-shaped globals `installer_write_config` emits from
+# whichever local inference provider was selected, so the caller keeps
+# supplying only INFERENCE_PROVIDER plus that provider's endpoint variable —
+# which is what lets the existing contract test drive the write with OLLAMA_URL
+# alone.
+#
+# Every assignment is unconditional. An earlier `${VAR:-...}` form let a value
+# left over from a previous call win, so a second write in the same shell
+# emitted the first write's provider — caught by the LM Studio case in
+# test-setup-local-first-api-key.sh, which ran after an Ollama write.
+#
+# `llm.baseUrl` used to be the literal http://localhost:11434/v1 regardless of
+# OLLAMA_URL, so a remote or WSL Ollama got a config pointing the LLM client at
+# the local machine. It is derived here instead.
+installer_provider_defaults() {
+  case "${INFERENCE_PROVIDER:-ollama}" in
+    lmstudio)
+      EMBEDDING_PROVIDER="lmstudio"
+      EMBEDDING_BASE_URL="${LMSTUDIO_URL:-http://localhost:1234/v1}"
+      LLM_BASE_URL="${LMSTUDIO_URL:-http://localhost:1234/v1}"
+      # Measured: LM Studio does not enforce auth, but the OpenAI client still
+      # requires the header to exist.
+      LLM_API_KEY="lmstudio"
+      # think:false is an Ollama-only request-body key (LIP-07).
+      LLM_DISABLE_THINK="false"
+      ;;
+    *)
+      EMBEDDING_PROVIDER="ollama"
+      EMBEDDING_BASE_URL="${OLLAMA_URL:-http://localhost:11434}"
+      LLM_BASE_URL="${OLLAMA_URL:-http://localhost:11434}/v1"
+      LLM_API_KEY="ollama"
+      LLM_DISABLE_THINK="true"
+      ;;
   esac
 }
 
@@ -205,7 +301,11 @@ installer_write_config() {
   local config_file="$1"
   local api_key="$2"
   local dimensions
-  dimensions="$(installer_embedding_dimensions "${EMBEDDING_MODEL}")"
+  installer_provider_defaults
+  if ! dimensions="$(installer_embedding_dimensions "${EMBEDDING_MODEL}")" || [ -z "$dimensions" ]; then
+    echo "Error: could not resolve the embedding width for '${EMBEDDING_MODEL}' at ${EMBEDDING_BASE_URL}." >&2
+    exit 4
+  fi
 
   mkdir -p "$(dirname "$config_file")"
 
@@ -218,21 +318,21 @@ installer_write_config() {
     "apiKey": "${api_key}"
   },
   "embedding": {
-    "provider": "ollama",
+    "provider": "${EMBEDDING_PROVIDER}",
     "model": "${EMBEDDING_MODEL}",
-    "baseURL": "${OLLAMA_URL}",
+    "baseURL": "${EMBEDDING_BASE_URL}",
     "dimensions": ${dimensions}
   },
   "llm": {
     "enabled": ${LLM_ENABLED:-true},
-    "baseUrl": "http://localhost:11434/v1",
-    "apiKey": "ollama",
+    "baseUrl": "${LLM_BASE_URL}",
+    "apiKey": "${LLM_API_KEY}",
     "model": "${LLM_MODEL}",
     "codeModel": "${CODE_MODEL}",
     "temperature": 0.2,
     "maxOutputTokens": 8000,
     "timeoutMs": 90000,
-    "disableThink": true
+    "disableThink": ${LLM_DISABLE_THINK}
   },
   "compression": {
     "defaultStrategy": "code_structure",
