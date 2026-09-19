@@ -133,6 +133,9 @@ model Workspace {
   filesCount     Int       @default(0) @map("files_count")
   chunksCount    Int       @default(0) @map("chunks_count")
   symbolsCount   Int       @default(0) @map("symbols_count")
+  // LIP-15: "${provider}:${model}:${dimensions}", stamped only by a completed
+  // full reindex. NULL = legacy/never-stamped (warn, never block).
+  embeddingFingerprint String? @map("embedding_fingerprint")
   activeGraphGenerationId  String?   @map("active_graph_generation_id")
   pendingGraphGenerationId String?   @map("pending_graph_generation_id")
   graphLeaseToken     String?   @map("graph_lease_token")
