@@ -18,6 +18,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-env-transaction.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-shared.sh"
 # shellcheck source=scripts/lib/installer-api-key.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-api-key.sh"
+# Sourced here rather than beside installer_feature_flow below: Step 0 needs
+# installer_detect_provider before anything else runs, and this file is
+# function-only with no side effects at source time.
+# shellcheck source=scripts/lib/installer-feature-prompts.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-feature-prompts.sh"
 massa_ai_banner
 
 # Back up an existing config file to <file>.bak before it gets regenerated.
@@ -73,6 +78,18 @@ massa_ai_probe_provider() {
   body="$(curl -s --max-time 3 "${origin}${path}" 2>/dev/null)" || return 1
   printf '%s' "$body" | grep -Eq "\"${key}\"[[:space:]]*:[[:space:]]*\["
 }
+
+# ---- Step 0: Local inference provider ----
+# Runs before the Ollama step because it decides whether that step applies.
+# installer_detect_provider / installer_select_provider / migrate_provider live
+# in scripts/lib/installer-feature-prompts.sh so install.sh can reuse them and
+# so scripts/tests/test-lms-model-exists.sh can execute them.
+LMSTUDIO_URL="${LMSTUDIO_BASE_URL:-http://localhost:1234/v1}"
+DETECTED_PROVIDER="$(installer_detect_provider "${HOME}/.config/massa-ai/config.json")"
+installer_select_provider "$DETECTED_PROVIDER"
+if [ -n "$INFERENCE_PROVIDER_FROM" ]; then
+    migrate_provider "$INFERENCE_PROVIDER_FROM" "$INFERENCE_PROVIDER"
+fi
 
 # ---- Step 1: Check Ollama ----
 echo -e "${BOLD}[1/6] Checking Ollama...${NC}"
@@ -180,6 +197,52 @@ print("yes" if sys.argv[1] in models else "no")
     fi
 }
 
+# Sibling of ollama_model_exists for LM Studio, same "yes"/"no" contract and
+# the same two fallbacks — a separate function, not a branch inside the one
+# above, because scripts/tests/test-setup-ollama-model-exists.sh extracts that
+# one by literal `sed -n '/^ollama_model_exists()/,/^}/p'` and must keep
+# finding it byte for byte.
+#
+# No CLI branch, deliberately: `lms` is not on PATH until bootstrapped and its
+# listing output format was never measured for this feature, while /v1/models
+# was (it is the shape probeProvider's lmstudio parser reads). LM Studio model
+# ids are exact — there is no :latest normalization to mirror.
+lms_model_exists() {
+    local model="$1" body
+    body="$(curl -s "${LMSTUDIO_URL}/models" 2>/dev/null || true)"
+    if [ -z "$body" ]; then echo "no"; return 0; fi
+    # 1. python3 JSON parse (model passed via argv — never interpolated into code)
+    if command -v python3 >/dev/null 2>&1; then
+        printf '%s' "$body" | python3 -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print("no"); sys.exit(0)
+ids = [m.get("id","") for m in data.get("data", [])]
+print("yes" if sys.argv[1] in ids else "no")
+' "$model" 2>/dev/null && return 0
+    fi
+    # 2. grep fallback: match \"id\":\"<model>\" exactly, closing quote included.
+    local model_re
+    model_re="$(printf '%s' "$model" | sed 's/[][\.*^$+?(){}|/]/\\&/g')"
+    if printf '%s' "$body" | grep -Eq "\"id\"[[:space:]]*:[[:space:]]*\"${model_re}\""; then
+        echo "yes"
+    else
+        echo "no"
+    fi
+}
+
+# The provider dispatch, a third function so neither sibling above has to grow
+# a provider branch. Defaults to Ollama: INFERENCE_PROVIDER is empty when the
+# install is on an API embedding provider, which LIP-13 leaves untouched.
+inference_model_exists() {
+    case "${INFERENCE_PROVIDER:-ollama}" in
+        lmstudio) lms_model_exists "$1" ;;
+        *) ollama_model_exists "$1" ;;
+    esac
+}
+
 # ---- Step 2: Pull embedding models ----
 echo ""
 echo -e "${BOLD}[2/6] Pulling embedding models...${NC}"
@@ -187,7 +250,7 @@ echo -e "${BOLD}[2/6] Pulling embedding models...${NC}"
 EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:4b}"
 
 # Check if model is already available
-MODEL_EXISTS="$(ollama_model_exists "$EMBEDDING_MODEL")"
+MODEL_EXISTS="$(inference_model_exists "$EMBEDDING_MODEL")"
 
 if [ "$MODEL_EXISTS" = "yes" ]; then
     echo -e "  ${GREEN}✓${NC} Model ${EMBEDDING_MODEL} already available"
@@ -210,7 +273,7 @@ fi
 
 # Pull the local-first LLM model (consolidation, salience, query rewrite, HyDE).
 LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen2.5:7b-instruct}"
-LLM_EXISTS="$(ollama_model_exists "$LLM_MODEL")"
+LLM_EXISTS="$(inference_model_exists "$LLM_MODEL")"
 
 if [ "$LLM_EXISTS" = "yes" ]; then
     echo -e "  ${GREEN}✓${NC} Model ${LLM_MODEL} already available"
@@ -233,7 +296,7 @@ fi
 
 # Pull the code-oriented LLM model (bootstrap seed, reranker, code compression).
 CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
-CODE_EXISTS="$(ollama_model_exists "$CODE_MODEL")"
+CODE_EXISTS="$(inference_model_exists "$CODE_MODEL")"
 
 if [ "$CODE_EXISTS" = "yes" ]; then
     echo -e "  ${GREEN}✓${NC} Model ${CODE_MODEL} already available"
@@ -399,13 +462,13 @@ ENV_FILE="${PROJECT_ROOT}/.env"
 # was never asking again on any machine that had ever run setup. That guard now
 # lives in `installer_feature_flow` as a once-per-install marker, so install.sh
 # asking first suppresses this call rather than the presence of a file.
-# shellcheck source=lib/installer-feature-prompts.sh
-. "${SCRIPT_DIR}/lib/installer-feature-prompts.sh"
+# (installer-feature-prompts.sh is sourced at the top of this file — Step 0
+# needs installer_detect_provider before the Ollama step runs.)
 
-# `ollama_model_exists` echoes yes/no; the prompt only offers the LLM-gated
+# `inference_model_exists` echoes yes/no; the prompt only offers the LLM-gated
 # toggles when the model is genuinely pulled.
 LLM_MODEL_PRESENT=false
-if [ "$(ollama_model_exists "${LLM_MODEL:-qwen2.5:7b-instruct}")" = "yes" ]; then
+if [ "$(inference_model_exists "${LLM_MODEL:-qwen2.5:7b-instruct}")" = "yes" ]; then
     LLM_MODEL_PRESENT=true
 fi
 

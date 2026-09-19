@@ -401,6 +401,50 @@ second copy of the (unexported) `LIST_MODELS_PATH` map.
 **Gate:** `bash scripts/tests/test-setup-ollama-model-exists.sh` (**unmodified,
 must stay green**) · `bash scripts/tests/test-lms-model-exists.sh`
 
+**Status: complete.** `installer_detect_provider`, `installer_select_provider`
+and `migrate_provider` live in `installer-feature-prompts.sh` (so `install.sh`
+can reuse them and the suite can execute them rather than grep them);
+`lms_model_exists` and the third dispatch function `inference_model_exists`
+live beside `ollama_model_exists` in the wizard. `ollama_model_exists` is
+untouched and `test-setup-ollama-model-exists.sh` is unmodified and green at
+**16 passed / 0 failed**. `OLLAMA_URL` / `OLLAMA_HAS_CLI` keep their names, and
+the new suite adds the caller-contract assertion LIP-05's second AC asks for —
+it reads the wizard, not the extracted function, so a rename that the
+byte-identity check cannot see still fails.
+
+**`installer_select_provider` sets globals instead of echoing.** A `die` inside
+a `$(...)` capture kills only the subshell, which would turn LIP-16's fatal
+unknown value into a silent empty string — the exact failure mode the
+requirement exists to prevent.
+
+**Amendment — `setup-local-first.sh:2` is `set -e`, not `set -euo pipefail`.**
+LIP-05's caller-contract paragraph cites the stronger form. The conclusion
+still holds (an unset `OLLAMA_URL` yields a `curl` to a bare `/api/tags` and a
+silent "no", not a loud failure), but the mechanism named is not the one in the
+file.
+
+**`lms_model_exists` has no CLI branch, deliberately.** `ollama_model_exists`
+prefers `ollama list`; the LM Studio equivalent would be `lms ls`, whose output
+format was never measured for this feature, while `/v1/models` was. An
+unverified parser in the branch that runs first is worse than one fallback
+fewer.
+
+**Residual, recorded not fixed.** `inference_model_exists` now fronts the three
+model checks in Step 2, but Step 1 still checks and installs Ollama and Step 2
+still pulls with `ollama pull` — T12 owns the LM Studio install and pull path
+(LIP-14). Between these two commits an `lmstudio` selection resolves model
+existence against LM Studio while the pull path is still Ollama's.
+
+**The pty block nearly shipped as a silent skip.** Measured: with the harness's
+own stdin inherited, `script -q /dev/null true` returns 1 on macOS, and the
+first version of the suite reported **40 passed / 0 failed** — 13 interactive
+menu assertions quietly not running and reading exactly like a green suite.
+The probe now redirects `</dev/null` (deterministic 0), empty pty reads are
+retried and then **fail**, and the skip branch is reserved for a box with no
+`script(1)` at all. `scripts/tests/test-installer-feature-prompts.sh:129` has
+the same one-shot probe and the same exposure; it is outside this task's write
+set and left alone.
+
 ### T12 — parameterised config write + LM Studio install
 **Requirements:** LIP-06, LIP-14
 **Writes:** `scripts/lib/installer-api-key.sh`, `scripts/setup-local-first.sh`
