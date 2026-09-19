@@ -25,6 +25,11 @@ let lastModel: string | null = null;
 // The options object createOpenAI was constructed with — lets a test assert
 // whether buildProvider injected a wrapped `fetch` (LIP-07 gating).
 let lastProviderOpts: any = null;
+// Which entrypoint of the constructed provider buildProvider actually invoked:
+// "responses" is `@ai-sdk/openai@3`'s default callable, "chat" is the explicit
+// `/v1/chat/completions` one. A boolean on the spec is not evidence of the
+// call position, so the stub records the member rather than the flag.
+let lastProviderEntrypoint: "responses" | "chat" | null = null;
 // Overrides let a test customize the SDK return shape (e.g. empty content +
 // reasoning) without throwing.
 let generateReturn: any = null;
@@ -48,10 +53,18 @@ mock.module("@ai-sdk/openai", () => ({
   // assert per-call role routing (instruct → model, code → codeModel), and
   // the options object itself so tests can assert whether a wrapped `fetch`
   // (think:false injection) was attached (LIP-07).
-  createOpenAI: (opts: any) => (model: string) => {
-    lastModel = model;
-    lastProviderOpts = opts;
-    return { model, __mock: true };
+  createOpenAI: (opts: any) => {
+    const build = (entrypoint: "responses" | "chat") => (model: string) => {
+      lastModel = model;
+      lastProviderOpts = opts;
+      lastProviderEntrypoint = entrypoint;
+      return { model, __mock: true };
+    };
+    const provider = build("responses") as ((model: string) => unknown) & {
+      chat: (model: string) => unknown;
+    };
+    provider.chat = build("chat");
+    return provider;
   },
 }));
 
@@ -805,5 +818,27 @@ describe("llm-client — provider-aware gating (LIP-07)", () => {
     await llmObject("hello", sampleSchema);
     expect(lastCall.schemaName).toBe("response");
     expect(lastCall.output).toBeUndefined();
+  });
+
+  // Enabling json_schema is not the same as delivering it. Measured against a
+  // live LM Studio 0.3.x serving qwen/qwen3-4b-2507: POST /v1/responses with
+  // `text.format` = json_schema came back `"text":{"format":{"type":"text"}}`
+  // and the prose "The capital of France is Paris.", while the identical
+  // schema on POST /v1/chat/completions returned `{ "capital": "Paris" }`.
+  // `@ai-sdk/openai@3`'s default callable resolves to Responses, so gating the
+  // version probe correctly still yielded unparseable prose until buildProvider
+  // switched entrypoints. Ollama is unaffected — its /v1/responses answered 400
+  // for a model reason, so it implements the endpoint.
+  test("lmstudio: buildProvider uses the chat-completions entrypoint, not Responses", async () => {
+    _setJsonSchemaSupportedForTesting(false);
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    await llmComplete("hello");
+    expect(lastProviderEntrypoint).toBe("chat");
+  });
+
+  test("ollama (default baseUrl): buildProvider keeps the default Responses entrypoint", async () => {
+    _setJsonSchemaSupportedForTesting(false);
+    await llmComplete("hello");
+    expect(lastProviderEntrypoint).toBe("responses");
   });
 });

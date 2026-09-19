@@ -286,7 +286,11 @@ function buildProvider(llm: ReturnType<typeof getLlmConfig>) {
       ? { fetch: _wrapFetchDisableThink(globalThis.fetch) }
       : {}),
   });
-  return openai(llm.model);
+  // The default callable resolves to the Responses API, which LM Studio serves
+  // while dropping `text.format` — gating json_schema on correctly still yields
+  // prose there. `.chat()` is the endpoint that honours it. See
+  // `requiresChatCompletionsApi`.
+  return spec.requiresChatCompletionsApi ? openai.chat(llm.model) : openai(llm.model);
 }
 
 /**

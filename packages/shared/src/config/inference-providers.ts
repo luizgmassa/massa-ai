@@ -33,6 +33,18 @@ export interface InferenceProviderSpec {
   readonly knownDimensions: Readonly<Record<string, number>>;
   readonly supportsOllamaVersionProbe: boolean;
   readonly injectsDisableThink: boolean;
+  /**
+   * Route structured output through `/v1/chat/completions` instead of the
+   * Responses API. `@ai-sdk/openai@3` resolves the default callable
+   * `openai(model)` to `/v1/responses`, and LM Studio serves that endpoint but
+   * **silently drops** `text.format`: measured against `qwen/qwen3-4b-2507`, a
+   * `json_schema` request came back as `"text":{"format":{"type":"text"}}` with
+   * the prose "The capital of France is Paris.", while the identical schema on
+   * `/v1/chat/completions` returned `{ "capital": "Paris" }`. Ollama is not
+   * affected — its `/v1/responses` answered 400 for a model reason, so the
+   * endpoint is implemented there.
+   */
+  readonly requiresChatCompletionsApi: boolean;
   readonly parseModelList: ParseModelList;
 }
 
@@ -69,6 +81,7 @@ export const INFERENCE_PROVIDERS: Readonly<
     knownDimensions: KNOWN_EMBEDDING_DIMENSIONS,
     supportsOllamaVersionProbe: true,
     injectsDisableThink: true,
+    requiresChatCompletionsApi: false,
     parseModelList: parseOllamaModelList,
   },
   lmstudio: {
@@ -85,6 +98,7 @@ export const INFERENCE_PROVIDERS: Readonly<
     },
     supportsOllamaVersionProbe: false,
     injectsDisableThink: false,
+    requiresChatCompletionsApi: true,
     parseModelList: parseLmStudioModelList,
   },
 };
