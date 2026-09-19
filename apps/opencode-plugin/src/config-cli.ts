@@ -28,12 +28,19 @@ import {
   type SwitchReport,
   type VariantSyncHostResult,
 } from "@massa-ai/shared";
+import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// The writable embedding.provider set (design.md §6, LIP-01's derived union
+// LOCAL_INFERENCE_IDS ∪ API_PROVIDER_IDS). This CLI is a copy-fork, not a
+// delegating consumer, so the list stays a literal here — same as its
+// sibling in apps/mcp-client.
+const WRITABLE_PROVIDERS = ["ollama", "lmstudio", "mistral", "openai", "google", "cohere"] as const;
 
 // This CLI is a PUBLISHED app (npm) and, unlike apps/tools-api's routes,
 // cannot depend on scripts/lib/model-profiles.ts at all — that tree ships
@@ -67,16 +74,18 @@ Usage:
 Commands:
   init              Initialize massa-ai configuration
     --ollama          Use Ollama (local, default)
+    --lmstudio        Use LM Studio (local)
     --mistral <key>   Use Mistral with API key
     --openai <key>    Use OpenAI with API key
 
   path              Show config file path
   show              Show current configuration
   set <key> <val>   Set a configuration value
-  use <provider>    Switch embedding provider
-    --api-key <key>   API key (required for mistral/openai)
+  use <provider>    Switch embedding provider (ollama, lmstudio, mistral,
+                    openai, google, cohere)
+    --api-key <key>   API key (required for mistral/openai/google/cohere)
     --model <name>    Model name
-    --base-url <url>  Base URL (for ollama)
+    --base-url <url>  Base URL (for ollama/lmstudio)
 
   agents            Manage the 18 subagent specialist definitions
     agents install [--user|--project]   Write 18 agent .md files
@@ -96,8 +105,10 @@ Commands:
 
 Examples:
   massa-ai-config init
+  massa-ai-config init --lmstudio
   massa-ai-config init --mistral your-api-key
   massa-ai-config use ollama --model qwen3-embedding:4b
+  massa-ai-config use lmstudio
   massa-ai-config use mistral --api-key your-key
   massa-ai-config set embedding.dimensions 1024
   massa-ai-config agents install --user
@@ -190,6 +201,17 @@ export async function runCli(argv: string[]): Promise<number> {
       };
       saveConfig(config);
       console.log("✓ Configured for OpenAI embeddings");
+    } else if (options.lmstudio) {
+      const config = loadConfig();
+      const model = "text-embedding-nomic-embed-text-v1.5";
+      config.embedding = {
+        provider: "lmstudio",
+        model,
+        baseURL: INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+        dimensions: INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ?? 768,
+      };
+      saveConfig(config);
+      console.log("✓ Configured for LM Studio (local) embeddings");
     } else {
       console.log("✓ Configured for Ollama (local) embeddings");
     }
@@ -242,14 +264,14 @@ export async function runCli(argv: string[]): Promise<number> {
 
   case "use": {
     const provider = args[1];
-    
-    if (!provider || !["ollama", "mistral", "openai"].includes(provider)) {
-      console.error("Provider must be: ollama, mistral, or openai");
+
+    if (!provider || !(WRITABLE_PROVIDERS as readonly string[]).includes(provider)) {
+      console.error(`Provider must be one of: ${WRITABLE_PROVIDERS.join(", ")}`);
       return 1;
     }
-    
+
     const config = loadConfig();
-    
+
     if (provider === "ollama") {
       config.embedding = {
         provider: "ollama",
@@ -259,6 +281,14 @@ export async function runCli(argv: string[]): Promise<number> {
         // emits 2560-d vectors, and refuseOnDimensionMismatch fails loudly
         // on a config that disagrees with what the model returns.
         dimensions: 2560,
+      };
+    } else if (provider === "lmstudio") {
+      const model = (options.model as string) || "text-embedding-nomic-embed-text-v1.5";
+      config.embedding = {
+        provider: "lmstudio",
+        model,
+        baseURL: (options["base-url"] as string) || INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+        dimensions: INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ?? 768,
       };
     } else if (provider === "mistral") {
       if (!options["api-key"]) {
@@ -282,8 +312,30 @@ export async function runCli(argv: string[]): Promise<number> {
         apiKey: options["api-key"] as string,
         dimensions: 1536,
       };
+    } else if (provider === "google") {
+      if (!options["api-key"]) {
+        console.error("Error: --api-key required for Google");
+        return 1;
+      }
+      config.embedding = {
+        provider: "google",
+        model: (options.model as string) || "gemini-embedding-001",
+        apiKey: options["api-key"] as string,
+        dimensions: 3072,
+      };
+    } else if (provider === "cohere") {
+      if (!options["api-key"]) {
+        console.error("Error: --api-key required for Cohere");
+        return 1;
+      }
+      config.embedding = {
+        provider: "cohere",
+        model: (options.model as string) || "embed-english-v3.0",
+        apiKey: options["api-key"] as string,
+        dimensions: 1024,
+      };
     }
-    
+
     saveConfig(config);
     console.log(`✓ Switched to ${provider} embeddings`);
     console.log(`  Model: ${config.embedding.model}`);

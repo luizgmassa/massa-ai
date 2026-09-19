@@ -75,6 +75,16 @@ describe("config-cli runCli", () => {
     expect(r.out).toContain("OpenAI");
   });
 
+  test("init --lmstudio → lmstudio config", async () => {
+    const r = await captureConsole(() => runCli(["init", "--lmstudio"]));
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("LM Studio");
+    const show = await captureConsole(() => runCli(["show"]));
+    expect(show.out).toContain("lmstudio");
+    expect(show.out).toContain("text-embedding-nomic-embed-text-v1.5");
+    expect(show.out).toContain("768");
+  });
+
   test("path → prints config path", async () => {
     const r = await captureConsole(() => runCli(["path"]));
     expect(r.code).toBe(0);
@@ -125,6 +135,51 @@ describe("config-cli runCli", () => {
     const show = await captureConsole(() => runCli(["show"]));
     expect(show.out).toContain("qwen3-embedding:4b");
     expect(show.out).toContain("2560");
+  });
+
+  test("use lmstudio defaults write the nomic/768 pair", async () => {
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() => runCli(["use", "lmstudio"]));
+    expect(r.code).toBe(0);
+    const show = await captureConsole(() => runCli(["show"]));
+    expect(show.out).toContain("text-embedding-nomic-embed-text-v1.5");
+    expect(show.out).toContain("768");
+    expect(show.out).toContain("http://localhost:1234/v1");
+  });
+
+  test("use lmstudio with model + base-url", async () => {
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() =>
+      runCli(["use", "lmstudio", "--model", "custom-model", "--base-url", "http://x:1234/v1"]),
+    );
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("custom-model");
+  });
+
+  test("use google without api-key → exit 1", async () => {
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() => runCli(["use", "google"]));
+    expect(r.code).toBe(1);
+  });
+
+  test("use google with api-key", async () => {
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() => runCli(["use", "google", "--api-key", "k"]));
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("google");
+  });
+
+  test("use cohere without api-key → exit 1", async () => {
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() => runCli(["use", "cohere"]));
+    expect(r.code).toBe(1);
+  });
+
+  test("use cohere with api-key", async () => {
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() => runCli(["use", "cohere", "--api-key", "k"]));
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("cohere");
   });
 
   test("use mistral without api-key → exit 1", async () => {
