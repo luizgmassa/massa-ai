@@ -195,10 +195,26 @@ reads must fail. Asserting "a branch exists" is self-answering.
   `INFERENCE_PROVIDERS.ollama.knownDimensions` as a byte-identical copy of
   `embedding-dimensions.ts`'s `KNOWN_EMBEDDING_DIMENSIONS` — a **fourth** writer
   of the model→width table, in the module whose own docblock states the defect
-  class here "has always been divergence between writers". `embedding-dimensions.ts`
-  must **derive** from `inference-providers.ts` and `KNOWN_EMBEDDING_DIMENSIONS`
-  must be **deleted**, not left beside it. Leaving two agreeing tables is the
-  failure mode, not the safe state.
+  class here "has always been divergence between writers". The duplicate must go
+  — but **in this direction, and not the other** (measured, orchestrator,
+  2026-09-19):
+
+  **`inference-providers.ts` derives FROM `embedding-dimensions.ts`.** Export
+  `KNOWN_EMBEDDING_DIMENSIONS` and set
+  `INFERENCE_PROVIDERS.ollama.knownDimensions` to it. Both modules are pure and
+  in the same package, so this adds no I/O and no new edge.
+
+  **Do NOT delete the literal and derive `embedding-dimensions.ts` from the
+  seam.** `embedding-defaults-parity.test.ts:312-313` extracts that table by
+  regex — `/KNOWN_EMBEDDING_DIMENSIONS[^=]*=\s*\{([\s\S]*?)\n\};/` over
+  `packages/shared/src/config/embedding-dimensions.ts` — and compares it to the
+  bash table. Deleting the literal makes that regex match nothing and reddens the
+  gate, in a file **T15 owns**, three tasks away. Adding `export ` in front of
+  the declaration does not disturb the regex, which anchors on the identifier.
+
+  LM Studio's own width table stays a literal in the seam. It is invisible to
+  this gate (it carries no `OLLAMA_EMBEDDING_` token) — that is LIP-18's subject
+  and T15 closes it.
 **Paired baseline to re-measure after this task** (`bun test
 scripts/__tests__/embedding-defaults-parity.test.ts`, scratch `XDG_CONFIG_HOME`):
 main@d523f06f and branch@4fca51e4 both report **width-writer scan population: 4**
