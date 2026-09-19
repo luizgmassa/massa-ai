@@ -26,6 +26,25 @@ timeout.
 
 ---
 
+## Phase 1 landed (`f5cb0956`, `4fca51e4`) — facts downstream tasks must not re-derive
+
+- **The model-listing endpoint path is `inference-probe.ts`'s private concern.**
+  `design.md` §2's 3-arg signature carries no endpoint-path field and neither does
+  `InferenceProviderSpec`, so T02 kept the signature and added a module-local
+  `LIST_MODELS_PATH: Record<InferenceProviderId, string>` (`ollama: "/api/tags"`,
+  `lmstudio: "/v1/models"`). **T05 and T10 must call `probeProvider` rather than
+  re-deriving either path** — a second copy of that map is a new divergence
+  writer, which is the defect class this whole feature exists to close.
+- **`probeProvider` resolves with `new URL(path, baseUrl)` and an absolute path**,
+  so any path prefix on `baseUrl` is discarded. Correct for both measured
+  defaults (`http://localhost:11434` and `http://localhost:1234/v1` both resolve
+  right), wrong for a reverse-proxied provider under a path prefix. Unmeasured
+  and out of scope; do not quote it as supported.
+- **`bun run test:scripts` was not in Phase 1's gate list** and was run by the
+  orchestrator afterwards. See the amendment under T07/T15 for what it showed.
+
+---
+
 ## Phase 1 — The seam (2 Tasks) · everything depends on this
 
 ### T01 — `inference-providers.ts` + subpath export
@@ -135,6 +154,20 @@ reads must fail. Asserting "a branch exists" is self-answering.
 - Merge each provider's `knownDimensions`. Unknown model + reachable endpoint →
   **probe one real embed and read `embedding.length`**. Unknown model +
   unreachable → **throw**, naming model and endpoint. The `2560` catch-all dies.
+- **COLLAPSE, do not add (measured after Phase 1, 2026-09-19).** T01 shipped
+  `INFERENCE_PROVIDERS.ollama.knownDimensions` as a byte-identical copy of
+  `embedding-dimensions.ts`'s `KNOWN_EMBEDDING_DIMENSIONS` — a **fourth** writer
+  of the model→width table, in the module whose own docblock states the defect
+  class here "has always been divergence between writers". `embedding-dimensions.ts`
+  must **derive** from `inference-providers.ts` and `KNOWN_EMBEDDING_DIMENSIONS`
+  must be **deleted**, not left beside it. Leaving two agreeing tables is the
+  failure mode, not the safe state.
+**Paired baseline to re-measure after this task** (`bun test
+scripts/__tests__/embedding-defaults-parity.test.ts`, scratch `XDG_CONFIG_HOME`):
+main@d523f06f and branch@4fca51e4 both report **width-writer scan population: 4**
+and **model→width entries — bash 4, TypeScript 4**, both 7 pass / 0 fail. The
+completeness population moved 25 → 27; the width-writer population did **not**
+move, which is the whole finding.
 **Gate:** `cd packages/shared && bun test` · live check:
 `resolve("text-embedding-nomic-embed-text-v1.5")` → **768**
 
@@ -263,6 +296,16 @@ contract must round-trip) · new case asserting an LM Studio write
 - Re-anchor `referencePair()` (`:47`) and rewrite its comment (`:43-46`) in the
   **same** commit — LIP-01 deletes the union it names as its discriminator.
 - Any new `MASSA_AI_*` var → `turbo.json` `passThroughEnv` (AD-010).
+- **The width-writer scan is blind to `inference-providers.ts` (measured, not
+  predicted).** Paired runs on main@d523f06f and branch@4fca51e4 both print
+  `width-writer scan population: 4 — apps/mcp-client/src/config-cli.ts,
+  apps/opencode-plugin/src/config-cli.ts,
+  packages/core/src/services/embeddings/config.ts,
+  packages/shared/src/config/massa-ai-config.ts`. The new seam module is absent
+  from that membership while carrying a model→width table. If T07 collapsed the
+  duplicate as required, assert the membership **still equals its sanctioned
+  set** after the collapse; if a table legitimately remains in the seam, add it
+  to the membership and observe a red on it.
 **Gate:** `bun run test:scripts`
 **Discriminating check:** induce a deliberate red on the **LM Studio** pair
 specifically and observe it. A gate never seen failing on its new subject is
