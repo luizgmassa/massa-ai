@@ -1464,7 +1464,28 @@
       "tasks": ".specs/features/bootstrap-file-and-rule-toggles/tasks.md",
       "validation": ".specs/features/bootstrap-file-and-rule-toggles/validation.md",
       "notes": "Specify complete 2026-09-06: 12 requirements (BST-01..BST-12), 5 stories, validate_spec 0 errors 0 warnings. Four user decisions closed: (1) Codex and Cursor get a short managed pointer block rather than the pasted body, because neither host has an import directive -- Codex project_doc_fallback_filenames renames the searched file rather than including a second one, and Cursor publishes no user-level global rules path; (2) the command surface is a per-host skill, with the massa-ai-config CLI kept as the always-reachable front; (3) the code-comments toggle gates references/code-annotation.md sections 1 and 2 only, never section 3 Tests; (4) all 9 rules are switchable with no protected id, including massa-ai-router. Measured premise behind the whole feature: Claude Code documents reading CLAUDE.md and not AGENTS.md, and no installer in this repository writes ~/.claude/CLAUDE.md, so the bootstrap contract has never loaded on Claude except where a user hand-added the import. EXECUTE COMPLETE 2026-09-08: 45 tasks across 11 phases plus 11 verification-fix iterations; final independent gate PASS at 46/46 ACs with three recorded bounds (T36 lexicon composition, T43/T45 marker-line payload, T46 the sweep's contract half) -- see validation.md. Two shipped-behaviour defects were found by the gate rather than by the suite and are in CHANGELOG under Fixed: the installer wrote a managed block carrying a duplicated marker because its guard read the existing target file rather than the block being written, and a home directory whose own path contains a massa-ai marker corrupted the contract because the renderer's marker sweep runs on the rule body while the header and pointer interpolate the path after it. Assumption A12 was amended rather than satisfied: the portal field ships editable, the Config form layer having no read-only mechanism, with the CLI guide text as the mitigation. Unpushed; push and PR are the user's call."
+    },
+    {
+      "id": "local-inference-provider-abstraction",
+      "slug": "local-inference-provider-abstraction",
+      "title": "LM Studio as a second local inference provider behind a shared derived seam, with body-shape probing and an embedding-fingerprint index gate",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": true
+      },
+      "branch": "feat/local-inference-provider-abstraction",
+      "created": "2026-09-19",
+      "depends_on": [],
+      "spec": ".specs/features/local-inference-provider-abstraction/spec.md",
+      "design": ".specs/features/local-inference-provider-abstraction/design.md",
+      "tasks": ".specs/features/local-inference-provider-abstraction/tasks.md",
+      "validation": ".specs/features/local-inference-provider-abstraction/validation.md",
+      "notes": "EXECUTE COMPLETE 2026-09-19: 18 Tasks across 7 Phases, delegated batch workers with every figure re-measured by the orchestrator. LM Studio joins Ollama as a local inference provider behind one shared seam (packages/shared/src/config/inference-providers.ts) that the config lists, both CLIs, the installers and the Web UI derive from rather than each copying Ollama's literals; deriving those lists closed a pre-existing gap where cohere was a valid embedding provider the lists never offered. Probing is by response body rather than HTTP status in both the TypeScript and bash dialects, pinned to one verdict by probe-dialect-parity.test.ts. A workspaces.embedding_fingerprint read gate and write gate stop a workspace indexed under one provider/model/width from being queried or appended to under another. The gate that would have lied: embedding-defaults-parity.test.ts anchored every extractor on the literal OLLAMA_EMBEDDING_ and skipped any file lacking it, so an LMSTUDIO_ pair was invisible to every scan and the gate would have gone GREEN over a second unchecked model/width pair -- re-keyed provider-neutrally, with the red induced on the LM Studio pair and observed. LIP-22 measured 2560 -> 768 at MRR 0.6423 -> 0.4650 and hit@1 0.5000 -> 0.2857 on the 14-needle corpus, widths asserted by independent curl rather than inferred; but that figure is chunk-embedding quality only, because benchmarks/needles/run.ts speaks solely Ollama /api/embeddings and is an in-process exact-cosine ranker that never constructs data/vector/postgres-vector-store.ts -- so the retrieval-algorithm risk LIP-22 names stays UNMEASURED and 14.needles.test.ts is the sensor that would settle it. Four Phase-7 gates could not observe their own subjects and were amended with their reasons rather than silently failed: bun run lint is oxlint and reads no markdown; creating validation.md early flips validate_state.ts's appearsComplete on mere existence and reddens the closing gate; check_specs_delivered.ts proves tracked-and-clean but never content and exited 0 before T18 edited anything. Largest open item: scripts/diagnose.ts never got the change design.md:140 promised (empty diff across the whole feature), so bun run diagnose still validates Ollama only. Five further residuals are enumerated in .specs/HANDOFF.md. Unpushed; push and PR are the user's call."
     }
   ],
-  "active_feature": "bootstrap-file-and-rule-toggles"
+  "active_feature": "local-inference-provider-abstraction"
 }

@@ -1,4 +1,91 @@
-# Handoff — bootstrap-file-and-rule-toggles (EXECUTE COMPLETE 2026-09-08 — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs; every gate green; unpushed, push/PR is the user's call)
+# Handoff — local-inference-provider-abstraction (EXECUTE COMPLETE 2026-09-19 — 18 Tasks across 7 Phases, delegated batch workers with every figure re-measured by the orchestrator; gates green; unpushed, push/PR is the user's call)
+
+**Branch:** `feat/local-inference-provider-abstraction`, off `main@d523f06f` (v1.57.0).
+Worktree `~/Projects/massa-ai-feat-local-inference-provider-abstraction`.
+
+**What shipped.** LM Studio is a second local inference provider, and the way it was added
+matters more than the provider itself: one shared seam
+(`packages/shared/src/config/inference-providers.ts`, 108 lines) holds a spec per provider,
+and the config lists, both CLIs, the installers and the Web UI now *derive* from it instead
+of each carrying its own copy of Ollama's literals. That derivation closed a pre-existing
+gap nobody was looking for — `cohere` was a valid embedding provider the lists never
+offered. Probing moved from HTTP status to response body, in both the TypeScript and bash
+dialects, pinned to the same verdict by `scripts/__tests__/probe-dialect-parity.test.ts`.
+A `workspaces.embedding_fingerprint` read gate and write gate stop a workspace indexed
+under one provider/model/width from being queried or appended to under another. The two
+Ollama-only LLM behaviours — the `/api/version` probe and the `think` key — are now gated
+as dialect rather than treated as general local-LLM behaviour.
+
+**The gate that was going to lie.** `embedding-defaults-parity.test.ts` anchored every
+extractor on the literal token `OLLAMA_EMBEDDING_` and skipped any file lacking it, so an
+`LMSTUDIO_*` model/width pair was invisible to every scan in the file. Its failure mode was
+**green**, not red — verbatim the defect the file exists to prevent. Tier 3 is re-keyed to
+`*_EMBEDDING_(MODEL|DIMENSIONS)` with any prefix, and the red was induced on the LM Studio
+pair specifically and observed before being trusted.
+
+**Read this before closing LIP-22.** The needles measurement is recorded in `tasks.md`'s
+Phase 7 landed note with **both halves of its bound**, and the bound is the finding: MRR
+0.6423 → 0.4650 and hit@1 0.5000 → 0.2857 going 2560 → 768 is a chunk-embedding-quality
+signal **only**. `benchmarks/needles/run.ts` speaks only Ollama `/api/embeddings` and never
+calls the LM Studio client the feature ships, and it is an in-process exact-cosine ranker
+that never constructs `packages/core/src/data/vector/postgres-vector-store.ts` — so neither
+the `dimensions > 2000` binary-quantization branch nor the ≤2000 plain-HNSW branch runs on
+*either* arm. The delta has the approximate-search component removed from both sides,
+biasing it in exactly the direction that hides the risk LIP-22 names. **That risk remains
+UNMEASURED**; the sensor that would settle it is
+`packages/core/src/__tests__/e2e/14.needles.test.ts`. Widths were asserted by independent
+curl (2560 / 768 exact), not inferred, because nothing in the harness validates the
+returned vector length.
+
+**Four Phase-7 gates could not observe their own subjects, and were amended with their
+reasons at `bc2f2f82` rather than silently failed.** `bun run lint` is oxlint and reads no
+markdown, so T16's stated gate was exit 0 before and after any docs edit — replaced by a
+FEATURES.md TOC-resolution check (0 unresolved on both sides, measured by the worker and
+again by the orchestrator) and 23-site coverage accounting. T17 was going to create
+`validation.md`, which `validate_state.ts:130` treats as proof of completeness on mere
+existence — and `TASK_HEADING_RE` (`:45`) requires `T\d+:` while this file writes
+`### T16 — `, so existence is the *only* trigger; an inputs-only file would have reddened
+the closing gate at exit 1. `check_specs_delivered.ts` proves tracked-and-clean and never
+content, and all three state files were already tracked from the previous feature — it
+exited **0 before T18 edited anything**, measured.
+
+### Open, recorded, not built
+
+1. **`scripts/diagnose.ts` never got its promised change.** `design.md:140` lists it as
+   gaining `probeProvider` + exact match, replacing the `/api/tags` + substring match at
+   `:165`. It shipped **untouched** — empty diff over the whole feature range, and
+   `grep -ci lmstudio scripts/diagnose.ts` is `0`. So `bun run diagnose` still validates
+   Ollama only. T16 correctly left the three doc sites that mention it unchanged rather
+   than documenting a capability that does not exist, and added a caveat pointing LM Studio
+   users at `curl :1234/v1/models` + `curl :3333/health`. This is a design-versus-shipped
+   gap, not a docs gap — fixing it is a new task.
+2. **Existing installs are unprotected until their first full reindex.** The fingerprint
+   gate reads legacy/`NULL` on every workspace indexed before the migration. Any claim of
+   stale-index protection needs that qualifier.
+3. **`install.sh` still has no provider menu.** It *did* gain the body-shape probe (26
+   insertions over the feature range — an earlier claim in this session that it was absent
+   from the diff entirely was wrong), but provider choice lives only in
+   `scripts/setup-local-first.sh` and `MASSA_AI_INFERENCE_PROVIDER`.
+4. **The LM Studio install and daemon commands were never executed**, here or in Phase 5.
+   `lms` is not on this host's `PATH` while the server itself runs on `:1234`, and T12
+   forbids running the vendor installer. T16's "execute every changed command once" AC was
+   narrowed in writing to exclude exactly those lines.
+5. **`tasks.md` has never passed `validate_tasks.ts`.** It reports 3 errors plus
+   `no tasks (### T1: ...) parsed` — the file writes `### T16 — ` (em dash, no colon)
+   against a `/^#{2,4}\s+T\d+\s*:/m` regex, and has since Phase 1. The task-level half of
+   that validator has therefore been vacuous for this feature throughout.
+6. **Phase 6 residual #2 stands:** `embedding-dimensions.ts` is in the parity gate's `known`
+   set, which skips the file *entirely* from Tier 3 rather than excluding its colliding
+   lines. A genuinely new unreviewed default added there would now be invisible.
+
+### Not part of this feature, found in passing
+
+`.specs/lessons.json` was dirty in **both** worktrees with an uncommitted deletion of 15
+lessons (L-002…L-016; 25 → 10, `next_id` untouched at 26). It was neither committed nor
+discarded — copied to `/tmp/lessons-pruned-{worktree,main}.json` and restored from HEAD, so
+the `check_specs_delivered` run would mean something. The prune is the user's call.
+
+## Previous handoff — bootstrap-file-and-rule-toggles (EXECUTE COMPLETE 2026-09-08 — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs; every gate green; unpushed, push/PR is the user's call)
 
 **Branch:** `feat/bootstrap-file-and-rule-toggles`, off `main@d32fce58`. Worktree
 `~/Projects/massa-ai-wt-bootstrap-toggles`.
@@ -104,7 +191,7 @@ and `### Fixed`, so this cuts a **minor** bump. Open follow-ups IPT-F1, F4, F6,
 F7 are recorded in `validation.md`, plus Feature 3's carried AC-03.3c, HPC-06,
 HPC-07.
 
-# Previous handoff — portal-handoff-proposal-crud (EXECUTE COMPLETE 2026-08-13 — 9 commits; gates green; unpushed)
+## Previous handoff — portal-handoff-proposal-crud (EXECUTE COMPLETE 2026-08-13 — 9 commits; gates green; unpushed)
 
 Session `spec-portal-handoff-proposal-crud` · workflow **spec-driven** · branch
 `feat/portal-handoff-proposal-crud` stacked on `dbdceead` (PR #107, **unmerged**),
@@ -157,7 +244,7 @@ throwing read).
 
 ---
 
-# Previous handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
+## Previous handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
 
 Session `spec-marketplace-directory-source-switching` · workflow **spec-driven** ·
 branch `fix/marketplace-directory-source-switching` from `origin/main` @ `89909051`,

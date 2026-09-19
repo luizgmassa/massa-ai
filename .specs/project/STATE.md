@@ -1,4 +1,46 @@
-## Current — Bootstrap file and rule toggles (**VALIDATED 2026-09-08** — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs with three recorded bounds; every gate green; unpushed, push/PR is the user's call)
+## Current — Local inference provider abstraction: LM Studio beside Ollama (**EXECUTE COMPLETE 2026-09-19** — 18 Tasks across 7 Phases, delegated batch workers with every figure re-measured by the orchestrator; gates green; independent validation pending; unpushed, push/PR is the user's call)
+
+Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
+worktree `~/Projects/massa-ai-feat-local-inference-provider-abstraction`. Full
+account in `.specs/HANDOFF.md` and
+`.specs/features/local-inference-provider-abstraction/tasks.md`.
+
+**What shipped.** LM Studio is a second local inference provider, added behind one shared
+seam (`packages/shared/src/config/inference-providers.ts`) that the config lists, both
+CLIs, the installers and the Web UI derive from — rather than a second copy of Ollama's
+literals in six places. Deriving those lists closed a pre-existing gap: `cohere` was a
+valid embedding provider they never offered. Probing is by response body, not HTTP status,
+in both the TypeScript and bash dialects. A `workspaces.embedding_fingerprint` read gate
+and write gate stop a workspace indexed under one provider/model/width from being queried
+or appended to under another.
+
+**The gate that was going to lie.** `embedding-defaults-parity.test.ts` anchored every
+extractor on the literal `OLLAMA_EMBEDDING_` and skipped any file lacking it — so an
+`LMSTUDIO_*` model/width pair was invisible to every scan in the file, and the gate would
+have reported clean over a second unchecked pair. Its failure mode was **green**. Tier 3 is
+re-keyed provider-neutrally and the red was induced on the LM Studio pair and observed.
+
+**Read this before closing LIP-22.** Going 2560 → 768 costs MRR 0.6423 → 0.4650 and hit@1
+0.5000 → 0.2857 on the 14-needle corpus — but that number is chunk-embedding quality only.
+`benchmarks/needles/run.ts` speaks solely Ollama `/api/embeddings` (never the LM Studio
+client this feature ships) and is an in-process exact-cosine ranker that never constructs
+`data/vector/postgres-vector-store.ts`, so neither the `>2000` binary-quantization branch
+nor the ≤2000 HNSW branch runs on *either* arm. The retrieval-algorithm risk LIP-22 names
+remains **UNMEASURED**; `packages/core/src/__tests__/e2e/14.needles.test.ts` is the sensor
+that would settle it.
+
+**Four Phase-7 gates could not observe their own subjects** and were amended with their
+reasons at `bc2f2f82`: `bun run lint` is oxlint and reads no markdown; creating
+`validation.md` early flips `validate_state.ts:130`'s `appearsComplete` and reddens the
+closing gate; `check_specs_delivered.ts` proves tracked-and-clean but never content, and
+exited 0 before T18 edited anything. Amend the clause with its reason, do not fail it
+silently.
+
+**Largest open item:** `scripts/diagnose.ts` never got the change `design.md:140` promised
+— empty diff across the whole feature, `grep -ci lmstudio` is 0 — so `bun run diagnose`
+still validates Ollama only. Five further residuals are enumerated in `.specs/HANDOFF.md`.
+
+## Previous — Bootstrap file and rule toggles (**VALIDATED 2026-09-08** — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs with three recorded bounds; every gate green; unpushed, push/PR is the user's call)
 
 Branch `feat/bootstrap-file-and-rule-toggles` off `main@d32fce58`, worktree
 `~/Projects/massa-ai-wt-bootstrap-toggles`. Full account in `.specs/HANDOFF.md`

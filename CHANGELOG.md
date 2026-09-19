@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **LM Studio as a second local inference provider, behind a shared seam rather than a
+  second copy of Ollama's literals.** `packages/shared/src/config/inference-providers.ts`
+  holds one spec per provider — base URL, env names, known embedding widths, probe shape —
+  and the provider lists that config, the CLIs, the installers and the Web UI read are now
+  *derived* from it instead of hand-maintained in six places. That derivation closed a
+  pre-existing gap on the way past: `cohere` was a valid embedding provider the lists never
+  offered. `EMBEDDING_PROVIDER=lmstudio` selects it; `LMSTUDIO_BASE_URL`,
+  `LMSTUDIO_EMBEDDING_MODEL` and `LMSTUDIO_EMBEDDING_DIMENSIONS` project through the same
+  env precedence every other provider uses, and all three were added to `turbo.json`'s
+  `passThroughEnv` (AD-010) — without which they arrive `undefined` under `bun run test`
+  while appearing to work under a direct `bun test`.
+- **Provider probing by response body, not HTTP status.** Both the TypeScript probe
+  (`packages/core/src/kernel/inference-probe.ts`) and its bash mirror in the installers
+  treat a `200` carrying an error body as unreachable. A status-only probe reported a
+  wedged server as healthy; `scripts/__tests__/probe-dialect-parity.test.ts` now pins the
+  two dialects to the same verdict on the same fixture bodies.
+- **Provider-aware embedding width resolution.** `text-embedding-nomic-embed-text-v1.5`
+  resolves to 768 from the seam's table; an unknown *and* unreachable model throws rather
+  than silently defaulting to a width that would corrupt an index.
+- **An `embedding_fingerprint` read gate and write gate on `workspaces`.** A workspace
+  indexed under one provider/model/width is no longer silently queried or appended to under
+  another — the failure it prevents is a vector space quietly mixed with a different one.
+  Migration included. Note the qualifier: every install that predates this ships a
+  legacy/`NULL` fingerprint and is unprotected until its first full reindex.
+- **Provider detection and a restricted menu in `scripts/setup-local-first.sh`.** It
+  detects which provider is already installed, offers the other, installs the `lms` CLI
+  when missing, and honours `MASSA_AI_INFERENCE_PROVIDER=ollama|lmstudio` non-interactively
+  — an unrecognised value exits non-zero naming the bad value rather than defaulting.
+- **Both config CLIs widened from 3 providers to the full writable set** — `ollama`,
+  `lmstudio`, `mistral`, `openai`, `google`, `cohere` — plus `init --lmstudio`. Keeping
+  them at 3 was drift, not a decision.
+- **Docs**: `README.md`, `FEATURES.md` and `docs/CHEATSHEET.md` no longer present Ollama as
+  the only local option, across the 23 surfaces the spec enumerated.
+
+### Changed
+
+- **The two Ollama-only LLM behaviours are now gated by provider.** The `/api/version`
+  probe and the `think` key injection are Ollama dialect, not general local-LLM dialect;
+  under LM Studio they are skipped and JSON-schema structured output is used instead.
+- **The embedding-defaults parity gate is re-keyed provider-neutrally.** Every extractor
+  was anchored on the literal token `OLLAMA_EMBEDDING_`, and the completeness scan skipped
+  any file that did not contain it — so an `LMSTUDIO_*` model/width pair was invisible to
+  every scan in the file and the gate would have reported clean over a second unchecked
+  pair. That is the going-green failure mode the file exists to prevent, not a going-red
+  one. Tier 3 now keys on `*_EMBEDDING_(MODEL|DIMENSIONS)` with any prefix, and the
+  width-writer membership gained the new seam module.
+
 ## [1.57.0] - 2026-09-18
 
 ### Added
