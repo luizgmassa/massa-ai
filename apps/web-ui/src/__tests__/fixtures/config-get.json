@@ -4,11 +4,11 @@
     "config": {
       "database": { "url": "***" },
       "embedding": {
-        "provider": "ollama",
-        "model": "qwen3-embedding:4b",
-        "baseURL": "http://localhost:11434",
+        "provider": "lmstudio",
+        "model": "text-embedding-nomic-embed-text-v1.5",
+        "baseURL": "http://localhost:1234/v1",
         "apiKey": "***",
-        "dimensions": 2560
+        "dimensions": 768
       },
       "compression": {
         "defaultStrategy": "code_structure",
@@ -41,7 +41,7 @@
       },
       "llm": {
         "enabled": false,
-        "baseUrl": "http://localhost:11434/v1",
+        "baseUrl": "http://localhost:1234/v1",
         "apiKey": "***",
         "model": "qwen2.5:7b-instruct",
         "codeModel": "qwen2.5-coder:7b",

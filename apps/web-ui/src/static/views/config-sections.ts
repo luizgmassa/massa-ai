@@ -44,9 +44,9 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
     label: "Embedding",
     fields: [
       { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "lmstudio", "mistral", "openai", "google", "cohere"], guide: "Which embedding provider to use. Ollama and LM Studio run locally; others are cloud APIs." },
-      { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., `qwen3-embedding:4b` for Ollama)." },
-      { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically `http://localhost:11434`." },
-      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama. Changing this requires a restart." },
+      { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., `qwen3-embedding:4b` for Ollama, `text-embedding-nomic-embed-text-v1.5` for LM Studio)." },
+      { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. Typically `http://localhost:11434` for Ollama, `http://localhost:1234/v1` for LM Studio." },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama or LM Studio. Changing this requires a restart." },
       { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 2560 for `qwen3-embedding:4b`)." },
     ],
   },
@@ -120,8 +120,8 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
     label: "LLM",
     fields: [
       { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables LLM-powered features (consolidation, query understanding, compression)." },
-      { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., `http://localhost:11434/v1` for Ollama OpenAI-compatible endpoint)." },
-      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for the LLM provider. Not needed for local Ollama. Changing this requires a restart." },
+      { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., `http://localhost:11434/v1` for Ollama, `http://localhost:1234/v1` for LM Studio — both OpenAI-compatible endpoints)." },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for the LLM provider. Not needed for local Ollama or LM Studio. Changing this requires a restart." },
       { name: "model", type: "text", label: "Model", guide: "Primary LLM model name (e.g., `qwen2.5:7b-instruct`)." },
       { name: "codeModel", type: "text", label: "Code Model", guide: "Model used for code-related tasks. When empty, falls back to the primary model." },
       { name: "temperature", type: "number", label: "Temperature", guide: "Sampling temperature (0 = deterministic, 1 = creative). Typically 0.2 for tasks." },
