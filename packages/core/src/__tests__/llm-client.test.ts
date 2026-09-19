@@ -22,6 +22,9 @@ let generateObjectShouldThrow: string | null = null;
 let lastCall: any = null;
 // The model string passed to the openai(model) provider factory in buildProvider.
 let lastModel: string | null = null;
+// The options object createOpenAI was constructed with — lets a test assert
+// whether buildProvider injected a wrapped `fetch` (LIP-07 gating).
+let lastProviderOpts: any = null;
 // Overrides let a test customize the SDK return shape (e.g. empty content +
 // reasoning) without throwing.
 let generateReturn: any = null;
@@ -42,9 +45,12 @@ mock.module("ai", () => ({
 
 mock.module("@ai-sdk/openai", () => ({
   // Capture the model string the provider was constructed with so tests can
-  // assert per-call role routing (instruct → model, code → codeModel).
-  createOpenAI: (_opts: any) => (model: string) => {
+  // assert per-call role routing (instruct → model, code → codeModel), and
+  // the options object itself so tests can assert whether a wrapped `fetch`
+  // (think:false injection) was attached (LIP-07).
+  createOpenAI: (opts: any) => (model: string) => {
     lastModel = model;
+    lastProviderOpts = opts;
     return { model, __mock: true };
   },
 }));
@@ -55,11 +61,13 @@ import {
   isLlmEnabled,
   _setLlmEnabledForTesting,
   _setJsonSchemaSupportedForTesting,
+  _setLlmBaseUrlForTesting,
   _reasoningToText,
   _extractJsonObject,
   _checkJsonSchemaSupport,
   _wrapFetchDisableThink,
   _isAbortOrTimeoutError,
+  resolveInferenceSpec,
 } from "../services/memory/llm-client.js";
 import { z } from "zod";
 
@@ -80,6 +88,8 @@ beforeEach(() => {
   generateObjectReturn = null;
   lastCall = null;
   lastModel = null;
+  lastProviderOpts = null;
+  _setLlmBaseUrlForTesting(null);
 });
 
 describe("llm-client — default-off gate (P1-LLMCLIENT-03)", () => {
@@ -735,5 +745,65 @@ describe("llm-client — abort/timeout skips reasoning recovery (#7 noise fix)",
     } finally {
       warnSpy.mockRestore();
     }
+  });
+});
+
+// ─── LIP-07: provider-aware gating of the two Ollama-only behaviours ────────
+
+describe("llm-client — resolveInferenceSpec (LIP-07 provider identity)", () => {
+  test("Ollama's default baseUrl (host:port) resolves to the ollama spec", () => {
+    expect(resolveInferenceSpec("http://localhost:11434/v1").id).toBe("ollama");
+  });
+
+  test("LM Studio's default baseUrl (host:port) resolves to the lmstudio spec", () => {
+    expect(resolveInferenceSpec("http://localhost:1234/v1").id).toBe("lmstudio");
+  });
+
+  test("an unmatched baseUrl (no known provider's port) falls back to ollama", () => {
+    expect(resolveInferenceSpec("http://example.com:9999/v1").id).toBe("ollama");
+  });
+});
+
+describe("llm-client — provider-aware gating (LIP-07)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(null);
+  });
+
+  test("lmstudio: _checkJsonSchemaSupport returns true WITHOUT calling fetch (no /api/version request)", async () => {
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    let fetchCalled = false;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (...args: any[]) => {
+      fetchCalled = true;
+      throw new Error("fetch should not have been called for lmstudio");
+    };
+    try {
+      const supported = await _checkJsonSchemaSupport();
+      expect(supported).toBe(true);
+      expect(fetchCalled).toBe(false);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("lmstudio: buildProvider does NOT attach a wrapped fetch (no think:false injection)", async () => {
+    _setJsonSchemaSupportedForTesting(false);
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    await llmComplete("hello");
+    expect(lastProviderOpts.fetch).toBeUndefined();
+  });
+
+  test("ollama (default baseUrl): buildProvider DOES attach a wrapped fetch (think:false active)", async () => {
+    _setJsonSchemaSupportedForTesting(false);
+    await llmComplete("hello");
+    expect(typeof lastProviderOpts.fetch).toBe("function");
+  });
+
+  test("lmstudio end-to-end: json-schema path stays enabled (not downgraded to json_object)", async () => {
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    await llmObject("hello", sampleSchema);
+    expect(lastCall.schemaName).toBe("response");
+    expect(lastCall.output).toBeUndefined();
   });
 });
