@@ -50,6 +50,30 @@ require_postgres_database_url() {
     [ -n "$authority" ] && [ -n "$database_name" ] || die "DATABASE_URL must include a host and database name."
 }
 
+# massa_ai_probe_provider <base_url> [provider]
+#
+# Bash mirror of probeProvider() in packages/core/src/kernel/inference-probe.ts:
+# discriminates by response BODY SHAPE, never by HTTP status. LM Studio answers
+# 200 with {"error":...} for every endpoint it does not implement, so a status
+# check reports a live Ollama that is not there. Byte-identical in install.sh,
+# scripts/setup-local-first.sh, scripts/ensure-ollama.sh and
+# scripts/validate-vscode-integration.sh; scripts/__tests__/probe-dialect-parity.test.ts
+# holds the copies identical and asserts both halves agree on every fixture body.
+massa_ai_probe_provider() {
+  local base_url="$1" provider="${2:-ollama}" path key origin body
+  case "$provider" in
+    ollama)   path="/api/tags"  ; key="models" ;;
+    lmstudio) path="/v1/models" ; key="data"   ;;
+    *) return 1 ;;
+  esac
+  # probeProvider resolves with new URL(<absolute path>, baseUrl), which drops
+  # any path prefix on baseUrl; keep scheme://authority only so that
+  # http://localhost:1234/v1 does not become .../v1/v1/models.
+  origin="$(printf '%s' "$base_url" | sed -E 's#^([a-zA-Z][a-zA-Z0-9+.-]*://[^/]*).*#\1#')"
+  body="$(curl -s --max-time 3 "${origin}${path}" 2>/dev/null)" || return 1
+  printf '%s' "$body" | grep -Eq "\"${key}\"[[:space:]]*:[[:space:]]*\["
+}
+
 # ---- Step 1: Check Ollama ----
 echo -e "${BOLD}[1/6] Checking Ollama...${NC}"
 
@@ -64,7 +88,7 @@ if command -v ollama &> /dev/null; then
 fi
 
 # Check if Ollama API is reachable (covers WSL -> Windows host, remote, etc.)
-if curl -s "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
+if massa_ai_probe_provider "$OLLAMA_URL"; then
     OLLAMA_API_REACHABLE=true
     OLLAMA_VERSION=$(curl -s "${OLLAMA_URL}/api/version" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null || echo "unknown")
     echo -e "  ${GREEN}✓${NC} Ollama API reachable at ${OLLAMA_URL} (v${OLLAMA_VERSION})"
@@ -98,7 +122,7 @@ if [ "$OLLAMA_API_REACHABLE" = false ]; then
         nohup ollama serve > /dev/null 2>&1 &
         sleep 2
 
-        if curl -s "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
+        if massa_ai_probe_provider "$OLLAMA_URL"; then
             OLLAMA_API_REACHABLE=true
             echo -e "  ${GREEN}✓${NC} Ollama started successfully"
         else
@@ -450,7 +474,7 @@ echo ""
 echo -e "${BOLD}[5/6] Verifying setup...${NC}"
 
 # Check Ollama health
-if curl -s "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
+if massa_ai_probe_provider "$OLLAMA_URL"; then
     MODELS=$(curl -s "${OLLAMA_URL}/api/tags" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data.get('models',[])))" 2>/dev/null || echo "?")
     echo -e "  ${GREEN}✓${NC} Ollama: healthy at ${OLLAMA_URL} (${MODELS} models)"
 else

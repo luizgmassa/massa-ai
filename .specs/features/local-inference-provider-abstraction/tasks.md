@@ -350,6 +350,34 @@ without it the PG suite reports **1 skip**, never a vacuous pass.
   `embedding-defaults-parity.test.ts:319`.
 **Gate:** `bun run test:scripts` · `bash -n` on each edited script
 
+**Status: complete.** One `massa_ai_probe_provider`, byte-identical in all four
+scripts (no shared lib: `install.sh` has no checkout to source one from, and a
+new `scripts/lib/` file is outside this task's write set). It curls the
+provider's list endpoint and greps the body for that provider's list key,
+reading no status at all — `curl -s`, deliberately **without** `-f`, because
+`probeProvider` ignores status too and a `-f` would disagree with it on a 500
+carrying a valid body.
+
+**Amendment — two of the enumerated sites are not probes.** `install.sh:260`
+(`ollama_has_model`) and `setup-local-first.sh:135` (inside
+`ollama_model_exists`) fetch a body and grep `"name":"<model>"` in it; they
+already discriminate by body shape and were never status-trusting, and `:135`
+is additionally under T11's byte-identity lock — editing it would break
+`test-setup-ollama-model-exists.sh`, which stubs `curl` on `PATH` and would
+find `massa_ai_probe_provider` undefined in the extracted function. Both left
+unchanged. The five *reachability* probes the requirement names are eight call
+lines, because two files run the same check more than once:
+`install.sh:162`,`:267`; `setup-local-first.sh:91`,`:125`,`:477`;
+`validate-vscode-integration.sh:72`; `ensure-ollama.sh:48`,`:71`.
+
+**URL resolution had to be mirrored too, not just body shape.**
+`probeProvider` resolves `new URL(<absolute path>, baseUrl)`, which **discards**
+any path on `baseUrl`; a naive `"${base}${path}"` in bash turns the LM Studio
+default `http://localhost:1234/v1` into `/v1/v1/models`. The bash copy keeps
+scheme://authority only, and Tier 3 of the parity test observes the path each
+half actually requests on one real server rather than comparing against a
+second copy of the (unexported) `LIST_MODELS_PATH` map.
+
 ### T11 — detection, restricted menu, non-interactive
 **Requirements:** LIP-12, LIP-13, LIP-16, LIP-05
 **Writes:** `scripts/setup-local-first.sh`,

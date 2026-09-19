@@ -103,6 +103,30 @@ detect_os() {
   esac
 }
 
+# massa_ai_probe_provider <base_url> [provider]
+#
+# Bash mirror of probeProvider() in packages/core/src/kernel/inference-probe.ts:
+# discriminates by response BODY SHAPE, never by HTTP status. LM Studio answers
+# 200 with {"error":...} for every endpoint it does not implement, so a status
+# check reports a live Ollama that is not there. Byte-identical in install.sh,
+# scripts/setup-local-first.sh, scripts/ensure-ollama.sh and
+# scripts/validate-vscode-integration.sh; scripts/__tests__/probe-dialect-parity.test.ts
+# holds the copies identical and asserts both halves agree on every fixture body.
+massa_ai_probe_provider() {
+  local base_url="$1" provider="${2:-ollama}" path key origin body
+  case "$provider" in
+    ollama)   path="/api/tags"  ; key="models" ;;
+    lmstudio) path="/v1/models" ; key="data"   ;;
+    *) return 1 ;;
+  esac
+  # probeProvider resolves with new URL(<absolute path>, baseUrl), which drops
+  # any path prefix on baseUrl; keep scheme://authority only so that
+  # http://localhost:1234/v1 does not become .../v1/v1/models.
+  origin="$(printf '%s' "$base_url" | sed -E 's#^([a-zA-Z][a-zA-Z0-9+.-]*://[^/]*).*#\1#')"
+  body="$(curl -s --max-time 3 "${origin}${path}" 2>/dev/null)" || return 1
+  printf '%s' "$body" | grep -Eq "\"${key}\"[[:space:]]*:[[:space:]]*\["
+}
+
 detect_ollama_url() {
   # Already set via env
   [ -n "$OLLAMA_URL" ] && { echo "$OLLAMA_URL"; return; }
@@ -135,7 +159,7 @@ detect_ollama_url() {
   candidates+=("http://localhost:11434")
 
   for url in "${candidates[@]}"; do
-    if curl -sf --connect-timeout 2 "${url}/api/tags" &>/dev/null; then
+    if massa_ai_probe_provider "$url"; then
       echo "$url"; return
     fi
   done
@@ -240,7 +264,7 @@ preflight_git() {
 
 check_ollama() {
   local url="$1"
-  if curl -sf --connect-timeout 2 "${url}/api/tags" &>/dev/null; then
+  if massa_ai_probe_provider "$url"; then
     ok "Ollama reachable at ${url}"
     return 0
   else

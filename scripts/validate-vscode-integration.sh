@@ -20,6 +20,30 @@ WARNINGS=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MASSA_AI_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# massa_ai_probe_provider <base_url> [provider]
+#
+# Bash mirror of probeProvider() in packages/core/src/kernel/inference-probe.ts:
+# discriminates by response BODY SHAPE, never by HTTP status. LM Studio answers
+# 200 with {"error":...} for every endpoint it does not implement, so a status
+# check reports a live Ollama that is not there. Byte-identical in install.sh,
+# scripts/setup-local-first.sh, scripts/ensure-ollama.sh and
+# scripts/validate-vscode-integration.sh; scripts/__tests__/probe-dialect-parity.test.ts
+# holds the copies identical and asserts both halves agree on every fixture body.
+massa_ai_probe_provider() {
+  local base_url="$1" provider="${2:-ollama}" path key origin body
+  case "$provider" in
+    ollama)   path="/api/tags"  ; key="models" ;;
+    lmstudio) path="/v1/models" ; key="data"   ;;
+    *) return 1 ;;
+  esac
+  # probeProvider resolves with new URL(<absolute path>, baseUrl), which drops
+  # any path prefix on baseUrl; keep scheme://authority only so that
+  # http://localhost:1234/v1 does not become .../v1/v1/models.
+  origin="$(printf '%s' "$base_url" | sed -E 's#^([a-zA-Z][a-zA-Z0-9+.-]*://[^/]*).*#\1#')"
+  body="$(curl -s --max-time 3 "${origin}${path}" 2>/dev/null)" || return 1
+  printf '%s' "$body" | grep -Eq "\"${key}\"[[:space:]]*:[[:space:]]*\["
+}
+
 # ---- Test 1: Prerequisites ----
 echo -e "${BOLD}[1/6] Checking prerequisites...${NC}"
 
@@ -45,7 +69,7 @@ echo -e "${BOLD}[2/6] Checking Ollama...${NC}"
 
 OLLAMA_URL="${OLLAMA_HOST:-http://localhost:11434}"
 
-if curl -s --max-time 2 "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
+if massa_ai_probe_provider "$OLLAMA_URL"; then
     OLLAMA_VERSION=$(curl -s "${OLLAMA_URL}/api/version" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null || echo "unknown")
     echo -e "  ${GREEN}✓${NC} Ollama: healthy (v${OLLAMA_VERSION})"
     
