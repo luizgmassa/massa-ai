@@ -467,6 +467,26 @@ export async function ensureFreshIndex(
   // two embedding spaces in one table. `liveFingerprint` is reused after a
   // successful full reindex to stamp the workspace row (the "clearing branch"
   // — design.md §5).
+  //
+  // CORRECTION (post-review, 2026-09-19): this whole `needsFullReindex`
+  // branch — not just the fingerprint arm — has zero production callers
+  // today. `ensureFreshIndex`'s only caller is `SearchController
+  // .handleAutoReindex`, which hardcodes `allowFullReindex: false`; every
+  // `needsFullReindex === true` outcome there is deferred at the check below
+  // and never reaches `deps.indexProject`/the stamp at `:536`. The reachable
+  // production recovery for a stale embedding fingerprint is `index_project`
+  // with `forceReindex: true`, which runs `EtlPipeline.run()`
+  // (`services/etl/pipeline.ts`) — a separate full-reindex mechanism that
+  // never calls this function — and that is where the fingerprint is
+  // actually stamped in production (same `stampEmbeddingFingerprint`/
+  // `currentEmbeddingFingerprint` pair, so the two sites can never disagree
+  // on the value, only on whether they currently run). This branch is kept,
+  // tested, and correct for the day a caller does pass
+  // `allowFullReindex: true` — deleting a documented, correct behaviour to
+  // chase "no dead code" would be the wrong trade here — but it must not be
+  // read as *the* write gate. See `search-controller.ts`'s Tier 1b comment
+  // for why the read gate stays unconditional rather than giving this branch
+  // a reachable caller.
   const storedFingerprint = await getEmbeddingFingerprint(projectId);
   const liveFingerprint = currentEmbeddingFingerprint();
   const fingerprintMismatch =

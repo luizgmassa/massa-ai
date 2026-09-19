@@ -172,6 +172,25 @@ export class SearchController {
     // Tier 1b — LIP-15 HARD-FAIL: a stale embedding fingerprint. Checked
     // before the generic admitted check so this never gets mislabeled as
     // "not indexed" — never returns rows either way.
+    //
+    // DELIBERATELY before `handleAutoReindex` (`:193` below), even when the
+    // caller passed `autoReindex: true` — recovery from a fingerprint
+    // mismatch is exclusively via `index_project` with `forceReindex: true`,
+    // never a silent self-heal mid-search. Two independent reasons, either
+    // one sufficient on its own:
+    //   1. `handleAutoReindex` always calls `ensureFreshIndex` with
+    //      `allowFullReindex: false` (`:388` below) — moving this check
+    //      after it would not let it self-heal anyway; a fingerprint-forced
+    //      `needsFullReindex` would just be deferred (see
+    //      project-indexer.ts's `ensureFreshIndex` CORRECTION note).
+    //   2. Design intent (spec.md LIP-15): "must make search fail loudly
+    //      with a reindex instruction" — an explicit, deliberate recovery a
+    //      human triggers, not an opportunistic full rebuild racing a search
+    //      request (a provider/model switch is an operator action, not file
+    //      drift — the thing `autoReindex` exists to paper over).
+    // If a future change makes `handleAutoReindex` allow full reindexes,
+    // revisit this ordering deliberately rather than leaving both
+    // half-wired.
     if (admission.embeddingMismatch) {
       throw new EmbeddingIndexStaleError(
         projectId,

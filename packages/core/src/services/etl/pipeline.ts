@@ -27,6 +27,8 @@ import { IndexManager } from "../search/index-manager.js";
 import { getVectorStore } from "../vector/vector-store-factory.js";
 import { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
+import { stampEmbeddingFingerprint } from "../../data/symbol/symbol-repo-workspace.js";
+import { currentEmbeddingFingerprint } from "../search/project-indexer.js";
 import type { EtlStageContext, EtlEvent, EtlResult, EtlStage } from "./stage-context.js";
 import { assertParserReadyForIndexing } from "../structural/parser-readiness.js";
 import { StructuralEtlParseError } from "./stages/parse.js";
@@ -522,6 +524,41 @@ export class EtlPipeline {
           jobId,
           error: (markerError as Error).message.slice(0, 160),
         });
+      }
+
+      // LIP-15 write gate: stamp the embedding fingerprint only from this
+      // clearing branch (`forceReindex` — the `vectorStore.deleteByProject` /
+      // `keywordSearch.deleteByProject` calls at the top of this method just
+      // cleared every row before Discover/Parse/Resolve/Load rebuilt them),
+      // and only after that rebuild actually completed. This is the
+      // production write path `EmbeddingIndexStaleError`'s message names
+      // ("Run index_project with forceReindex: true") — `index_project` runs
+      // exactly this method with `forceReindex: true`. It is intentionally a
+      // *second* call site of the same T08 primitive as
+      // `project-indexer.ts`'s `ensureFreshIndex` clearing branch, not a
+      // second definition of the fact: both call the identical
+      // `stampEmbeddingFingerprint`/`currentEmbeddingFingerprint` pair, so
+      // the value written can never diverge between them. The other site
+      // has zero production callers today (`ensureFreshIndex`'s only caller,
+      // `SearchController.handleAutoReindex`, hardcodes
+      // `allowFullReindex: false`, so its full-reindex branch — this stamp
+      // included — never runs there); this one is the reachable path.
+      // Best-effort and non-fatal, matching the admission-marker write just
+      // above: a missing stamp degrades the next read-gate check to a
+      // legacy warning, never the index itself.
+      if (forceReindex) {
+        const liveFingerprint = currentEmbeddingFingerprint();
+        if (liveFingerprint !== null) {
+          try {
+            await stampEmbeddingFingerprint(projectId, liveFingerprint);
+          } catch (stampError) {
+            logger.warn("EtlPipeline: embedding fingerprint stamp failed", {
+              projectId,
+              jobId,
+              error: (stampError as Error).message.slice(0, 160),
+            });
+          }
+        }
       }
 
       // Belt-and-suspenders terminal signal: mark the job completed the moment
