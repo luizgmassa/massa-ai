@@ -1,6 +1,6 @@
 /** PostgreSQL/pgvector health checks used by local system status endpoints. */
 import { config } from "@massa-ai/shared";
-import { requirePostgresDatabaseUrl } from "@massa-ai/shared/config";
+import { requirePostgresDatabaseUrl, loadConfigSafe } from "@massa-ai/shared/config";
 import {
   INFERENCE_PROVIDERS,
   type InferenceProviderId,
@@ -28,18 +28,27 @@ export class LocalHealthChecker {
   private readonly dataDir = config.get("dataDir") as string;
 
   /**
-   * Which local-inference provider is configured (`embedding.provider`,
-   * default `ollama`). Read defensively — `config.getAll()` throws in a few
-   * unconfigured test contexts, and an unset/unknown value must fall back to
-   * `ollama` rather than crash the health check.
+   * `config.json`'s `embedding` block, mirroring `embeddings/config.ts`'s own
+   * `fileEmbedding` read — `config.get()`/`config.getAll()` (the `@massa-ai/shared`
+   * default export) is a *different* runtime-defaults object (`ServerConfig`)
+   * with no `embedding` key at all, so reading the provider from there would
+   * always silently resolve `undefined` rather than throw. Read defensively:
+   * an unconfigured install has no file, and this must fall back to `ollama`
+   * rather than crash the health check.
    */
-  private resolveProviderId(): InferenceProviderId {
-    let provider: string | undefined;
+  private fileEmbedding(): { provider?: string; baseURL?: string; model?: string } | undefined {
     try {
-      provider = (config.getAll() as any)?.embedding?.provider;
+      return loadConfigSafe().embedding;
     } catch {
-      provider = undefined;
+      return undefined;
     }
+  }
+
+  /** Which local-inference provider is configured: `EMBEDDING_PROVIDER` env >
+   *  `config.json`'s `embedding.provider` > `ollama` (mirrors
+   *  `embeddings/config.ts`'s `selectedProvider` precedence). */
+  private resolveProviderId(): InferenceProviderId {
+    const provider = process.env.EMBEDDING_PROVIDER || this.fileEmbedding()?.provider;
     return provider === "lmstudio" ? "lmstudio" : "ollama";
   }
 
@@ -47,24 +56,16 @@ export class LocalHealthChecker {
     const spec = INFERENCE_PROVIDERS[id];
     const envUrl = process.env[spec.envNames.baseUrl];
     if (envUrl) return envUrl;
-    try {
-      const embedding = (config.getAll() as any)?.embedding;
-      if (embedding?.provider === id && embedding?.baseURL) return embedding.baseURL;
-    } catch {
-      // fall through to the provider default below
-    }
+    const embedding = this.fileEmbedding();
+    if (embedding?.provider === id && embedding?.baseURL) return embedding.baseURL;
     return spec.defaultEmbeddingBaseUrl;
   }
 
   private resolveConfiguredEmbeddingModel(envName: string): string {
     const envModel = process.env[envName];
     if (envModel) return envModel;
-    try {
-      const fileModel = (config.getAll() as any)?.embedding?.model;
-      if (fileModel) return fileModel;
-    } catch {
-      // fall through to the literal default below
-    }
+    const fileModel = this.fileEmbedding()?.model;
+    if (fileModel) return fileModel;
     return "nomic-embed-text:latest";
   }
 
