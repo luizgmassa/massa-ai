@@ -794,19 +794,95 @@ re-anchoring holds; and LIP-24's substitute sensor exists at
 **Writes:** `README.md`, `FEATURES.md`, `docs/CHEATSHEET.md`
 - Surfaces are enumerated with line numbers in the spec. **`FEATURES.md:34` is
   a TOC anchor `#local-first-llm-ollama`** — heading and anchor move together
-  or the link breaks.
+  or the link breaks. Measured at `c5a7f72c`: that slug has exactly **3**
+  occurrences repo-wide — `FEATURES.md:34` (the one live inbound link),
+  `spec.md:350` and `tasks.md:796` (both prose). `README.md:618` carries the
+  same heading text but README has **no** TOC link to it.
 - Every changed command is **executed once** before it is written down.
-**Gate:** `bun run lint` · manual link check on the TOC anchor
+
+  **AC amended, with its reason (Plan Challenge, verified).** The exclusion is
+  the LM Studio install/daemon lines — `curl … lmstudio.ai/install.sh | bash`,
+  `lms daemon up`, `lms get -y`. Phase 5's bounded residual #1 (`:549-552`)
+  already recorded them as deliberately never executed, because T12 forbids
+  running the LM Studio installer; and on this host **`lms` is not on `PATH`**
+  (`which lms` → not found) while the LM Studio server itself is live on
+  `:1234`, so they are unexecutable here, not merely unmeasured. Every *other*
+  changed command is executed once and its exit code transcribed. Writing the
+  narrower AC down beats silently failing the wider one.
+- **`README.md:47` and `:49-53` are the `install.sh` quick start, and
+  `install.sh` has no provider menu** (Phase 5 bounded residual #4, `:563-567`:
+  only `setup-local-first.sh` dispatches; `install.sh` installs Ollama
+  unconditionally). Documenting a provider choice there would be false. Route
+  LM Studio selection to `setup-local-first.sh` or
+  `MASSA_AI_INFERENCE_PROVIDER` explicitly.
+- **Do not claim stale-index protection without its qualifier.** Phase 3
+  residual #3 (`:338-341`): every existing install is legacy/NULL until its
+  first full reindex, so LIP-15 protects no existing project until then.
+**Gate:** `bun run lint` is a **structural no-op here** — it is `oxlint`
+(`package.json:29`), which reads JS/TS and no markdown, so it is exit 0 before
+and after any T16 edit, correct or not. Run it, but never quote it as the
+sensor. The two discriminating checks are: (1) **TOC resolution** — extract
+every `](#…)` in `FEATURES.md` and assert each resolves to a slugified heading
+in that same file; zero new unresolved links before vs after. (2) **Claim
+coverage** — the spec enumerates **23** sites (README 8, FEATURES 7,
+CHEATSHEET 8, `spec.md:346-358`); each is either in the diff or carries a
+written reason why it is not. "3 files changed" proves nothing about the 23.
 
 ### T17 — measurement (LIP-22)
 **Requirements:** LIP-22
-**Writes:** `.specs/features/local-inference-provider-abstraction/validation.md`
-(inputs section)
+**Writes:** the **Phase 7 landed note in this file** — *not* `validation.md`.
+
+  **Write target amended, with its reason (Plan Challenge, verified).**
+  `validation.md` has exactly one writer, the verification-agent
+  (`skills/massa-ai/workflows/spec-driven.md:117`, author ≠ verifier), and
+  creating it early is actively harmful: `validate_state.ts:130`'s
+  `appearsComplete()` returns `true` on **mere existence** of the file — and
+  the other branch cannot save it, because `TASK_HEADING_RE` is
+  `/^#{2,4}\s+T\d+\s*:/m` (`:45`) while this file writes `### T16 — …` (em
+  dash, no colon), so existence is the *only* trigger. The feature then enters
+  `checkFeature()` and an inputs-only file fails with "validation.md has no
+  PASS/FAIL verdict (a prose-only report does not count)", exit 1. T17
+  therefore records its figures here, where every other phase's measurements
+  live, and hands them to the Verifier as an input; the Verifier transcribes
+  them into `validation.md`, which is what LIP-22's AC sentence asks for.
 - `bun run bench:needles` at 768 recorded **as a number** beside the 2560
-  baseline. 768 leaves the binary-quantization path entirely
-  (`postgres-vector-store.ts:267-270`, `:329`, `:363`) — a retrieval-algorithm
-  change, not a width change. A promise to measure later is not acceptable.
-**Gate:** the recorded figure exists in `validation.md`
+  baseline. A promise to measure later is not acceptable.
+- **How to get a 768 run (measured, not assumed).** The harness embeds **only**
+  via Ollama `POST /api/embeddings` (`benchmarks/needles/run.ts:113-140`); it
+  has no client for LM Studio's OpenAI-shaped `/v1/embeddings`, and no 768-dim
+  model is installed in Ollama at `c5a7f72c` (`qwen3-embedding:4b`,
+  `qwen2.5:7b-instruct`, `qwen2.5-coder:7b`, plus three `:cloud` chat models).
+  Approved route: `ollama pull nomic-embed-text` — the same
+  nomic-embed-text-v1.5 family LM Studio serves — then
+  `NEEDLE_MODEL=nomic-embed-text bun run bench:needles`, with the default
+  `qwen3-embedding:4b` run as the 2560 baseline. Both runs on the same tree,
+  the same `benchmarks/needles/fixtures/massa-ai.json` revision (pin its sha),
+  and `benchmarks/needles/reports/` is gitignored, so the transcribed numbers
+  here are the only durable artifact.
+- **Assert the width, do not infer it.** Nothing in the harness checks the
+  returned vector length, so a tag that silently resolves elsewhere, or an
+  Ollama fallback to the already-loaded model, yields a plausible number at the
+  wrong width. Record the observed `embedding.length` (768 and 2560) beside
+  each score.
+- **The bound is two-part, and both parts get written down.** LIP-22's title
+  says "measure the retrieval-algorithm change at 768"; this harness cannot.
+  (a) **Not the shipped path** — the production LM Studio `/v1/embeddings`
+  client is never exercised; only the same model family under a different
+  server, with Ollama-only knobs applied (`run.ts:129-137` truncates at 8000
+  chars and passes `options.num_ctx`, which has no `/v1/embeddings`
+  counterpart). (b) **Not the algorithm change** — `run.ts:5-16` is a
+  self-contained in-process **exact-cosine** ranker that never constructs
+  `packages/core/src/data/vector/postgres-vector-store.ts`, so neither the
+  `dimensions > 2000` two-phase binary-quantization branch (`:233`, `:267`) nor
+  the ≤2000 plain-HNSW branch runs on **either** side. The delta it reports has
+  the approximate-search component removed from both sides — biased in exactly
+  the direction that hides the risk LIP-22 names. So the stated risk stays
+  **UNMEASURED**, and the sensor that would settle it is named: a full-stack
+  run against a real pgvector index at each width, i.e. `14.needles.test.ts`
+  (`run.ts:14-16`). Note the spec cites this file under `services/vector/`; it
+  is under `data/vector/` — a stale path cite, corrected here.
+**Gate:** both figures, both observed vector lengths, the fixture sha, and both
+halves of the bound appear in the Phase 7 landed note.
 
 ### T18 — CHANGELOG + `.specs` close-out
 **Requirements:** LIP-21
@@ -816,7 +892,33 @@ re-anchoring holds; and LIP-24's substitute sensor exists at
   the heading drives the release bump. CI fails a PR that does not touch it.
 - **Never write the skip-ci marker literally** in a commit message or PR body.
 - Committed **before** the first push, so delivery stage 3.5 is a no-op.
+- **`.specs/HANDOFF.md` is rotated, never replaced — and this file breaks a
+  naive rotation worse than the one that produced the rule.** The recorded
+  failure (2026-08-04, model-profile-switching close-out) is that a regex
+  prepend *consumed* the prior feature's active block instead of demoting it.
+  Procedure: rename the old heading to `Previous handoff` **first**, prepend
+  **second**. Two traps measured here: (1) the headings are **inconsistent** —
+  `:1` `# Handoff — bootstrap-file-and-rule-toggles` (H1), `:83`
+  `## Previous handoff — installer-prune-and-test-scoping` (H2), `:107` and
+  `:160` `# Previous handoff — …` (**H1**), `:220` and `:311` H2 — so a
+  rotation keyed on `^## Previous handoff` is blind to the H1 entries, and one
+  keyed on `^# Handoff` through the next `^#` consumes through `:83` and
+  destroys the installer-prune record; (2) the convention here is
+  `# Handoff — <slug>` / `## Previous handoff — <slug>`, **not** the
+  `## Active` / `## Previous` shape the rule is usually written with, so a
+  rotation transcribed from that shape matches nothing and silently no-ops.
+  Normalise the H1/H2 inconsistency while in there, or the next rotation
+  inherits it.
 **Gate:** `bun skills/massa-ai/scripts/check_specs_delivered.ts local-inference-provider-abstraction --root .`
+is **necessary but vacuous on its own** — it proves only that `.specs/` is
+porcelain-clean and that the named paths are tracked on HEAD (`:14-19`), and
+all three state files are *already* tracked from the previous feature.
+Measured at `c5a7f72c` with `.specs/` clean: it exits **0 before T18 edits
+anything**. The four discriminating assertions:
+1. `git diff --name-only main..HEAD -- .specs/project/STATE.md .specs/HANDOFF.md .specs/project/FEATURES.json` lists **all three**.
+2. `FEATURES.json` contains `local-inference-provider-abstraction`, and `active_feature` is no longer `bootstrap-file-and-rule-toggles` (it is, at `:1469`).
+3. `CHANGELOG.md`'s `[Unreleased]` holds a heading **with bullets** — `CONTRIBUTING.md` § CHANGELOG authoring: a heading with no bullets is ignored, and the heading derives the release bump. Confirm the intended bump before filing.
+4. `grep -n "^#\{1,2\} " .specs/HANDOFF.md` before vs after: the count grows by exactly one, `bootstrap-file-and-rule-toggles` still appears and now reads `Previous handoff`, and all five existing Previous titles survive unchanged.
 
 ---
 
@@ -838,12 +940,12 @@ re-anchoring holds; and LIP-24's substitute sensor exists at
 | LIP-12/13/16 | fixture-driven detection + menu + `die` on bad env | T11 |
 | LIP-14 | detection succeeds with `lms` off PATH | T12 |
 | LIP-15 | 4 cases: 2 read-gate, 2 write-gate | T08, T09 |
-| LIP-17 | TOC anchor intact; commands executed before written | T16 |
+| LIP-17 | FEATURES.md TOC links all resolve (before = after); 23-site coverage accounted for; commands executed before written, minus the written `lms` exclusion. **Not** `bun run lint` — oxlint reads no markdown | T16 |
 | LIP-18/19b | observed red on the **LM Studio** pair | T15 |
 | LIP-19 | golden regenerated + diff reviewed | T14 |
 | LIP-20 | `turbo-passthrough-env.test.ts` | T15 |
 | LIP-21 | `check_specs_delivered.ts` exit 0 | T18 |
-| LIP-22 | recorded needles figure at 768 | T17 |
+| LIP-22 | both needles figures (768 + 2560) with both observed vector lengths, in the Phase 7 landed note, plus both halves of the recorded bound — the algorithm change itself stays UNMEASURED, sensor named | T17 |
 | LIP-23 | entrypoint-recording sensor + live parsed-object run | done in Phase 3 (`c838837d`) |
 | LIP-24 | completeness shrinkage accounted for, not waved through | T15 |
 
