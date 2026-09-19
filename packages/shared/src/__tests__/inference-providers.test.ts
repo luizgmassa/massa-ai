@@ -152,11 +152,21 @@ describe("side-effect freedom (T01 discriminating check)", () => {
     expect(bundled).not.toContain("getConfigDir");
   });
 
-  test("the source file has zero import statements", async () => {
+  // T07 (2026-09-19, approved amendment): this module now derives
+  // `ollama.knownDimensions` from `embedding-dimensions.ts`'s
+  // `KNOWN_EMBEDDING_DIMENSIONS` rather than carrying a second copy of that
+  // table — a one-line, one-direction import of an equally zero-I/O module.
+  // The bundling check above is the test that actually matters (it would
+  // catch a reach into `config/index.ts` through any import chain); this one
+  // is narrowed from "zero imports" to "no import besides that one sanctioned
+  // sibling", so a stray new import is still caught.
+  test("the source file imports nothing besides embedding-dimensions.ts", async () => {
     const source = await Bun.file(MODULE_PATH).text();
     const importLines = source
       .split("\n")
       .filter((line) => /^\s*import\b/.test(line));
-    expect(importLines).toEqual([]);
+    expect(importLines).toEqual([
+      'import { KNOWN_EMBEDDING_DIMENSIONS } from "./embedding-dimensions.js";',
+    ]);
   });
 });

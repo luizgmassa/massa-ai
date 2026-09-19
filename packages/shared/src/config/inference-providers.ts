@@ -1,12 +1,17 @@
 /**
  * Provider-neutral data for the local inference seam: ids, default base URLs,
  * env names, known embedding widths, LLM-behaviour flags, and the pure
- * response-body parsers. Zero I/O and zero imports — mirrors
- * `embedding-dimensions.ts`. `apps/web-ui` value-imports this module through
- * the `@massa-ai/shared/inference-providers` subpath, which must never reach
+ * response-body parsers. Zero I/O — the only import is `embedding-dimensions.ts`
+ * (also zero-I/O, one direction only: this module derives `ollama.knownDimensions`
+ * from its `KNOWN_EMBEDDING_DIMENSIONS` rather than carrying a second copy of
+ * that table, T07). `apps/web-ui` value-imports this module through the
+ * `@massa-ai/shared/inference-providers` subpath, which must never reach
  * `config/index.ts` (`loadConfigSafe()` runs at module scope there and would
- * break the browser).
+ * break the browser) — `embedding-dimensions.ts` never imports `config/index.ts`
+ * either, so that constraint still holds transitively.
  */
+
+import { KNOWN_EMBEDDING_DIMENSIONS } from "./embedding-dimensions.js";
 
 export const LOCAL_INFERENCE_IDS = ["ollama", "lmstudio"] as const;
 
@@ -61,12 +66,7 @@ export const INFERENCE_PROVIDERS: Readonly<
       baseUrl: "OLLAMA_BASE_URL",
       dimensions: "OLLAMA_EMBEDDING_DIMENSIONS",
     },
-    knownDimensions: {
-      "qwen3-embedding:8b": 4096,
-      "qwen3-embedding:4b": 2560,
-      "qwen3-embedding:0.6b": 1024,
-      "bge-m3": 1024,
-    },
+    knownDimensions: KNOWN_EMBEDDING_DIMENSIONS,
     supportsOllamaVersionProbe: true,
     injectsDisableThink: true,
     parseModelList: parseOllamaModelList,
