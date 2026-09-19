@@ -49,7 +49,41 @@ Therefore:
 
 | Piece | Home | Why |
 |---|---|---|
-| Provider ids, default URLs, env names, dimension tables, **pure** `parseModelList` functions | `packages/shared/src/config/inference-providers.ts`, exposed through a **new `"./inference-providers"` subpath export** | Side-effect-free, so web-ui can value-import it without dragging `config/index.ts`. Exact precedent: `embedding-dimensions.ts` — a pure table plus pure functions, zero I/O |
+| Provider ids, default URLs, env names, dimension tables, **pure** `parseModelList` functions | `packages/shared/src/config/inference-providers.ts`, exposed through a **new `"./inference-providers"` subpath export** | Side-effect-free, consumed by `packages/core` and `apps/*` server code. Exact precedent: `embedding-dimensions.ts` — a pure table plus pure functions, zero I/O |
+
+### Correction (measured 2026-09-19, orchestrator, after Phase 1 landed)
+
+The row above originally justified side-effect-freedom with "so web-ui can
+value-import it". **That justification is false and the plan built on it is not
+implementable.** Side-effect-freedom was necessary but never sufficient; the
+binding constraint is module *resolution*, which §1 never named:
+
+- `apps/web-ui`'s build is plain `tsc` — `"build": "rm -f tsconfig.tsbuildinfo &&
+  tsc -p tsconfig.build.json && mkdir -p dist/static && cp ..."`. No bundler, no
+  specifier rewriting.
+- `src/static/index.html:61` loads `/ui/app.js` as a raw
+  `<script type="module">`, and the file contains **no import map**.
+- The already-built `dist/static/views/config-sections.js` carries **zero**
+  import statements: the `import type { MassaAiConfig }` erased entirely under
+  `verbatimModuleSyntax`, exactly as that file's own docblock claims.
+
+A *value* import would therefore emit a literal
+`import { LOCAL_INFERENCE_IDS } from "@massa-ai/shared/inference-providers"` into
+a browser-loaded module — a bare specifier no browser resolves — and `/ui` would
+fail at load.
+
+**Decision (orchestrator, 2026-09-19).** `config-sections.ts:46` keeps a literal
+enum. The parity sensor pins it by **reading the file as text**, not by importing
+it, and asserts membership equality against the derived set. This is not a new
+technique: `embedding-defaults-parity.test.ts` already text-scans across the
+bash/TypeScript dialect split for exactly this reason. T01's side-effect-freedom
+test stays — the property is still worth holding, and it is still the reason the
+module may not reach `config/index.ts` from *any* consumer — only its stated
+motive changes.
+
+**Consequence for LIP-01's wording:** `config-sections.ts` is a **text-pinned**
+consumer, not a derived one. A verifier reading "derived consumers" and finding a
+literal there is reading a stale clause, not a defect.
 | `probeProvider` (network) | `packages/core/src/kernel/` | `kernel/` is the repo's declared home for cross-tier leaves (`packages/core/src/index.ts`); any tier may import it, it imports no tier. Reachable from scripts the same way `verify-tree-sitter-grammars.ts:18` already reaches core |
 
 `packages/shared/package.json` gains one `exports` entry. That is the whole

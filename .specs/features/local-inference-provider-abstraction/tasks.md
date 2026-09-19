@@ -99,6 +99,18 @@ the side-effect-freedom is asserted, not assumed.
 - Sensor asserts **membership equality between derived consumers**, not the
   absence of array literals — an allowlist over literals cannot tell a fourth
   copy from the three sanctioned ones. Shape: `embedding-defaults-parity.test.ts:290`.
+- **`config-sections.ts` cannot be a derived consumer** (measured; see
+  `design.md` §1 "Correction"). `apps/web-ui` builds with plain `tsc`, no
+  bundler, and `index.html:61` loads a raw `<script type="module">` with no
+  import map — a value import would emit an unresolvable bare specifier and
+  break `/ui` at load. Its enum **stays a literal**; the sensor pins it by
+  **reading the file as text** and asserting membership equality against the
+  derived set. Same technique the parity test already uses across the
+  bash/TypeScript split. Do not add an import to that file, and do not add an
+  import map or a bundler — both are out of scope.
+- `turbo.json` has `OLLAMA_BASE_URL` in `tasks.test.passThroughEnv` (`:40`) and
+  **no** `LMSTUDIO_*`. That file is **T15's** write set — do not edit it here;
+  report the omission so T15 closes it.
 **Gate:** `bun run type-check` · `bun run test:scripts` · `bun run lint`
 **Discriminating check:** mutate one derived list by hand and observe the
 sensor go **red**; restore. A sensor never seen failing is not a sensor.
