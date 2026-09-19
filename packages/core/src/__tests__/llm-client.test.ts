@@ -774,7 +774,7 @@ describe("llm-client — provider-aware gating (LIP-07)", () => {
     _setLlmBaseUrlForTesting("http://localhost:1234/v1");
     let fetchCalled = false;
     const origFetch = globalThis.fetch;
-    (globalThis as any).fetch = async (...args: any[]) => {
+    (globalThis as any).fetch = async () => {
       fetchCalled = true;
       throw new Error("fetch should not have been called for lmstudio");
     };
