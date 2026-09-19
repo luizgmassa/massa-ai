@@ -348,7 +348,20 @@ contract must round-trip) · new case asserting an LM Studio write
   pair.
 - Re-anchor `referencePair()` (`:47`) and rewrite its comment (`:43-46`) in the
   **same** commit — LIP-01 deletes the union it names as its discriminator.
-- Any new `MASSA_AI_*` var → `turbo.json` `passThroughEnv` (AD-010).
+- Any new `MASSA_AI_*` var → `turbo.json` `passThroughEnv` (AD-010). **Measured
+  gap:** `turbo.json:40` carries `OLLAMA_BASE_URL` and **no** `LMSTUDIO_*`,
+  while T04 emits `LMSTUDIO_EMBEDDING_MODEL` / `LMSTUDIO_BASE_URL` /
+  `LMSTUDIO_EMBEDDING_DIMENSIONS`. Under `bun run test` those arrive
+  `undefined`. Close it here.
+- **LIP-24 — account for the completeness scan's shrinkage.** Populations
+  measured with a scratch `XDG_CONFIG_HOME`: `main@d523f06f` **25**, after
+  Phase 1 **27**, after Phase 3 **26**. The drop is `local-health-checker.ts`
+  leaving the scan because T05 correctly replaced `process.env.OLLAMA_BASE_URL`
+  with `process.env[spec.envNames.baseUrl]` — the read still happens, the
+  literal does not. Either teach the scan the `spec.envNames.*` indirection, or
+  enumerate the files it no longer covers and show each is covered elsewhere.
+  Do not close this by observing the gate is green; a shrinking scan goes green
+  more easily, which is the defect.
 - **The width-writer scan is blind to `inference-providers.ts` (measured, not
   predicted).** Paired runs on main@d523f06f and branch@4fca51e4 both print
   `width-writer scan population: 4 — apps/mcp-client/src/config-cli.ts,
@@ -423,6 +436,8 @@ unquotable as a sensor for that subject.
 | LIP-20 | `turbo-passthrough-env.test.ts` | T15 |
 | LIP-21 | `check_specs_delivered.ts` exit 0 | T18 |
 | LIP-22 | recorded needles figure at 768 | T17 |
+| LIP-23 | entrypoint-recording sensor + live parsed-object run | done in Phase 3 (`c838837d`) |
+| LIP-24 | completeness shrinkage accounted for, not waved through | T15 |
 
 ## Dependencies
 

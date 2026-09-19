@@ -381,6 +381,51 @@ note.
   AC: a deliberate red is induced on the **LM Studio** pair specifically — not
   only the Ollama one — and observed failing. A gate that has never failed on
   the new subject is unquotable as a sensor for it.
+- **LIP-23 — structured output must reach an endpoint that honours it
+  (found in Execute, Phase 3; measured 2026-09-19).** LIP-07 gates the Ollama
+  version probe off for LM Studio, which *enables* the json_schema path.
+  Enabling it is not delivering it.
+
+  Measured against a live LM Studio 0.3.x serving `qwen/qwen3-4b-2507`:
+
+  | Endpoint | Request | Response |
+  |---|---|---|
+  | `POST /v1/responses` | `text.format` = `json_schema`, `strict:true` | `"text":{"format":{"type":"text"}}`, body `"The capital of France is Paris."` |
+  | `POST /v1/chat/completions` | `response_format` = `json_schema`, `strict:true` | `{ "capital": "Paris" }` |
+
+  LM Studio **serves** the Responses endpoint and **silently drops** the
+  requested format. `@ai-sdk/openai@3.0.80` resolves the default callable
+  `openai(model)` to Responses (`.chat()` and `.responses()` are the explicit
+  alternatives, `dist/index.d.ts:1105-1113`), and `buildProvider`
+  (`llm-client.ts:278-290`) used the default — so `llmObject` returned
+  `{ok:false, error:"No object generated: could not parse the response."}`
+  against LM Studio with LIP-07's gating fully correct.
+
+  **Ollama is not affected and this was checked, not assumed:** its
+  `/v1/responses` answered **400** `"qwen3-embedding:4b" does not support chat`
+  — a model error, so the endpoint is implemented there. The fix is therefore
+  a per-provider flag, `requiresChatCompletionsApi`, true only for LM Studio.
+
+  AC: the sensor records **which entrypoint `buildProvider` invoked**, not the
+  flag's value — a boolean read back is not evidence of a call position.
+  Flipping the flag must redden it. A live end-to-end `llmObject` run against
+  LM Studio must return a parsed object.
+- **LIP-24 — the seam makes env readers invisible to literal scanners
+  (found in Execute, Phase 3).** T05 replaced
+  `process.env.OLLAMA_BASE_URL` in `local-health-checker.ts` with
+  `process.env[spec.envNames.baseUrl]`. The name is still read at runtime, and
+  the dynamic form is the point of the seam — but the **literal token is gone**,
+  so every text-scanning sensor stops seeing that file. Measured on the parity
+  gate's completeness population: 25 on `main`, 27 after Phase 1 added the two
+  seam files, **26** after Phase 3 dropped `local-health-checker.ts` out of it.
+
+  This is LIP-18's failure shape one level deeper. LIP-18 is about a *new* pair
+  being invisible; this is about an *existing reader* becoming invisible as call
+  sites migrate to the seam. A scan that sees fewer files reports clean more
+  easily. AC (T15): the completeness scan's shrinkage is accounted for
+  explicitly — either the scan learns the `spec.envNames.*` indirection, or the
+  set of files it no longer covers is enumerated and each is shown to be covered
+  by a different sensor. "The gate is still green" is not an answer here.
 - **LIP-19b — re-anchor `referencePair()` in the same edit.** LIP-01 **deletes**
   the type union that `referencePair()` relies on as its documented
   discriminator: `/embedding:\s*(\{[^}]*provider:\s*"ollama",[^}]*\})/g`
