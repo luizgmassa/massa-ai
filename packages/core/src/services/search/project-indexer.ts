@@ -39,6 +39,11 @@ import { buildExtensionGlob, loadProjectIgnore } from "./ignore-patterns.js";
 import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import { ManagedRunRepositoryPg } from "../../data/managed-runs/managed-run-repository-pg.js";
 import type { ManagedRunLease } from "../../data/managed-runs/managed-run-contract.js";
+import {
+  getEmbeddingFingerprint,
+  stampEmbeddingFingerprint,
+} from "../../data/symbol/symbol-repo-workspace.js";
+import { getProvidersByPriority } from "../embeddings/config.js";
 import type { IndexManager } from "./index-manager.js";
 import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import type { getVectorStore } from "../vector/vector-store-factory.js";
@@ -81,7 +86,62 @@ export type SearchAdmissionResult = {
     newFiles?: number;
     deletedFiles?: number;
   };
+  /**
+   * LIP-15 read gate. Set when the workspace's stored embedding fingerprint
+   * disagrees with the currently configured embedding. The caller (the
+   * search entry path) MUST throw {@link EmbeddingIndexStaleError} and never
+   * proceed to `search()` when this is present — this module never throws
+   * that error itself, so every degraded-search test that only reads
+   * `admitted`/`stale` keeps passing unmodified.
+   */
+  embeddingMismatch?: {
+    stored: string;
+    current: string;
+  };
 };
+
+// ── Embedding fingerprint (LIP-15) ──────────────────────────────────────────
+
+/**
+ * Raised by the search entry path when the workspace's stored embedding
+ * fingerprint (`${provider}:${model}:${dimensions}`, stamped by the last full
+ * reindex) disagrees with the currently configured embedding. Search must
+ * never fall through to a table holding two mixed embedding spaces — the
+ * caller throws this instead of returning rows.
+ */
+export class EmbeddingIndexStaleError extends Error {
+  constructor(
+    readonly projectId: string,
+    readonly storedFingerprint: string,
+    readonly currentFingerprint: string,
+  ) {
+    super(
+      `Project '${projectId}' was indexed with embedding fingerprint ` +
+        `'${storedFingerprint}', but the configured embedding is now ` +
+        `'${currentFingerprint}'. Run index_project with forceReindex: true ` +
+        `to rebuild the index for the new embedding.`,
+    );
+    this.name = "EmbeddingIndexStaleError";
+  }
+}
+
+/**
+ * The live embedding fingerprint (design.md §5): `${provider}:${model}:${dimensions}`
+ * for the currently *selected* provider — `getProvidersByPriority()[0]`, the
+ * priority-1 entry `services/embeddings/config.ts` resolves synchronously
+ * from env + config.json at module load (no network probe, no fallback
+ * chain walk — that is `createEmbeddingProvider`'s job, not this gate's).
+ * `null` when any component is not resolvable — every caller here treats
+ * "unknown" the same as "no mismatch": warn or skip, never block on a value
+ * we can't compute.
+ */
+export function currentEmbeddingFingerprint(): string | null {
+  const [, active] = getProvidersByPriority()[0] ?? [];
+  if (!active?.provider || !active?.model || active.dimensions === undefined) {
+    return null;
+  }
+  return `${active.provider}:${active.model}:${active.dimensions}`;
+}
 
 // ── Deps ─────────────────────────────────────────────────────────────────────
 
@@ -402,11 +462,24 @@ export async function ensureFreshIndex(
     };
   }
 
+  // LIP-15 write gate: a fingerprint mismatch forces the full-reindex branch
+  // below, so a stale project can never take the incremental branch and mix
+  // two embedding spaces in one table. `liveFingerprint` is reused after a
+  // successful full reindex to stamp the workspace row (the "clearing branch"
+  // — design.md §5).
+  const storedFingerprint = await getEmbeddingFingerprint(projectId);
+  const liveFingerprint = currentEmbeddingFingerprint();
+  const fingerprintMismatch =
+    storedFingerprint !== null &&
+    liveFingerprint !== null &&
+    storedFingerprint !== liveFingerprint;
+
   // For full reindex or many changes, clear and reindex
   const needsFullReindex =
     staleCheck.reason === "no_index" ||
     staleCheck.reason === "path_mismatch" ||
-    filesToReindex.length > maxSyncFiles;
+    filesToReindex.length > maxSyncFiles ||
+    fingerprintMismatch;
 
   if (needsFullReindex && !allowFullReindex) {
     logger.warn("Deferring full reindex in latency-sensitive path", {
@@ -455,6 +528,13 @@ export async function ensureFreshIndex(
     let lease: ManagedRunLease = beginOutcome.lease;
     try {
       await deps.indexProject(projectPath, projectId);
+
+      // LIP-15 write gate: stamp only from this clearing branch, only after
+      // every row was just rewritten under `liveFingerprint`. Never stamped
+      // from the incremental branch below.
+      if (liveFingerprint !== null) {
+        await stampEmbeddingFingerprint(projectId, liveFingerprint);
+      }
 
       // Invalidate cache after reindex
       await deps.searchCache.invalidateProject(projectId);
@@ -543,6 +623,26 @@ export async function checkSearchAdmission(
       admitted: false,
       error: `Project '${projectId}' is not indexed. Run index_project first, then retry.`,
     };
+  }
+
+  // LIP-15 read gate. NULL/no row = legacy or never-stamped: warn once, never
+  // block — the next full reindex stamps it. A live fingerprint we can't
+  // resolve is treated the same way (see currentEmbeddingFingerprint). Only a
+  // stored value that actively disagrees with a resolvable live one blocks.
+  const storedFingerprint = await getEmbeddingFingerprint(projectId);
+  if (storedFingerprint === null) {
+    logger.warn(
+      "Workspace has no embedding fingerprint (legacy or never-stamped); skipping the embedding staleness check",
+      { projectId },
+    );
+  } else {
+    const liveFingerprint = currentEmbeddingFingerprint();
+    if (liveFingerprint !== null && storedFingerprint !== liveFingerprint) {
+      return {
+        admitted: false,
+        embeddingMismatch: { stored: storedFingerprint, current: liveFingerprint },
+      };
+    }
   }
 
   if (projectPath) {
