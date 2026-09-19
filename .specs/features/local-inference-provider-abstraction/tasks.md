@@ -922,6 +922,72 @@ anything**. The four discriminating assertions:
 
 ---
 
+## Phase 7 landed — T17 (LIP-22): the measurement, and what it is not
+
+Corpus pinned: head `bc2f2f82`, fixture
+`benchmarks/needles/fixtures/massa-ai.json` sha256
+`3028ced20b6642c77c791d317649da696f0b18ab7f656f6aefe16785129137bc`, **14**
+needles (`N01`–`N14`), `scoring.staleNeedles` `[]`. The fixture carries no
+static per-needle `filePath`; resolution is content-anchor-based (`resolve.ts`,
+SEN-04) and hard-fails on an unresolvable anchor rather than warning, so
+"14/14 resolved, zero `NeedleResolutionError`, zero `[warn]`" on both runs is
+the only existence check this fixture supports — and it is the one that passed.
+
+| metric | 2560 — `qwen3-embedding:4b` | 768 — `nomic-embed-text` |
+|---|---|---|
+| hit@1 | 0.5000 | 0.2857 |
+| hit@3 | 0.7143 | 0.6429 |
+| hit@5 | 0.7857 | 0.7143 |
+| hit@10 | 1.0000 | 0.7857 |
+| MRR | 0.6423 | 0.4650 |
+| wall clock | 90.88 s | 20.23 s |
+
+Misses at 768 and at neither width otherwise: **N08** (`chunker-post.ts:33-36`),
+**N11** (`discover.ts:188-194`), **N12** (`postgres-vector-store.ts:74-77`) —
+all outside top-10, each with a plausible-but-wrong top hit.
+
+**Width asserted, not inferred — and re-probed by the orchestrator, not accepted
+from the worker.** Independent `curl POST :11434/api/embeddings` with a trivial
+prompt: `qwen3-embedding:4b` → `embedding.length` **2560**, `nomic-embed-text` →
+**768**. Both exact. This check exists because nothing in the harness validates
+the returned vector length, so a tag resolving elsewhere, or an Ollama fallback
+to the already-loaded model, would have produced a plausible number at the wrong
+width. Reports: `benchmarks/needles/reports/massa-ai-t17-2560-results.json` and
+`…/massa-ai-lmstudio-width-768-results.json`; that directory is gitignored, so
+durable copies live at `/tmp/t17-needles-{2560,768}.json` and the table above is
+the record. Every figure here was re-read from those JSON files by the
+orchestrator, not transcribed from the worker's prose. No eviction thrash: the
+768 run was *faster* (its model is far smaller), the harness's retry counter
+fired zero on both runs.
+
+**The two-part bound. Both halves are the point; neither is a caveat.**
+
+(a) **Not the shipped path.** `run.ts:113-140` calls only
+`POST {OLLAMA_HOST}/api/embeddings`, truncates at 8000 chars (`:129`) and passes
+`options.num_ctx` (`:133-136`) — an Ollama-only knob with no counterpart on the
+OpenAI-shaped `/v1/embeddings` this feature actually ships. LM Studio was live
+on `:1234` serving `text-embedding-nomic-embed-text-v1.5` throughout and was
+never called. Both numbers are the same model *family* through a different
+server with different request shaping than production.
+
+(b) **Not the algorithm change — and biased in the direction that hides it.**
+`run.ts:5-16` is a self-contained in-process **exact-cosine** ranker; it never
+imports or constructs `packages/core/src/data/vector/postgres-vector-store.ts`,
+so neither the `dimensions > 2000` two-phase binary-quantization branch (`:233`,
+`:267`) nor the ≤2000 plain-HNSW branch runs on **either** arm. The delta above
+therefore has the approximate-search component removed from both sides.
+
+So LIP-22's stated risk — that 768 leaves the binary-quantization path — remains
+**UNMEASURED**. The sensor that would settle it is a full-stack run against a
+real pgvector index at each width: `packages/core/src/__tests__/e2e/14.needles.test.ts`
+(the worker's report placed this file under `data/vector/`; corrected here from
+`git ls-files`). What the table *does* measure is chunk-embedding quality at the
+two widths, and on that narrower question the 768 model is materially worse on
+this corpus — MRR 0.6423 → 0.4650, hit@1 0.5000 → 0.2857. Recorded as the
+accepted risk LIP-22 declares it to be, not as a clean result.
+
+---
+
 ## Test Coverage Matrix
 
 | Requirement | Sensor | Task |
