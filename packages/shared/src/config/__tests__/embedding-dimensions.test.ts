@@ -168,7 +168,7 @@ describe("resolveModelDimensions — provider-aware, probe-backed resolution (LI
     let requestedUrl = "";
     const fetchImpl = (async (url: string) => {
       requestedUrl = url;
-      return new Response(JSON.stringify({ embedding: new Array(384).fill(0) }));
+      return new Response(JSON.stringify({ embedding: Array.from({ length: 384 }, () => 0) }));
     }) as unknown as typeof fetch;
     const dims = await resolveModelDimensions("some-org/unknown-embed:v9", {
       baseUrl: "http://localhost:11434",
@@ -184,7 +184,7 @@ describe("resolveModelDimensions — provider-aware, probe-backed resolution (LI
     const fetchImpl = (async (url: string) => {
       requestedUrl = url;
       return new Response(
-        JSON.stringify({ object: "list", data: [{ embedding: new Array(768).fill(0) }] }),
+        JSON.stringify({ object: "list", data: [{ embedding: Array.from({ length: 768 }, () => 0) }] }),
       );
     }) as unknown as typeof fetch;
     const dims = await resolveModelDimensions("some-org/unknown-embed:v9", {
