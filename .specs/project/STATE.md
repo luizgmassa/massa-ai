@@ -77,7 +77,36 @@ contextWindow` to `99999` instead of deriving it from `INFERENCE_ROLE_DEFAULTS.i
 contextWindow` failed "the shipped llm defaults are the role-table values" (expected 16384,
 got 99999); (2) removing the `llm.codeTemperature` numeric check from `config-writer.ts`
 failed "rejects a non-number llm.codeTemperature" (expected `success:false`, got `true`).
-Next: T03 (provider-derived instruct/coding defaults), depends only on T01.
+
+**T03 (W2) — Complete.** `DEFAULT_LLM_MODEL`/`DEFAULT_LLM_CODE_MODEL` (`config/index.ts`) moved
+from the top of the file to right after `fileConfig` is resolved and now derive from
+`INFERENCE_PROVIDERS[activeInferenceProviderId()].defaultModels.{instruct,coding}`; the new
+`activeInferenceProviderId()` reads `fileConfig.embedding.provider`, falling back to `ollama`
+when it does not name a `LOCAL_INFERENCE_IDS` entry (mistral/openai/etc. keep today's ollama-trio
+behavior — no local-inference provider dimension of their own). `defaultMassaAiConfig.llm.model`/
+`codeModel` (`massa-ai-config.ts`) now read `INFERENCE_PROVIDERS.ollama.defaultModels.{instruct,
+coding}` instead of the literals `"qwen2.5:7b-instruct"`/`"qwen2.5-coder:7b"` — the coding value
+is unchanged (ollama's coding default was already that model), only the instruct value moves to
+`"qwen3-vl:8b"`.
+Gate: `bun test packages/shared/src/config/__tests__/` → 266 pass / 0 fail (up from 264: added 2
+new tests). Fixed one expected fallout: `llm-env-prefix.test.ts`'s `MODEL` knob's documented
+default was the retired literal; updated to `"qwen3-vl:8b"`. `bun run type-check` → 6/6.
+**Adequacy gap closed:** the two exported constants are otherwise dead code by the time any
+existing test observes them — `fileConfig.llm.model` is already resolved via
+`defaultMassaAiConfig.llm.model` before `?? DEFAULT_LLM_MODEL` is ever consulted, so mutating the
+constant alone produced no red through `config.get("llm")`. Added a dedicated
+"T03: DEFAULT_LLM_MODEL / DEFAULT_LLM_CODE_MODEL are provider-derived" block to
+`llm-env-prefix.test.ts` that imports the two constants directly, for both the no-config (ollama
+fallback) and `embedding.provider: "lmstudio"` cases. Observed red (restored by file copy,
+`git status --porcelain` clean before commit): pinning `DEFAULT_LLM_MODEL` back to the literal
+`"qwen2.5:7b-instruct"` failed both new tests (expected `"qwen3-vl:8b"`/`"qwen3-vl-8b-instruct"`,
+got the pinned literal).
+**Known fallout outside this batch (not fixed — belongs to the sweep/gate tasks):**
+`packages/shared/src/bootstrap/__tests__/state.test.ts` (inside `packages/shared` but outside
+`config/__tests__/`, so outside T02-T04's declared gates) still asserts the retired
+`"qwen2.5:7b-instruct"` literal; `packages/core/src/__tests__/llm-client.test.ts` (T05's file)
+will need the same repointing once code role no longer falls back to the instruct model.
+Next: T04 (wire the 11th `MASSA_AI_LLM_*` knob), depends on T02.
 
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)

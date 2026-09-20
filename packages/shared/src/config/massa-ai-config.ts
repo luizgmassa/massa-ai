@@ -1,6 +1,6 @@
 import path from "path";
 import { configDir } from "./xdg";
-import { LOCAL_INFERENCE_IDS, INFERENCE_ROLE_DEFAULTS } from "./inference-providers";
+import { LOCAL_INFERENCE_IDS, INFERENCE_PROVIDERS, INFERENCE_ROLE_DEFAULTS } from "./inference-providers";
 
 /**
  * API-only embedding providers writable to `config.json` — the other half of
@@ -450,8 +450,8 @@ export const defaultMassaAiConfig: MassaAiConfig = {
     enabled: false,
     baseUrl: "http://localhost:11434/v1",
     apiKey: "ollama",
-    model: "qwen2.5:7b-instruct",
-    codeModel: "qwen2.5-coder:7b",
+    model: INFERENCE_PROVIDERS.ollama.defaultModels.instruct,
+    codeModel: INFERENCE_PROVIDERS.ollama.defaultModels.coding,
     temperature: 0.2,
     maxOutputTokens: 8000,
     timeoutMs: 90_000,

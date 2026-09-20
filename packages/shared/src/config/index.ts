@@ -19,23 +19,12 @@ import {
   SCHEDULER_JOB_KINDS,
   type SchedulerConfig,
 } from "./massa-ai-config";
-import { INFERENCE_ROLE_DEFAULTS } from "./inference-providers";
-
-/**
- * Default LLM model for NL/instruction-shaped sites. Pure-instruct (non-thinking)
- * so structured/free-text calls finish fast and never stall on a reasoning
- * channel (the qwen3 thinking-model 90s-timeout degrade). Single source of
- * truth — `llm-client.ts` falls back to this constant instead of a bare literal.
- * Override via MASSA_AI_LLM_MODEL.
- */
-export const DEFAULT_LLM_MODEL = "qwen2.5:7b-instruct";
-
-/**
- * Default LLM model for code-oriented sites (bootstrap summarization, reranker
- * verdict, code compression). Coder-tuned instruct model. Override via
- * MASSA_AI_LLM_CODE_MODEL.
- */
-export const DEFAULT_LLM_CODE_MODEL = "qwen2.5-coder:7b";
+import {
+  INFERENCE_ROLE_DEFAULTS,
+  INFERENCE_PROVIDERS,
+  LOCAL_INFERENCE_IDS,
+  type InferenceProviderId,
+} from "./inference-providers";
 
 export interface ServerConfig {
   // Server Info
@@ -641,6 +630,38 @@ export const DEFAULT_ALLOWED_EXTENSIONS: readonly string[] = [
  * everything else the env does not set.
  */
 const fileConfig = loadConfigSafe();
+
+/**
+ * The local-inference provider whose trio backs the instruct/coding defaults
+ * below. `embedding.provider` is the only config field naming a local-inference
+ * id today; a remote embedding provider (mistral/openai/...) has no LLM-provider
+ * dimension of its own, so it falls back to ollama's trio — today's only
+ * behaviour, unchanged for that case.
+ */
+function activeInferenceProviderId(): InferenceProviderId {
+  const providerId = fileConfig.embedding?.provider;
+  if (providerId && (LOCAL_INFERENCE_IDS as readonly string[]).includes(providerId)) {
+    return providerId as InferenceProviderId;
+  }
+  return "ollama";
+}
+
+/**
+ * Default LLM model for NL/instruction-shaped sites. Pure-instruct (non-thinking)
+ * so structured/free-text calls finish fast and never stall on a reasoning
+ * channel (the qwen3 thinking-model 90s-timeout degrade). Derived from the
+ * active provider's seam entry (`inference-providers.ts`) rather than a bare
+ * literal — `llm-client.ts` falls back to this constant. Override via
+ * MASSA_AI_LLM_MODEL.
+ */
+export const DEFAULT_LLM_MODEL = INFERENCE_PROVIDERS[activeInferenceProviderId()].defaultModels.instruct;
+
+/**
+ * Default LLM model for code-oriented sites (bootstrap summarization, reranker
+ * verdict, code compression). Derived from the active provider's seam entry.
+ * Override via MASSA_AI_LLM_CODE_MODEL.
+ */
+export const DEFAULT_LLM_CODE_MODEL = INFERENCE_PROVIDERS[activeInferenceProviderId()].defaultModels.coding;
 
 // config.json cache block is in MB; ServerConfig expects bytes for l1/l2 maxSize.
 const fileCacheL1Bytes = fileConfig.cache?.l1MaxSizeMB

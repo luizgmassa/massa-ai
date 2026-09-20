@@ -75,7 +75,7 @@ Tests: new config-resolution cases: a file value beats the role-table default fo
 Gate: bun test packages/shared/src/config/__tests__/config-loader.test.ts packages/shared/src/config/__tests__/config-writer.test.ts
 Depends on: T01.
 
-### T03: Make the instruct/coding defaults provider-derived
+### T03: Make the instruct/coding defaults provider-derived — ✅ Complete
 
 `DEFAULT_LLM_MODEL` / `DEFAULT_LLM_CODE_MODEL` (`config/index.ts:30,37`) resolve from the active
 provider's `defaultModels`; `defaultMassaAiConfig.llm` (`massa-ai-config.ts:426-436`) derives

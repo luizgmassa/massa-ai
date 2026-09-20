@@ -44,7 +44,9 @@ const KNOBS = [
     probe: "probe-instruct-model",
     field: "model",
     expected: "probe-instruct-model",
-    default: "qwen2.5:7b-instruct",
+    // Provider-derived (T03): the ollama seam entry's instruct default, not a
+    // disconnected literal — see inference-providers.ts's `defaultModels`.
+    default: "qwen3-vl:8b",
   },
   {
     suffix: "CODE_MODEL",
@@ -145,5 +147,73 @@ describe("AD-010: MASSA_AI_LLM_* is the project's only LLM env prefix", () => {
     for (const k of KNOBS) {
       expect(resolved[k.field], `config.${k.field} is not its documented default`).toBe(k.default);
     }
+  }, 30_000);
+});
+
+describe("T03: DEFAULT_LLM_MODEL / DEFAULT_LLM_CODE_MODEL are provider-derived", () => {
+  let home: IsolatedConfigHome;
+
+  beforeEach(() => {
+    home = makeIsolatedConfigHome("massa-ai-default-model-");
+  });
+
+  afterEach(() => {
+    removeIsolatedConfigHome(home);
+  });
+
+  /**
+   * Asserts the exported constants directly, not through `config.get("llm")` —
+   * `llm.model` is already resolved by `defaultMassaAiConfig.llm.model` before
+   * this fallback is ever consulted, so testing only the resolved field would
+   * leave `DEFAULT_LLM_MODEL`/`DEFAULT_LLM_CODE_MODEL` themselves unobserved
+   * (T03's actual deliverable).
+   */
+  test("with no embedding.provider configured, both constants derive from ollama's seam entry", () => {
+    const child = `
+      import { DEFAULT_LLM_MODEL, DEFAULT_LLM_CODE_MODEL } from ${JSON.stringify(CONFIG_INDEX)};
+      import { INFERENCE_PROVIDERS } from ${JSON.stringify(
+        path.join(import.meta.dir, "..", "inference-providers.ts"),
+      )};
+      console.log(JSON.stringify({
+        model: DEFAULT_LLM_MODEL,
+        codeModel: DEFAULT_LLM_CODE_MODEL,
+        expectedModel: INFERENCE_PROVIDERS.ollama.defaultModels.instruct,
+        expectedCodeModel: INFERENCE_PROVIDERS.ollama.defaultModels.coding,
+      }));
+    `;
+    const res = runIsolated(home, "default-model-ollama", child, [], clearedEnv());
+    expect(res.exitCode, `child failed:\n${res.stderr}`).toBe(0);
+    const out = JSON.parse(res.stdout.trim().split("\n").pop() ?? "");
+    expect(out.model).toBe(out.expectedModel);
+    expect(out.codeModel).toBe(out.expectedCodeModel);
+  }, 30_000);
+
+  test("with embedding.provider=lmstudio, both constants derive from lmstudio's seam entry", () => {
+    const child = `
+      import fs from "fs";
+      import path from "path";
+      import os from "os";
+      const dir = path.join(${JSON.stringify(home.configDir)});
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, "config.json"),
+        JSON.stringify({ embedding: { provider: "lmstudio", model: "x" } }),
+      );
+      const { DEFAULT_LLM_MODEL, DEFAULT_LLM_CODE_MODEL } = await import(${JSON.stringify(CONFIG_INDEX)});
+      const { INFERENCE_PROVIDERS } = await import(${JSON.stringify(
+        path.join(import.meta.dir, "..", "inference-providers.ts"),
+      )});
+      console.log(JSON.stringify({
+        model: DEFAULT_LLM_MODEL,
+        codeModel: DEFAULT_LLM_CODE_MODEL,
+        expectedModel: INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct,
+        expectedCodeModel: INFERENCE_PROVIDERS.lmstudio.defaultModels.coding,
+      }));
+    `;
+    const res = runIsolated(home, "default-model-lmstudio", child, [], clearedEnv());
+    expect(res.exitCode, `child failed:\n${res.stderr}`).toBe(0);
+    const out = JSON.parse(res.stdout.trim().split("\n").pop() ?? "");
+    expect(out.model).toBe(out.expectedModel);
+    expect(out.codeModel).toBe(out.expectedCodeModel);
   }, 30_000);
 });
