@@ -85,20 +85,20 @@ jobs:
         if: env.SKIPPED != '1'
         uses: actions/cache@v4
         with:
-          # qwen3-embedding:4b is ~2.5GB; cache its blobs across runs so the
-          # `ollama pull` below is a no-op on a warm runner. Bump the -vN
-          # suffix when changing the model.
+          # Cache qwen3-embedding:0.6b's blobs across runs so the `ollama
+          # pull` below is a no-op on a warm runner. Bump the -vN suffix when
+          # changing the model.
           path: ~/.ollama/models
-          key: ollama-model-qwen3-embedding-4b-v1
-          restore-keys: ollama-model-qwen3-embedding-4b-
+          key: ollama-model-qwen3-embedding-0.6b-v1
+          restore-keys: ollama-model-qwen3-embedding-0.6b-
 
       - name: Pull embedding model
         if: env.SKIPPED != '1'
         run: |
           # Pull the same model the E2E baseline uses. Falls back to
-          # nomic-embed-text if qwen3-embedding:4b is unavailable.
-          if ollama pull qwen3-embedding:4b 2>/tmp/pull.log; then
-            echo "NEEDLE_MODEL=qwen3-embedding:4b" >> "$GITHUB_ENV"
+          # nomic-embed-text if qwen3-embedding:0.6b is unavailable.
+          if ollama pull qwen3-embedding:0.6b 2>/tmp/pull.log; then
+            echo "NEEDLE_MODEL=qwen3-embedding:0.6b" >> "$GITHUB_ENV"
           elif ollama pull nomic-embed-text 2>>/tmp/pull.log; then
             echo "NEEDLE_MODEL=nomic-embed-text" >> "$GITHUB_ENV"
           else

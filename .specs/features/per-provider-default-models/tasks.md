@@ -462,7 +462,7 @@ branches of `embeddings/config.ts`'s literal fallback, and `scripts/diagnose.ts`
 gaps left for T15: `lmstudio-embedding-live.test.ts` and `embeddings-config-file-layer.test.ts`
 still assert the retired nomic/768 and `qwen3-embedding:4b` pairs.
 
-### T14: Repoint the needles surfaces
+### T14: Repoint the needles surfaces — ✅ Complete
 
 Both `FLOORS` rows to explicit `null` with a calibration note naming this feature — recording that
 the `ollama` row was **already unsatisfiable** (`14.needles.test.ts:161`) and that F-NEEDLE-2 and
@@ -472,6 +472,22 @@ F-NEEDLE-3 still assert. Separately, `.github/workflows/needles-gate.yml:88-108`
 Tests: the unknown-arm guard still throws; a null row takes the console-log path and F-NEEDLE-2/3 still assert
 Gate: bun test packages/core/src/__tests__/e2e/14.needles.test.ts
 Depends on: T11.
+
+**Execution note (2026-09-20).** Both `FLOORS` rows set to `null` with a calibration note citing
+this feature and the specific facts that invalidated each (ollama: 2560d→1024d model+algorithm
+change, plus the pre-existing hit@5-caps-at-0.50-vs-0.64-floor gap the file already documented;
+lmstudio: 768d nomic→1024d qwen3-embedding change). `needles-gate.yml`: all four pins swapped
+(`ollama pull` command, `NEEDLE_MODEL` env assignment, cache `key`/`restore-keys`, and their
+comments) from `qwen3-embedding:4b` to `qwen3-embedding:0.6b`; verified with `actionlint`.
+This environment has no live Ollama/LM Studio/API stack (`bun test
+packages/core/src/__tests__/e2e/14.needles.test.ts` → 0 pass / 2 skip / 0 fail, `READY=false`),
+so the unknown-arm-guard/no-assert-path claims were verified two ways instead of by a live run:
+(1) direct reading — the guard (`if (!(profile.id in FLOORS))`) and the two F-NEEDLE-2/3
+assertion blocks are unconditional and sit textually before the `if (!floors)` branch, unaffected
+by the value change from an object to `null`; (2) a throwaway script reproducing the exact
+`FLOORS`/guard/branch shape with the real `null` values, run under `bun`, confirming `"ollama"`
+and `"lmstudio"` both take the no-assert path and an unmapped id still throws. `bun run
+type-check` and `bun run build` both green (6/6).
 
 ### T15: Repoint the tests the parity gate is forbidden to see
 

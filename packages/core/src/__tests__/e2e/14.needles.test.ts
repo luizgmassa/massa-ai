@@ -77,21 +77,36 @@ const READY = !!AVAIL?.API_UP && !!AVAIL?.INFERENCE_UP;
  * assert a number nobody measured for it.
  */
 const FLOORS: Record<string, { hit1: number; hit5: number; mrr: number } | null> = {
-  // Measured on this host, warm shared index, qwen3-embedding (2560d, so the
-  // > 2000 two-phase binary-quantization search path). See OBSERVED_BASELINE
-  // in the file header for the run these are derived from.
-  ollama: { hit1: 0.36, hit5: 0.64, mrr: 0.47 },
-  // LM Studio at 768 takes the OTHER store branch (≤ 2000, direct HNSW
-  // cosine). Calibrated 2026-09-20 from the LIP-22 measurement on this host —
-  // same corpus (743 files / 8129 chunks), same fixture, same ±5-line scorer,
-  // two deterministic sweeps: hit@1 0.1429 (2/14), hit@5 0.2857 (4/14),
-  // MRR 0.2116. Floors at ~80% rounded DOWN to the nearest whole needle, the
-  // same rule the Ollama row uses: hit@1 1/14, hit@5 3/14, MRR 0.16.
+  // Nulled by per-provider-default-models (T14). Both rows were calibrated
+  // against embedding stacks this feature retires: the Ollama row measured
+  // qwen3-embedding at 2560d (the `> 2000` binary-quantization search path);
+  // this feature moves the Ollama default to qwen3-embedding:0.6b at 1024d,
+  // which takes the *other* store branch (direct HNSW cosine) — a different
+  // model on a different algorithm, so asserting the old numbers against it
+  // would be a false claim, not a stricter gate.
   //
-  // These floors are LOW because the arm is, not because the gate was relaxed
-  // to fit it. That gap is the finding LIP-22 exists to record, and it is the
-  // reason the row is written rather than the row being omitted.
-  lmstudio: { hit1: 0.07, hit5: 0.21, mrr: 0.16 },
+  // The Ollama floor was already unsatisfiable before this feature touched
+  // it, independent of the model change: this file's own comment above
+  // `runSweep` (near line 162) records that with the 7 `services/search/`
+  // targets moved, hit@5 caps at 7/14 = 0.50 against the old 0.64 floor.
+  // Nulling replaces an already-broken assertion, not a working one.
+  //
+  // The LM Studio row was calibrated by LIP-22 at 768d
+  // (text-embedding-nomic-embed-text-v1.5, same HNSW-cosine branch as the
+  // new Ollama default lands on) — this feature moves LM Studio's default to
+  // text-embedding-qwen3-embedding-0.6b at 1024d, the same model/width the
+  // Ollama arm now uses. Neither prior number describes the shipped config.
+  //
+  // `null` records "awaiting calibration": F-NEEDLE-1's floor assertions
+  // (hit@1/hit@5/MRR) are skipped for a null arm and it runs on the
+  // no-calibrated-floor console.log path instead — recording the candidate
+  // baseline rather than asserting an invented number. F-NEEDLE-2 (`anyHits`)
+  // and F-NEEDLE-3 (determinism) are unconditional and still assert for
+  // every arm regardless of this table. The unknown-arm guard above (`!(profile.id
+  // in FLOORS)`) still throws for any id that is not a key at all — `null` is
+  // a deliberate, recorded key, not an absent one.
+  ollama: null,
+  lmstudio: null,
 };
 
 // ── Long-timeout POST (shared helper caps at 120s; search embeds can exceed) ─

@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), T13 of Phase 7 complete, T14-T15 and Phase 8 (T16-T17) pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), T13-T14 of Phase 7 complete, T15 and Phase 8 (T16-T17) pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -656,6 +656,26 @@ still asserts `qwen3-embedding:4b`. Both are exactly R-07's invisible-to-the-gat
 
 Next: T14 (needles surfaces), then T15 (repoint the ~16 test files, including the two named
 above).
+
+**T14 (W7) — Complete.** Both `packages/core/src/__tests__/e2e/14.needles.test.ts` `FLOORS` rows
+(`ollama`, `lmstudio`) set to `null`, replacing calibrations against embedding stacks this
+feature retires (ollama 2560d→1024d, a model+algorithm change; lmstudio 768d nomic→1024d
+qwen3-embedding). The ollama floor was independently already-unsatisfiable per the file's own
+pre-existing comment (hit@5 caps at 0.50 against its 0.64 floor). `.github/workflows/
+needles-gate.yml`: all four `qwen3-embedding:4b` pins (pull command, `NEEDLE_MODEL` env
+assignment, cache `key`/`restore-keys`, comments) swapped to `qwen3-embedding:0.6b`; validated
+with `actionlint` (exit 0). Two unrelated stale prose mentions at lines 11/36 (latency/size
+figures tied to the retired 4b model) are named but not touched — out of T14's 4-pin scope and
+re-measuring them for the new model is not something this environment can do.
+No live Ollama/LM Studio/API stack is available here, so `bun test packages/core/src/__tests__/
+e2e/14.needles.test.ts` reports 0 pass / 2 skip / 0 fail (`READY=false`) rather than a live green.
+The unknown-arm-guard-still-throws and null-row-takes-console-log-path claims were verified by
+direct code reading (both are textually unconditional / structurally independent of the value
+change) plus a throwaway `bun run` script reproducing the exact FLOORS/guard/branch shape with
+the real `null` values — confirmed `"ollama"`/`"lmstudio"` take the no-assert path and an unknown
+id still throws. `bun run type-check` → 6/6, `bun run build` → 6/6.
+Next: T15 (repoint the ~16 test files the parity gate cannot see, including
+`lmstudio-embedding-live.test.ts` and `embeddings-config-file-layer.test.ts` named under T13).
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
