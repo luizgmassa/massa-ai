@@ -1,10 +1,17 @@
 # Per-Provider Default Models — Tasks
 
-**8 Phases = 18 Tasks.** Max 3 Tasks per Phase. One atomic commit per Task.
+**8 Phases = 19 Tasks.** Max 3 Tasks per Phase. One atomic commit per Task.
 
-Originally 17. **T06b was added during Execute on 2026-09-20** under the Tasks safety valve, after
-T06 closed: PDM-12 AC-2 names five fields and the breakdown gave only four of them a reader. See
-T06b for the full reason. Phase 3 goes from 2 Tasks to 3 and stays inside the per-Phase budget.
+Originally 17. Two Tasks were added during Execute on 2026-09-20 under the Tasks safety valve,
+both closing a requirement the breakdown had left without an implementation site — neither is new
+behaviour:
+
+- **T06b** (Phase 3, now 3 Tasks) — PDM-12 AC-2 names five fields and only four had a reader.
+- **T07b** (Phase 4, now 3 Tasks) — PDM-02 AC-2 says "that provider's **three** model ids" and
+  T07 wrote two of them, leaving the retired embedding id and width at the writer.
+
+Both Phases stay inside the per-Phase budget. The recurring shape is worth naming: each gap sat
+between a requirement that named a set and a task that named a subset of it.
 
 ## Execution Plan
 
@@ -171,6 +178,33 @@ Tests: installer-config-template executes the template function per provider bra
 Gate: bun test scripts/__tests__/installer-config-template.test.ts
 Depends on: T01.
 
+### T07b: Both config CLIs write the provider's **embedding** id and width too
+
+**Added during Execute 2026-09-20 (Tasks safety valve), after T07 closed.** PDM-02 AC-2 reads
+"SHALL write that provider's **three** model ids as file values". T07's text, and design.md's
+surface-inventory row (`:113`), scoped the writers to `llm.model`/`llm.codeModel` only — so after
+T07 the `init --lmstudio` written-config check returns `"model": "text-embedding-nomic-embed-text-v1.5"`
+at `"dimensions": 768`, and the `use ollama` branch writes `qwen3-embedding:4b` at a literal `2560`.
+Both are the **retired** defaults this feature replaces, which also makes PDM-03/PDM-04 AC-1 and
+AC-2 ("both providers embed at 1024") false at the writer — the one surface PDM-02's own Independent
+Test says matters, because file beats default. This is a Tasks/Design-authoring gap, not new
+behaviour: the requirement was already written.
+
+Both CLIs (`apps/mcp-client/src/config-cli.ts`, `apps/opencode-plugin/src/config-cli.ts`), every
+local-provider branch of both `init --<provider>` and `use <provider>`: derive the embedding model
+from `INFERENCE_PROVIDERS[provider].defaultModels.embedding` and the width by **key lookup**, never
+a literal — `knownDimensions[model]` for lmstudio, `knownEmbeddingDimensions(model)` for ollama.
+Both widths already exist (`embedding-dimensions.ts:40` → `qwen3-embedding:0.6b: 1024`;
+`inference-providers.ts:116` → `text-embedding-qwen3-embedding-0.6b: 1024`), so this is a derivation
+swap, not a new value. Keep the `?? 768` fallback and the nomic row intact (design TD-7). Enumerate
+the branches rather than trusting a count — the `--model` override path and the `usage` help text
+carry the retired literal too. Non-local providers (mistral, openai, voyage, cohere) are out of
+scope; do not touch their blocks.
+
+Tests: the written-config assertion extended to `embedding.model` + `embedding.dimensions`, per provider, per branch, per CLI, under a scratch `XDG_CONFIG_HOME`
+Gate: bun test apps/mcp-client/src/__tests__/config-cli.test.ts && bun test apps/opencode-plugin/src/__tests__/config-cli.test.ts && bun test scripts/__tests__/embedding-defaults-parity.test.ts
+Depends on: T01, T07.
+
 ---
 
 ### Phase 5 — Admin Portal
@@ -298,8 +332,8 @@ Depends on: T16.
 | Requirement | Task | Sensor | Observed red on |
 | --- | --- | --- | --- |
 | PDM-01, PDM-04 | T01 | seam unit test; type-check | removing a role from one provider's `defaultModels` |
-| PDM-02 | T07, T08 | the written-config check (spec P1 Independent Test) | reverting one CLI branch |
-| PDM-03 | T03, T05 | config-resolution unit test per provider | pinning the global constant back |
+| PDM-02 | T07, T07b, T08 | the written-config check (spec P1 Independent Test) — T07 covers the instruct/coding pair, T07b the embedding id and width, T08 the wizard template | reverting one CLI branch; restoring one retired embedding literal |
+| PDM-03, PDM-04 | T03, T05, T07b | config-resolution unit test per provider; the written-config check for `embedding.model` + `dimensions` at the writer | pinning the global constant back; restoring `qwen3-embedding:4b`/2560 in a `use` branch |
 | PDM-05 | T05 | code-role fallback unit test | restoring `?? cfg?.model` |
 | PDM-06 | T12 | `test-setup-local-first-api-key.sh` | mutating `:500`'s literal |
 | PDM-08..PDM-11 | T06 | `num_ctx` request-body assertion; `embedBatch` call-count for 130 docs | reverting the batch constant |
