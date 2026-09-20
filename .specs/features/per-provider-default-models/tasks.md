@@ -282,7 +282,7 @@ Depends on: T09.
 
 ### Phase 6 — Install and diagnostic surfaces
 
-### T03b: Derive `defaultMassaAiConfig.embedding` from the seam
+### T03b: Derive `defaultMassaAiConfig.embedding` from the seam — ✅ Complete
 
 **Added during Execute 2026-09-20 (Tasks safety valve), after T07b measured the parity gate red.**
 PDM-03 AC-1 says the system SHALL default `ollama` embedding to `qwen3-embedding:0.6b` at 1024

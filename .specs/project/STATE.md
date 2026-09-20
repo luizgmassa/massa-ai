@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 19 Tasks (T06b, T07b added mid-Execute); T01-T10 complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below, W5 Phase 5 closed), T11-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); T01-T10 + T03b complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below, W5 Phase 5 closed, W6 T03b closed), T11-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -460,6 +460,33 @@ the single-dialect surfaces; T12 repair setup-local-first.sh) — depends on T01
 Phase 4/5's CLI and Web UI files. T13 (Phase 7) should additionally absorb the three
 `embedding-defaults-parity.test.ts`/`massa-ai-config.ts` defects T07b documented, beyond the one
 (`referencePairLmStudio()`'s entry-#1 anchor) its own task text already names.
+
+**T03b (W6) — Complete.** Added during Execute as a Phase-2 remainder (Tasks safety valve),
+landed in Phase 6 before T13 per its own task text. `packages/shared/src/config/
+massa-ai-config.ts`'s `defaultMassaAiConfig.embedding.model`/`.dimensions` now derive from
+`INFERENCE_PROVIDERS.ollama.defaultModels.embedding` and `knownEmbeddingDimensions(...)
+?? 768` (the same `?? 768` idiom T07b's two CLI writers already use), replacing the retired
+`"qwen3-embedding:4b"`/`2560` literals. `contextWindow`/`batchSize` and their SPEC_DEVIATION
+comment are untouched, matching the task's explicit instruction. Closes PDM-03 AC-1 for a plain
+`init`/`init --ollama` and supplies T13's ollama reference pair.
+New test: `packages/shared/src/config/__tests__/massa-ai-config-defaults.test.ts` — asserts
+`defaultMassaAiConfig.embedding.model`/`.dimensions` equal the seam's derived values, not a
+pinned literal, so a future seam change cannot leave this block silently stale.
+Gate: `bun test packages/shared/src/config/__tests__/` → 268 pass / 0 fail (up from 266 — 2 new
+tests). `bun run type-check` → 0 (6/6 packages). Observed red: pinned both fields back to
+`"qwen3-embedding:4b"`/`2560` → both new assertions failed (`Expected: "qwen3-embedding:0.6b" /
+Received: "qwen3-embedding:4b"`; `Expected: 1024 / Received: 2560`). Restored via file copy,
+`git status --porcelain` clean before commit, re-ran green (2/0).
+**Finding, not fixed (outside T03b's write set and pre-existing):** running the whole
+`packages/shared/src/config/__tests__/` directory in one `bun test` process prints "Created
+default config at /Users/luizmassa/.config/massa-ai/config.json" and a data-dir migration
+line from `config-loader.test.ts` — the known "first import wins the config freeze" class,
+triggered only when that file runs alongside its siblings in the same process rather than
+isolated. Test count and pass/fail are unaffected (268/0); flagging for T13/orchestrator
+since a shell-out gate that shares this process could touch the developer's real
+`~/.config/massa-ai/`.
+Next: T11 (sweep the single-dialect surfaces) and T12 (repair `setup-local-first.sh`), both
+depend on T01 and are disjoint from T03b's write set.
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 

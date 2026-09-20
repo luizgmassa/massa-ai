@@ -1,6 +1,7 @@
 import path from "path";
 import { configDir } from "./xdg";
 import { LOCAL_INFERENCE_IDS, INFERENCE_PROVIDERS, INFERENCE_ROLE_DEFAULTS } from "./inference-providers";
+import { knownEmbeddingDimensions } from "./embedding-dimensions";
 
 /**
  * API-only embedding providers writable to `config.json` — the other half of
@@ -399,9 +400,9 @@ export const defaultMassaAiConfig: MassaAiConfig = {
   // env-only path defaults to, or the merge itself would change behavior.
   embedding: {
     provider: "ollama",
-    model: "qwen3-embedding:4b",
+    model: INFERENCE_PROVIDERS.ollama.defaultModels.embedding,
     baseURL: "http://localhost:11434",
-    dimensions: 2560,
+    dimensions: knownEmbeddingDimensions(INFERENCE_PROVIDERS.ollama.defaultModels.embedding) ?? 768,
     // contextWindow / batchSize are deliberately left unset here (unlike
     // `dimensions` above): the role table (`INFERENCE_ROLE_DEFAULTS.embedding`,
     // `InferenceProviderSpec.embedBatchSize`) is their default source, applied
