@@ -1,8 +1,8 @@
 # Per-Provider Default Models — Tasks
 
-**8 Phases = 20 Tasks.** Max 3 Tasks per Phase. One atomic commit per Task.
+**8 Phases = 21 Tasks.** Max 3 Tasks per Phase. One atomic commit per Task.
 
-Originally 17. Three Tasks were added during Execute on 2026-09-20 under the Tasks safety valve,
+Originally 17. Four Tasks were added during Execute on 2026-09-20 — three under the Tasks safety valve,
 each closing a requirement the breakdown had left without an implementation site — none is new
 behaviour:
 
@@ -13,12 +13,19 @@ behaviour:
   only `defaultMassaAiConfig.llm`, leaving `.embedding` at `qwen3-embedding:4b`/2560. A Phase-2
   remainder by subject, placed in Phase 6 because Phase 2 is closed and at budget.
 
-Every Phase stays inside the per-Phase budget. **The recurring shape is worth naming, because it
-produced all three: a requirement named a set, and the task that was supposed to implement it
-named a subset.** Each was found by reading the requirement against the task rather than by a
-gate — the first two by inspection, the third only when the parity gate went red for an unrelated
-reason. When auditing the remaining tasks, compare each against the full requirement text, not
-against the task's own summary of it.
+The fourth was added at the user's explicit decision rather than by the safety valve, and is the
+only one that touches a shared gate rather than this feature's own surfaces:
+
+- **T15b** (Phase 8, now 3 Tasks) — `bun run test:scripts` short-circuits on `&&` and never runs
+  its 37 shell suites when the bun half fails, while still printing the bun half's counts. The
+  feature's Success Criteria cite that command as evidence.
+
+Every Phase stays inside the per-Phase budget. **The recurring shape of the first three is worth
+naming, because it produced all three: a requirement named a set, and the task that was supposed
+to implement it named a subset.** Each was found by reading the requirement against the task
+rather than by a gate — the first two by inspection, the third only when the parity gate went red
+for an unrelated reason. When auditing the remaining tasks, compare each against the full
+requirement text, not against the task's own summary of it.
 
 ## Execution Plan
 
@@ -552,6 +559,37 @@ pre-existing, host-specific failures W6 already identified (`test-install-skills
 
 ### Phase 8 — Documentation and close-out
 
+### T15b: Make `bun run test:scripts` reach the shell half
+
+**Added during Execute 2026-09-20 at the user's explicit decision, after W6 measured it.** The
+script is:
+
+```
+bun test scripts/__tests__ scripts/tests/*.test.ts && for f in scripts/tests/*.sh; do bash "$f" || exit 1; done
+```
+
+The `&&` means that when the bun-test half exits non-zero, **the 37 shell suites never execute** —
+while the command still prints the bun half's counts, which reads like a full run. The feature's
+own Success Criteria name `bun run test:scripts` as evidence, so that evidence was partly unearned
+for every phase before this one. It is a pre-existing structural gap, not one this feature
+introduced; it stayed invisible until T13 stopped the parity gate from aborting.
+
+Run both halves unconditionally and aggregate the exit codes, so a failure in either half is
+reported with the other half's result still visible. Keep it one npm-script line if that stays
+readable; a small runner script is acceptable if it does not.
+
+**Expect this to turn `test:scripts` red on this host, and that is the point.** W6 and W7 both
+measured the shell half directly: **36 of 39 pass**, with 3 pre-existing failures
+(`test-install-skills-cli.sh`, `test-plugin-auto-install.sh`, `test-plugin-registry-registration.sh`)
+caused by this machine's own Claude install, unrelated to this feature. Do **not** fix, skip, or
+exclude those three to make the gate green — that would reintroduce the exact dishonesty this task
+removes. Record them in `STATE.md` as a named host-specific residual, and make sure T17 does not
+claim `test:scripts` green in the close-out.
+
+Tests: the composed command runs the shell half even when the bun half exits non-zero
+Gate: induce a bun-half failure by file copy, confirm shell-suite output still appears and the aggregated exit code is non-zero, restore by file copy, re-run
+Depends on: T13.
+
 ### T16: Update the 7 non-history documentation surfaces
 
 `README.md`, `FEATURES.md`, `docs/CHEATSHEET.md`, `docs/ONBOARDING.md`,
@@ -559,7 +597,24 @@ pre-existing, host-specific failures W6 already identified (`test-install-skills
 `benchmarks/needles/README.md`. `CHANGELOG.md` and `.specs/` are append-only history and are
 excluded by design.
 
-Tests: the narrow Markdown tier added in T13 covers each updated doc
+**Scope addition during Execute 2026-09-20.** T13's Markdown tier checks membership and
+completeness, **not doc prose values** — it cannot tell an updated doc from a stale one, so T16
+still needs a real content pass over all seven. Two surfaces W7 found that no task owned are also
+in scope here:
+
+- **`.github/workflows/needles-gate.yml:11` and `:36`** carry `qwen3-embedding:4b` inside a
+  rationale — "~60s/embed on a 2-core free runner (~90min for the fixture)" — which is the stated
+  reason the gate is manual-only. The model changed; the figure did not, and it **cannot be
+  re-measured from this worktree**. Do not fabricate a replacement number and do not delete the
+  rationale. Attribute it: name the figure as measured on `qwen3-embedding:4b`, the previous
+  default, and state it has not been re-measured for `qwen3-embedding:0.6b` — a smaller model, so
+  the stated cost is an upper bound rather than a current reading. Same treatment as the judge
+  fixtures: the literal stays because it is history, and the prose now says so.
+- **`benchmarks/llm-judge/reports/llm-judge-baseline.md`** is a dated historical report that T13's
+  Markdown tier found and excluded. `design.md` never named it beside the two "Must NOT change"
+  fixtures. Add the one-line mention so the exclusion is stated rather than implied.
+
+Tests: the narrow Markdown tier added in T13 covers each updated doc for membership; the prose pass is verified by reading, and every changed claim is either re-measured or explicitly attributed to the retired model
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts
 Depends on: T13.
 
