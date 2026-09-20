@@ -416,9 +416,20 @@ value rather than an `extractOne` throw. Add a **narrow named Markdown tier** fo
 non-history doc files; `.specs/` and `CHANGELOG.md` stay excluded as append-only history.
 **Observed red per tier**, each on its own subject.
 
-**Scope widened during Execute 2026-09-20.** The task text above names one of the three defects
-that keep this gate red; all three were measured on `319c7cbc` (6 pass / 3 fail) and all three
-must close here, because they share one extractor design:
+**Scope widened during Execute 2026-09-20.** The task text above names one of the defects that
+keep this gate red; all of them were measured, and all must close here, because they share one
+extractor design:
+
+0. **The gate no longer fails — it crashes the whole file.** Re-measured on `18cc67fa` after T03b
+   landed: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` reports
+   **0 pass / 0 fail / 1 error**, not the 6 pass / 3 fail recorded below on `319c7cbc`.
+   `referencePair()` is called from the `describe()` body (`:249`), outside any `test()`, so its
+   `extractOne` throw aborts the file before a single test runs — `massa-ai-config.ts model:
+   expected exactly 1 match for /model:\s*"([^"]+)"/g, got 0`. Two consequences worth separating:
+   the gate cannot report the defects below because it never reaches them, and **an aborted file
+   reads as "no failures" to anything that only counts `fail`**. Fix the anchoring *and* move
+   every reference resolution inside a test, so a rotted extractor fails loudly with a count
+   instead of silently taking the whole suite with it.
 
 1. **The `config-cli.ts` extractors require a quoted literal at the model/width position.** T07b
    replaced those literals with seam-derived property access, which is the change this feature
