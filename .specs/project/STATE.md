@@ -127,11 +127,46 @@ resolver reads is listed in passThroughEnv" (expected `[]` missing names, got
 `["MASSA_AI_LLM_CODE_TEMPERATURE"]`) — exactly the task's named sensor.
 **Phase-closing gate (last task in Phase 2):** `bun run lint` → 0 (oxlint, repo root). `bun run
 type-check` → 0 (6/6 packages). `bun run build` → 0 (6/6 packages, 2 cached).
-Phase 2 (config schema and resolution) is closed. Next: Phase 3 (T05 `getLlmConfig` code-role
-fallback repair; T06 per-role context + batch size), both depend only on T01 — a different
-worker's write set (`packages/core/src/services/memory/llm-client.ts`,
-`packages/core/src/data/vector/postgres-vector-store.ts`), disjoint from this batch's
-`packages/shared/src/config/*`.
+Phase 2 (config schema and resolution) is closed.
+
+**T05 (W3) — Complete.** `getLlmConfig` (`packages/core/src/services/memory/llm-client.ts`)
+extracted into a pure, exported `_resolveLlmConfig(cfg, role, baseUrlOverride)` so its per-role
+fallback behavior is unit-testable with a synthetic config shape (this file's suite deliberately
+never `mock.module("@massa-ai/shared")` — see its docblock). All four Ollama-shaped fallbacks
+named in design.md are gone: `baseUrl` now falls back to `INFERENCE_PROVIDERS.ollama.
+defaultLlmBaseUrl` (seam constant, not a bare literal); `apiKey` falls back to the resolved
+provider's own `spec.id` (was hardcoded `"ollama"` for every provider); `temperature` resolves
+per role from `INFERENCE_ROLE_DEFAULTS` (instruct 0.2, coding 0.0 — was a flat `?? 0.2`);
+`disableThink` follows the resolved provider's `injectsDisableThink` (was hardcoded `?? true`,
+contradicting the seam it sits beside). The code role's model fallback is
+`cfg?.codeModel ?? spec.defaultModels.coding` — never `cfg?.model`/`DEFAULT_LLM_MODEL` (the
+regression T05 exists to close: after this feature the instruct default is a vision-language
+model). `DEFAULT_LLM_MODEL` import dropped from this file (orphaned by the rewrite).
+Also repointed `llm-client.test.ts`'s pre-existing stale assertion (flagged by T03's note above)
+from the retired `"qwen2.5:7b-instruct"` literal to a provider-agnostic check against
+`INFERENCE_PROVIDERS[*].defaultModels.instruct` (this suite intentionally never pins
+`embedding.provider`, and this host's own config may name either provider).
+Gate: `bun test packages/core/src/__tests__/llm-client.test.ts` → 66 pass / 0 fail (was 59 tests,
++7 new `_resolveLlmConfig` cases) under a scratch `XDG_CONFIG_HOME`. **Host-environment finding
+(pre-existing, not introduced by T05):** the bare gate command with no `XDG_CONFIG_HOME`
+override fails 12-13 tests on this machine, because this host's real
+`~/.config/massa-ai/config.json` sets `llm.baseUrl` to LM Studio, and several pre-existing tests
+in this file (`"ollama (default baseUrl): ..."`) assume the unset-baseUrl default resolves to
+Ollama. Confirmed pre-existing by running the unmodified HEAD version of both files under the
+same real config (13 failures, one being T03's already-known stale literal) — T05 did not
+introduce or worsen this; it is a missing-isolation gap in tests this batch did not author. Not
+fixed (out of T05's declared scope: `llm-client.ts` + its own new tests, not a file-wide
+isolation rewrite); surfaced here for the orchestrator/W4+.
+Observed red (two mutations on the same subject, each restored by file copy, `git status
+--porcelain` clean before commit): (1) restoring `cfg?.codeModel ?? cfg?.model ?? spec.
+defaultModels.coding` failed "code role falls back to defaultModels.coding, never to the
+instruct model" (expected `"qwen2.5-coder:7b"`, got `"some-instruct-model"`); (2) restoring
+`disableThink: cfg?.disableThink ?? true` failed "disableThink follows the resolved provider's
+injectsDisableThink" (lmstudio case: expected `false`, got `true`).
+
+Next: T06 (send per-role `num_ctx` where `appliesContextPerRequest`; `postgres-vector-store.ts`
+reads `spec.embedBatchSize`) — depends only on T01, same worker (W3), same file
+(`llm-client.ts`) plus `postgres-vector-store.ts`.
 
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)

@@ -17,10 +17,11 @@
 
 import { generateText, generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import { config, logger, DEFAULT_LLM_MODEL } from "@massa-ai/shared";
+import { config, logger } from "@massa-ai/shared";
 import { loadConfigSafe } from "@massa-ai/shared/config";
 import {
   INFERENCE_PROVIDERS,
+  INFERENCE_ROLE_DEFAULTS,
   LOCAL_INFERENCE_IDS,
   inferenceProviderList,
   type InferenceProviderId,
@@ -182,25 +183,63 @@ export function _setLlmBaseUrlForTesting(url: string | null): void {
   testBaseUrlOverride = url;
 }
 
-/** Read the llm config block with safe defaults (defensive against partial/missing config). */
-function getLlmConfig(opts?: { modelRole?: LlmModelRole }) {
-  const cfg = config.get("llm");
-  const role = opts?.modelRole ?? "instruct";
-  // Resolve the per-call model. Instruct → `model`, code → `codeModel`. The
-  // instruct fallback uses the shared DEFAULT_LLM_MODEL constant (no bare literal).
+/**
+ * Pure resolution of the effective LLM config for one call from the raw
+ * `config.llm` block (possibly partial/undefined — defensive against a
+ * partial or missing config) and the requested role. Every fallback reads
+ * the resolved provider's own seam entry (`inference-providers.ts`), never a
+ * bare Ollama-shaped literal: code role falls back to `defaultModels.coding`
+ * — never to the instruct model, which after this feature is a
+ * vision-language model (COVERAGE #5) — and `disableThink` follows the
+ * resolved provider's `injectsDisableThink` (LIP-07) instead of a hardcoded
+ * `true`.
+ *
+ * Exported so this fallback behavior can be unit-tested with a synthetic
+ * config shape — this file's test suite deliberately does not
+ * `mock.module("@massa-ai/shared")` (see llm-client.test.ts's docblock).
+ * @internal
+ */
+export function _resolveLlmConfig(
+  cfg:
+    | Partial<{
+        baseUrl: string;
+        apiKey: string;
+        model: string;
+        codeModel: string;
+        temperature: number;
+        codeTemperature: number;
+        maxOutputTokens: number;
+        timeoutMs: number;
+        disableThink: boolean;
+      }>
+    | undefined,
+  role: LlmModelRole,
+  baseUrlOverride: string | null,
+) {
+  const baseUrl = baseUrlOverride ?? cfg?.baseUrl ?? INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl;
+  const spec = resolveInferenceSpec(baseUrl);
   const model =
     role === "code"
-      ? cfg?.codeModel ?? cfg?.model ?? DEFAULT_LLM_MODEL
-      : cfg?.model ?? DEFAULT_LLM_MODEL;
+      ? cfg?.codeModel ?? spec.defaultModels.coding
+      : cfg?.model ?? spec.defaultModels.instruct;
+  const temperature =
+    role === "code"
+      ? cfg?.codeTemperature ?? INFERENCE_ROLE_DEFAULTS.coding.temperature
+      : cfg?.temperature ?? INFERENCE_ROLE_DEFAULTS.instruct.temperature;
   return {
-    baseUrl: testBaseUrlOverride ?? cfg?.baseUrl ?? "http://localhost:11434/v1",
-    apiKey: cfg?.apiKey ?? "ollama",
+    baseUrl,
+    apiKey: cfg?.apiKey ?? spec.id,
     model,
-    temperature: cfg?.temperature ?? 0.2,
+    temperature,
     maxOutputTokens: cfg?.maxOutputTokens ?? 8000,
     timeoutMs: cfg?.timeoutMs ?? 90000,
-    disableThink: cfg?.disableThink ?? true,
+    disableThink: cfg?.disableThink ?? spec.injectsDisableThink,
   };
+}
+
+/** Read the llm config block with safe defaults (defensive against partial/missing config). */
+function getLlmConfig(opts?: { modelRole?: LlmModelRole }) {
+  return _resolveLlmConfig(config.get("llm"), opts?.modelRole ?? "instruct", testBaseUrlOverride);
 }
 
 /** host:port for a URL, or `null` when it doesn't parse. */

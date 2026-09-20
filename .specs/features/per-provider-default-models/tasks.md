@@ -100,7 +100,7 @@ Depends on: T02.
 
 ### Phase 3 — Runtime consumers
 
-### T05: Repair `getLlmConfig` and the code-role fallback
+### T05: Repair `getLlmConfig` and the code-role fallback — ✅ Complete
 
 `llm-client.ts:192-206` — read the seam instead of four Ollama-shaped fallbacks
 (`?? "http://localhost:11434/v1"`, `?? "ollama"`, `?? 0.2`, `disableThink ?? true`, the last
