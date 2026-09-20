@@ -1,17 +1,24 @@
 # Per-Provider Default Models — Tasks
 
-**8 Phases = 19 Tasks.** Max 3 Tasks per Phase. One atomic commit per Task.
+**8 Phases = 20 Tasks.** Max 3 Tasks per Phase. One atomic commit per Task.
 
-Originally 17. Two Tasks were added during Execute on 2026-09-20 under the Tasks safety valve,
-both closing a requirement the breakdown had left without an implementation site — neither is new
+Originally 17. Three Tasks were added during Execute on 2026-09-20 under the Tasks safety valve,
+each closing a requirement the breakdown had left without an implementation site — none is new
 behaviour:
 
 - **T06b** (Phase 3, now 3 Tasks) — PDM-12 AC-2 names five fields and only four had a reader.
 - **T07b** (Phase 4, now 3 Tasks) — PDM-02 AC-2 says "that provider's **three** model ids" and
   T07 wrote two of them, leaving the retired embedding id and width at the writer.
+- **T03b** (Phase 6, now 3 Tasks) — PDM-03 AC-1 names the ollama embedding default and T03 derived
+  only `defaultMassaAiConfig.llm`, leaving `.embedding` at `qwen3-embedding:4b`/2560. A Phase-2
+  remainder by subject, placed in Phase 6 because Phase 2 is closed and at budget.
 
-Both Phases stay inside the per-Phase budget. The recurring shape is worth naming: each gap sat
-between a requirement that named a set and a task that named a subset of it.
+Every Phase stays inside the per-Phase budget. **The recurring shape is worth naming, because it
+produced all three: a requirement named a set, and the task that was supposed to implement it
+named a subset.** Each was found by reading the requirement against the task rather than by a
+gate — the first two by inspection, the third only when the parity gate went red for an unrelated
+reason. When auditing the remaining tasks, compare each against the full requirement text, not
+against the task's own summary of it.
 
 ## Execution Plan
 
@@ -275,6 +282,30 @@ Depends on: T09.
 
 ### Phase 6 — Install and diagnostic surfaces
 
+### T03b: Derive `defaultMassaAiConfig.embedding` from the seam
+
+**Added during Execute 2026-09-20 (Tasks safety valve), after T07b measured the parity gate red.**
+PDM-03 AC-1 says the system SHALL default `ollama` embedding to `qwen3-embedding:0.6b` at 1024
+dimensions. T03's text named only `defaultMassaAiConfig.llm`, so the shipped config template at
+`massa-ai-config.ts:400-404` still reads `model: "qwen3-embedding:4b"` / `dimensions: 2560` —
+measured on `319c7cbc`. PDM-03 AC-1 is therefore still false for a plain `init` / `init --ollama`,
+and `referencePair()` in the parity gate reads exactly this block as its ollama reference, which
+is one of the three reasons that gate is red.
+
+It sits in Phase 6 rather than Phase 2 only because Phase 2 is closed and already at the 3-Task
+budget; it is a Phase-2 remainder by subject and **must land before T13**, whose ollama reference
+pair it supplies. Its logical home is next to T03.
+
+`packages/shared/src/config/massa-ai-config.ts` — `defaultMassaAiConfig.embedding.model` and
+`.dimensions` derive from `INFERENCE_PROVIDERS.ollama.defaultModels.embedding` and a **by-key**
+width lookup (`knownEmbeddingDimensions`), exactly as T03 did for `.llm`. Do not touch
+`contextWindow`/`batchSize` — their deliberate absence from this block is T02's accepted
+SPEC_DEVIATION and the comment recording it stays. `baseURL` and `provider` are unchanged.
+
+Tests: the shipped default block derives rather than restates — asserted against the seam, not against a literal, so a future seam change cannot leave this block stale silently
+Gate: bun test packages/shared/src/config/__tests__/ && bun run type-check
+Depends on: T01.
+
 ### T11: Sweep the single-dialect surfaces
 
 `.env.example`, `install.sh` (including the `  local llm_model="..."` dialect at `:379-380` and
@@ -313,9 +344,30 @@ value rather than an `extractOne` throw. Add a **narrow named Markdown tier** fo
 non-history doc files; `.specs/` and `CHANGELOG.md` stay excluded as append-only history.
 **Observed red per tier**, each on its own subject.
 
-Tests: one induced red per new tier and per dialect, each on its own subject, restored by file copy
+**Scope widened during Execute 2026-09-20.** The task text above names one of the three defects
+that keep this gate red; all three were measured on `319c7cbc` (6 pass / 3 fail) and all three
+must close here, because they share one extractor design:
+
+1. **The `config-cli.ts` extractors require a quoted literal at the model/width position.** T07b
+   replaced those literals with seam-derived property access, which is the change this feature
+   exists to make — so the extractor now fails on the surface it is meant to watch. It fails two
+   ways, and the second is the dangerous one: `init --lmstudio` throws `extractOne: ... got 0 —
+   extractor rotted or surface removed`, while the ollama width-writer scan **silently matched the
+   next branch's literal** and reported `mistral-embed/1024 across 2 writers`. A silent wrong match
+   is indistinguishable from a pass. Re-key both to resolve the seam reference rather than to
+   scrape a literal, and make "no literal found where a derived value is expected" a *declared*
+   outcome, not a throw and not a silent slide to the next match.
+2. **`referencePairLmStudio()` is anchored on `knownDimensions` entry #1** — the defect the
+   original task text names. Re-anchor by key.
+3. **`referencePair()` (ollama) reads `defaultMassaAiConfig.embedding`**, which T03b now derives
+   from the seam. T13 must therefore run *after* T03b, not merely after T11.
+
+T13 is also what flips **T07b** from ⚠️ Partial to ✅ Complete — T07b's implementation is verified
+by its config-cli suites, but the parity clause of its Gate line is this task's subject.
+
+Tests: one induced red per new tier and per dialect, each on its own subject, restored by file copy; plus a red proving the derived-value extractor reports a mismatch instead of silently matching an adjacent branch
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts
-Depends on: T11.
+Depends on: T11, T03b.
 
 ### T14: Repoint the needles surfaces
 
@@ -372,7 +424,7 @@ Depends on: T16.
 | --- | --- | --- | --- |
 | PDM-01, PDM-04 | T01 | seam unit test; type-check | removing a role from one provider's `defaultModels` |
 | PDM-02 | T07, T07b, T08 | the written-config check (spec P1 Independent Test) — T07 covers the instruct/coding pair, T07b the embedding id and width, T08 the wizard template | reverting one CLI branch; restoring one retired embedding literal |
-| PDM-03, PDM-04 | T03, T05, T07b | config-resolution unit test per provider; the written-config check for `embedding.model` + `dimensions` at the writer | pinning the global constant back; restoring `qwen3-embedding:4b`/2560 in a `use` branch |
+| PDM-03, PDM-04 | T03, T03b, T05, T07b | config-resolution unit test per provider; the written-config check for `embedding.model` + `dimensions` at the writer | pinning the global constant back; restoring `qwen3-embedding:4b`/2560 in a `use` branch |
 | PDM-05 | T05 | code-role fallback unit test | restoring `?? cfg?.model` |
 | PDM-06 | T12 | `test-setup-local-first-api-key.sh` | mutating `:500`'s literal |
 | PDM-08..PDM-11 | T06 | `num_ctx` request-body assertion; `embedBatch` call-count for 130 docs | reverting the batch constant |
