@@ -461,7 +461,36 @@ describe("getConfigForEnv", () => {
     // technique scripts/__tests__/embedding-defaults-parity.test.ts already
     // uses for this exact kind of cross-package/cross-dialect assertion.
     const text = realReadFileSync(CORE_EMBEDDINGS_CONFIG, "utf8") as string;
-    for (const name of ["LMSTUDIO_EMBEDDING_MODEL", "LMSTUDIO_BASE_URL", "LMSTUDIO_EMBEDDING_DIMENSIONS"]) {
+
+    // The NAME LIST is derived from what the function actually emits, never
+    // declared here. A literal list makes this sensor exactly as wide as
+    // whoever last edited it: a fourth LMSTUDIO_* name emitted by
+    // getConfigForEnv and read by nobody would escape both this test and the
+    // emission test, because neither would know to look for it.
+    // Select lmstudio here rather than inheriting whatever the previous test
+    // left saved — the neighbouring case saves `cohere`, which projects no
+    // LMSTUDIO_* key at all. `dimensions` is set because the width is emitted
+    // conditionally (config-loader.ts:490-492), and an unset one would silently
+    // narrow the population to two.
+    const cfg = { ...defaultMassaAiConfig };
+    cfg.embedding = {
+      provider: "lmstudio",
+      model: "text-embedding-nomic-embed-text-v1.5",
+      dimensions: 768,
+    };
+    saveConfig(cfg);
+
+    const emitted = Object.keys(getConfigForEnv()).filter((k) =>
+      k.startsWith("LMSTUDIO_"),
+    );
+
+    // Guard the derivation itself: if the fixture stops selecting lmstudio,
+    // `emitted` goes empty and every assertion below vacuously passes. An
+    // empty population is the failure mode of a derived list, the way a stale
+    // literal is the failure mode of a declared one.
+    expect(emitted.length).toBeGreaterThan(0);
+
+    for (const name of emitted) {
       // Word-boundary regex, not `.toContain` — a plain substring match
       // would false-pass `process.env.LMSTUDIO_BASE_URL_TYPO` as "containing"
       // `process.env.LMSTUDIO_BASE_URL` (observed while proving this sensor;

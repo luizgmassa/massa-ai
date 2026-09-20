@@ -139,6 +139,41 @@ describe("checkSearchAdmission — LIP-15 read gate", () => {
     expect(result.embeddingMismatch?.stored).toBe("ollama:qwen3-embedding:4b:2560");
     expect(result.embeddingMismatch?.current).toBe("custom:text-embedding-nomic-embed-text-v1.5:768");
   });
+
+  // Every other fixture in this file stores an `ollama:` fingerprint, so the
+  // gate was only ever measured in the ollama → LM Studio direction. It is
+  // sound by construction (string inequality is symmetric), but "sound by
+  // construction" is what an unmeasured direction always looks like.
+  //
+  // Note which literal an LM Studio install actually stamps: the `lmstudio`
+  // entry in embeddings/config.ts is an ALIAS whose inner `provider` field is
+  // `"custom"` (it rides the OpenAI-compatible path), while "lmstudio" is only
+  // the key you select it by. `currentEmbeddingFingerprint` formats from that
+  // inner field, so the stored string is `custom:…` and never `lmstudio:…`.
+  // Consequence worth knowing and NOT fixed here: an LM Studio install and any
+  // other `custom` OpenAI-compatible install on the same model and width
+  // produce an identical fingerprint, so the gate cannot tell them apart. The
+  // model name carries the distinction in practice; the provider field does not.
+  test("stored LM Studio fingerprint vs live ollama → mismatch in the reverse direction", async () => {
+    storedFingerprint = "custom:text-embedding-nomic-embed-text-v1.5:768";
+    activeProvider = { provider: "ollama", model: "qwen3-embedding:4b", dimensions: 2560, priority: 1 };
+    const result = await checkSearchAdmission(baseDeps(), "p");
+    expect(result.admitted).toBe(false);
+    expect(result.embeddingMismatch).toEqual({
+      stored: "custom:text-embedding-nomic-embed-text-v1.5:768",
+      current: "ollama:qwen3-embedding:4b:2560",
+    });
+  });
+
+  // The aliasing above, asserted rather than only described: two different
+  // selections that share a model and width are indistinguishable to the gate.
+  test("a stored LM Studio fingerprint admits a live `custom` entry on the same model and width", async () => {
+    storedFingerprint = "custom:text-embedding-nomic-embed-text-v1.5:768";
+    activeProvider = { provider: "custom", model: "text-embedding-nomic-embed-text-v1.5", dimensions: 768, priority: 1 };
+    const result = await checkSearchAdmission(baseDeps(), "p");
+    expect(result.admitted).toBe(true);
+    expect(result.embeddingMismatch).toBeUndefined();
+  });
 });
 
 // ── EmbeddingIndexStaleError ─────────────────────────────────────────────────
