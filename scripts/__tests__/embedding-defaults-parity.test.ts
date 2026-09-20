@@ -16,6 +16,15 @@
  *                     known-surface/allowlist sets fails by name: a new
  *                     surface must be added here, not silently shipped.
  *
+ * Tiers 1 and 2 each run twice — once per provider (T21/G3). The re-key in
+ * Tier 3 above made an `LMSTUDIO_*` pair *visible*; it never checked its
+ * *value*, so `PAIR_SURFACES`/`MODEL_ONLY_SURFACES`/`DIMS_ONLY_SURFACES`
+ * carried zero LM Studio rows and three mutants making the LM Studio
+ * model/width pair self-contradictory (`.env.example`, `embeddings/config.ts`,
+ * `setup-local-first.sh`) survived every gate. `LMSTUDIO_PAIR_SURFACES` /
+ * `LMSTUDIO_MODEL_ONLY_SURFACES` below close that — exactly one rule per
+ * provider per surface, not one rule shared across providers.
+ *
  * Each extractor is per-dialect (ENV / bare KEY=VALUE / ${VAR:-default} /
  * TS object literal) and must match EXACTLY once — 0 matches is a rotted
  * extractor, >1 is an ambiguous surface; both fail loudly (the
@@ -77,6 +86,30 @@ function referencePair(): { model: string; dims: string } {
   // names a width, so a model change there cannot pass unnoticed.
   const core = read("packages/core/src/services/embeddings/config.ts");
   expect(core).toContain(`"${model}"`);
+  return { model, dims };
+}
+
+// ── Reference pair, LM Studio (T21/G3/LIP-18) ───────────────────────────────
+// LM Studio is opt-in, never the shipped default, so it has no counterpart to
+// `massa-ai-config.ts`'s `defaultMassaAiConfig` block to anchor on. Its one
+// canonical model/width fact lives in the seam's own literal table —
+// `INFERENCE_PROVIDERS.lmstudio.knownDimensions` in `inference-providers.ts`
+// — which every surface below is required to restate identically. That
+// object literal is unique in the file (Ollama's `knownDimensions` is the
+// imported `KNOWN_EMBEDDING_DIMENSIONS` identifier, not a literal `{`), so
+// no further anchoring is needed to keep the match to exactly one.
+function referencePairLmStudio(): { model: string; dims: string } {
+  const seam = read("packages/shared/src/config/inference-providers.ts");
+  const model = extractOne(
+    "inference-providers.ts lmstudio reference model",
+    seam,
+    /knownDimensions:\s*\{\s*"([^"]+)":\s*\d+/g,
+  );
+  const dims = extractOne(
+    "inference-providers.ts lmstudio reference dims",
+    seam,
+    /knownDimensions:\s*\{\s*"[^"]+":\s*(\d+)/g,
+  );
   return { model, dims };
 }
 
@@ -147,8 +180,63 @@ const DIMS_ONLY_SURFACES: Array<{ file: string; dims: RegExp }> = [
   },
 ];
 
+// ── LM Studio surface table (T21/G3/LIP-18) ─────────────────────────────────
+// `label` disambiguates the two files below that carry TWO independent
+// LM Studio write sites (`init --lmstudio` and `use lmstudio`) — each site's
+// regex is anchored to its own branch so `extractOne` still sees exactly one
+// match per entry, and a violation names which branch, not just the file.
+// Ollama has no equivalent second site in these files (`init` never writes an
+// Ollama literal), so `PAIR_SURFACES` above needed no such split.
+const LMSTUDIO_PAIR_SURFACES: Array<{ file: string; label?: string; model: RegExp; dims: RegExp }> = [
+  {
+    // LM Studio is opt-in, so its documented pair in .env.example is
+    // deliberately commented — the anchor keeps the leading `#`.
+    file: ".env.example",
+    model: /^#LMSTUDIO_EMBEDDING_MODEL=(\S+)/gm,
+    dims: /^#LMSTUDIO_EMBEDDING_DIMENSIONS=(\d+)/gm,
+  },
+  {
+    file: "packages/core/src/services/embeddings/config.ts",
+    model: /process\.env\.LMSTUDIO_EMBEDDING_MODEL \|\| file\?\.model \|\| "([^"]+)"/g,
+    dims: /LMSTUDIO_EMBEDDING_DIMENSIONS[\s\S]*?\|\|\s*(\d+),/g,
+  },
+  {
+    file: "apps/mcp-client/src/config-cli.ts",
+    label: "apps/mcp-client/src/config-cli.ts (init --lmstudio)",
+    model: /options\.lmstudio\) \{[\s\S]*?const model = "([^"]+)"/g,
+    dims: /options\.lmstudio\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
+  },
+  {
+    file: "apps/mcp-client/src/config-cli.ts",
+    label: "apps/mcp-client/src/config-cli.ts (use lmstudio)",
+    model: /provider === "lmstudio"\) \{[\s\S]*?model = \(options\.model as string\) \|\| "([^"]+)"/g,
+    dims: /provider === "lmstudio"\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
+  },
+  {
+    file: "apps/opencode-plugin/src/config-cli.ts",
+    label: "apps/opencode-plugin/src/config-cli.ts (init --lmstudio)",
+    model: /options\.lmstudio\) \{[\s\S]*?const model = "([^"]+)"/g,
+    dims: /options\.lmstudio\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
+  },
+  {
+    file: "apps/opencode-plugin/src/config-cli.ts",
+    label: "apps/opencode-plugin/src/config-cli.ts (use lmstudio)",
+    model: /provider === "lmstudio"\) \{[\s\S]*?model = \(options\.model as string\) \|\| "([^"]+)"/g,
+    dims: /provider === "lmstudio"\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
+  },
+];
+
+/** `install.sh`/`Dockerfile`/`docker-compose.yml`/`setup-ollama-wsl.sh`/
+ *  `validate-vscode-integration.sh` carry no LM Studio equivalent at all
+ *  (measured: zero `lmstudio`/`LMSTUDIO` occurrences besides the bash probe
+ *  dialect's dispatch key) — genuinely Ollama-only surfaces, not a gap. */
+const LMSTUDIO_MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
+  { file: "scripts/setup-local-first.sh", model: /\$\{LMSTUDIO_EMBEDDING_MODEL:-([^}]+)\}/g },
+];
+
 describe("embedding defaults parity (EDC-06)", () => {
   const ref = referencePair();
+  const refLm = referencePairLmStudio();
 
   test(`every pair surface carries the reference pair ${ref.model}/${ref.dims}`, () => {
     // Collect-then-assert so ONE red run names EVERY violating surface
@@ -179,6 +267,33 @@ describe("embedding defaults parity (EDC-06)", () => {
       );
     }
     console.log(`[parity] width-only surfaces checked: ${DIMS_ONLY_SURFACES.length}`);
+  });
+
+  test(`every LM Studio pair surface carries the reference pair ${refLm.model}/${refLm.dims}`, () => {
+    // Same collect-then-assert shape as the Ollama pair test above (T21/G3):
+    // one red run names every violating LM Studio surface, not just the
+    // first — which is exactly what let M1a/M10/M13 hide behind each other
+    // had they landed together.
+    const violations: string[] = [];
+    for (const s of LMSTUDIO_PAIR_SURFACES) {
+      const label = s.label ?? s.file;
+      const text = read(s.file);
+      const model = extractOne(label, text, s.model);
+      const dims = extractOne(label, text, s.dims);
+      if (model !== refLm.model) violations.push(`${label}: model=${model} (want ${refLm.model})`);
+      if (dims !== refLm.dims) violations.push(`${label}: dims=${dims} (want ${refLm.dims})`);
+    }
+    console.log(
+      `[parity] LM Studio pair surfaces checked: ${LMSTUDIO_PAIR_SURFACES.length}, reference ${refLm.model}/${refLm.dims}`,
+    );
+    expect(violations).toEqual([]);
+  });
+
+  test("LM Studio model-only surfaces carry the reference model", () => {
+    for (const s of LMSTUDIO_MODEL_ONLY_SURFACES) {
+      expect(`${s.file} model=${extractOne(s.file, read(s.file), s.model)}`).toBe(`${s.file} model=${refLm.model}`);
+    }
+    console.log(`[parity] LM Studio model-only surfaces checked: ${LMSTUDIO_MODEL_ONLY_SURFACES.length}`);
   });
 
   /**
