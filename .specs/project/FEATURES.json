@@ -1486,6 +1486,29 @@
       "validation": ".specs/features/local-inference-provider-abstraction/validation.md",
       "notes": "COMPLETE 2026-09-20 after Phase 8 and three independent verification passes (verdict FAIL, FAIL, then PASS with 0 surviving mutants). 25 Tasks across 8 Phases. LM Studio joins Ollama as a local inference provider behind one shared seam (packages/shared/src/config/inference-providers.ts) that the config lists, both CLIs, the installers and the Web UI derive from rather than each copying Ollama literals; deriving those lists closed a pre-existing gap where cohere was a valid embedding provider the lists never offered. Probing is by response body rather than HTTP status in both dialects. A workspaces.embedding_fingerprint read and write gate stops a workspace indexed under one provider/model/width from being queried or appended to under another. WHAT PHASE 8 COST AND TAUGHT: the first validation returned FAIL on 7 ACs with 4 surviving mutants, and every failure clustered away from the core -- one promised file never written (scripts/diagnose.ts), one parity gate re-keyed but not extended, one config surface writing half a config block. The three that were silently GREEN are the ones to remember: G3 made the LM Studio model/width pair self-contradictory on three real surfaces and survived parity 7/0 plus a 116-test core filter; G4 guarded llm.baseUrl with a substring assertion that embedding.baseURL already satisfied, so it passed while resolveInferenceSpec still resolved to the ollama spec and silently re-enabled the probe and think-injection LIP-07 exists to suppress; G5 had no sensor at all. LIP-22 IS MEASURED: 14.needles.test.ts run on both arms through the real postgres-vector-store.ts, same 743-file corpus, separate profile-keyed workspaces -- 2560 (binary-quantization) hit@1 0.5000 / MRR 0.5893, 768 (hnsw-cosine) hit@1 0.1429 / MRR 0.2116, widths attested twice by direct curl and by the LIP-15 stamped fingerprint. The risk is accepted, not prevented: 768 is inherent to the measured model. Do NOT read the gap against the older bench:needles bound as proof the old benchmark understated the risk -- a draft claimed that and the verifier refuted it, because bench:needles ran its 768 arm on Ollama nomic-embed-text and the two instruments already disagree by 4 needles at hit@10 on the SHARED 2560 control arm. Two instruments deltas are comparable only once their shared control agrees. The widest trap found: 15 E2E files gated on an Ollama-specific availability flag, so the whole E2E suite skipped and reported no failures under any other provider -- one edit in probeAvailability, resolving it from the neutral /system/inference, unblocks the other 14. Residuals 2-6 stand in .specs/HANDOFF.md; the diagnose.ts item is closed. Unpushed; push and PR are the user call.",
       "completed": "2026-09-20"
+    },
+    {
+      "id": "per-provider-default-models",
+      "slug": "per-provider-default-models",
+      "title": "Per-provider default models: one equivalent trio per provider, with per-role runtime parameters configurable in config.json and the Admin Portal",
+      "status": "in_progress",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": true,
+        "tasks": true,
+        "execute": false
+      },
+      "branch": "feat/per-provider-default-models",
+      "created": "2026-09-20",
+      "depends_on": [
+        "local-inference-provider-abstraction"
+      ],
+      "spec": ".specs/features/per-provider-default-models/spec.md",
+      "design": ".specs/features/per-provider-default-models/design.md",
+      "tasks": ".specs/features/per-provider-default-models/tasks.md",
+      "validation": null,
+      "notes": "Planning complete 2026-09-20: 8 Phases = 17 Tasks, all three artifacts validator-clean. Execute NOT started — the user explicitly chose to stop after planning, so no implementation commit exists and no delivery authorization was given. BREAKING when executed: the Ollama embedding default moves to qwen3-embedding:0.6b/1024, invalidating every embedding_fingerprint and flipping the vector store from the >2000 binary-quantization branch to direct HNSW cosine. Retrieval quality at 1024 is unmeasured by the user's choice. Resume at T01 (the seam); everything depends on it."
     }
   ],
   "active_feature": "local-inference-provider-abstraction"

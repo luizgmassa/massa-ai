@@ -1,4 +1,92 @@
-# Handoff — local-inference-provider-abstraction (PHASE 8 COMPLETE 2026-09-20 — 25 Tasks across 8 Phases; independent validation returned **FAIL**, Phase 8 closed its ranked gap list, re-verification pending; unpushed, push/PR is the user's call)
+# Handoff — per-provider-default-models (PLANNING COMPLETE 2026-09-20 — Specify, Design and Tasks closed and validated; Execute NOT started, by the user's explicit choice)
+
+**Branch:** `feat/per-provider-default-models`, off `origin/main@8ea21839` (v1.58.0).
+Worktree `~/Projects/massa-ai-feat-per-provider-default-models`, provisioned
+(`bun install` + native tree-sitter addons copied from the primary checkout + `bun run build`).
+
+## Objective
+
+Equalize the default models across the two local inference providers, and make every model
+setting configurable. Three roles, one equivalent model per provider in that provider's native
+format, plus per-role runtime parameters exposed in `config.json` and the Admin Portal.
+
+| Role | Ollama | LM Studio | Context | Other |
+| --- | --- | --- | --- | --- |
+| Embedding | `qwen3-embedding:0.6b` | `text-embedding-qwen3-embedding-0.6b` | 8192 | batch 64, 1024 dims |
+| Instruct | `qwen3-vl:8b` | `qwen3-vl-8b-instruct` | 16384 | temperature 0.2 |
+| Coding | `qwen2.5-coder:7b` | `qwen2.5-coder-7b-instruct` | 32768 | temperature 0.0 |
+
+## State
+
+`.specs/features/per-provider-default-models/` holds `spec.md`, `design.md`, `tasks.md` —
+all three exit clean from their validators (`validate_spec`, `validate_design`, `validate_tasks`;
+the one remaining `validate_tasks` warning is T17's advisory `Tests: none`, confirmed in the
+coverage matrix). **8 Phases = 17 Tasks.** No implementation commit exists.
+
+## Next step
+
+Start at **T01** (the seam). Nothing else can land first — every other task depends on it.
+
+The user chose **8 workers, 5 in parallel**: W1=T01 alone → then W2(T02-04), W3(T05-06),
+W4(T07-08), W5(T09-10), W6(T11-12) concurrently → W7(T13-15) → W8(T16-17). The packing is not
+arbitrary: T02/T03 share `config/index.ts` and `massa-ai-config.ts`, and T05/T06 share
+`llm-client.ts`, so those pairs must stay inside one worker to keep write sets disjoint.
+
+Delivery authorization was **not** given. Obtain it before the first commit.
+
+## Traps worth carrying forward
+
+1. **LM Studio model ids are catalog names, underivable from the HuggingFace repo path.** Three
+   measured samples: `mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ` → `qwen3-embedding-0.6b-dwq`;
+   `mlx-community/Qwen3-VL-8B-Instruct-4bit` → `qwen3-vl-8b-instruct`;
+   `lmstudio-community/Qwen3-4B-Instruct-2507-MLX-4bit` → `qwen/qwen3-4b-2507`. A lowercased-path
+   rule fits the first two and not the third. The only way to know is to download and read
+   `GET /v1/models`.
+2. **LM Studio types a model by architecture, and MLX Qwen3-Embedding types as an LLM.** Measured:
+   it loads, answers `/v1/chat/completions`, and is invisible to `/v1/embeddings` ("No models
+   loaded") while nomic succeeds on the same server. The GGUF build of the identical model is
+   typed EMBEDDING and returns 1024. This is why the embedding default is GGUF, not MLX.
+3. **The live defect the feature exists for.** On `8ea21839`,
+   `massa-ai-config init --lmstudio` writes `"baseUrl": "http://localhost:1234/v1"` next to
+   `"model": "qwen2.5:7b-instruct"` and `"codeModel": "qwen2.5-coder:7b"`. Installers serialize
+   models as **file values**, and file beats default — so fixing only the seam default changes
+   nothing for anyone who ran an installer. The writers are the deliverable.
+4. **The parity gate's LM Studio reference extractor is positional.** `referencePairLmStudio()`
+   anchors `/knownDimensions:\s*\{\s*"([^"]+)":\s*\d+/g` on the opening brace and returns entry
+   **#1**. It is safe today only because the table has one row — and this feature is what makes
+   it multi-entry. Re-anchor on `defaultModels.embedding` with a by-key width lookup (T13).
+5. **`knownDimensions` must be additive.** Four call sites resolve
+   `knownDimensions[model] ?? 768` (two branches × two CLIs). Dropping the nomic row, or moving
+   the fallback literal before adding the qwen3 row, produces an inconsistent model/width pair.
+6. **The 11th `MASSA_AI_LLM_*` knob fires a different gate than the obvious one.**
+   `turbo-passthrough-env.test.ts` sees only literal `process.env.X`; the LLM knobs are read
+   through `envNum(...)`. The gate that goes red is `llm-env-passthrough.test.ts:36-48`, a
+   `toEqual` against a hardcoded ten-name array, plus `llm-env-prefix.test.ts:32-56`'s `KNOBS`.
+7. **The needles `ollama` floor is already unsatisfiable, before this feature.** The file's own
+   comment at `14.needles.test.ts:161`: hit@5 caps at 7/14 = 0.50 against its own 0.64 floor.
+   Nulling it replaces a broken assertion, not a working one — but a `null` row takes a bare
+   `console.log` path and asserts nothing, so with both rows null F-NEEDLE-1 asserts nothing for
+   any arm. F-NEEDLE-2 and F-NEEDLE-3 survive.
+8. **`benchmarks/llm-judge/fixtures/known-{dup,distinct}.json` and `run.ts:171` must NOT change.**
+   They carry `qwen2.5:7b-instruct` as memory *content* about a past decision, not as a default.
+   A literal sweep corrupts the judge benchmark.
+9. **The 1024 path is not new.** `prisma/schema.prisma:458-468` defines `vector_documents_1024d`,
+   created by the initial migration, its HNSW cosine index built lazily at runtime. No migration
+   is needed. What is genuinely unmeasured is retrieval *quality* at 1024 — the user chose to
+   ship without measuring it (spec A-03).
+10. **The Portal coverage gate is section-level.** `config-section-coverage.test.ts` extracts
+    `key:` and never `name:`, so a schema field absent from the Portal passes silently. The
+    field-level gate the review requires does not exist and is T10.
+
+## Environment notes
+
+Models on disk for verification: LM Studio holds all three of the new trio plus the unusable MLX
+embedding build (`qwen3-embedding-0.6b-dwq`, 351 MB — safe to delete, kept only as the evidence
+for trap 2). Ollama pulls of `qwen3-embedding:0.6b` and `qwen3-vl:8b` were started at the user's
+request; confirm with `ollama list` before relying on a live Ollama sensor.
+
+
+## Previous handoff — local-inference-provider-abstraction (MERGED 2026-09-20 — PR #121, released as v1.58.0; the head line below said "unpushed, push/PR is the user's call" and was stale at rotation time)
 
 **Branch:** `feat/local-inference-provider-abstraction`, off `main@d523f06f` (v1.57.0).
 Worktree `~/Projects/massa-ai-feat-local-inference-provider-abstraction`.

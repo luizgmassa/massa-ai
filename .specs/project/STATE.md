@@ -1,4 +1,45 @@
-## Current — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
+## Current — Per-provider default models (**PLANNING COMPLETE 2026-09-20** — 8 Phases = 17 Tasks specified, designed and broken down; Execute not started by the user's explicit choice; no implementation commit exists)
+
+Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
+worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
+`.specs/HANDOFF.md` and `.specs/features/per-provider-default-models/`.
+
+**What the feature is.** One trio of roles — embedding, instruct, coding — with an equivalent
+model per provider in that provider's native format, plus per-role runtime parameters exposed in
+`config.json` and the Admin Portal Config tab, where a configured value always beats the code
+default.
+
+| Role | Ollama | LM Studio | Context | Other |
+| --- | --- | --- | --- | --- |
+| Embedding | `qwen3-embedding:0.6b` | `text-embedding-qwen3-embedding-0.6b` | 8192 | batch 64, 1024 dims |
+| Instruct | `qwen3-vl:8b` | `qwen3-vl-8b-instruct` | 16384 | temperature 0.2 |
+| Coding | `qwen2.5-coder:7b` | `qwen2.5-coder-7b-instruct` | 32768 | temperature 0.0 |
+
+**Breaking.** The Ollama embedding default moves from `qwen3-embedding:4b`/2560 to
+`qwen3-embedding:0.6b`/1024, invalidating every existing workspace's `embedding_fingerprint` and
+flipping `postgres-vector-store.ts` from its `> 2000` binary-quantization branch to the `<= 2000`
+direct-HNSW-cosine branch. The fingerprint read and write gates fail closed with an actionable
+message; no migration is built. Retrieval quality at 1024 is **unmeasured** — the user chose to
+ship without measuring it rather than run the LIP-22 harness at the new width.
+
+**Two decisions that shaped the design, both from review.**
+
+1. The first draft's premise — "the model id varies by provider; the runtime parameters do not" —
+   is falsified by the file it extends (`inference-providers.ts` already carries three
+   per-provider behaviour flags) and by measurement (the same 64-text batch took 2.6 s on LM
+   Studio and 21.6 s on Ollama). The split is **value vs mechanism**: values required to be equal
+   live once, provider-independently; model ids and mechanism facts live per provider.
+2. The draft treated the seam default as the deliverable. Every installer **serializes** models
+   into `config.json`, and precedence is env > file > default — so the writers are the
+   deliverable. Measured on `8ea21839`, `massa-ai-config init --lmstudio` writes an LM Studio
+   base URL beside Ollama model tags. That is a live defect today.
+
+**Execution plan on record.** The user chose 8 workers, 5 in parallel: W1=T01 alone → W2(T02-04),
+W3(T05-06), W4(T07-08), W5(T09-10), W6(T11-12) concurrently → W7(T13-15) → W8(T16-17). Write-set
+disjointness is why T02/T03 and T05/T06 stay paired.
+
+
+## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
 worktree `~/Projects/massa-ai-feat-local-inference-provider-abstraction`. Full
