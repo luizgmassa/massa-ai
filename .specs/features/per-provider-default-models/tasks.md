@@ -1,6 +1,10 @@
 # Per-Provider Default Models — Tasks
 
-**8 Phases = 17 Tasks.** Max 3 Tasks per Phase. One atomic commit per Task.
+**8 Phases = 18 Tasks.** Max 3 Tasks per Phase. One atomic commit per Task.
+
+Originally 17. **T06b was added during Execute on 2026-09-20** under the Tasks safety valve, after
+T06 closed: PDM-12 AC-2 names five fields and the breakdown gave only four of them a reader. See
+T06b for the full reason. Phase 3 goes from 2 Tasks to 3 and stays inside the per-Phase budget.
 
 ## Execution Plan
 
@@ -121,6 +125,27 @@ off for LM Studio (load-time only, spec A-07). `postgres-vector-store.ts:421` re
 Tests: request-body assertion for options.num_ctx per role and its absence on LM Studio; embedBatch call count 3 for 130 documents
 Gate: bun test packages/core/src/__tests__/llm-client.test.ts && bun test packages/core/src/__tests__/vector-store-factory.test.ts
 Depends on: T01.
+
+### T06b: Give `embedding.contextWindow` a consumption site
+
+**Added during Execute 2026-09-20 (Tasks safety valve), after T06 closed.** PDM-12 AC-2 requires a
+configured value to beat the role-table default **for every one of the five fields**, and design
+decision 4 restates it. The original breakdown gave four of the five a reader — `llm.contextWindow`,
+`llm.codeContextWindow` and `llm.codeTemperature` through `llm-client.ts` (T05/T06),
+`embedding.batchSize` through `postgres-vector-store.ts` (T06) — and left `embedding.contextWindow`
+schema-only. Nothing reads it, so AC-2 is vacuously false for that field and the field-level Portal
+gate (T10) would pass on a setting that changes nothing. This is a Tasks-authoring gap, not new
+behaviour: the requirement was already written.
+
+`packages/core/src/services/embeddings/provider.ts` — `OLLAMA_EMBED_NUM_CTX` (`:37`) is a
+module-level const frozen at import, consumed at `:447` and `:600`. Resolve the value per call as
+`config.embedding?.contextWindow ?? <the existing env knob> ?? INFERENCE_ROLE_DEFAULTS.embedding.contextWindow`,
+preserving the existing env override's precedence over the role-table default. Do not widen the
+change beyond those sites; the Ollama-embed-only scope recorded in design.md:87 stands.
+
+Tests: a config-file `embedding.contextWindow` reaches the Ollama embed request body as `options.num_ctx`, beating the role-table default; absent the field, the role-table default is sent
+Gate: bun test packages/core/src/__tests__/embedding-provider.test.ts (or the suite that covers `services/embeddings/provider.ts`) && bun run type-check
+Depends on: T01, T02.
 
 ---
 
@@ -278,7 +303,7 @@ Depends on: T16.
 | PDM-05 | T05 | code-role fallback unit test | restoring `?? cfg?.model` |
 | PDM-06 | T12 | `test-setup-local-first-api-key.sh` | mutating `:500`'s literal |
 | PDM-08..PDM-11 | T06 | `num_ctx` request-body assertion; `embedBatch` call-count for 130 docs | reverting the batch constant |
-| PDM-12 | T02 | config-file-beats-default test | removing one field from the resolver |
+| PDM-12 | T02, T06, T06b | config-file-beats-default test per field — the schema half is T02; the reader half is T06 (`_resolveEmbedBatchSize`) and T06b (`embedding.contextWindow`) | removing one field from the resolver; inverting the `config ?? role-table` fallback |
 | PDM-13 | T09 | golden render snapshot | withholding one field |
 | PDM-14 | T10 | field-level parity gate | schema field withheld from the Portal |
 | Sweep completeness | T13 | parity gate, all tiers | one literal per tier, per dialect |
