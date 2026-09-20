@@ -143,9 +143,37 @@ export function resolveModelName(
 
 // ─── Provider URL auto-detection ─────────────────────────────────────
 
-/** Candidate URLs to probe, in priority order */
-export async function ollamaCandidates(envUrl: string): Promise<string[]> {
+/**
+ * Candidate URLs to probe, in priority order.
+ *
+ * Provider-neutral: every candidate is the configured URL with only its host
+ * swapped, so the port and path come from the active provider's spec rather
+ * than from a literal. The WSL2 arm used to build `http://<nameserver>:11434`
+ * unconditionally — Ollama's port, and no `/v1` — which under LM Studio
+ * probed a port the provider does not listen on. It could not produce a false
+ * *positive* (the lmstudio probe rejects Ollama's `{models:[…]}` body shape),
+ * but it was a dead branch carrying the one literal LIP-03 exists to remove.
+ *
+ * `resolvConf` is injectable so the WSL2 arm is testable off WSL2: callers
+ * pass the file's contents, the default reads it.
+ */
+export async function providerCandidates(
+  envUrl: string,
+  resolvConf?: string,
+): Promise<string[]> {
   const candidates: string[] = [envUrl];
+
+  const withHost = (host: string): string | null => {
+    try {
+      const url = new URL(envUrl);
+      url.hostname = host;
+      // `URL.href` appends a trailing slash to a pathless URL; the probe
+      // concatenates its own path, so strip it back off.
+      return url.href.replace(/\/$/, "");
+    } catch {
+      return null;
+    }
+  };
 
   // When the env URL uses "localhost", also try the explicit IPv4 address.
   // In WSL2 with mirrored networking, "localhost" may resolve to ::1 (IPv6)
@@ -156,9 +184,10 @@ export async function ollamaCandidates(envUrl: string): Promise<string[]> {
 
   // Try the WSL2 Windows-host nameserver IP as a last resort
   try {
-    const resolv = await Bun.file("/etc/resolv.conf").text();
+    const resolv = resolvConf ?? (await Bun.file("/etc/resolv.conf").text());
     const match = resolv.match(/^nameserver\s+([\d.]+)/m);
-    if (match) candidates.push(`http://${match[1]}:11434`);
+    const wslCandidate = match ? withHost(match[1]!) : null;
+    if (wslCandidate) candidates.push(wslCandidate);
   } catch { /* ignore */ }
 
   // Deduplicate while preserving order
@@ -266,7 +295,7 @@ async function checkProvider(): Promise<boolean> {
 
   // 2. Check API connectivity — probe multiple candidates to handle WSL2 quirks
   console.log(`\n${BOLD}[2/7] Checking ${spec.id} API connectivity...${NC}`);
-  const candidates = await ollamaCandidates(configuredUrl);
+  const candidates = await providerCandidates(configuredUrl);
   let models: string[] | null = null;
 
   const start = Date.now();

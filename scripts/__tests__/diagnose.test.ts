@@ -13,7 +13,7 @@
 import { afterEach, describe, test, expect } from "bun:test";
 import {
   maskDatabaseUrl,
-  ollamaCandidates,
+  providerCandidates,
   resolveProviderId,
   resolveProviderBaseUrl,
   resolveModelName,
@@ -54,23 +54,58 @@ describe("maskDatabaseUrl", () => {
   });
 });
 
-describe("ollamaCandidates", () => {
+describe("providerCandidates", () => {
   test("a localhost URL yields both localhost and 127.0.0.1 variants", async () => {
-    const candidates = await ollamaCandidates("http://localhost:11434");
+    const candidates = await providerCandidates("http://localhost:11434");
     expect(candidates[0]).toBe("http://localhost:11434");
     expect(candidates).toContain("http://127.0.0.1:11434");
   });
 
   test("a non-localhost URL is returned as-is (plus any resolv.conf nameserver)", async () => {
-    const candidates = await ollamaCandidates("http://ollama.example:11434");
+    const candidates = await providerCandidates("http://ollama.example:11434");
     expect(candidates[0]).toBe("http://ollama.example:11434");
     // localhost variant must NOT be added for a non-localhost input
     expect(candidates).not.toContain("http://127.0.0.1:11434");
   });
 
   test("never throws and always returns at least the input URL", async () => {
-    const candidates = await ollamaCandidates("http://localhost:11434");
+    const candidates = await providerCandidates("http://localhost:11434");
     expect(candidates.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // LIP-03/LIP-10 — the WSL2 nameserver arm used to hardcode `:11434` and drop
+  // the path, so under LM Studio it probed a port the provider does not listen
+  // on. `resolvConf` is injected here so the arm is exercised off WSL2 rather
+  // than depending on the host having an /etc/resolv.conf at all.
+  const RESOLV = "nameserver 172.20.16.1\n";
+
+  test("the WSL2 candidate keeps the LM Studio port and /v1 path, not Ollama's :11434", async () => {
+    const candidates = await providerCandidates("http://localhost:1234/v1", RESOLV);
+    expect(candidates).toContain("http://172.20.16.1:1234/v1");
+    expect(candidates.some((c) => c.includes(":11434"))).toBe(false);
+  });
+
+  test("the WSL2 candidate for a pathless Ollama URL gains no trailing slash", async () => {
+    // The probe concatenates its own `/api/tags`, so a trailing slash here
+    // would produce a double slash rather than a working URL.
+    const candidates = await providerCandidates("http://localhost:11434", RESOLV);
+    expect(candidates).toContain("http://172.20.16.1:11434");
+    expect(candidates.some((c) => c.endsWith("/"))).toBe(false);
+  });
+
+  test("every candidate shares the configured URL's port and path", async () => {
+    for (const envUrl of ["http://localhost:1234/v1", "http://localhost:11434"]) {
+      const candidates = await providerCandidates(envUrl, RESOLV);
+      const { port, pathname } = new URL(envUrl);
+      // Anti-vacuity: all three arms must be present, or the loop below could
+      // pass over a single candidate that is trivially the input itself.
+      expect(candidates.length).toBe(3);
+      for (const candidate of candidates) {
+        const url = new URL(candidate);
+        expect(url.port).toBe(port);
+        expect(url.pathname).toBe(pathname || "/");
+      }
+    }
   });
 });
 

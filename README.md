@@ -78,8 +78,9 @@ Instead of Docker (~5GB RAM), run PostgreSQL natively (~100MB):
 
 Linux/WSL: install `postgresql` + `postgresql-*-pgvector` from your distro, create the role/db/extension, then set `DATABASE_URL`. Or use Docker (option 3, ~5GB RAM).
 
-> **Tip:** Run `bun run diagnose` at any time to validate Ollama connectivity,
-> database access, embedding generation, and migration status.
+> **Tip:** Run `bun run diagnose` at any time to validate your local inference
+> provider (Ollama or LM Studio), database access, embedding generation, and
+> migration status.
 
 ---
 
@@ -1044,7 +1045,7 @@ and config CLI commands.**
 | `bun run lint:fix` | Apply oxlint's safe auto-fixes |
 | `bun run type-check` | Type checking |
 | `bun run generate:artifacts` | Regenerate the skill/agent/command bundles (add `--check` to diff only) |
-| `bun run diagnose` | Validate full stack (Ollama, database, embeddings) |
+| `bun run diagnose` | Validate full stack (inference provider, database, embeddings) |
 | `bun run version:sync` | Bump root + workspace versions (all bumps go through this) |
 | `bun run bench:fixture` | Run the massa-ai retrieval fixture benchmark |
 

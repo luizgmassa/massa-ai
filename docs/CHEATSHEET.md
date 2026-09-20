@@ -60,7 +60,7 @@ cd packages/core && bunx prisma migrate deploy
 ### Health check
 
 ```bash
-bun run diagnose                       # Ollama, DB, embeddings, migration status
+bun run diagnose                       # inference provider, DB, embeddings, migration status
 ```
 
 ---
