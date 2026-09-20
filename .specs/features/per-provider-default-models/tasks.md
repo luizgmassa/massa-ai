@@ -614,7 +614,7 @@ host because of `test-install-skills-cli.sh`, `test-plugin-auto-install.sh`,
 T15's measurement), each caused by this machine's own Claude install and unrelated to this
 feature. Not fixed, skipped, or excluded, per this task's own instruction.
 
-### T16: Update the 7 non-history documentation surfaces
+### T16: Update the 7 non-history documentation surfaces — ✅ Complete
 
 `README.md`, `FEATURES.md`, `docs/CHEATSHEET.md`, `docs/ONBOARDING.md`,
 `apps/tools-api/OLLAMA_WSL_SETUP.md`, `benchmarks/llm-judge/README.md`,
@@ -641,6 +641,70 @@ in scope here:
 Tests: the narrow Markdown tier added in T13 covers each updated doc for membership; the prose pass is verified by reading, and every changed claim is either re-measured or explicitly attributed to the retired model
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts
 Depends on: T13.
+
+**Result (W8, 2026-09-20).** Read all seven docs plus the two named extra surfaces; updated
+content in five of the seven (README.md, FEATURES.md, docs/CHEATSHEET.md, docs/ONBOARDING.md,
+apps/tools-api/OLLAMA_WSL_SETUP.md) and left two unchanged after verifying their literals were
+already correct or deliberately historical, not stale:
+
+- **README.md** — setup-wizard comment block (Ollama/LM Studio model + dims), the manual
+  `ollama pull`/`lms get` prerequisite commands, the `MASSA_AI_LLM_MODEL` env example
+  (`qwen2.5:7b-instruct` → `qwen3-vl:8b`, matching `defaultMassaAiConfig.llm.model`'s new
+  derivation from `INFERENCE_PROVIDERS.ollama.defaultModels.instruct`), the embeddings note
+  paragraph (rewritten to name the new default, the breaking reindex requirement, and the
+  unmeasured-retrieval-quality caveat), and the `massa-ai-config use`/`set` example.
+- **FEATURES.md** — the Embedding Providers table, the `massa-ai-config` example block, the
+  `MASSA_AI_LLM_ENABLED=true` example's `MASSA_AI_LLM_MODEL` line, and the config-reference
+  table's `llm.model` default cell.
+- **docs/CHEATSHEET.md** — the `massa-ai-config use` example and the Ollama/LM Studio embedding
+  env-var defaults.
+- **docs/ONBOARDING.md** — the one-line architecture table's Embeddings cell.
+- **apps/tools-api/OLLAMA_WSL_SETUP.md** — both `ollama pull` command lines (doc is Portuguese;
+  left the surrounding prose untouched, matching existing style, per coding-principles' "match
+  existing style" and "don't touch what isn't in scope").
+
+**Left unchanged, verified rather than assumed:**
+
+- **`benchmarks/llm-judge/README.md`** — its `MASSA_AI_LLM_MODEL`/`qwen2.5:7b-instruct` and
+  `MASSA_AI_LLM_CODE_MODEL`/`qwen2.5-coder:7b` defaults are `run.ts`'s own hardcoded literal
+  fallbacks (`run.ts:257-258,278-280`), not reads of `defaultMassaAiConfig` — this standalone
+  benchmark is deliberately pinned to the historical "qwen2.5 model swap" it measures (matching
+  design.md's already-recorded "Must NOT change" fixtures), and the coding-role default
+  (`qwen2.5-coder:7b`) did not change in this feature anyway. Verified by reading `run.ts`
+  before deciding not to touch the README.
+- **`benchmarks/needles/README.md`** — updated one factual claim (see below) but left
+  `run.ts`'s own `NEEDLE_MODEL` default (`qwen3-embedding:4b`) undisturbed, because `run.ts` is
+  a `.ts` file outside this doc-only task's write set and outside every other task's write set
+  too (grepped; confirmed absent from `PAIR_SURFACES`/`MODEL_ONLY_SURFACES`/any parity-gate
+  tier). **Fixed a now-false claim rather than leaving it:** the doc used to say `run.ts`'s
+  default is "the same model as the E2E baseline" — true when both were written, false now that
+  the E2E baseline (`14.needles.test.ts`) moved to `qwen3-embedding:0.6b`/1024d while `run.ts`
+  stayed at `qwen3-embedding:4b`. Corrected the claim and added a "Known drift" note naming the
+  gap, its cause, and the env override to run the harness against the current default — without
+  touching the out-of-scope `.ts` literal itself. **SPEC_DEVIATION-adjacent finding, not a fix:**
+  `benchmarks/needles/run.ts`'s own `NEEDLE_MODEL` default is stale and untouched by any task in
+  this feature; recorded here and in `STATE.md` for T17's close-out.
+
+**The two extra surfaces named in this task's scope addition:**
+
+- `.github/workflows/needles-gate.yml:11` and `:36` — both rationale comments rewritten to name
+  the ~60s/embed, ~90min-fixture figure as measured on the retired `qwen3-embedding:4b`, and to
+  state plainly that `qwen3-embedding:0.6b` (a smaller model) has not been re-measured, so the
+  figure is an upper bound. No fabricated number. Verified with `actionlint` (exit 0) — comment
+  edits only, no structural YAML change.
+- `benchmarks/llm-judge/reports/llm-judge-baseline.md` — read the report (dated
+  `2026-07-12T15:47:09.981Z`, recording `qwen2.5:7b-instruct`/`qwen2.5-coder:7b` as the models in
+  effect at that run). Added the one-line mention to `design.md`'s "Must NOT change" section,
+  beside the two fixtures it was already grouped with in spirit but not in text.
+
+Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → **14 pass / 0 fail**
+(unchanged from T13/T15b; Markdown tier population 8 tracked `.md` files, no offenders — the
+membership check this tier runs cannot see the prose-value changes above, which is why this task
+existed). `git status --porcelain` before commit: seven files
+(`.github/workflows/needles-gate.yml`, `.specs/features/per-provider-default-models/design.md`,
+`FEATURES.md`, `README.md`, `apps/tools-api/OLLAMA_WSL_SETUP.md`, `docs/CHEATSHEET.md`,
+`docs/ONBOARDING.md`) plus `benchmarks/needles/README.md`, `tasks.md`, `STATE.md` — all within
+this task's declared write set (the 7 docs + the two named extra surfaces + status updates).
 
 ### T17: Close out
 

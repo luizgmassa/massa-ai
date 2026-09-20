@@ -48,12 +48,12 @@ bun install
 ./scripts/setup-local-first.sh
 # - Prompts for a local inference provider (Ollama or LM Studio), or set
 #   MASSA_AI_INFERENCE_PROVIDER=ollama|lmstudio to skip the prompt
-# - Ollama: pulls qwen3-embedding:4b (embeddings, 2560 dims), qwen2.5:7b-instruct
+# - Ollama: pulls qwen3-embedding:0.6b (embeddings, 1024 dims), qwen3-vl:8b
 #   (default LLM), and qwen2.5-coder:7b (code-oriented LLM sites)
 # - LM Studio: installs the `lms` CLI if missing, starts the server, and fetches
-#   text-embedding-nomic-embed-text-v1.5 (embeddings, 768 dims) and
-#   qwen/qwen3-4b-2507 (both LLM slots) — override via LMSTUDIO_EMBEDDING_MODEL,
-#   MASSA_AI_LLM_MODEL, MASSA_AI_LLM_CODE_MODEL
+#   text-embedding-qwen3-embedding-0.6b (embeddings, 1024 dims), qwen3-vl-8b-instruct
+#   (default LLM) and qwen2.5-coder-7b-instruct (code-oriented LLM sites) —
+#   override via LMSTUDIO_EMBEDDING_MODEL, MASSA_AI_LLM_MODEL, MASSA_AI_LLM_CODE_MODEL
 # - Creates .env with defaults
 # - Runs bun run diagnose to validate the stack
 
@@ -638,8 +638,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama serve
 
 # Pull models
-ollama pull qwen3-embedding:4b    # embeddings (2560 dims)
-ollama pull qwen2.5:7b-instruct   # default LLM (consolidation, salience, handoff, query rewrite, HyDE)
+ollama pull qwen3-embedding:0.6b  # embeddings (1024 dims)
+ollama pull qwen3-vl:8b           # default LLM (consolidation, salience, handoff, query rewrite, HyDE)
 ollama pull qwen2.5-coder:7b      # code-oriented LLM sites (bootstrap seed, reranker, code compression)
 ```
 
@@ -653,7 +653,7 @@ curl -fsSL https://lmstudio.ai/install.sh | bash
 lms daemon up
 
 # Download and load models (pick any instruct + embedding model you prefer)
-lms get -y text-embedding-nomic-embed-text-v1.5   # embeddings (768 dims)
+lms get -y text-embedding-qwen3-embedding-0.6b    # embeddings (1024 dims)
 lms get -y <your-instruct-model>                   # chat model
 ```
 
@@ -697,7 +697,7 @@ status. It does not currently probe LM Studio — verify an LM Studio setup with
 MASSA_AI_LLM_ENABLED=true
 MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
 MASSA_AI_LLM_API_KEY=ollama
-MASSA_AI_LLM_MODEL=qwen2.5:7b-instruct        # default instruct model (NL-judgment sites)
+MASSA_AI_LLM_MODEL=qwen3-vl:8b                # default instruct model (NL-judgment sites)
 MASSA_AI_LLM_CODE_MODEL=qwen2.5-coder:7b      # code-oriented sites (bootstrap seed, reranker, compress)
 # MASSA_AI_LLM_DISABLE_THINK=true             # best-effort thinking-disable (default true; safety net)
 ```
@@ -726,17 +726,21 @@ falls back to its rule-based path.
 > reasoning channel and silently degraded). Override either with the env vars
 > above.
 
-> **Embeddings note:** The config default embedding model is `qwen3-embedding:4b`
-> (2560d — see `massa-ai-config.ts`). It balances recall against on-device speed
-> better than `nomic-embed-text` (768d) or `bge-m3` (1024d), but it is slower:
-> bulk indexing a large corpus takes minutes. Override via
-> `OLLAMA_EMBEDDING_MODEL` or config `embedding.model`, and move
-> `embedding.dimensions` with it — a width that disagrees with what the model
-> returns fails loudly rather than degrading. Switch to `bge-m3` for speed if
-> its recall quality is sufficient. On LM Studio, `LMSTUDIO_EMBEDDING_MODEL`
-> defaults to `text-embedding-nomic-embed-text-v1.5` (768d, resolved
-> automatically); override `LMSTUDIO_EMBEDDING_DIMENSIONS` alongside a
-> different model the same way.
+> **Embeddings note:** The config default embedding model is `qwen3-embedding:0.6b`
+> (1024d — see `massa-ai-config.ts`), a smaller/faster model than the prior
+> default (`qwen3-embedding:4b`, 2560d). Override via `OLLAMA_EMBEDDING_MODEL`
+> or config `embedding.model`, and move `embedding.dimensions` with it — a
+> width that disagrees with what the model returns fails loudly rather than
+> degrading. On LM Studio, `LMSTUDIO_EMBEDDING_MODEL` defaults to
+> `text-embedding-qwen3-embedding-0.6b` (1024d, resolved automatically);
+> override `LMSTUDIO_EMBEDDING_DIMENSIONS` alongside a different model the
+> same way. **Breaking change if you upgrade an existing install:** switching
+> the default moves every workspace's embedding width from 2560 to 1024
+> dimensions, which invalidates the stored `embedding_fingerprint` and
+> requires a full reindex (see the reindex command above) — the fingerprint
+> gates fail closed with an actionable message rather than silently mixing
+> widths. Retrieval quality at 1024 dimensions has not been re-measured
+> against the retired 2560-dimension default.
 
 > **Switching providers:** changing `embedding.provider` or the embedding
 > model changes what future searches expect the stored vectors to look like.
@@ -1009,7 +1013,7 @@ The `massa-ai-config` CLI (a bin of `@massa-ai/mcp-client`, and of
 massa-ai-config show                              # current configuration
 massa-ai-config path                              # config file path
 massa-ai-config init --mistral your-api-key       # or --ollama (default) / --lmstudio / --openai <key>
-massa-ai-config use ollama --model qwen3-embedding:4b   # or: use lmstudio --model text-embedding-nomic-embed-text-v1.5
+massa-ai-config use ollama --model qwen3-embedding:0.6b   # or: use lmstudio --model text-embedding-qwen3-embedding-0.6b
 massa-ai-config set embedding.dimensions 1024
 massa-ai-config recover my-project --path /new/path   # re-associate a moved index
 massa-ai-config profile list                      # shipped profiles + per-host active one

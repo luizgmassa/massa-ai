@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 21 Tasks (T06b, T07b, T03b, T15b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), Phase 7 (T13-T15) complete, Phase 8 T15b ✅ Complete, T16-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 21 Tasks (T06b, T07b, T03b, T15b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), Phase 7 (T13-T15) complete, Phase 8 T15b + T16 ✅ Complete, T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -749,6 +749,50 @@ fail on this development machine's own Claude install state, not because of anyt
 changed. Recorded here for T17's close-out to cite honestly.
 
 Next: T16 (7 non-history docs + the two unowned surfaces), then T17 (close-out).
+
+**T16 (W8) — Complete.** Real content pass over all 7 named docs (T13's Markdown tier only
+checks membership, not prose values). Updated stale model/dims literals in 5 of 7:
+`README.md` (setup-wizard comments, `ollama pull`/`lms get` prerequisites, `MASSA_AI_LLM_MODEL`
+example `qwen2.5:7b-instruct` → `qwen3-vl:8b`, the embeddings note rewritten with the breaking
+reindex requirement and the unmeasured-retrieval-quality caveat, `massa-ai-config use`/`set`
+examples), `FEATURES.md` (Embedding Providers table, config examples, `llm.model` reference
+row), `docs/CHEATSHEET.md` (config examples, Ollama/LM Studio embedding env defaults),
+`docs/ONBOARDING.md` (architecture table Embeddings cell), `apps/tools-api/OLLAMA_WSL_SETUP.md`
+(both `ollama pull` lines; doc stays Portuguese, only the literal changed).
+
+Left 2 of 7 unchanged after verifying, not assuming: `benchmarks/llm-judge/README.md`'s
+`qwen2.5:7b-instruct`/`qwen2.5-coder:7b` defaults are `run.ts`'s own hardcoded literals
+(`run.ts:257-258,278-280`), deliberately pinned to the historical "qwen2.5 model swap" this
+standalone benchmark measures — same class as design.md's already-recorded "Must NOT change"
+fixtures, and the coding default didn't change anyway. `benchmarks/needles/README.md` — fixed
+one now-false claim ("same model as the E2E baseline", true when written, false since T14 moved
+the E2E baseline to `qwen3-embedding:0.6b`/1024d while `run.ts` stayed at `qwen3-embedding:4b`)
+and added a "Known drift" note, but left `run.ts`'s own `NEEDLE_MODEL` literal untouched — a
+`.ts` file outside every task's write set in this feature (confirmed absent from every parity-gate
+tier by grep).
+
+**Named residual (not fixed, out of scope for every task in this feature):**
+`benchmarks/needles/run.ts`'s `NEEDLE_MODEL` default is still `qwen3-embedding:4b`, unlike the
+E2E baseline and everything the parity gate covers. The parity gate does not scan this file
+(only its README). Override with `NEEDLE_MODEL=qwen3-embedding:0.6b` to run it against the
+current default; a future task should either fix the literal or explicitly re-pin it like the
+llm-judge harness.
+
+**The two extra surfaces named in T16's scope addition:** `.github/workflows/needles-gate.yml:11`
+and `:36` rewritten to attribute the ~60s/embed, ~90min-fixture figure to the retired
+`qwen3-embedding:4b` and state plainly it has not been re-measured for the smaller
+`qwen3-embedding:0.6b` (no fabricated number) — verified with `actionlint` (exit 0).
+`benchmarks/llm-judge/reports/llm-judge-baseline.md` (dated `2026-07-12T15:47:09.981Z`) now has
+its one-line exclusion mention added to `design.md`'s "Must NOT change" section, beside the two
+fixtures it was already grouped with in spirit but not in text.
+
+Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 14 pass / 0 fail
+(unchanged; Markdown tier population 8 tracked `.md` files, no offenders — this tier's
+membership check cannot see the prose-value changes T16 made, confirming the task was necessary
+independent of the gate).
+
+Next: T17 (close-out: CHANGELOG entry, this file, HANDOFF.md, FEATURES.json, then
+`check_specs_delivered.ts`).
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 

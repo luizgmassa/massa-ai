@@ -134,6 +134,10 @@ Live measurements taken this session (host: this machine, Ollama :11434, LM Stud
 past decision** ("Swapped the default LLM to … because the thinking model degraded structured
 calls"). They are historical fixtures for the judge benchmark, not defaults. A literal sweep
 would corrupt the benchmark's semantics. `CHANGELOG.md` is likewise append-only history.
+`benchmarks/llm-judge/reports/llm-judge-baseline.md` is the same class: a dated run report
+(`Ran at: 2026-07-12T15:47:09.981Z`) recording the instruct/coder models in effect at that run,
+not a current-default declaration — added to T16's Execute-time doc scope as the same exclusion,
+found by T13's Markdown tier.
 
 ### Parity-gate re-anchoring (the riskiest single item)
 

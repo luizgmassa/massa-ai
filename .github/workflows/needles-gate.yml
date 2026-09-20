@@ -8,11 +8,13 @@ name: Needles Gate
 # chunker-default changes, embedding-model swaps, or content shifts that would
 # otherwise only surface as a slow quality decay in real usage.
 #
-# MANUAL-ONLY (workflow_dispatch) or local. qwen3-embedding:4b is ~60s/embed on
-# a 2-core free runner (~90min for the fixture), so the gate is impractical for
-# per-PR CI and would burn the free-tier quota. PR gating relies on the CI build
-# + structural-native jobs. Run on demand from the Actions tab, or locally with
-# `bun run bench:needles:gate`.
+# MANUAL-ONLY (workflow_dispatch) or local. The retired default, qwen3-embedding:4b,
+# measured ~60s/embed on a 2-core free runner (~90min for the fixture), so the
+# gate was impractical for per-PR CI and would burn the free-tier quota. The
+# current default, qwen3-embedding:0.6b, is a smaller model and has not been
+# re-measured on this runner — the figure above is an upper bound, not a
+# current reading. PR gating relies on the CI build + structural-native jobs.
+# Run on demand from the Actions tab, or locally with `bun run bench:needles:gate`.
 #
 # The job is defensive: if Ollama or the model can't be brought up, it exits 0
 # with a "skipped — no embedding provider" notice rather than erroring.
@@ -33,12 +35,15 @@ concurrency:
 jobs:
   needles:
     runs-on: ubuntu-latest
-    # NON-BLOCKING by design. qwen3-embedding:4b is ~60s/embed on a 2-core free
-    # runner (~90min for the fixture), so this gate cannot reliably complete on
-    # free runners. It remains for manual dispatch (workflow_dispatch) or a
-    # beefier runner, and never blocks PR merge — PR gating depends on the CI
-    # build + structural-native jobs. continue-on-error makes a timeout/failure
-    # informational (reported as a warning, not a required-check failure).
+    # NON-BLOCKING by design. The retired default, qwen3-embedding:4b, measured
+    # ~60s/embed on a 2-core free runner (~90min for the fixture), so this gate
+    # could not reliably complete on free runners. The current default,
+    # qwen3-embedding:0.6b, is a smaller model and has not been re-measured —
+    # the figure above is an upper bound, not a current reading. It remains for
+    # manual dispatch (workflow_dispatch) or a beefier runner, and never blocks
+    # PR merge — PR gating depends on the CI build + structural-native jobs.
+    # continue-on-error makes a timeout/failure informational (reported as a
+    # warning, not a required-check failure).
     continue-on-error: true
     timeout-minutes: 20
 

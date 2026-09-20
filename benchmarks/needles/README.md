@@ -42,9 +42,10 @@ fixtures/<project>.json ──┐
 `run.ts` is a self-contained chunker-quality harness that does NOT need the
 live tools-api stack or a database. It chunks each referenced source file with
 `smartChunk`, embeds the query + every chunk via the Ollama embedding endpoint
-(`qwen3-embedding:4b` by default — the same model as the E2E baseline), and
-cosine-ranks chunks per query. This isolates chunker effects from API/DB/RRF
-variance, giving stable, reproducible before/after numbers for tuning.
+(`qwen3-embedding:4b` by default, its own independent literal — see the note
+below), and cosine-ranks chunks per query. This isolates chunker effects from
+API/DB/RRF variance, giving stable, reproducible before/after numbers for
+tuning.
 
 ```sh
 # Default config (uses the smart-chunker DEFAULT_CONFIG):
@@ -61,6 +62,16 @@ bun run bench:needles:gate
 Env: `OLLAMA_HOST` (default `http://localhost:11434`), `NEEDLE_MODEL` (default
 `qwen3-embedding:4b`), `NEEDLE_FLOOR_HIT1`, `NEEDLE_FLOOR_MRR`. Results are
 written under `reports/` (gitignored).
+
+**Known drift (per-provider-default-models, 2026-09-20):** `run.ts`'s
+`NEEDLE_MODEL` default and this doc's default both still say `qwen3-embedding:4b`.
+The E2E baseline this doc used to say it matched moved to
+`qwen3-embedding:0.6b`/1024d for Ollama (see `14.needles.test.ts`). Neither the
+harness literal nor its floors were part of any task's write set for that
+feature — the parity gate that swept the rest of the codebase does not reach
+this file, only this README. Left as-is rather than fixed opportunistically;
+override with `NEEDLE_MODEL=qwen3-embedding:0.6b` to run this harness against
+the current default.
 
 The full-stack gate (live API + Postgres + RRF) lives in the E2E suite:
 `packages/core/src/__tests__/e2e/14.needles.test.ts` (run with `RUN_E2E=1`).

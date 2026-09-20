@@ -917,7 +917,7 @@ batch_execute { commands: ["rg 'function' src/", "wc -l src/*.ts"] }
 MASSA_AI_LLM_ENABLED=true
 MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
 MASSA_AI_LLM_API_KEY=ollama
-MASSA_AI_LLM_MODEL=qwen2.5:7b-instruct         # NL-judgment sites
+MASSA_AI_LLM_MODEL=qwen3-vl:8b                 # NL-judgment sites
 MASSA_AI_LLM_CODE_MODEL=qwen2.5-coder:7b       # code-oriented sites (bootstrap seed, reranker, compress)
 ```
 
@@ -1228,7 +1228,7 @@ rows default **OFF** and degrade silently when disabled.
 | `llm.enabled` | `MASSA_AI_LLM_ENABLED` | `false` | **OFF** |
 | `llm.baseUrl` | `MASSA_AI_LLM_BASE_URL` | `http://localhost:11434/v1` | LM Studio: `http://localhost:1234/v1` |
 | `llm.apiKey` | `MASSA_AI_LLM_API_KEY` | `ollama` | any non-empty string for either local provider |
-| `llm.model` | `MASSA_AI_LLM_MODEL` | `qwen2.5:7b-instruct` | default instruct model (NL-judgment sites) |
+| `llm.model` | `MASSA_AI_LLM_MODEL` | `qwen3-vl:8b` | default instruct model (NL-judgment sites) |
 | `llm.codeModel` | `MASSA_AI_LLM_CODE_MODEL` | `qwen2.5-coder:7b` | code-oriented sites (bootstrap seed, reranker, compress) |
 | `llm.disableThink` | `MASSA_AI_LLM_DISABLE_THINK` | `true` | best-effort thinking-disable (safety net for thinking models) |
 | `llm.temperature` | `MASSA_AI_LLM_TEMPERATURE` | `0.2` | — |
@@ -1300,8 +1300,8 @@ process environment at boot, so they do not appear in `~/.config/massa-ai/config
 
 | Provider | Model | Cost | Quality |
 |----------|-------|------|---------|
-| **Ollama** (default, local) | qwen3-embedding:4b (also bge-m3) | Free | Good-Excellent |
-| **LM Studio** (local) | text-embedding-nomic-embed-text-v1.5 (768d) | Free | Good |
+| **Ollama** (default, local) | qwen3-embedding:0.6b, 1024d (also bge-m3) | Free | Good-Excellent |
+| **LM Studio** (local) | text-embedding-qwen3-embedding-0.6b (1024d) | Free | Good |
 | **Mistral** | mistral-embed, codestral-embed | $$ | Great |
 | **OpenAI** | text-embedding-3-small | $$ | Great |
 
@@ -1327,9 +1327,9 @@ process environment at boot, so they do not appear in `~/.config/massa-ai/config
 ```bash
 massa-ai-config init --mistral your-api-key
 massa-ai-config init --lmstudio
-massa-ai-config use ollama --model qwen3-embedding:4b
-massa-ai-config use lmstudio --model text-embedding-nomic-embed-text-v1.5
-massa-ai-config set embedding.dimensions 2560
+massa-ai-config use ollama --model qwen3-embedding:0.6b
+massa-ai-config use lmstudio --model text-embedding-qwen3-embedding-0.6b
+massa-ai-config set embedding.dimensions 1024
 massa-ai-config recover my-project --path /home/user/renamed-dir
 massa-ai-config profile set work --dry-run
 massa-ai-config bootstrap disable caveman
