@@ -35,8 +35,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const LMSTUDIO_URL = "http://localhost:1234/v1";
-const EXPECTED_DIMENSIONS = 768;
-const EXPECTED_MODEL = "text-embedding-nomic-embed-text-v1.5";
+// Retargeted by per-provider-default-models (PDM-03/04 AC-4): the shipped
+// lmstudio embedding default moved from text-embedding-nomic-embed-text-v1.5
+// (768d) to text-embedding-qwen3-embedding-0.6b (1024d), the same model/width
+// the Ollama default now uses.
+const EXPECTED_DIMENSIONS = 1024;
+const EXPECTED_MODEL = "text-embedding-qwen3-embedding-0.6b";
 
 const scratchConfigHome = mkdtempSync(join(tmpdir(), "lip08-xdg-"));
 process.env.XDG_CONFIG_HOME = scratchConfigHome;
@@ -61,8 +65,9 @@ describe("LIP-08 — embedding through the lmstudio alias", () => {
   test("the shipped lmstudio entry declares the measured model and width", async () => {
     // Runs with or without the server: the entry's own defaults are static,
     // and pinning them here is what keeps the live case below meaningful —
-    // a live 768 against a table that had silently been re-pointed at some
-    // other model would prove nothing about the default install.
+    // a live vector length against a table that had silently been
+    // re-pointed at some other model would prove nothing about the default
+    // install.
     const { embeddingProviders } = await import("../services/embeddings/config.js");
     const entry = embeddingProviders.lmstudio!;
     expect(entry.provider).toBe("custom");
@@ -72,7 +77,7 @@ describe("LIP-08 — embedding through the lmstudio alias", () => {
   });
 
   test.skipIf(!lmStudioReachable)(
-    "a live embed through createEmbeddingProvider returns a 768-length vector",
+    "a live embed through createEmbeddingProvider returns a 1024-length vector",
     async () => {
       const provider = await createEmbeddingProvider({
         provider: "lmstudio",
@@ -88,7 +93,7 @@ describe("LIP-08 — embedding through the lmstudio alias", () => {
 
       expect(Array.isArray(vector)).toBe(true);
       expect(vector.length).toBe(EXPECTED_DIMENSIONS);
-      // Not a zero-filled placeholder: a stub returning `new Array(768).fill(0)`
+      // Not a zero-filled placeholder: a stub returning `new Array(1024).fill(0)`
       // would satisfy the length assertion alone.
       expect(vector.some((v) => v !== 0)).toBe(true);
     },

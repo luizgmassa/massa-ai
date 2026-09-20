@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), T13-T14 of Phase 7 complete, T15 and Phase 8 (T16-T17) pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), Phase 7 (T13-T15) complete, Phase 8 (T16-T17) pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -676,6 +676,50 @@ the real `null` values — confirmed `"ollama"`/`"lmstudio"` take the no-assert 
 id still throws. `bun run type-check` → 6/6, `bun run build` → 6/6.
 Next: T15 (repoint the ~16 test files the parity gate cannot see, including
 `lmstudio-embedding-live.test.ts` and `embeddings-config-file-layer.test.ts` named under T13).
+
+**T15 (W7) — Complete — Phase 7 closed.** Enumerated candidates with a 3-dialect cross-check
+(this host's default `grep`/ugrep, `git grep -E`, BSD `/usr/bin/grep -E` — all three agreed) over
+5 retired-literal patterns across `*.test.ts`: 23 candidates after excluding the parity gate
+itself and the two files T13 already fixed. Each candidate was RUN (isolation runner for
+`packages/core`, scratch-`XDG_CONFIG_HOME` `bun test` elsewhere), not just grepped, to separate a
+true positive (asserts the retired value as the current default) from a false positive (arbitrary
+mock data, or a legitimate assertion about a still-valid non-default model like nomic's own 768d
+width, design TD-7). **Exactly 2 of 23 were true positives** — the spec's "~16" was the design
+phase's unverified raw grep count, not a behaviorally-confirmed one, the same over/under-scoping
+pattern this feature has hit three times before (T03b/T06b/T07b), this time in the conservative
+direction (smaller real population, not a missed one).
+
+Repointed: `embeddings-config-file-layer.test.ts`'s shared-default alignment sensor
+(`qwen3-embedding:4b`/2560 → `qwen3-embedding:0.6b`/1024); `lmstudio-embedding-live.test.ts`'s
+`EXPECTED_MODEL`/`EXPECTED_DIMENSIONS` plus its same-numbers inline comments and live-test name
+(nomic/768 → `text-embedding-qwen3-embedding-0.6b`/1024 — its historical LIP-08 docstring
+paragraph left untouched as a record of the original 768d requirement). Not touched, with reason
+recorded in tasks.md: `embedding-fingerprint.test.ts` (R-07's own named example — its stale-looking
+pair is arbitrary mock data for fingerprint format testing, unrelated to the real default),
+`embedding-dimensions.test.ts`'s nomic/768 assertions (a still-valid non-default model, TD-7), and
+`embeddings-config-file-layer.test.ts`'s other two tests (arbitrary custom-override values, not
+default claims).
+
+Gate: `bun test packages/core/src/__tests__/embedding-fingerprint.test.ts` → 14/0 (unchanged, no
+repoint needed). `bun run test` → **12/12 tasks successful** (turbo's own count). `bun run
+test:plugins` → 142/0. `bun run test:scripts`'s bun-half → **2057 pass / 0 fail** (up from 2043
+pass / 0 fail / 1 error pre-T13 — confirms the crash is gone). The composed `test:scripts` script
+now reaches its shell loop (T13's fix restored that) but still exits 1 on the pre-existing
+`&&`/`exit 1` short-circuit at the first failing shell suite — untouched, out of this batch's
+write set per instruction. Ran all 39 `scripts/tests/*.sh` directly: **36 pass, 3 fail**, the same
+three pre-existing host-specific failures W6 already identified
+(`test-install-skills-cli.sh`, `test-plugin-auto-install.sh`, `test-plugin-registry-registration.sh`),
+unchanged.
+
+**Phase-closing gate (last task in Phase 7):** `bun run lint` → 0. `bun run type-check` → 6/6.
+`bun run build` → 6/6. `bun run test` → 12/12. `bun run test:plugins` → 142/0.
+`bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 14/0.
+
+Phase 7 (the gates) is closed. Next: Phase 8 — T16 (update the 7 non-history documentation
+surfaces; T13's narrow Markdown tier tracks membership/completeness for these files — a new
+unlisted doc mentioning a model default would fail it — but does not check their prose *values*,
+which is a manual review, not an automated one) and T17 (close-out: CHANGELOG entry, STATE.md,
+HANDOFF.md, FEATURES.json, then `check_specs_delivered.ts`).
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 

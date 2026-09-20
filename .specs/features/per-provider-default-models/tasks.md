@@ -489,7 +489,7 @@ by the value change from an object to `null`; (2) a throwaway script reproducing
 and `"lmstudio"` both take the no-assert path and an unmapped id still throws. `bun run
 type-check` and `bun run build` both green (6/6).
 
-### T15: Repoint the tests the parity gate is forbidden to see
+### T15: Repoint the tests the parity gate is forbidden to see — ✅ Complete
 
 `isTestFile` (`:361`, `:437`) excludes every `__tests__`/`*.test.ts` from both completeness scans,
 so ~16 files hardcoding `ollama:qwen3-embedding:4b:2560` or the 9-key `llm` object are invisible
@@ -499,6 +499,54 @@ gate to cover tests, which legitimately pin specific models.
 Tests: the repointed fingerprint and dimension assertions
 Gate: bun test packages/core/src/__tests__/embedding-fingerprint.test.ts && bun run test
 Depends on: T11.
+
+**Execution note (2026-09-20).** Enumerated by hand with a 3-dialect cross-check (this host's
+default `grep` — ugrep, honours `.gitignore` — plus `git grep -E` and BSD `/usr/bin/grep -E`; all
+three agreed on every population) over five retired-literal patterns: `qwen3-embedding:4b`,
+`qwen2.5:7b-instruct`, `qwen/qwen3-4b-2507`, `text-embedding-nomic-embed-text-v1.5`, and a bare
+`2560` sweep to catch a dims-only reference with no adjacent model name. Union: 23 candidate
+`*.test.ts` files (after excluding `embedding-defaults-parity.test.ts` itself and the two files
+T13 already fixed, `diagnose.test.ts` and `installer-config-template.test.ts`).
+
+**Population was verified behaviorally, not just textually**: every candidate was run (isolation
+runner for `packages/core`, plain `bun test` with a scratch `XDG_CONFIG_HOME` elsewhere) to
+distinguish a true positive (asserts the retired value as the *current default* — breaks under
+today's code) from a false positive (uses the same literal as arbitrary mock/fixture data, or
+asserts a still-valid fact about a named non-default model, e.g. nomic's own 768d width, which
+design TD-7 keeps in the table on purpose). Exactly **2 of the 23 were true positives** — the
+"~16" figure in `spec.md` R-07 and this task's own text was the design phase's unverified raw
+grep count, not a behaviorally-confirmed one; the gap is the same over/under-scoping pattern this
+feature has hit three times already (T03b/T06b/T07b), just in the conservative direction this
+time (a smaller real population than estimated, not a missed one).
+
+Repointed: `packages/core/src/__tests__/embeddings-config-file-layer.test.ts` ("no config file →
+literal defaults" — the file's own comment calls this the shared-default alignment sensor) from
+`qwen3-embedding:4b`/2560 to `qwen3-embedding:0.6b`/1024; `packages/core/src/__tests__/
+lmstudio-embedding-live.test.ts` (`EXPECTED_MODEL`/`EXPECTED_DIMENSIONS` plus the same-numbers
+inline comments and the live test's own name) from nomic/768 to `text-embedding-qwen3-embedding-0.6b`/1024
+— its historical docstring paragraph (LIP-08's original AC text, at 768d) was left untouched as a
+record of what the requirement said at the time.
+
+Not touched, with reason: `embedding-fingerprint.test.ts` (R-07's own named example) — its
+`qwen3-embedding:4b`/2560 pair is an arbitrary mock `activeProvider` value used to test fingerprint
+*format/comparison* logic, unrelated to which model is the real default; changing it would not
+change what the test proves. `embedding-dimensions.test.ts`'s nomic/768 assertions — testing that
+the by-key/probe resolver correctly handles a specific, still-valid, non-default model (design
+TD-7). `embeddings-config-file-layer.test.ts`'s other two tests, which use `qwen3-embedding-4b-ctx8k`/2560
+as an arbitrary custom file-supplied override, not a default claim.
+
+Gate: `bun test packages/core/src/__tests__/embedding-fingerprint.test.ts` → 14 pass / 0 fail
+(unchanged — this file needed no repoint). `bun run test` → **12/12 tasks successful** (turbo's
+own count, per CLAUDE.md's own guidance on trusting that line over a scrollback tail).
+`bun run test:plugins` → 142 pass / 0 fail. `bun run test:scripts`'s bun-half (`bun test
+scripts/__tests__ scripts/tests/*.test.ts`) → **2057 pass / 0 fail** (up from 2043 pass / 0 fail /
+1 error pre-T13 — the crash is gone and 14 more tests now run). The composed `test:scripts`
+script still exits 1 on the pre-existing `&&`/`exit 1` shell-loop short-circuit (out of this
+batch's write set, per instruction) — it now reaches the shell loop at all (T13's fix restored
+that), and stops at the first pre-existing failure, `test-install-skills-cli.sh`. Ran all 39
+`scripts/tests/*.sh` directly to see past the short-circuit: **36 pass, 3 fail** — the same three
+pre-existing, host-specific failures W6 already identified (`test-install-skills-cli.sh`,
+`test-plugin-auto-install.sh`, `test-plugin-registry-registration.sh`), unchanged, not touched.
 
 ---
 
