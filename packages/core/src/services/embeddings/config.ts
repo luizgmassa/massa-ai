@@ -417,6 +417,12 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
         process.env.LMSTUDIO_BASE_URL ||
         file?.baseURL ||
         INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+      // ponytail: G6 — 768 below only fires for a model outside
+      // knownDimensions (no LMSTUDIO_EMBEDDING_DIMENSIONS/file.dimensions
+      // override); refuseOnDimensionMismatch catches a wrong guess loudly.
+      // Upgrade path: wire the async, probe-backed resolveModelDimensions
+      // (shared/config/embedding-dimensions.ts) in here if this table ever
+      // becomes async — it already backs the installer wizard.
       dimensions: Number(
         process.env.LMSTUDIO_EMBEDDING_DIMENSIONS ||
           file?.dimensions ||

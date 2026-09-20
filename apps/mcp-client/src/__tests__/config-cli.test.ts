@@ -83,6 +83,9 @@ describe("config-cli runCli", () => {
     expect(show.out).toContain("lmstudio");
     expect(show.out).toContain("text-embedding-nomic-embed-text-v1.5");
     expect(show.out).toContain("768");
+    // LIP-09/G4: init must also point llm.baseUrl at LM Studio, not Ollama.
+    const config = JSON.parse(show.out);
+    expect(config.llm.baseUrl).toBe("http://localhost:1234/v1");
   });
 
   test("path → prints config path", async () => {
@@ -144,7 +147,12 @@ describe("config-cli runCli", () => {
     const show = await captureConsole(() => runCli(["show"]));
     expect(show.out).toContain("text-embedding-nomic-embed-text-v1.5");
     expect(show.out).toContain("768");
-    expect(show.out).toContain("http://localhost:1234/v1");
+    // Assert the llm.baseUrl FIELD, not a substring of the whole `show`
+    // output — embedding.baseURL alone already contains this URL, so a
+    // substring check here would pass even if llm.baseUrl still pointed at
+    // Ollama's :11434 (LIP-09/G4).
+    const config = JSON.parse(show.out);
+    expect(config.llm.baseUrl).toBe("http://localhost:1234/v1");
   });
 
   test("use lmstudio with model + base-url", async () => {

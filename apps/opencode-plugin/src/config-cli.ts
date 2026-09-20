@@ -210,6 +210,8 @@ export async function runCli(argv: string[]): Promise<number> {
         baseURL: INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
         dimensions: INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ?? 768,
       };
+      // LIP-09: keep llm.baseUrl off Ollama's :11434 so resolveInferenceSpec resolves lmstudio.
+      config.llm.baseUrl = INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl;
       saveConfig(config);
       console.log("✓ Configured for LM Studio (local) embeddings");
     } else {
@@ -288,8 +290,12 @@ export async function runCli(argv: string[]): Promise<number> {
         provider: "lmstudio",
         model,
         baseURL: (options["base-url"] as string) || INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+        // ponytail: G6 — 768 fallback for a custom --model outside
+        // knownDimensions; see embeddings/config.ts's matching comment.
         dimensions: INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ?? 768,
       };
+      // LIP-09: same fix as init --lmstudio above.
+      config.llm.baseUrl = (options["base-url"] as string) || INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl;
     } else if (provider === "mistral") {
       if (!options["api-key"]) {
         console.error("Error: --api-key required for Mistral");
