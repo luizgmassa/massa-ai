@@ -46,9 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lmstudio`, `mistral`, `openai`, `google`, `cohere` — plus `init --lmstudio`. Keeping
   them at 3 was drift, not a decision.
 - **Docs**: `README.md`, `FEATURES.md` and `docs/CHEATSHEET.md` no longer present Ollama as
-  the only local option. 17 of the 23 surfaces the spec enumerated changed; the other 6
-  were left Ollama-only on purpose, because they describe `bun run diagnose`, which really
-  is still Ollama-only.
+  the only local option. 17 of the 23 surfaces the spec enumerated changed. Of the 6 left
+  unchanged, 3 describe `bun run diagnose`, which is still Ollama-only; the other 3 are
+  genuinely Ollama-scoped and not exclusivity claims — `OLLAMA_EMBED_DELAY_MS`, the
+  `OLLAMA_BASE_URL` endpoint row, and `run-deterministic.ts`'s "no Postgres, Ollama, or
+  native tree-sitter" comment.
 
 ### Changed
 
