@@ -126,7 +126,7 @@ Tests: request-body assertion for options.num_ctx per role and its absence on LM
 Gate: bun test packages/core/src/__tests__/llm-client.test.ts && bun test packages/core/src/__tests__/vector-store-factory.test.ts
 Depends on: T01.
 
-### T06b: Give `embedding.contextWindow` a consumption site
+### T06b: Give `embedding.contextWindow` a consumption site — ✅ Complete
 
 **Added during Execute 2026-09-20 (Tasks safety valve), after T06 closed.** PDM-12 AC-2 requires a
 configured value to beat the role-table default **for every one of the five fields**, and design

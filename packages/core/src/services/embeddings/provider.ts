@@ -22,7 +22,8 @@ import type { EmbeddingProviderConfig } from "./config.js";
 import { metrics } from "../monitoring/metrics.js";
 import { EmbeddingRateLimiter } from "./rate-limiter.js";
 import { logger } from "@massa-ai/shared";
-import { parsePositiveIntEnv } from "@massa-ai/shared/config";
+import { loadConfigSafe, parsePositiveIntEnv } from "@massa-ai/shared/config";
+import { INFERENCE_ROLE_DEFAULTS } from "@massa-ai/shared/inference-providers";
 import { LocalTransformersEmbeddingProvider } from "./providers/local-transformers.js";
 
 /**
@@ -31,13 +32,21 @@ import { LocalTransformersEmbeddingProvider } from "./providers/local-transforme
  * qwen3-embedding), which costs ~10 GiB for the 8b model and ~10 GiB for the
  * 4b at load time — enough to evict a resident chat model on a 24 GB host and
  * thrash. Inputs are truncated to maxChars (≤8000 chars ≈ 2k tokens) long
- * before this limit matters, so 8192 is 4× headroom. Override with
- * OLLAMA_EMBEDDING_NUM_CTX when raising EMBEDDING_MAX_CHARS past ~16000.
+ * before this limit matters, so 8192 is 4× headroom. Resolved per call:
+ * `config.embedding.contextWindow` wins over `OLLAMA_EMBEDDING_NUM_CTX`, which
+ * wins over the role-table default.
  */
-const OLLAMA_EMBED_NUM_CTX = parsePositiveIntEnv(
-  process.env.OLLAMA_EMBEDDING_NUM_CTX,
-  8192,
-);
+export function _resolveEmbedContextWindow(
+  embeddingConfig: Partial<{ contextWindow: number }> | undefined,
+): number {
+  return (
+    embeddingConfig?.contextWindow ??
+    parsePositiveIntEnv(
+      process.env.OLLAMA_EMBEDDING_NUM_CTX,
+      INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
+    )
+  );
+}
 
 /**
  * Base interface for embedding providers
@@ -444,7 +453,7 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
                   const response = await this.ollamaFetch("/api/embed", {
                     model: this.model,
                     input: inputText,
-                    options: { num_ctx: OLLAMA_EMBED_NUM_CTX },
+                    options: { num_ctx: _resolveEmbedContextWindow(loadConfigSafe().embedding) },
                   });
 
                   if (!response.ok) {
@@ -597,7 +606,7 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
                 const response = await this.ollamaFetch("/api/embed", {
                   model: this.model,
                   input: texts.map((t) => this.sanitizeText(this.truncateText(t))),
-                  options: { num_ctx: OLLAMA_EMBED_NUM_CTX },
+                  options: { num_ctx: _resolveEmbedContextWindow(loadConfigSafe().embedding) },
                 });
 
                 if (!response.ok) {

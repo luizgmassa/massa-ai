@@ -6,14 +6,43 @@
  */
 
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
+import path from "path";
 import {
   AISDKEmbeddingProvider,
   DimensionMismatchError,
   createProvider,
+  _resolveEmbedContextWindow,
 } from "../services/embeddings/provider.js";
 import type { EmbeddingProviderConfig } from "../services/embeddings/config.js";
+import { INFERENCE_ROLE_DEFAULTS } from "@massa-ai/shared/inference-providers";
 
 const originalFetch = globalThis.fetch;
+
+// `config-loader.ts` freezes CONFIG_DIR from XDG_CONFIG_HOME at its first
+// import, so this file's own tests can vary the config.json *content* but
+// not the directory — the gate for this suite must set a scratch
+// XDG_CONFIG_HOME before the bun process starts (see tasks.md T06b).
+function embeddingConfigFile(): string {
+  const xdgHome = process.env.XDG_CONFIG_HOME;
+  if (!xdgHome) {
+    throw new Error(
+      "XDG_CONFIG_HOME must be set (scratch dir) before running this suite",
+    );
+  }
+  return path.join(xdgHome, "massa-ai", "config.json");
+}
+
+function writeEmbeddingConfig(embedding: Record<string, unknown>): void {
+  const file = embeddingConfigFile();
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify({ embedding }));
+}
+
+function clearEmbeddingConfig(): void {
+  const file = embeddingConfigFile();
+  if (existsSync(file)) rmSync(file);
+}
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -421,5 +450,78 @@ describe("AISDKEmbeddingProvider", () => {
     );
     const opts = (provider as unknown as { getProviderOptions: () => Record<string, any> }).getProviderOptions();
     expect(Object.keys(opts).length).toBe(0);
+  });
+});
+
+describe("_resolveEmbedContextWindow (PDM-12 AC-2)", () => {
+  const ORIGINAL_ENV = process.env.OLLAMA_EMBEDDING_NUM_CTX;
+
+  afterEach(() => {
+    if (ORIGINAL_ENV === undefined) delete process.env.OLLAMA_EMBEDDING_NUM_CTX;
+    else process.env.OLLAMA_EMBEDDING_NUM_CTX = ORIGINAL_ENV;
+  });
+
+  test("config value wins over the role-table default", () => {
+    delete process.env.OLLAMA_EMBEDDING_NUM_CTX;
+    expect(_resolveEmbedContextWindow({ contextWindow: 12000 })).toBe(12000);
+  });
+
+  test("config value wins over an explicit env override", () => {
+    process.env.OLLAMA_EMBEDDING_NUM_CTX = "20000";
+    expect(_resolveEmbedContextWindow({ contextWindow: 12000 })).toBe(12000);
+  });
+
+  test("absent config, the env override wins over the role-table default", () => {
+    process.env.OLLAMA_EMBEDDING_NUM_CTX = "20000";
+    expect(_resolveEmbedContextWindow(undefined)).toBe(20000);
+  });
+
+  test("absent config and env, the role-table default is used", () => {
+    delete process.env.OLLAMA_EMBEDDING_NUM_CTX;
+    expect(_resolveEmbedContextWindow(undefined)).toBe(
+      INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
+    );
+  });
+});
+
+describe("embedding.contextWindow reaches the Ollama embed request (T06b)", () => {
+  afterEach(() => {
+    clearEmbeddingConfig();
+  });
+
+  test("config.json embedding.contextWindow beats the role-table default in the request body", async () => {
+    writeEmbeddingConfig({ contextWindow: 12000 });
+    let capturedBody: string | undefined;
+    globalThis.fetch = mock((_url: string, init?: RequestInit) => {
+      capturedBody = init?.body as string;
+      return Promise.resolve(
+        new Response(JSON.stringify({ embeddings: [[1, 2, 3, 4]] }), { status: 200 }),
+      );
+    }) as typeof fetch;
+    const provider = new AISDKEmbeddingProvider(
+      makeConfig({ provider: "ollama", dimensions: 4, maxRetries: 0, timeout: 5000 }),
+      "ollama-ctx-config",
+    );
+    await provider.embedQuery("hello");
+    expect(JSON.parse(capturedBody!).options.num_ctx).toBe(12000);
+  });
+
+  test("absent embedding.contextWindow, the role-table default reaches the request body", async () => {
+    clearEmbeddingConfig();
+    let capturedBody: string | undefined;
+    globalThis.fetch = mock((_url: string, init?: RequestInit) => {
+      capturedBody = init?.body as string;
+      return Promise.resolve(
+        new Response(JSON.stringify({ embeddings: [[1, 2, 3, 4]] }), { status: 200 }),
+      );
+    }) as typeof fetch;
+    const provider = new AISDKEmbeddingProvider(
+      makeConfig({ provider: "ollama", dimensions: 4, maxRetries: 0, timeout: 5000 }),
+      "ollama-ctx-default",
+    );
+    await provider.embedQuery("hello");
+    expect(JSON.parse(capturedBody!).options.num_ctx).toBe(
+      INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
+    );
   });
 });

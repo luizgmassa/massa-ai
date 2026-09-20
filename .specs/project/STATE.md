@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 17 Tasks; T01-T06 complete (W1 Phase 1, W2 Phase 2, W3 Phase 3), T07-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 18 Tasks (T06b added mid-Execute); T01-T06b complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3), T07-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -215,6 +215,36 @@ trio; T08 wizard config template) — both depend only on T01, a different worke
 `scripts/lib/installer-api-key.sh`), disjoint from this batch's `packages/core/src/services/
 memory/llm-client.ts` and `packages/core/src/data/vector/postgres-vector-store.ts`.
 
+**T06b (W4) — Complete — Phase 3 re-closed.** Added mid-Execute (see `tasks.md`'s T06b entry) to
+close the PDM-12 AC-2 gap T06 named but did not fix: `embedding.contextWindow` was schema-only,
+with no reader. `packages/core/src/services/embeddings/provider.ts`'s module-level
+`OLLAMA_EMBED_NUM_CTX` const (frozen at import from `OLLAMA_EMBEDDING_NUM_CTX` env, default 8192)
+is replaced by an exported pure `_resolveEmbedContextWindow(embeddingConfig)`, resolved per call
+as `embeddingConfig?.contextWindow ?? parsePositiveIntEnv(process.env.OLLAMA_EMBEDDING_NUM_CTX,
+INFERENCE_ROLE_DEFAULTS.embedding.contextWindow)` — config wins, then the existing env override,
+then the role-table default (unchanged numeric value, 8192). Both call sites (`embedQuery`'s
+single-text path and `embedBatchDirect`'s batch path) now call
+`_resolveEmbedContextWindow(loadConfigSafe().embedding)` instead of reading the frozen constant.
+Scope held to the Ollama-embed-only surface named in design.md's evidence table (no chat
+equivalent, no LM Studio equivalent) — nothing else touched.
+Gate: `bun test packages/core/src/__tests__/embeddings-provider.test.ts && bun run type-check`
+→ 41 pass / 0 fail (up from 33, +8 new: 4 pure `_resolveEmbedContextWindow` unit cases + 2
+request-body integration cases, each split config-wins/absent-config), type-check 6/6.
+Both new integration tests write/clear a real `config.json` at the frozen `CONFIG_DIR` path
+(`XDG_CONFIG_HOME` must be set as a scratch dir before the bun process starts, since
+`config-loader.ts` freezes that directory at its first import — the file *content* still varies
+per test, only the directory does not).
+Observed red (one mutation, restored by file copy, `git status --porcelain` clean before
+commit): inverting the fallback to `parsePositiveIntEnv(...) ?? embeddingConfig?.contextWindow`
+failed 3 of the 6 new config-wins-shaped tests — "config value wins over the role-table default"
+(expected 12000, got 8192), "config value wins over an explicit env override" (expected 12000,
+got 20000), and "config.json embedding.contextWindow beats the role-table default in the request
+body" (expected 12000, got 8192). The 3 absent-config-shaped tests were unaffected by construction
+(the mutation only changes which operand wins when both are present).
+Phase 3 (runtime consumers) is closed. Next: Phase 4 (T07 both config CLIs write the provider's
+trio; T08 wizard config template) — both depend only on T01, a disjoint write set
+(`apps/mcp-client/src/config-cli.ts`, `apps/opencode-plugin/src/config-cli.ts`,
+`scripts/lib/installer-api-key.sh`).
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
