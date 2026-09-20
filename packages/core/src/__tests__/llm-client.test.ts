@@ -79,6 +79,7 @@ import {
   _extractJsonObject,
   _checkJsonSchemaSupport,
   _wrapFetchDisableThink,
+  _wrapFetchContextWindow,
   _isAbortOrTimeoutError,
   resolveInferenceSpec,
   _resolveLlmConfig,
@@ -833,12 +834,19 @@ describe("llm-client — _resolveLlmConfig seam-derived fallbacks (T05)", () => 
     expect(_resolveLlmConfig(undefined, "code", null).temperature).toBe(0.0);
   });
 
+  test("per-role context window resolves from INFERENCE_ROLE_DEFAULTS: instruct 16384, coding 32768", () => {
+    expect(_resolveLlmConfig(undefined, "instruct", null).contextWindow).toBe(16384);
+    expect(_resolveLlmConfig(undefined, "code", null).contextWindow).toBe(32768);
+  });
+
   test("config values win over every role-table/seam default (PDM-12 AC-2 shape)", () => {
     const cfg = {
       model: "cfg-instruct",
       codeModel: "cfg-code",
       temperature: 0.9,
       codeTemperature: 0.1,
+      contextWindow: 1111,
+      codeContextWindow: 2222,
       apiKey: "cfg-key",
       baseUrl: "http://custom-host:9999/v1",
       disableThink: false,
@@ -846,6 +854,7 @@ describe("llm-client — _resolveLlmConfig seam-derived fallbacks (T05)", () => 
     const instructResult = _resolveLlmConfig(cfg, "instruct", null);
     expect(instructResult.model).toBe("cfg-instruct");
     expect(instructResult.temperature).toBe(0.9);
+    expect(instructResult.contextWindow).toBe(1111);
     expect(instructResult.apiKey).toBe("cfg-key");
     expect(instructResult.baseUrl).toBe("http://custom-host:9999/v1");
     expect(instructResult.disableThink).toBe(false);
@@ -853,6 +862,120 @@ describe("llm-client — _resolveLlmConfig seam-derived fallbacks (T05)", () => 
     const codeResult = _resolveLlmConfig(cfg, "code", null);
     expect(codeResult.model).toBe("cfg-code");
     expect(codeResult.temperature).toBe(0.1);
+    expect(codeResult.contextWindow).toBe(2222);
+  });
+});
+
+// ─── T06: per-role options.num_ctx, gated on appliesContextPerRequest ───────
+
+describe("llm-client — _wrapFetchContextWindow", () => {
+  test("injects options.num_ctx into JSON body", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 16384);
+    await wrapped("http://test", {
+      method: "POST",
+      body: JSON.stringify({ messages: [] }),
+    });
+    const parsed = JSON.parse(capturedInit.body);
+    expect(parsed.options.num_ctx).toBe(16384);
+    expect(parsed.messages).toEqual([]);
+  });
+
+  test("merges into an existing options object rather than overwriting it", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 32768);
+    await wrapped("http://test", {
+      body: JSON.stringify({ options: { seed: 1 } }),
+    });
+    const parsed = JSON.parse(capturedInit.body);
+    expect(parsed.options).toEqual({ seed: 1, num_ctx: 32768 });
+  });
+
+  test("leaves non-JSON body untouched (no throw)", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 8192);
+    await wrapped("http://test", { body: "not-json-at-all" });
+    expect(capturedInit.body).toBe("not-json-at-all");
+  });
+
+  test("leaves request with no body untouched", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 8192);
+    await wrapped("http://test", { method: "GET" });
+    expect(capturedInit.body).toBeUndefined();
+  });
+});
+
+describe("llm-client — buildProvider sends per-role num_ctx (T06 / PDM-08, PDM-09)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test("ollama: instruct role's chat request carries options.num_ctx = 16384", async () => {
+    let captured: any = null;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (_input: any, init?: any) => {
+      captured = init;
+      return new Response("{}");
+    };
+    try {
+      await llmComplete("hello");
+      expect(typeof lastProviderOpts.fetch).toBe("function");
+      await lastProviderOpts.fetch("http://test", {
+        method: "POST",
+        body: JSON.stringify({ messages: [] }),
+      });
+      const parsed = JSON.parse(captured.body);
+      expect(parsed.options.num_ctx).toBe(16384);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("ollama: code role's chat request carries options.num_ctx = 32768", async () => {
+    let captured: any = null;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (_input: any, init?: any) => {
+      captured = init;
+      return new Response("{}");
+    };
+    try {
+      await llmComplete("hello", { modelRole: "code" });
+      await lastProviderOpts.fetch("http://test", {
+        method: "POST",
+        body: JSON.stringify({ messages: [] }),
+      });
+      const parsed = JSON.parse(captured.body);
+      expect(parsed.options.num_ctx).toBe(32768);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("lmstudio: buildProvider attaches no fetch wrapper at all — num_ctx never sent (spec A-07)", async () => {
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    await llmComplete("hello");
+    // LM Studio has both appliesContextPerRequest=false and
+    // injectsDisableThink=false, so no wrapped fetch is attached — the
+    // strongest available proof that num_ctx is never sent to it.
+    expect(lastProviderOpts.fetch).toBeUndefined();
   });
 });
 

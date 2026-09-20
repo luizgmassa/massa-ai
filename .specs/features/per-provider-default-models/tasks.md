@@ -112,7 +112,7 @@ Tests: llm-client cases: code role falls back to defaultModels.coding; no Ollama
 Gate: bun test packages/core/src/__tests__/llm-client.test.ts
 Depends on: T01.
 
-### T06: Send per-role context and read the per-provider batch size
+### T06: Send per-role context and read the per-provider batch size — ✅ Complete
 
 Send the role's context window as `options.num_ctx` **where `appliesContextPerRequest`**; leave it
 off for LM Studio (load-time only, spec A-07). `postgres-vector-store.ts:421` reads

@@ -208,6 +208,8 @@ export function _resolveLlmConfig(
         codeModel: string;
         temperature: number;
         codeTemperature: number;
+        contextWindow: number;
+        codeContextWindow: number;
         maxOutputTokens: number;
         timeoutMs: number;
         disableThink: boolean;
@@ -226,11 +228,19 @@ export function _resolveLlmConfig(
     role === "code"
       ? cfg?.codeTemperature ?? INFERENCE_ROLE_DEFAULTS.coding.temperature
       : cfg?.temperature ?? INFERENCE_ROLE_DEFAULTS.instruct.temperature;
+  // Context window per role (PDM-08/PDM-09); sent as `options.num_ctx` only
+  // where `spec.appliesContextPerRequest` (buildProvider) — LM Studio applies
+  // it at load time (spec A-07) and must never receive this field.
+  const contextWindow =
+    role === "code"
+      ? cfg?.codeContextWindow ?? INFERENCE_ROLE_DEFAULTS.coding.contextWindow
+      : cfg?.contextWindow ?? INFERENCE_ROLE_DEFAULTS.instruct.contextWindow;
   return {
     baseUrl,
     apiKey: cfg?.apiKey ?? spec.id,
     model,
     temperature,
+    contextWindow,
     maxOutputTokens: cfg?.maxOutputTokens ?? 8000,
     timeoutMs: cfg?.timeoutMs ?? 90000,
     disableThink: cfg?.disableThink ?? spec.injectsDisableThink,
@@ -314,16 +324,51 @@ export function _wrapFetchDisableThink(
   return wrapped as unknown as typeof globalThis.fetch;
 }
 
+/**
+ * Best-effort `options.num_ctx` injection (PDM-08/PDM-09). Ollama's
+ * OpenAI-compat chat layer honors a top-level `options` object; LM Studio
+ * has no per-request context-length field (spec A-07, `appliesContextPerRequest:
+ * false`) and must never receive this — gated at the call site in
+ * `buildProvider`. Merges into any existing `options` object rather than
+ * overwriting it, mirroring `_wrapFetchDisableThink`'s shape.
+ * @internal
+ */
+export function _wrapFetchContextWindow(
+  baseFetch: typeof globalThis.fetch,
+  contextWindow: number,
+): typeof globalThis.fetch {
+  const wrapped = async (input: any, init?: any): Promise<Response> => {
+    try {
+      if (init?.body && typeof init.body === "string") {
+        const parsed = JSON.parse(init.body);
+        if (parsed && typeof parsed === "object") {
+          parsed.options = { ...parsed.options, num_ctx: contextWindow };
+          init = { ...init, body: JSON.stringify(parsed) };
+        }
+      }
+    } catch {
+      // Not JSON or unparseable — leave the request untouched.
+    }
+    return baseFetch(input as any, init as any);
+  };
+  return wrapped as unknown as typeof globalThis.fetch;
+}
+
 function buildProvider(llm: ReturnType<typeof getLlmConfig>) {
   // Ollama exposes an OpenAI-compatible API at /v1; createOpenAI over baseURL
   // is sufficient (no special compatibility flag in @ai-sdk/openai v3).
   const spec = resolveInferenceSpec(llm.baseUrl);
+  let fetchImpl: typeof globalThis.fetch | undefined;
+  if (spec.appliesContextPerRequest) {
+    fetchImpl = _wrapFetchContextWindow(fetchImpl ?? globalThis.fetch, llm.contextWindow);
+  }
+  if (llm.disableThink && spec.injectsDisableThink) {
+    fetchImpl = _wrapFetchDisableThink(fetchImpl ?? globalThis.fetch);
+  }
   const openai = createOpenAI({
     baseURL: llm.baseUrl,
     apiKey: llm.apiKey,
-    ...(llm.disableThink && spec.injectsDisableThink
-      ? { fetch: _wrapFetchDisableThink(globalThis.fetch) }
-      : {}),
+    ...(fetchImpl ? { fetch: fetchImpl } : {}),
   });
   // The default callable resolves to the Responses API, which LM Studio serves
   // while dropping `text.format` — gating json_schema on correctly still yields

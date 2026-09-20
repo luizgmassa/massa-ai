@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 17 Tasks; T01-T04 complete (W1 Phase 1, W2 Phase 2), T05-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 17 Tasks; T01-T06 complete (W1 Phase 1, W2 Phase 2, W3 Phase 3), T07-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -164,9 +164,56 @@ instruct model" (expected `"qwen2.5-coder:7b"`, got `"some-instruct-model"`); (2
 `disableThink: cfg?.disableThink ?? true` failed "disableThink follows the resolved provider's
 injectsDisableThink" (lmstudio case: expected `false`, got `true`).
 
-Next: T06 (send per-role `num_ctx` where `appliesContextPerRequest`; `postgres-vector-store.ts`
-reads `spec.embedBatchSize`) — depends only on T01, same worker (W3), same file
-(`llm-client.ts`) plus `postgres-vector-store.ts`.
+**T06 (W3) — Complete — Phase 3 closed.** `buildProvider` (`llm-client.ts`) now composes up to
+two wrapped-fetch mutations instead of one: `_wrapFetchContextWindow` (new) injects
+`options.num_ctx = llm.contextWindow` into the outgoing JSON body **only where
+`spec.appliesContextPerRequest`** (ollama `true`, lmstudio `false` — spec A-07, load-time only for
+LM Studio), composed with the existing `_wrapFetchDisableThink` when `llm.disableThink &&
+spec.injectsDisableThink`. `_resolveLlmConfig` (T05's extraction) gained a `contextWindow` field,
+resolved per role from `cfg?.contextWindow`/`cfg?.codeContextWindow` falling back to
+`INFERENCE_ROLE_DEFAULTS.{instruct,coding}.contextWindow` — same config-wins shape as the other
+fields. `postgres-vector-store.ts:421`'s `EMBED_SUB_BATCH_SIZE = 8` literal is now
+`_resolveEmbedBatchSize(loadConfigSafe().embedding)`, a new pure exported function (config's
+`embedding.batchSize` wins, else the resolved provider's `embedBatchSize` from the seam) —
+extracted as a standalone function rather than inlined because `loadConfigSafe`'s `CONFIG_DIR`
+freezes at first import (`config-loader.ts` — the "first import wins" trap), so a test cannot
+flip which config.json file backs this value mid-suite; a pure function taking the config object
+as a parameter sidesteps that entirely. `data/` cannot import `services/memory/llm-client.ts`'s
+`resolveInferenceSpec` (`data -> services` is a layering violation), so the provider-id
+resolution is duplicated in `postgres-vector-store.ts`, not shared.
+Gate: `bun test packages/core/src/__tests__/llm-client.test.ts` → 74 pass / 0 fail (up from 66,
++8 new num_ctx cases) under a scratch `XDG_CONFIG_HOME` (see T05's host-environment finding above
+— still applies, unrelated to T06). `bun test packages/core/src/__tests__/vector-store-factory.test.ts`
+→ 10 pass / 0 fail (up from 6, +4 new: 3 `_resolveEmbedBatchSize` unit cases + 1 real-Postgres
+`addDocuments`/`embedBatch` call-count case, `describe.skipIf(!DB_AVAILABLE)` matching this
+file's existing convention; DB was available and exercised this run).
+**PDM-12 AC-2 (embedding half):** proven for `embedding.batchSize` at
+`postgres-vector-store.ts` (`_resolveEmbedBatchSize`, `EMBED_SUB_BATCH_SIZE` call site inside
+`addDocuments`) — test "config's embedding.batchSize wins over the seam default" in
+`vector-store-factory.test.ts` asserts `_resolveEmbedBatchSize({provider:"ollama",batchSize:30})
+=== 30` (not 64), which fails under either an inverted fallback or an ignored config value.
+`embedding.contextWindow` (the fifth PDM-12 field) has no consumption site named by any task in
+Phase 3 — `services/embeddings/provider.ts`'s existing `OLLAMA_EMBED_NUM_CTX` is a separate,
+untouched env-only knob per design.md's proposed-structure table (no row wires the new config
+field into it) — so it stays schema-only pending whichever later task (T09 Admin Portal, or an
+unassigned gap) wires it; not fixed here as it is outside T05/T06's named files.
+Observed red (two mutations, each restored by file copy, `git status --porcelain` clean before
+commit): (1) reverting `EMBED_SUB_BATCH_SIZE` to the literal `8` failed "addDocuments calls
+embedBatch 3 times for 130 documents" (expected 3, got 17 = ceil(130/8)); (2) removing the
+`spec.appliesContextPerRequest` gate (always attaching the context wrapper) failed the
+pre-existing LIP-07 test "lmstudio: buildProvider does NOT attach a wrapped fetch" AND the new
+"lmstudio: buildProvider attaches no fetch wrapper at all" test (both expected `undefined`, got
+an `AsyncFunction`) — proof the LM Studio no-`num_ctx` guarantee (spec A-07) is load-bearing on
+that exact gate, not incidental.
+**Phase-closing gate (last task in Phase 3):** `bun run lint` → 0 (oxlint; one real finding fixed
+— `unicorn(no-useless-fallback-in-spread)` on `{...(parsed.options ?? {})}`, simplified to
+`{...parsed.options}`, behavior-identical since spreading `undefined` is a no-op). `bun run
+type-check` → 0 (9/9 packages, turbo). `bun run build` → 0 (6/6, 3 cached).
+Phase 3 (runtime consumers) is closed. Next: Phase 4 (T07 both config CLIs write the provider's
+trio; T08 wizard config template) — both depend only on T01, a different worker's write set
+(`apps/mcp-client/src/config-cli.ts`, `apps/opencode-plugin/src/config-cli.ts`,
+`scripts/lib/installer-api-key.sh`), disjoint from this batch's `packages/core/src/services/
+memory/llm-client.ts` and `packages/core/src/data/vector/postgres-vector-store.ts`.
 
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
