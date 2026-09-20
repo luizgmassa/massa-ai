@@ -202,6 +202,8 @@ installer_provider_defaults() {
       LLM_API_KEY="lmstudio"
       # think:false is an Ollama-only request-body key (LIP-07).
       LLM_DISABLE_THINK="false"
+      LLM_MODEL="qwen3-vl-8b-instruct"
+      CODE_MODEL="qwen2.5-coder-7b-instruct"
       ;;
     *)
       EMBEDDING_PROVIDER="ollama"
@@ -209,6 +211,8 @@ installer_provider_defaults() {
       LLM_BASE_URL="${OLLAMA_URL:-http://localhost:11434}/v1"
       LLM_API_KEY="ollama"
       LLM_DISABLE_THINK="true"
+      LLM_MODEL="qwen3-vl:8b"
+      CODE_MODEL="qwen2.5-coder:7b"
       ;;
   esac
 }
@@ -278,9 +282,13 @@ POLICYEOF
 # installer_write_config <config_file> <api_key>
 #
 # Write the wizard's config.json. Reads the tunables the wizard resolved as
-# globals (DATABASE_URL, EMBEDDING_MODEL, OLLAMA_URL, LLM_MODEL, CODE_MODEL,
-# DATA_DIR, and one *_ENABLED global per prompted feature) and takes the key
-# explicitly, because the key is the one field that must survive a rewrite.
+# globals (DATABASE_URL, EMBEDDING_MODEL, OLLAMA_URL, DATA_DIR, and one
+# *_ENABLED global per prompted feature) and takes the key explicitly, because
+# the key is the one field that must survive a rewrite. `LLM_MODEL`/
+# `CODE_MODEL` are no longer wizard-supplied inputs — `installer_provider_defaults`
+# (called first below) derives both from `INFERENCE_PROVIDER`, the same trio
+# `config-cli.ts`'s `INFERENCE_PROVIDERS[provider].defaultModels` names, so the
+# written baseUrl/model/codeModel always agree (PDM-02 AC-2).
 #
 # Every *_ENABLED default below is the literal this template used to hardcode,
 # so a caller that sets none of them writes the same config.json as before.

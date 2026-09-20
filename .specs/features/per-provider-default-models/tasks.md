@@ -163,7 +163,7 @@ Tests: both CLIs, both branches, written-config assertion under a scratch XDG_CO
 Gate: bun test apps/mcp-client/src/__tests__/config-cli.test.ts apps/opencode-plugin/src/__tests__/config-cli.test.ts
 Depends on: T01.
 
-### T08: Wizard config template writes the trio
+### T08: Wizard config template writes the trio — ✅ Complete
 
 `scripts/lib/installer-api-key.sh:331` and its provider branch.
 

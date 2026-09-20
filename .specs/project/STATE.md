@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 18 Tasks (T06b added mid-Execute); T01-T07 complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4 Phase 4 in progress), T08-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 18 Tasks (T06b added mid-Execute); T01-T08 complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4 Phase 4 closed), T09-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -301,6 +301,49 @@ ollama-vs-lmstudio mismatch.
 Next: T08 (wizard config template, `scripts/lib/installer-api-key.sh:331`) — depends only on T01,
 a disjoint write set from T07's two config-cli.ts files. T08 is the last task in Phase 4; its
 commit also runs the phase-closing gate (lint, type-check, build, test:plugins).
+
+**T08 (W4) — Complete — Phase 4 closed.** `scripts/lib/installer-api-key.sh`'s
+`installer_provider_defaults()` gained the same defect T07 fixed for the CLIs: `LLM_MODEL`/
+`CODE_MODEL` were not among the "provider-shaped globals" this function derives — they were
+plain caller-supplied globals `installer_write_config` read verbatim, so any caller (or a
+leftover value from an earlier call in the same shell) could hand this template a model pair
+that disagreed with `EMBEDDING_PROVIDER`/`LLM_BASE_URL`. Both branches of the case statement now
+set `LLM_MODEL`/`CODE_MODEL` unconditionally — ollama: `qwen3-vl:8b`/`qwen2.5-coder:7b`;
+lmstudio: `qwen3-vl-8b-instruct`/`qwen2.5-coder-7b-instruct` — matching the same "every assignment
+is unconditional" style already used for `EMBEDDING_PROVIDER`/`EMBEDDING_BASE_URL`/`LLM_BASE_URL`/
+`LLM_API_KEY`/`LLM_DISABLE_THINK` in this exact function (its own docblock: an earlier `${VAR:-...}`
+form let a leftover value from a previous call win). `installer_write_config`'s docblock, which
+claimed LLM_MODEL/CODE_MODEL were "the wizard['s] resolved... globals", is corrected to name
+`installer_provider_defaults` as the actual source. Literal values are hand-pinned (a shell script
+cannot import the TypeScript seam), matching this file's existing precedent for every other
+provider literal; T13's parity gate is the sweep that keeps them honest.
+Gate: `bun test scripts/__tests__/installer-config-template.test.ts` → 34 pass / 0 fail (up from
+32, +2 new: one asserting ollama's trio via both `INFERENCE_PROVIDER=ollama` and the unset
+default, one asserting LM Studio's trio and that it differs from ollama's). Sanity-checked the
+adjacent (not-gated) `bash scripts/tests/test-setup-local-first-api-key.sh` → 40 passed / 0
+failed, confirming no regression in that suite's own `installer_write_config` assertions.
+Observed red (one mutation, restored by file copy, `git status --porcelain` clean before commit):
+removing the lmstudio branch's two new assignments let the ambient/previous-call `LLM_MODEL` leak
+through unchanged — the test harness's own baseline env value (`qwen2.5:7b-instruct`, ollama's
+literal) was returned for an `INFERENCE_PROVIDER=lmstudio` write instead of
+`"qwen3-vl-8b-instruct"`, reproducing exactly the "leftover value from a previous call" failure
+mode this function's docblock already warns about.
+**Phase-closing gate (last task in Phase 4):** `bun run lint` → 0 (oxlint, clean). `bun run
+type-check` → 0 (6/6 packages, turbo). `bun run build` → 0 (6/6 packages). `bun run test:plugins`
+→ 0 (142 pass / 0 fail across 10 files, all four plugin `__tests__/` dirs — regenerates the
+plugin bundle artifacts first via `generate:artifacts`, which is also what resolved an unrelated
+`ENOENT` on `apps/opencode-plugin/agents` seen when running `apps/opencode-plugin/src/__tests__/
+config-cli.test.ts` in isolation without that regeneration step first — confirmed pre-existing
+and unrelated to T07/T08, a worktree-provisioning gap, not a code defect).
+**Known environmental note (not fixed, out of scope):** running T07's two config-cli test files
+together in one `bun test file1 file2` process (the literal Gate line tasks.md wrote for T07)
+still shows the pre-documented env-setup freeze collision between the two packages' own
+`env-setup.{js,ts}` modules; each file is green alone and `bun run test:plugins`/`bun run test`
+never invoke them combined in one process, so this is inert for CI.
+Phase 4 (config writers) is closed. Next: Phase 5 (T09 Admin Portal config sections; T10
+field-level parity gate) — depends on T02, a disjoint write set from Phase 4's shell/CLI files
+(`apps/web-ui/src/static/views/config-sections.ts`, `apps/tools-api/src/routes/
+config-section-coverage.test.ts`).
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
