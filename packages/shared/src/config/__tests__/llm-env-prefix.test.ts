@@ -57,6 +57,16 @@ const KNOBS = [
   },
   { suffix: "TEMPERATURE", probe: "0.77", field: "temperature", expected: 0.77, default: 0.2 },
   {
+    // The 11th MASSA_AI_LLM_* knob (T04, AD-010/R-08). contextWindow and
+    // codeContextWindow are also new PDM-12 fields but take no env var of
+    // their own — codeTemperature is the only one this feature wires.
+    suffix: "CODE_TEMPERATURE",
+    probe: "0.55",
+    field: "codeTemperature",
+    expected: 0.55,
+    default: 0.0,
+  },
+  {
     suffix: "MAX_OUTPUT_TOKENS",
     probe: "4242",
     field: "maxOutputTokens",

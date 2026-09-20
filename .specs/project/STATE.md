@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 17 Tasks; T01 complete (W1, Phase 1), T02-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 17 Tasks; T01-T04 complete (W1 Phase 1, W2 Phase 2), T05-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -106,7 +106,32 @@ got the pinned literal).
 `config/__tests__/`, so outside T02-T04's declared gates) still asserts the retired
 `"qwen2.5:7b-instruct"` literal; `packages/core/src/__tests__/llm-client.test.ts` (T05's file)
 will need the same repointing once code role no longer falls back to the instruct model.
-Next: T04 (wire the 11th `MASSA_AI_LLM_*` knob), depends on T02.
+
+**T04 (W2) — Complete — Phase 2 closed.** Added `MASSA_AI_LLM_CODE_TEMPERATURE` (the 11th
+`MASSA_AI_LLM_*` name; `contextWindow`/`codeContextWindow` take no env var of their own, per
+design R-08) to `turbo.json` → `tasks.test.passThroughEnv` (alphabetical position, after
+`MASSA_AI_LLM_CODE_MODEL`); extended the hardcoded ten-name array in
+`scripts/__tests__/llm-env-passthrough.test.ts:36-48` to eleven; added the matching `KNOBS` row
+(`suffix: "CODE_TEMPERATURE"`, default `0.0`) to
+`packages/shared/src/config/__tests__/llm-env-prefix.test.ts:32-56`. The env-var wiring itself
+(`envNum("MASSA_AI_LLM_CODE_TEMPERATURE", ...)`) was already added in T02, so this task's own
+gate was already green before the turbo.json/test-array edits — confirmed by first observing it
+red (see below), matching the design's prediction that the obvious gate
+(`turbo-passthrough-env.test.ts`, blind to `envNum(...)`) is the wrong one and
+`llm-env-passthrough.test.ts` is the one that actually fires.
+Gate: `bun test scripts/__tests__/llm-env-passthrough.test.ts
+packages/shared/src/config/__tests__/llm-env-prefix.test.ts` → 8 pass / 0 fail.
+Observed red (restored by file copy, `git status --porcelain` clean before commit): removing
+`MASSA_AI_LLM_CODE_TEMPERATURE` from `turbo.json`'s `passThroughEnv` failed "every knob the
+resolver reads is listed in passThroughEnv" (expected `[]` missing names, got
+`["MASSA_AI_LLM_CODE_TEMPERATURE"]`) — exactly the task's named sensor.
+**Phase-closing gate (last task in Phase 2):** `bun run lint` → 0 (oxlint, repo root). `bun run
+type-check` → 0 (6/6 packages). `bun run build` → 0 (6/6 packages, 2 cached).
+Phase 2 (config schema and resolution) is closed. Next: Phase 3 (T05 `getLlmConfig` code-role
+fallback repair; T06 per-role context + batch size), both depend only on T01 — a different
+worker's write set (`packages/core/src/services/memory/llm-client.ts`,
+`packages/core/src/data/vector/postgres-vector-store.ts`), disjoint from this batch's
+`packages/shared/src/config/*`.
 
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)

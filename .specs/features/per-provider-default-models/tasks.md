@@ -85,7 +85,7 @@ Tests: config-loader cases per provider id; massa-ai-config default block derive
 Gate: bun test packages/shared/src/config/__tests__/
 Depends on: T01.
 
-### T04: Wire the 11th `MASSA_AI_LLM_*` knob
+### T04: Wire the 11th `MASSA_AI_LLM_*` knob — ✅ Complete
 
 `turbo.json` → `tasks.test.passThroughEnv`, **plus** the hardcoded ten-name array in
 `scripts/__tests__/llm-env-passthrough.test.ts:36-48` and an 11th `KNOBS` row in
