@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 18 Tasks (T06b added mid-Execute); T01-T08 complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4 Phase 4 closed), T09-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 19 Tasks (T06b, T07b added mid-Execute); T01-T08, T07b complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below), T09-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -344,6 +344,51 @@ Phase 4 (config writers) is closed. Next: Phase 5 (T09 Admin Portal config secti
 field-level parity gate) — depends on T02, a disjoint write set from Phase 4's shell/CLI files
 (`apps/web-ui/src/static/views/config-sections.ts`, `apps/tools-api/src/routes/
 config-section-coverage.test.ts`).
+
+**T07b (W5) — Partial, Phase 4 re-closed with one documented pre-existing blocker.** Added mid-Execute
+after W4 already ran Phase 4's closing gate for T08 (see tasks.md's T07b entry: T07 scoped the
+writer fix to `llm.model`/`llm.codeModel` only, leaving `init --lmstudio`/`use ollama` writing the
+retired embedding literal — `text-embedding-nomic-embed-text-v1.5`/768 and `qwen3-embedding:4b`/2560
+respectively — which falsifies PDM-03/PDM-04 at the one surface PDM-02's own Independent Test says
+matters). Both CLIs (`apps/mcp-client/src/config-cli.ts`, `apps/opencode-plugin/src/config-cli.ts`)
+now derive `embedding.model` from `INFERENCE_PROVIDERS[provider].defaultModels.embedding` in every
+local-provider branch of `init --<provider>`/`use <provider>` (plus the `--model` override default
+and the `usage` help-text example, both of which also carried the retired literal), and
+`embedding.dimensions` by key lookup — `INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ?? 768`
+(unchanged shape) and `knownEmbeddingDimensions(model) ?? 768` (new, imported from
+`@massa-ai/shared/config`) for ollama. The `?? 768` fallback and the nomic row survive untouched
+(design TD-7).
+Gate: `bun test apps/mcp-client/src/__tests__/config-cli.test.ts` → 35 pass / 0 fail (was 31/3 fail
+before extending the three assertions that hardcoded the retired pair — `init --lmstudio`,
+`use ollama`, `use lmstudio` — to derive from the seam instead, plus 4 new PDM-02 AC-2 embedding-pair
+tests mirroring the existing trio tests). `bun test apps/opencode-plugin/src/__tests__/config-cli.test.ts`
+→ 31 pass / 0 fail (2 new tests added for parity with mcp-client's coverage; this file had no
+pre-existing hardcoded-ollama-pair test to fix). `bun run type-check` → 0 (6/6 packages).
+Observed red: reverted the `use ollama` branch's model to the literal `"qwen3-embedding:4b"` →
+`config-cli runCli > use ollama defaults write the provider's embedding pair (EDC-03, PDM-02 AC-2)`
+failed (1 fail / 34 pass); restored via file copy, `git status --porcelain` clean before commit,
+re-ran green (35/0).
+P1 Independent Test, all 6 combinations (2 providers × {init --lmstudio, use ollama, use lmstudio} ×
+2 CLIs — `init --ollama`/plain `init` write no CLI-branch literal, so excluded): every combination's
+`model`/`baseUrl`/`baseURL`/`dimensions`/`codeModel` values are internally consistent and match the
+selected provider — confirmed on both mcp-client and opencode-plugin.
+**`bun test scripts/__tests__/embedding-defaults-parity.test.ts` is red — 6 pass / 3 fail — and
+cannot be fixed inside this task's write set.** Full diagnosis in tasks.md's T07b entry; summary:
+(1) `PAIR_SURFACES`/`LMSTUDIO_PAIR_SURFACES`'s config-cli.ts regexes require a literal quoted string
+at the model/dims position — a seam-derived property access has none, so the lazy regex either
+throws ("extractor rotted") or silently matches the *next* branch's literal (ollama's entry matched
+`mistral-embed`); (2) `referencePairLmStudio()` is anchored to `knownDimensions`'s entry #1, stale
+now that this feature made the table multi-entry (the literal defect T13's task text already names
+for re-anchoring); (3) `referencePair()` (ollama) reads `defaultMassaAiConfig.embedding` in
+`massa-ai-config.ts`, which no task ever assigned — T03 derived only `.llm`, so `.embedding.model`/
+`.dimensions` are still the retired `qwen3-embedding:4b`/2560 literal, meaning PDM-03 AC-1 is still
+false for a plain `init`/`init --ollama`. All three fixes require touching either
+`scripts/__tests__/embedding-defaults-parity.test.ts` or `massa-ai-config.ts`, both outside T07b's
+named write set and explicitly reserved for T13 ("the parity-gate re-anchoring... belong to later
+batches — do not touch them"). Recommend T13's scope be read as covering all three, not only (2).
+`tasks.md` marks T07b **⚠️ Partial** rather than Complete to keep this claim honest and not silently
+excluded. Next: T09 (Admin Portal config sections) and T10 (field-level parity gate) — depends on
+T02, a disjoint write set from T07b's CLI files, unaffected by this blocker.
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 

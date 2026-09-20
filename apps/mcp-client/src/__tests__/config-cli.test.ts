@@ -82,11 +82,26 @@ describe("config-cli runCli", () => {
     expect(r.out).toContain("LM Studio");
     const show = await captureConsole(() => runCli(["show"]));
     expect(show.out).toContain("lmstudio");
-    expect(show.out).toContain("text-embedding-nomic-embed-text-v1.5");
-    expect(show.out).toContain("768");
-    // LIP-09/G4: init must also point llm.baseUrl at LM Studio, not Ollama.
     const config = JSON.parse(show.out);
+    expect(config.embedding.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding);
+    expect(config.embedding.dimensions).toBe(
+      INFERENCE_PROVIDERS.lmstudio.knownDimensions[INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding],
+    );
+    // LIP-09/G4: init must also point llm.baseUrl at LM Studio, not Ollama.
     expect(config.llm.baseUrl).toBe("http://localhost:1234/v1");
+  });
+
+  test("init --lmstudio writes the LM Studio embedding id and width, not Ollama's (PDM-02 AC-2)", async () => {
+    rmSync(getConfigPath(), { force: true });
+    const r = await captureConsole(() => runCli(["init", "--lmstudio"]));
+    expect(r.code).toBe(0);
+    const show = await captureConsole(() => runCli(["show"]));
+    const config = JSON.parse(show.out);
+    expect(config.embedding.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding);
+    expect(config.embedding.dimensions).toBe(
+      INFERENCE_PROVIDERS.lmstudio.knownDimensions[INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding],
+    );
+    expect(config.embedding.model).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.embedding);
   });
 
   test("init --lmstudio writes the LM Studio instruct/coding trio, not Ollama's (PDM-02 AC-2)", async () => {
@@ -148,30 +163,37 @@ describe("config-cli runCli", () => {
     expect(r.out).toContain("nomic");
   });
 
-  test("use ollama defaults write the 4b/2560 pair (EDC-03)", async () => {
+  test("use ollama defaults write the provider's embedding pair (EDC-03, PDM-02 AC-2)", async () => {
     // The written pair must match the default model's real output width —
-    // 768 here shipped a config that refuseOnDimensionMismatch rejects at
-    // first embed.
+    // a mismatched pair shipped a config that refuseOnDimensionMismatch
+    // rejects at first embed.
     await captureConsole(() => runCli(["init"]));
     const r = await captureConsole(() => runCli(["use", "ollama"]));
     expect(r.code).toBe(0);
     const show = await captureConsole(() => runCli(["show"]));
-    expect(show.out).toContain("qwen3-embedding:4b");
-    expect(show.out).toContain("2560");
+    const config = JSON.parse(show.out);
+    expect(config.embedding.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.embedding);
+    expect(config.embedding.dimensions).toBe(
+      INFERENCE_PROVIDERS.ollama.knownDimensions[INFERENCE_PROVIDERS.ollama.defaultModels.embedding],
+    );
+    expect(config.embedding.model).not.toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding);
   });
 
-  test("use lmstudio defaults write the nomic/768 pair", async () => {
+  test("use lmstudio defaults write the provider's embedding pair (PDM-02 AC-2)", async () => {
     await captureConsole(() => runCli(["init"]));
     const r = await captureConsole(() => runCli(["use", "lmstudio"]));
     expect(r.code).toBe(0);
     const show = await captureConsole(() => runCli(["show"]));
-    expect(show.out).toContain("text-embedding-nomic-embed-text-v1.5");
-    expect(show.out).toContain("768");
+    const config = JSON.parse(show.out);
+    expect(config.embedding.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding);
+    expect(config.embedding.dimensions).toBe(
+      INFERENCE_PROVIDERS.lmstudio.knownDimensions[INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding],
+    );
+    expect(config.embedding.model).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.embedding);
     // Assert the llm.baseUrl FIELD, not a substring of the whole `show`
     // output — embedding.baseURL alone already contains this URL, so a
     // substring check here would pass even if llm.baseUrl still pointed at
     // Ollama's :11434 (LIP-09/G4).
-    const config = JSON.parse(show.out);
     expect(config.llm.baseUrl).toBe("http://localhost:1234/v1");
   });
 

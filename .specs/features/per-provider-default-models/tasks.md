@@ -178,7 +178,36 @@ Tests: installer-config-template executes the template function per provider bra
 Gate: bun test scripts/__tests__/installer-config-template.test.ts
 Depends on: T01.
 
-### T07b: Both config CLIs write the provider's **embedding** id and width too
+### T07b: Both config CLIs write the provider's **embedding** id and width too — ⚠️ Partial
+
+**Writer fix delivered and verified**: both CLIs now derive `embedding.model` from
+`INFERENCE_PROVIDERS[provider].defaultModels.embedding` and `embedding.dimensions` by key lookup
+(`knownDimensions[model]` for lmstudio, `knownEmbeddingDimensions(model)` for ollama) in every
+local-provider branch of `init --<provider>` and `use <provider>`, plus the `usage` help text.
+`config-cli.test.ts` in both apps is green (35/35, 31/31) and the P1 Independent Test confirms an
+internally-consistent trio+embedding pair per provider, per branch, per CLI.
+
+**`bun test scripts/__tests__/embedding-defaults-parity.test.ts` is red — pre-existing, out of this
+task's write set.** Three independent, confirmed defects, none introduced by this task's diff:
+1. `PAIR_SURFACES`/`LMSTUDIO_PAIR_SURFACES`'s config-cli.ts regexes require a quoted string literal
+   at the exact model/dims position (`"([^"]+)"` / `(\d+)`); a seam derivation (property access) has
+   no literal there, so `extractOne` either throws ("extractor rotted") or — worse — the lazy
+   `[\s\S]*?` skips ahead and silently matches the next branch's literal (observed: ollama's
+   `PAIR_SURFACES` entry matched `mistral-embed` instead of throwing).
+2. `referencePairLmStudio()` reads `inference-providers.ts`'s `knownDimensions` object and always
+   returns entry #1 via `/knownDimensions:\s*\{\s*"([^"]+)":\s*\d+/` — now stale by construction
+   since this feature made the table multi-entry. This is the exact defect T13's own task text
+   names for re-anchoring.
+3. `referencePair()` (ollama) reads `massa-ai-config.ts`'s `defaultMassaAiConfig.embedding` block,
+   which was never assigned to any task — T03 derived only `defaultMassaAiConfig.llm`, leaving
+   `embedding.model`/`.dimensions` at the retired `qwen3-embedding:4b`/2560 literal. PDM-03 AC-1 is
+   therefore still false for a plain `init`/`init --ollama` with no explicit CLI-writer branch.
+
+All three require touching `scripts/__tests__/embedding-defaults-parity.test.ts` and/or
+`packages/shared/src/config/massa-ai-config.ts` — both outside T07b's write set and explicitly
+named as belonging to a later batch (T13's "re-anchor and extend the parity gate"). Recommend
+folding items 2 and 3 into T13 explicitly; T13's current text only names item 2. Evidence in
+`.specs/project/STATE.md`.
 
 **Added during Execute 2026-09-20 (Tasks safety valve), after T07 closed.** PDM-02 AC-2 reads
 "SHALL write that provider's **three** model ids as file values". T07's text, and design.md's

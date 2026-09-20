@@ -7,6 +7,7 @@ import {
   saveConfig,
   initConfig,
   defaultMassaAiConfig,
+  knownEmbeddingDimensions,
 } from "@massa-ai/shared/config";
 import {
   listProfiles,
@@ -103,7 +104,7 @@ Examples:
   massa-ai-config init
   massa-ai-config init --lmstudio
   massa-ai-config init --mistral your-api-key
-  massa-ai-config use ollama --model qwen3-embedding:4b
+  massa-ai-config use ollama --model qwen3-embedding:0.6b
   massa-ai-config use lmstudio
   massa-ai-config use mistral --api-key your-key
   massa-ai-config set embedding.dimensions 1024
@@ -199,7 +200,7 @@ export async function runCli(argv: string[]): Promise<number> {
       console.log("✓ Configured for OpenAI embeddings");
     } else if (options.lmstudio) {
       const config = loadConfig();
-      const model = "text-embedding-nomic-embed-text-v1.5";
+      const model = INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
       config.embedding = {
         provider: "lmstudio",
         model,
@@ -273,17 +274,17 @@ export async function runCli(argv: string[]): Promise<number> {
     const config = loadConfig();
 
     if (provider === "ollama") {
+      const model = (options.model as string) || INFERENCE_PROVIDERS.ollama.defaultModels.embedding;
       config.embedding = {
         provider: "ollama",
-        model: (options.model as string) || "qwen3-embedding:4b",
+        model,
         baseURL: (options["base-url"] as string) || "http://localhost:11434",
-        // Must match the default model's output width: qwen3-embedding:4b
-        // emits 2560-d vectors, and refuseOnDimensionMismatch fails loudly
-        // on a config that disagrees with what the model returns.
-        dimensions: 2560,
+        // ponytail: G6 — 768 fallback for a custom --model outside
+        // knownDimensions; see embeddings/config.ts's matching comment.
+        dimensions: knownEmbeddingDimensions(model) ?? 768,
       };
     } else if (provider === "lmstudio") {
-      const model = (options.model as string) || "text-embedding-nomic-embed-text-v1.5";
+      const model = (options.model as string) || INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
       config.embedding = {
         provider: "lmstudio",
         model,
