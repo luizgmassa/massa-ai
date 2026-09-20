@@ -164,11 +164,70 @@ function resolveSharedProfileIdentity(): string | null {
 
 export const SHARED_PROFILE_IDENTITY = resolveSharedProfileIdentity();
 
+/**
+ * The active provider's model and embedding width, from the same in-process
+ * resolver `resolveSharedProfileIdentity` above keys the shared index on.
+ *
+ * Exposed for LIP-22: the width decides which branch of
+ * `data/vector/postgres-vector-store.ts` runs (`> 2000` → two-phase binary
+ * quantization, `≤ 2000` → direct HNSW cosine, `:233`/`:267`), so a
+ * cross-provider retrieval comparison is only a comparison of that branch if
+ * the width is recorded beside the score. Callers must cross-check `model`
+ * against the running server's reported model — this resolver reads the test
+ * process's own config, and a silent disagreement between the two processes
+ * would measure one stack while describing another.
+ */
+export const ACTIVE_EMBEDDING_PROFILE: {
+  /**
+   * The selected provider id — the `embeddingProviders` key, i.e. what
+   * `EMBEDDING_PROVIDER` / `config.json`'s `embedding.provider` names
+   * (`"lmstudio"`). Use this for labels, floors and reports.
+   */
+  id: string;
+  /**
+   * The inner dispatch path (`"custom"` for LM Studio), i.e. which code path
+   * actually runs. Distinct from `id` on purpose: LM Studio is an alias over
+   * the OpenAI-compatible `custom` entry, so reading `config.provider` for a
+   * label reports "custom" and silently merges every future alias sharing
+   * that path.
+   */
+  dispatchPath: string;
+  model: string;
+  dimensions: number;
+} = (() => {
+  const [id, active] = getProvidersByPriority()[0]!;
+  return {
+    id,
+    dispatchPath: active.provider,
+    model: active.model,
+    dimensions: active.dimensions ?? 0,
+  };
+})();
+
 export type Backend = "postgres" | "unknown";
 
 export interface Availability {
   API_UP: boolean;
+  /**
+   * The configured local inference provider is reachable and can embed.
+   *
+   * Provider-neutral since LIP-10 shipped a second one. 16 E2E files gate on
+   * this, and in every case they mean "embeddings are available", not "Ollama
+   * specifically" — so resolving it from `/system/ollama` alone made the whole
+   * suite skip silently under an LM Studio config, which reads as a pass. It
+   * now resolves from `/system/inference` (the neutral counterpart) and falls
+   * back to `/system/ollama` only when that route is absent, i.e. against a
+   * server older than this feature.
+   */
+  INFERENCE_UP: boolean;
+  /**
+   * Deprecated alias of `INFERENCE_UP`, kept so the 16 existing call sites
+   * keep working. It carries the neutral value, not an Ollama-specific one —
+   * read `INFERENCE_PROVIDER` when you actually need to know which provider.
+   */
   OLLAMA_UP: boolean;
+  /** `"ollama" | "lmstudio"`, as the server reports it. */
+  INFERENCE_PROVIDER?: string;
   BACKEND: Backend;
   AUTH_REQUIRED: boolean;
   API_KEY: string;
@@ -247,7 +306,8 @@ export async function probeAvailability(): Promise<Availability> {
     .then((r) => r.ok)
     .catch(() => false);
 
-  let OLLAMA_UP = false;
+  let INFERENCE_UP = false;
+  let INFERENCE_PROVIDER: string | undefined;
   let BACKEND: Backend = "unknown";
   let AUTH_REQUIRED = false;
   let EMBEDDING_MODEL: string | undefined;
@@ -259,15 +319,35 @@ export async function probeAvailability(): Promise<Availability> {
     // undefined, `OLLAMA_UP` false, and every suite gated on it skip silently
     // — reporting "2 skip / 0 fail", which reads like a pass. The auth probe
     // below stays keyless on purpose: its whole job is to observe the 401.
+    // `/system/inference` first — it dispatches on the configured provider.
+    // `/system/ollama` is the fallback for a server predating LIP-10, where
+    // the neutral route 404s; note a 404 still parses as JSON, so the
+    // `available` field being absent is what distinguishes it, not a throw.
     try {
-      const ollama = await fetch(`${API}/api/v1/system/ollama`, {
+      const inference = await fetch(`${API}/api/v1/system/inference`, {
         headers: apiHeaders(),
         signal: AbortSignal.timeout(4000),
       }).then((r) => r.json() as Promise<any>);
-      OLLAMA_UP = !!ollama?.available;
-      EMBEDDING_MODEL = ollama?.embeddingModel ?? ollama?.configuredModel;
+      if (typeof inference?.available === "boolean") {
+        INFERENCE_UP = inference.available;
+        INFERENCE_PROVIDER = inference?.provider;
+        EMBEDDING_MODEL = inference?.embeddingModel ?? inference?.configuredModel;
+      }
     } catch {
-      OLLAMA_UP = false;
+      /* fall through to the legacy probe */
+    }
+    if (!INFERENCE_PROVIDER) {
+      try {
+        const ollama = await fetch(`${API}/api/v1/system/ollama`, {
+          headers: apiHeaders(),
+          signal: AbortSignal.timeout(4000),
+        }).then((r) => r.json() as Promise<any>);
+        INFERENCE_UP = !!ollama?.available;
+        INFERENCE_PROVIDER = INFERENCE_UP ? "ollama" : undefined;
+        EMBEDDING_MODEL = ollama?.embeddingModel ?? ollama?.configuredModel;
+      } catch {
+        INFERENCE_UP = false;
+      }
     }
     try {
       const info = await fetch(`${API}/api/v1/system/info`, {
@@ -295,7 +375,11 @@ export async function probeAvailability(): Promise<Availability> {
 
   _avail = {
     API_UP,
-    OLLAMA_UP,
+    INFERENCE_UP,
+    // Deprecated alias — same neutral value, so the 16 existing gates stop
+    // skipping under a non-Ollama provider without each needing an edit.
+    OLLAMA_UP: INFERENCE_UP,
+    INFERENCE_PROVIDER,
     BACKEND,
     AUTH_REQUIRED,
     API_KEY,

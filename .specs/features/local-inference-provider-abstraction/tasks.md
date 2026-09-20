@@ -1296,6 +1296,55 @@ rather than imported because the const is module-private and importing
 **8 pass / 1 fail**, naming that copy while the opencode copy stayed green.
 Restored from file copy, sha256 `f5c31cc7…` matches.
 
+**LIP-22 measured (H2) — the accepted risk was about twice what was recorded.**
+The re-verification graded LIP-22 FAIL because T24 amended its AC to name
+`14.needles.test.ts` and never ran it, and because that file was gated on
+Ollama with no 768 arm — so it could not observe the subject either. Both are
+now closed by running it, not by amending again.
+
+Three things had to change before the file could measure anything. Its gate
+read `/system/ollama`, so **all 16 E2E files that gate on `OLLAMA_UP` skip
+silently under any other provider** — which reads as a pass; `probeAvailability`
+now resolves that flag from the neutral `/system/inference` and falls back only
+against a server predating LIP-10, so one edit unblocks all 16. Its floors were
+a single Ollama-calibrated triple; they are now keyed per arm, because
+asserting an uncalibrated number against a different stack is inventing one.
+And its `beforeAll` budget was **700s against a cold index that measured 1h
+12m** — the file could not complete a cold run at all, which is a large part of
+why it had never been run.
+
+Full figures and the two-arm table are in `spec.md`'s LIP-22 block. The
+headline: through the real `postgres-vector-store.ts`, 2560 (binary
+quantization) scores hit@1 0.5000 / MRR 0.5893 and 768 (HNSW cosine) scores
+hit@1 0.1429 / MRR 0.2116 — **ΔMRR −0.3777** against the **−0.1773** the
+`bench:needles` record claimed. The in-process ranker understated the risk by
+about half, exactly the direction G14 predicted.
+
+Method notes worth reusing. The harness already keyed `SHARED_PID` on
+`{commit, provider, model, dimensions}`, so the two arms got independent
+workspaces for free and the LIP-15 fingerprint stamped each one
+(`ollama:…:2560`, `custom:…:768`) — the widths are attested twice, by direct
+`curl` and by the stamp. The whole measurement ran on an ephemeral stack (a
+scratch PostgreSQL cluster on `127.0.0.1:5433/massa_ai_test`, the API on
+`127.0.0.1:3334`, scratch `XDG_CONFIG_HOME` per arm), so nothing touched the
+developer's own database; it was torn down afterward. Arm A cost 1h 12m to
+index and arm B about 3 minutes for the identical corpus — a ~20x gap that is
+a throughput observation, not a quality one, and should not be confused for
+the retrieval result.
+
+**Observed red on the new floor row:** raising `FLOORS["lmstudio"].hit1` to
+0.99 fails with `Expected: >= 0.99  Received: 0.14285714285714285`; restored
+from file copy, sha256 `c5d49f03…`.
+
+**One labelling defect found and fixed mid-measurement.**
+`ACTIVE_EMBEDDING_PROFILE` first read `config.provider`, which is the inner
+*dispatch path* — so the LM Studio arm reported `provider=custom`, its floor
+lookup missed `FLOORS["lmstudio"]` and hit `undefined` instead, and the record
+would have been published under the wrong name. It now carries `id` (the
+selected provider) and `dispatchPath` (the code path) separately. LM Studio
+being an alias over the `custom` entry is precisely what makes the two
+distinct.
+
 **T23 gate.** `bun run lint` (oxlint) clean, exit 0. `bun run test:scripts`
 exits 1 on exactly the two **pre-existing** `install-skills CLI` failures
 (`no tools exits 2 → got='1'`; `reason is reported`) the verifier measured
@@ -1327,7 +1376,7 @@ mutation: the five intended paths only.
 | LIP-19 | golden regenerated + diff reviewed | T14 |
 | LIP-20 | `turbo-passthrough-env.test.ts` — the derived `process.env` scan for the three `LMSTUDIO_*` names, **plus** the bash-only sentinel pinning `MASSA_AI_INFERENCE_PROVIDER`, which that scan is structurally blind to | T15, T23 |
 | LIP-21 | `check_specs_delivered.ts` exit 0 | T18 |
-| LIP-22 | both needles figures (768 + 2560) with both observed vector lengths, in the Phase 7 landed note, plus both halves of the recorded bound — the algorithm change itself stays UNMEASURED, sensor named | T17 |
+| LIP-22 | `packages/core/src/__tests__/e2e/14.needles.test.ts`, run on **both** arms through the real `postgres-vector-store.ts` — 2560 → `binary-quantization`, hit@1 0.5000 / MRR 0.5893; 768 → `hnsw-cosine`, hit@1 0.1429 / MRR 0.2116. Widths attested twice (direct `curl` + the LIP-15 stamped fingerprint). The algorithm change is **MEASURED**, and is ~2x worse than the `bench:needles` bound it replaces | T17, T25 |
 | LIP-23 | `llm-client.test.ts:832` (`lmstudio` → entrypoint `"chat"`) and `:839` (`ollama` → `"responses"`), both asserting `lastProviderEntrypoint`; plus the live parsed-object run. **Not** `llm-client-json-schema.test.ts` — its `@ai-sdk/openai` mock has no `.chat` member and structurally cannot sense the entrypoint (G13) | done in Phase 3 (`c838837d`) |
 | LIP-24 | completeness shrinkage accounted for, not waved through | T15 |
 

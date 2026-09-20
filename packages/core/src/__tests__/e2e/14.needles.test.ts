@@ -52,6 +52,7 @@ import {
   probeAvailability,
   ensureSharedIndex,
   PROJECT_PATH,
+  ACTIVE_EMBEDDING_PROFILE,
 } from "./_helpers";
 import {
   resolveNeedles,
@@ -60,12 +61,38 @@ import {
 } from "../../../../../benchmarks/needles/resolve.ts";
 
 // ── Gating ────────────────────────────────────────────────────────────────
-// Two-stage gate: RUN_E2E + API up + Ollama up (search needs embeddings).
-const READY = await (async () => {
-  if (!E2E_ENABLED) return false;
-  const a = await probeAvailability();
-  return a.API_UP && a.OLLAMA_UP;
-})();
+// Two-stage gate: RUN_E2E + API up + the configured inference provider up
+// (search needs embeddings). Provider-neutral on purpose: LIP-22's subject is
+// the 768 arm, and gating on Ollama specifically is exactly what made this
+// file structurally incapable of observing it.
+const AVAIL = E2E_ENABLED ? await probeAvailability() : null;
+const READY = !!AVAIL?.API_UP && !!AVAIL?.INFERENCE_UP;
+
+/**
+ * Per-arm regression floors (F-NEEDLE-1).
+ *
+ * Keyed by provider because a floor is a statement about one embedding
+ * stack, not about retrieval in general. `null` means "no calibrated
+ * baseline yet": the arm runs and records, and the run below refuses to
+ * assert a number nobody measured for it.
+ */
+const FLOORS: Record<string, { hit1: number; hit5: number; mrr: number } | null> = {
+  // Measured on this host, warm shared index, qwen3-embedding (2560d, so the
+  // > 2000 two-phase binary-quantization search path). See OBSERVED_BASELINE
+  // in the file header for the run these are derived from.
+  ollama: { hit1: 0.36, hit5: 0.64, mrr: 0.47 },
+  // LM Studio at 768 takes the OTHER store branch (≤ 2000, direct HNSW
+  // cosine). Calibrated 2026-09-20 from the LIP-22 measurement on this host —
+  // same corpus (743 files / 8129 chunks), same fixture, same ±5-line scorer,
+  // two deterministic sweeps: hit@1 0.1429 (2/14), hit@5 0.2857 (4/14),
+  // MRR 0.2116. Floors at ~80% rounded DOWN to the nearest whole needle, the
+  // same rule the Ollama row uses: hit@1 1/14, hit@5 3/14, MRR 0.16.
+  //
+  // These floors are LOW because the arm is, not because the gate was relaxed
+  // to fit it. That gap is the finding LIP-22 exists to record, and it is the
+  // reason the row is written rather than the row being omitted.
+  lmstudio: { hit1: 0.07, hit5: 0.21, mrr: 0.16 },
+};
 
 // ── Long-timeout POST (shared helper caps at 120s; search embeds can exceed) ─
 async function postLong<T = any>(endpoint: string, body?: unknown, timeoutMs = 120_000): Promise<T> {
@@ -246,11 +273,37 @@ function printTable(label: string, s: SweepResult): void {
 describe.skipIf(!READY)("T10 needles benchmark", () => {
   let pid: string;
   let dataset: Dataset;
+  const profile = ACTIVE_EMBEDDING_PROFILE;
 
   beforeAll(async () => {
+    // The scores below describe whichever stack actually served the searches.
+    // `profile` comes from THIS process's config resolver while the searches
+    // are served by the API process, so a disagreement means the run would
+    // measure one stack and label it another — fail here rather than publish
+    // a mislabelled number. This is the whole failure mode LIP-22 turns on.
+    const served = AVAIL?.EMBEDDING_MODEL;
+    if (served && served !== profile.model) {
+      throw new Error(
+        `arm mismatch: the API reports embedding model "${served}" but this process's ` +
+          `resolver says "${profile.model}" (${profile.provider}, ${profile.dimensions}d). ` +
+          `Point both at the same config before measuring.`,
+      );
+    }
+    console.log(
+      `[T10] arm: provider=${profile.id} (dispatch=${profile.dispatchPath}) model=${profile.model} ` +
+        `dimensions=${profile.dimensions} ` +
+        `searchPath=${profile.dimensions > 2000 ? "binary-quantization" : "hnsw-cosine"}`,
+    );
     pid = await ensureSharedIndex();
     dataset = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
-  }, 700_000);
+    // 700s was not enough to build this index cold and is why the file could
+    // sit unrun: `ensureSharedIndex` polls until the store is richly
+    // searchable, and a COLD full-repo index measured 1h 12m on the Ollama arm
+    // (743 files / 8129 chunks / 23913 symbols at 0.19 files/sec — the embed
+    // call dominates). The LM Studio arm indexed the same corpus at 3.86
+    // files/sec, ~20x faster, in about 3 minutes. Budget the slow arm, since
+    // this hook is a no-op once the index is warm.
+  }, 5_400_000);
 
   test(
     "F-NEEDLE-1/2/3: needle sweep — hit@k floors, non-empty results, determinism",
@@ -317,18 +370,58 @@ describe.skipIf(!READY)("T10 needles benchmark", () => {
       // floor is ≥ its pre-T7 value — this is a quality lift, not a carve-out.
       // We assert against the FIRST run (warm cache); if run #1 dipped, run #2
       // almost certainly dipped too, so this is the right gate.
-      const HIT1_FLOOR = 0.36;
-      const HIT5_FLOOR = 0.64;
-      const MRR_FLOOR = 0.47;
+      // Floors are calibrated PER ARM. The numbers above were measured on
+      // Ollama at 2560; they are not a statement about any other provider, and
+      // asserting them against an arm nobody calibrated would be inventing a
+      // number — which is the exact defect LIP-22 exists to prevent. An arm
+      // with no calibrated baseline still runs, still asserts the
+      // provider-independent invariants (non-empty, determinism), and records
+      // its aggregate as the candidate baseline.
+      const floors = FLOORS[profile.id];
 
       console.log("\n=== T10 regression floors ===");
-      console.log(`  hit@1 ${sweep1.hitAt1.toFixed(3)} ≥ ${HIT1_FLOOR}  → ${sweep1.hitAt1 >= HIT1_FLOOR ? "PASS" : "FAIL"}`);
-      console.log(`  hit@5 ${sweep1.hitAt5.toFixed(3)} ≥ ${HIT5_FLOOR}  → ${sweep1.hitAt5 >= HIT5_FLOOR ? "PASS" : "FAIL"}`);
-      console.log(`  MRR   ${sweep1.mrr.toFixed(3)} ≥ ${MRR_FLOOR}   → ${sweep1.mrr >= MRR_FLOOR ? "PASS" : "FAIL"}`);
+      if (!floors) {
+        console.log(
+          `  no calibrated floor for arm "${profile.id}" — recording this run as the ` +
+            `candidate baseline (hit@1 ${sweep1.hitAt1.toFixed(4)}, hit@5 ${sweep1.hitAt5.toFixed(4)}, ` +
+            `MRR ${sweep1.mrr.toFixed(4)}). Set FLOORS["${profile.id}"] at ~80% of it, ` +
+            `rounded DOWN to the nearest whole needle, once it is confirmed.`,
+        );
+      } else {
+        console.log(`  hit@1 ${sweep1.hitAt1.toFixed(3)} ≥ ${floors.hit1}  → ${sweep1.hitAt1 >= floors.hit1 ? "PASS" : "FAIL"}`);
+        console.log(`  hit@5 ${sweep1.hitAt5.toFixed(3)} ≥ ${floors.hit5}  → ${sweep1.hitAt5 >= floors.hit5 ? "PASS" : "FAIL"}`);
+        console.log(`  MRR   ${sweep1.mrr.toFixed(3)} ≥ ${floors.mrr}   → ${sweep1.mrr >= floors.mrr ? "PASS" : "FAIL"}`);
 
-      expect(sweep1.hitAt1).toBeGreaterThanOrEqual(HIT1_FLOOR);
-      expect(sweep1.hitAt5).toBeGreaterThanOrEqual(HIT5_FLOOR);
-      expect(sweep1.mrr).toBeGreaterThanOrEqual(MRR_FLOOR);
+        expect(sweep1.hitAt1).toBeGreaterThanOrEqual(floors.hit1);
+        expect(sweep1.hitAt5).toBeGreaterThanOrEqual(floors.hit5);
+        expect(sweep1.mrr).toBeGreaterThanOrEqual(floors.mrr);
+      }
+
+      // ── LIP-22: the arm record, machine-readable ────────────────────────
+      // One line per arm, so the two arms can be diffed exactly rather than
+      // transcribed from a console table. `searchPath` is the whole point:
+      // it names which branch of postgres-vector-store.ts actually ran, which
+      // is the thing `bench:needles` structurally could not observe.
+      console.log(
+        "[T10][LIP-22] " +
+          JSON.stringify({
+            provider: profile.id,
+            dispatchPath: profile.dispatchPath,
+            model: profile.model,
+            dimensions: profile.dimensions,
+            searchPath: profile.dimensions > 2000 ? "binary-quantization" : "hnsw-cosine",
+            projectId: pid,
+            n: sweep1.perNeedle.length,
+            aggregate: {
+              hitAt1: Number(sweep1.hitAt1.toFixed(4)),
+              hitAt3: Number(sweep1.hitAt3.toFixed(4)),
+              hitAt5: Number(sweep1.hitAt5.toFixed(4)),
+              hitAt10: Number(sweep1.hitAt10.toFixed(4)),
+              mrr: Number(sweep1.mrr.toFixed(4)),
+            },
+            misses: sweep1.perNeedle.filter((e) => e.rank === null).map((e) => e.id),
+          }),
+      );
     },
     // 14 needles × 2 runs × ~40s worst-case embed = ~1120s; pad to 1500s.
     1_500_000,

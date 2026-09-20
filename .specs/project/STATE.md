@@ -20,14 +20,30 @@ extractor on the literal `OLLAMA_EMBEDDING_` and skipped any file lacking it —
 have reported clean over a second unchecked pair. Its failure mode was **green**. Tier 3 is
 re-keyed provider-neutrally and the red was induced on the LM Studio pair and observed.
 
-**Read this before closing LIP-22.** Going 2560 → 768 costs MRR 0.6423 → 0.4650 and hit@1
-0.5000 → 0.2857 on the 14-needle corpus — but that number is chunk-embedding quality only.
-`benchmarks/needles/run.ts` speaks solely Ollama `/api/embeddings` (never the LM Studio
-client this feature ships) and is an in-process exact-cosine ranker that never constructs
-`data/vector/postgres-vector-store.ts`, so neither the `>2000` binary-quantization branch
-nor the ≤2000 HNSW branch runs on *either* arm. The retrieval-algorithm risk LIP-22 names
-remains **UNMEASURED**; `packages/core/src/__tests__/e2e/14.needles.test.ts` is the sensor
-that would settle it.
+**LIP-22 is measured, and the accepted risk was about twice what had been recorded.**
+`14.needles.test.ts` was run on both arms through the real
+`data/vector/postgres-vector-store.ts`, same 743-file corpus, same fixture, separate
+profile-keyed workspaces: **2560** (`binary-quantization`, `> 2000`) → hit@1 0.5000, MRR
+0.5893; **768** (`hnsw-cosine`, `≤ 2000`) → hit@1 0.1429, MRR 0.2116. Widths attested
+twice, by direct `curl` and by the LIP-15 fingerprint each workspace stamped itself
+(`ollama:qwen3-embedding:4b:2560`, `custom:text-embedding-nomic-embed-text-v1.5:768`).
+
+The `bench:needles` bound this replaces put the cost at ΔMRR −0.1773; through the real
+store it is **ΔMRR −0.3777**. The in-process exact-cosine ranker did not merely fail to
+observe the branch — by removing approximate search from *both* sides it understated the
+risk by roughly half, which is the direction the gap list predicted. **A benchmark that
+cannot reach the mechanism does not return a conservative answer; it returns a flattering
+one.**
+
+Three defects had to be fixed before the file could measure anything, and the first is the
+one with reach: its gate read `/system/ollama`, and **all 16 E2E files gating on
+`OLLAMA_UP` skip silently under any other provider** — a whole suite reporting "0 fail"
+while testing nothing. Resolving that flag from the neutral `/system/inference` in
+`probeAvailability` unblocks all 16 from one edit. The other two: floors were a single
+Ollama-calibrated triple (now keyed per arm — asserting an uncalibrated number against a
+different stack is inventing one), and the `beforeAll` budget was 700s against a cold index
+that measured **1h 12m**, so the file could not complete a cold run at all. That budget is
+a large part of why it had never been run.
 
 **Four Phase-7 gates could not observe their own subjects** and were amended with their
 reasons at `bc2f2f82`: `bun run lint` is oxlint and reads no markdown; creating

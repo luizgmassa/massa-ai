@@ -475,6 +475,45 @@ note.
   the branch. `needles-gate.yml` stays out of scope, so this runs manually; a
   promise to measure later is not an AC.
 
+  **AC MET — measured 2026-09-20.** Both arms run, same corpus, same fixture,
+  same ±5-line scorer, each through the real
+  `data/vector/postgres-vector-store.ts`, each on its own profile-keyed
+  workspace so neither could contaminate the other:
+
+  | | 2560 — `qwen3-embedding:4b` | 768 — `text-embedding-nomic-embed-text-v1.5` |
+  |---|---|---|
+  | store branch | `binary-quantization` (`> 2000`) | `hnsw-cosine` (`≤ 2000`) |
+  | hit@1 | **0.5000** (7/14) | **0.1429** (2/14) |
+  | hit@3 | 0.6429 (9/14) | 0.2143 (3/14) |
+  | hit@5 | 0.7143 (10/14) | 0.2857 (4/14) |
+  | hit@10 | 0.7143 (10/14) | 0.5000 (7/14) |
+  | MRR | **0.5893** | **0.2116** |
+  | workspace | `e2e-ai-shared-15a80127ec130c64` | `e2e-ai-shared-1ddfda0f4c64eda1` |
+  | stamped fingerprint | `ollama:qwen3-embedding:4b:2560` | `custom:text-embedding-nomic-embed-text-v1.5:768` |
+  | index build | 743 files / 8129 chunks / 23913 symbols, 0.19 files/sec, **1h 12m** | same corpus, 3.86 files/sec, **~3 min** |
+
+  Corpus identical on both arms (743 files). Widths asserted independently by
+  direct `curl` against each provider (2560 / 768) *and* by the LIP-15
+  fingerprint each workspace stamped itself. Determinism held: two sweeps per
+  arm inside a run, plus a third confirming run per arm in a fresh process,
+  all with identical hit@k. Misses at 2560: N05, N12, N13, N14. At 768: those
+  four plus N07, N08, N11.
+
+  **The finding, and it is not the one the accepted risk recorded.** The
+  `bench:needles` figures kept below put the cost at ΔMRR −0.1773 and
+  Δhit@1 −0.2143. Measured through the real store the cost is **ΔMRR −0.3777
+  and Δhit@1 −0.3571** — roughly **twice** the degradation, on MRR. The
+  in-process exact-cosine ranker did not merely fail to observe the branch; by
+  removing approximate search from both sides it *understated the risk by
+  about half*, which is the direction G14 predicted and the reason this
+  requirement was not allowed to close on it. The risk is real, it is now
+  quantified, and it remains accepted rather than prevented — 768 is inherent
+  to the measured LM Studio model.
+
+  Floors follow the measurement rather than the reverse:
+  `FLOORS["lmstudio"]` in that file is set at ~80% of the observed values,
+  rounded down to whole needles, the identical rule the Ollama row uses.
+
   **What was already measured stands, under a narrower label.** The
   `bench:needles` figures are recorded in `tasks.md`'s "Phase 7 landed — T17"
   note — 2560: hit@1 0.5000, MRR 0.6423; 768: hit@1 0.2857, MRR 0.4650, widths

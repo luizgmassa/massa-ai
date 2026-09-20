@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while appearing to work under a direct `bun test`. `MASSA_AI_INFERENCE_PROVIDER` joins
   them there and in `.env.example`; it is read only from bash, so the guard that derives
   its read-set from `process.env` accessors cannot see it and pins it by name instead.
+  **Measured caveat, because it affects what you get, not just how it is configured.** The
+  LM Studio embedding model this ships against is 768-dimensional, which puts the vector
+  store on its direct-HNSW-cosine path instead of the two-phase binary-quantization path
+  that widths above 2000 take. Measured end to end on a 743-file corpus, retrieval is
+  materially worse: hit@1 0.5000 → 0.1429 and MRR 0.5893 → 0.2116 against Ollama's
+  2560-dimensional `qwen3-embedding:4b`. Indexing, in exchange, is roughly 20x faster
+  (about 3 minutes versus 1h 12m for the same corpus). Pick accordingly; this is inherent
+  to the model's width, not a defect in the integration.
 - **Provider probing by response body, not HTTP status.** Both the TypeScript probe
   (`packages/core/src/kernel/inference-probe.ts`) and its bash mirror in the installers
   treat a `200` carrying an error body as unreachable. A status-only probe reported a
@@ -74,6 +82,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pair. That is the going-green failure mode the file exists to prevent, not a going-red
   one. Tier 3 now keys on `*_EMBEDDING_(MODEL|DIMENSIONS)` with any prefix, and the
   width-writer membership gained the new seam module.
+
+- **The E2E availability gate is provider-neutral.** Sixteen E2E files gate on a single
+  "can we embed?" flag that was resolved from `/system/ollama`, so under any other
+  configured provider the whole suite skipped and reported no failures — a silent pass.
+  It now resolves from `/system/inference`, falling back to the Ollama route only against
+  a server that predates it. `14.needles.test.ts` additionally keys its regression floors
+  per provider, because a floor calibrated on one embedding stack says nothing about
+  another, and asserting it anyway would invent a number.
 
 ### Fixed
 

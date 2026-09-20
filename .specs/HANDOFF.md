@@ -23,19 +23,36 @@ extractor on the literal token `OLLAMA_EMBEDDING_` and skipped any file lacking 
 `*_EMBEDDING_(MODEL|DIMENSIONS)` with any prefix, and the red was induced on the LM Studio
 pair specifically and observed before being trusted.
 
-**Read this before closing LIP-22.** The needles measurement is recorded in `tasks.md`'s
-Phase 7 landed note with **both halves of its bound**, and the bound is the finding: MRR
-0.6423 → 0.4650 and hit@1 0.5000 → 0.2857 going 2560 → 768 is a chunk-embedding-quality
-signal **only**. `benchmarks/needles/run.ts` speaks only Ollama `/api/embeddings` and never
-calls the LM Studio client the feature ships, and it is an in-process exact-cosine ranker
-that never constructs `packages/core/src/data/vector/postgres-vector-store.ts` — so neither
-the `dimensions > 2000` binary-quantization branch nor the ≤2000 plain-HNSW branch runs on
-*either* arm. The delta has the approximate-search component removed from both sides,
-biasing it in exactly the direction that hides the risk LIP-22 names. **That risk remains
-UNMEASURED**; the sensor that would settle it is
-`packages/core/src/__tests__/e2e/14.needles.test.ts`. Widths were asserted by independent
-curl (2560 / 768 exact), not inferred, because nothing in the harness validates the
-returned vector length.
+**LIP-22 is measured.** `14.needles.test.ts` was run on both arms through the real
+`postgres-vector-store.ts`, identical 743-file corpus, separate profile-keyed workspaces:
+**2560** (`binary-quantization`) → hit@1 0.5000, MRR 0.5893; **768** (`hnsw-cosine`) →
+hit@1 0.1429, MRR 0.2116. Full table in `spec.md`'s LIP-22 block.
+
+The headline is not the number but the correction: the `bench:needles` bound previously
+recorded here said ΔMRR −0.1773; the real-store measurement says **−0.3777**. That earlier
+figure was not conservative, it was **flattering** — an in-process exact-cosine ranker
+removes approximate search from *both* arms, so the delta it reports has the very mechanism
+under test subtracted out of it. Carry that as the pattern: a benchmark that cannot reach
+the mechanism does not err toward caution.
+
+Widths are attested twice over — direct `curl` per provider (2560 / 768) and the LIP-15
+fingerprint each workspace stamped itself. Determinism held across two sweeps per run and a
+third confirming run per arm in a fresh process.
+
+**The trap that made this unmeasurable, and it is wider than LIP-22.** The file gated on
+`OLLAMA_UP`, read from `/system/ollama`. **All 16 E2E files gate on that flag**, and in
+every case they mean "embeddings are available" — so under any non-Ollama provider the
+entire E2E suite skips and reports no failures, which reads as a pass. `probeAvailability`
+now resolves it from the neutral `/system/inference`, falling back to `/system/ollama` only
+against a server predating LIP-10, so one edit unblocks all 16 without touching them. Two
+smaller ones in the same file: the floors were a single Ollama-calibrated triple (now keyed
+per arm), and the `beforeAll` budget was 700s against a cold index that measured 1h 12m.
+
+Method, reusable: the whole run used an ephemeral stack — a scratch PostgreSQL cluster on
+`127.0.0.1:5433/massa_ai_test`, the API on `127.0.0.1:3334`, a scratch `XDG_CONFIG_HOME`
+per arm — so the developer's own database was never written to, and it was torn down
+afterward. `SHARED_PID` is already keyed on `{commit, provider, model, dimensions}`, so the
+two arms got independent workspaces with no harness change at all.
 
 **Four Phase-7 gates could not observe their own subjects, and were amended with their
 reasons at `bc2f2f82` rather than silently failed.** `bun run lint` is oxlint and reads no
