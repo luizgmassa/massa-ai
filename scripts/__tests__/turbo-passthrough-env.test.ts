@@ -15,6 +15,18 @@
  * static scan by design — those ten are covered separately by
  * `llm-env-passthrough.test.ts`, which derives its own set from the config
  * resolver's literal occurrences of the name.
+ *
+ * LIP-20 / G8 — vars read only from bash are the second blind spot, and the
+ * derived scan cannot be widened to cover them. Measured on this tree: 58
+ * shell files under `scripts/` read 27 distinct `MASSA_AI_*` names without
+ * assigning them, and 25 of those 27 are absent from `passThroughEnv` —
+ * installer-internal knobs (`MASSA_AI_INSTALLER_TEST_*`, `MASSA_AI_PG_ROLE`,
+ * `MASSA_AI_PLUGIN_SOURCE`, …) that turbo has no reason to forward, because
+ * turbo never dispatches the shell suites at all: they run under the
+ * root-level `test:scripts`, outside the `packages/*` / `apps/*` globs. A
+ * shell-wide scan would therefore redden on 25 pre-existing names while
+ * proving nothing. Bash-read knobs that the spec still requires on the
+ * allowlist are pinned by name below, the same way the `RUN_*` sentinels are.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -84,6 +96,24 @@ describe("turbo passThroughEnv covers every literally-accessed MASSA_AI_* var", 
       missing,
       `not listed in turbo.json tasks.test.passThroughEnv: ${missing.join(", ")}`,
     ).toEqual([]);
+  });
+
+  test("bash-only MASSA_AI_* knobs the derived scan cannot see are pinned by name (LIP-20)", () => {
+    const listed = new Set(passThroughEnv());
+    // Read at scripts/lib/installer-feature-prompts.sh (`installer_select_provider`)
+    // and nowhere in packages/ or apps/, so readSet() above is structurally
+    // blind to it and its green says nothing here. Removing the name from
+    // turbo.json reddens this test and nothing else.
+    for (const name of ["MASSA_AI_INFERENCE_PROVIDER"]) {
+      const readers = execSync(`git grep -l -E '\\$\\{?${name}' -- 'scripts/**/*.sh'`, {
+        cwd: REPO_ROOT,
+      })
+        .toString()
+        .trim();
+      // Anti-vacuity: if the shell reader is gone the pin is stale, not passing.
+      expect(readers, `${name}: no shell reader found — pin is stale`).not.toBe("");
+      expect(listed.has(name), `${name} missing from tasks.test.passThroughEnv`).toBe(true);
+    }
   });
 
   test("sentinel vars XP-04/XP-10 depend on are present", () => {

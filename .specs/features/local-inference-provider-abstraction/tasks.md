@@ -1224,6 +1224,80 @@ T24                   (independent; spec/tasks/shell only)
 T25                   last, then re-verification
 ```
 
+## Phase 8 landed — T23 (G5, G8, G10), and the T22 re-verification
+
+**T22 re-measured rather than accepted** (`1d5d3489`). Gate re-run here, not
+transcribed from the task report: `apps/mcp-client` **13/13 isolation groups
+PASS**, `apps/opencode-plugin` **166 pass / 0 fail across 9 files**. The gate
+first came back red with **7 groups failing on `DATABASE_URL is required and
+must be a PostgreSQL URL`** — this worktree has **no `.env`**, which is
+provisioning, not the feature; re-run with `DATABASE_URL` exported, all 13
+pass. T22's own discriminating check was then induced: deleting both
+`config.llm.baseUrl =` writes gives **mcp-client 30/2** and **opencode 25/2**,
+both failing with `Expected: "http://localhost:1234/v1" / Received:
+"http://localhost:11434/v1"` — the exact defect LIP-09 names, on the repaired
+assertion that the old substring check could not see. Restored from file copy;
+sha256 matches, `git status --porcelain` empty. G6's claim was checked rather
+than read: `refuseOnDimensionMismatch` really exists
+(`packages/core/src/services/embeddings/index.ts:155`, called at `:215` and
+`:250`), and the bash degraded arm's literal `2560` was already recorded as a
+bounded degradation with its condition named
+(`scripts/lib/installer-api-key.sh:136-148`), so G6 is closed on both dialects.
+
+**G5 — LIP-08 now has a live sensor, and it kills M9.**
+`packages/core/src/__tests__/lmstudio-embedding-live.test.ts`. Measured live
+against LM Studio on `:1234`: `[lmstudio] Provider ready (model:
+text-embedding-nomic-embed-text-v1.5, dimensions: 768)`, `embedQuery` returned
+a vector of length **768**, not zero-filled — **2 pass / 0 fail, 9 expect()
+calls**, the live case executed rather than skipped. It embeds *through the
+alias* (`createEmbeddingProvider({provider:"lmstudio"})` → `provider:"custom"`
+→ `createOpenAI`), which is what LIP-08's AC is about and what LIP-04's raw
+`fetch` bypasses. `XDG_CONFIG_HOME` is redirected to a scratch dir **before**
+the dynamic core import, because `embeddings/config.ts` builds its table in
+module-level IIFEs from `loadConfigSafe()`; without it a developer config
+selecting LM Studio would override the very defaults under test.
+**Observed red:** **M9** re-induced — lmstudio `knownDimensions` 768 → 1024 in
+the *resolved* artifact `packages/shared/dist/config/inference-providers.js`
+(the export map sends `@massa-ai/shared/inference-providers` to `dist/`, the
+harness defect the verifier recorded) — **0 pass / 2 fail**. M9 survived the
+verification gate at `inference-probe` 9/0 + `llm-client` 59/0 because *no
+runtime consumer sensed the width*; it now has one. Restored from file copy,
+sha256 `4c8474f1…` matches.
+
+**G8 — `MASSA_AI_INFERENCE_PROVIDER` allowlisted, and the guard widening
+measured and rejected.** Added to `turbo.json` → `tasks.test.passThroughEnv`
+and to `.env.example`. T23 suggested widening
+`turbo-passthrough-env.test.ts` to scan `scripts/**/*.sh`; **measured, that is
+the wrong sensor**: 58 shell files read **27** distinct `MASSA_AI_*` names
+without assigning them and **25 of the 27** are absent from the allowlist —
+installer internals (`MASSA_AI_INSTALLER_TEST_*`, `MASSA_AI_PG_ROLE`,
+`MASSA_AI_PLUGIN_SOURCE`, …) that turbo has no reason to forward, because
+turbo never dispatches the shell suites at all (they run under the root-level
+`test:scripts`, outside the `packages/*` / `apps/*` globs). A shell-wide scan
+would redden on 25 pre-existing names while proving nothing. The name is
+instead pinned by the file's own established sentinel pattern, with an
+anti-vacuity arm that fails if the shell reader ever disappears.
+**Observed red:** removing the one line from `turbo.json` → **3 pass / 1
+fail**, `MASSA_AI_INFERENCE_PROVIDER missing from tasks.test.passThroughEnv`.
+Restored from file copy.
+
+**G10 — both `WRITABLE_PROVIDERS` copies pinned.**
+`provider-list-parity.test.ts` now text-extracts the literal from
+`apps/mcp-client/src/config-cli.ts` and `apps/opencode-plugin/src/config-cli.ts`
+with the same `matches.length !== 1` anti-rot throw the `config-sections.ts`
+row uses, asserting membership equality against the writable union. Text-pinned
+rather than imported because the const is module-private and importing
+`config-cli.ts` would drag each app's runtime in to read one array. **7/0 →
+9/0. Observed red:** dropping `cohere` from the mcp-client copy alone →
+**8 pass / 1 fail**, naming that copy while the opencode copy stayed green.
+Restored from file copy, sha256 `f5c31cc7…` matches.
+
+**T23 gate.** `bun run lint` (oxlint) clean, exit 0. `bun run test:scripts`
+exits 1 on exactly the two **pre-existing** `install-skills CLI` failures
+(`no tools exits 2 → got='1'`; `reason is reported`) the verifier measured
+identically on `d523f06f`; no other suite fails. Working tree after every
+mutation: the five intended paths only.
+
 ---
 
 ## Test Coverage Matrix
@@ -1237,17 +1311,17 @@ T25                   last, then re-verification
 | LIP-05 | existing shell suite green unmodified + sibling suite | T11 |
 | LIP-06 | existing api-key contract round-trips + LM Studio write case | T12 |
 | LIP-07 | no `/api/version` call, no `think` key, json-schema enabled | T06 |
-| LIP-08 | live 768-length vector via the alias | T04 |
+| LIP-08 | `lmstudio-embedding-live.test.ts` — live `embedQuery` through `createEmbeddingProvider({provider:"lmstudio"})` returns a non-zero 768-length vector, plus the shipped-defaults pin; kills M9 | T23 |
 | LIP-09 | config round-trip | T04, T12 |
 | LIP-10 | `system.test.ts` green unmodified + neutral siblings | T05 |
-| LIP-11 | both CLI test files assert the new provider | T13 |
+| LIP-11 | both CLI test files assert the new provider; both copies' `WRITABLE_PROVIDERS` pinned to the writable union in `provider-list-parity.test.ts` (G10) | T13, T23 |
 | LIP-12/13/16 | fixture-driven detection + menu + `die` on bad env | T11 |
 | LIP-14 | detection succeeds with `lms` off PATH | T12 |
 | LIP-15 | 4 cases: 2 read-gate, 2 write-gate | T08, T09 |
 | LIP-17 | FEATURES.md TOC links all resolve (before = after); 23-site coverage accounted for; commands executed before written, minus the written `lms` exclusion. **Not** `bun run lint` — oxlint reads no markdown | T16 |
 | LIP-18/19b | observed red on the **LM Studio** pair | T15 |
 | LIP-19 | golden regenerated + diff reviewed | T14 |
-| LIP-20 | `turbo-passthrough-env.test.ts` | T15 |
+| LIP-20 | `turbo-passthrough-env.test.ts` — the derived `process.env` scan for the three `LMSTUDIO_*` names, **plus** the bash-only sentinel pinning `MASSA_AI_INFERENCE_PROVIDER`, which that scan is structurally blind to | T15, T23 |
 | LIP-21 | `check_specs_delivered.ts` exit 0 | T18 |
 | LIP-22 | both needles figures (768 + 2560) with both observed vector lengths, in the Phase 7 landed note, plus both halves of the recorded bound — the algorithm change itself stays UNMEASURED, sensor named | T17 |
 | LIP-23 | `llm-client.test.ts:832` (`lmstudio` → entrypoint `"chat"`) and `:839` (`ollama` → `"responses"`), both asserting `lastProviderEntrypoint`; plus the live parsed-object run. **Not** `llm-client-json-schema.test.ts` — its `@ai-sdk/openai` mock has no `.chat` member and structurally cannot sense the entrypoint (G13) | done in Phase 3 (`c838837d`) |

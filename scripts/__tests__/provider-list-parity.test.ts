@@ -88,6 +88,32 @@ describe("provider list parity (LIP-01)", () => {
     expect(SELECTABLE_PROVIDERS.has("cohere")).toBe(true);
   });
 
+  // G10 — the two config-CLI copies gate `use <provider>` on a hand-edited
+  // `WRITABLE_PROVIDERS` literal that this file pinned for every *other*
+  // consumer of the same union. Unpinned, a seventh provider would leave both
+  // CLIs silently rejecting it while every assertion above stayed green.
+  // Text-pinned rather than imported for the same reason config-sections.ts
+  // is: the const is module-private, and importing config-cli.ts from here
+  // would drag each app's whole runtime in to read one array literal.
+  for (const cliPath of [
+    "apps/mcp-client/src/config-cli.ts",
+    "apps/opencode-plugin/src/config-cli.ts",
+  ]) {
+    test(`${cliPath} WRITABLE_PROVIDERS matches the writable union`, () => {
+      const text = read(cliPath);
+      const matches = [...text.matchAll(/const WRITABLE_PROVIDERS\s*=\s*\[([^\]]+)\]/g)];
+      if (matches.length !== 1) {
+        throw new Error(
+          `${cliPath}: expected exactly 1 WRITABLE_PROVIDERS match, got ${matches.length} — ` +
+            (matches.length === 0 ? "extractor rotted or const renamed" : "ambiguous match"),
+        );
+      }
+      const ids = [...matches[0]![1]!.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
+      console.log(`[parity] ${cliPath} WRITABLE_PROVIDERS: ${ids.join(", ")}`);
+      expect(sorted(ids)).toEqual(writableUnion);
+    });
+  }
+
   test("lmstudio reaches every config-writable consumer end to end", () => {
     expect(EMBEDDING_PROVIDER_IDS).toContain("lmstudio");
     expect(VALID_EMBEDDING_PROVIDERS).toContain("lmstudio");
