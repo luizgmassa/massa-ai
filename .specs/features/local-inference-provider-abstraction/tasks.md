@@ -1025,6 +1025,181 @@ accepted risk LIP-22 declares it to be, not as a clean result.
 
 ---
 
+## Phase 8 — Close the validation gaps (7 Tasks)
+
+Source of truth is `validation.md`'s ranked gap list (G1–G16), not this prose.
+The gate returned **FAIL** on 7 ACs with 4 surviving mutants; Phase 8 exists to
+clear them and re-verify. **G7 is already closed** (`e04e12d0`).
+
+Standing rule for this Phase, learned the hard way in Phase 7: a task is not
+done because its gate is green. Three of the four surviving mutants survived
+against green gates. **Every task below that adds or repairs a sensor must show
+an observed red on its own new subject**, induced deliberately and then
+reverted, with `git status --porcelain` empty afterward. Restore from a file
+copy, never `git checkout` — the tree carries other workers' uncommitted work.
+
+### T19 — `scripts/diagnose.ts` (G1)
+**Requirements:** LIP-10 (whole AC), LIP-03 (site 2 of 5)
+**Writes:** `scripts/diagnose.ts` and its test
+- `design.md:140` promised this file `probeProvider` + exact model match. It is
+  byte-unchanged over the whole feature range. Steps 1–4 still hardcode Ollama's
+  endpoint, `/api/tags`, `response.ok`, `/api/embed` and a **substring** model
+  match. Convert all four to `probeProvider` + a provider-dispatched embed shape
+  + exact match.
+- The site list was silently **re-membered**, not merely under-delivered: T10's
+  write set dropped `diagnose.ts` and added `ensure-ollama.sh`, which neither
+  spec nor design names, so LIP-03's count stayed 5 while membership changed.
+  Restore the named site; do not re-argue the count.
+- Bound worth knowing, measured: the wizard calls `bun run diagnose || echo "⚠ …"`,
+  so today an LM Studio user gets a **false red plus a warning, not a failed
+  install**. Still a broken claim on the feature's own happy path —
+  `README.md:58` says this step validates the stack.
+**Gate:** the test fails before the change and passes after; plus one run against
+a live LM Studio on `:1234` with its exit code transcribed.
+**Discriminating check:** point it at a wedged provider that returns `200` with
+an error body and observe it report unreachable — the substring/`response.ok`
+path cannot do this, which is why it is the discriminator.
+
+### T20 — the feature-induced regression + two sensor-derivation gaps (G2, G9, G11)
+**Requirements:** LIP-24's own failure shape; LIP-02 and LIP-13 residuals
+**Writes:** `packages/core/src/__tests__/health-checker-config.test.ts`,
+`packages/shared/src/config/__tests__/config-loader.test.ts`,
+`packages/core/src/__tests__/embedding-fingerprint.test.ts`
+- **G2 is a regression this feature caused on a file it never edited.** 3 pass /
+  0 fail at `d523f06f`, **1 pass / 2 fail at HEAD**. The seam moved the model
+  read from `config.getAll()` (`@massa-ai/shared`, which the test's
+  `mock.module` covers) to `loadConfigSafe()` (`@massa-ai/shared/config`, a
+  **different specifier** the mock does not cover), so both file-read cases now
+  receive the real default. `mock.module` registers by **resolved path**;
+  extend it to the second specifier. This is also the file LIP-24's accounting
+  leans on as its substitute sensor, so LIP-24's closure depends on it.
+- **G9:** LIP-02's sensor derives its consumers from real source but its *name
+  list* from a literal the test declares (`config-loader.test.ts:468`). A fourth
+  `LMSTUDIO_*` name emitted and unread escapes both tests. Derive the loop from
+  `Object.keys(getConfigForEnv(...))`.
+- **G11:** all 26 provider literals in `embedding-fingerprint.test.ts` are
+  `ollama:`. Sound by construction, unmeasured in the `lmstudio → ollama`
+  direction. One fixture with an `lmstudio:` stored fingerprint.
+**Gate:** `health-checker-config.test.ts` 3/0; the other two suites green.
+
+### T21 — LIP-18's missing LM Studio extractors (G3)
+**Requirements:** LIP-18
+**Writes:** `scripts/__tests__/embedding-defaults-parity.test.ts`
+- **The re-key landed; the extractors never did.** `PAIR_SURFACES`,
+  `MODEL_ONLY_SURFACES` and `DIMS_ONLY_SURFACES` contain **zero** LM Studio
+  entries. The file's only two `lmstudio` mentions are comments — and `:213`
+  asserts in prose that an `LMSTUDIO_EMBEDDING_MODEL/DIMENSIONS` pair "must be
+  as visible as" the Ollama one while nothing implements it. That is verbatim
+  the EDC-06 defect the file exists to prevent, on the second provider.
+- Add LM Studio rows keyed on `LMSTUDIO_EMBEDDING_(MODEL|DIMENSIONS)` and the
+  `text-embedding-nomic…` literal, with a second `referencePair()` for the LM
+  Studio pair. Keep the exactly-one rule **per provider per surface**.
+**Gate:** `bun run test:scripts`
+**Discriminating check — mandatory, and it is the whole point of this task.**
+Re-induce the three mutants that survived the verifier and observe each go red:
+**M1a** `.env.example` LM Studio dims 768→1024 (contradicting the model two
+lines above); **M10** `embeddings/config.ts` default model → bogus *and* width
+768→1536; **M13** the wizard's default LM Studio model → bogus. All three
+previously survived at parity 7/0, M10 additionally against a 116-test core
+filter. A gate never seen failing on its new subject is unquotable as a sensor
+for that subject.
+
+### T22 — `config.llm` on the LM Studio path, and the resolver wiring (G4, G6)
+**Requirements:** LIP-09; silently defeats LIP-07 and LIP-23 on this path
+**Writes:** `apps/mcp-client/src/config-cli.ts`,
+`apps/opencode-plugin/src/config-cli.ts`,
+`packages/core/src/services/embeddings/config.ts`, and their tests
+- **Both CLIs never write `config.llm` at all** — `grep -c llm` is **0** in
+  each. So `llm.baseUrl` stays on `:11434`, and `resolveInferenceSpec` matches
+  **host:port first**, returning the *ollama* spec — which re-enables the
+  `/api/version` probe and the `think:false` injection the feature gated. Write
+  `config.llm.baseUrl` in both forks' `use`/`init` LM Studio branches.
+- **The guarding test passes vacuously.** It asserts `show.out` *contains*
+  `http://localhost:1234/v1`, which `embedding.baseURL` alone already satisfies.
+  Assert the `llm.baseUrl` **field**, not a substring of the whole `show` output.
+- **G6:** `resolveModelDimensions` has **zero TypeScript production callers** —
+  `embeddings/config.ts:424` and both CLI copies fall back to a silent literal
+  `768`, and the bash degraded arm returns a literal `2560`. Either wire the
+  resolver into the runtime `lmstudio` branch, or record the literal fallbacks
+  as a deliberate bounded degradation **with the condition named**. Do not close
+  it by observing the gate is green.
+**Gate:** `cd apps/mcp-client && bun run test` · `cd apps/opencode-plugin && bun run test`
+(never bare `bun test` there — it walks the generated skills bundle and exits 2)
+**Discriminating check:** revert the `llm.baseUrl` write and observe the repaired
+test go red. The old assertion could not.
+
+### T23 — LIP-08's missing sensor, the env allowlist, and the unpinned list (G5, G8, G10)
+**Requirements:** LIP-08 (NOT COVERED), LIP-20, LIP-11 residual
+**Writes:** `turbo.json`, `.env.example`,
+`scripts/__tests__/provider-list-parity.test.ts`, one new LIP-08 test
+- **G5:** LIP-08 has no sensor and no recorded measurement — nothing embeds
+  through the `lmstudio` alias. One live test, or one recorded manual run, that
+  calls `createEmbeddingProvider` with `embedding.provider = "lmstudio"` and
+  asserts `vector.length === 768`. LM Studio is live on `:1234` serving
+  `text-embedding-nomic-embed-text-v1.5`, so this is runnable here.
+- **G8:** `MASSA_AI_INFERENCE_PROVIDER` is absent from `turbo.json`'s
+  `passThroughEnv` **and** from `.env.example` (AD-010). The mechanised guard is
+  structurally **bash-blind**, so its green proves nothing about a var read only
+  from shell — consider widening `turbo-passthrough-env.test.ts` to scan
+  `scripts/**/*.sh` for `MASSA_AI_*` reads.
+- **G10:** `WRITABLE_PROVIDERS` is a hand-edited literal in two CLI copies that
+  `provider-list-parity.test.ts` does not pin, though it pins every other
+  consumer of the same union. A seventh provider would leave both CLIs silently
+  rejecting it, green. Add both copies to the membership-equality assertion.
+**Gate:** `bun run test:scripts`
+**Discriminating check:** drop one provider from one CLI's `WRITABLE_PROVIDERS`
+and observe the membership assertion name it.
+
+### T24 — the bookkeeping the gate found wrong (G12, G13, G14, G15, G16)
+**Requirements:** LIP-19b, LIP-22, LIP-23, LIP-14 hygiene, LIP-19 spec defect
+**Writes:** `spec.md`, `tasks.md`, `scripts/tests/test-lms-model-exists.sh`
+- **G14 — the one spec amendment that matters.** LIP-22's AC names
+  `bun run bench:needles`, which *structurally cannot* observe the
+  binary-quantization branch the requirement exists to measure. Strike it as the
+  sensor and name `packages/core/src/__tests__/e2e/14.needles.test.ts`. The
+  measured figures stay; what changes is which mechanism the AC demands.
+- **G13:** the matrix attributes LIP-23's sensor to
+  `llm-client-json-schema.test.ts`, which **cannot** sense the entrypoint — its
+  `@ai-sdk/openai` mock has no `.chat` member. The real sensor is
+  `llm-client.test.ts:832`/`:839`. Correct `tasks.md:1052`.
+- **G12:** LIP-19b's AC says "in the same commit"; the union was deleted in
+  `7987443d` and the extractor re-anchored in `018e1529`, four phases apart. End
+  state correct, gate never vacuous. Record as an accepted deviation or amend
+  the clause — with the reason either way.
+- **G16:** `spec.md:450` lists `config-section-coverage.test.ts` among the
+  fixtures to update. No such file exists at HEAD **or** at `d523f06f`. Strike it.
+- **G15:** two vacuous-skip guards at `test-lms-model-exists.sh:191` — reshaping
+  `lms_cli_path` silently drops all four LIP-14 assertions with no failure.
+  Contrast `:334-341`, where the same risk *is* handled with an explicit `fail`.
+  Mirror that pattern.
+**Gate:** `bash scripts/tests/test-lms-model-exists.sh`
+
+### T25 — close-out and re-verify
+**Requirements:** LIP-21
+**Writes:** `CHANGELOG.md`, `.specs/project/STATE.md`, `.specs/HANDOFF.md`,
+`.specs/project/FEATURES.json`
+- Update the `[Unreleased]` entries for what Phase 8 changed. Once T19 lands,
+  the CHANGELOG's doc-surface sentence needs revisiting again: 3 of the 6
+  unchanged surfaces were diagnose-bound and stop needing an excuse.
+- Flip `FEATURES.json` `status` to `complete` **only** when the re-verification
+  passes — it is `in_progress` on purpose.
+- Re-dispatch the verification-agent over the G1–G16 list. It is the only
+  legitimate writer of `validation.md`.
+**Gate:** `bun skills/massa-ai/scripts/check_specs_delivered.ts local-inference-provider-abstraction --root .`
+plus the four discriminating assertions recorded under T18 — the script alone
+proves tracked-and-clean, never content.
+
+### Dependencies
+
+```
+T19 ── T25            (T19 removes 3 of LIP-17's doc exceptions)
+T20, T21, T22, T23    (mutually independent; disjoint write sets)
+T24                   (independent; spec/tasks/shell only)
+T25                   last, then re-verification
+```
+
+---
+
 ## Test Coverage Matrix
 
 | Requirement | Sensor | Task |
