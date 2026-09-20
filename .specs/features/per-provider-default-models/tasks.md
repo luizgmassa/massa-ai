@@ -338,7 +338,7 @@ suite regressed). **T13 must re-anchor `referencePair()` to tolerate a derived (
 `model:`/`dimensions:` expression** — this is squarely its "re-anchor" mandate, not a narrower
 fix than its task text already implies.
 
-### T12: Repair `setup-local-first.sh`
+### T12: Repair `setup-local-first.sh` — ✅ Complete
 
 Three literal sites under two variable names (`:338`, `:339`, `:500` — the last decides whether
 LLM features get enabled at all, PDM-06 AC-3). The `:344` dedup guard
@@ -350,7 +350,59 @@ Tests: test-setup-local-first-api-key.sh and test-lms-model-exists.sh against th
 Gate: bash scripts/tests/test-setup-local-first-api-key.sh && bash scripts/tests/test-lms-model-exists.sh
 Depends on: T01.
 
----
+**Execution note (2026-09-20).** Fixed a fourth site the task text's line numbers did not name:
+`:337`'s `EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:4b}"` — same conditional
+block as `:338`/`:339`, and the literal a plain `setup-local-first.sh` run actually pulls and
+writes for the embedding role (`installer_write_config` reads `EMBEDDING_MODEL` as a
+wizard-resolved global, unlike `LLM_MODEL`/`CODE_MODEL`, which `installer_provider_defaults`
+re-derives independently). Left unfixed it would have silently violated PDM-03 AC-1/P2 AC-1 for
+this installer's embedding pull. Also fixed the LM Studio branch's `:334`/`:335`
+`LLM_MODEL`/`CODE_MODEL` (`qwen/qwen3-4b-2507` for both → `qwen3-vl-8b-instruct` /
+`qwen2.5-coder-7b-instruct`) — required for the `:344` dedup-guard flip design R-09 describes to
+actually occur; leaving them at the old shared literal would have kept the guard skipping the
+second pull. `scripts/lib/installer-api-key.sh`'s `installer_provider_defaults` already carried
+the correct new ids for both providers (T08) — confirmed unaffected, not touched.
+Added `lms load -c <context> --ttl 600` per LM Studio model, reusing the already-resolved
+`$LMSTUDIO_CLI` (not a bare `command -v lms`, which misses the `~/.lmstudio/bin` case
+`lms_cli_path()` exists to handle). **Design R-09 resolved by staggering, not sizing:** a flat
+600s `--ttl` evicts an idle model instead of holding all three loaded forever, so peak residency
+tracks actual usage rather than the sum of embedding(0.6B) + instruct(8B) + coding(7B). Marked
+`ponytail:` — the 600s figure is not sized per model footprint; upgrade path is measuring real
+VRAM per model and picking a role-specific TTL (or explicit `lms unload`) if idle memory
+pressure is reported. Not executed (`lms` is not on this host's PATH; verified through the test
+harness only, per instruction).
+Added test coverage `scripts/tests/test-lms-model-exists.sh` did not have before: (1) the `:500`
+enable decision, extracted by content anchor (line numbers drift) and exercised behaviorally
+with a stubbed `inference_model_exists` — 4 cases (present/absent × default/explicit id) plus a
+literal-currency check on the `qwen3-vl:8b` fallback; (2) the `:344` dedup-guard flip, asserted
+on the LM Studio branch's actual `LLM_MODEL`/`CODE_MODEL` literals being distinct (skip→pull).
+`test-setup-local-first-api-key.sh` needed no edits — its `EMBEDDING_MODEL`/`LLM_MODEL`/
+`CODE_MODEL` values are test-supplied env overrides for `installer_write_config` (T07b/T08's
+writer), not the wizard's own default-resolution literals this task changed.
+Gate: `bash scripts/tests/test-setup-local-first-api-key.sh` → 40 pass / 0 fail (unchanged).
+`bash scripts/tests/test-lms-model-exists.sh` → 64 pass / 0 fail (up from 57 — 7 new tests).
+`bash -n scripts/setup-local-first.sh` → syntax OK.
+Observed red (file copy, restored, `git status --porcelain` clean before commit, both re-ran
+green): (1) reverted `:500`'s fallback to `qwen2.5:7b-instruct` → "the enable decision does not
+fall back to qwen3-vl:8b — retired literal or extractor rotted" (63 pass / 1 fail); (2) reverted
+the LM Studio branch's `LLM_MODEL`/`CODE_MODEL` to the shared old literal
+(`qwen/qwen3-4b-2507`/`qwen/qwen3-4b-2507`) → "the LM Studio dedup guard still skips the code
+model (qwen/qwen3-4b-2507 = qwen/qwen3-4b-2507)" (63 pass / 1 fail).
+**`bun run test:scripts` cannot currently prove any shell suite** — a compound finding beyond
+what T11's execution note already flagged. `package.json`'s `test:scripts` is
+`bun test scripts/__tests__ scripts/tests/*.test.ts && for f in scripts/tests/*.sh; do bash
+"$f" || exit 1; done`: the `&&` short-circuits on the first half's non-zero exit (the T03b-caused
+parity crash), so **none of the 37 shell suites run at all** through this composed command —
+not a subset, zero. Measured directly: `bun run test:scripts`'s own output contains no
+"LM Studio installer surface" or "setup-local-first.sh API key provisioning tests" banner line.
+Both of this task's shell suites were therefore verified by direct invocation
+(`bash scripts/tests/<file>.sh`), not through the composed script. Ran all 39 `scripts/tests/*.sh`
+directly for a full sanity net: 36 pass, 3 fail — `test-install-skills-cli.sh`,
+`test-plugin-auto-install.sh`, `test-plugin-registry-registration.sh` — all pre-existing,
+unrelated to this feature (a plugin/skills-installer host-detection issue: this host's own
+Claude install is detected where the fixtures expect it absent), none touched by this batch.
+**T13, or whoever fixes the parity-gate crash, should re-verify `test:scripts` actually reaches
+the shell suites afterward** — that repair restores more than the one crashed file's tests.
 
 ### Phase 7 — Gates
 

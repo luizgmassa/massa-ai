@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); T01-T11 + T03b complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below, W5 Phase 5 closed, W6 T03b+T11 closed), T12, T13-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b — T07b ⚠️ partial, see below), Phase 7 (T13-T15) and Phase 8 (T16-T17) pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -523,6 +523,57 @@ diagnose.ts's mutation additionally failed `diagnose.test.ts`'s own
 `dimensions:` expression in `defaultMassaAiConfig.embedding` — this is squarely its "re-anchor"
 mandate, and now blocks the whole file rather than one of its three known failing tests.
 Next: T12 (repair `setup-local-first.sh`) — depends on T01, disjoint from T11's file set.
+
+**T12 (W6) — Complete — Phase 6 closed.** `scripts/setup-local-first.sh`: fixed the task's three
+named sites (`:338`/`:339` ollama `LLM_MODEL`/`CODE_MODEL`→`qwen3-vl:8b`/unchanged; `:500`'s
+`inference_model_exists` fallback→`qwen3-vl:8b`) plus a fourth the task text's line numbers did
+not name — `:337`'s `EMBEDDING_MODEL` (`qwen3-embedding:4b`→`qwen3-embedding:0.6b`), the same
+conditional block as :338/:339 and the literal that actually reaches `installer_write_config`
+for the embedding role (`EMBEDDING_MODEL` is a wizard-resolved global that writer reads
+directly; `LLM_MODEL`/`CODE_MODEL` are independently re-derived by `installer_provider_defaults`,
+already correct from T08). Also fixed the LM Studio branch's `LLM_MODEL`/`CODE_MODEL`
+(`qwen/qwen3-4b-2507` shared → `qwen3-vl-8b-instruct`/`qwen2.5-coder-7b-instruct`), required for
+the `:344` dedup guard to actually flip skip→pull per design R-09. Added
+`"$LMSTUDIO_CLI" load -c <role context> --ttl 600` per LM Studio model (embedding 8192, instruct
+16384, coding 32768), reusing the already-resolved `LMSTUDIO_CLI` global rather than a bare
+`command -v lms` (misses the `~/.lmstudio/bin` case `lms_cli_path()` exists for).
+**Design R-09 resolved by staggering, not sizing:** `--ttl 600` evicts an idle model instead of
+holding embedding(0.6B)+instruct(8B)+coding(7B) resident forever; marked `ponytail:` — the flat
+600s figure is not measured per model, upgrade path is a role-specific TTL or explicit
+`lms unload` if idle memory pressure is reported. Not executed — `lms` is not on this host's
+PATH; verified through the test harness only.
+Added to `scripts/tests/test-lms-model-exists.sh`: the `:500` enable decision (content-anchored
+extraction, 4 behavioral cases via a stubbed `inference_model_exists` plus a literal-currency
+check) and the `:344` dedup-guard flip (asserted on the LM Studio branch's actual literals being
+distinct). `test-setup-local-first-api-key.sh` needed no changes — it tests
+`installer_write_config` with its own env-var fixtures, not this task's wizard-default literals.
+Gate: `bash scripts/tests/test-setup-local-first-api-key.sh` → 40/0 (unchanged).
+`bash scripts/tests/test-lms-model-exists.sh` → 64/0 (up from 57 — 7 new). `bash -n
+scripts/setup-local-first.sh` → syntax OK.
+Observed red, two mutations, file copy + restore, `git status --porcelain` clean before commit:
+(1) `:500` reverted to `qwen2.5:7b-instruct` → currency check failed (63/1); (2) LM Studio
+`LLM_MODEL`/`CODE_MODEL` reverted to the shared `qwen/qwen3-4b-2507` literal → dedup-guard check
+failed, printing the collapsed pair (63/1). Both restored and re-ran green.
+**Compound finding — `bun run test:scripts` cannot currently prove any of the 37 shell suites,
+retroactively including T11's own "2043 pass" figure.** Its script is
+`bun test ... && for f in scripts/tests/*.sh; do bash "$f" || exit 1; done` — the T03b-caused
+parity crash makes the first half exit 1, so the `&&` skips the shell-suite loop entirely.
+Measured: the composed run's output contains no "LM Studio installer surface" or
+"setup-local-first.sh API key provisioning tests" banner. Both of T12's gate files were verified
+by direct `bash scripts/tests/<file>.sh` invocation instead. Ran all 39 shell suites directly as
+a sanity net: 36 pass, 3 pre-existing unrelated failures (`test-install-skills-cli.sh`,
+`test-plugin-auto-install.sh`, `test-plugin-registry-registration.sh` — a plugin/skills
+host-detection issue on this machine, not touched by this batch, not part of this feature).
+**Whoever repairs the parity-gate crash (T13) should re-verify `test:scripts` reaches the shell
+suites afterward** — that repair restores far more than the one crashed file.
+Phase 6 (install and diagnostic surfaces) is closed. Batch (W6: T03b, T11, T12) complete.
+Phase-closing gate (last task in Phase 6): `bun run lint` → 0. `bun run type-check` → 0 (6/6).
+`bun run build` → 0 (6/6). `bun run test:scripts` → exit 1, 2043 pass / 0 fail / 1 error in the
+bun-test half (the T03b/T13 parity crash, unchanged by this batch); the shell-suite half did not
+run under this command per the compound finding above — verified directly instead (see T11/T12
+entries). Next: Phase 7 (T13 re-anchor and extend the parity gate — must close the crash before
+`test:scripts` can prove anything again; T14 needles surfaces; T15 the ~16 hardcoding test
+files), then Phase 8 (T16 docs, T17 close-out).
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
