@@ -44,7 +44,7 @@ repaired sensor needs an **observed red on its own subject**, induced and revert
 
 ### Phase 1 — The seam
 
-### T01: Extend `inference-providers.ts` with roles, per-provider models and mechanism
+### T01: Extend `inference-providers.ts` with roles, per-provider models and mechanism — ✅ Complete
 
 - Add `InferenceRole = "embedding" | "instruct" | "coding"`.
 - Add `INFERENCE_ROLE_DEFAULTS` — embedding 8192; instruct 16384 @ 0.2; coding 32768 @ 0.0.

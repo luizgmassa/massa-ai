@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**PLANNING COMPLETE 2026-09-20** — 8 Phases = 17 Tasks specified, designed and broken down; Execute not started by the user's explicit choice; no implementation commit exists)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 17 Tasks; T01 complete (W1, Phase 1), T02-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -37,6 +37,19 @@ ship without measuring it rather than run the LIP-22 harness at the new width.
 **Execution plan on record.** The user chose 8 workers, 5 in parallel: W1=T01 alone → W2(T02-04),
 W3(T05-06), W4(T07-08), W5(T09-10), W6(T11-12) concurrently → W7(T13-15) → W8(T16-17). Write-set
 disjointness is why T02/T03 and T05/T06 stay paired.
+
+**T01 (W1) — Complete.** `packages/shared/src/config/inference-providers.ts` gained
+`InferenceRole`, `INFERENCE_ROLE_DEFAULTS` (embedding 8192; instruct 16384@0.2; coding
+32768@0.0), and per-provider `defaultModels` (total `Record<InferenceRole,string>`),
+`appliesContextPerRequest` (ollama `true`, lmstudio `false`), `embedBatchSize` (64 both).
+`lmstudio.knownDimensions` additively gained `"text-embedding-qwen3-embedding-0.6b": 1024`,
+keeping the nomic row. No new import — zero-I/O constraint intact.
+Gate: `bun test packages/shared/src/__tests__/inference-providers.test.ts && bun run type-check`
+→ 25 pass / 0 fail, type-check 6/6. Observed red: dropping `coding` from `ollama.defaultModels`
+(with a type-cast to isolate the runtime assertion from the also-failing compile check) killed
+2 tests; separately confirmed the uncast mutation fails `tsc` with `TS2741` (AC-4). Restored via
+file copy, `git status --porcelain` clean before the commit. Next: T02 (five new config fields)
+and T03 (provider-derived instruct/coding defaults), both depend only on T01.
 
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)

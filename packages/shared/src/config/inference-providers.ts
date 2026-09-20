@@ -25,12 +25,23 @@ export interface InferenceProviderEnvNames {
 
 export type ParseModelList = (body: unknown) => string[] | null;
 
+export type InferenceRole = "embedding" | "instruct" | "coding";
+
+export const INFERENCE_ROLE_DEFAULTS = {
+  embedding: { contextWindow: 8192 },
+  instruct: { contextWindow: 16384, temperature: 0.2 },
+  coding: { contextWindow: 32768, temperature: 0.0 },
+} as const;
+
 export interface InferenceProviderSpec {
   readonly id: InferenceProviderId;
   readonly defaultEmbeddingBaseUrl: string;
   readonly defaultLlmBaseUrl: string;
   readonly envNames: InferenceProviderEnvNames;
   readonly knownDimensions: Readonly<Record<string, number>>;
+  readonly defaultModels: Readonly<Record<InferenceRole, string>>;
+  readonly appliesContextPerRequest: boolean;
+  readonly embedBatchSize: number;
   readonly supportsOllamaVersionProbe: boolean;
   readonly injectsDisableThink: boolean;
   /**
@@ -79,6 +90,13 @@ export const INFERENCE_PROVIDERS: Readonly<
       dimensions: "OLLAMA_EMBEDDING_DIMENSIONS",
     },
     knownDimensions: KNOWN_EMBEDDING_DIMENSIONS,
+    defaultModels: {
+      embedding: "qwen3-embedding:0.6b",
+      instruct: "qwen3-vl:8b",
+      coding: "qwen2.5-coder:7b",
+    },
+    appliesContextPerRequest: true,
+    embedBatchSize: 64,
     supportsOllamaVersionProbe: true,
     injectsDisableThink: true,
     requiresChatCompletionsApi: false,
@@ -95,7 +113,15 @@ export const INFERENCE_PROVIDERS: Readonly<
     },
     knownDimensions: {
       "text-embedding-nomic-embed-text-v1.5": 768,
+      "text-embedding-qwen3-embedding-0.6b": 1024,
     },
+    defaultModels: {
+      embedding: "text-embedding-qwen3-embedding-0.6b",
+      instruct: "qwen3-vl-8b-instruct",
+      coding: "qwen2.5-coder-7b-instruct",
+    },
+    appliesContextPerRequest: false,
+    embedBatchSize: 64,
     supportsOllamaVersionProbe: false,
     injectsDisableThink: false,
     requiresChatCompletionsApi: true,

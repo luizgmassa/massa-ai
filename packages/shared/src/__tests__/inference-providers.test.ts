@@ -2,9 +2,13 @@ import { describe, expect, test } from "bun:test";
 import path from "path";
 import {
   INFERENCE_PROVIDERS,
+  INFERENCE_ROLE_DEFAULTS,
   LOCAL_INFERENCE_IDS,
   inferenceProviderList,
+  type InferenceRole,
 } from "../config/inference-providers";
+
+const ROLES: InferenceRole[] = ["embedding", "instruct", "coding"];
 
 const MODULE_PATH = path.join(
   import.meta.dir,
@@ -56,6 +60,14 @@ describe("provider defaults", () => {
     ).toBe(768);
   });
 
+  test("lmstudio knownDimensions additively gains the qwen3 embedding default at 1024", () => {
+    expect(
+      INFERENCE_PROVIDERS.lmstudio.knownDimensions[
+        "text-embedding-qwen3-embedding-0.6b"
+      ],
+    ).toBe(1024);
+  });
+
   test("env names follow the OLLAMA_/LMSTUDIO_ pattern with no collisions", () => {
     const allNames = LOCAL_INFERENCE_IDS.flatMap((id) => {
       const spec = INFERENCE_PROVIDERS[id];
@@ -72,6 +84,63 @@ describe("provider defaults", () => {
       baseUrl: "LMSTUDIO_BASE_URL",
       dimensions: "LMSTUDIO_EMBEDDING_DIMENSIONS",
     });
+  });
+});
+
+describe("INFERENCE_ROLE_DEFAULTS", () => {
+  test("embedding: 8192 context, no temperature", () => {
+    expect(INFERENCE_ROLE_DEFAULTS.embedding).toEqual({ contextWindow: 8192 });
+  });
+
+  test("instruct: 16384 context at temperature 0.2", () => {
+    expect(INFERENCE_ROLE_DEFAULTS.instruct).toEqual({
+      contextWindow: 16384,
+      temperature: 0.2,
+    });
+  });
+
+  test("coding: 32768 context at temperature 0.0", () => {
+    expect(INFERENCE_ROLE_DEFAULTS.coding).toEqual({
+      contextWindow: 32768,
+      temperature: 0.0,
+    });
+  });
+});
+
+describe("per-provider defaultModels trio (PDM-01 AC-1)", () => {
+  test("ollama carries the measured trio", () => {
+    expect(INFERENCE_PROVIDERS.ollama.defaultModels).toEqual({
+      embedding: "qwen3-embedding:0.6b",
+      instruct: "qwen3-vl:8b",
+      coding: "qwen2.5-coder:7b",
+    });
+  });
+
+  test("lmstudio carries the measured trio", () => {
+    expect(INFERENCE_PROVIDERS.lmstudio.defaultModels).toEqual({
+      embedding: "text-embedding-qwen3-embedding-0.6b",
+      instruct: "qwen3-vl-8b-instruct",
+      coding: "qwen2.5-coder-7b-instruct",
+    });
+  });
+
+  test("every provider's defaultModels covers exactly the three roles (PDM-01 AC-1)", () => {
+    for (const id of LOCAL_INFERENCE_IDS) {
+      const keys = Object.keys(INFERENCE_PROVIDERS[id].defaultModels).sort();
+      expect(keys).toEqual([...ROLES].sort());
+    }
+  });
+});
+
+describe("per-provider mechanism fields", () => {
+  test("ollama applies context per request; lmstudio applies it at load time", () => {
+    expect(INFERENCE_PROVIDERS.ollama.appliesContextPerRequest).toBe(true);
+    expect(INFERENCE_PROVIDERS.lmstudio.appliesContextPerRequest).toBe(false);
+  });
+
+  test("both providers embed in batches of 64 (design R-03)", () => {
+    expect(INFERENCE_PROVIDERS.ollama.embedBatchSize).toBe(64);
+    expect(INFERENCE_PROVIDERS.lmstudio.embedBatchSize).toBe(64);
   });
 });
 
