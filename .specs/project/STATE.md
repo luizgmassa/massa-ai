@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b — T07b ⚠️ partial, see below), Phase 7 (T13-T15) and Phase 8 (T16-T17) pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), T13 of Phase 7 complete, T14-T15 and Phase 8 (T16-T17) pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -574,6 +574,88 @@ run under this command per the compound finding above — verified directly inst
 entries). Next: Phase 7 (T13 re-anchor and extend the parity gate — must close the crash before
 `test:scripts` can prove anything again; T14 needles surfaces; T15 the ~16 hardcoding test
 files), then Phase 8 (T16 docs, T17 close-out).
+
+**T13 (W7) — Complete — also flips T07b from ⚠️ Partial to ✅ Complete.** Re-anchored and extended
+`scripts/__tests__/embedding-defaults-parity.test.ts`. All four numbered defects closed:
+
+0. **Crash → declared failure.** `referencePair()`/`referencePairLmStudio()` used to run in the
+   `describe()` body; a rotted extractor threw before any `test()` ran, so the file reported
+   0/0/1-error, which reads as "no failures" to anything counting only `fail`. Both now run
+   inside their own `test()`, with dependent tests guarded (`if (!ref) throw …`) so a resolution
+   failure is a named, counted test failure, never a whole-file abort.
+1. **`config-cli.ts` extractors re-keyed to resolve the seam, not scrape a literal.** T07b replaced
+   the quoted embedding literal with `INFERENCE_PROVIDERS.<provider>.defaultModels.embedding` in
+   4 branches × 2 apps; the old regexes either threw (0 matches) or — the dangerous case —
+   silently slid past the empty branch into the next one's literal (measured:
+   `mistral-embed`/1024 reported as the ollama pair). New structural tier (`DERIVED_SURFACES`,
+   `checkStructural`) requires the exact derivation expression, bounded per branch with a
+   `(?:(?!\} else)[\s\S])*?` lookahead so a missing/reverted derivation is a declared 0-match on
+   its own branch — it can never read as a match from a sibling branch again.
+2. **`referencePairLmStudio()` re-anchored by key.** Replaced the brace-position regex
+   (`knownDimensions` entry #1) with a direct import of `INFERENCE_PROVIDERS` and a by-key
+   `knownDimensions[defaultModels.embedding]` lookup — position-independent by construction.
+3. **`referencePair()` re-anchored on the resolved value, not text.** Imports
+   `defaultMassaAiConfig` directly and reads `.embedding.model`/`.dimensions` — tolerates T03b's
+   derived (non-literal) expression because it reads the *evaluated* value, not the source text.
+
+**Two production gaps the repaired gate found and closed (T11/T12 misses, one-line fixes each,
+same shape as the sibling literal 4 lines away in every case):** `.env.example`'s commented LM
+Studio pair and `scripts/setup-local-first.sh`'s LM Studio `EMBEDDING_MODEL` fallback still said
+nomic/768 (never swept — `setup-local-first.sh` isn't in T11's file list and T12 touched adjacent
+lines, not this one); `scripts/lib/installer-api-key.sh`'s no-bun/no-checkout dims fallback still
+said `2560`; `packages/core/src/services/embeddings/config.ts`'s ollama AND lmstudio branches
+still had `"qwen3-embedding:4b"`/`"text-embedding-nomic-embed-text-v1.5"` literal fallbacks
+(dead code in the ollama case — `loadConfigSafe()` always folds in the default, so `file?.model`
+is never actually undefined — but real drift text `referencePair()`'s own pre-existing
+cross-check assertion is designed to catch); `scripts/diagnose.ts`'s lmstudio `DEFAULT_MODEL` row
+(and its mirror assertion in `scripts/__tests__/diagnose.test.ts`, fixed in the same commit since
+T13's own production fix caused that one assertion to go red). All six mirror an already-derived
+or already-corrected sibling line in the same file/table — no new design decisions.
+
+**Silent-wrong-match, proven closed.** Reverted `apps/mcp-client/src/config-cli.ts`'s `use ollama`
+branch to a literal `"qwen3-embedding:4b"` (file copy, restored after): `DERIVED_SURFACES`
+reported `apps/mcp-client/src/config-cli.ts (use ollama, embedding model): expected exactly 1
+structural match … got 0`, and "the ollama default is one pair across every writer of it"
+reported `undefined/knownEmbeddingDimensions(model) vs INFERENCE_PROVIDERS.ollama.defaultModels.
+embedding/…` — the mcp-client side reports `undefined`, not a slide into the mistral branch's
+`mistral-embed` literal (the pre-fix defect).
+
+**New tiers added, each with an observed red (file copy, restored, `git status --porcelain`
+clean before commit, re-ran green):** `DERIVED_SURFACES` (20 structural checks, +2 for
+`embeddings/config.ts`'s lmstudio branch = 24) — red via the mutation above. Instruct/coding
+tier (`INSTRUCT_CODING_SURFACES`, 8 rows, seam-value-derived expectations, no hand-duplicated
+literals) — red by mutating `install.sh`'s `llm_model` literal (named single-match violation) and
+by mutating one of `setup-local-first.sh`'s two `MASSA_AI_LLM_MODEL:-` matches away (declared
+"expected exactly 2 match(es) … got 1", proving the two-branch case is a declared count, not an
+`extractOne` throw). Narrow Markdown tier (7 known docs + `.specs/`/`CHANGELOG.md` excluded +
+1 dated benchmark report excluded as historical, mirroring the fixtures already excluded by
+design) — red by adding a scratch `docs/SCRATCH-PARITY-TEST.md` mentioning `qwen3-vl:8b` (named
+offender), reverted. Width-only surface (`installer-api-key.sh` dims fallback) — red by reverting
+`1024` to `2560`.
+
+`KNOWN_WIDTH_WRITERS` (pre-existing Tier-3 completeness scan, mechanism unchanged) dropped
+`packages/shared/src/config/massa-ai-config.ts`: T03b's `dimensions: knownEmbeddingDimensions(…)
+?? 768` is no longer a `dimensions: <digit>` literal anywhere in that file, so it legitimately
+stopped matching the scan's trigger — documented as a measured fact, not a silent narrowing.
+
+Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → **14 pass / 0 fail** (was
+0/0/1-error). `bun run lint` → 0. `bun run type-check` → 6/6. `bun run build` → 6/6 (core +
+shared `tsc` clean). Collateral suites re-verified green: `bun test apps/mcp-client/src/__tests__/
+config-cli.test.ts` 35/35, `apps/opencode-plugin/src/__tests__/config-cli.test.ts` 31/31,
+`scripts/__tests__/diagnose.test.ts` 33/33, `scripts/__tests__/installer-config-template.test.ts`
+34/34, `scripts/__tests__/provider-list-parity.test.ts` (unaffected) all green,
+`test-setup-local-first-api-key.sh` 40/0, `test-lms-model-exists.sh` 64/0.
+
+**Two pre-existing, out-of-batch findings for T15 (not fixed here — production-code fixes above
+are the T13 boundary; these are `*.test.ts` files T15 owns):**
+`packages/core/src/__tests__/lmstudio-embedding-live.test.ts` still asserts the retired
+nomic/768 pair (design's own Reuse Plan says "retarget 768 → 1024", but no task claimed it) —
+2 failures measured live (LM Studio reachable on this host). `packages/core/src/__tests__/
+embeddings-config-file-layer.test.ts`'s "no config file → literal defaults, ollama first" case
+still asserts `qwen3-embedding:4b`. Both are exactly R-07's invisible-to-the-gate class.
+
+Next: T14 (needles surfaces), then T15 (repoint the ~16 test files, including the two named
+above).
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 

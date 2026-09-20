@@ -150,7 +150,7 @@ installer_resolve_embedding_dimensions() {
      || [ -z "$repo_root" ] \
      || ! command -v bun >/dev/null 2>&1 \
      || [ ! -f "${repo_root}/packages/shared/src/config/embedding-dimensions.ts" ]; then
-    echo "${OLLAMA_EMBEDDING_DIMENSIONS:-2560}"
+    echo "${OLLAMA_EMBEDDING_DIMENSIONS:-1024}"
     return 0
   fi
 

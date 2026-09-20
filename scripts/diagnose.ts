@@ -126,7 +126,7 @@ export function resolveProviderBaseUrl(
 
 const DEFAULT_MODEL: Readonly<Record<InferenceProviderId, string>> = {
   ollama: "qwen3-embedding:0.6b",
-  lmstudio: "text-embedding-nomic-embed-text-v1.5",
+  lmstudio: "text-embedding-qwen3-embedding-0.6b",
 };
 
 export function resolveModelName(

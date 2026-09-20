@@ -330,7 +330,7 @@ ensure_inference_model() {
 # the defaults are too. The LM Studio values are the ones measured for this
 # feature; the env overrides keep their existing names.
 if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
-    EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
+    EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-qwen3-embedding-0.6b}"
     LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
     CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
 else

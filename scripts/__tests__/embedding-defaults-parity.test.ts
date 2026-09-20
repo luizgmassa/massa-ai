@@ -33,6 +33,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { defaultMassaAiConfig } from "../../packages/shared/src/config/massa-ai-config";
+import { INFERENCE_PROVIDERS } from "../../packages/shared/src/config/inference-providers";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -48,68 +50,78 @@ function extractOne(surface: string, text: string, re: RegExp): string {
   return matches[0];
 }
 
-// ── Reference pair: the runtime defaults, from both defining modules ────────
-function referencePair(): { model: string; dims: string } {
-  const shared = read("packages/shared/src/config/massa-ai-config.ts");
-  // Two `embedding:` blocks exist (the `MassaAiConfig` interface, and
-  // `defaultMassaAiConfig`'s literal defaults). LIP-01 changed the
-  // interface's `provider` field from a hand-written string union to
-  // `(typeof EMBEDDING_PROVIDER_IDS)[number]` — a derived type reference,
-  // not a union of string literals — so the discriminator is no longer
-  // "literal vs. union". It still works: the interface's `embedding:` block
-  // never contains the literal substring `provider: "ollama",` (it names a
-  // type, not a value), so only `defaultMassaAiConfig`'s block — which
-  // assigns the literal default — can ever satisfy this pattern. Re-anchored
-  // on that literal-value match rather than on the now-nonexistent union
-  // (LIP-19b).
-  const embeddingBlock = extractOne(
-    "massa-ai-config.ts embedding defaults block",
-    shared,
-    /embedding:\s*(\{[^}]*provider:\s*"ollama",[^}]*\})/g,
-  );
-  const model = extractOne("massa-ai-config.ts model", embeddingBlock, /model:\s*"([^"]+)"/g);
-  const dims = extractOne("massa-ai-config.ts dimensions", embeddingBlock, /dimensions:\s*(\d+)/g);
+/**
+ * A structural surface asserts that a TS writer still delegates to the seam
+ * expression named in `expected`, bounded to its own branch so a missing
+ * derivation can never be reported as a match from a sibling branch.
+ */
+interface StructuralSurface {
+  file: string;
+  label: string;
+  pattern: RegExp;
+  expected: string;
+}
 
-  // Second defining module must agree — a drift between the two reference
-  // sources is itself a defect this test should catch.
-  //
-  // That module used to be `embeddings/config.ts`, keyed on its `?? <dims>`
-  // literal. The literal is gone: the ollama width now resolves through
-  // `resolveEmbeddingDimensions`, so config.ts names no width at all and the
-  // canonical model→width statement moved to `embedding-dimensions.ts`. A
-  // repoint rather than a relaxation — a sweep whose anchor its own subject
-  // deleted reports a clean population it can no longer see, so this asserts
-  // against the table that now holds the fact.
-  const table = read("packages/shared/src/config/embedding-dimensions.ts");
-  expect(table).toContain(`"${model}": ${dims}`);
-  // config.ts must still name the model default even though it no longer
-  // names a width, so a model change there cannot pass unnoticed.
-  const core = read("packages/core/src/services/embeddings/config.ts");
-  expect(core).toContain(`"${model}"`);
+function checkStructural(s: StructuralSurface): string | null {
+  const text = read(s.file);
+  const matches = [...text.matchAll(s.pattern)].map((m) => m[1]!);
+  if (matches.length !== 1) {
+    return (
+      `${s.label}: expected exactly 1 structural match for ${s.pattern}, got ${matches.length} — ` +
+      (matches.length === 0
+        ? "seam derivation missing, reverted to a literal, or extractor rotted"
+        : `ambiguous: ${matches.join(", ")}`)
+    );
+  }
+  if (matches[0] !== s.expected) {
+    return `${s.label}: derivation=${matches[0]} (want ${s.expected})`;
+  }
+  return null;
+}
+
+interface MultiMatchRow {
+  file: string;
+  label: string;
+  pattern: RegExp;
+  expected: string[];
+}
+
+function checkMultiMatch(row: MultiMatchRow): string[] {
+  const text = read(row.file);
+  const matches = [...text.matchAll(row.pattern)].map((m) => m[1]!);
+  if (matches.length !== row.expected.length) {
+    throw new Error(
+      `${row.label}: expected exactly ${row.expected.length} match(es) for ${row.pattern}, got ${matches.length} — ` +
+        (matches.length === 0 ? "extractor rotted or surface removed" : `got: ${matches.join(", ")}`),
+    );
+  }
+  const violations: string[] = [];
+  matches.forEach((val, i) => {
+    if (val !== row.expected[i]) {
+      violations.push(`${row.label} match #${i + 1}: got ${val}, want ${row.expected[i]}`);
+    }
+  });
+  return violations;
+}
+
+// ── Reference pair: the runtime defaults, from both defining modules ────────
+// Re-anchored (T13) on the real, resolved value from the seam-derived config
+// template instead of scraping `model:`/`dimensions:` as quoted-literal text
+// — T03b made that block a property-access expression with no literal at
+// that position, which is what made the old text-based extractor throw.
+function referencePair(): { model: string; dims: string } {
+  const model = defaultMassaAiConfig.embedding.model;
+  const dims = String(defaultMassaAiConfig.embedding.dimensions);
   return { model, dims };
 }
 
 // ── Reference pair, LM Studio (T21/G3/LIP-18) ───────────────────────────────
-// LM Studio is opt-in, never the shipped default, so it has no counterpart to
-// `massa-ai-config.ts`'s `defaultMassaAiConfig` block to anchor on. Its one
-// canonical model/width fact lives in the seam's own literal table —
-// `INFERENCE_PROVIDERS.lmstudio.knownDimensions` in `inference-providers.ts`
-// — which every surface below is required to restate identically. That
-// object literal is unique in the file (Ollama's `knownDimensions` is the
-// imported `KNOWN_EMBEDDING_DIMENSIONS` identifier, not a literal `{`), so
-// no further anchoring is needed to keep the match to exactly one.
+// Re-anchored (T13) on `defaultModels.embedding` with a by-key width lookup,
+// replacing the brace-anchored regex that silently returned `knownDimensions`
+// entry #1 once this feature made the table multi-entry.
 function referencePairLmStudio(): { model: string; dims: string } {
-  const seam = read("packages/shared/src/config/inference-providers.ts");
-  const model = extractOne(
-    "inference-providers.ts lmstudio reference model",
-    seam,
-    /knownDimensions:\s*\{\s*"([^"]+)":\s*\d+/g,
-  );
-  const dims = extractOne(
-    "inference-providers.ts lmstudio reference dims",
-    seam,
-    /knownDimensions:\s*\{\s*"[^"]+":\s*(\d+)/g,
-  );
+  const model = INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
+  const dims = String(INFERENCE_PROVIDERS.lmstudio.knownDimensions[model]);
   return { model, dims };
 }
 
@@ -142,22 +154,11 @@ const PAIR_SURFACES: Array<{ file: string; model: RegExp; dims: RegExp }> = [
     model: /\$\{OLLAMA_EMBEDDING_MODEL:-([^}]+)\}/g,
     dims: /\$\{OLLAMA_EMBEDDING_DIMENSIONS:-(\d+)\}/g,
   },
-  {
-    // `massa-ai-config use ollama` writes a literal pair into config.json.
-    // Three provider branches share the `options.model || "…"` shape; the
-    // extractors anchor inside the ollama branch only.
-    file: "apps/mcp-client/src/config-cli.ts",
-    model: /provider === "ollama"\) \{[\s\S]*?model: \(options\.model as string\) \|\| "([^"]+)"/g,
-    dims: /provider === "ollama"\) \{[\s\S]*?dimensions:\s*(\d+)/g,
-  },
-  {
-    // The second config CLI. The 2026-08 sweep corrected the mcp-client copy
-    // above and left this one on nomic-embed-text/768, so which model
-    // `massa-ai-config use ollama` wrote depended on which CLI you ran.
-    file: "apps/opencode-plugin/src/config-cli.ts",
-    model: /provider === "ollama"\) \{[\s\S]*?model: \(options\.model as string\) \|\| "([^"]+)"/g,
-    dims: /provider === "ollama"\) \{[\s\S]*?dimensions:\s*(\d+)/g,
-  },
+  // `apps/mcp-client/src/config-cli.ts` and `apps/opencode-plugin/src/config-cli.ts`
+  // used to carry a quoted literal here (`massa-ai-config use ollama`). T07b
+  // replaced it with `INFERENCE_PROVIDERS.ollama.defaultModels.embedding` — a
+  // property-access expression, not a literal — so those two surfaces moved
+  // to the structural `DERIVED_SURFACES` tier below (T13).
 ];
 
 const MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
@@ -203,35 +204,12 @@ const LMSTUDIO_PAIR_SURFACES: Array<{ file: string; label?: string; model: RegEx
     model: /^#LMSTUDIO_EMBEDDING_MODEL=(\S+)/gm,
     dims: /^#LMSTUDIO_EMBEDDING_DIMENSIONS=(\d+)/gm,
   },
-  {
-    file: "packages/core/src/services/embeddings/config.ts",
-    model: /process\.env\.LMSTUDIO_EMBEDDING_MODEL \|\| file\?\.model \|\| "([^"]+)"/g,
-    dims: /LMSTUDIO_EMBEDDING_DIMENSIONS[\s\S]*?\|\|\s*(\d+),/g,
-  },
-  {
-    file: "apps/mcp-client/src/config-cli.ts",
-    label: "apps/mcp-client/src/config-cli.ts (init --lmstudio)",
-    model: /options\.lmstudio\) \{[\s\S]*?const model = "([^"]+)"/g,
-    dims: /options\.lmstudio\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
-  },
-  {
-    file: "apps/mcp-client/src/config-cli.ts",
-    label: "apps/mcp-client/src/config-cli.ts (use lmstudio)",
-    model: /provider === "lmstudio"\) \{[\s\S]*?model = \(options\.model as string\) \|\| "([^"]+)"/g,
-    dims: /provider === "lmstudio"\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
-  },
-  {
-    file: "apps/opencode-plugin/src/config-cli.ts",
-    label: "apps/opencode-plugin/src/config-cli.ts (init --lmstudio)",
-    model: /options\.lmstudio\) \{[\s\S]*?const model = "([^"]+)"/g,
-    dims: /options\.lmstudio\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
-  },
-  {
-    file: "apps/opencode-plugin/src/config-cli.ts",
-    label: "apps/opencode-plugin/src/config-cli.ts (use lmstudio)",
-    model: /provider === "lmstudio"\) \{[\s\S]*?model = \(options\.model as string\) \|\| "([^"]+)"/g,
-    dims: /provider === "lmstudio"\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
-  },
+  // `packages/core/src/services/embeddings/config.ts`'s lmstudio branch used
+  // to carry a quoted literal model and a `768` last-resort dims fallback
+  // here too. The model now derives from the seam (T13, mirroring its ollama
+  // sibling), and the dims fallback was never the reference width in the
+  // first place — it fires only for a model the by-key table does not
+  // recognize, so both moved to the structural `DERIVED_SURFACES` tier below.
 ];
 
 /** `install.sh`/`Dockerfile`/`docker-compose.yml`/`setup-ollama-wsl.sh`/
@@ -245,11 +223,208 @@ const LMSTUDIO_MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
   { file: "scripts/diagnose.ts", model: /^ {2}lmstudio: "([^"]+)",$/gm },
 ];
 
-describe("embedding defaults parity (EDC-06)", () => {
-  const ref = referencePair();
-  const refLm = referencePairLmStudio();
+// ── Derived (structural) surfaces (T13) ─────────────────────────────────────
+// The four config-cli.ts embedding branches, plus their LM Studio
+// instruct/coding assignments, no longer carry a quoted literal — T07b
+// re-derived them from the seam. Each pattern is bounded to its own
+// `if (...) { ... }`/`} else if (...) { ... }` branch with a `(?!\} else)`
+// lookahead so a missing or reverted derivation is reported as a 0-match
+// failure on its own branch, never a silent match against a sibling
+// branch's unrelated literal (the `mistral-embed`/1024 defect this
+// re-anchor closes).
+const CONFIG_CLI_FILES = ["apps/mcp-client/src/config-cli.ts", "apps/opencode-plugin/src/config-cli.ts"];
+const BOUND = "(?:(?!\\} else)[\\s\\S])*?";
 
-  test(`every pair surface carries the reference pair ${ref.model}/${ref.dims}`, () => {
+const DERIVED_SURFACES: StructuralSurface[] = CONFIG_CLI_FILES.flatMap((file) => [
+  {
+    file,
+    label: `${file} (init --lmstudio, embedding model)`,
+    pattern: new RegExp(`options\\.lmstudio\\) \\{${BOUND}const model = (INFERENCE_PROVIDERS\\.lmstudio\\.defaultModels\\.embedding);`, "g"),
+    expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding",
+  },
+  {
+    file,
+    label: `${file} (init --lmstudio, embedding dims)`,
+    pattern: new RegExp(`options\\.lmstudio\\) \\{${BOUND}dimensions:\\s*(INFERENCE_PROVIDERS\\.lmstudio\\.knownDimensions\\[model\\])\\s*\\?\\?\\s*\\d+,`, "g"),
+    expected: "INFERENCE_PROVIDERS.lmstudio.knownDimensions[model]",
+  },
+  {
+    file,
+    label: `${file} (init --lmstudio, instruct)`,
+    pattern: new RegExp(`options\\.lmstudio\\) \\{${BOUND}config\\.llm\\.model = (INFERENCE_PROVIDERS\\.lmstudio\\.defaultModels\\.instruct);`, "g"),
+    expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct",
+  },
+  {
+    file,
+    label: `${file} (init --lmstudio, coding)`,
+    pattern: new RegExp(`options\\.lmstudio\\) \\{${BOUND}config\\.llm\\.codeModel = (INFERENCE_PROVIDERS\\.lmstudio\\.defaultModels\\.coding);`, "g"),
+    expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.coding",
+  },
+  {
+    file,
+    label: `${file} (use ollama, embedding model)`,
+    pattern: new RegExp(`provider === "ollama"\\) \\{${BOUND}const model = \\(options\\.model as string\\) \\|\\| (INFERENCE_PROVIDERS\\.ollama\\.defaultModels\\.embedding);`, "g"),
+    expected: "INFERENCE_PROVIDERS.ollama.defaultModels.embedding",
+  },
+  {
+    file,
+    label: `${file} (use ollama, embedding dims)`,
+    pattern: new RegExp(`provider === "ollama"\\) \\{${BOUND}dimensions:\\s*(knownEmbeddingDimensions\\(model\\))\\s*\\?\\?\\s*\\d+,`, "g"),
+    expected: "knownEmbeddingDimensions(model)",
+  },
+  {
+    file,
+    label: `${file} (use lmstudio, embedding model)`,
+    pattern: new RegExp(`provider === "lmstudio"\\) \\{${BOUND}const model = \\(options\\.model as string\\) \\|\\| (INFERENCE_PROVIDERS\\.lmstudio\\.defaultModels\\.embedding);`, "g"),
+    expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding",
+  },
+  {
+    file,
+    label: `${file} (use lmstudio, embedding dims)`,
+    pattern: new RegExp(`provider === "lmstudio"\\) \\{${BOUND}dimensions:\\s*(INFERENCE_PROVIDERS\\.lmstudio\\.knownDimensions\\[model\\])\\s*\\?\\?\\s*\\d+,`, "g"),
+    expected: "INFERENCE_PROVIDERS.lmstudio.knownDimensions[model]",
+  },
+  {
+    file,
+    label: `${file} (use lmstudio, instruct)`,
+    pattern: new RegExp(`provider === "lmstudio"\\) \\{${BOUND}config\\.llm\\.model = (INFERENCE_PROVIDERS\\.lmstudio\\.defaultModels\\.instruct);`, "g"),
+    expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct",
+  },
+  {
+    file,
+    label: `${file} (use lmstudio, coding)`,
+    pattern: new RegExp(`provider === "lmstudio"\\) \\{${BOUND}config\\.llm\\.codeModel = (INFERENCE_PROVIDERS\\.lmstudio\\.defaultModels\\.coding);`, "g"),
+    expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.coding",
+  },
+  {
+    file: "packages/core/src/services/embeddings/config.ts",
+    label: "packages/core/src/services/embeddings/config.ts (lmstudio, embedding model)",
+    pattern: /LMSTUDIO_EMBEDDING_MODEL \|\| file\?\.model \|\| (INFERENCE_PROVIDERS\.lmstudio\.defaultModels\.embedding);/g,
+    expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding",
+  },
+  {
+    file: "packages/core/src/services/embeddings/config.ts",
+    label: "packages/core/src/services/embeddings/config.ts (lmstudio, embedding dims by-key lookup)",
+    pattern: /file\?\.dimensions \|\|\s*\n\s*(INFERENCE_PROVIDERS\.lmstudio\.knownDimensions\[model\]) \|\|/g,
+    expected: "INFERENCE_PROVIDERS.lmstudio.knownDimensions[model]",
+  },
+]);
+
+// ── Instruct/coding tiers (T13/P1 "the parity gate covers all three roles") ─
+// Bash/env surfaces cannot import the seam, so instruct/coding stay literal
+// there and are checked by value against the seam's real resolved defaults.
+// `setup-local-first.sh` and `installer-api-key.sh` each state BOTH
+// providers' literal in one file (LM Studio branch first in source order),
+// so a naive single-occurrence extractor sees two matches — declared here as
+// an explicit expected two-element array instead of an `extractOne` throw.
+const INSTRUCT_CODING_SURFACES: MultiMatchRow[] = [
+  {
+    file: "install.sh",
+    label: "install.sh (instruct)",
+    pattern: /local llm_model="([^"]+)"/g,
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.instruct],
+  },
+  {
+    file: "install.sh",
+    label: "install.sh (coding)",
+    pattern: /local llm_code_model="([^"]+)"/g,
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.coding],
+  },
+  {
+    file: ".env.example",
+    label: ".env.example (instruct)",
+    pattern: /^MASSA_AI_LLM_MODEL=(\S+)$/gm,
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.instruct],
+  },
+  {
+    file: ".env.example",
+    label: ".env.example (coding)",
+    pattern: /^MASSA_AI_LLM_CODE_MODEL=(\S+)$/gm,
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.coding],
+  },
+  {
+    file: "scripts/lib/installer-api-key.sh",
+    label: "installer-api-key.sh installer_provider_defaults (instruct)",
+    pattern: /LLM_MODEL="([^"]+)"/g,
+    expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct, INFERENCE_PROVIDERS.ollama.defaultModels.instruct],
+  },
+  {
+    file: "scripts/lib/installer-api-key.sh",
+    label: "installer-api-key.sh installer_provider_defaults (coding)",
+    pattern: /CODE_MODEL="([^"]+)"/g,
+    expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.coding, INFERENCE_PROVIDERS.ollama.defaultModels.coding],
+  },
+  {
+    file: "scripts/setup-local-first.sh",
+    label: "setup-local-first.sh provider branches (instruct)",
+    pattern: /\$\{MASSA_AI_LLM_MODEL:-([^}]+)\}/g,
+    expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct, INFERENCE_PROVIDERS.ollama.defaultModels.instruct],
+  },
+  {
+    file: "scripts/setup-local-first.sh",
+    label: "setup-local-first.sh provider branches (coding)",
+    pattern: /\$\{MASSA_AI_LLM_CODE_MODEL:-([^}]+)\}/g,
+    expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.coding, INFERENCE_PROVIDERS.ollama.defaultModels.coding],
+  },
+];
+
+// ── Narrow Markdown tier (T13/R-06) ─────────────────────────────────────────
+// Tier 3's completeness scans never reach `.md` files at all (their file-type
+// filter excludes them), and widening that filter would sweep in `.specs/`
+// history the design explicitly must not touch (R-06). This tier is a
+// separate, narrow completeness scan over Markdown only: any tracked `.md`
+// file that mentions an embedding or instruct/coding model default must be
+// one of the 7 named docs (T16's write set), `.specs/`, or `CHANGELOG.md`
+// (append-only history, excluded by design), or a dated benchmark report
+// recording a past run rather than stating a current default.
+const KNOWN_MARKDOWN_SURFACES = [
+  "README.md",
+  "FEATURES.md",
+  "docs/CHEATSHEET.md",
+  "docs/ONBOARDING.md",
+  "apps/tools-api/OLLAMA_WSL_SETUP.md",
+  "benchmarks/llm-judge/README.md",
+  "benchmarks/needles/README.md",
+];
+const MARKDOWN_ALLOWED_PREFIXES = [".specs/", "CHANGELOG.md"];
+// Dated benchmark run outputs, not default declarations — same historical
+// class as `benchmarks/llm-judge/fixtures/known-{dup,distinct}.json` (design
+// § Must NOT change).
+const MARKDOWN_HISTORICAL_REPORTS = ["benchmarks/llm-judge/reports/llm-judge-baseline.md"];
+const MARKDOWN_MODEL_TOKEN = /qwen3-embedding|qwen3-vl|qwen2\.5-coder|text-embedding-qwen3-embedding/;
+
+describe("embedding defaults parity (EDC-06)", () => {
+  let ref: { model: string; dims: string } | undefined;
+  let refLm: { model: string; dims: string } | undefined;
+
+  test("reference pair resolves (ollama) and agrees across defining modules", () => {
+    // Kept inside a test (T13) so a rotted or removed reference throws a
+    // named, counted test failure instead of crashing the whole file from
+    // the describe() body before any test runs.
+    ref = referencePair();
+    expect(ref.model.length).toBeGreaterThan(0);
+    expect(Number(ref.dims)).toBeGreaterThan(0);
+    const table = read("packages/shared/src/config/embedding-dimensions.ts");
+    expect(table).toContain(`"${ref.model}": ${ref.dims}`);
+    // `embeddings/config.ts` used to restate the model as a quoted literal
+    // fallback; it now derives it from the same seam property `ref` itself
+    // reads, so the check follows (T13) — a model change there still cannot
+    // pass unnoticed, because reverting to any other literal or expression
+    // makes this fail.
+    const core = read("packages/core/src/services/embeddings/config.ts");
+    expect(core).toContain(`INFERENCE_PROVIDERS.ollama.defaultModels.embedding`);
+    console.log(`[parity] reference pair (ollama): ${ref.model}/${ref.dims}`);
+  });
+
+  test("reference pair resolves (lmstudio)", () => {
+    refLm = referencePairLmStudio();
+    expect(refLm.model.length).toBeGreaterThan(0);
+    expect(Number(refLm.dims)).toBeGreaterThan(0);
+    console.log(`[parity] reference pair (lmstudio): ${refLm.model}/${refLm.dims}`);
+  });
+
+  test("every pair surface carries the reference pair (ollama)", () => {
+    if (!ref) throw new Error("reference pair (ollama) did not resolve — see the previous test's failure");
     // Collect-then-assert so ONE red run names EVERY violating surface
     // (spec AC-1), instead of stopping at the first.
     const violations: string[] = [];
@@ -265,6 +440,7 @@ describe("embedding defaults parity (EDC-06)", () => {
   });
 
   test("model-only surfaces carry the reference model", () => {
+    if (!ref) throw new Error("reference pair (ollama) did not resolve — see the previous test's failure");
     for (const s of MODEL_ONLY_SURFACES) {
       expect(`${s.file} model=${extractOne(s.file, read(s.file), s.model)}`).toBe(`${s.file} model=${ref.model}`);
     }
@@ -272,6 +448,7 @@ describe("embedding defaults parity (EDC-06)", () => {
   });
 
   test("width-only surfaces carry the reference width", () => {
+    if (!ref) throw new Error("reference pair (ollama) did not resolve — see the previous test's failure");
     for (const s of DIMS_ONLY_SURFACES) {
       expect(`${s.file} dims=${extractOne(s.file, read(s.file), s.dims)}`).toBe(
         `${s.file} dims=${ref.dims}`,
@@ -280,7 +457,8 @@ describe("embedding defaults parity (EDC-06)", () => {
     console.log(`[parity] width-only surfaces checked: ${DIMS_ONLY_SURFACES.length}`);
   });
 
-  test(`every LM Studio pair surface carries the reference pair ${refLm.model}/${refLm.dims}`, () => {
+  test("every LM Studio pair surface carries the reference pair", () => {
+    if (!refLm) throw new Error("reference pair (lmstudio) did not resolve — see the previous test's failure");
     // Same collect-then-assert shape as the Ollama pair test above (T21/G3):
     // one red run names every violating LM Studio surface, not just the
     // first — which is exactly what let M1a/M10/M13 hide behind each other
@@ -301,10 +479,47 @@ describe("embedding defaults parity (EDC-06)", () => {
   });
 
   test("LM Studio model-only surfaces carry the reference model", () => {
+    if (!refLm) throw new Error("reference pair (lmstudio) did not resolve — see the previous test's failure");
     for (const s of LMSTUDIO_MODEL_ONLY_SURFACES) {
       expect(`${s.file} model=${extractOne(s.file, read(s.file), s.model)}`).toBe(`${s.file} model=${refLm.model}`);
     }
     console.log(`[parity] LM Studio model-only surfaces checked: ${LMSTUDIO_MODEL_ONLY_SURFACES.length}`);
+  });
+
+  test("derived (structural) config-cli.ts surfaces still delegate to the seam", () => {
+    const violations = DERIVED_SURFACES.map(checkStructural).filter((v): v is string => v !== null);
+    console.log(`[parity] derived structural surfaces checked: ${DERIVED_SURFACES.length}`);
+    expect(violations).toEqual([]);
+  });
+
+  test("instruct/coding surfaces carry the seam's per-provider defaults", () => {
+    const violations = INSTRUCT_CODING_SURFACES.flatMap(checkMultiMatch);
+    console.log(`[parity] instruct/coding surfaces checked: ${INSTRUCT_CODING_SURFACES.length}`);
+    expect(violations).toEqual([]);
+  });
+
+  test("no unlisted Markdown file mentions an embedding/instruct/coding model default", () => {
+    const ls = Bun.spawnSync(["git", "ls-files", "*.md"], { cwd: ROOT });
+    const tracked = ls.stdout.toString().trim().split("\n").filter(Boolean);
+    const known = new Set([...KNOWN_MARKDOWN_SURFACES, ...MARKDOWN_HISTORICAL_REPORTS]);
+
+    let scanned = 0;
+    const offenders: string[] = [];
+    for (const f of tracked) {
+      if (MARKDOWN_ALLOWED_PREFIXES.some((p) => f.startsWith(p))) continue;
+      let text: string;
+      try {
+        text = read(f);
+      } catch {
+        continue;
+      }
+      if (!MARKDOWN_MODEL_TOKEN.test(text)) continue;
+      scanned++;
+      if (!known.has(f)) offenders.push(f);
+    }
+    console.log(`[parity] Markdown tier population: ${scanned} tracked .md files mention a model default`);
+    expect(scanned).toBeGreaterThan(0);
+    expect(offenders).toEqual([]);
   });
 
   /**
@@ -426,12 +641,18 @@ describe("embedding defaults parity (EDC-06)", () => {
     // no `embedding:` field, only named `InferenceProviderSpec` objects), so
     // the trigger below gained a second, narrowly-scoped alternative for the
     // `knownDimensions: { "<model>": <n> }` shape.
+    //
+    // `packages/shared/src/config/massa-ai-config.ts` left this population
+    // (T13): T03b's fix made `dimensions:` derive via `knownEmbeddingDimensions(...)
+    // ?? 768` instead of a literal digit, so `literalWidth` no longer matches
+    // that block, and no other block in the file writes a dimensions literal
+    // either. Measured absence, not an oversight — removed with this note so
+    // its disappearance is a reviewed fact, not a silent scope narrowing.
     const KNOWN_WIDTH_WRITERS = [
       "apps/mcp-client/src/config-cli.ts",
       "apps/opencode-plugin/src/config-cli.ts",
       "packages/core/src/services/embeddings/config.ts",
       "packages/shared/src/config/inference-providers.ts",
-      "packages/shared/src/config/massa-ai-config.ts",
     ];
     const allowedPrefixes = [".specs/", "docs/", "CHANGELOG.md", "FEATURES.md", "README.md"];
     const isTestFile = (f: string) => /__tests__|\.test\.ts$/.test(f);
@@ -465,22 +686,27 @@ describe("embedding defaults parity (EDC-06)", () => {
   });
 
   test("the ollama default is one pair across every writer of it", () => {
-    // The two config CLIs disagreed for a full release. Comparing them to the
-    // reference individually is what the PAIR_SURFACES loop does; comparing
-    // them to EACH OTHER is what says the surfaces are one decision.
-    const ollamaWriters = [
-      "apps/mcp-client/src/config-cli.ts",
-      "apps/opencode-plugin/src/config-cli.ts",
-    ];
+    // The two config CLIs disagreed for a full release. Comparing them to
+    // EACH OTHER (not just to the reference individually, which the
+    // DERIVED_SURFACES tier already does) is what says the surfaces are one
+    // decision. Bounded to the ollama branch with the same `(?!\} else)`
+    // lookahead as DERIVED_SURFACES (T13) — the old unbounded `[\s\S]*?` here
+    // is what let this exact test slide past an empty ollama branch into the
+    // mistral branch's literal and report `mistral-embed/1024`.
+    const ollamaWriters = CONFIG_CLI_FILES;
+    const modelRe = new RegExp(
+      `provider === "ollama"\\) \\{${BOUND}const model = \\(options\\.model as string\\) \\|\\| (INFERENCE_PROVIDERS\\.ollama\\.defaultModels\\.embedding);`,
+    );
+    const dimsRe = new RegExp(`provider === "ollama"\\) \\{${BOUND}dimensions:\\s*(knownEmbeddingDimensions\\(model\\))\\s*\\?\\?\\s*\\d+,`);
     const pairs = ollamaWriters.map((f) => {
       const text = read(f);
-      const model = /provider === "ollama"\) \{[\s\S]*?model: \(options\.model as string\) \|\| "([^"]+)"/.exec(text)?.[1];
-      const dims = /provider === "ollama"\) \{[\s\S]*?dimensions:\s*(\d+)/.exec(text)?.[1];
+      const model = modelRe.exec(text)?.[1];
+      const dims = dimsRe.exec(text)?.[1];
       return `${f} → ${model}/${dims}`;
     });
     const distinct = new Set(pairs.map((p) => p.split(" → ")[1]));
     expect(`${[...distinct].join(" vs ")} across ${pairs.length} writers`).toBe(
-      `${ref.model}/${ref.dims} across ${pairs.length} writers`,
+      `INFERENCE_PROVIDERS.ollama.defaultModels.embedding/knownEmbeddingDimensions(model) across ${pairs.length} writers`,
     );
   });
 
@@ -494,6 +720,7 @@ describe("embedding defaults parity (EDC-06)", () => {
    * config CLIs above drifted for a release.
    */
   test("the bash and TypeScript model→width tables are the same table", () => {
+    if (!ref) throw new Error("reference pair (ollama) did not resolve — see the previous test's failure");
     const shellBody = /installer_embedding_dimensions\(\)\s*\{[\s\S]*?\n\}/.exec(
       read("scripts/lib/installer-api-key.sh"),
     )?.[0];

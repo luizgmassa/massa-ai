@@ -185,7 +185,7 @@ Tests: installer-config-template executes the template function per provider bra
 Gate: bun test scripts/__tests__/installer-config-template.test.ts
 Depends on: T01.
 
-### T07b: Both config CLIs write the provider's **embedding** id and width too — ⚠️ Partial
+### T07b: Both config CLIs write the provider's **embedding** id and width too — ✅ Complete (parity clause closed by T13)
 
 **Writer fix delivered and verified**: both CLIs now derive `embedding.model` from
 `INFERENCE_PROVIDERS[provider].defaultModels.embedding` and `embedding.dimensions` by key lookup
@@ -406,7 +406,7 @@ the shell suites afterward** — that repair restores more than the one crashed 
 
 ### Phase 7 — Gates
 
-### T13: Re-anchor and extend the parity gate
+### T13: Re-anchor and extend the parity gate — ✅ Complete
 
 Re-anchor `referencePairLmStudio()` on `defaultModels.embedding` with a **by-key** width lookup —
 the current brace-anchored regex silently returns entry #1 and this feature is what makes the
@@ -451,6 +451,16 @@ by its config-cli suites, but the parity clause of its Gate line is this task's 
 Tests: one induced red per new tier and per dialect, each on its own subject, restored by file copy; plus a red proving the derived-value extractor reports a mismatch instead of silently matching an adjacent branch
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts
 Depends on: T11, T03b.
+
+**Execution note (2026-09-20).** All four numbered defects closed — see `.specs/project/STATE.md`
+for the full account. Gate: 14 pass / 0 fail (was 0 pass / 0 fail / 1 error). Also fixed six
+one-line production gaps the repaired gate exposed (T11/T12-era misses, all mirroring an
+already-corrected sibling line in the same file): `.env.example` and `setup-local-first.sh`'s LM
+Studio embedding fallback, `installer-api-key.sh`'s no-checkout dims fallback, both provider
+branches of `embeddings/config.ts`'s literal fallback, and `scripts/diagnose.ts`'s lmstudio
+`DEFAULT_MODEL` row (plus its mirror assertion in `diagnose.test.ts`). Two pre-existing test-file
+gaps left for T15: `lmstudio-embedding-live.test.ts` and `embeddings-config-file-layer.test.ts`
+still assert the retired nomic/768 and `qwen3-embedding:4b` pairs.
 
 ### T14: Repoint the needles surfaces
 
