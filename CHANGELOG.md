@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.58.0] - 2026-09-20
+
 ### Added
 
 - **LM Studio as a second local inference provider, behind a shared seam rather than a
