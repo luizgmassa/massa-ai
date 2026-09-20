@@ -46,6 +46,19 @@
  *    substituting `>Startup Contract<` back to `>Bootstrap<` reproduces the
  *    previous string **byte-for-byte** in both — so the change is that one
  *    substitution and nothing else, and the other 86 cases are untouched.
+ *
+ * 3. T09 (per-provider-default-models, PDM-13) — `renderConfig/read` and
+ *    `renderConfig/write` moved because `config-sections.ts` gained two
+ *    `embedding` fields (`contextWindow`, `batchSize`) and three `llm` fields
+ *    (`contextWindow`, `codeContextWindow`, `codeTemperature`), plus updated
+ *    `guide` text for `embedding.model`/`embedding.dimensions`/`llm.model`
+ *    (retired `qwen3-embedding:4b`/2560/`qwen2.5:7b-instruct` examples
+ *    replaced with the current defaults). Diffed before regenerating: exactly
+ *    those 2 cases changed, no case was added or dropped, and the byte
+ *    divergence in both starts immediately after `embedding.dimensions`'s
+ *    closing `</div>` (the five new field blocks) plus the three guide-text
+ *    substitutions — every other case and every byte before that point is
+ *    untouched.
  */
 
 import { describe, it, expect } from "bun:test";

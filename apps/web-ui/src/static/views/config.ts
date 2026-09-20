@@ -59,10 +59,13 @@ function getConfigFieldValue(config: Record<string, unknown>, sectionKey: string
 export interface ResolvedConfigField {
   value: unknown;
   /** True only when a real shipped default filled a gap the persisted file
-   *  left open. The 5 fields with no shipped default (`embedding.apiKey`,
-   *  `compression.prompt`, `logging.file`, `security.apiKey`,
-   *  `security.allowedExtensions`) still resolve `value: undefined` here and
-   *  render blank, exactly as before T43. */
+   *  left open. The 7 fields with no shipped default (`embedding.apiKey`,
+   *  `embedding.contextWindow`, `embedding.batchSize`, `compression.prompt`,
+   *  `logging.file`, `security.apiKey`, `security.allowedExtensions`) still
+   *  resolve `value: undefined` here and render blank, exactly as before T43
+   *  (PDM-12: the two `embedding.*` additions are deliberately absent from
+   *  `defaultMassaAiConfig.embedding` — the role-table default applies at the
+   *  consumption site instead). */
   inherited: boolean;
 }
 

@@ -238,7 +238,7 @@ Depends on: T01, T07.
 
 ### Phase 5 — Admin Portal
 
-### T09: Add the new fields to the Portal config sections
+### T09: Add the new fields to the Portal config sections — ✅ Complete
 
 `config-sections.ts` — `embedding` (`:43-52`) gains `contextWindow` + `batchSize`; `llm`
 (`:119-132`) gains `codeTemperature`, `contextWindow`, `codeContextWindow`. Update every `guide`

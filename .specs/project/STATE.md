@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 19 Tasks (T06b, T07b added mid-Execute); T01-T08, T07b complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below), T09-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 19 Tasks (T06b, T07b added mid-Execute); T01-T09 complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below), T10-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -389,6 +389,45 @@ batches — do not touch them"). Recommend T13's scope be read as covering all t
 `tasks.md` marks T07b **⚠️ Partial** rather than Complete to keep this claim honest and not silently
 excluded. Next: T09 (Admin Portal config sections) and T10 (field-level parity gate) — depends on
 T02, a disjoint write set from T07b's CLI files, unaffected by this blocker.
+
+**T09 (W5) — Complete.** `apps/web-ui/src/static/views/config-sections.ts`'s `embedding` section
+gained `contextWindow` + `batchSize` (5 → 7 fields); `llm` gained `codeTemperature`,
+`contextWindow`, `codeContextWindow` (9 → 12 fields). Updated the three `guide` strings citing a
+retired default: `embedding.model` (`qwen3-embedding:4b`/`text-embedding-nomic-embed-text-v1.5` →
+`qwen3-embedding:0.6b`/`text-embedding-qwen3-embedding-0.6b`), `embedding.dimensions` (2560 → 1024
+example), `llm.model` (`qwen2.5:7b-instruct` → `qwen3-vl:8b`/`qwen3-vl-8b-instruct`). Also
+corrected `config.ts`'s `ResolvedConfigField.inherited` docblock, which named the exact 5-field
+"no shipped default" set my two new optional `embedding.*` fields extend to 7 — a comment my own
+diff made stale, not an unrelated cleanup.
+Regenerated `fixtures/render-golden.json` (`MASSA_AI_WRITE_GOLDEN=1`): diffed old vs new first —
+predicted only `renderConfig/read`/`renderConfig/write` would move (the two cases that render
+`CONFIG_SECTIONS`), and confirmed by diff: exactly those 2 of 90 cases changed, no case added or
+dropped, divergence starts immediately after `embedding.dimensions`'s closing `</div>` (the 5 new
+field blocks) plus the 3 guide-text substitutions — logged as regeneration #3 in
+`render-golden.test.ts`'s header.
+Updated `config-forms.test.ts`: the two guide-token assertions (`qwen3-embedding:4b` →
+`qwen3-embedding:0.6b`, `qwen2.5:7b-instruct` → `qwen3-vl:8b`), the declared-population count
+(105 → 110 fields, 17 sections unchanged), and the unresolved-field-against-defaults list (5 → 7:
+`embedding.contextWindow`/`embedding.batchSize` join the pre-existing 5, since PDM-12 deliberately
+leaves both absent from `defaultMassaAiConfig.embedding`; the three new `llm.*` fields do NOT join
+it — they are required fields with real shipped defaults from T02/T03).
+Updated `fixtures/config-get.json`: the embedding/llm block was internally inconsistent even before
+this task (`provider: "lmstudio"` beside Ollama-colon-style `llm.model`/`codeModel` and the retired
+`text-embedding-nomic-embed-text-v1.5`/768) — corrected to the LM Studio trio + 1024 dims, matching
+what `use lmstudio` now actually writes (T07b). This fixture is not field-completeness-checked by
+any test (`web-ui-contract.test.ts` only checks masking + shape), so this is a currency fix, not a
+gate requirement.
+Gate: `bun test apps/web-ui/src/__tests__/` → 784 pass / 0 fail across 15 files (up from whatever
+the pre-change count was for the 2 files actually touched: config-forms.test.ts 67/0,
+render-golden.test.ts 90/0, web-ui-contract.test.ts unaffected at 8/0 — the other 12 files in the
+directory were untouched and already green). `bun run type-check` → 0 (6/6 packages).
+Observed red: removed the `batchSize` field entry from `config-sections.ts`'s `embedding` section →
+`config-forms.test.ts`'s "declared population is 110 fields" and "unresolved-field count... 7 of
+110" failed, plus both `render-golden.test.ts` byte-identical cases for `renderConfig/read` and
+`renderConfig/write` failed (4 fail / 153 pass total across the two files). Restored via file copy,
+`git status --porcelain` clean before commit, re-ran green (157/0 across the two files).
+Next: T10 (field-level config↔Portal parity gate) — depends on T09, same `apps/tools-api` /
+`apps/web-ui` write-set boundary.
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
