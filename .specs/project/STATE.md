@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), Phase 7 (T13-T15) complete, Phase 8 (T16-T17) pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 21 Tasks (T06b, T07b, T03b, T15b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), Phase 7 (T13-T15) complete, Phase 8 T15b ✅ Complete, T16-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -720,6 +720,35 @@ surfaces; T13's narrow Markdown tier tracks membership/completeness for these fi
 unlisted doc mentioning a model default would fail it — but does not check their prose *values*,
 which is a manual review, not an automated one) and T17 (close-out: CHANGELOG entry, STATE.md,
 HANDOFF.md, FEATURES.json, then `check_specs_delivered.ts`).
+
+**T15b (W8) — Complete.** `package.json`'s `test:scripts` joined its bun-half and shell-half with
+`&&`, so a bun-half failure skipped all 37+ shell suites while still printing the bun half's
+counts — evidence the feature's own Success Criteria cite. Fixed to run both halves
+unconditionally and aggregate: `bun test scripts/__tests__ scripts/tests/*.test.ts; s1=$?; (for f
+in scripts/tests/*.sh; do bash "$f" || exit 1; done); s2=$?; [ $s1 -eq 0 ] && [ $s2 -eq 0 ]`. The
+shell loop's own pre-existing `|| exit 1` (stops at the first failing `.sh`) is untouched —
+out of this task's named scope.
+
+Observed red (file copy): mutated `scripts/__tests__/skill-doc-paths.test.ts`'s
+`expect(code).toBe(0)` to `.toBe(999)`, forcing a bun-half failure. Shell-half output still
+appeared (`test-install-skills-cli.sh`'s own suite ran, 44 passed / 2 failed) and the aggregate
+exit was non-zero. Restored by file copy; `git status --porcelain` clean before commit.
+
+Re-ran the real gate: bun half **2057 pass / 0 fail** (unchanged from T15). Shell half now
+executes and stops at the first of three pre-existing, host-specific failures —
+`test-install-skills-cli.sh`, `test-plugin-auto-install.sh`, `test-plugin-registry-registration.sh`
+— each re-run directly and independently confirmed still failing (this machine's own Claude
+install, unrelated to this feature). Ran all 39 `scripts/tests/*.sh` directly (bypassing the
+loop's early exit): **36 pass / 3 fail**, exactly matching T15's prior count. **This makes
+`bun run test:scripts` red on this host, on purpose** — it was reporting an unearned green before
+this task. Not fixed, skipped, or excluded, per the task's own instruction. `git status
+--porcelain` clean before commit (package.json + tasks.md + this entry only).
+
+**Named host-specific residual (do not fix as part of this feature):** the 3 shell suites above
+fail on this development machine's own Claude install state, not because of anything this feature
+changed. Recorded here for T17's close-out to cite honestly.
+
+Next: T16 (7 non-history docs + the two unowned surfaces), then T17 (close-out).
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 

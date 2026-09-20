@@ -559,7 +559,7 @@ pre-existing, host-specific failures W6 already identified (`test-install-skills
 
 ### Phase 8 — Documentation and close-out
 
-### T15b: Make `bun run test:scripts` reach the shell half
+### T15b: Make `bun run test:scripts` reach the shell half — ✅ Complete
 
 **Added during Execute 2026-09-20 at the user's explicit decision, after W6 measured it.** The
 script is:
@@ -589,6 +589,30 @@ claim `test:scripts` green in the close-out.
 Tests: the composed command runs the shell half even when the bun half exits non-zero
 Gate: induce a bun-half failure by file copy, confirm shell-suite output still appears and the aggregated exit code is non-zero, restore by file copy, re-run
 Depends on: T13.
+
+**Result (W8, 2026-09-20).** `package.json`'s `test:scripts` no longer joins the two halves with
+`&&`. It runs the bun half, captures its exit code, runs the shell for-loop in a subshell (so the
+loop's own pre-existing `|| exit 1` — first-failure-stops, unchanged and out of this task's scope
+— only exits the subshell), captures that exit code, and the script's own exit is non-zero only
+if either half was non-zero: `bun test scripts/__tests__ scripts/tests/*.test.ts; s1=$?; (for f in
+scripts/tests/*.sh; do bash "$f" || exit 1; done); s2=$?; [ $s1 -eq 0 ] && [ $s2 -eq 0 ]`.
+
+Observed red (file copy, restored): backed up `scripts/__tests__/skill-doc-paths.test.ts`,
+changed one assertion (`expect(code).toBe(0)` → `expect(code).toBe(999)`) to force a bun-half
+failure, ran `bun run test:scripts`. Bun half reported `1 fail` for the mutated test; the shell
+half still ran afterward and its output appeared (`test-install-skills-cli.sh`'s own suite output,
+44 passed / 2 failed); aggregate exit was 1. Restored the file by copy; `git status --porcelain`
+showed only `package.json` before the commit.
+
+Re-ran the real gate with the file restored: bun half **2057 pass / 0 fail** (unchanged from
+T15); shell half ran through the suites in order and stopped at the first of the three named
+host-specific failures, `test-install-skills-cli.sh` (44 passed / 2 failed) — confirming the fix
+did not touch the pre-existing per-suite `|| exit 1` behavior, only the half-to-half gate.
+Aggregate exit: **1**. This is the expected, honest result — `bun run test:scripts` is red on this
+host because of `test-install-skills-cli.sh`, `test-plugin-auto-install.sh`,
+`test-plugin-registry-registration.sh` (all three re-confirmed failing when run directly, same as
+T15's measurement), each caused by this machine's own Claude install and unrelated to this
+feature. Not fixed, skipped, or excluded, per this task's own instruction.
 
 ### T16: Update the 7 non-history documentation surfaces
 
