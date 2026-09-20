@@ -1,6 +1,6 @@
 import path from "path";
 import { configDir } from "./xdg";
-import { LOCAL_INFERENCE_IDS } from "./inference-providers";
+import { LOCAL_INFERENCE_IDS, INFERENCE_ROLE_DEFAULTS } from "./inference-providers";
 
 /**
  * API-only embedding providers writable to `config.json` — the other half of
@@ -53,6 +53,15 @@ export interface MassaAiConfig {
     baseURL?: string;
     apiKey?: string;
     dimensions?: number;
+    /** Context window sent/loaded for the embedding role (PDM-12). Optional like
+     *  `dimensions` above — a config predating this field has none. Config wins over
+     *  the role-table default (`INFERENCE_ROLE_DEFAULTS.embedding.contextWindow`)
+     *  when present. */
+    contextWindow?: number;
+    /** Texts submitted per provider call (PDM-12). Optional like `dimensions` above.
+     *  Config wins over the provider's measured default
+     *  (`InferenceProviderSpec.embedBatchSize`) when present. */
+    batchSize?: number;
   };
   compression: {
     // Runtime canonical shape — mirrors ServerConfig.compression. The loader
@@ -133,6 +142,16 @@ export interface MassaAiConfig {
     maxOutputTokens: number;
     timeoutMs: number;
     disableThink: boolean;
+    /** Context window for the instruct role (PDM-12). Config wins over
+     *  `INFERENCE_ROLE_DEFAULTS.instruct.contextWindow`. */
+    contextWindow: number;
+    /** Context window for the coding role (PDM-12). Config wins over
+     *  `INFERENCE_ROLE_DEFAULTS.coding.contextWindow`. */
+    codeContextWindow: number;
+    /** Temperature for the coding role — a new field, not a reinterpretation of
+     *  `temperature` (design decision 3). Config wins over
+     *  `INFERENCE_ROLE_DEFAULTS.coding.temperature`. */
+    codeTemperature: number;
   };
   memory: {
     decay: {
@@ -383,6 +402,10 @@ export const defaultMassaAiConfig: MassaAiConfig = {
     model: "qwen3-embedding:4b",
     baseURL: "http://localhost:11434",
     dimensions: 2560,
+    // contextWindow / batchSize are deliberately left unset here (unlike
+    // `dimensions` above): the role table (`INFERENCE_ROLE_DEFAULTS.embedding`,
+    // `InferenceProviderSpec.embedBatchSize`) is their default source, applied
+    // at the consumption site, not duplicated into this shipped template.
   },
   compression: {
     defaultStrategy: "code_structure",
@@ -433,6 +456,9 @@ export const defaultMassaAiConfig: MassaAiConfig = {
     maxOutputTokens: 8000,
     timeoutMs: 90_000,
     disableThink: true,
+    contextWindow: INFERENCE_ROLE_DEFAULTS.instruct.contextWindow,
+    codeContextWindow: INFERENCE_ROLE_DEFAULTS.coding.contextWindow,
+    codeTemperature: INFERENCE_ROLE_DEFAULTS.coding.temperature,
   },
   memory: {
     decay: {

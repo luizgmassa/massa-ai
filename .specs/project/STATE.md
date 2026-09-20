@@ -51,6 +51,34 @@ Gate: `bun test packages/shared/src/__tests__/inference-providers.test.ts && bun
 file copy, `git status --porcelain` clean before the commit. Next: T02 (five new config fields)
 and T03 (provider-derived instruct/coding defaults), both depend only on T01.
 
+**T02 (W2) — Complete.** Added the five PDM-12 config fields. `ServerConfig.llm`
+(`config/index.ts`) and `MassaAiConfig.llm` (`massa-ai-config.ts`) both gained `contextWindow`,
+`codeContextWindow`, `codeTemperature` (required, mirroring the sibling `llm.*` fields);
+`defaultMassaAiConfig.llm` derives all three from `INFERENCE_ROLE_DEFAULTS` instead of a second
+set of literals. `MassaAiConfig.embedding` gained `contextWindow?`/`batchSize?` (optional, like
+`dimensions` — required would have broken both config-cli.ts's existing embedding-literal
+switch branches, an out-of-batch file measured via `bun run type-check`); `defaultMassaAiConfig`
+deliberately leaves them unset, since the role table is their default source at the consumption
+site (T06), not a second copy in the shipped template — setting them there produced a real
+`changedRestartSections` flicker in an existing test (a matching-provider resave silently
+dropped the two fields because `savePartialConfig` replaces `embedding` wholesale while
+`loadConfig`'s read-back re-merges the default block). `config-writer.ts` validates all five
+(the three `llm.*` fields unconditionally, matching their required siblings; the two
+`embedding.*` fields only `!== undefined`, matching `dimensions`). `codeTemperature` reads
+`MASSA_AI_LLM_CODE_TEMPERATURE`; `contextWindow`/`codeContextWindow` take no new env var (T04's
+"the 11th knob" is `codeTemperature` alone, per design R-08).
+Gate: `bun test packages/shared/src/config/__tests__/config-loader.test.ts
+packages/shared/src/config/__tests__/config-writer.test.ts` → 87 pass / 0 fail. `bun run
+type-check` → 6/6 (caught and fixed the opencode-plugin/mcp-client config-cli.ts embedding-
+literal breakage described above by relaxing to optional, rather than touching those
+out-of-batch files). Observed red (two separate mutations, each restored by file copy,
+`git status --porcelain` clean before commit): (1) hardcoding `defaultMassaAiConfig.llm.
+contextWindow` to `99999` instead of deriving it from `INFERENCE_ROLE_DEFAULTS.instruct.
+contextWindow` failed "the shipped llm defaults are the role-table values" (expected 16384,
+got 99999); (2) removing the `llm.codeTemperature` numeric check from `config-writer.ts`
+failed "rejects a non-number llm.codeTemperature" (expected `success:false`, got `true`).
+Next: T03 (provider-derived instruct/coding defaults), depends only on T01.
+
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 

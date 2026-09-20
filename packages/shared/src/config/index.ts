@@ -19,6 +19,7 @@ import {
   SCHEDULER_JOB_KINDS,
   type SchedulerConfig,
 } from "./massa-ai-config";
+import { INFERENCE_ROLE_DEFAULTS } from "./inference-providers";
 
 /**
  * Default LLM model for NL/instruction-shaped sites. Pure-instruct (non-thinking)
@@ -104,6 +105,16 @@ export interface ServerConfig {
     maxOutputTokens: number;
     timeoutMs: number;
     disableThink: boolean;
+    /** Context window for the instruct role (PDM-12). Config wins over
+     *  `INFERENCE_ROLE_DEFAULTS.instruct.contextWindow`. */
+    contextWindow: number;
+    /** Context window for the coding role (PDM-12). Config wins over
+     *  `INFERENCE_ROLE_DEFAULTS.coding.contextWindow`. */
+    codeContextWindow: number;
+    /** Temperature for the coding role — a new field, not a reinterpretation of
+     *  `temperature`. Config wins over `INFERENCE_ROLE_DEFAULTS.coding.temperature`.
+     *  Override via MASSA_AI_LLM_CODE_TEMPERATURE. */
+    codeTemperature: number;
   };
 
   // Memory-quality configuration (Phase 1).
@@ -745,6 +756,14 @@ export const defaultConfig: ServerConfig = {
     disableThink: envBool(
       "MASSA_AI_LLM_DISABLE_THINK",
       fileConfig.llm?.disableThink ?? true,
+    ),
+    contextWindow:
+      fileConfig.llm?.contextWindow ?? INFERENCE_ROLE_DEFAULTS.instruct.contextWindow,
+    codeContextWindow:
+      fileConfig.llm?.codeContextWindow ?? INFERENCE_ROLE_DEFAULTS.coding.contextWindow,
+    codeTemperature: envNum(
+      "MASSA_AI_LLM_CODE_TEMPERATURE",
+      fileConfig.llm?.codeTemperature ?? INFERENCE_ROLE_DEFAULTS.coding.temperature,
     ),
   },
 

@@ -149,6 +149,10 @@ function validatePartial(partial: Partial<MassaAiConfig>): string[] {
       details.push("embedding.apiKey must be a string");
     if (e.dimensions !== undefined && !checkNumber(e.dimensions, 1))
       details.push("embedding.dimensions must be a positive number");
+    if (e.contextWindow !== undefined && !checkNumber(e.contextWindow, 1))
+      details.push("embedding.contextWindow must be a positive number");
+    if (e.batchSize !== undefined && !checkNumber(e.batchSize, 1))
+      details.push("embedding.batchSize must be a positive number");
   }
 
   if (partial.compression !== undefined) {
@@ -239,6 +243,12 @@ function validatePartial(partial: Partial<MassaAiConfig>): string[] {
       details.push("llm.timeoutMs must be a positive number");
     if (!checkBoolean(l.disableThink))
       details.push("llm.disableThink must be a boolean");
+    if (!checkNumber(l.contextWindow, 1))
+      details.push("llm.contextWindow must be a positive number");
+    if (!checkNumber(l.codeContextWindow, 1))
+      details.push("llm.codeContextWindow must be a positive number");
+    if (!checkNumber(l.codeTemperature))
+      details.push("llm.codeTemperature must be a number");
   }
 
   if (partial.memory !== undefined) {

@@ -63,7 +63,7 @@ Depends on: none.
 
 ### Phase 2 — Config schema and resolution
 
-### T02: Add the five new config fields
+### T02: Add the five new config fields — ✅ Complete
 
 `llm.contextWindow`, `llm.codeContextWindow`, `llm.codeTemperature`, `embedding.contextWindow`,
 `embedding.batchSize` — in **both** `ServerConfig.llm` (`config/index.ts:96-107`) and
