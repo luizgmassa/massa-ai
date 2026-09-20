@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `LMSTUDIO_EMBEDDING_MODEL` and `LMSTUDIO_EMBEDDING_DIMENSIONS` project through the same
   env precedence every other provider uses, and all three were added to `turbo.json`'s
   `passThroughEnv` (AD-010) — without which they arrive `undefined` under `bun run test`
-  while appearing to work under a direct `bun test`.
+  while appearing to work under a direct `bun test`. `MASSA_AI_INFERENCE_PROVIDER` joins
+  them there and in `.env.example`; it is read only from bash, so the guard that derives
+  its read-set from `process.env` accessors cannot see it and pins it by name instead.
 - **Provider probing by response body, not HTTP status.** Both the TypeScript probe
   (`packages/core/src/kernel/inference-probe.ts`) and its bash mirror in the installers
   treat a `200` carrying an error body as unreachable. A status-only probe reported a
@@ -45,12 +47,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Both config CLIs widened from 3 providers to the full writable set** — `ollama`,
   `lmstudio`, `mistral`, `openai`, `google`, `cohere` — plus `init --lmstudio`. Keeping
   them at 3 was drift, not a decision.
+- **`bun run diagnose` validates whichever local provider is configured.** Steps 1–4 were
+  hardcoded to Ollama's endpoint, `/api/tags`, `response.ok` and a substring model match;
+  they now dispatch on `EMBEDDING_PROVIDER` / `config.json`'s `embedding.provider`, probe
+  through the shared `probeProvider` seam, and match the model name exactly. An LM Studio
+  user finishing `scripts/setup-local-first.sh` used to watch the stack-validation step
+  report Ollama unreachable. Measured both ways: LM Studio up → exit 0,
+  `dimensions=768`; down → `API not responding` naming every candidate it tried.
 - **Docs**: `README.md`, `FEATURES.md` and `docs/CHEATSHEET.md` no longer present Ollama as
-  the only local option. 17 of the 23 surfaces the spec enumerated changed. Of the 6 left
-  unchanged, 3 describe `bun run diagnose`, which is still Ollama-only; the other 3 are
-  genuinely Ollama-scoped and not exclusivity claims — `OLLAMA_EMBED_DELAY_MS`, the
-  `OLLAMA_BASE_URL` endpoint row, and `run-deterministic.ts`'s "no Postgres, Ollama, or
-  native tree-sitter" comment.
+  the only local option. 20 of the 23 surfaces the spec enumerated changed. The 3 left
+  unchanged are genuinely Ollama-scoped and not exclusivity claims — `OLLAMA_EMBED_DELAY_MS`,
+  the `OLLAMA_BASE_URL` endpoint row, and `run-deterministic.ts`'s "no Postgres, Ollama, or
+  native tree-sitter" comment. Three further surfaces described `bun run diagnose` and were
+  left alone only while diagnose was Ollama-only; that stopped being true, so they changed
+  too.
 
 ### Changed
 
@@ -64,6 +74,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pair. That is the going-green failure mode the file exists to prevent, not a going-red
   one. Tier 3 now keys on `*_EMBEDDING_(MODEL|DIMENSIONS)` with any prefix, and the
   width-writer membership gained the new seam module.
+
+### Fixed
+
+- **Selecting LM Studio through either config CLI left `llm.baseUrl` on Ollama's `:11434`.**
+  `init --lmstudio` and `use lmstudio` wrote only the `embedding` block, and
+  `resolveInferenceSpec` matches host:port *first* — so the LLM client kept resolving to the
+  ollama spec and silently re-enabled the `/api/version` probe and `think:false` injection
+  that provider gating exists to suppress. The guarding test asserted the LM Studio URL
+  appeared *somewhere* in `show`'s output, which `embedding.baseURL` already satisfied, so
+  it passed throughout.
 
 ## [1.57.0] - 2026-09-18
 

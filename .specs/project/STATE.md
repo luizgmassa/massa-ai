@@ -1,4 +1,4 @@
-## Current — Local inference provider abstraction: LM Studio beside Ollama (**EXECUTE COMPLETE 2026-09-19** — 18 Tasks across 7 Phases, delegated batch workers with every figure re-measured by the orchestrator; gates green; independent validation pending; unpushed, push/PR is the user's call)
+## Current — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
 worktree `~/Projects/massa-ai-feat-local-inference-provider-abstraction`. Full
@@ -36,9 +36,43 @@ closing gate; `check_specs_delivered.ts` proves tracked-and-clean but never cont
 exited 0 before T18 edited anything. Amend the clause with its reason, do not fail it
 silently.
 
-**Largest open item:** `scripts/diagnose.ts` never got the change `design.md:140` promised
-— empty diff across the whole feature, `grep -ci lmstudio` is 0 — so `bun run diagnose`
-still validates Ollama only. Five further residuals are enumerated in `.specs/HANDOFF.md`.
+**Phase 8 — what the FAIL verdict cost, and what closing it taught.** The verdict's own
+summary is the lesson: the feature's *core* was proven sound by mutation, and every failure
+clustered somewhere else — one promised file never written (`scripts/diagnose.ts`), one
+parity gate re-keyed but not extended, one config surface writing half a config block. Of
+16 ranked gaps, **14 were closed, 1 was closed against a corrected target, and 1 was
+rejected outright with a measurement.** G13's *finding* held —
+`llm-client-json-schema.test.ts` genuinely cannot sense the entrypoint, its `@ai-sdk/openai`
+mock has no `.chat` member — but its *claim of a miscitation* did not: nothing cited that
+file as LIP-23's sensor, so the fix was to make the matrix row name the real one
+(`llm-client.test.ts:832`/`:839`) rather than correct a citation that never existed. G16 is
+rejected: `config-section-coverage.test.ts` resolves under
+`apps/tools-api/src/routes/` at both HEAD and `d523f06f`, and the feature added 22 lines to
+it — striking that spec clause would have deleted a correct line on a false premise, most
+likely produced by a bare-filename search that missed the path.
+
+**The three that were silently green are the ones worth remembering.** G3's three mutants
+(`.env.example`, `embeddings/config.ts`, the wizard) each made the LM Studio model/width
+pair self-contradictory and survived parity 7/0 *and* a 116-test core filter. G4's guarding
+test asserted `show.out` *contains* the LM Studio URL, which `embedding.baseURL` already
+satisfies — so it passed with `llm.baseUrl` still on Ollama, which made
+`resolveInferenceSpec` return the *ollama* spec and quietly re-enable the `/api/version`
+probe and `think:false` injection LIP-07 exists to suppress. G5's LIP-08 had no sensor at
+all, and the mutation that exposed it (**M9**, lmstudio `knownDimensions` 768 → 1024)
+survived verification because no *runtime* consumer sensed the width; it now dies against
+`lmstudio-embedding-live.test.ts`. A gate never seen failing on its new subject is not a
+sensor for that subject.
+
+**One measurement reversed a prescribed fix.** T23 proposed widening
+`turbo-passthrough-env.test.ts` to scan `scripts/**/*.sh` for `MASSA_AI_*` reads. Measured:
+58 shell files read 27 such names without assigning them and **25 of the 27** are absent
+from `passThroughEnv` — because turbo never dispatches the shell suites at all (they run
+under the root-level `test:scripts`, outside the workspace globs). The widening would have
+reddened on 25 pre-existing installer internals while proving nothing about the one
+variable at issue. Pinned by the file's own sentinel pattern instead.
+
+Residuals #2–#6 stand and are enumerated in `.specs/HANDOFF.md`; #1 (`diagnose.ts`) is
+closed.
 
 ## Previous — Bootstrap file and rule toggles (**VALIDATED 2026-09-08** — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs with three recorded bounds; every gate green; unpushed, push/PR is the user's call)
 

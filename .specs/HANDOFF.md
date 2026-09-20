@@ -1,4 +1,4 @@
-# Handoff — local-inference-provider-abstraction (EXECUTE COMPLETE 2026-09-19 — 18 Tasks across 7 Phases, delegated batch workers with every figure re-measured by the orchestrator; gates green; unpushed, push/PR is the user's call)
+# Handoff — local-inference-provider-abstraction (PHASE 8 COMPLETE 2026-09-20 — 25 Tasks across 8 Phases; independent validation returned **FAIL**, Phase 8 closed its ranked gap list, re-verification pending; unpushed, push/PR is the user's call)
 
 **Branch:** `feat/local-inference-provider-abstraction`, off `main@d523f06f` (v1.57.0).
 Worktree `~/Projects/massa-ai-feat-local-inference-provider-abstraction`.
@@ -51,14 +51,20 @@ exited **0 before T18 edited anything**, measured.
 
 ### Open, recorded, not built
 
-1. **`scripts/diagnose.ts` never got its promised change.** `design.md:140` lists it as
-   gaining `probeProvider` + exact match, replacing the `/api/tags` + substring match at
-   `:165`. It shipped **untouched** — empty diff over the whole feature range, and
-   `grep -ci lmstudio scripts/diagnose.ts` is `0`. So `bun run diagnose` still validates
-   Ollama only. T16 correctly left the three doc sites that mention it unchanged rather
-   than documenting a capability that does not exist, and added a caveat pointing LM Studio
-   users at `curl :1234/v1/models` + `curl :3333/health`. This is a design-versus-shipped
-   gap, not a docs gap — fixing it is a new task.
+1. ~~**`scripts/diagnose.ts` never got its promised change.**~~ **Closed in Phase 8**
+   (T19 `a59e7901`, plus `06ddadb1` for the literal T19 missed). `+190/−71`, 14
+   `lmstudio`/`probeProvider` mentions. Measured end to end rather than asserted: LM Studio
+   up → exit 0, `dimensions=768 latency=36ms`; Ollama up → `dimensions=2560`; LM Studio
+   down on `:1299` → `API not responding (tried: …)` naming every candidate and
+   `Inference: FAILED`. The three doc sites T16 correctly left alone now say "inference
+   provider" instead of "Ollama", because the excuse for leaving them expired with the fix.
+   **Carry the tail forward as a pattern:** the conversion left one Ollama literal behind —
+   the WSL2 last-resort candidate was built as `http://<nameserver>:11434` regardless of
+   provider, dropping both the configured port and the `/v1` path, and the function was
+   still named `ollamaCandidates`. It was found by *running* the command with the server
+   down, not by reading the diff, and no test covered that arm. A provider-dispatch
+   conversion is not finished when the main path dispatches; the last-resort branches carry
+   the surviving literals.
 2. **Existing installs are unprotected until their first full reindex.** The fingerprint
    gate reads legacy/`NULL` on every workspace indexed before the migration. Any claim of
    stale-index protection needs that qualifier.
@@ -89,8 +95,13 @@ exited **0 before T18 edited anything**, measured.
 
 `.specs/lessons.json` was dirty in **both** worktrees with an uncommitted deletion of 15
 lessons (L-002…L-016; 25 → 10, `next_id` untouched at 26). It was neither committed nor
-discarded — copied to `/tmp/lessons-pruned-{worktree,main}.json` and restored from HEAD, so
-the `check_specs_delivered` run would mean something. The prune is the user's call.
+discarded — copied aside and restored from HEAD in this worktree, so the
+`check_specs_delivered` run would mean something. **The prune is still the user's call, and
+still undecided.** State as of 2026-09-20: this worktree is clean, `~/Projects/massa-ai`
+still carries the modification in its working tree. The copies were moved off `/tmp`, which
+does not survive a reboot, to
+`~/.config/massa-ai/lessons-prune-2026-09-20/lessons-pruned-{main,worktree}.json`
+(sha256 `b2fb278a…` for the main copy, verified identical after the move).
 
 ## Previous handoff — bootstrap-file-and-rule-toggles (EXECUTE COMPLETE 2026-09-08 — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs; every gate green; unpushed, push/PR is the user's call)
 
