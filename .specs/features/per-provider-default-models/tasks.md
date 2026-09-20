@@ -306,7 +306,7 @@ Tests: the shipped default block derives rather than restates — asserted again
 Gate: bun test packages/shared/src/config/__tests__/ && bun run type-check
 Depends on: T01.
 
-### T11: Sweep the single-dialect surfaces
+### T11: Sweep the single-dialect surfaces — ✅ Complete
 
 `.env.example`, `install.sh` (including the `  local llm_model="..."` dialect at `:379-380` and
 the prose at `:432`, `:472`), `Dockerfile`, `docker-compose.yml`,
@@ -317,6 +317,26 @@ or `run.ts:171` — historical memory content, not defaults (design § Must NOT 
 Tests: parity gate tiers covering each swept file; judge fixtures asserted unchanged
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts && bun run test:scripts
 Depends on: T01.
+
+**Execution note (2026-09-20).** T03b's correct derivation of `defaultMassaAiConfig.embedding`
+(non-literal `INFERENCE_PROVIDERS.ollama.defaultModels.embedding` expression, same shape T03
+already used for `.llm`) makes `referencePair()`'s `/model:\s*"([^"]+)"/g` regex match 0 times.
+Because that call sits in the `describe()` body (not inside a `test()`), it throws before any
+test in the file runs: measured, `bun test scripts/__tests__/embedding-defaults-parity.test.ts`
+now reports **0 pass / 0 fail / 1 error** (`massa-ai-config.ts model: expected exactly 1 match
+... got 0 — extractor rotted or surface removed`), not the 6 pass / 3 fail this task's brief
+was written against. This is the same defect class as failure #2 (`extractOne` "rotted"),
+now also hitting the ollama reference anchor — expected, not a T11 regression: T11's own edits
+never touch `massa-ai-config.ts`, and the crash is byte-identical before and after T11's sweep.
+Verified correct independently of the crashed instrument: an ad-hoc script replicating every
+`PAIR_SURFACES`/`MODEL_ONLY_SURFACES`/`LMSTUDIO_MODEL_ONLY_SURFACES` regex for T11's 7 files
+confirmed all 8 checks pass against the `qwen3-embedding:0.6b`/1024 reference (and that
+`scripts/diagnose.ts`'s lmstudio line correctly stays `text-embedding-nomic-embed-text-v1.5`,
+the `knownDimensions` table's first entry, which `referencePairLmStudio()` anchors on — not the
+new default). `bun run test:scripts` → 2043 pass / 0 fail / 1 error (the same crash; no other
+suite regressed). **T13 must re-anchor `referencePair()` to tolerate a derived (non-literal)
+`model:`/`dimensions:` expression** — this is squarely its "re-anchor" mandate, not a narrower
+fix than its task text already implies.
 
 ### T12: Repair `setup-local-first.sh`
 

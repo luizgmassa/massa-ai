@@ -17,7 +17,7 @@
  *   EMBEDDING_PROVIDER        - "ollama" (default) or "lmstudio"; falls back to
  *                               config.json's embedding.provider
  *   OLLAMA_BASE_URL           - Ollama API URL (default: http://localhost:11434)
- *   OLLAMA_EMBEDDING_MODEL    - Ollama model to test (default: qwen3-embedding:4b)
+ *   OLLAMA_EMBEDDING_MODEL    - Ollama model to test (default: qwen3-embedding:0.6b)
  *   LMSTUDIO_BASE_URL         - LM Studio API URL (default: http://localhost:1234/v1)
  *   LMSTUDIO_EMBEDDING_MODEL  - LM Studio model to test (default: text-embedding-nomic-embed-text-v1.5)
  *   DATABASE_URL              - Required PostgreSQL connection string
@@ -125,7 +125,7 @@ export function resolveProviderBaseUrl(
 }
 
 const DEFAULT_MODEL: Readonly<Record<InferenceProviderId, string>> = {
-  ollama: "qwen3-embedding:4b",
+  ollama: "qwen3-embedding:0.6b",
   lmstudio: "text-embedding-nomic-embed-text-v1.5",
 };
 

@@ -376,7 +376,7 @@ write_env() {
   # auto-importance call a 404 instead of taking the rule-based silent-degrade
   # path (which only applies when the flag is false). Search rerank and query
   # understanding stay off — they're latency-sensitive and a separate opt-in.
-  local llm_model="qwen2.5:7b-instruct"
+  local llm_model="qwen3-vl:8b"
   local llm_code_model="qwen2.5-coder:7b"
   local llm_enabled=false
   if ollama_has_model "$llm_model" "$ollama_url"; then
@@ -416,8 +416,8 @@ DATABASE_URL=${db_url}
 
 # ── Embeddings (Ollama - local, free) ────────────────────────
 OLLAMA_BASE_URL=${ollama_url}
-OLLAMA_EMBEDDING_MODEL=qwen3-embedding:4b
-OLLAMA_EMBEDDING_DIMENSIONS=2560
+OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
+OLLAMA_EMBEDDING_DIMENSIONS=1024
 
 # ── Optional: Cloud embedding providers ─────────────────────
 #EMBEDDING_PROVIDER=google
@@ -429,7 +429,7 @@ LOG_LEVEL=info
 ENABLE_METRICS=true
 
 # ── Local-first LLM (Ollama); default OFF, silent degrade ──
-# Auto-set ON by install.sh only when qwen2.5:7b-instruct is pulled in Ollama.
+# Auto-set ON by install.sh only when qwen3-vl:8b is pulled in Ollama.
 MASSA_AI_LLM_ENABLED=${llm_enabled}
 MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
 MASSA_AI_LLM_API_KEY=ollama
@@ -469,7 +469,7 @@ AUTO_IMPROVE_MIN_FILE_HITS=3
 AUTO_IMPROVE_MIN_FIX_HITS=2
 
 # ── Auto importance/salience (LLM) ────────────────────────────
-# Auto-set ON by install.sh only when qwen2.5:7b-instruct is pulled in Ollama.
+# Auto-set ON by install.sh only when qwen3-vl:8b is pulled in Ollama.
 AUTO_IMPORTANCE_ENABLED=${llm_enabled}
 
 # ── Search quality knobs ──────────────────────────────────────

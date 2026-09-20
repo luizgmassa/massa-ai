@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); T01-T10 + T03b complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below, W5 Phase 5 closed, W6 T03b closed), T11-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 20 Tasks (T06b, T07b, T03b added mid-Execute); T01-T11 + T03b complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below, W5 Phase 5 closed, W6 T03b+T11 closed), T12, T13-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -487,6 +487,42 @@ since a shell-out gate that shares this process could touch the developer's real
 `~/.config/massa-ai/`.
 Next: T11 (sweep the single-dialect surfaces) and T12 (repair `setup-local-first.sh`), both
 depend on T01 and are disjoint from T03b's write set.
+
+**T11 (W6) — Complete.** Swept the retired ollama defaults (`qwen3-embedding:4b`/2560 →
+`qwen3-embedding:0.6b`/1024; instruct `qwen2.5:7b-instruct` → `qwen3-vl:8b`; coding
+`qwen2.5-coder:7b` unchanged) across `.env.example`, `install.sh` (`llm_model` at :379 plus the
+two `qwen2.5:7b-instruct` prose lines), `Dockerfile`, `docker-compose.yml`,
+`apps/tools-api/setup-ollama-wsl.sh`, `scripts/validate-vscode-integration.sh`, and
+`scripts/diagnose.ts`'s ollama `DEFAULT_MODEL` entry — its lmstudio sibling
+(`text-embedding-nomic-embed-text-v1.5`) is deliberately untouched, matching
+`referencePairLmStudio()`'s own anchor (the first entry in
+`INFERENCE_PROVIDERS.lmstudio.knownDimensions`, not `defaultModels.embedding`). Also updated
+`scripts/__tests__/diagnose.test.ts:174` (`resolveModelName("ollama", ...)`'s expected value) —
+the direct unit test for the changed constant, not in T11's file list by name but the same
+subject, left stale otherwise. `benchmarks/llm-judge/fixtures/known-{dup,distinct}.json` and
+`run.ts:171` untouched (verified — not in the diff).
+**Parity-gate crash, not a T11 regression — see tasks.md's T11 entry for the full diagnosis.**
+T03b's correct seam-derived `defaultMassaAiConfig.embedding.model`/`.dimensions` breaks
+`referencePair()`'s literal-string regex, and since that call is in the `describe()` body it
+aborts the whole file before any test runs. Measured before and after T11's edits: byte-identical
+crash both times (`massa-ai-config.ts model: expected exactly 1 match ... got 0`), confirming
+T11 changes nothing about this outcome. Correctness of T11's own sweep was verified with an
+ad-hoc script (not committed) replicating the crashed test's exact per-surface regexes for all 7
+files — 8/8 checks pass against the `qwen3-embedding:0.6b`/1024 reference.
+Gate: `bun test scripts/__tests__/diagnose.test.ts` → 33 pass / 0 fail (direct sensor for the one
+TS-object-literal surface). `bun test scripts/__tests__/embedding-defaults-parity.test.ts` →
+0 pass / 0 fail / 1 error (pre-existing crash from T03b, unchanged by T11). `bun run test:scripts`
+→ 2043 pass / 0 fail / 1 error (same single crash; no other suite affected), exit 1.
+Observed red, one mutation per dialect (file copy, restored, `git status --porcelain` clean
+before commit): Dockerfile (`ENV KEY=value`), install.sh (bare `KEY=value`), docker-compose.yml
++ validate-vscode-integration.sh (`${VAR:-default}`), diagnose.ts (TS object literal) — each
+reverted to the retired literal made the ad-hoc verify script report FAIL for that surface;
+diagnose.ts's mutation additionally failed `diagnose.test.ts`'s own
+"falls back to the per-provider default" assertion.
+**T13 must re-anchor `referencePair()`** to tolerate a derived, non-literal `model:`/
+`dimensions:` expression in `defaultMassaAiConfig.embedding` — this is squarely its "re-anchor"
+mandate, and now blocks the whole file rather than one of its three known failing tests.
+Next: T12 (repair `setup-local-first.sh`) — depends on T01, disjoint from T11's file set.
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
