@@ -65,11 +65,20 @@ sensor for that subject.
 
 **One measurement reversed a prescribed fix.** T23 proposed widening
 `turbo-passthrough-env.test.ts` to scan `scripts/**/*.sh` for `MASSA_AI_*` reads. Measured:
-58 shell files read 27 such names without assigning them and **25 of the 27** are absent
-from `passThroughEnv` — because turbo never dispatches the shell suites at all (they run
-under the root-level `test:scripts`, outside the workspace globs). The widening would have
-reddened on 25 pre-existing installer internals while proving nothing about the one
+58 tracked `.sh` files read 27 such names without assigning them and **24** are absent from
+`passThroughEnv` — because turbo never dispatches the shell suites at all (they run under
+the root-level `test:scripts`, outside the workspace globs). The widening would have
+reddened on two dozen pre-existing installer internals while proving nothing about the one
 variable at issue. Pinned by the file's own sentinel pattern instead.
+
+**And that figure decayed inside one session, which is the transferable part.** It was
+first recorded as **25 absent** — correct when taken, *before* the same task added
+`MASSA_AI_INFERENCE_PROVIDER` to the allowlist, and stale the moment the fix landed. An
+independent re-measure then reported **30/25** on a narrower definition of "assignment".
+Three readings, one conclusion, three different totals. A count taken before your own fix
+and quoted after it is a different measurement; quote the method beside the number, and
+name which part is load-bearing — here, only "the absent set is two dozen names and almost
+none of them are ours" survives every definition.
 
 Residuals #2–#6 stand and are enumerated in `.specs/HANDOFF.md`; #1 (`diagnose.ts`) is
 closed.

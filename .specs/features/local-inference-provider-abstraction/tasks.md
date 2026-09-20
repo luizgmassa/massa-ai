@@ -1268,8 +1268,12 @@ sha256 `4c8474f1…` matches.
 measured and rejected.** Added to `turbo.json` → `tasks.test.passThroughEnv`
 and to `.env.example`. T23 suggested widening
 `turbo-passthrough-env.test.ts` to scan `scripts/**/*.sh`; **measured, that is
-the wrong sensor**: 58 shell files read **27** distinct `MASSA_AI_*` names
-without assigning them and **25 of the 27** are absent from the allowlist —
+the wrong sensor**: over the 58 *tracked* `.sh` files, counting a name as read
+when it appears as `$NAME`/`${NAME…}` in a file that does not also assign it,
+**27** distinct `MASSA_AI_*` names are read and **24** are absent from the
+allowlist (**25** before `MASSA_AI_INFERENCE_PROVIDER` itself was added — the
+first figure recorded here was that pre-fix reading, corrected on re-measure;
+an independent count using a narrower definition of assignment got 30/25) —
 installer internals (`MASSA_AI_INSTALLER_TEST_*`, `MASSA_AI_PG_ROLE`,
 `MASSA_AI_PLUGIN_SOURCE`, …) that turbo has no reason to forward, because
 turbo never dispatches the shell suites at all (they run under the root-level

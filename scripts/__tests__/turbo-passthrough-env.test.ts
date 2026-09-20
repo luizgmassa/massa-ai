@@ -17,16 +17,27 @@
  * resolver's literal occurrences of the name.
  *
  * LIP-20 / G8 — vars read only from bash are the second blind spot, and the
- * derived scan cannot be widened to cover them. Measured on this tree: 58
- * shell files under `scripts/` read 27 distinct `MASSA_AI_*` names without
- * assigning them, and 25 of those 27 are absent from `passThroughEnv` —
- * installer-internal knobs (`MASSA_AI_INSTALLER_TEST_*`, `MASSA_AI_PG_ROLE`,
+ * derived scan cannot be widened to cover them. Measured on this tree, where
+ * the method matters as much as the figure: over the **58** tracked `.sh`
+ * files under `scripts/` (`git ls-files`, not a filesystem glob), counting a
+ * name as *read* when it appears as `$NAME`/`${NAME…}` in a file that does not
+ * also assign it, there are **27** such `MASSA_AI_*` names and **24** of them
+ * are absent from `passThroughEnv` — installer-internal knobs
+ * (`MASSA_AI_INSTALLER_TEST_*`, `MASSA_AI_PG_ROLE`,
  * `MASSA_AI_PLUGIN_SOURCE`, …) that turbo has no reason to forward, because
  * turbo never dispatches the shell suites at all: they run under the
  * root-level `test:scripts`, outside the `packages/*` / `apps/*` globs. A
- * shell-wide scan would therefore redden on 25 pre-existing names while
+ * shell-wide scan would therefore redden on two dozen pre-existing names while
  * proving nothing. Bash-read knobs that the spec still requires on the
  * allowlist are pinned by name below, the same way the `RUN_*` sentinels are.
+ *
+ * The absent count is a moving baseline, not a constant: it read **25** before
+ * `MASSA_AI_INFERENCE_PROVIDER` was itself added to the allowlist, and **24**
+ * after. A different read-definition gives a different total — an independent
+ * re-measure counting only `local`-scoped assignment found 30/25 — so quote
+ * the method beside the number or the number decays into folklore. What is
+ * stable across every definition tried, and is the only load-bearing part, is
+ * that the absent set is two dozen names and almost none of them are ours.
  */
 
 import { describe, expect, test } from "bun:test";

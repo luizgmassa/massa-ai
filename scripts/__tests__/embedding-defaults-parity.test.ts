@@ -163,6 +163,14 @@ const PAIR_SURFACES: Array<{ file: string; model: RegExp; dims: RegExp }> = [
 const MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
   { file: "scripts/setup-local-first.sh", model: /\$\{OLLAMA_EMBEDDING_MODEL:-([^}]+)\}/g },
   { file: "scripts/validate-vscode-integration.sh", model: /\$\{OLLAMA_EMBEDDING_MODEL:-([^}]+)\}/g },
+  // `diagnose.ts`'s DEFAULT_MODEL table, added when the script became
+  // provider-dispatched. It is keyed on the provider id rather than on a
+  // `*_EMBEDDING_MODEL` token, so the Tier-3 completeness scan below is
+  // structurally blind to it — the same going-green shape this file exists to
+  // prevent, and the reason it is listed by hand here. Its only other pin was
+  // `diagnose.test.ts`'s own copy of the same two literals, which is an
+  // agreement between two files, not an anchor to the canonical table.
+  { file: "scripts/diagnose.ts", model: /^ {2}ollama: "([^"]+)",$/gm },
 ];
 
 /** Surfaces carrying a width but no model literal — the width is what has to
@@ -232,6 +240,9 @@ const LMSTUDIO_PAIR_SURFACES: Array<{ file: string; label?: string; model: RegEx
  *  dialect's dispatch key) — genuinely Ollama-only surfaces, not a gap. */
 const LMSTUDIO_MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
   { file: "scripts/setup-local-first.sh", model: /\$\{LMSTUDIO_EMBEDDING_MODEL:-([^}]+)\}/g },
+  // The LM Studio half of `diagnose.ts`'s DEFAULT_MODEL table — see the note
+  // on its Ollama sibling in MODEL_ONLY_SURFACES above.
+  { file: "scripts/diagnose.ts", model: /^ {2}lmstudio: "([^"]+)",$/gm },
 ];
 
 describe("embedding defaults parity (EDC-06)", () => {

@@ -435,6 +435,22 @@ note.
   the stated mechanism no longer exists. AC: the extractor is re-anchored and
   its comment rewritten **in the same commit**; a comment describing a
   mechanism that no longer exists is the defect, not a cosmetic issue.
+
+  **Deviation accepted (gap G12) — orchestrator, 2026-09-20.** The "same commit"
+  clause was **not** met: the union was deleted in `7987443d` (T03, Phase 2) and
+  the extractor re-anchored in `018e1529` (T15, Phase 6) — four commits and four
+  phases apart. Accepted rather than re-litigated, on a measurable reason rather
+  than an appeal to effort: **the gate never went vacuous in that window.** The
+  interface block never contains the literal `provider: "ollama",`, so the old
+  extractor still matched exactly once throughout and `extractOne`'s `!== 1`
+  throw was never armed. What the clause protects against — silently losing the
+  discriminator — did not happen. What did happen is that for four phases the
+  extractor's *comment* described a mechanism that no longer existed, which is
+  the lesser half of the same defect and is now corrected. No code change
+  follows from this record; it exists so an unmet clause is a decision with an
+  owner and a date rather than an unexplained gap. The clause itself stays as
+  written — it is the right rule, and this feature is the evidence for why:
+  it took an independent verifier to notice the four-phase window at all.
 - **LIP-22 — measure the retrieval-algorithm change at 768 (accepted risk).**
   The measured LM Studio model moves the store off the binary-quantization
   path entirely (see the Premise correction). This is inherent to the model's
