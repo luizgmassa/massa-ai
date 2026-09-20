@@ -35,7 +35,8 @@ import path from "path";
 import { glob } from "glob";
 import { randomUUID } from "node:crypto";
 import { smartChunk } from "./smart-chunker.js";
-import { buildExtensionGlob, loadProjectIgnore } from "./ignore-patterns.js";
+import { buildExtensionGlob, loadGitignore } from "./ignore-patterns.js";
+export { loadGitignore };
 import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import { ManagedRunRepositoryPg } from "../../data/managed-runs/managed-run-repository-pg.js";
 import type { ManagedRunLease } from "../../data/managed-runs/managed-run-contract.js";
@@ -43,7 +44,14 @@ import {
   getEmbeddingFingerprint,
   stampEmbeddingFingerprint,
 } from "../../data/symbol/symbol-repo-workspace.js";
-import { getProvidersByPriority } from "../embeddings/config.js";
+import {
+  EmbeddingIndexStaleError,
+  currentEmbeddingFingerprint,
+  embeddingFingerprintMismatch,
+} from "./embedding-freshness.js";
+// Re-exported so every existing importer of this module keeps working; the
+// declarations moved out to stay under the G-HUB 700-LOC ceiling.
+export { EmbeddingIndexStaleError, currentEmbeddingFingerprint };
 import type { IndexManager } from "./index-manager.js";
 import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import type { getVectorStore } from "../vector/vector-store-factory.js";
@@ -87,61 +95,17 @@ export type SearchAdmissionResult = {
     deletedFiles?: number;
   };
   /**
-   * LIP-15 read gate. Set when the workspace's stored embedding fingerprint
-   * disagrees with the currently configured embedding. The caller (the
-   * search entry path) MUST throw {@link EmbeddingIndexStaleError} and never
-   * proceed to `search()` when this is present — this module never throws
-   * that error itself, so every degraded-search test that only reads
-   * `admitted`/`stale` keeps passing unmodified.
+   * LIP-15 read gate — set on a fingerprint disagreement (the rule itself is
+   * in `embedding-freshness.ts`). The caller MUST throw
+   * {@link EmbeddingIndexStaleError} rather than reach `search()`; this
+   * module never throws it, so degraded-search tests reading only
+   * `admitted`/`stale` keep passing unmodified.
    */
   embeddingMismatch?: {
     stored: string;
     current: string;
   };
 };
-
-// ── Embedding fingerprint (LIP-15) ──────────────────────────────────────────
-
-/**
- * Raised by the search entry path when the workspace's stored embedding
- * fingerprint (`${provider}:${model}:${dimensions}`, stamped by the last full
- * reindex) disagrees with the currently configured embedding. Search must
- * never fall through to a table holding two mixed embedding spaces — the
- * caller throws this instead of returning rows.
- */
-export class EmbeddingIndexStaleError extends Error {
-  constructor(
-    readonly projectId: string,
-    readonly storedFingerprint: string,
-    readonly currentFingerprint: string,
-  ) {
-    super(
-      `Project '${projectId}' was indexed with embedding fingerprint ` +
-        `'${storedFingerprint}', but the configured embedding is now ` +
-        `'${currentFingerprint}'. Run index_project with forceReindex: true ` +
-        `to rebuild the index for the new embedding.`,
-    );
-    this.name = "EmbeddingIndexStaleError";
-  }
-}
-
-/**
- * The live embedding fingerprint (design.md §5): `${provider}:${model}:${dimensions}`
- * for the currently *selected* provider — `getProvidersByPriority()[0]`, the
- * priority-1 entry `services/embeddings/config.ts` resolves synchronously
- * from env + config.json at module load (no network probe, no fallback
- * chain walk — that is `createEmbeddingProvider`'s job, not this gate's).
- * `null` when any component is not resolvable — every caller here treats
- * "unknown" the same as "no mismatch": warn or skip, never block on a value
- * we can't compute.
- */
-export function currentEmbeddingFingerprint(): string | null {
-  const [, active] = getProvidersByPriority()[0] ?? [];
-  if (!active?.provider || !active?.model || active.dimensions === undefined) {
-    return null;
-  }
-  return `${active.provider}:${active.model}:${active.dimensions}`;
-}
 
 // ── Deps ─────────────────────────────────────────────────────────────────────
 
@@ -468,31 +432,15 @@ export async function ensureFreshIndex(
   // successful full reindex to stamp the workspace row (the "clearing branch"
   // — design.md §5).
   //
-  // CORRECTION (post-review, 2026-09-19): this whole `needsFullReindex`
-  // branch — not just the fingerprint arm — has zero production callers
-  // today. `ensureFreshIndex`'s only caller is `SearchController
-  // .handleAutoReindex`, which hardcodes `allowFullReindex: false`; every
-  // `needsFullReindex === true` outcome there is deferred at the check below
-  // and never reaches `deps.indexProject`/the stamp at `:536`. The reachable
-  // production recovery for a stale embedding fingerprint is `index_project`
-  // with `forceReindex: true`, which runs `EtlPipeline.run()`
-  // (`services/etl/pipeline.ts`) — a separate full-reindex mechanism that
-  // never calls this function — and that is where the fingerprint is
-  // actually stamped in production (same `stampEmbeddingFingerprint`/
-  // `currentEmbeddingFingerprint` pair, so the two sites can never disagree
-  // on the value, only on whether they currently run). This branch is kept,
-  // tested, and correct for the day a caller does pass
-  // `allowFullReindex: true` — deleting a documented, correct behaviour to
-  // chase "no dead code" would be the wrong trade here — but it must not be
-  // read as *the* write gate. See `search-controller.ts`'s Tier 1b comment
-  // for why the read gate stays unconditional rather than giving this branch
-  // a reachable caller.
-  const storedFingerprint = await getEmbeddingFingerprint(projectId);
+  // This branch has zero production callers today and is kept deliberately;
+  // the reachable recovery is `index_project --forceReindex` via
+  // `EtlPipeline.run()`. Full reasoning in `embedding-freshness.ts`.
   const liveFingerprint = currentEmbeddingFingerprint();
   const fingerprintMismatch =
-    storedFingerprint !== null &&
-    liveFingerprint !== null &&
-    storedFingerprint !== liveFingerprint;
+    embeddingFingerprintMismatch(
+      await getEmbeddingFingerprint(projectId),
+      liveFingerprint,
+    ) !== null;
 
   // For full reindex or many changes, clear and reindex
   const needsFullReindex =
@@ -656,12 +604,9 @@ export async function checkSearchAdmission(
       { projectId },
     );
   } else {
-    const liveFingerprint = currentEmbeddingFingerprint();
-    if (liveFingerprint !== null && storedFingerprint !== liveFingerprint) {
-      return {
-        admitted: false,
-        embeddingMismatch: { stored: storedFingerprint, current: liveFingerprint },
-      };
+    const embeddingMismatch = embeddingFingerprintMismatch(storedFingerprint);
+    if (embeddingMismatch) {
+      return { admitted: false, embeddingMismatch };
     }
   }
 
@@ -751,10 +696,4 @@ export async function indexFile(
   ]);
 
   return { chunks: chunks.length };
-}
-
-// ── loadGitignore ────────────────────────────────────────────────────────────
-
-export function loadGitignore(projectPath: string) {
-  return loadProjectIgnore(projectPath);
 }
