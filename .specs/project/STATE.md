@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 18 Tasks (T06b added mid-Execute); T01-T06b complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3), T07-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 18 Tasks (T06b added mid-Execute); T01-T07 complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4 Phase 4 in progress), T08-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -245,6 +245,62 @@ Phase 3 (runtime consumers) is closed. Next: Phase 4 (T07 both config CLIs write
 trio; T08 wizard config template) — both depend only on T01, a disjoint write set
 (`apps/mcp-client/src/config-cli.ts`, `apps/opencode-plugin/src/config-cli.ts`,
 `scripts/lib/installer-api-key.sh`).
+
+**T07 (W4) — Complete.** The feature's core defect: `initConfig()`/`saveConfig()` serialize the
+**whole** config object to disk, and `defaultMassaAiConfig.llm.model`/`codeModel` (T03) always
+derive from `INFERENCE_PROVIDERS.ollama`, never the active provider — so before this task,
+`init --lmstudio` and `use lmstudio` each overrode `config.llm.baseUrl` to LM Studio's URL while
+`config.llm.model`/`codeModel` silently kept whatever ollama-derived value the file already held.
+Fixed in all four call sites named by the task (two branches × two CLIs, copy-forks of each
+other): `apps/mcp-client/src/config-cli.ts`'s `init --lmstudio` and `use "lmstudio"` branches, and
+the identical branches in `apps/opencode-plugin/src/config-cli.ts`. Each now sets
+`config.llm.model = INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct` and
+`config.llm.codeModel = INFERENCE_PROVIDERS.lmstudio.defaultModels.coding` right beside the
+pre-existing `config.llm.baseUrl` override (LIP-09). The embedding-model literal
+(`text-embedding-nomic-embed-text-v1.5`) and the `knownDimensions[model] ?? 768` fallback in
+those same branches are untouched — out of this task's scope (T11's sweep), and the additive
+`?? 768` fallback stays load-bearing for a custom `--model`.
+**P1 Independent Test (spec.md), run against all four surfaces:**
+```
+D=$(mktemp -d) && XDG_CONFIG_HOME=$D bun apps/mcp-client/src/config-cli.ts init --lmstudio \
+  && grep -E '"(model|codeModel|dimensions|baseUrl)"' "$D/massa-ai/config.json"
+```
+→ `"model": "text-embedding-nomic-embed-text-v1.5"`, `"dimensions": 768`,
+`"baseUrl": "http://localhost:1234/v1"`, `"model": "qwen3-vl-8b-instruct"`,
+`"codeModel": "qwen2.5-coder-7b-instruct"` — baseUrl/model/codeModel now all name LM Studio.
+Repeated for `use lmstudio` on both CLIs with the same result (mcp-client and opencode-plugin).
+Gate: `bun test apps/mcp-client/src/__tests__/config-cli.test.ts` → 34 pass / 0 fail (up from 32,
++2 new); `bun test apps/opencode-plugin/src/__tests__/config-cli.test.ts` → 26 pass / 3 fail (up
+from 24, +2 new; the 3 failures are pre-existing and unrelated — `agents install/uninstall`
+fail with `ENOENT` on `apps/opencode-plugin/agents`, a directory this worktree never
+provisioned, confirmed unrelated by inspecting the failing test names). **Running both files in
+one `bun test file1 file2` process** (the literal Gate line in tasks.md) additionally shows 1 more
+failure: `apps/mcp-client/.../config-cli.test.ts`'s own "env-setup import guard" test, because
+each CLI's test file imports its own `env-setup.{js,ts}` which freezes `XDG_CONFIG_HOME`/
+`CONFIG_DIR` at first import — whichever file's env-setup module loads first in the shared
+process wins the freeze for the entire run, an artifact already documented in
+`apps/mcp-client/src/__tests__/env-setup.js`'s own docblock ("the isolation runner hides this").
+Neither file exhibits this when run alone; not fixed here (touches `env-setup.*`, outside T07's
+named files) — `bun run test:plugins` runs each package's suite in its own process and does not
+hit this.
+**Adequacy fix during Test Adequacy Review:** the first draft of the "use lmstudio" trio test in
+both files passed even when the "use lmstudio" branch's new lines were reverted, because
+`CONFIG_DIR` is frozen process-wide and every test in the file shares one real `config.json` — an
+earlier test's successful `init --lmstudio` write leaked the correct LM Studio model/codeModel
+into the file before the "use lmstudio" test ever ran its own (mutated) code path. Fixed by
+deleting the config file (`rmSync(getConfigPath(), { force: true })`) at the start of both new
+"init" and "use" trio tests in both files, forcing a fresh, deterministically ollama-derived
+baseline each time — confirmed this makes the mutation observable (see below).
+Observed red (one mutation per CLI, each restored by file copy, `git status --porcelain` clean
+before commit): reverting the `use "lmstudio"` branch's two new lines in
+`apps/opencode-plugin/src/config-cli.ts` failed "use lmstudio writes the LM Studio
+instruct/coding trio, not Ollama's" (expected `"qwen3-vl-8b-instruct"`, got `"qwen3-vl:8b"` — the
+exact live defect); reverting the `init --lmstudio` branch's two new lines in
+`apps/mcp-client/src/config-cli.ts` failed the equivalent init-side test with the same
+ollama-vs-lmstudio mismatch.
+Next: T08 (wizard config template, `scripts/lib/installer-api-key.sh:331`) — depends only on T01,
+a disjoint write set from T07's two config-cli.ts files. T08 is the last task in Phase 4; its
+commit also runs the phase-closing gate (lint, type-check, build, test:plugins).
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 

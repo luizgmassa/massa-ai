@@ -3,6 +3,8 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, rmSync, readdirSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
+import { getConfigPath } from "@massa-ai/shared/config";
+import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
 import { runCli, parseOptions } from "../config-cli";
 
 const BASE_TMP = tmpdir();
@@ -76,6 +78,25 @@ describe("opencode config-cli runCli", () => {
     expect(config.llm.baseUrl).toBe("http://localhost:1234/v1");
   });
 
+  test("init --lmstudio writes the LM Studio instruct/coding trio, not Ollama's (PDM-02 AC-2)", async () => {
+    // The live defect measured on 8ea21839: init --lmstudio wrote an LM
+    // Studio baseUrl next to Ollama's model/codeModel tags. baseUrl, model,
+    // and codeModel must all name the same provider. CONFIG_DIR is frozen
+    // process-wide (see env-setup.ts), so this suite's config.json is shared
+    // across every test — remove it first so this assertion is not
+    // satisfied by a leftover write from an earlier test.
+    rmSync(getConfigPath(), { force: true });
+    const r = await captureConsole(() => runCli(["init", "--lmstudio"]));
+    expect(r.code).toBe(0);
+    const show = await captureConsole(() => runCli(["show"]));
+    const config = JSON.parse(show.out);
+    expect(config.llm.baseUrl).toBe(INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl);
+    expect(config.llm.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct);
+    expect(config.llm.codeModel).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.coding);
+    expect(config.llm.model).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+    expect(config.llm.codeModel).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
+  });
+
   test("path", async () => {
     const r = await captureConsole(() => runCli(["path"]));
     expect(r.code).toBe(0);
@@ -119,6 +140,23 @@ describe("opencode config-cli runCli", () => {
     // Ollama's :11434 (LIP-09/G4).
     const config = JSON.parse(show.out);
     expect(config.llm.baseUrl).toBe("http://localhost:1234/v1");
+  });
+
+  test("use lmstudio writes the LM Studio instruct/coding trio, not Ollama's (PDM-02 AC-2)", async () => {
+    // Reset to a fresh, ollama-derived config first (see the init test above
+    // for why the reset is required) so this test proves the "use" branch
+    // itself writes the trio, not a leftover value from an earlier test.
+    rmSync(getConfigPath(), { force: true });
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() => runCli(["use", "lmstudio"]));
+    expect(r.code).toBe(0);
+    const show = await captureConsole(() => runCli(["show"]));
+    const config = JSON.parse(show.out);
+    expect(config.llm.baseUrl).toBe(INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl);
+    expect(config.llm.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct);
+    expect(config.llm.codeModel).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.coding);
+    expect(config.llm.model).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+    expect(config.llm.codeModel).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
   });
 
   test("use google with api-key", async () => {

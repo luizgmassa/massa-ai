@@ -151,7 +151,7 @@ Depends on: T01, T02.
 
 ### Phase 4 — Config writers (the live defect)
 
-### T07: Both config CLIs write the provider's trio
+### T07: Both config CLIs write the provider's trio — ✅ Complete
 
 `apps/mcp-client/src/config-cli.ts` `init --lmstudio` (`:200-212`) and `use <provider>`
 (`:283-294`), and the same two branches in `apps/opencode-plugin/src/config-cli.ts`. Each sets
