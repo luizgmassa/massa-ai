@@ -98,4 +98,26 @@ describe("Admin Portal config sections all resolve", () => {
     const missing = portalSectionKeys().filter((key) => config[key] === undefined);
     expect(missing).toEqual([]);
   });
+
+  test("no portal section resolves to undefined against an LM Studio installer config", () => {
+    // Same shape as the Ollama installer case above, but with the provider
+    // T12's `installer_write_config` writes for an LM Studio selection
+    // (LIP-06/LIP-14) — a second local-inference provider must not reintroduce
+    // the missing-section bug this file guards.
+    const installerish = JSON.stringify({
+      database: { url: "postgresql://massa_ai:massa_ai_password@localhost:5432/massa_ai" },
+      security: { apiKey: "0".repeat(64) },
+      embedding: {
+        provider: "lmstudio",
+        model: "text-embedding-nomic-embed-text-v1.5",
+        baseURL: "http://localhost:1234/v1",
+        dimensions: 768,
+      },
+      llm: { enabled: true, baseUrl: "http://localhost:1234/v1", model: "qwen2.5:7b-instruct" },
+      hooks: { enabled: true },
+    });
+    const config = loadConfigInScratchHome(installerish);
+    const missing = portalSectionKeys().filter((key) => config[key] === undefined);
+    expect(missing).toEqual([]);
+  });
 });

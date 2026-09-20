@@ -7,11 +7,15 @@ import {
   writeFileAtomically,
   mergeSchedulerSection,
 } from "./config-loader";
-import { SCHEDULER_JOB_KINDS, type MassaAiConfig } from "./massa-ai-config";
+import { SCHEDULER_JOB_KINDS, EMBEDDING_PROVIDER_IDS, type MassaAiConfig } from "./massa-ai-config";
 
 const MASK_SENTINEL = "***";
 const RESTART_SECTIONS = ["database", "embedding", "llm", "security", "scheduler"];
-const VALID_EMBEDDING_PROVIDERS = ["ollama", "mistral", "openai", "google", "cohere"];
+// Derived from LOCAL_INFERENCE_IDS ∪ API_PROVIDER_IDS (LIP-01) — adds
+// "lmstudio" to what config.json can validate for `embedding.provider`.
+// Exported so scripts/__tests__/provider-list-parity.test.ts can assert
+// membership equality against the other provider-list consumers.
+export const VALID_EMBEDDING_PROVIDERS: readonly string[] = EMBEDDING_PROVIDER_IDS;
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"];
 /** Keep the 10 most recent `config.json.bak.<ISO>` files; delete older ones (APCR-08.4). No
  *  prior policy existed — 10 covers a normal editing session while bounding a directory

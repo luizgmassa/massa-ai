@@ -156,6 +156,145 @@ installer_ask() {
   esac
 }
 
+# ── Local inference provider (LIP-12, LIP-13, LIP-16) ────────
+
+# installer_detect_provider <config_file>
+#
+# Echoes which local inference provider an install is already on:
+#   ollama | lmstudio | other | fresh
+#
+# The key is `embedding.provider` in config.json — the literal
+# installer_write_config writes. NOT install-state.json, which records
+# agent-harness state and names no provider at all. `other` means an API
+# provider (mistral, openai, …): that is not a local inference install and
+# LIP-13 leaves it alone. An absent, unreadable or malformed file is `fresh`,
+# the same graceful degradation installer_feature_defaults uses.
+installer_detect_provider() {
+  local config_file="$1" runner stored
+  [ -f "$config_file" ] || { echo fresh; return 0; }
+  runner="$(installer_detect_runner)" || { echo fresh; return 0; }
+
+  stored="$("$runner" -e '
+    const fs = require("fs");
+    let c;
+    try { c = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch { process.exit(0); }
+    const p = c.embedding && c.embedding.provider;
+    if (typeof p === "string") process.stdout.write(p);
+  ' "$config_file" 2>/dev/null)" || { echo fresh; return 0; }
+
+  case "$stored" in
+    ollama|lmstudio) echo "$stored" ;;
+    "") echo fresh ;;
+    *) echo other ;;
+  esac
+}
+
+# migrate_provider <from> <to>
+#
+# Announces a provider switch. One function for both directions on purpose
+# (LIP-13): the rule is uniform — the installer always offers the provider you
+# are not currently using — so the body and its tests are written once rather
+# than as a second, untested half.
+#
+# It deliberately does not touch the index. LIP-15's fingerprint gate already
+# makes a stale index fail loudly with the reindex command on the next search,
+# so starting a multi-GB reindex from an installer would be a heavy action the
+# user never asked for.
+migrate_provider() {
+  local from="$1" to="$2"
+  echo ""
+  echo "  Migrating local inference provider: ${from} → ${to}"
+  echo "  The existing embedding index was built by ${from} and cannot be reused."
+  echo "  Search will refuse to return stale rows until you re-index:"
+  echo "      massa-ai index --force"
+}
+
+# installer_select_provider <detected>
+#
+# Resolves the provider to install with, and sets two globals rather than
+# echoing: a `die` inside a $(...) capture only kills the subshell, which would
+# turn LIP-16's fatal unknown value into a silent empty string.
+#
+#   INFERENCE_PROVIDER       ollama | lmstudio | "" (API provider, left alone)
+#   INFERENCE_PROVIDER_FROM  the provider being migrated away from, else ""
+#
+# MASSA_AI_INFERENCE_PROVIDER follows MASSA_AI_MODE / MASSA_AI_DB_BACKEND: an
+# unrecognised value is fatal and names itself, never a silent default. `die`
+# is supplied by whichever installer sources this file.
+installer_select_provider() {
+  local detected="$1" reply target
+  INFERENCE_PROVIDER=""
+  INFERENCE_PROVIDER_FROM=""
+
+  case "${MASSA_AI_INFERENCE_PROVIDER:-}" in
+    "") ;;
+    ollama|lmstudio)
+      INFERENCE_PROVIDER="$MASSA_AI_INFERENCE_PROVIDER"
+      case "$detected" in
+        ollama|lmstudio)
+          if [ "$detected" != "$INFERENCE_PROVIDER" ]; then
+            INFERENCE_PROVIDER_FROM="$detected"
+          fi
+          ;;
+      esac
+      return 0
+      ;;
+    *)
+      die "Invalid MASSA_AI_INFERENCE_PROVIDER: '${MASSA_AI_INFERENCE_PROVIDER}'. Choose ollama or lmstudio."
+      ;;
+  esac
+
+  if [ "$detected" = "other" ]; then
+    echo "  Existing install uses an API embedding provider — leaving it unchanged."
+    return 0
+  fi
+
+  case "$detected" in
+    ollama)   target="lmstudio" ;;
+    lmstudio) target="ollama" ;;
+    *)        target="" ;;
+  esac
+
+  if ! installer_can_prompt; then
+    case "$detected" in
+      ollama|lmstudio) INFERENCE_PROVIDER="$detected" ;;
+      *) INFERENCE_PROVIDER="ollama" ;;
+    esac
+    echo "  Non-interactive install — keeping inference provider: ${INFERENCE_PROVIDER}"
+    return 0
+  fi
+
+  # No shared menu helper exists in this repo; this is the inline
+  # echo + read <>/dev/tty + case shape install.sh:147-166 uses.
+  echo ""
+  if [ -z "$target" ]; then
+    echo "  Local inference provider:"
+    echo ""
+    echo "    1) Ollama     (default)"
+    echo "    2) LM Studio"
+    echo ""
+    reply=""
+    read -r -p "  Enter your choice [1]: " reply <>/dev/tty || reply=""
+    case "$reply" in
+      2) INFERENCE_PROVIDER="lmstudio" ;;
+      *) INFERENCE_PROVIDER="ollama" ;;
+    esac
+    return 0
+  fi
+
+  echo "  This install already uses ${detected}."
+  echo ""
+  echo "    1) Keep ${detected}     (default)"
+  echo "    2) Migrate to ${target}  (re-index required)"
+  echo ""
+  reply=""
+  read -r -p "  Enter your choice [1]: " reply <>/dev/tty || reply=""
+  case "$reply" in
+    2) INFERENCE_PROVIDER="$target"; INFERENCE_PROVIDER_FROM="$detected" ;;
+    *) INFERENCE_PROVIDER="$detected" ;;
+  esac
+}
+
 # installer_prompt_features <llm_available>
 #
 # Walks every Config-tab feature section. <llm_available> is "true" when an LLM

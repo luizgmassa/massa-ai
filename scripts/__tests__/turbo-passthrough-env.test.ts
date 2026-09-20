@@ -15,6 +15,32 @@
  * static scan by design — those ten are covered separately by
  * `llm-env-passthrough.test.ts`, which derives its own set from the config
  * resolver's literal occurrences of the name.
+ *
+ * LIP-20 / G8 — vars read only from bash are the second blind spot, and the
+ * derived scan cannot be widened to cover them. Measured on this tree, where
+ * the method matters as much as the figure: over the **58** tracked `.sh`
+ * files under `scripts/` (`git ls-files`, not a filesystem glob), counting a
+ * name as *read* when it appears as `$NAME`/`${NAME…}` in a file that does not
+ * also assign it, there are **27** such `MASSA_AI_*` names and **24** of them
+ * are absent from `passThroughEnv` — installer-internal knobs
+ * (`MASSA_AI_INSTALLER_TEST_*`, `MASSA_AI_PG_ROLE`,
+ * `MASSA_AI_PLUGIN_SOURCE`, …) that turbo has no reason to forward, because
+ * turbo never dispatches the shell suites at all: they run under the
+ * root-level `test:scripts`, outside the `packages/*` / `apps/*` globs. A
+ * shell-wide scan would therefore redden on two dozen pre-existing names while
+ * proving nothing. Bash-read knobs that the spec still requires on the
+ * allowlist are pinned by name below, the same way the `RUN_*` sentinels are.
+ *
+ * The absent count is a moving baseline, not a constant: it read **25** before
+ * `MASSA_AI_INFERENCE_PROVIDER` was itself added to the allowlist, and **24**
+ * after — the fix moved the number the fix was justified by. A different
+ * read-definition also gives a different total; an independent re-measure
+ * reported 30/25, and its definition is not recorded here because it was not
+ * reproduced (an earlier draft of this comment guessed at it, and the guess
+ * did not reproduce either — the guess is the mistake worth remembering, not
+ * the discrepancy). Quote the method beside the number, or claim no method.
+ * What is stable across every definition tried, and the only load-bearing
+ * part, is that the absent set is two dozen names and almost none are ours.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -84,6 +110,24 @@ describe("turbo passThroughEnv covers every literally-accessed MASSA_AI_* var", 
       missing,
       `not listed in turbo.json tasks.test.passThroughEnv: ${missing.join(", ")}`,
     ).toEqual([]);
+  });
+
+  test("bash-only MASSA_AI_* knobs the derived scan cannot see are pinned by name (LIP-20)", () => {
+    const listed = new Set(passThroughEnv());
+    // Read at scripts/lib/installer-feature-prompts.sh (`installer_select_provider`)
+    // and nowhere in packages/ or apps/, so readSet() above is structurally
+    // blind to it and its green says nothing here. Removing the name from
+    // turbo.json reddens this test and nothing else.
+    for (const name of ["MASSA_AI_INFERENCE_PROVIDER"]) {
+      const readers = execSync(`git grep -l -E '\\$\\{?${name}' -- 'scripts/**/*.sh'`, {
+        cwd: REPO_ROOT,
+      })
+        .toString()
+        .trim();
+      // Anti-vacuity: if the shell reader is gone the pin is stale, not passing.
+      expect(readers, `${name}: no shell reader found — pin is stale`).not.toBe("");
+      expect(listed.has(name), `${name} missing from tasks.test.passThroughEnv`).toBe(true);
+    }
   });
 
   test("sentinel vars XP-04/XP-10 depend on are present", () => {

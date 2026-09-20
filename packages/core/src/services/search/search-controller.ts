@@ -12,6 +12,7 @@ import { eventBus } from "../events/event-bus.js";
 import { LLMJudgeReranker } from "./reranker.js";
 import type { SearchDegradation } from "../../kernel/search-diagnostics.js";
 import { projectNotIndexed } from "../../kernel/search-diagnostics.js";
+import { EmbeddingIndexStaleError, type SearchAdmissionResult } from "./project-indexer.js";
 import { minimatch } from "minimatch";
 import { validateFilters } from "./filter-validation.js";
 import type { FilterDowngrade } from "./filter-validation.js";
@@ -160,10 +161,43 @@ export class SearchController {
     //            success:false. Replaces the prior silent `results:[]` path.
     //   Tier 2 — WARN: indexed but stale (needs projectPath) → search proceeds,
     //            `staleWarning` attached to the returned result.
-    const admission = await this.contextualSearch.checkSearchAdmission(
+    // The type here is narrower than SearchAdmissionResult — declared on
+    // ContextualSearchRLM.checkSearchAdmission ahead of this feature and out
+    // of this task's write set — but it always returns the wider shape at
+    // runtime, since it delegates straight through. See project-indexer.ts.
+    const admission = (await this.contextualSearch.checkSearchAdmission(
       projectId,
       projectPath,
-    );
+    )) as SearchAdmissionResult;
+    // Tier 1b — LIP-15 HARD-FAIL: a stale embedding fingerprint. Checked
+    // before the generic admitted check so this never gets mislabeled as
+    // "not indexed" — never returns rows either way.
+    //
+    // DELIBERATELY before `handleAutoReindex` (`:193` below), even when the
+    // caller passed `autoReindex: true` — recovery from a fingerprint
+    // mismatch is exclusively via `index_project` with `forceReindex: true`,
+    // never a silent self-heal mid-search. Two independent reasons, either
+    // one sufficient on its own:
+    //   1. `handleAutoReindex` always calls `ensureFreshIndex` with
+    //      `allowFullReindex: false` (`:388` below) — moving this check
+    //      after it would not let it self-heal anyway; a fingerprint-forced
+    //      `needsFullReindex` would just be deferred (see
+    //      project-indexer.ts's `ensureFreshIndex` CORRECTION note).
+    //   2. Design intent (spec.md LIP-15): "must make search fail loudly
+    //      with a reindex instruction" — an explicit, deliberate recovery a
+    //      human triggers, not an opportunistic full rebuild racing a search
+    //      request (a provider/model switch is an operator action, not file
+    //      drift — the thing `autoReindex` exists to paper over).
+    // If a future change makes `handleAutoReindex` allow full reindexes,
+    // revisit this ordering deliberately rather than leaving both
+    // half-wired.
+    if (admission.embeddingMismatch) {
+      throw new EmbeddingIndexStaleError(
+        projectId,
+        admission.embeddingMismatch.stored,
+        admission.embeddingMismatch.current,
+      );
+    }
     if (!admission.admitted) {
       throw projectNotIndexed(
         projectId,

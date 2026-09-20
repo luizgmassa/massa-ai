@@ -35,10 +35,23 @@ import path from "path";
 import { glob } from "glob";
 import { randomUUID } from "node:crypto";
 import { smartChunk } from "./smart-chunker.js";
-import { buildExtensionGlob, loadProjectIgnore } from "./ignore-patterns.js";
+import { buildExtensionGlob, loadGitignore } from "./ignore-patterns.js";
+export { loadGitignore };
 import { getProjectIdentityAliasResolver } from "../../kernel/alias-resolver.js";
 import { ManagedRunRepositoryPg } from "../../data/managed-runs/managed-run-repository-pg.js";
 import type { ManagedRunLease } from "../../data/managed-runs/managed-run-contract.js";
+import {
+  getEmbeddingFingerprint,
+  stampEmbeddingFingerprint,
+} from "../../data/symbol/symbol-repo-workspace.js";
+import {
+  EmbeddingIndexStaleError,
+  currentEmbeddingFingerprint,
+  embeddingFingerprintMismatch,
+} from "./embedding-freshness.js";
+// Re-exported so every existing importer of this module keeps working; the
+// declarations moved out to stay under the G-HUB 700-LOC ceiling.
+export { EmbeddingIndexStaleError, currentEmbeddingFingerprint };
 import type { IndexManager } from "./index-manager.js";
 import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory.js";
 import type { getVectorStore } from "../vector/vector-store-factory.js";
@@ -80,6 +93,17 @@ export type SearchAdmissionResult = {
     modifiedFiles?: number;
     newFiles?: number;
     deletedFiles?: number;
+  };
+  /**
+   * LIP-15 read gate — set on a fingerprint disagreement (the rule itself is
+   * in `embedding-freshness.ts`). The caller MUST throw
+   * {@link EmbeddingIndexStaleError} rather than reach `search()`; this
+   * module never throws it, so degraded-search tests reading only
+   * `admitted`/`stale` keep passing unmodified.
+   */
+  embeddingMismatch?: {
+    stored: string;
+    current: string;
   };
 };
 
@@ -402,11 +426,28 @@ export async function ensureFreshIndex(
     };
   }
 
+  // LIP-15 write gate: a fingerprint mismatch forces the full-reindex branch
+  // below, so a stale project can never take the incremental branch and mix
+  // two embedding spaces in one table. `liveFingerprint` is reused after a
+  // successful full reindex to stamp the workspace row (the "clearing branch"
+  // — design.md §5).
+  //
+  // This branch has zero production callers today and is kept deliberately;
+  // the reachable recovery is `index_project --forceReindex` via
+  // `EtlPipeline.run()`. Full reasoning in `embedding-freshness.ts`.
+  const liveFingerprint = currentEmbeddingFingerprint();
+  const fingerprintMismatch =
+    embeddingFingerprintMismatch(
+      await getEmbeddingFingerprint(projectId),
+      liveFingerprint,
+    ) !== null;
+
   // For full reindex or many changes, clear and reindex
   const needsFullReindex =
     staleCheck.reason === "no_index" ||
     staleCheck.reason === "path_mismatch" ||
-    filesToReindex.length > maxSyncFiles;
+    filesToReindex.length > maxSyncFiles ||
+    fingerprintMismatch;
 
   if (needsFullReindex && !allowFullReindex) {
     logger.warn("Deferring full reindex in latency-sensitive path", {
@@ -455,6 +496,13 @@ export async function ensureFreshIndex(
     let lease: ManagedRunLease = beginOutcome.lease;
     try {
       await deps.indexProject(projectPath, projectId);
+
+      // LIP-15 write gate: stamp only from this clearing branch, only after
+      // every row was just rewritten under `liveFingerprint`. Never stamped
+      // from the incremental branch below.
+      if (liveFingerprint !== null) {
+        await stampEmbeddingFingerprint(projectId, liveFingerprint);
+      }
 
       // Invalidate cache after reindex
       await deps.searchCache.invalidateProject(projectId);
@@ -545,6 +593,23 @@ export async function checkSearchAdmission(
     };
   }
 
+  // LIP-15 read gate. NULL/no row = legacy or never-stamped: warn once, never
+  // block — the next full reindex stamps it. A live fingerprint we can't
+  // resolve is treated the same way (see currentEmbeddingFingerprint). Only a
+  // stored value that actively disagrees with a resolvable live one blocks.
+  const storedFingerprint = await getEmbeddingFingerprint(projectId);
+  if (storedFingerprint === null) {
+    logger.warn(
+      "Workspace has no embedding fingerprint (legacy or never-stamped); skipping the embedding staleness check",
+      { projectId },
+    );
+  } else {
+    const embeddingMismatch = embeddingFingerprintMismatch(storedFingerprint);
+    if (embeddingMismatch) {
+      return { admitted: false, embeddingMismatch };
+    }
+  }
+
   if (projectPath) {
     const staleCheck = await deps.indexManager.isIndexStale(
       projectId,
@@ -631,10 +696,4 @@ export async function indexFile(
   ]);
 
   return { chunks: chunks.length };
-}
-
-// ── loadGitignore ────────────────────────────────────────────────────────────
-
-export function loadGitignore(projectPath: string) {
-  return loadProjectIgnore(projectPath);
 }

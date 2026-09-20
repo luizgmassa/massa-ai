@@ -1,5 +1,19 @@
 import path from "path";
 import { configDir } from "./xdg";
+import { LOCAL_INFERENCE_IDS } from "./inference-providers";
+
+/**
+ * API-only embedding providers writable to `config.json` — the other half of
+ * the union the three config provider lists derive from (LIP-01).
+ * Local-inference ids (`ollama`, `lmstudio`) live in `inference-providers.ts`.
+ */
+export const API_PROVIDER_IDS = ["mistral", "openai", "google", "cohere"] as const;
+
+/** `LOCAL_INFERENCE_IDS ∪ API_PROVIDER_IDS` — the writable `embedding.provider` set. */
+export const EMBEDDING_PROVIDER_IDS = [
+  ...LOCAL_INFERENCE_IDS,
+  ...API_PROVIDER_IDS,
+] as const;
 
 /** Registered scheduler job kinds exposed on the config surface. The row ids
  *  (`scheduled-*`) stay an implementation detail; the kind is the contract
@@ -34,7 +48,7 @@ export interface MassaAiConfig {
     url: string;
   };
   embedding: {
-    provider: "ollama" | "mistral" | "openai" | "google" | "cohere";
+    provider: (typeof EMBEDDING_PROVIDER_IDS)[number];
     model: string;
     baseURL?: string;
     apiKey?: string;

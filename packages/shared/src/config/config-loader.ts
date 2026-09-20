@@ -4,6 +4,7 @@ import os from "os";
 import crypto from "crypto";
 import { MassaAiConfig, defaultMassaAiConfig } from "./massa-ai-config";
 import { configDir } from "./xdg";
+import { INFERENCE_PROVIDERS } from "./inference-providers";
 
 const CONFIG_DIR = configDir("massa-ai");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
@@ -116,11 +117,27 @@ export function loadConfig(): MassaAiConfig {
     const content = fs.readFileSync(CONFIG_FILE, "utf-8");
     const userConfig = JSON.parse(content);
 
+    // `defaultMassaAiConfig.embedding` names ollama's own baseURL/dimensions
+    // (LIP-01/02). Merging it under every provider was harmless while ollama
+    // was the only provider that read `baseURL` from this block — mistral
+    // and openai never consulted the leaked field — but it actively lies for
+    // a provider with its own real default (lmstudio's :1234/v1): a user
+    // config naming `provider: "lmstudio"` with no baseURL would otherwise
+    // merge-inherit ollama's :11434 here, before embeddings/config.ts's own
+    // provider-aware fallback ever gets a say. Only inherit the default
+    // block's fields when the user's config targets the SAME provider the
+    // default block describes.
+    const embeddingBase =
+      userConfig.embedding?.provider &&
+      userConfig.embedding.provider !== defaultMassaAiConfig.embedding.provider
+        ? {}
+        : defaultMassaAiConfig.embedding;
+
     return {
       ...defaultMassaAiConfig,
       ...userConfig,
       database: { ...defaultMassaAiConfig.database, ...userConfig.database },
-      embedding: { ...defaultMassaAiConfig.embedding, ...userConfig.embedding },
+      embedding: { ...embeddingBase, ...userConfig.embedding },
       compression: { ...defaultMassaAiConfig.compression, ...userConfig.compression },
       cache: { ...defaultMassaAiConfig.cache, ...userConfig.cache },
       logging: { ...defaultMassaAiConfig.logging, ...userConfig.logging },
@@ -459,18 +476,34 @@ export function getConfigForEnv(): Record<string, string> {
   const config = loadConfig();
   const env: Record<string, string> = {};
 
-  if (config.embedding.provider === "ollama") {
+  const provider = config.embedding.provider;
+  if (provider === "ollama") {
     env.OLLAMA_EMBEDDING_MODEL = config.embedding.model;
     env.OLLAMA_BASE_URL = config.embedding.baseURL || "http://localhost:11434";
     if (config.embedding.dimensions) {
       env.OLLAMA_EMBEDDING_DIMENSIONS = String(config.embedding.dimensions);
     }
-  } else if (config.embedding.provider === "mistral") {
+  } else if (provider === "lmstudio") {
+    env.LMSTUDIO_EMBEDDING_MODEL = config.embedding.model;
+    env.LMSTUDIO_BASE_URL =
+      config.embedding.baseURL || INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl;
+    if (config.embedding.dimensions) {
+      env.LMSTUDIO_EMBEDDING_DIMENSIONS = String(config.embedding.dimensions);
+    }
+  } else if (provider === "mistral") {
     env.MISTRAL_API_KEY = config.embedding.apiKey || "";
     env.MISTRAL_TEXT_EMBEDDING_MODEL = config.embedding.model;
-  } else if (config.embedding.provider === "openai") {
+  } else if (provider === "openai") {
     env.OPENAI_API_KEY = config.embedding.apiKey || "";
     env.OPENAI_EMBEDDING_MODEL = config.embedding.model;
+  } else {
+    // google, cohere, or any future provider with no branch here: fail by
+    // name instead of silently returning a block that exports nothing
+    // (LIP-02) — console.error, not the shared logger, keeps this module
+    // dependency-free (see initConfig() above).
+    console.error(
+      `[getConfigForEnv] embedding.provider "${provider}" has no env-projection branch — no embedding env vars were set`,
+    );
   }
 
   env.LOG_LEVEL = config.logging.level;

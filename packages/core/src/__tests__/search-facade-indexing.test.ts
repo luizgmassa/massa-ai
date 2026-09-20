@@ -87,6 +87,19 @@ mock.module("../data/managed-runs/managed-run-repository-pg.js", () => ({
     }),
   },
 }));
+// LIP-15: no stored fingerprint by default (the pre-existing "legacy, never
+// blocks" behaviour every test in this file assumes). Individual tests below
+// override these mocks for their duration where the fingerprint gate itself
+// is under test.
+mock.module("../data/symbol/symbol-repo-workspace.js", () => ({
+  getEmbeddingFingerprint: async () => null,
+  stampEmbeddingFingerprint: async () => {},
+}));
+mock.module("../services/embeddings/config.js", () => ({
+  getProvidersByPriority: () => [
+    ["ollama", { provider: "ollama", model: "qwen3-embedding:4b", dimensions: 2560, priority: 1 }],
+  ],
+}));
 
 mock.module("../services/structural/parser-readiness.js", () => ({
   assertParserReadyForIndexing: async () => {},

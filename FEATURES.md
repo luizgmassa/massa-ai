@@ -31,7 +31,7 @@ Every feature in massa-ai, what it does, why it exists, and how to use it.
 - [Scheduler](#scheduler)
 - [Code Execution (Sandbox)](#code-execution-sandbox)
 - [L1/L2 Cache](#l1l2-cache)
-- [Local-first LLM (Ollama)](#local-first-llm-ollama)
+- [Local-first LLM (Ollama or LM Studio)](#local-first-llm-ollama-or-lm-studio)
 - [Query Understanding (Rewrite + HyDE)](#query-understanding-rewrite--hyde)
 - [Rerank (LLM-judge)](#rerank-llm-judge)
 - [Fetch and Index](#fetch-and-index)
@@ -904,13 +904,13 @@ batch_execute { commands: ["rg 'function' src/", "wc -l src/*.ts"] }
 
 ---
 
-## Local-first LLM (Ollama)
+## Local-first LLM (Ollama or LM Studio)
 
-**What:** All LLM-driven features run against a local Ollama instance and default OFF, degrading silently to rule-based behavior when disabled. Everything still works without an LLM — you just lose consolidation, polish, rerank, and query rewrite.
+**What:** All LLM-driven features run against a local inference provider — Ollama or LM Studio — and default OFF, degrading silently to rule-based behavior when disabled. Everything still works without an LLM — you just lose consolidation, polish, rerank, and query rewrite.
 
-**Why:** Privacy and cost. Your code and memories never leave your machine. Ollama is free and runs offline. No API keys, no per-token billing.
+**Why:** Privacy and cost. Your code and memories never leave your machine. Both providers are free and run offline. No API keys, no per-token billing.
 
-**How to enable:**
+**How to enable (Ollama):**
 
 ```bash
 # .env
@@ -921,9 +921,29 @@ MASSA_AI_LLM_MODEL=qwen2.5:7b-instruct         # NL-judgment sites
 MASSA_AI_LLM_CODE_MODEL=qwen2.5-coder:7b       # code-oriented sites (bootstrap seed, reranker, compress)
 ```
 
+**How to enable (LM Studio):** point the same four variables at LM Studio's
+OpenAI-compatible server instead:
+
+```bash
+# .env
+MASSA_AI_LLM_ENABLED=true
+MASSA_AI_LLM_BASE_URL=http://localhost:1234/v1
+MASSA_AI_LLM_API_KEY=lm-studio
+MASSA_AI_LLM_MODEL=<model loaded in LM Studio>
+MASSA_AI_LLM_CODE_MODEL=<model loaded in LM Studio>
+```
+
 With `MASSA_AI_LLM_ENABLED=true` you get: hook→memory consolidation, handoff-summary polish, query understanding (rewrite + HyDE), LLM-judge rerank, and auto importance scoring.
 
 **Per-task model routing:** the 10 LLM call sites split by task shape. 7 NL-judgment sites use `MASSA_AI_LLM_MODEL`; the 3 code-oriented sites (bootstrap seed, reranker, code-compressor) use `MASSA_AI_LLM_CODE_MODEL`. Both must be **non-thinking instruct** models — a thinking model routes structured output into the reasoning channel and silently burns the 90 s timeout.
+
+**Provider-specific behaviour:** the two Ollama-only quirks — the `/api/version`
+JSON-schema-support probe and the injected `think:false` body flag — run only
+against Ollama; LM Studio implements OpenAI-style `response_format:
+{type:"json_schema"}` natively and needs neither. LM Studio also requires
+structured-output calls to go through `/v1/chat/completions` rather than the
+`/v1/responses` endpoint Ollama uses — handled automatically by provider
+identity, no config needed.
 
 ---
 
@@ -1206,8 +1226,8 @@ rows default **OFF** and degrade silently when disabled.
 | `database.port` | `MASSA_AI_POSTGRES_PORT` | `5432` | host port (Docker) |
 | `database.backend` | `MASSA_AI_DB_BACKEND` | _(interactive)_ | installer provisioning: `native`/`docker` |
 | `llm.enabled` | `MASSA_AI_LLM_ENABLED` | `false` | **OFF** |
-| `llm.baseUrl` | `MASSA_AI_LLM_BASE_URL` | `http://localhost:11434/v1` | — |
-| `llm.apiKey` | `MASSA_AI_LLM_API_KEY` | `ollama` | — |
+| `llm.baseUrl` | `MASSA_AI_LLM_BASE_URL` | `http://localhost:11434/v1` | LM Studio: `http://localhost:1234/v1` |
+| `llm.apiKey` | `MASSA_AI_LLM_API_KEY` | `ollama` | any non-empty string for either local provider |
 | `llm.model` | `MASSA_AI_LLM_MODEL` | `qwen2.5:7b-instruct` | default instruct model (NL-judgment sites) |
 | `llm.codeModel` | `MASSA_AI_LLM_CODE_MODEL` | `qwen2.5-coder:7b` | code-oriented sites (bootstrap seed, reranker, compress) |
 | `llm.disableThink` | `MASSA_AI_LLM_DISABLE_THINK` | `true` | best-effort thinking-disable (safety net for thinking models) |
@@ -1280,7 +1300,8 @@ process environment at boot, so they do not appear in `~/.config/massa-ai/config
 
 | Provider | Model | Cost | Quality |
 |----------|-------|------|---------|
-| **Ollama** (default) | qwen3-embedding:4b (also bge-m3) | Free | Good-Excellent |
+| **Ollama** (default, local) | qwen3-embedding:4b (also bge-m3) | Free | Good-Excellent |
+| **LM Studio** (local) | text-embedding-nomic-embed-text-v1.5 (768d) | Free | Good |
 | **Mistral** | mistral-embed, codestral-embed | $$ | Great |
 | **OpenAI** | text-embedding-3-small | $$ | Great |
 
@@ -1291,11 +1312,11 @@ process environment at boot, so they do not appear in `~/.config/massa-ai/config
 
 | Command | Options | Purpose |
 |---|---|---|
-| `init` | `--ollama` (default), `--mistral <key>`, `--openai <key>` | Create the config |
+| `init` | `--ollama` (default), `--lmstudio`, `--mistral <key>`, `--openai <key>` | Create the config |
 | `path` | | Print the config file path |
 | `show` | | Print the current configuration |
 | `set <key> <val>` | | Set one value |
-| `use <provider>` | `--api-key <key>`, `--model <name>`, `--base-url <url>` | Switch embedding provider |
+| `use <provider>` | `--api-key <key>`, `--model <name>`, `--base-url <url>` | Switch embedding provider (`ollama`, `lmstudio`, `mistral`, `openai`, `google`, `cohere`) |
 | `recover <projectId>` | `--path <newPath>` | Re-associate an index with a moved directory (`mcp-client` bin only) |
 | `agents install\|uninstall` | `--user`, `--project` | Write/remove the 18 agent files (`opencode-plugin` bin only) |
 | `profile list\|show` | | Shipped profiles + per-host active profile |
@@ -1305,7 +1326,9 @@ process environment at boot, so they do not appear in `~/.config/massa-ai/config
 
 ```bash
 massa-ai-config init --mistral your-api-key
+massa-ai-config init --lmstudio
 massa-ai-config use ollama --model qwen3-embedding:4b
+massa-ai-config use lmstudio --model text-embedding-nomic-embed-text-v1.5
 massa-ai-config set embedding.dimensions 2560
 massa-ai-config recover my-project --path /home/user/renamed-dir
 massa-ai-config profile set work --dry-run

@@ -1,4 +1,108 @@
-## Current — Bootstrap file and rule toggles (**VALIDATED 2026-09-08** — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs with three recorded bounds; every gate green; unpushed, push/PR is the user's call)
+## Current — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
+
+Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
+worktree `~/Projects/massa-ai-feat-local-inference-provider-abstraction`. Full
+account in `.specs/HANDOFF.md` and
+`.specs/features/local-inference-provider-abstraction/tasks.md`.
+
+**What shipped.** LM Studio is a second local inference provider, added behind one shared
+seam (`packages/shared/src/config/inference-providers.ts`) that the config lists, both
+CLIs, the installers and the Web UI derive from — rather than a second copy of Ollama's
+literals in six places. Deriving those lists closed a pre-existing gap: `cohere` was a
+valid embedding provider they never offered. Probing is by response body, not HTTP status,
+in both the TypeScript and bash dialects. A `workspaces.embedding_fingerprint` read gate
+and write gate stop a workspace indexed under one provider/model/width from being queried
+or appended to under another.
+
+**The gate that was going to lie.** `embedding-defaults-parity.test.ts` anchored every
+extractor on the literal `OLLAMA_EMBEDDING_` and skipped any file lacking it — so an
+`LMSTUDIO_*` model/width pair was invisible to every scan in the file, and the gate would
+have reported clean over a second unchecked pair. Its failure mode was **green**. Tier 3 is
+re-keyed provider-neutrally and the red was induced on the LM Studio pair and observed.
+
+**LIP-22 is measured, and the accepted risk was about twice what had been recorded.**
+`14.needles.test.ts` was run on both arms through the real
+`data/vector/postgres-vector-store.ts`, same 743-file corpus, same fixture, separate
+profile-keyed workspaces: **2560** (`binary-quantization`, `> 2000`) → hit@1 0.5000, MRR
+0.5893; **768** (`hnsw-cosine`, `≤ 2000`) → hit@1 0.1429, MRR 0.2116. Widths attested
+twice, by direct `curl` and by the LIP-15 fingerprint each workspace stamped itself
+(`ollama:qwen3-embedding:4b:2560`, `custom:text-embedding-nomic-embed-text-v1.5:768`).
+
+The `bench:needles` bound this replaces put the cost at ΔMRR −0.1773; through the real
+store it is **ΔMRR −0.3777**. **Do not read that as "the old benchmark understated the risk
+by half" — an earlier draft here did, and it was wrong.** Three variables separate the two
+harnesses: the ranker, the pipeline, and the embedding stack, since `bench:needles` ran its
+768 arm on Ollama's `nomic-embed-text` rather than LM Studio's model. On the *shared* 2560
+control arm the two instruments already disagree by 4 needles at hit@10 and −0.0530 MRR, so
+the instrument alone moves the control by a quarter of the difference-of-deltas being
+explained. **Two instruments' deltas are only comparable once their shared control agrees —
+check that before attributing the gap to the variable you care about.**
+
+Three defects had to be fixed before the file could measure anything, and the first is the
+one with reach: its gate read `/system/ollama`, and **all 15 E2E files gating on
+`OLLAMA_UP` skip silently under any other provider** — a whole suite reporting "0 fail"
+while testing nothing. Resolving that flag from the neutral `/system/inference` in
+`probeAvailability` unblocks the other 14 from one edit. The other two: floors were a single
+Ollama-calibrated triple (now keyed per arm — asserting an uncalibrated number against a
+different stack is inventing one), and the `beforeAll` budget was 700s against a cold index
+that measured **1h 12m**, so the file could not complete a cold run at all. That budget is
+a large part of why it had never been run.
+
+**Four Phase-7 gates could not observe their own subjects** and were amended with their
+reasons at `bc2f2f82`: `bun run lint` is oxlint and reads no markdown; creating
+`validation.md` early flips `validate_state.ts:130`'s `appearsComplete` and reddens the
+closing gate; `check_specs_delivered.ts` proves tracked-and-clean but never content, and
+exited 0 before T18 edited anything. Amend the clause with its reason, do not fail it
+silently.
+
+**Phase 8 — what the FAIL verdict cost, and what closing it taught.** The verdict's own
+summary is the lesson: the feature's *core* was proven sound by mutation, and every failure
+clustered somewhere else — one promised file never written (`scripts/diagnose.ts`), one
+parity gate re-keyed but not extended, one config surface writing half a config block. Of
+16 ranked gaps, **14 were closed, 1 was closed against a corrected target, and 1 was
+rejected outright with a measurement.** G13's *finding* held —
+`llm-client-json-schema.test.ts` genuinely cannot sense the entrypoint, its `@ai-sdk/openai`
+mock has no `.chat` member — but its *claim of a miscitation* did not: nothing cited that
+file as LIP-23's sensor, so the fix was to make the matrix row name the real one
+(`llm-client.test.ts:832`/`:839`) rather than correct a citation that never existed. G16 is
+rejected: `config-section-coverage.test.ts` resolves under
+`apps/tools-api/src/routes/` at both HEAD and `d523f06f`, and the feature added 22 lines to
+it — striking that spec clause would have deleted a correct line on a false premise, most
+likely produced by a bare-filename search that missed the path.
+
+**The three that were silently green are the ones worth remembering.** G3's three mutants
+(`.env.example`, `embeddings/config.ts`, the wizard) each made the LM Studio model/width
+pair self-contradictory and survived parity 7/0 *and* a 116-test core filter. G4's guarding
+test asserted `show.out` *contains* the LM Studio URL, which `embedding.baseURL` already
+satisfies — so it passed with `llm.baseUrl` still on Ollama, which made
+`resolveInferenceSpec` return the *ollama* spec and quietly re-enable the `/api/version`
+probe and `think:false` injection LIP-07 exists to suppress. G5's LIP-08 had no sensor at
+all, and the mutation that exposed it (**M9**, lmstudio `knownDimensions` 768 → 1024)
+survived verification because no *runtime* consumer sensed the width; it now dies against
+`lmstudio-embedding-live.test.ts`. A gate never seen failing on its new subject is not a
+sensor for that subject.
+
+**One measurement reversed a prescribed fix.** T23 proposed widening
+`turbo-passthrough-env.test.ts` to scan `scripts/**/*.sh` for `MASSA_AI_*` reads. Measured:
+58 tracked `.sh` files read 27 such names without assigning them and **24** are absent from
+`passThroughEnv` — because turbo never dispatches the shell suites at all (they run under
+the root-level `test:scripts`, outside the workspace globs). The widening would have
+reddened on two dozen pre-existing installer internals while proving nothing about the one
+variable at issue. Pinned by the file's own sentinel pattern instead.
+
+**And that figure decayed inside one session, which is the transferable part.** It was
+first recorded as **25 absent** — correct when taken, *before* the same task added
+`MASSA_AI_INFERENCE_PROVIDER` to the allowlist, and stale the moment the fix landed. An
+independent re-measure then reported **30/25** on a narrower definition of "assignment".
+Three readings, one conclusion, three different totals. A count taken before your own fix
+and quoted after it is a different measurement; quote the method beside the number, and
+name which part is load-bearing — here, only "the absent set is two dozen names and almost
+none of them are ours" survives every definition.
+
+Residuals #2–#6 stand and are enumerated in `.specs/HANDOFF.md`; #1 (`diagnose.ts`) is
+closed.
+
+## Previous — Bootstrap file and rule toggles (**VALIDATED 2026-09-08** — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs with three recorded bounds; every gate green; unpushed, push/PR is the user's call)
 
 Branch `feat/bootstrap-file-and-rule-toggles` off `main@d32fce58`, worktree
 `~/Projects/massa-ai-wt-bootstrap-toggles`. Full account in `.specs/HANDOFF.md`

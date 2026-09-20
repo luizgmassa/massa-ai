@@ -24,6 +24,10 @@
     "./config": {
       "types": "./dist/config/index.d.ts",
       "default": "./dist/config/index.js"
+    },
+    "./inference-providers": {
+      "types": "./dist/config/inference-providers.d.ts",
+      "default": "./dist/config/inference-providers.js"
     }
   },
   "scripts": {

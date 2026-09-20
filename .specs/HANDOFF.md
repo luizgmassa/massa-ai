@@ -1,4 +1,131 @@
-# Handoff — bootstrap-file-and-rule-toggles (EXECUTE COMPLETE 2026-09-08 — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs; every gate green; unpushed, push/PR is the user's call)
+# Handoff — local-inference-provider-abstraction (PHASE 8 COMPLETE 2026-09-20 — 25 Tasks across 8 Phases; independent validation returned **FAIL**, Phase 8 closed its ranked gap list, re-verification pending; unpushed, push/PR is the user's call)
+
+**Branch:** `feat/local-inference-provider-abstraction`, off `main@d523f06f` (v1.57.0).
+Worktree `~/Projects/massa-ai-feat-local-inference-provider-abstraction`.
+
+**What shipped.** LM Studio is a second local inference provider, and the way it was added
+matters more than the provider itself: one shared seam
+(`packages/shared/src/config/inference-providers.ts`, 108 lines) holds a spec per provider,
+and the config lists, both CLIs, the installers and the Web UI now *derive* from it instead
+of each carrying its own copy of Ollama's literals. That derivation closed a pre-existing
+gap nobody was looking for — `cohere` was a valid embedding provider the lists never
+offered. Probing moved from HTTP status to response body, in both the TypeScript and bash
+dialects, pinned to the same verdict by `scripts/__tests__/probe-dialect-parity.test.ts`.
+A `workspaces.embedding_fingerprint` read gate and write gate stop a workspace indexed
+under one provider/model/width from being queried or appended to under another. The two
+Ollama-only LLM behaviours — the `/api/version` probe and the `think` key — are now gated
+as dialect rather than treated as general local-LLM behaviour.
+
+**The gate that was going to lie.** `embedding-defaults-parity.test.ts` anchored every
+extractor on the literal token `OLLAMA_EMBEDDING_` and skipped any file lacking it, so an
+`LMSTUDIO_*` model/width pair was invisible to every scan in the file. Its failure mode was
+**green**, not red — verbatim the defect the file exists to prevent. Tier 3 is re-keyed to
+`*_EMBEDDING_(MODEL|DIMENSIONS)` with any prefix, and the red was induced on the LM Studio
+pair specifically and observed before being trusted.
+
+**LIP-22 is measured.** `14.needles.test.ts` was run on both arms through the real
+`postgres-vector-store.ts`, identical 743-file corpus, separate profile-keyed workspaces:
+**2560** (`binary-quantization`) → hit@1 0.5000, MRR 0.5893; **768** (`hnsw-cosine`) →
+hit@1 0.1429, MRR 0.2116. Full table in `spec.md`'s LIP-22 block.
+
+The `bench:needles` bound previously recorded here said ΔMRR −0.1773; the real-store
+measurement says **−0.3777**. **Resist the obvious reading.** A draft of this handoff
+concluded the old benchmark "understated the risk by half"; the verifier refuted it with the
+shared control arm, and the refutation is the more useful artifact. `bench:needles` ran its
+768 arm on Ollama's `nomic-embed-text`, not LM Studio's model, so three variables moved
+between harnesses — and on the identical 2560 arm with the identical fixture the two
+instruments disagree by 4 needles at hit@10 and −0.0530 MRR anyway. **Before attributing a
+difference-of-deltas to the variable under test, check that the two instruments agree on the
+control arm they share.** Here they do not, so the decomposition is unavailable and only the
+end-to-end measurement stands.
+
+Widths are attested twice over — direct `curl` per provider (2560 / 768) and the LIP-15
+fingerprint each workspace stamped itself. Determinism held across two sweeps per run and a
+third confirming run per arm in a fresh process.
+
+**The trap that made this unmeasurable, and it is wider than LIP-22.** The file gated on
+`OLLAMA_UP`, read from `/system/ollama`. **15 of the 19 E2E test files gate on that flag** (measured; the other four are
+`06.checkpoints`, `13.cli`, `17.cleanup-verify`, `23.owned-destructive`), and in
+every case they mean "embeddings are available" — so under any non-Ollama provider the
+entire E2E suite skips and reports no failures, which reads as a pass. `probeAvailability`
+now resolves it from the neutral `/system/inference`, falling back to `/system/ollama` only
+against a server predating LIP-10, so one edit unblocks the other 14 without touching them. Two
+smaller ones in the same file: the floors were a single Ollama-calibrated triple (now keyed
+per arm), and the `beforeAll` budget was 700s against a cold index that measured 1h 12m.
+
+Method, reusable: the whole run used an ephemeral stack — a scratch PostgreSQL cluster on
+`127.0.0.1:5433/massa_ai_test`, the API on `127.0.0.1:3334`, a scratch `XDG_CONFIG_HOME`
+per arm — so the developer's own database was never written to, and it was torn down
+afterward. `SHARED_PID` is already keyed on `{commit, provider, model, dimensions}`, so the
+two arms got independent workspaces with no harness change at all.
+
+**Four Phase-7 gates could not observe their own subjects, and were amended with their
+reasons at `bc2f2f82` rather than silently failed.** `bun run lint` is oxlint and reads no
+markdown, so T16's stated gate was exit 0 before and after any docs edit — replaced by a
+FEATURES.md TOC-resolution check (0 unresolved on both sides, measured by the worker and
+again by the orchestrator) and 23-site coverage accounting. T17 was going to create
+`validation.md`, which `validate_state.ts:130` treats as proof of completeness on mere
+existence — and `TASK_HEADING_RE` (`:45`) requires `T\d+:` while this file writes
+`### T16 — `, so existence is the *only* trigger; an inputs-only file would have reddened
+the closing gate at exit 1. `check_specs_delivered.ts` proves tracked-and-clean and never
+content, and all three state files were already tracked from the previous feature — it
+exited **0 before T18 edited anything**, measured.
+
+### Open, recorded, not built
+
+1. ~~**`scripts/diagnose.ts` never got its promised change.**~~ **Closed in Phase 8**
+   (T19 `a59e7901`, plus `06ddadb1` for the literal T19 missed). `+190/−71`, 14
+   `lmstudio`/`probeProvider` mentions. Measured end to end rather than asserted: LM Studio
+   up → exit 0, `dimensions=768 latency=36ms`; Ollama up → `dimensions=2560`; LM Studio
+   down on `:1299` → `API not responding (tried: …)` naming every candidate and
+   `Inference: FAILED`. The three doc sites T16 correctly left alone now say "inference
+   provider" instead of "Ollama", because the excuse for leaving them expired with the fix.
+   **Carry the tail forward as a pattern:** the conversion left one Ollama literal behind —
+   the WSL2 last-resort candidate was built as `http://<nameserver>:11434` regardless of
+   provider, dropping both the configured port and the `/v1` path, and the function was
+   still named `ollamaCandidates`. It was found by *running* the command with the server
+   down, not by reading the diff, and no test covered that arm. A provider-dispatch
+   conversion is not finished when the main path dispatches; the last-resort branches carry
+   the surviving literals.
+2. **Existing installs are unprotected until their first full reindex.** The fingerprint
+   gate reads legacy/`NULL` on every workspace indexed before the migration. Any claim of
+   stale-index protection needs that qualifier.
+3. **Only `MASSA_AI_MODE=docker` and `=build` miss the provider prompt.** The claim that
+   stood here first — inherited from Phase 5 bounded residual #4 — was that `install.sh`
+   installs Ollama unconditionally and has no provider menu. **Both halves are false**, and
+   it reached a shipped user-facing doc before the Phase 7 reviewer caught it. `install.sh`
+   installs no provider at all (its only Ollama handling is `check_ollama()` at `:265-276`,
+   a warning; the `ollama.com/install.sh` curl is in `scripts/setup-local-first.sh:162`),
+   and its **default** `source` mode runs the wizard at `:1055`, so the one-liner already
+   prompts. Residual #4 is struck through and corrected in place in `tasks.md`. Worth
+   carrying as a pattern, not just a fact: a residual recorded in one phase was read as
+   established truth by the next and shipped — it took a worker checking the claim before
+   documenting it, plus the reviewer, to catch it.
+4. **The LM Studio install and daemon commands were never executed**, here or in Phase 5.
+   `lms` is not on this host's `PATH` while the server itself runs on `:1234`, and T12
+   forbids running the vendor installer. T16's "execute every changed command once" AC was
+   narrowed in writing to exclude exactly those lines.
+5. **`tasks.md` has never passed `validate_tasks.ts`.** It reports 3 errors plus
+   `no tasks (### T1: ...) parsed` — the file writes `### T16 — ` (em dash, no colon)
+   against a `/^#{2,4}\s+T\d+\s*:/m` regex, and has since Phase 1. The task-level half of
+   that validator has therefore been vacuous for this feature throughout.
+6. **Phase 6 residual #2 stands:** `embedding-dimensions.ts` is in the parity gate's `known`
+   set, which skips the file *entirely* from Tier 3 rather than excluding its colliding
+   lines. A genuinely new unreviewed default added there would now be invisible.
+
+### Not part of this feature, found in passing
+
+`.specs/lessons.json` was dirty in **both** worktrees with an uncommitted deletion of 15
+lessons (L-002…L-016; 25 → 10, `next_id` untouched at 26). It was neither committed nor
+discarded — copied aside and restored from HEAD in this worktree, so the
+`check_specs_delivered` run would mean something. **The prune is still the user's call, and
+still undecided.** State as of 2026-09-20: this worktree is clean, `~/Projects/massa-ai`
+still carries the modification in its working tree. The copies were moved off `/tmp`, which
+does not survive a reboot, to
+`~/.config/massa-ai/lessons-prune-2026-09-20/lessons-pruned-{main,worktree}.json`
+(sha256 `b2fb278a…` for the main copy, verified identical after the move).
+
+## Previous handoff — bootstrap-file-and-rule-toggles (EXECUTE COMPLETE 2026-09-08 — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs; every gate green; unpushed, push/PR is the user's call)
 
 **Branch:** `feat/bootstrap-file-and-rule-toggles`, off `main@d32fce58`. Worktree
 `~/Projects/massa-ai-wt-bootstrap-toggles`.
@@ -104,7 +231,7 @@ and `### Fixed`, so this cuts a **minor** bump. Open follow-ups IPT-F1, F4, F6,
 F7 are recorded in `validation.md`, plus Feature 3's carried AC-03.3c, HPC-06,
 HPC-07.
 
-# Previous handoff — portal-handoff-proposal-crud (EXECUTE COMPLETE 2026-08-13 — 9 commits; gates green; unpushed)
+## Previous handoff — portal-handoff-proposal-crud (EXECUTE COMPLETE 2026-08-13 — 9 commits; gates green; unpushed)
 
 Session `spec-portal-handoff-proposal-crud` · workflow **spec-driven** · branch
 `feat/portal-handoff-proposal-crud` stacked on `dbdceead` (PR #107, **unmerged**),
@@ -157,7 +284,7 @@ throwing read).
 
 ---
 
-# Previous handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
+## Previous handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
 
 Session `spec-marketplace-directory-source-switching` · workflow **spec-driven** ·
 branch `fix/marketplace-directory-source-switching` from `origin/main` @ `89909051`,

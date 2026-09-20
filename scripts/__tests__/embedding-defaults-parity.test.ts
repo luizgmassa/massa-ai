@@ -10,9 +10,20 @@
  *  Tier 1 (pairs)   — every surface that writes a model+dims default must
  *                     carry exactly the runtime reference pair.
  *  Tier 2 (models)  — model-only surfaces must carry the reference model.
- *  Tier 3 (complete)— any tracked file assigning OLLAMA_EMBEDDING_* not in
- *                     the known-surface/allowlist sets fails by name: a new
+ *  Tier 3 (complete)— any tracked file assigning a `*_EMBEDDING_MODEL` or
+ *                     `*_EMBEDDING_DIMENSIONS` default (any provider prefix,
+ *                     not just OLLAMA_ — LIP-18/LIP-19b) not in the
+ *                     known-surface/allowlist sets fails by name: a new
  *                     surface must be added here, not silently shipped.
+ *
+ * Tiers 1 and 2 each run twice — once per provider (T21/G3). The re-key in
+ * Tier 3 above made an `LMSTUDIO_*` pair *visible*; it never checked its
+ * *value*, so `PAIR_SURFACES`/`MODEL_ONLY_SURFACES`/`DIMS_ONLY_SURFACES`
+ * carried zero LM Studio rows and three mutants making the LM Studio
+ * model/width pair self-contradictory (`.env.example`, `embeddings/config.ts`,
+ * `setup-local-first.sh`) survived every gate. `LMSTUDIO_PAIR_SURFACES` /
+ * `LMSTUDIO_MODEL_ONLY_SURFACES` below close that — exactly one rule per
+ * provider per surface, not one rule shared across providers.
  *
  * Each extractor is per-dialect (ENV / bare KEY=VALUE / ${VAR:-default} /
  * TS object literal) and must match EXACTLY once — 0 matches is a rotted
@@ -40,9 +51,17 @@ function extractOne(surface: string, text: string, re: RegExp): string {
 // ── Reference pair: the runtime defaults, from both defining modules ────────
 function referencePair(): { model: string; dims: string } {
   const shared = read("packages/shared/src/config/massa-ai-config.ts");
-  // Two `embedding:` blocks exist (interface at :11, defaults at :225). The
-  // interface's provider is a type union (`"ollama" | "mistral" | …`), the
-  // defaults block a literal — the trailing comma is the discriminator.
+  // Two `embedding:` blocks exist (the `MassaAiConfig` interface, and
+  // `defaultMassaAiConfig`'s literal defaults). LIP-01 changed the
+  // interface's `provider` field from a hand-written string union to
+  // `(typeof EMBEDDING_PROVIDER_IDS)[number]` — a derived type reference,
+  // not a union of string literals — so the discriminator is no longer
+  // "literal vs. union". It still works: the interface's `embedding:` block
+  // never contains the literal substring `provider: "ollama",` (it names a
+  // type, not a value), so only `defaultMassaAiConfig`'s block — which
+  // assigns the literal default — can ever satisfy this pattern. Re-anchored
+  // on that literal-value match rather than on the now-nonexistent union
+  // (LIP-19b).
   const embeddingBlock = extractOne(
     "massa-ai-config.ts embedding defaults block",
     shared,
@@ -67,6 +86,30 @@ function referencePair(): { model: string; dims: string } {
   // names a width, so a model change there cannot pass unnoticed.
   const core = read("packages/core/src/services/embeddings/config.ts");
   expect(core).toContain(`"${model}"`);
+  return { model, dims };
+}
+
+// ── Reference pair, LM Studio (T21/G3/LIP-18) ───────────────────────────────
+// LM Studio is opt-in, never the shipped default, so it has no counterpart to
+// `massa-ai-config.ts`'s `defaultMassaAiConfig` block to anchor on. Its one
+// canonical model/width fact lives in the seam's own literal table —
+// `INFERENCE_PROVIDERS.lmstudio.knownDimensions` in `inference-providers.ts`
+// — which every surface below is required to restate identically. That
+// object literal is unique in the file (Ollama's `knownDimensions` is the
+// imported `KNOWN_EMBEDDING_DIMENSIONS` identifier, not a literal `{`), so
+// no further anchoring is needed to keep the match to exactly one.
+function referencePairLmStudio(): { model: string; dims: string } {
+  const seam = read("packages/shared/src/config/inference-providers.ts");
+  const model = extractOne(
+    "inference-providers.ts lmstudio reference model",
+    seam,
+    /knownDimensions:\s*\{\s*"([^"]+)":\s*\d+/g,
+  );
+  const dims = extractOne(
+    "inference-providers.ts lmstudio reference dims",
+    seam,
+    /knownDimensions:\s*\{\s*"[^"]+":\s*(\d+)/g,
+  );
   return { model, dims };
 }
 
@@ -120,6 +163,14 @@ const PAIR_SURFACES: Array<{ file: string; model: RegExp; dims: RegExp }> = [
 const MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
   { file: "scripts/setup-local-first.sh", model: /\$\{OLLAMA_EMBEDDING_MODEL:-([^}]+)\}/g },
   { file: "scripts/validate-vscode-integration.sh", model: /\$\{OLLAMA_EMBEDDING_MODEL:-([^}]+)\}/g },
+  // `diagnose.ts`'s DEFAULT_MODEL table, added when the script became
+  // provider-dispatched. It is keyed on the provider id rather than on a
+  // `*_EMBEDDING_MODEL` token, so the Tier-3 completeness scan below is
+  // structurally blind to it — the same going-green shape this file exists to
+  // prevent, and the reason it is listed by hand here. Its only other pin was
+  // `diagnose.test.ts`'s own copy of the same two literals, which is an
+  // agreement between two files, not an anchor to the canonical table.
+  { file: "scripts/diagnose.ts", model: /^ {2}ollama: "([^"]+)",$/gm },
 ];
 
 /** Surfaces carrying a width but no model literal — the width is what has to
@@ -137,8 +188,66 @@ const DIMS_ONLY_SURFACES: Array<{ file: string; dims: RegExp }> = [
   },
 ];
 
+// ── LM Studio surface table (T21/G3/LIP-18) ─────────────────────────────────
+// `label` disambiguates the two files below that carry TWO independent
+// LM Studio write sites (`init --lmstudio` and `use lmstudio`) — each site's
+// regex is anchored to its own branch so `extractOne` still sees exactly one
+// match per entry, and a violation names which branch, not just the file.
+// Ollama has no equivalent second site in these files (`init` never writes an
+// Ollama literal), so `PAIR_SURFACES` above needed no such split.
+const LMSTUDIO_PAIR_SURFACES: Array<{ file: string; label?: string; model: RegExp; dims: RegExp }> = [
+  {
+    // LM Studio is opt-in, so its documented pair in .env.example is
+    // deliberately commented — the anchor keeps the leading `#`.
+    file: ".env.example",
+    model: /^#LMSTUDIO_EMBEDDING_MODEL=(\S+)/gm,
+    dims: /^#LMSTUDIO_EMBEDDING_DIMENSIONS=(\d+)/gm,
+  },
+  {
+    file: "packages/core/src/services/embeddings/config.ts",
+    model: /process\.env\.LMSTUDIO_EMBEDDING_MODEL \|\| file\?\.model \|\| "([^"]+)"/g,
+    dims: /LMSTUDIO_EMBEDDING_DIMENSIONS[\s\S]*?\|\|\s*(\d+),/g,
+  },
+  {
+    file: "apps/mcp-client/src/config-cli.ts",
+    label: "apps/mcp-client/src/config-cli.ts (init --lmstudio)",
+    model: /options\.lmstudio\) \{[\s\S]*?const model = "([^"]+)"/g,
+    dims: /options\.lmstudio\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
+  },
+  {
+    file: "apps/mcp-client/src/config-cli.ts",
+    label: "apps/mcp-client/src/config-cli.ts (use lmstudio)",
+    model: /provider === "lmstudio"\) \{[\s\S]*?model = \(options\.model as string\) \|\| "([^"]+)"/g,
+    dims: /provider === "lmstudio"\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
+  },
+  {
+    file: "apps/opencode-plugin/src/config-cli.ts",
+    label: "apps/opencode-plugin/src/config-cli.ts (init --lmstudio)",
+    model: /options\.lmstudio\) \{[\s\S]*?const model = "([^"]+)"/g,
+    dims: /options\.lmstudio\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
+  },
+  {
+    file: "apps/opencode-plugin/src/config-cli.ts",
+    label: "apps/opencode-plugin/src/config-cli.ts (use lmstudio)",
+    model: /provider === "lmstudio"\) \{[\s\S]*?model = \(options\.model as string\) \|\| "([^"]+)"/g,
+    dims: /provider === "lmstudio"\) \{[\s\S]*?knownDimensions\[model\] \?\? (\d+)/g,
+  },
+];
+
+/** `install.sh`/`Dockerfile`/`docker-compose.yml`/`setup-ollama-wsl.sh`/
+ *  `validate-vscode-integration.sh` carry no LM Studio equivalent at all
+ *  (measured: zero `lmstudio`/`LMSTUDIO` occurrences besides the bash probe
+ *  dialect's dispatch key) — genuinely Ollama-only surfaces, not a gap. */
+const LMSTUDIO_MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
+  { file: "scripts/setup-local-first.sh", model: /\$\{LMSTUDIO_EMBEDDING_MODEL:-([^}]+)\}/g },
+  // The LM Studio half of `diagnose.ts`'s DEFAULT_MODEL table — see the note
+  // on its Ollama sibling in MODEL_ONLY_SURFACES above.
+  { file: "scripts/diagnose.ts", model: /^ {2}lmstudio: "([^"]+)",$/gm },
+];
+
 describe("embedding defaults parity (EDC-06)", () => {
   const ref = referencePair();
+  const refLm = referencePairLmStudio();
 
   test(`every pair surface carries the reference pair ${ref.model}/${ref.dims}`, () => {
     // Collect-then-assert so ONE red run names EVERY violating surface
@@ -171,12 +280,67 @@ describe("embedding defaults parity (EDC-06)", () => {
     console.log(`[parity] width-only surfaces checked: ${DIMS_ONLY_SURFACES.length}`);
   });
 
-  test("no unlisted tracked file assigns an OLLAMA_EMBEDDING_* default", () => {
+  test(`every LM Studio pair surface carries the reference pair ${refLm.model}/${refLm.dims}`, () => {
+    // Same collect-then-assert shape as the Ollama pair test above (T21/G3):
+    // one red run names every violating LM Studio surface, not just the
+    // first — which is exactly what let M1a/M10/M13 hide behind each other
+    // had they landed together.
+    const violations: string[] = [];
+    for (const s of LMSTUDIO_PAIR_SURFACES) {
+      const label = s.label ?? s.file;
+      const text = read(s.file);
+      const model = extractOne(label, text, s.model);
+      const dims = extractOne(label, text, s.dims);
+      if (model !== refLm.model) violations.push(`${label}: model=${model} (want ${refLm.model})`);
+      if (dims !== refLm.dims) violations.push(`${label}: dims=${dims} (want ${refLm.dims})`);
+    }
+    console.log(
+      `[parity] LM Studio pair surfaces checked: ${LMSTUDIO_PAIR_SURFACES.length}, reference ${refLm.model}/${refLm.dims}`,
+    );
+    expect(violations).toEqual([]);
+  });
+
+  test("LM Studio model-only surfaces carry the reference model", () => {
+    for (const s of LMSTUDIO_MODEL_ONLY_SURFACES) {
+      expect(`${s.file} model=${extractOne(s.file, read(s.file), s.model)}`).toBe(`${s.file} model=${refLm.model}`);
+    }
+    console.log(`[parity] LM Studio model-only surfaces checked: ${LMSTUDIO_MODEL_ONLY_SURFACES.length}`);
+  });
+
+  /**
+   * LIP-24 — the seam makes env readers invisible to literal scanners.
+   *
+   * `packages/core/src/services/health/local-health-checker.ts` used to read
+   * `process.env.OLLAMA_EMBEDDING_MODEL` directly, and this scan saw it. T05
+   * (Phase 3) replaced that with `process.env[spec.envNames.model]` — a
+   * dynamic lookup through the `inference-providers.ts` seam. The env var is
+   * still read at runtime (`spec.envNames.model` resolves to the literal
+   * `"OLLAMA_EMBEDDING_MODEL"` for the ollama spec), but the literal token no
+   * longer appears as text in the file, so this grep-based scan cannot see it
+   * — population measured at 25 on `main@d523f06f`, 27 after Phase 1 (the two
+   * new seam files), 26 after Phase 3 (this file left the token-visible set).
+   * Re-keying Tier 3 below to a provider-neutral token does not restore
+   * visibility here either, because the file names no provider prefix at
+   * all anymore.
+   *
+   * Not silently accepted: `resolveConfiguredEmbeddingModel`'s env-precedence
+   * behavior (env var wins over config.json, for the literal name
+   * `OLLAMA_EMBEDDING_MODEL`) is covered by a different, behavioral sensor —
+   * `packages/core/src/__tests__/health-checker-config.test.ts`'s "checkOllama
+   * prefers env OLLAMA_EMBEDDING_MODEL over config" — which exercises the
+   * real runtime read through the seam rather than grepping for it. That test
+   * file is itself excluded from this scan's population (`isTestFile`), which
+   * is why the two mechanisms do not overlap or double-count.
+   */
+  test("no unlisted tracked file assigns a *_EMBEDDING_MODEL/DIMENSIONS default", () => {
     const ls = Bun.spawnSync(["git", "ls-files"], { cwd: ROOT });
     const tracked = ls.stdout.toString().trim().split("\n");
-    // Assignment-shaped, not env READS (process.env.X) and not the
-    // passthrough allowlist (turbo.json is a bare name list, no "=").
-    const assignment = /OLLAMA_EMBEDDING_(MODEL|DIMENSIONS)\s*[=:]\s*["']?[\w.${:-]/;
+    // Provider-neutral token (LIP-18/LIP-19b): any prefix, not just OLLAMA_ —
+    // an LMSTUDIO_EMBEDDING_MODEL/DIMENSIONS pair must be as visible as the
+    // Ollama one. Assignment-shaped, not env READS (process.env.X) and not
+    // the passthrough allowlist (turbo.json is a bare name list, no "=").
+    const mentionsToken = /[A-Za-z][A-Za-z0-9]*_EMBEDDING_(MODEL|DIMENSIONS)/;
+    const assignment = /[A-Za-z][A-Za-z0-9]*_EMBEDDING_(MODEL|DIMENSIONS)\s*[=:]\s*["']?[\w.${:-]/;
     const known = new Set([
       ...PAIR_SURFACES.map((s) => s.file),
       ...MODEL_ONLY_SURFACES.map((s) => s.file),
@@ -184,6 +348,14 @@ describe("embedding defaults parity (EDC-06)", () => {
       "packages/shared/src/config/massa-ai-config.ts",
       "packages/core/src/services/embeddings/config.ts",
       "packages/shared/src/config/config-loader.ts", // seeds env FROM config.json
+      "packages/shared/src/config/inference-providers.ts", // the seam's own envNames map — names the var, assigns nothing
+      // The canonical model→width table (LIP-04). Under the re-keyed
+      // provider-neutral token, `KNOWN_EMBEDDING_DIMENSIONS: Readonly<...> =`
+      // and `DEFAULT_EMBEDDING_DIMENSIONS = 2560` both read as an
+      // "TOKEN[=:]value" assignment to the naive line scan below — a false
+      // offender, not a new surface. This file IS the reference table
+      // `referencePair()` reads at :64; it is reviewed, not unlisted.
+      "packages/shared/src/config/embedding-dimensions.ts",
     ]);
     const allowedPrefixes = [".specs/", "docs/", "CHANGELOG.md", "FEATURES.md", "README.md"];
     const isTestFile = (f: string) => /__tests__|\.test\.ts$/.test(f);
@@ -198,7 +370,7 @@ describe("embedding defaults parity (EDC-06)", () => {
       } catch {
         continue;
       }
-      if (!text.includes("OLLAMA_EMBEDDING_")) continue;
+      if (!mentionsToken.test(text)) continue;
       scanned++;
       if (known.has(f) || isTestFile(f) || allowedPrefixes.some((p) => f.startsWith(p))) continue;
       for (const line of text.split("\n")) {
@@ -209,7 +381,7 @@ describe("embedding defaults parity (EDC-06)", () => {
         }
       }
     }
-    console.log(`[parity] completeness scan population: ${scanned} tracked files mention OLLAMA_EMBEDDING_*`);
+    console.log(`[parity] completeness scan population: ${scanned} tracked files mention *_EMBEDDING_MODEL/DIMENSIONS`);
     expect(scanned).toBeGreaterThan(5); // the scan itself must see its subjects
     expect(offenders).toEqual([]);
   });
@@ -241,16 +413,36 @@ describe("embedding defaults parity (EDC-06)", () => {
     // no longer pins a literal at all — it derives the width from the model,
     // which is what closed the original defect, and is covered by executing
     // the template in scripts/__tests__/installer-config-template.test.ts.
+    //
+    // `packages/shared/src/config/inference-providers.ts` (T07/LIP-01's seam)
+    // is a FIFTH member, added here rather than collapsed away: its `ollama`
+    // spec derives `knownDimensions` from `embedding-dimensions.ts` (no
+    // second copy — the T07 collapse this scan originally asked to verify),
+    // but its `lmstudio` spec carries its own literal
+    // `{ "text-embedding-nomic-embed-text-v1.5": 768 }` table, because that
+    // model has no entry in the Ollama-only reference table. That is a real,
+    // reviewed width-writer the scan's original trigger could not see at all
+    // (measured: `writesEmbeddingBlock` never matches this file — it writes
+    // no `embedding:` field, only named `InferenceProviderSpec` objects), so
+    // the trigger below gained a second, narrowly-scoped alternative for the
+    // `knownDimensions: { "<model>": <n> }` shape.
     const KNOWN_WIDTH_WRITERS = [
       "apps/mcp-client/src/config-cli.ts",
       "apps/opencode-plugin/src/config-cli.ts",
       "packages/core/src/services/embeddings/config.ts",
+      "packages/shared/src/config/inference-providers.ts",
       "packages/shared/src/config/massa-ai-config.ts",
     ];
     const allowedPrefixes = [".specs/", "docs/", "CHANGELOG.md", "FEATURES.md", "README.md"];
     const isTestFile = (f: string) => /__tests__|\.test\.ts$/.test(f);
     const writesEmbeddingBlock = /embedding\s*[:=]|"embedding"\s*:|config\.embedding/;
     const literalWidth = /["']?dimensions["']?\s*[:=]\s*\d/;
+    // A literal `"<model>": <width>` entry inside a `knownDimensions: { … }`
+    // object — the shape `inference-providers.ts` uses instead of a
+    // `dimensions:`/`embedding:` field. Scoped to one `{ … }` body
+    // (`[^}]*`, no nested braces) so it cannot drift into matching an
+    // unrelated later line in the same file.
+    const knownDimensionsTable = /knownDimensions:\s*\{[^}]*:\s*\d+[^}]*\}/;
 
     const matched: string[] = [];
     for (const f of tracked) {
@@ -262,7 +454,9 @@ describe("embedding defaults parity (EDC-06)", () => {
       } catch {
         continue;
       }
-      if (!writesEmbeddingBlock.test(text) || !literalWidth.test(text)) continue;
+      const isWidthWriter =
+        (writesEmbeddingBlock.test(text) && literalWidth.test(text)) || knownDimensionsTable.test(text);
+      if (!isWidthWriter) continue;
       matched.push(f);
     }
 

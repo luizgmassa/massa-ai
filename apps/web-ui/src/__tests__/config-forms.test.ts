@@ -100,6 +100,7 @@ describe("renderConfig — 17 sectioned forms (CFG-01)", () => {
     expect(html).toContain("Embedding");
     expect(html).toContain('data-section="embedding"');
     expect(html).toContain("ollama");
+    expect(html).toContain("lmstudio");
     expect(html).toContain("mistral");
     expect(html).toContain("openai");
   });

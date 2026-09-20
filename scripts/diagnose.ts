@@ -3,8 +3,8 @@
  * massa-ai - Stack Diagnostic Tool
  *
  * Validates the entire local infrastructure in seconds:
- * 1. Ollama installation
- * 2. Ollama API connectivity
+ * 1. Local inference provider installation
+ * 2. Local inference provider API connectivity
  * 3. Required embedding model
  * 4. Embedding generation test
  * 5. PostgreSQL connectivity
@@ -14,12 +14,25 @@
  * Usage: bun scripts/diagnose.ts
  *
  * Environment variables:
+ *   EMBEDDING_PROVIDER        - "ollama" (default) or "lmstudio"; falls back to
+ *                               config.json's embedding.provider
  *   OLLAMA_BASE_URL           - Ollama API URL (default: http://localhost:11434)
- *   OLLAMA_EMBEDDING_MODEL    - Model to test (default: qwen3-embedding:4b)
+ *   OLLAMA_EMBEDDING_MODEL    - Ollama model to test (default: qwen3-embedding:4b)
+ *   LMSTUDIO_BASE_URL         - LM Studio API URL (default: http://localhost:1234/v1)
+ *   LMSTUDIO_EMBEDDING_MODEL  - LM Studio model to test (default: text-embedding-nomic-embed-text-v1.5)
  *   DATABASE_URL              - Required PostgreSQL connection string
  */
+import { existsSync } from "fs";
+import os from "os";
+import path from "path";
 import { spawn } from "bun";
-import { requirePostgresDatabaseUrl } from "../packages/shared/src/config/index.js";
+import { loadConfigSafe, requirePostgresDatabaseUrl } from "../packages/shared/src/config/index.js";
+import {
+  INFERENCE_PROVIDERS,
+  type InferenceProviderId,
+  type InferenceProviderSpec,
+} from "../packages/shared/src/config/inference-providers.js";
+import { probeProvider } from "../packages/core/src/kernel/inference-probe.js";
 
 const BOLD = "\x1b[1m";
 const GREEN = "\x1b[32m";
@@ -70,121 +83,263 @@ async function run(
   }
 }
 
-// ─── Ollama URL auto-detection ───────────────────────────────────────
+// ─── Provider selection ──────────────────────────────────────────────
+// EMBEDDING_PROVIDER env > config.json's embedding.provider > "ollama" —
+// the same precedence `embeddings/config.ts`'s `selectedProvider` and
+// `LocalHealthChecker.resolveProviderId` use (LIP-10). Never a new knob.
 
-/** Candidate URLs to probe, in priority order */
-export async function ollamaCandidates(envUrl: string): Promise<string[]> {
+interface FileEmbeddingConfig {
+  provider?: string;
+  baseURL?: string;
+  model?: string;
+}
+
+/** `config.json`'s `embedding` block, or undefined on any read failure —
+ *  an unconfigured install has no file and must fall back to Ollama. */
+function fileEmbedding(): FileEmbeddingConfig | undefined {
+  try {
+    return loadConfigSafe().embedding;
+  } catch {
+    return undefined;
+  }
+}
+
+export function resolveProviderId(
+  env: Record<string, string | undefined>,
+  file: FileEmbeddingConfig | undefined,
+): InferenceProviderId {
+  const provider = env.EMBEDDING_PROVIDER || file?.provider;
+  return provider === "lmstudio" ? "lmstudio" : "ollama";
+}
+
+export function resolveProviderBaseUrl(
+  id: InferenceProviderId,
+  env: Record<string, string | undefined>,
+  file: FileEmbeddingConfig | undefined,
+): string {
+  const spec = INFERENCE_PROVIDERS[id];
+  const envUrl = env[spec.envNames.baseUrl];
+  if (envUrl) return envUrl;
+  if (file?.provider === id && file?.baseURL) return file.baseURL;
+  return spec.defaultEmbeddingBaseUrl;
+}
+
+const DEFAULT_MODEL: Readonly<Record<InferenceProviderId, string>> = {
+  ollama: "qwen3-embedding:4b",
+  lmstudio: "text-embedding-nomic-embed-text-v1.5",
+};
+
+export function resolveModelName(
+  id: InferenceProviderId,
+  env: Record<string, string | undefined>,
+  file: FileEmbeddingConfig | undefined,
+): string {
+  const spec = INFERENCE_PROVIDERS[id];
+  const envModel = env[spec.envNames.model];
+  if (envModel) return envModel;
+  if (file?.provider === id && file?.model) return file.model;
+  return DEFAULT_MODEL[id];
+}
+
+// ─── Provider URL auto-detection ─────────────────────────────────────
+
+/**
+ * Candidate URLs to probe, in priority order.
+ *
+ * Provider-neutral: every candidate is the configured URL with only its host
+ * swapped, so the port and path come from the active provider's spec rather
+ * than from a literal. The WSL2 arm used to build `http://<nameserver>:11434`
+ * unconditionally — Ollama's port, and no `/v1` — which under LM Studio
+ * probed a port the provider does not listen on. It could not produce a false
+ * *positive* (the lmstudio probe rejects Ollama's `{models:[…]}` body shape),
+ * but it was a dead branch carrying the one literal LIP-03 exists to remove.
+ *
+ * `resolvConf` is injectable so the WSL2 arm is testable off WSL2: callers
+ * pass the file's contents, the default reads it.
+ */
+export async function providerCandidates(
+  envUrl: string,
+  resolvConf?: string,
+): Promise<string[]> {
   const candidates: string[] = [envUrl];
+
+  const withHost = (host: string): string | null => {
+    try {
+      const url = new URL(envUrl);
+      url.hostname = host;
+      // `URL.href` appends a trailing slash to a pathless URL; the probe
+      // concatenates its own path, so strip it back off.
+      return url.href.replace(/\/$/, "");
+    } catch {
+      return null;
+    }
+  };
 
   // When the env URL uses "localhost", also try the explicit IPv4 address.
   // In WSL2 with mirrored networking, "localhost" may resolve to ::1 (IPv6)
-  // while Ollama only listens on 127.0.0.1 (IPv4).
+  // while the provider only listens on 127.0.0.1 (IPv4).
   if (envUrl.includes("localhost")) {
     candidates.push(envUrl.replace("localhost", "127.0.0.1"));
   }
 
   // Try the WSL2 Windows-host nameserver IP as a last resort
   try {
-    const resolv = await Bun.file("/etc/resolv.conf").text();
+    const resolv = resolvConf ?? (await Bun.file("/etc/resolv.conf").text());
     const match = resolv.match(/^nameserver\s+([\d.]+)/m);
-    if (match) candidates.push(`http://${match[1]}:11434`);
+    const wslCandidate = match ? withHost(match[1]!) : null;
+    if (wslCandidate) candidates.push(wslCandidate);
   } catch { /* ignore */ }
 
   // Deduplicate while preserving order
   return [...new Set(candidates)];
 }
 
-/** Probe each candidate URL and return the first one that responds, or null */
-async function detectOllamaUrl(candidates: string[]): Promise<{ url: string; data: { models?: Array<{ name: string }> } } | null> {
+/**
+ * Probe each candidate URL with `probeProvider` (kernel/inference-probe.ts)
+ * and return the first one that is reachable, or null. Discriminates by
+ * response body shape, never by HTTP status — LM Studio answers 200 with
+ * `{"error": "..."}` for an unknown endpoint, so a status-code check alone
+ * would report a live provider that is not actually the configured one.
+ */
+export async function detectProviderUrl(
+  spec: InferenceProviderSpec,
+  candidates: string[],
+): Promise<{ url: string; models: string[] } | null> {
   for (const url of candidates) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      const response = await fetch(`${url}/api/tags`, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (response.ok) {
-        const data = (await response.json()) as { models?: Array<{ name: string }> };
-        return { url, data };
-      }
-    } catch { /* try next */ }
+    const result = await probeProvider(spec, url);
+    if (result.reachable) return { url, models: result.models };
   }
   return null;
 }
 
-// ─── Ollama Checks ───────────────────────────────────────────────────
+/** Exact model-name match — never a substring: a sibling tag or a longer
+ *  model id must not satisfy the check (LIP-03). */
+export function modelIsAvailable(models: string[], target: string): boolean {
+  return models.some((name) => name === target);
+}
 
-async function checkOllama(): Promise<boolean> {
-  const envUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-  const modelName = process.env.OLLAMA_EMBEDDING_MODEL || "qwen3-embedding:4b";
+/** Where to POST a single-input embedding request, per provider. Ollama
+ *  serves its own `/api/embed`; LM Studio's base URL already ends in `/v1`
+ *  and it speaks the OpenAI-compatible `/embeddings` endpoint. */
+function embedPath(id: InferenceProviderId): string {
+  return id === "lmstudio" ? "/embeddings" : "/api/embed";
+}
+
+/**
+ * Parse a single embedding vector out of a provider's response body.
+ * Ollama: `{embeddings: number[][]}` (batch shape) or `{embedding: number[]}`
+ * (legacy singular). LM Studio: OpenAI-compatible `{data: [{embedding}]}`.
+ * These shapes are incompatible — reading one against the other silently
+ * returns undefined, which is exactly the LIP-03 defect this replaces.
+ */
+export function parseEmbeddingResponse(
+  id: InferenceProviderId,
+  body: unknown,
+): number[] | null {
+  if (typeof body !== "object" || body === null) return null;
+  if (id === "lmstudio") {
+    const data = (body as { data?: unknown }).data;
+    const first = Array.isArray(data) ? (data[0] as { embedding?: unknown }) : undefined;
+    const embedding = first?.embedding;
+    return Array.isArray(embedding) ? (embedding as number[]) : null;
+  }
+  const b = body as { embeddings?: unknown; embedding?: unknown };
+  const embedding = Array.isArray(b.embeddings) ? b.embeddings[0] : b.embedding;
+  return Array.isArray(embedding) ? (embedding as number[]) : null;
+}
+
+/** Locate the provider's CLI, or null. LM Studio's `lms` is not on PATH
+ *  until the app has bootstrapped it, so the bundled location is checked
+ *  first (mirrors `lms_cli_path` in setup-local-first.sh). */
+async function findProviderCli(id: InferenceProviderId): Promise<string | null> {
+  if (id === "lmstudio") {
+    const bundled = path.join(os.homedir(), ".lmstudio", "bin", "lms");
+    if (existsSync(bundled)) return bundled;
+    return run(["which", "lms"]);
+  }
+  return run(["which", "ollama"]);
+}
+
+// ─── Provider checks ──────────────────────────────────────────────────
+
+async function checkProvider(): Promise<boolean> {
+  const env = process.env;
+  const file = fileEmbedding();
+  const providerId = resolveProviderId(env, file);
+  const spec = INFERENCE_PROVIDERS[providerId];
+  const modelName = resolveModelName(providerId, env, file);
+  const configuredUrl = resolveProviderBaseUrl(providerId, env, file);
   let ok = true;
-  let resolvedUrl = envUrl;
+  let resolvedUrl = configuredUrl;
 
-  // 1. Check if Ollama is in PATH
-  console.log(`${BOLD}[1/7] Checking Ollama installation...${NC}`);
-  const ollamaPath = await run(["which", "ollama"]);
-  if (ollamaPath) {
-    console.log(`  ${GREEN}✓${NC} Ollama found at: ${ollamaPath}`);
+  const installHint = providerId === "lmstudio"
+    ? "curl -fsSL https://lmstudio.ai/install.sh | bash"
+    : "curl -fsSL https://ollama.com/install.sh | sh";
+  const startHint = providerId === "lmstudio"
+    ? "lms daemon up"
+    : "ollama serve  or  bash scripts/ensure-ollama.sh";
+  const pullHint = providerId === "lmstudio"
+    ? `lms get -y ${modelName}`
+    : `ollama pull ${modelName}`;
+
+  // 1. Check if the provider CLI is in PATH
+  console.log(`${BOLD}[1/7] Checking ${spec.id} installation...${NC}`);
+  const cliPath = await findProviderCli(providerId);
+  if (cliPath) {
+    console.log(`  ${GREEN}✓${NC} ${spec.id} found at: ${cliPath}`);
   } else {
-    console.log(
-      `  ${RED}✗${NC} Ollama not found in PATH`,
-    );
-    console.log(
-      `  ${YELLOW}!${NC} Install: curl -fsSL https://ollama.com/install.sh | sh`,
-    );
+    console.log(`  ${RED}✗${NC} ${spec.id} not found in PATH`);
+    console.log(`  ${YELLOW}!${NC} Install: ${installHint}`);
     ok = false;
   }
 
   // 2. Check API connectivity — probe multiple candidates to handle WSL2 quirks
-  console.log(`\n${BOLD}[2/7] Checking Ollama API connectivity...${NC}`);
-  const candidates = await ollamaCandidates(envUrl);
-  let modelsData: { models?: Array<{ name: string }> } | null = null;
+  console.log(`\n${BOLD}[2/7] Checking ${spec.id} API connectivity...${NC}`);
+  const candidates = await providerCandidates(configuredUrl);
+  let models: string[] | null = null;
 
   const start = Date.now();
-  const detected = await detectOllamaUrl(candidates);
+  const detected = await detectProviderUrl(spec, candidates);
   const duration = Date.now() - start;
 
   if (detected) {
     resolvedUrl = detected.url;
-    modelsData = detected.data;
-    const note = resolvedUrl !== envUrl ? `  ${DIM}(OLLAMA_BASE_URL=${envUrl} didn't respond — using ${resolvedUrl})${NC}` : "";
+    models = detected.models;
+    const note = resolvedUrl !== configuredUrl
+      ? `  ${DIM}(configured URL ${configuredUrl} didn't respond — using ${resolvedUrl})${NC}`
+      : "";
     console.log(`  ${GREEN}✓${NC} API reachable at ${resolvedUrl} (${duration}ms)`);
     if (note) console.log(note);
-    console.log(`  ${GREEN}✓${NC} Models available: ${modelsData?.models?.length || 0}`);
+    console.log(`  ${GREEN}✓${NC} Models available: ${models.length}`);
   } else {
     console.log(`  ${RED}✗${NC} API not responding (tried: ${candidates.join(", ")})`);
-    console.log(
-      `  ${YELLOW}!${NC} Start with: ${BOLD}ollama serve${NC}  or  ${BOLD}bash scripts/ensure-ollama.sh${NC}`,
-    );
+    console.log(`  ${YELLOW}!${NC} Start with: ${BOLD}${startHint}${NC}`);
     ok = false;
   }
 
-  // 3. Check embedding model
+  // 3. Check embedding model — exact match, never a substring
   console.log(`\n${BOLD}[3/7] Checking model: ${modelName}...${NC}`);
-  if (modelsData) {
-    const models = modelsData.models || [];
-    const found = models.some((m) => m.name.includes(modelName));
-    if (found) {
+  if (models) {
+    if (modelIsAvailable(models, modelName)) {
       console.log(`  ${GREEN}✓${NC} Model '${modelName}' is available`);
     } else {
-      const available = models.map((m) => m.name).join(", ") || "(none)";
+      const available = models.join(", ") || "(none)";
       console.log(`  ${YELLOW}!${NC} Model '${modelName}' not found`);
       console.log(`  ${DIM}  Available: ${available}${NC}`);
-      console.log(
-        `  ${YELLOW}!${NC} Run: ${BOLD}ollama pull ${modelName}${NC}`,
-      );
+      console.log(`  ${YELLOW}!${NC} Run: ${BOLD}${pullHint}${NC}`);
     }
   } else {
     console.log(`  ${YELLOW}!${NC} Skipped (API unreachable)`);
   }
 
-  // 4. Test embedding generation
+  // 4. Test embedding generation — provider-dispatched request + response shape
   console.log(`\n${BOLD}[4/7] Testing embedding generation...${NC}`);
-  if (modelsData) {
+  if (models) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
       const start = Date.now();
-      const response = await fetch(`${resolvedUrl}/api/embed`, {
+      const response = await fetch(`${resolvedUrl}${embedPath(providerId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
@@ -197,12 +352,9 @@ async function checkOllama(): Promise<boolean> {
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const data = (await response.json()) as {
-        embeddings?: number[][];
-        embedding?: number[];
-      };
+      const data = await response.json();
       const duration = Date.now() - start;
-      const embedding = data.embeddings?.[0] || data.embedding;
+      const embedding = parseEmbeddingResponse(providerId, data);
       const dimensions = embedding?.length || 0;
 
       if (!embedding || dimensions === 0) {
@@ -214,12 +366,8 @@ async function checkOllama(): Promise<boolean> {
 
       console.log(`  ${GREEN}✓${NC} Embedding OK!  dimensions=${dimensions}  latency=${duration}ms`);
     } catch (err) {
-      console.log(
-        `  ${RED}✗${NC} Embedding failed: ${(err as Error).message}`,
-      );
-      console.log(
-        `  ${YELLOW}!${NC} Ensure '${modelName}' is fully pulled.`,
-      );
+      console.log(`  ${RED}✗${NC} Embedding failed: ${(err as Error).message}`);
+      console.log(`  ${YELLOW}!${NC} Ensure '${modelName}' is fully pulled.`);
       ok = false;
     }
   } else {
@@ -365,7 +513,7 @@ async function checkPostgres(): Promise<boolean> {
 // ─── Main ────────────────────────────────────────────────────────────
 
 if (import.meta.main) {
-  const ollamaOk = await checkOllama();
+  const providerOk = await checkProvider();
   const pgOk = await checkPostgres();
 
   // Summary
@@ -379,13 +527,13 @@ if (import.meta.main) {
     `${BOLD}╚═══════════════════════════════════════════════════════════════╝${NC}`,
   );
   console.log(
-    `  Ollama:     ${ollamaOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
+    `  Inference:  ${providerOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
   );
   console.log(
     `  PostgreSQL: ${pgOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
   );
   console.log("");
 
-  const allOk = ollamaOk && pgOk;
+  const allOk = providerOk && pgOk;
   process.exit(allOk ? 0 : 1);
 }

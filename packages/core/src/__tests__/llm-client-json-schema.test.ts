@@ -39,6 +39,7 @@ import {
   llmObject,
   _setLlmEnabledForTesting,
   _setJsonSchemaSupportedForTesting,
+  _setLlmBaseUrlForTesting,
   _checkJsonSchemaSupport,
 } from "../services/memory/llm-client.js";
 import { z } from "zod";
@@ -54,6 +55,7 @@ const sampleSchema = z.object({
 beforeEach(() => {
   _setLlmEnabledForTesting(true);
   _setJsonSchemaSupportedForTesting(null);
+  _setLlmBaseUrlForTesting(null);
   lastCall = null;
   generateObjectShouldThrow = null;
   generateObjectReturn = null;
@@ -194,6 +196,25 @@ describe("json_schema version parser (discrimination)", () => {
       expect(supported).toBe(false);
     } finally {
       globalThis.fetch = origFetch;
+    }
+  });
+
+  // LIP-07: LM Studio has no /api/version endpoint to probe and implements
+  // response_format:{type:"json_schema"} natively, so the version-parser
+  // path above must not even run against it.
+  test("lmstudio baseUrl → supported without ever reaching the version parser", async () => {
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async () => {
+      throw new Error("fetch must not be called for a provider with no version probe");
+    };
+    _setJsonSchemaSupportedForTesting(null);
+    try {
+      const supported = await _checkJsonSchemaSupport();
+      expect(supported).toBe(true);
+    } finally {
+      globalThis.fetch = origFetch;
+      _setLlmBaseUrlForTesting(null);
     }
   });
 });

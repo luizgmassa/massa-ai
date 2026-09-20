@@ -161,6 +161,67 @@ assert_eq "written config keeps dataDir" \
 PERMS="$(ls -l "$WRITTEN_CFG" | cut -c2-10)"
 assert_eq "written config is owner-only (holds DATABASE_URL and the API key)" "rw-------" "$PERMS"
 
+# ---- The Ollama block is no longer three hardcoded literals (LIP-06) --------
+# Every case above drives the write with OLLAMA_URL alone, exactly as the
+# wizard does, so the defaults must still produce today's file. The llm.baseUrl
+# assertion is the one that used to be unconditionally true: the template
+# hardcoded http://localhost:11434/v1 regardless of OLLAMA_URL.
+assert_eq "written config still names ollama as the embedding provider" \
+    "ollama" "$(json_field "$WRITTEN_CFG" 'c.embedding.provider')"
+assert_eq "written config takes embedding.baseURL from OLLAMA_URL" \
+    "$OLLAMA_URL" "$(json_field "$WRITTEN_CFG" 'c.embedding.baseURL')"
+assert_eq "written config derives llm.baseUrl from OLLAMA_URL" \
+    "${OLLAMA_URL}/v1" "$(json_field "$WRITTEN_CFG" 'c.llm.baseUrl')"
+assert_eq "written config keeps the ollama llm.apiKey" \
+    "ollama" "$(json_field "$WRITTEN_CFG" 'c.llm.apiKey')"
+assert_eq "written config keeps disableThink on for ollama" \
+    "true" "$(json_field "$WRITTEN_CFG" 'c.llm.disableThink')"
+assert_eq "written config resolves the known width for qwen3-embedding:4b" \
+    "2560" "$(json_field "$WRITTEN_CFG" 'c.embedding.dimensions')"
+
+# A remote/WSL Ollama is the case the hardcoded literal got wrong.
+REMOTE_CFG="${TMP_ROOT}/remote/config.json"
+mkdir -p "$(dirname "$REMOTE_CFG")"
+(
+    OLLAMA_URL="http://192.168.1.50:11434"
+    export OLLAMA_URL
+    installer_write_config "$REMOTE_CFG" "$FIRST_KEY"
+)
+assert_eq "a remote OLLAMA_URL reaches llm.baseUrl too" \
+    "http://192.168.1.50:11434/v1" "$(json_field "$REMOTE_CFG" 'c.llm.baseUrl')"
+
+# ---- An LM Studio write (LIP-06) -------------------------------------------
+# Same writer, different provider globals. The model is one LM Studio's own
+# knownDimensions table carries, so this resolves 768 without a live probe —
+# the suite stays offline.
+LMS_CFG="${TMP_ROOT}/lmstudio/config.json"
+mkdir -p "$(dirname "$LMS_CFG")"
+(
+    INFERENCE_PROVIDER="lmstudio"
+    EMBEDDING_MODEL="text-embedding-nomic-embed-text-v1.5"
+    LLM_MODEL="qwen/qwen3-4b-2507"
+    CODE_MODEL="qwen/qwen3-4b-2507"
+    export INFERENCE_PROVIDER EMBEDDING_MODEL LLM_MODEL CODE_MODEL
+    installer_write_config "$LMS_CFG" "$FIRST_KEY"
+)
+assert_eq "an LM Studio write records provider lmstudio" \
+    "lmstudio" "$(json_field "$LMS_CFG" 'c.embedding.provider')"
+assert_eq "an LM Studio write points embedding.baseURL at :1234/v1" \
+    "http://localhost:1234/v1" "$(json_field "$LMS_CFG" 'c.embedding.baseURL')"
+assert_eq "an LM Studio write points llm.baseUrl at :1234/v1" \
+    "http://localhost:1234/v1" "$(json_field "$LMS_CFG" 'c.llm.baseUrl')"
+assert_eq "an LM Studio write keeps the embedding model it was given" \
+    "text-embedding-nomic-embed-text-v1.5" "$(json_field "$LMS_CFG" 'c.embedding.model')"
+assert_eq "an LM Studio write resolves 768, not the retired 2560 catch-all" \
+    "768" "$(json_field "$LMS_CFG" 'c.embedding.dimensions')"
+assert_eq "an LM Studio write does not ask for Ollama's think:false" \
+    "false" "$(json_field "$LMS_CFG" 'c.llm.disableThink')"
+if [ "$(json_field "$LMS_CFG" 'c.llm.apiKey')" = "ollama" ]; then
+    fail "an LM Studio write still carries the hardcoded ollama llm.apiKey"
+else
+    ok "an LM Studio write does not carry the hardcoded ollama llm.apiKey"
+fi
+
 # ---- Re-run idempotency: the whole point of the task ------------------------
 
 SECOND_KEY="$(installer_resolve_api_key "$WRITTEN_CFG")"

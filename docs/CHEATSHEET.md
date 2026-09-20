@@ -31,13 +31,20 @@ Environment overrides (export before piping):
 | `MASSA_AI_BRANCH` | `main` | Git branch (source/build mode) |
 | `MASSA_AI_NO_START` | unset | `1` skips starting services after install |
 
+`install.sh` carries no provider logic of its own: in its default `source` mode
+it hands off to `scripts/setup-local-first.sh`, which is where both the provider
+prompt and the provider's own installer live. So the one-liner already offers
+LM Studio — set `MASSA_AI_INFERENCE_PROVIDER=lmstudio` to skip the prompt.
+`MASSA_AI_MODE=docker` and `MASSA_AI_MODE=build` do not run that wizard, so
+under those two you point massa-ai at a provider yourself.
+
 ### From source
 
 ```bash
 git clone git@github.com:luizgmassa/massa-ai.git
 cd massa-ai
 bun install                            # Bun 1.3.14 — not Node
-bash scripts/setup-local-first.sh      # Postgres + Ollama + .env wizard
+bash scripts/setup-local-first.sh      # Postgres + Ollama/LM Studio + .env wizard
 bun run build
 bun run start:api
 ```
@@ -53,7 +60,7 @@ cd packages/core && bunx prisma migrate deploy
 ### Health check
 
 ```bash
-bun run diagnose                       # Ollama, DB, embeddings, migration status
+bun run diagnose                       # inference provider, DB, embeddings, migration status
 ```
 
 ---
@@ -141,11 +148,11 @@ massa-ai-config <command> [options]
 
 | Command | Options | Purpose |
 |---|---|---|
-| `init` | `--ollama` (default), `--mistral <key>`, `--openai <key>` | Create the config |
+| `init` | `--ollama` (default), `--lmstudio`, `--mistral <key>`, `--openai <key>` | Create the config |
 | `path` | | Print config file path |
 | `show` | | Print current configuration |
 | `set <key> <val>` | | Set one value, e.g. `set embedding.dimensions 1024` |
-| `use <provider>` | `--api-key <key>`, `--model <name>`, `--base-url <url>` | Switch embedding provider |
+| `use <provider>` | `--api-key <key>`, `--model <name>`, `--base-url <url>` | Switch embedding provider (`ollama`, `lmstudio`, `mistral`, `openai`, `google`, `cohere`) |
 | `recover <projectId>` | `--path <newPath>` | Re-associate an index with a moved directory (`mcp-client` bin only) |
 | `agents install\|uninstall` | `--user`, `--project` | Write/remove the 18 agent files (`opencode-plugin` bin only) |
 | `profile list` / `profile show` | | Shipped profiles + per-host active profile |
@@ -158,7 +165,9 @@ Examples:
 
 ```bash
 massa-ai-config init --mistral your-api-key
+massa-ai-config init --lmstudio
 massa-ai-config use ollama --model qwen3-embedding:4b
+massa-ai-config use lmstudio --model text-embedding-nomic-embed-text-v1.5
 massa-ai-config set embedding.dimensions 1024
 massa-ai-config recover my-project --path /home/user/renamed-dir
 massa-ai-config profile set work --dry-run
@@ -490,8 +499,8 @@ Every `MASSA_AI_*` var a test reads must also be listed in `turbo.json` →
 | Variable | Notes |
 |---|---|
 | `MASSA_AI_LLM_ENABLED` | `false` by default; `true` turns on all 10 call sites |
-| `MASSA_AI_LLM_BASE_URL` | e.g. `http://localhost:11434/v1` |
-| `MASSA_AI_LLM_API_KEY` | e.g. `ollama` |
+| `MASSA_AI_LLM_BASE_URL` | e.g. `http://localhost:11434/v1` (Ollama) or `http://localhost:1234/v1` (LM Studio) |
+| `MASSA_AI_LLM_API_KEY` | e.g. `ollama` (any non-empty string works for either local provider) |
 | `MASSA_AI_LLM_MODEL` | 7 NL-judgment sites |
 | `MASSA_AI_LLM_CODE_MODEL` | 3 code sites: bootstrap seed, reranker, code-compressor |
 | `MASSA_AI_LLM_TEMPERATURE`, `MASSA_AI_LLM_MAX_OUTPUT_TOKENS` | |
@@ -501,8 +510,14 @@ output into the reasoning channel and silently burns the 90 s timeout.
 
 ### Embeddings
 
-`OLLAMA_BASE_URL`, `OLLAMA_EMBEDDING_MODEL` (default `qwen3-embedding:4b`),
+Ollama: `OLLAMA_BASE_URL`, `OLLAMA_EMBEDDING_MODEL` (default `qwen3-embedding:4b`),
 `OLLAMA_EMBEDDING_DIMENSIONS` (default `2560`).
+
+LM Studio: `LMSTUDIO_BASE_URL` (default `http://localhost:1234/v1`),
+`LMSTUDIO_EMBEDDING_MODEL` (default `text-embedding-nomic-embed-text-v1.5`,
+resolved to `768` dims automatically), `LMSTUDIO_EMBEDDING_DIMENSIONS`. Select
+either provider via `EMBEDDING_PROVIDER=ollama|lmstudio` or
+`massa-ai-config use <provider>`.
 
 ### Search and Synapse tuning
 

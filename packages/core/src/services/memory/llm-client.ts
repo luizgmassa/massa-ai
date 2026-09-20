@@ -18,6 +18,14 @@
 import { generateText, generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { config, logger, DEFAULT_LLM_MODEL } from "@massa-ai/shared";
+import { loadConfigSafe } from "@massa-ai/shared/config";
+import {
+  INFERENCE_PROVIDERS,
+  LOCAL_INFERENCE_IDS,
+  inferenceProviderList,
+  type InferenceProviderId,
+  type InferenceProviderSpec,
+} from "@massa-ai/shared/inference-providers";
 import { z } from "zod";
 
 /**
@@ -68,6 +76,17 @@ export async function _checkJsonSchemaSupport(): Promise<boolean> {
   if (_jsonSchemaSupported !== null) return _jsonSchemaSupported;
   try {
     const llm = getLlmConfig();
+    const spec = resolveInferenceSpec(llm.baseUrl);
+    if (!spec.supportsOllamaVersionProbe) {
+      // LM Studio (and any other non-Ollama local provider) implements the
+      // OpenAI-native response_format:{type:"json_schema"} path directly —
+      // no version handshake exists to probe, and none is needed (LIP-07).
+      _jsonSchemaSupported = true;
+      logger.info("json_schema: native support assumed (non-Ollama provider)", {
+        provider: spec.id,
+      });
+      return true;
+    }
     // Ollama's version endpoint is at /api/version (no /v1 prefix).
     const versionUrl = llm.baseUrl.replace(/\/v1\/?$/, "") + "/api/version";
     const res = await fetch(versionUrl, { signal: AbortSignal.timeout(5000) });
@@ -150,6 +169,19 @@ export function _setLlmEnabledForTesting(flag: boolean | null): void {
  * regresses to today's (content-only) path exactly.
  */
 
+/**
+ * Test seam: force the resolved `llm.baseUrl` without touching config or
+ * mocking `@massa-ai/shared` (this file's own test suite deliberately avoids
+ * that mock — see llm-client.test.ts's docblock — since bun's mock.module is
+ * process-wide and would collide with sibling test files). Pass `null` to
+ * clear.
+ * @internal
+ */
+let testBaseUrlOverride: string | null = null;
+export function _setLlmBaseUrlForTesting(url: string | null): void {
+  testBaseUrlOverride = url;
+}
+
 /** Read the llm config block with safe defaults (defensive against partial/missing config). */
 function getLlmConfig(opts?: { modelRole?: LlmModelRole }) {
   const cfg = config.get("llm");
@@ -161,7 +193,7 @@ function getLlmConfig(opts?: { modelRole?: LlmModelRole }) {
       ? cfg?.codeModel ?? cfg?.model ?? DEFAULT_LLM_MODEL
       : cfg?.model ?? DEFAULT_LLM_MODEL;
   return {
-    baseUrl: cfg?.baseUrl ?? "http://localhost:11434/v1",
+    baseUrl: testBaseUrlOverride ?? cfg?.baseUrl ?? "http://localhost:11434/v1",
     apiKey: cfg?.apiKey ?? "ollama",
     model,
     temperature: cfg?.temperature ?? 0.2,
@@ -169,6 +201,48 @@ function getLlmConfig(opts?: { modelRole?: LlmModelRole }) {
     timeoutMs: cfg?.timeoutMs ?? 90000,
     disableThink: cfg?.disableThink ?? true,
   };
+}
+
+/** host:port for a URL, or `null` when it doesn't parse. */
+function hostPort(url: string): string | null {
+  try {
+    const u = new URL(url);
+    return `${u.hostname}:${u.port || (u.protocol === "https:" ? "443" : "80")}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve which local-inference provider `llm.baseUrl` targets (design.md
+ * §4, LIP-07): the two Ollama-only behaviours below must not fire against
+ * LM Studio. Primary signal is a host:port match against each provider's
+ * `defaultLlmBaseUrl`; a baseUrl that matches none of them (custom host, or
+ * a provider's default port overridden) falls back to `embedding.provider`
+ * when it names a local-inference id, then to `ollama` — today's only
+ * behaviour, so an unresolvable baseUrl regresses to nothing.
+ * @internal
+ */
+export function resolveInferenceSpec(baseUrl: string): InferenceProviderSpec {
+  const target = hostPort(baseUrl);
+  if (target) {
+    const match = inferenceProviderList().find(
+      (spec) => hostPort(spec.defaultLlmBaseUrl) === target,
+    );
+    if (match) return match;
+  }
+  let embeddingProvider: string | undefined = process.env.EMBEDDING_PROVIDER;
+  if (!embeddingProvider) {
+    try {
+      embeddingProvider = loadConfigSafe().embedding?.provider;
+    } catch {
+      embeddingProvider = undefined;
+    }
+  }
+  if (embeddingProvider && (LOCAL_INFERENCE_IDS as readonly string[]).includes(embeddingProvider)) {
+    return INFERENCE_PROVIDERS[embeddingProvider as InferenceProviderId];
+  }
+  return INFERENCE_PROVIDERS.ollama;
 }
 
 /**
@@ -204,12 +278,19 @@ export function _wrapFetchDisableThink(
 function buildProvider(llm: ReturnType<typeof getLlmConfig>) {
   // Ollama exposes an OpenAI-compatible API at /v1; createOpenAI over baseURL
   // is sufficient (no special compatibility flag in @ai-sdk/openai v3).
+  const spec = resolveInferenceSpec(llm.baseUrl);
   const openai = createOpenAI({
     baseURL: llm.baseUrl,
     apiKey: llm.apiKey,
-    ...(llm.disableThink ? { fetch: _wrapFetchDisableThink(globalThis.fetch) } : {}),
+    ...(llm.disableThink && spec.injectsDisableThink
+      ? { fetch: _wrapFetchDisableThink(globalThis.fetch) }
+      : {}),
   });
-  return openai(llm.model);
+  // The default callable resolves to the Responses API, which LM Studio serves
+  // while dropping `text.format` — gating json_schema on correctly still yields
+  // prose there. `.chat()` is the endpoint that honours it. See
+  // `requiresChatCompletionsApi`.
+  return spec.requiresChatCompletionsApi ? openai.chat(llm.model) : openai(llm.model);
 }
 
 /**
