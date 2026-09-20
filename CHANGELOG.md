@@ -83,7 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one. Tier 3 now keys on `*_EMBEDDING_(MODEL|DIMENSIONS)` with any prefix, and the
   width-writer membership gained the new seam module.
 
-- **The E2E availability gate is provider-neutral.** Sixteen E2E files gate on a single
+- **The E2E availability gate is provider-neutral.** Fifteen E2E files gate on a single
   "can we embed?" flag that was resolved from `/system/ollama`, so under any other
   configured provider the whole suite skipped and reported no failures — a silent pass.
   It now resolves from `/system/inference`, falling back to the Ollama route only against

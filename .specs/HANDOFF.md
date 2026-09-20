@@ -28,23 +28,28 @@ pair specifically and observed before being trusted.
 **2560** (`binary-quantization`) → hit@1 0.5000, MRR 0.5893; **768** (`hnsw-cosine`) →
 hit@1 0.1429, MRR 0.2116. Full table in `spec.md`'s LIP-22 block.
 
-The headline is not the number but the correction: the `bench:needles` bound previously
-recorded here said ΔMRR −0.1773; the real-store measurement says **−0.3777**. That earlier
-figure was not conservative, it was **flattering** — an in-process exact-cosine ranker
-removes approximate search from *both* arms, so the delta it reports has the very mechanism
-under test subtracted out of it. Carry that as the pattern: a benchmark that cannot reach
-the mechanism does not err toward caution.
+The `bench:needles` bound previously recorded here said ΔMRR −0.1773; the real-store
+measurement says **−0.3777**. **Resist the obvious reading.** A draft of this handoff
+concluded the old benchmark "understated the risk by half"; the verifier refuted it with the
+shared control arm, and the refutation is the more useful artifact. `bench:needles` ran its
+768 arm on Ollama's `nomic-embed-text`, not LM Studio's model, so three variables moved
+between harnesses — and on the identical 2560 arm with the identical fixture the two
+instruments disagree by 4 needles at hit@10 and −0.0530 MRR anyway. **Before attributing a
+difference-of-deltas to the variable under test, check that the two instruments agree on the
+control arm they share.** Here they do not, so the decomposition is unavailable and only the
+end-to-end measurement stands.
 
 Widths are attested twice over — direct `curl` per provider (2560 / 768) and the LIP-15
 fingerprint each workspace stamped itself. Determinism held across two sweeps per run and a
 third confirming run per arm in a fresh process.
 
 **The trap that made this unmeasurable, and it is wider than LIP-22.** The file gated on
-`OLLAMA_UP`, read from `/system/ollama`. **All 16 E2E files gate on that flag**, and in
+`OLLAMA_UP`, read from `/system/ollama`. **15 of the 19 E2E test files gate on that flag** (measured; the other four are
+`06.checkpoints`, `13.cli`, `17.cleanup-verify`, `23.owned-destructive`), and in
 every case they mean "embeddings are available" — so under any non-Ollama provider the
 entire E2E suite skips and reports no failures, which reads as a pass. `probeAvailability`
 now resolves it from the neutral `/system/inference`, falling back to `/system/ollama` only
-against a server predating LIP-10, so one edit unblocks all 16 without touching them. Two
+against a server predating LIP-10, so one edit unblocks the other 14 without touching them. Two
 smaller ones in the same file: the floors were a single Ollama-calibrated triple (now keyed
 per arm), and the `beforeAll` budget was 700s against a cold index that measured 1h 12m.
 

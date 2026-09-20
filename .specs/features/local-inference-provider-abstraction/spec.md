@@ -499,16 +499,28 @@ note.
   all with identical hit@k. Misses at 2560: N05, N12, N13, N14. At 768: those
   four plus N07, N08, N11.
 
-  **The finding, and it is not the one the accepted risk recorded.** The
-  `bench:needles` figures kept below put the cost at ΔMRR −0.1773 and
-  Δhit@1 −0.2143. Measured through the real store the cost is **ΔMRR −0.3777
-  and Δhit@1 −0.3571** — roughly **twice** the degradation, on MRR. The
-  in-process exact-cosine ranker did not merely fail to observe the branch; by
-  removing approximate search from both sides it *understated the risk by
-  about half*, which is the direction G14 predicted and the reason this
-  requirement was not allowed to close on it. The risk is real, it is now
-  quantified, and it remains accepted rather than prevented — 768 is inherent
-  to the measured LM Studio model.
+  **The finding, and the attribution it does NOT support.** The `bench:needles`
+  figures kept below put the cost at ΔMRR −0.1773; through the real store it is
+  **ΔMRR −0.3777**. It is tempting — and an earlier draft of this block did it —
+  to conclude the in-process ranker "understated the risk by half". **That
+  conclusion does not survive its own control arm.** Three things differ between
+  the two harnesses, not one: the ranker, the indexing pipeline, and **the
+  embedding stack itself** — `bench:needles` ran its 768 arm on Ollama's
+  `nomic-embed-text`, never LM Studio's `text-embedding-nomic-embed-text-v1.5`
+  (its own recorded table header reads `768 — nomic-embed-text`). And on the
+  *identical* 2560 stack with the identical 14-needle fixture the two
+  instruments already disagree by **4 needles at hit@10 (1.0000 vs 0.7143) and
+  −0.0530 MRR**. A difference-of-deltas of −0.2004 cannot be assigned to the
+  store branch when the instrument alone moves the shared control arm that much.
+
+  What stands is the measurement, not a decomposition of it: **at 768 through
+  the real store, retrieval on this corpus is hit@1 0.1429 / MRR 0.2116 against
+  0.5000 / 0.5893 at 2560.** That is the number LIP-22 asked for. Isolating how
+  much of the gap is the store branch versus the embedding model would need a
+  third arm — the same model at both widths, or both models through the same
+  store — and no such arm was run. The risk is real, quantified end to end, and
+  remains accepted rather than prevented: 768 is inherent to the measured LM
+  Studio model.
 
   Floors follow the measurement rather than the reverse:
   `FLOORS["lmstudio"]` in that file is set at ~80% of the observed values,

@@ -1,264 +1,527 @@
 # Validation — Local inference provider abstraction + LM Studio (LIP)
 
 **Feature slug:** `local-inference-provider-abstraction`
-**Commit range verified:** `d523f06f..c9232108` (44 commits, 8 Phases, 25 Tasks).
-Phase 8 alone: `cf29d5d5..HEAD` — `9e26e119` (T20), `a59e7901`+`9407567d` (T19),
-`87dacbc3` (T21), `1d5d3489` (T22), `4354f2ba` (T24), `a691cf0b` (T23),
-`06ddadb1` (T19 literal + doc fix), `c9232108` (T25). G7 closed earlier in `e04e12d0`.
+**Commit range verified:** `d523f06f..75496925`. This pass re-verifies the three findings
+the previous pass raised, against the two commits that answer them: `92e1a098` (H1 + M1 +
+L1) and `75496925` (H2 / LIP-22 measurement). The four commits it already reviewed
+(`06ddadb1`, `a691cf0b`, `c9232108`, and the Phase-8 set behind them) are carried forward,
+not re-derived.
 **Worktree:** `/Users/luizmassa/Projects/massa-ai-feat-local-inference-provider-abstraction`,
-branch `feat/local-inference-provider-abstraction`.
-**Verifier:** verification agent (author != verifier). This is the **second** independent
-pass; it supersedes the Phase-7 report whose verdict was FAIL with gaps G1–G16.
-Coverage re-derived from `spec.md`'s own requirement text. `tasks.md`'s Test Coverage
-Matrix was treated as a claim to falsify, not a source. Evidence-or-zero.
+branch `feat/local-inference-provider-abstraction`, HEAD `75496925`.
+**Verifier:** verification agent (author != verifier). **Third** independent pass; it
+supersedes the report at `1ea64f15`, whose verdict was FAIL on H1/H2/M1.
 **Date:** 2026-09-20.
 
 ---
 
 ## Summary
 
-**Result: FAIL**
+**Result: PASS**
 
-Phase 8 closed **13 of the 16** gaps, and closed the important ones properly — with code,
-not with prose. `scripts/diagnose.ts` is genuinely provider-dispatched and was verified
-**live in five configurations**; LIP-08 acquired a real sensor that kills the mutant no
-runtime consumer could previously see; the three LM Studio mutants that survived the last
-pass all die now; and assumption **A1** — which `spec.md:502-510` makes an explicit FAIL
-condition if only stubbed — is satisfied for the first time with a real request transcript.
+All three findings are closed, and closed by mechanism rather than by narration. Each was
+re-induced or re-executed from scratch here; none was accepted on the author's record.
 
-Two requirements are nevertheless unmet, and one new surface escaped every gate:
-
-| | Requirement | Verdict |
-|---|---|---|
-| 1 | **LIP-22** | **FAIL** — T24 amended the AC to name `14.needles.test.ts`, then never ran it. That file is **byte-unchanged over the whole range** and is gated on `RUN_E2E + API + **Ollama** up` with no 768/LM Studio arm, so as written it cannot observe this requirement's subject either. The amendment's own sentence is "a promise to measure later is not an AC". **Phase 8 converted a PASS into a FAIL by strengthening a clause it did not execute.** |
-| 2 | **LIP-19b** | **FAIL** (unchanged from the last pass) — G12 was listed in T24's heading and restated verbatim in its body, and then **nothing was done**. Neither branch of its own directive ("record as an accepted deviation, or amend the clause") exists anywhere in the repo. |
-| 3 | **LIP-18** | **PASS on its AC**, but its body clause *"keep the exactly-one rule per provider per surface"* is violated on a surface **T19 itself created**: `scripts/diagnose.ts:127-130` now hand-copies **both** providers' default embedding models, in no surface table. Mutation **M14b survives every gate**. |
-
-**One mutant survives** (M14b). **Nine of ten mutations were killed**, including all four the
-last pass could not kill (M1a, M10, M13, M9).
-
----
-
-## Scope and method
-
-**(1) Spec-anchored outcome check.** For LIP-01..LIP-24 the sensor claimed to cover each AC
-was located and read against `spec.md`'s own text, asking whether it asserts the
-*spec-defined outcome* or merely the *implementation's behaviour*. An AC with no locatable
-sensor is NOT COVERED.
-
-**(2) Discrimination sensor.** 10 behaviour-level mutations, including the four the previous
-pass recorded as survivors. **Every restore was from a file copy held outside the repository
-(`/tmp/lip-p8-backup`). No `git checkout`, `git restore` or `git stash` was used at any
-point.** A literal-string patcher that asserts its own match count and prints the population
-beside the verdict was used throughout, because a `perl -pi -e` expression carrying `${...}`
-is eaten by shell interpolation and can silently patch nothing.
-
-**(3) Live measurement.** The environment of record was exercised directly rather than
-attested: Ollama on `:11434` (`qwen3-embedding:4b`, 2560), LM Studio on `:1234`
-(`text-embedding-nomic-embed-text-v1.5` 768, plus `qwen/qwen3-4b-2507`), PostgreSQL 17.10 +
-pgvector 0.8.4.
-
-**Provenance.** `[V]` = the verifier ran the command in this worktree. `[D]` = a delegated
-reader ran it and the verifier re-derived the *conclusion*, not the *number*. Every FAIL row
-above rests on at least one `[V]` measurement.
-
-**Harness traps carried forward and respected.** `@massa-ai/shared/inference-providers`
-resolves through the export map to `packages/shared/dist/config/inference-providers.js`, not
-`src/` — M9 was applied to the resolved artifact and verified by sha256, since `dist/` is
-gitignored and `git status` cannot see a mutation there. `DATABASE_URL` was exported for
-every `apps/*` gate (this worktree has no `.env`; without it seven `apps/mcp-client`
-isolation groups fail on provisioning, not on the feature).
-
----
-
-## Gates run, with measured results
-
-| Gate | Result | Provenance |
-|---|---|---|
-| `bun run lint` (oxlint) | clean, **exit 0** | [V] |
-| `bun run type-check` | **6/6 successful, 0 cached**, exit 0 | [V] |
-| `bun run test:scripts` | TS half **2050 pass / 0 fail across 89 files**; exit 1 on the documented pre-existing `install-skills CLI: 44 passed, 2 failed`. `scripts/install-skills.sh` and `scripts/tests/test-install-skills-cli.sh` both have an **empty diff** over `d523f06f..HEAD`. **Not this feature's.** Nothing else in the shell half fails. | [V] |
-| `bun run diagnose` — LM Studio **up**, provider via env | **exit 0**; `[1/7] lmstudio found at ~/.lmstudio/bin/lms`, `[2/7] API reachable at http://localhost:1234/v1 (9ms)`, `[3/7] Model 'text-embedding-nomic-embed-text-v1.5' is available`, `[4/7] Embedding OK! dimensions=768 latency=68ms` | [V] |
-| `bun run diagnose` — LM Studio **up**, provider from `config.json` only (scratch `XDG_CONFIG_HOME`, no env knob) | **exit 0**, `dimensions=768 latency=29ms` | [V] |
-| `bun run diagnose` — LM Studio **down** (`LMSTUDIO_BASE_URL=:1235/v1`) | **exit 1**; `API not responding (tried: http://localhost:1235/v1, http://127.0.0.1:1235/v1, http://100.100.100.100:1235/v1)`, `Start with: lms daemon up` | [V] |
-| `bun run diagnose` — **ollama** provider pointed at LM Studio's live `:1234` | **exit 1**, `API not responding` — the LIP-03 false positive, killed live | [V] |
-| `bun run diagnose` — real developer config (ollama), no override | **exit 0**, `dimensions=2560` — no regression | [V] |
-| **Live `llmObject` against LM Studio** (`qwen/qwen3-4b-2507`, real config path, fetch transcript captured) | `{"ok": true, "value": {"capital": "Paris"}}`; `/api/version` calls **0**, `/v1/responses` calls **0**, `/v1/chat/completions` calls **1**, any body carrying a `think` key **false**, request body carries `"response_format":{"type":"json_schema",…}` | [V] |
-| `scripts/__tests__/embedding-defaults-parity.test.ts` | **9 pass / 0 fail**; pair surfaces 7, model-only 2, width-only 1, **LM Studio pair surfaces 6**, **LM Studio model-only 1**, completeness population **32**, width-writer population **5** | [V] |
-| `scripts/__tests__/diagnose.test.ts` | **33 pass / 0 fail** (new file, +253 lines) | [V] |
-| `scripts/__tests__/probe-dialect-parity.test.ts` | 14 pass / 0 fail; scanned 4 scripts, 0 offenders | [V] |
-| `scripts/__tests__/provider-list-parity.test.ts` | **9 pass / 0 fail** (was 7 — both CLI copies now pinned) | [V] |
-| `scripts/__tests__/turbo-passthrough-env.test.ts` | **4 pass / 0 fail** (was 3 — the LIP-20 sentinel is new) | [V] |
-| `packages/core` isolated `--unit --filter='embedding\|inference\|llm-client\|health\|fingerprint\|lmstudio'` | **all 14 groups PASS** — incl. `health-checker-config` **3/0**, `embedding-fingerprint` **14/0**, `llm-client` **59/0**, `llm-client-json-schema` **13/0**, `lmstudio-embedding-live` **2/0**, `etl-embedding-fingerprint` **1/0** | [V] |
-| `packages/core` `inference-probe.test.ts` | 9 pass / 0 fail | [V] |
-| `packages/shared` `bun run test` | **921 pass / 0 fail across 37 files**; `inference-providers.test.ts` 16/0, `embedding-dimensions.test.ts` 20/0 (LM Studio live — the probe case really executed), `config-loader.test.ts` 40/0 | [V] |
-| `apps/mcp-client` `bun run test` | **all 13 isolation groups PASS** | [V] |
-| `apps/opencode-plugin` `bun run test` | **166 pass / 0 fail across 9 files** | [V] |
-| `apps/web-ui` `bun test` | **784 pass / 0 fail** | [V] |
-| `apps/tools-api` `system.test.ts` | 12 pass / 0 fail | [V] |
-| `apps/tools-api` `config-section-coverage.test.ts` | 4 pass / 0 fail | [V] |
-| `bash scripts/tests/test-lms-model-exists.sh` | **57 passed / 0 failed** | [V] |
-| `bash scripts/tests/test-setup-local-first-api-key.sh` | 40 passed / 0 failed | [V] |
-| `bash scripts/tests/test-setup-ollama-model-exists.sh` | 16 passed / 0 failed | [V] |
-| `bun skills/massa-ai/scripts/check_specs_delivered.ts local-inference-provider-abstraction --root .` | `0 error(s)`, **exit 0** | [V] |
-
-**One reading not to mistake for a finding.** `apps/opencode-plugin` came back **165 pass /
-1 fail** on a run taken while a mutation was still on disk elsewhere in the tree, and **166 /
-0** twice on a clean tree. Recorded because *a worker's "pre-existing" failures are usually
-its own residue*; the clean readings are the ones that count.
-
----
-
-## Per-AC evidence table — LIP-01 .. LIP-24
-
-| Req | Verdict | Sensor / evidence (file:line) | Basis |
-|---|---|---|---|
-| **LIP-01** | **PASS** | `scripts/__tests__/provider-list-parity.test.ts:46-113` | Membership equality between derived consumers, as the AC demands. `cohere` asserted against the live `Set`. **Now also pins both CLI copies' `WRITABLE_PROVIDERS` (`:99-113`)** with a `matches.length !== 1` throw so it cannot pass vacuously — M16 and M16b each named the offending file. 9/0. |
-| **LIP-02** | **PASS** | `packages/shared/src/config/__tests__/config-loader.test.ts:454-493` | **G9 closed.** The name list is no longer test-declared: `const emitted = Object.keys(getConfigForEnv()).filter(k => k.startsWith("LMSTUDIO_"))` with `expect(emitted.length).toBeGreaterThan(0)` as an anti-vacuity guard, then each derived name matched against real source for `process.env.<NAME>`. A fourth emitted-but-unread `LMSTUDIO_*` name now reddens. 40/0. [D + code read [V]] |
-| **LIP-03** | **PASS** | seam `packages/core/src/kernel/inference-probe.ts`; `inference-probe.test.ts` 9/0; `probe-dialect-parity.test.ts:196-282` 14/0; **site 2** `scripts/diagnose.ts:204-213`, sensed by `scripts/__tests__/diagnose.test.ts:234-292` | **G1 closed — all five call sites delivered.** `diagnose.ts` now calls `probeProvider(spec, url)` and decides on `result.reachable`, never `response.ok`. Verified **live, not by inspection**: with the real LM Studio answering 200 + `{"error":…}` on `/api/tags`, the ollama arm reports `API not responding` and exits 1. `diagnose.test.ts:248` is the matching unit red ("a 200 response carrying an error body is reported unreachable — the old `response.ok` path could not do this"). Mutants M2, M3', M11', M12 remain killed from the previous pass. |
-| **LIP-04** | **PASS** | `packages/shared/src/config/__tests__/embedding-dimensions.test.ts:127-165`, `:228-240` | 768 resolved through the merged LM Studio table with a fetch-poisoning stub; both unknown-model arms throw naming model and endpoint. **The previous pass's residual is closed:** M9 (`dist` lmstudio `knownDimensions` 768→1024) is now killed at **runtime** by LIP-08's new sensor, not only inside `packages/shared`. 20/0. |
-| **LIP-05** | **PASS** | `scripts/tests/test-setup-ollama-model-exists.sh` (**empty diff over the range**, 16/0); `test-lms-model-exists.sh:165-169`, `:227-235` (57/0) | `ollama_model_exists` byte-identical; `OLLAMA_URL` / `OLLAMA_HAS_CLI` keep their names and the new suite greps the wizard for them — the caller-contract assertion the second AC demands. |
-| **LIP-06** | **PASS** | `scripts/tests/test-setup-local-first-api-key.sh:203-220` | LM Studio write asserts `provider: "lmstudio"`, `:1234/v1`, `dimensions: 768`, and that `llm.apiKey` is no longer the hardcoded `"ollama"`. Pre-existing 40-assertion contract round-trips. 40/0. |
-| **LIP-07** | **PASS — and now live, closing A1** | `packages/core/src/__tests__/llm-client.test.ts:786`, `:803`, `:810`, `:816` (59/0); **live transcript this session** | `spec.md:502-510` (A1) makes a stubbed-only result a **FAIL**. It is no longer stubbed-only. Against LM Studio with a real instruct model, through the real `config.json` path: **`/api/version` calls = 0**, **no request body carries a `think` key**, and the json-schema path is **enabled, not downgraded** (`json_schema: native support assumed (non-Ollama provider)`, then `json_schema: constrained decoding used`, request body `"response_format":{"type":"json_schema",…}`). `resolveInferenceSpec("http://localhost:1234/v1").id = lmstudio`, `supportsOllamaVersionProbe=false`, `injectsDisableThink=false`. Mutants M5', M6' remain killed. |
-| **LIP-08** | **PASS** | **new** `packages/core/src/__tests__/lmstudio-embedding-live.test.ts:60-97` | **G5 closed with a real sensor, not a recorded anecdote.** It embeds *through the alias* — `createEmbeddingProvider({provider:"lmstudio"})` → `embeddingProviders.lmstudio` → `provider:"custom"` → `createOpenAI` — which is exactly what LIP-04's raw `fetch` bypasses. Ran **live**: 2 pass / 0 fail, 9 expect() calls, `[lmstudio] Provider ready (model: text-embedding-nomic-embed-text-v1.5, dimensions: 768)`, vector length 768, and a `vector.some(v => v !== 0)` guard so a zero-filled stub cannot satisfy it. **It discriminates twice over:** M9 → `expected: 1024, got: 768`; M10 → `expected: 1536, got: 768`, both raised by the real `DimensionMismatchError` against the running model. *Vacuity judged, not assumed:* `test.skipIf(!lmStudioReachable)` gates only the live case; the static declaration pin at `:61-72` always runs, so the file is never wholly vacuous on CI. *Isolation judged, not assumed:* `XDG_CONFIG_HOME` is redirected at `:41-42` before the **dynamic** import at `:54` (static imports at `:32-35` are node builtins and `bun:test` only), and the isolation runner classifies the file `process-global state` and forks it — verified by running it under `run-tests-isolated.ts`, 2/0. |
-| **LIP-09** | **PASS** | `apps/mcp-client/src/config-cli.ts:210`, `:294`; `apps/opencode-plugin/src/config-cli.ts:214`, `:298`; tests `config-cli.test.ts:88`/`:155` and `:76`/`:121` | **G4 closed.** Both forks now write `config.llm.baseUrl` in **both** the `init --lmstudio` and `use lmstudio` branches, and the vacuous substring assertion is replaced by a **field** assertion. M15 (dropping both writes in one fork) gives **30 pass / 2 fail** with `Expected: "http://localhost:1234/v1"  Received: "http://localhost:11434/v1"` — the exact defect the old `show.out` substring check could not see. Gate run as `cd apps/<pkg> && bun run test`, never bare `bun test`. |
-| **LIP-10** | **PASS** | `scripts/diagnose.ts` (+223/−75 over the range); `local-health-checker.ts:86`; `system.test.ts:52-57` 12/0 | **G1 closed. The AC is the whole AC and it was executed, not argued.** `bun run diagnose` **passes** against LM Studio up (exit 0, 768 dims) and **fails informatively** with it down (exit 1, naming `lms daemon up` and listing the candidates actually tried). **No Ollama literal survives that should not:** the 15 remaining `ollama` tokens are the docblock's env-name reference, the ollama half of `DEFAULT_MODEL`, `which ollama`, and the three ollama-branch install/start/pull hints — every one inside a provider-dispatched ternary or the ollama spec itself. `06ddadb1`'s fix is real and observable: the WSL2 last-resort candidate is now `http://100.100.100.100:**1235/v1**` under LM Studio — the provider's own port *and* path — where it used to be `:11434` unconditionally. Compatibility half intact: `services.ollama` survives with `inference` beside it; `/system/ollama` untouched. |
-| **LIP-11** | **PASS** | `apps/mcp-client/src/__tests__/config-cli.test.ts:78`, `:140`; `apps/opencode-plugin/src/__tests__/config-cli.test.ts:67`, `:106`; `provider-list-parity.test.ts:99-113` | **G10 closed.** `WRITABLE_PROVIDERS` is now pinned in **both** copies against the derived writable union; dropping `lmstudio` from either one reddens naming that file (M16, M16b). |
-| **LIP-12** | **PASS** | `scripts/tests/test-lms-model-exists.sh:260-272` | Six fixture cases; `:270` greps the function body to prove it does **not** read `install-state.json`, which LIP-12 forbids. |
-| **LIP-13** | **PASS**, residual | menu: `test-lms-model-exists.sh:409-421` (real pty via `script(1)`, both directions), `:310-320` (token-swap symmetry); invalidation: `embedding-fingerprint.test.ts:157-178` | **G11 substantially closed, and closed more correctly than the gap asked.** Two new reverse-direction cases exist. The fix's own comment (`:148-156`) records why the gap's literal suggestion was wrong: the `lmstudio` alias routes through the OpenAI-compatible path whose **inner** provider field is `"custom"`, so a real LM Studio install never stamps a fingerprint starting `lmstudio:` — the fixture correctly uses `custom:text-embedding-nomic-embed-text-v1.5:768` vs live `ollama`. **Residual:** both new cases exercise `checkSearchAdmission` (the read gate's *detection* layer). No test drives an LM-Studio-flavoured fingerprint through to an actual `EmbeddingIndexStaleError` **throw** (`:298-316` is still generic `ollama:a`/`ollama:b`), and every `activeProvider` in the **write-gate** block (`:203`, `:236`, `:257`, `:276`) is still `provider: "ollama"`. [D, code re-read [V]] |
-| **LIP-14** | **PASS** | `test-lms-model-exists.sh:206-208`, `:212-220` | **G15 closed.** The vacuous-skip guard is now an explicit `fail` running in the **main shell**, not inside `$( )`, so `FAIL=$((FAIL+1))` is no longer swallowed and the script's `[ "$FAIL" -eq 0 ]` exit really flips. Four `lms_cli_path` cases ran. [D, pattern re-read [V]] |
-| **LIP-15** | **PASS** | read gate `search-controller.ts:194-199`; write gate `project-indexer.ts:490-500`; stamp `etl/pipeline.ts:553` | All four required cases exist; V1/V2/V3 were each killed in the previous pass and the suites are green here (14/0, 1/0). Author-disclosed residual stands: the `needsFullReindex` branch carrying the write gate has zero production callers; the reachable recovery is `index_project --forceReindex` → `EtlPipeline.run()`, which **is** where the stamp lives and **is** sensed. |
-| **LIP-16** | **PASS** | `test-lms-model-exists.sh:288-308`, `:424-427`; production reader `scripts/lib/installer-feature-prompts.sh:229-243` | The `die` is a real process exit, asserted by the **absence** of a `REACHED:` marker. `MASSA_AI_INFERENCE_PROVIDER=llamacpp` dies naming the bad value. Unset → keeps current, covered non-interactively and via Enter. |
-| **LIP-17** | **PASS** | `CHANGELOG.md:57-63`; unchanged sites `FEATURES.md:1277`, `docs/CHEATSHEET.md:30`, `:447` | **G7 closed and re-derived independently from `spec.md:344-357`'s own 23-surface inventory, not from the CHANGELOG.** 20 of 23 changed. The 3 that did not are `OLLAMA_EMBED_DELAY_MS` (a genuine Ollama-only knob), the `OLLAMA_BASE_URL` install.sh override row, and `run-deterministic.ts`'s gate-exclusion comment — each verified to be per-provider config or gate text, **none of them an exclusivity claim**, so the written reason is now TRUE for all three. `06ddadb1` fixed the three that were diagnose-bound. FEATURES.md TOC: 33 link occurrences, 31 unique, **31/31 resolve** to a matching heading. [D, spot-checked [V]] |
-| **LIP-18** | **PASS on its AC; body clause violated on a new surface** | `embedding-defaults-parity.test.ts:92-114` (`referencePairLmStudio`), `:190-235` (`LMSTUDIO_PAIR_SURFACES` ×6, `LMSTUDIO_MODEL_ONLY_SURFACES` ×1), `:272-297` | **G3 closed on the AC, and the author's recorded reds were not accepted — all three were re-induced from scratch and all three now die:** M1a (`.env.example` 768→1024) → the LM Studio pair test names the surface; M10 (`embeddings/config.ts` model+width) → same, **and** the LIP-08 live sensor independently; M13 (`setup-local-first.sh` wizard model) → the LM Studio model-only test. The reference is derived from the seam's own `knownDimensions` literal, and the collect-then-assert shape means one red run names every violator. **But** `spec.md:379` also says *"Keep the exactly-one rule per provider per surface"*, and **T19 created a new violating surface**: `scripts/diagnose.ts:127-130` hand-copies **both** providers' default models into a `DEFAULT_MODEL` table that appears in **no** surface list and is invisible to the completeness scan (the literal is not keyed to a `*_EMBEDDING_MODEL` token). **M14b survives** — see below. |
-| **LIP-19** | **PASS** | `config-sections.ts:46`, `:120-123`; `apps/tools-api/src/routes/config-section-coverage.test.ts` | `bun run type-check` 6/6, 0 cached — the mapped type over `keyof MassaAiConfig` is the real gate and it is exercised. `apps/web-ui` 784/0. `config-section-coverage.test.ts` 4/0 (**+22 lines** over the range). |
-| **LIP-19b** | **FAIL** (narrow clause; end state correct) | `embedding-defaults-parity.test.ts:43-60` | Unchanged from the last pass. The extractor is re-anchored and green, but the AC says **"in the same commit"** and the union was deleted in `7987443d` (T03) while the extractor was re-anchored in `018e1529` (T15) — four phases apart. **G12 was not closed.** T24 names G12 in its heading and restates the directive verbatim in its body, but `git show 4354f2ba -- spec.md` touches **only** the LIP-22 section; the G12 bullet in `tasks.md:1184-1187` is unchanged context with no `+`/`−` lines; `grep -rn "accepted deviation" .specs/` finds nothing near LIP-19b; and T24's commit message names G14, G16, G13, G15 and **never mentions G12**. Neither branch of its own directive was executed. [D, spot-checked [V]] |
-| **LIP-20** | **PASS** | `turbo.json:44`; `.env.example:229`; `scripts/__tests__/turbo-passthrough-env.test.ts:101+` | **G8 closed.** `MASSA_AI_INFERENCE_PROVIDER` is present in both files and pinned by name, and the sentinel **discriminates**: M17 (removing it from `turbo.json`) → `4 pass` becomes `3 pass / 1 fail` on "bash-only `MASSA_AI_*` knobs the derived scan cannot see are pinned by name (LIP-20)". **The stated reason for not widening the scan was re-measured, because if the number is wrong the design decision is wrong.** It is right where it is load-bearing: `scripts/` holds exactly **58** tracked `*.sh` files, and under "a name mentioned in a file that does not assign it there, unioned over files" they read **30** distinct `MASSA_AI_*` names of which **25 are absent** from `passThroughEnv` (`MASSA_AI_PG_ROLE`, `MASSA_AI_PLUGIN_SOURCE`, the six `MASSA_AI_INSTALLER_TEST_*` barriers, …). So a shell-wide scan really would redden on 25 pre-existing names while proving nothing, since turbo never dispatches the shell suites. **Citation defect, not a design defect:** the comment says "27 distinct"; the same definition that yields its correct 25 yields **30**. |
-| **LIP-21** | **PASS** | `CHANGELOG.md` `## [Unreleased]` → `### Added` / `### Changed`; +32 lines in Phase 8 | Valid headings per `CONTRIBUTING.md`; no released section hand-edited. `check_specs_delivered.ts` → `0 error(s)`, exit 0. |
-| **LIP-22** | **FAIL** | amended AC at `spec.md:445-460`; named sensor `packages/core/src/__tests__/e2e/14.needles.test.ts` | **The amendment is correct about `bench:needles` and wrong to stop there.** Its reasoning verifies: `benchmarks/needles/run.ts` contains **zero** references to `postgres-vector-store`/`VectorStore` and implements its own `cosine()` at `:156`, so neither the `>2000` binary-quantization path nor the ≤2000 plain-HNSW path runs on either arm. But the replacement AC is **unmet on three counts, measured**: (a) **no run of `14.needles.test.ts` at any width is recorded anywhere** — `grep -n '14.needles' .specs/features/local-inference-provider-abstraction/*.md CHANGELOG.md` returns only four *mentions of the plan*, no figures; (b) that file is **byte-unchanged over `d523f06f..HEAD`** (`git diff --stat` → empty); (c) as written it is gated `RUN_E2E + API up + **Ollama** up` (`:63`) with no LM Studio or 768 arm, so it **cannot observe the subject either** without work nobody did. The amendment's own sentence — *"a promise to measure later is not an AC"* — is the standard it fails. The `bench:needles` figures (2560: hit@1 0.5000, MRR 0.6423; 768: hit@1 0.2857, MRR 0.4650, n=14, one shared population) remain valid as a **chunk-embedding-quality** comparison and are kept as one. |
-| **LIP-23** | **PASS — and now live, closing A1** | `packages/core/src/__tests__/llm-client.test.ts:832`, `:839` via `lastProviderEntrypoint` (`:32`, `:51-66`); matrix row `tasks.md:1327` | The AC demands the sensor record **which entrypoint `buildProvider` invoked**. It does, both directions, and M4' killed it in the previous pass. **The live half is now real:** against LM Studio, `/v1/responses` calls **0**, `/v1/chat/completions` calls **1**, and `llmObject` returned `{"ok":true,"value":{"capital":"Paris"}}` — a parsed object, which is the second sentence of the AC. **G13's technical finding was true and its framing was false, and T24's partial rejection is correct:** `llm-client-json-schema.test.ts` genuinely cannot sense the entrypoint (its `@ai-sdk/openai` mock has no `.chat` member), but it was never cited as LIP-23's sensor — at `e04e12d0` and `ee34213e` the matrix row read only "entrypoint-recording sensor + live parsed-object run", and the file's only appearance was in **T06's write set** (`tasks.md:186`). Vague, not misattributed. The row now names the file and lines. [D verified at three revisions] |
-| **LIP-24** | **PASS** | `embedding-defaults-parity.test.ts:299-376` (accounting) → `packages/core/src/__tests__/health-checker-config.test.ts:51` | The accounting takes the **enumerate-and-show-covered** branch, not an allowlist silencing: one file (`local-health-checker.ts`) left the token-visible population and its named substitute is a behavioural sensor driving the runtime read through the seam. **G2 closed, and closed honestly:** that substitute file is now **3 pass / 0 fail** (it was 1/2 at the previous HEAD). The repair extends `mock.module` to the second specifier — `@massa-ai/shared/config`, which the export map resolves to `dist/config/index.js`, a genuinely different file from `@massa-ai/shared` → `dist/index.js` — and the diff hunks touch only the mock-setup block; **every `expect(...)` value is byte-identical to `d523f06f`**, so this is a repair and not a test rewritten to assert the defect. Completeness population independently measured at **32** at HEAD. **Residual:** the docblock's recorded population (`:309-310`, "25 → 27 → 26") is stale against that 32. [D for the diff, [V] for the runs] |
-
----
-
-## Discrimination sensor — mutation results
-
-**10 mutations. 9 killed, 1 survived.** All four of the previous pass's survivors were
-re-induced from scratch rather than read from the author's record; all four now die.
-
-### Killed
-
-| # | Requirement | Mutation | Killed by |
-|---|---|---|---|
-| **M1a** | LIP-18 | `.env.example:221` `#LMSTUDIO_EMBEDDING_DIMENSIONS` 768 → **1024** (contradicting the 768 model two lines above) | parity **8/1** — "every LM Studio pair surface carries the reference pair text-embedding-nomic-embed-text-v1.5/768". **Previously survived.** |
-| **M10** | LIP-18 / LIP-08 | `embeddings/config.ts:411` model → `"bogus-lmstudio-model"` **and** `:430` width fallback 768 → **1536** | parity **8/1**, **and** `lmstudio-embedding-live` **0 pass / 2 fail** with a live `DimensionMismatchError: configured dimensions 1536 but the model returned 768`. **Previously survived a 116-test core filter.** |
-| **M13** | LIP-18 | `setup-local-first.sh:333` wizard LM Studio default model → `"bogus-wizard-model"` | parity **8/1** — "LM Studio model-only surfaces carry the reference model". **Previously survived.** |
-| **M9** | LIP-04 / LIP-08 | **`dist`** `inference-providers.js:57` lmstudio `knownDimensions` 768 → **1024** (applied to the *resolved* artifact; sha256-verified, since `dist/` is gitignored) | `lmstudio-embedding-live` **0/2**, `expected: 1024, got: 768`. **Previously survived** — no runtime consumer could sense the width. |
-| **M14** | LIP-18 | `diagnose.ts:129` `DEFAULT_MODEL.lmstudio` → `"bogus-diagnose-model"` | `diagnose.test.ts` **32/1** — but by its own hardcoded literal, **not** by any parity gate (see M14b). |
-| **M15** | LIP-09 | `apps/mcp-client/src/config-cli.ts` — both `config.llm.baseUrl =` writes deleted (`init --lmstudio` and `use lmstudio`) | `cd apps/mcp-client && bun run test` → **30 pass / 2 fail**, `Expected: "http://localhost:1234/v1"  Received: "http://localhost:11434/v1"` on both branches. The old substring assertion could not have seen this. |
-| **M16** | LIP-11 / LIP-01 | `apps/opencode-plugin/src/config-cli.ts:43` — `lmstudio` dropped from `WRITABLE_PROVIDERS` | `provider-list-parity` **8/1**, naming that file. |
-| **M16b** | LIP-11 / LIP-01 | same drop in the `apps/mcp-client` copy | `provider-list-parity` **8/1**, naming that file. Both copies are pinned, not just one. |
-| **M17** | LIP-20 | `turbo.json:44` — `MASSA_AI_INFERENCE_PROVIDER` removed from `tasks.test.passThroughEnv` | `turbo-passthrough-env` **3/1** on the LIP-20 sentinel. |
-
-### Survived (this becomes the top fix task)
-
-| # | Requirement | Mutation | Every gate stayed green |
-|---|---|---|---|
-| **M14b** | **LIP-18** (body clause) | `scripts/diagnose.ts:129` **and** `scripts/__tests__/diagnose.test.ts:176` drift **together** to `"drifted-model-v9"` — the way real drift happens, when someone edits a file and its own test | `diagnose` 33/0, `embedding-defaults-parity` **9/0**, `probe-dialect-parity` 14/0, `provider-list-parity` 9/0, `turbo-passthrough-env` 4/0. |
-
-**Why M14b matters and is not pedantry.** `scripts/diagnose.ts:127-130` is a fourth
-hand-written copy of the default embedding model for **both** providers. It is in no entry
-of `PAIR_SURFACES`, `MODEL_ONLY_SURFACES`, `DIMS_ONLY_SURFACES`, `LMSTUDIO_PAIR_SURFACES` or
-`LMSTUDIO_MODEL_ONLY_SURFACES`, and the Tier-3 completeness scan cannot reach it: the file
-*is* in the scan's population of 32 (its docblock names `OLLAMA_EMBEDDING_MODEL` and
-`LMSTUDIO_EMBEDDING_MODEL`), but the literals live in a `DEFAULT_MODEL` object keyed on the
-provider id, not on a `*_EMBEDDING_MODEL` token, so the `TOKEN[=:]value` offender test never
-fires. The only thing pinning them is `diagnose.test.ts`'s own hardcoded copy of the same
-two strings — which is an agreement between two files, not an anchor to the canonical table.
-The user-visible consequence of drift is `bun run diagnose` reporting
-`Model '<canonical model>' not found` on a correct install, on the feature's own happy path,
-with every gate green. This is **verbatim the EDC-06 defect that
-`embedding-defaults-parity.test.ts:5-8` exists to prevent**, one surface further out — and
-it was introduced by the very task that closed G1.
-
----
-
-## Ranked gap list (what remains)
-
-| # | Sev | Gap | Requirement | Fix |
+| | Finding | Previous | Now | How it was settled |
 |---|---|---|---|---|
-| **H1** | **HIGH** | `scripts/diagnose.ts:127-130` `DEFAULT_MODEL` is an unguarded fourth copy of **both** providers' default embedding models, in no parity surface table and invisible to the completeness scan. **M14b survives every gate.** | **LIP-18** body clause ("exactly one rule per provider per surface"), introduced by T19 | Add `scripts/diagnose.ts` to `MODEL_ONLY_SURFACES` (anchor `ollama:\s*"([^"]+)"` inside `DEFAULT_MODEL`) and to `LMSTUDIO_MODEL_ONLY_SURFACES` (`lmstudio:\s*"([^"]+)"`), then re-induce **M14b** and observe the red. Or delete the table and derive both from the seam. |
-| **H2** | **HIGH** | **LIP-22's amended AC is unmet.** `14.needles.test.ts` has no recorded run at any width, is byte-unchanged over the range, and is gated on Ollama with no 768/LM Studio arm — so the amendment swapped one mechanism that cannot observe the subject for another that also cannot, and then measured neither. | **LIP-22** | Either run it at both widths and transcribe the figures here, which requires giving it an LM Studio/768 arm first; **or** amend the AC again to name what was actually measured and mark the binary-quantization delta explicitly UNMEASURED with the reason. Do not leave a third un-executed mechanism in its place. |
-| **M1** | **MED** | **G12 was never closed.** LIP-19b's "in the same commit" clause has neither an accepted-deviation record nor an amendment, while T24's heading and the close-out narrate G12–G16 as handled together. | **LIP-19b** | One paragraph. Either amend the clause with its reason, or record the deviation as `Resolved (verifier, 2026-09-20)` naming *why* the four-phase gap was harmless (the extractor never went vacuous in the window). No code change. |
-| **M2** | **MED** | LIP-13's reverse direction is proven at the read gate's **detection** layer only. No test drives an LM-Studio-flavoured stored fingerprint through to an actual `EmbeddingIndexStaleError` **throw**, and every `activeProvider` in the write-gate block is still `provider: "ollama"`. | LIP-13 residual | One `custom:…:768` fixture in the `SearchController.searchProject` throw test and one in the `ensureFreshIndex` write-gate block. |
-| **L1** | **LOW** | LIP-20's rationale comment says the bash corpus reads **27** distinct `MASSA_AI_*` names; the same definition that reproduces its correct **25 absent** yields **30**. The design decision is sound; the population figure is 3 low. | LIP-20 bookkeeping | Correct the number in `turbo-passthrough-env.test.ts:20-22`. |
-| **L2** | **LOW** | LIP-24's docblock still records the completeness population as "25 → 27 → 26"; measured **32** at HEAD after the Tier-3 re-key. A stale figure in the comment that explains the mechanism. | LIP-24 bookkeeping | Update the three numbers. |
-| **L3** | **LOW** | LIP-22's amendment (`spec.md:445`) records the phase and the gap id but **no author and no date**, unlike the `Resolved (reviewer, date)` shape the rest of these artifacts use. | LIP-22 bookkeeping | Add the attribution. |
-| **L4** | **LOW** | `init --lmstudio`'s `knownDimensions[model] ?? 768` (`config-cli.ts:207` / `:211`) is an **unreachable** fallback — the model is a literal that is always in the table — so it is not a bounded degradation at all, but nothing records that. The `use` branches and `embeddings/config.ts` both carry explicit `ponytail: G6` comments naming their condition; this one carries none and needs a different sentence, not the same one. | LIP-04 / G6 residual | One line, or delete the `?? 768`. |
-| **L5** | **LOW** | No completeness sensor would notice a **future TypeScript** probe site regressing to `response.ok`: `probe-dialect-parity`'s scan covers four shell files by construction. The five current sites are all correct and all sensed; this is about the next one. | LIP-03 hygiene | Add a TS arm to the dialect scan, or accept and record. |
+| **H1** | LIP-18 body clause — `diagnose.ts`'s `DEFAULT_MODEL` unguarded | **FAIL**, M14b survived | **PASS** | M14b re-induced by this verifier in the hard direction (both files drifted together). Parity goes **7/2** naming both providers while `diagnose.test.ts` stays **33/0**. |
+| **M1** | LIP-19b G12 — "in the same commit" unmet, unrecorded | **FAIL** | **PASS** | The deviation record exists with owner and date, **and its stated reason is true**: the extractor regex is byte-unchanged across the window and matched **exactly 1**, on the correct block, at every revision in it. |
+| **L1** | LIP-20 shell-population figure decayed | **LOW** (27 stated, 30 measured) | **PASS** | Re-measured by the stated method: **58 tracked `.sh` / 27 read / 24 absent** — exact. The moving-baseline explanation is arithmetically confirmed. |
+| **H2** | LIP-22 — AC named a sensor nobody ran | **FAIL** | **PASS** | The sensor was run on both arms through the real store. Figures are internally consistent on every axis checkable without re-running. |
 
-**G6 is closed on both dialects** and is not listed above: `embeddings/config.ts:420-425`
-and both CLI `use` branches carry explicit comments naming the condition and the upgrade
-path, `refuseOnDimensionMismatch` really exists and really fires (M9/M10 proved it live),
-and the bash `2560` arm was already documented as a bounded degradation with its condition
-named at `scripts/lib/installer-api-key.sh:136-148`. Only the narrow L4 sub-case remains.
+**Surviving mutants: 0.** M14b was the only survivor of the previous pass and it now dies.
+
+Four new findings are recorded below. **None unmets an acceptance criterion** — three are
+citation/bookkeeping defects and one is a latent vacuity path in a manually-run gate. The
+sharpest of them (N1) is a *causal attribution* in four internal artifacts that the
+measurement does not support; the measurement itself, and the user-facing CHANGELOG entry,
+are sound.
 
 ---
 
-## Pre-existing failures (explicitly NOT this feature's)
+## Method
 
-- `bun run test:scripts` exits 1 on `scripts/tests/test-install-skills-cli.sh`
-  (`no tools exits 2` → got `1`; `reason is reported`). `scripts/install-skills.sh` **and**
-  `scripts/tests/test-install-skills-cli.sh` both have an **empty diff** over
-  `d523f06f..HEAD`. Measured identically on `d523f06f` in the previous pass. Nothing else in
-  `test:scripts` fails; the TypeScript half is 2050/0 across 89 files.
-- `tasks.md` has never passed `validate_tasks.ts` ("no tasks parsed") because it writes
-  `### T19 — ` against `/^#{2,4}\s+T\d+\s*:/m`. Pre-existing since Phase 1.
+**Evidence-or-zero, and re-derived rather than read.** Every figure quoted from the
+author's record was recomputed here from source or from arithmetic. The one exception is
+stated explicitly and prominently: **the `14.needles.test.ts` run was not reproduced** (see
+"What was not reproduced").
 
-## Skipped checks, with reasons
+**Restore discipline.** Five files were copied to `/tmp/lip-p9-backup` *before* any
+mutation and restored **from those copies**. No `git checkout`, `git restore` or `git
+stash` was used at any point. The patcher asserts its own match count and refuses to write
+on a miss, because a `perl -pi -e` carrying `${...}` is eaten by shell interpolation and can
+silently patch nothing.
 
-- **`packages/core/src/__tests__/e2e/14.needles.test.ts` was not run.** It is `RUN_E2E`-gated,
-  needs a real pgvector index built per width, and re-indexing at 768 would destroy the shared
-  development index in this worktree. A verification gate does not get to mutate the subject's
-  environment to manufacture the measurement the subject owes. This is **why LIP-22 is FAIL**,
-  not a substitute for it: the requirement is that the figure be *recorded*, and it is not.
-- **`bun run bench:needles` was not re-run** (slow, and it mutates the index). Its figures were
-  checked for internal consistency in the previous pass and nothing in Phase 8 touched them.
-- **The full `bun run test` turbo aggregate was not run.** Turbo cancels siblings on a failure
-  and would have hidden reds; targeted per-package gates were used instead, and every package
-  the feature touches was run to completion.
-- **Docker/Swagger smoke and the 90 % coverage floor** were out of scope for this gate.
-- **A `d523f06f` re-baseline of `health-checker-config.test.ts`** was not re-measured; the
-  previous pass measured 3/0 there and the file is 3/0 here, so the regression is closed at
-  both ends by the numbers already in hand.
+---
+
+## H1 — LIP-18 body clause: closed, mutant dead
+
+`92e1a098` adds `scripts/diagnose.ts` to **both** surface tables in
+`scripts/__tests__/embedding-defaults-parity.test.ts`:
+
+- `MODEL_ONLY_SURFACES` — `/^ {2}ollama: "([^"]+)",$/gm`
+- `LMSTUDIO_MODEL_ONLY_SURFACES` — `/^ {2}lmstudio: "([^"]+)",$/gm`
+
+Both anchors were checked for uniqueness before trusting them: `grep -cE '^  (ollama|lmstudio): "'`
+→ **2** in `diagnose.ts`, one per provider, so `extractOne`'s `!== 1` throw is armed rather
+than ambiguous. Deleting the table would raise "extractor rotted or surface removed", so the
+new pin cannot go vacuous.
+
+**M14b re-induced, in the direction that matters.** Not the easy single-file drift — the
+realistic one, where a developer changes a default and edits its test in the same commit.
+Four literal patches, each asserting exactly 1 match:
+
+| File | From | To |
+|---|---|---|
+| `scripts/diagnose.ts:128` | `ollama: "qwen3-embedding:4b",` | `ollama: "drifted-ollama-v9",` |
+| `scripts/diagnose.ts:129` | `lmstudio: "text-embedding-nomic-embed-text-v1.5",` | `lmstudio: "drifted-lmstudio-v9",` |
+| `scripts/__tests__/diagnose.test.ts:174` | the `resolveModelName("ollama", …)` default assertion | drifted to match |
+| `scripts/__tests__/diagnose.test.ts:175-177` | the `resolveModelName("lmstudio", …)` default assertion | drifted to match |
+
+Only those two assertions read `DEFAULT_MODEL`; the file's other occurrences of the same
+literals are `modelIsAvailable` and fetch-stub fixtures, which a real drift would not touch.
+That was verified by reading `:165-200` and `:250-300` before choosing the patch set.
+
+**Measured under the mutation:**
+
+| Gate | Clean | Under M14b |
+|---|---|---|
+| `scripts/__tests__/diagnose.test.ts` | 33 pass / 0 fail | **33 pass / 0 fail** — still green, as predicted |
+| `scripts/__tests__/embedding-defaults-parity.test.ts` | 9 pass / 0 fail | **7 pass / 2 fail** |
+
+Both failures name the file and the drifted value:
+
+```
+Expected: "scripts/diagnose.ts model=qwen3-embedding:4b"
+Received: "scripts/diagnose.ts model=drifted-ollama-v9"
+  at embedding-defaults-parity.test.ts:269   (model-only surfaces)
+
+Expected: "scripts/diagnose.ts model=text-embedding-nomic-embed-text-v1.5"
+Received: "scripts/diagnose.ts model=drifted-lmstudio-v9"
+  at embedding-defaults-parity.test.ts:305   (LM Studio model-only surfaces)
+```
+
+The commit's claim is reproduced exactly: **7/2, both providers named, `diagnose.test.ts`
+33/0**. The two-file agreement is not a sensor; the anchor to the canonical table is.
+**LIP-18 body clause: PASS. M14b: killed.**
+
+---
+
+## M1 — LIP-19b / G12: the reason is true, not merely present
+
+`92e1a098` adds an accepted-deviation record at `spec.md:438-453`, attributed
+**"orchestrator, 2026-09-20"**. The clause stays as written; no code change follows.
+
+The record's load-bearing claim is falsifiable, so it was falsified rather than read: *the
+gate never went vacuous in the four-phase window, because the interface block never contains
+the literal `provider: "ollama",`, so `extractOne`'s `!== 1` throw was never armed.*
+
+**First, the precondition.** `git show 018e1529 -- scripts/__tests__/embedding-defaults-parity.test.ts`
+shows the re-anchor commit changed **only the comment**. The regex
+`/embedding:\s*(\{[^}]*provider:\s*"ollama",[^}]*\})/g` is byte-identical before and after —
+the commit message says so ("the regex itself needed no change") and the diff confirms it.
+That makes the claim purely a question of file contents.
+
+**Then, the regex executed against the real file at five revisions spanning the window:**
+
+| Revision | `extractOne` matches | literal `provider: "ollama",` count | extracted |
+|---|---|---|---|
+| `7987443d~1` (before the union was deleted) | **1** | 1 | `qwen3-embedding:4b` / `2560` |
+| `7987443d` (T03 — union deleted, LIP-19b's trigger) | **1** | 1 | `qwen3-embedding:4b` / `2560` |
+| `018e1529~1` (last revision before the re-anchor) | **1** | 1 | `qwen3-embedding:4b` / `2560` |
+| `018e1529` (T15 — re-anchored) | **1** | 1 | `qwen3-embedding:4b` / `2560` |
+| `HEAD` | **1** | 1 | `qwen3-embedding:4b` / `2560` |
+
+Exactly one match at every point, always the `defaultMassaAiConfig` block, always the same
+values. The throw was never armed and the gate never matched the wrong block. **The stated
+reason holds.**
+
+It is in fact *stronger* than the record claims, and worth recording because it explains why
+the four-phase gap was survivable at all: at `7987443d~1` the interface read
+`provider: "ollama" | "mistral" | "openai" | "google" | "cohere"` — a union whose `"ollama"`
+is followed by ` |`, **never a comma**. So the old comment's stated discriminator ("the
+trailing comma distinguishes literal from union") was already describing the mechanism
+loosely: the regex never depended on LIP-01's union existing, which is precisely why deleting
+it could not break the gate. The defect in the window was a comment that described a
+mechanism that no longer existed — the lesser half, as the record says.
+
+**LIP-19b: PASS** (deviation accepted on a verified reason, with owner and date).
+
+---
+
+## L1 — the shell-population figure now reproduces exactly
+
+Re-measured here by the method the comment now states beside the number: over tracked `.sh`
+files under `scripts/` (`git ls-files`, not a filesystem glob), a name counted as *read* when
+it appears as `$NAME`/`${NAME…}` in a file that does not also assign it, unioned over files.
+
+| Quantity | Stated at `turbo-passthrough-env.test.ts:17-42` | Measured here |
+|---|---|---|
+| tracked `.sh` files under `scripts/` | 58 | **58** |
+| distinct `MASSA_AI_*` names read without same-file assignment | 27 | **27** |
+| of those, absent from `passThroughEnv` | 24 | **24** |
+
+**Exact on all three.** The moving-baseline explanation is confirmed arithmetically, not
+taken on faith: `MASSA_AI_INFERENCE_PROVIDER` **is** in the read set, and removing it from
+the allowlist yields **25** absent — so "25 before it was allowlisted, 24 after" is literally
+true. The three names present on the allowlist are `MASSA_AI_INFERENCE_PROVIDER`,
+`MASSA_AI_LLM_MODEL`, `MASSA_AI_LLM_CODE_MODEL`.
+
+The design conclusion it supports is sound and stable: the absent set is two dozen
+installer-internal knobs (`MASSA_AI_INSTALLER_TEST_*` ×6, `MASSA_AI_PG_ROLE`,
+`MASSA_AI_PLUGIN_SOURCE`, `MASSA_AI_NONINTERACTIVE`, …) that turbo has no reason to forward,
+because turbo never dispatches the shell suites at all.
+
+**Residual (N4, LOW).** One parenthetical does not reproduce. The comment attributes the
+prior pass's `30/25` to "an independent re-measure counting only `local`-scoped assignment".
+Implemented literally — treating only `local NAME=` as assignment — the measurement gives
+**35 read / 31 absent**, not 30/25. Membership was diffed rather than counts compared: the
+broad 27-name set is a strict **subset** of the narrow 35-name set (0 names only in broad, 8
+only in narrow), so the definitions are nested and the direction is right, but the specific
+method named for that figure is not the one that produces it. Inside a comment whose whole
+thesis is "quote the method beside the number", that is worth one more edit.
+
+**LIP-20: PASS.**
+
+---
+
+## H2 — LIP-22: the AC is met, and the measurement survives every consistency check
+
+### What the AC now demands, and whether it was delivered
+
+> the retrieval-algorithm change at 768 is measured by `14.needles.test.ts` — a full-stack
+> run against a real pgvector index at each width, the only sensor that exercises the branch.
+
+Delivered. Both arms ran; figures, workspaces, fingerprints and miss lists are transcribed
+in `spec.md`'s LIP-22 block. **The AC's own standard — "a promise to measure later is not an
+AC" — is satisfied this time.**
+
+### (1) Both arms through the real store, on different branches
+
+Verified in source. `packages/core/src/data/vector/postgres-vector-store.ts` branches on the
+same threshold in two places, and the cited lines are correct:
+
+- `:233` — `const hasBq = dimensions > 2000;` gates the `embedding_bq bit(N)` column at table creation
+- `:267` — `if (this.schemaDimensions && this.schemaDimensions > 2000) { await this.createBqIndex(); return; }`
+- `:564` — "Direct cosine similarity search (for dims ≤ 2000 with HNSW index)"
+- `:596` — "Two-phase binary-quantization search (for dims > 2000)"
+
+2560 → `> 2000` → binary quantization; 768 → `≤ 2000` → direct HNSW cosine. The branch
+assignment is correct.
+
+**One precision note, in the interest of not overstating it.** The `searchPath` field in the
+`[T10][LIP-22]` record is *derived in the test* (`profile.dimensions > 2000 ? … : …`), not
+read back from the store. It is a sound inference — the store applies the identical
+predicate at the identical threshold, and the widths are independently attested twice (direct
+`curl` per provider, plus the LIP-15 fingerprint each workspace stamped itself:
+`ollama:qwen3-embedding:4b:2560` and `custom:text-embedding-nomic-embed-text-v1.5:768`) — but
+it is an inference, not an observation.
+
+### (2) Corpus identity
+
+`743 files / 8129 chunks / 23913 symbols` is recorded for the **2560 arm**. The 768 row
+records "same corpus" plus its own rate and duration, with identity resting on both arms
+indexing the same `PROJECT_PATH` at the same commit — and `SHARED_PID` being keyed on
+`{commit, provider, model, dimensions}`, which is what gave the two arms independent
+workspaces for free. The reasoning is sound (chunking precedes embedding, so the model cannot
+move the chunk count), but **arm B's chunk count is not independently recorded** — see N3.
+
+### (3) Internal consistency of the aggregates — every check passes
+
+**Every hit@k is an exact n/14.** Recomputed:
+
+| | 2560 | | 768 | |
+|---|---|---|---|---|
+| hit@1 | 0.5000 | = 7/14 ✓ | 0.1429 | = 2/14 ✓ |
+| hit@3 | 0.6429 | = 9/14 ✓ | 0.2143 | = 3/14 ✓ |
+| hit@5 | 0.7143 | = 10/14 ✓ | 0.2857 | = 4/14 ✓ |
+| hit@10 | 0.7143 | = 10/14 ✓ | 0.5000 | = 7/14 ✓ |
+
+**Each MRR falls inside the bounds its own hit@k ladder implies** — the same check applied to
+the `bench:needles` figures in the previous pass:
+
+| Arm | ladder-implied `[min, max]` | recorded MRR | verdict |
+|---|---|---|---|
+| 2560 | `[0.5619, 0.5893]` | **0.5893** | inside — **exactly at the ceiling** |
+| 768 | `[0.2024, 0.2321]` | **0.2116** | inside, with room both sides |
+
+Both admit an exact per-needle rank decomposition: 2560 = `7@r1 + 2@r2 + 1@r4` (= 8.25/14 =
+0.58928…, which rounds to the recorded 0.5893) and 768 = `2@r1 + 1@r3 + 1@r5 + 3@r7` (=
+2.96190/14 = 0.21156…, → 0.2116), among others. The 2560 arm sitting exactly at its ceiling
+is a uniquely-determined configuration, not an impossible one — it means every needle found
+within k=3 was at rank 2 and the one found within k=5 was at rank 4.
+
+**The miss lists independently corroborate hit@10**, which is a cross-check the aggregates do
+not imply on their own: 2560 lists 4 misses (N05, N12, N13, N14) and 14 − 10 = 4 ✓; 768 lists
+those four plus N07, N08, N11 = 7, and 14 − 7 = 7 ✓.
+
+**Two further signals that the run is real rather than transcribed from an earlier record.**
+The file header's pre-existing `OBSERVED_BASELINE` for Ollama is hit@1 0.500 / hit@3 0.643 /
+hit@5 0.714 / hit@10 0.714 / **MRR 0.586**. The new 2560 arm reproduces the *identical hit
+ladder* but reports **MRR 0.5893** — which decomposes as one needle moving from rank 5 to rank
+4 (8.20/14 → 8.25/14). A fabricated figure copied from the header would have read 0.586; a
+genuine re-index on a newer tree drifts in exactly this way. Separately, the author's recorded
+observed-red transcript shows `Received: 0.14285714285714285` — the full-precision float of
+2/14, produced at runtime by the assertion, not a value anyone types.
+
+### (4) The derived "understated by about half" claim — arithmetic sound, attribution not
+
+**The arithmetic is exact.** ΔMRR recorded: 0.4650 − 0.6423 = **−0.1773** ✓. ΔMRR measured:
+0.2116 − 0.5893 = **−0.3777** ✓. Δhit@1: −0.2143 and −0.3571 ✓. Ratio 0.3777 / 0.1773 =
+**2.13**, so "roughly twice" and "understated by about half" are both fair descriptions of
+the two numbers.
+
+**The causal attribution is not supported by the data** — see **N1**. The claim, stated as
+settled in four artifacts, is that the in-process exact-cosine ranker *"did not merely fail to
+observe the branch; by removing approximate search from both sides it understated the risk by
+about half."* That assigns the entire −0.2004 difference-of-deltas to the store branch, but
+**three variables moved together** between the two harnesses, and the repo's own records prove
+at least two of them:
+
+1. **The ranker** — the mechanism under test. Real.
+2. **The embedding stack.** `bench:needles` embeds **only** via Ollama `/api/embeddings`
+   (`run.ts:113-140`), so its 768 arm used Ollama's **`nomic-embed-text`**, not LM Studio's
+   `text-embedding-nomic-embed-text-v1.5`. `tasks.md`'s T17 brief states this explicitly
+   ("the same model family under a different server, with Ollama-only knobs applied … truncates
+   at 8000 chars and passes `options.num_ctx`, which has no `/v1/embeddings` counterpart") and
+   the Phase-7 table's column header literally reads `768 — nomic-embed-text`. The caveat was
+   recorded at the source and was not carried forward into the LIP-22 block that now compares
+   against it.
+3. **The whole indexing pipeline** — the bench chunks in-process; the E2E arm runs the real ETL
+   over 743 files / 8129 chunks.
+
+**The decisive evidence is the shared control arm.** Both harnesses measured the *same* 2560
+Ollama `qwen3-embedding:4b` stack against the *same* 14-needle fixture
+(`benchmarks/needles/fixtures/massa-ai.json` — confirmed, `run.ts:228` and the E2E header both
+load it), and they disagree:
+
+| 2560 arm, same model, same fixture | `bench:needles` | `14.needles.test.ts` | instrument delta |
+|---|---|---|---|
+| hit@1 | 0.5000 | 0.5000 | 0 |
+| hit@3 | 0.7143 | 0.6429 | −0.0714 |
+| hit@5 | 0.7857 | 0.7143 | −0.0714 |
+| hit@10 | **1.0000** | **0.7143** | **−0.2857 (4 needles)** |
+| MRR | 0.6423 | 0.5893 | **−0.0530** |
+
+The two instruments differ by **4 needles at hit@10 and −0.0530 MRR on an identical embedding
+stack**. An instrument that moves the control arm that much cannot have its delta subtracted
+from the other instrument's delta and the remainder attributed to a single mechanism. The
+*direction* of the finding is well supported — approximate search should and does bite harder
+— and the 768 result stands on its own as a real-store measurement. What is not supported is
+the quantified causal claim "the ranker understated the risk by about half."
+
+**This does not unmet the AC**, which asks for a full-stack run at each width and got one.
+It is a claim in the narrative that outruns its evidence, in artifacts future readers will
+treat as settled.
+
+**Notably, the user-facing CHANGELOG entry does not make this error.** It reports the measured
+figures, attributes them to the model's width, and adds the indexing-speed trade-off. That
+entry is sound as written.
+
+### (5) The floors: derived from the measurement, not fitted to it
+
+`FLOORS["lmstudio"] = { hit1: 0.07, hit5: 0.21, mrr: 0.16 }`, against measured 0.1429 /
+0.2857 / 0.2116. The stated rule is "~80% rounded DOWN to the nearest whole needle, the same
+rule the Ollama row uses". Recomputed:
+
+| | measured | 80% | rounded down to whole needles | floor set | ✓ |
+|---|---|---|---|---|---|
+| hit@1 | 2/14 | 1.6 needles | 1/14 = 0.0714 | 0.07 | ✓ |
+| hit@5 | 4/14 | 3.2 needles | 3/14 = 0.2143 | 0.21 | ✓ |
+| MRR | 0.2116 | 0.1693 | — | 0.16 | ✓ (down, 2dp) |
+
+**The LM Studio row applies the stated rule correctly on all three.** It was set *after* the
+measurement and *below* it with real headroom, and it is armed: the author's observed red
+(`hit1` → 0.99 → `Expected: >= 0.99  Received: 0.14285714285714285`) shows the assertion
+executing against the live value.
+
+**On "the identical rule the Ollama row uses" — 2 of 3.** Against the header's `OBSERVED_BASELINE`
+(hit@1 7/14, hit@5 10/14, MRR 0.586), the rule reproduces `hit@1` (80% of 7 = 5.6 → 5/14 =
+0.357 → 0.36 ✓) and `MRR` (80% of 0.586 = 0.469 → 0.47 ✓), but **not** `hit@5`: 80% of 10 = 8
+→ 8/14 = 0.571, while the row carries **0.64** (= 9/14, i.e. 90%). That value is
+**pre-existing and unchanged by this commit** — `75496925` moved `0.36/0.64/0.47` verbatim
+from three consts into the map. So the new row is the more rule-consistent of the two; the
+inconsistency is in the old one and predates this feature. Recorded, not charged.
+
+### (6) `probeAvailability` — the discriminator is sound; the count and the rationale are loose
+
+**The unblocking works.** `probeAvailability` now reads `/api/v1/system/inference` and sets
+the neutral `INFERENCE_UP`, with `OLLAMA_UP` kept as a deprecated alias carrying the same
+neutral value — so every existing gate stops skipping without being edited. The route exists
+and returns what the probe expects: `apps/tools-api/src/routes/system.ts:199-214` spreads
+`checkInference()`'s `ServiceStatus` (which carries a boolean `available`) and adds
+`provider`, `models`, `configuredModel`, `baseUrl`. `checkInference()` delegates to the
+LIP-10 provider-dispatched `checkOllama()`, so `provider` really does name the configured
+provider.
+
+**Is `typeof available === "boolean"` a sound discriminator for a 404?** Yes, and it is sound
+in both directions, which is what matters:
+
+- If the neutral route is absent and the 404 body parses as JSON without an `available` key →
+  not a boolean → no value taken, fall through.
+- If the 404 body does **not** parse as JSON (Elysia's default 404 is the bare string
+  `NOT_FOUND`) → `r.json()` rejects → the `catch` falls through.
+
+Either way the legacy probe runs. **The comment's stated reason is narrower than the code's
+actual robustness** — it claims "a 404 still parses as JSON, so the `available` field being
+absent is what distinguishes it, not a throw", which is true for some servers and false for
+this stack's own default 404. The code handles both; only the rationale is imprecise.
+
+**The fallback to `/system/ollama` is correct for a pre-LIP-10 server**, for a reason worth
+stating: a server predating LIP-10 has no provider dispatch at all, so the only provider it
+can be serving is Ollama, and an Ollama-specific answer is the right one. There is no case
+where the fallback answers for the wrong provider.
+
+**One shape note.** The fallback's actual trigger is `if (!INFERENCE_PROVIDER)`, not "the
+neutral route gave no boolean". A LIP-10 server reporting `available` without a `provider`
+field (the unavailable path, where `details` may be absent) therefore runs the legacy probe
+redundantly. Traced through every case, the resulting `INFERENCE_UP` is correct each time —
+it costs one wasted 4-second-timeout request, nothing more.
+
+**LIP-22: PASS.**
+
+---
+
+## New findings (none unmets an AC)
+
+| # | Sev | Finding | Where | Fix |
+|---|---|---|---|---|
+| **N1** | **MED** | **The "the in-process ranker understated the risk by about half" attribution is not supported.** Three variables moved between the two harnesses, not one — the ranker, *and* the embedding stack (bench's 768 arm was Ollama `nomic-embed-text`, not LM Studio's model, as `tasks.md`'s own T17 brief records), *and* the indexing pipeline. On the **shared 2560 control arm** the two instruments disagree by 4 needles at hit@10 and −0.0530 MRR, so the −0.2004 difference-of-deltas cannot be assigned to the store branch. | `spec.md` LIP-22 block, `tasks.md` Phase-8 note, `HANDOFF.md`, `STATE.md` (**not** CHANGELOG, which is correct as written) | Keep the measurement and the direction; replace the quantified cause with the control-arm numbers. Two sentences: the real-store 768 result stands alone, and the cross-harness delta is not attributable. |
+| **N2** | **MED** | **`FLOORS[profile.id]` has a silent no-assertion path with no guard.** When `profile.id` is not a key of `FLOORS`, `14.needles.test.ts:383` logs "no calibrated floor" and asserts **nothing** — F-NEEDLE-1 passes vacuously while the suite reports green. This is not hypothetical: it is exactly the bug the author hit mid-measurement (`id` read as `"custom"` → `FLOORS["custom"]` undefined → floors skipped), found by eye rather than by a gate. A third provider, or any regression in `ACTIVE_EMBEDDING_PROFILE.id`, disarms the floor silently. | `packages/core/src/__tests__/e2e/14.needles.test.ts:380-398` | One line: `expect(Object.keys(FLOORS)).toContain(profile.id)` before the branch, or make the uncalibrated path fail loudly with the candidate baseline in the message. Blast radius is low (RUN_E2E-gated, manual, out of CI), which is why this is MED not HIGH. |
+| **N3** | **LOW** | **"16 E2E files" is 15.** `grep -l 'OLLAMA_UP\|INFERENCE_UP'` over `e2e/` returns 16 paths, but one is `_helpers.ts` — the file that *defines* the flag, not one that gates on it. Of 19 E2E test files, 15 gate (4 do not: `06.checkpoints`, `13.cli`, `17.cleanup-verify`, `23.owned-destructive`). The claim counts grep hits, not gated suites. Repeated identically in five places including the published CHANGELOG ("Sixteen E2E files"). | `spec.md`, `tasks.md`, `HANDOFF.md`, `STATE.md`, `CHANGELOG.md`, and the `_helpers.ts` docblock | s/16/15/, or say "every E2E file that gates on it". The substantive claim — one edit unblocks all of them — is true. |
+| **N4** | **LOW** | **The `30/25` method attribution does not reproduce.** `turbo-passthrough-env.test.ts:36-38` attributes that figure to "counting only `local`-scoped assignment"; implemented literally it yields **35/31**. The sets are properly nested (the 27-set is a strict subset of the 35-set), so the reasoning is directionally right, but the named method is not the one producing the cited number — inside the very comment arguing that a number without its method decays into folklore. | `scripts/__tests__/turbo-passthrough-env.test.ts:36-38` | Drop the parenthetical, or replace it with the measured 35/31 and its definition. |
+
+### Carried forward, unchanged from the previous pass
+
+| # | Sev | Gap | Status |
+|---|---|---|---|
+| **M2** | MED | LIP-13's reverse direction is proven at the read gate's *detection* layer only. No test drives an LM-Studio-flavoured fingerprint through to an actual `EmbeddingIndexStaleError` **throw**, and every `activeProvider` in the write-gate block is still `provider: "ollama"`. | Open |
+| **L2** | LOW | LIP-24's docblock still records the completeness population as "25 → 27 → 26" (`embedding-defaults-parity.test.ts:320-321`); the scan printed **32** at HEAD this pass. | Open |
+| **L3** | LOW | LIP-22's original amendment line ("AC amended in Phase 8 (gap G14)") still carries no author. The new "AC MET — measured 2026-09-20" carries a date but no owner; the G12 record's "orchestrator, 2026-09-20" is the shape to copy. | Partly addressed |
+| **L4** | LOW | `init --lmstudio`'s `knownDimensions[model] ?? 768` is an unreachable fallback with no comment recording that, unlike its `use`-branch siblings. | Open |
+| **L5** | LOW | No completeness sensor would catch a *future* TypeScript probe site regressing to `response.ok`; `probe-dialect-parity`'s scan covers four shell files by construction. | Open |
+
+---
+
+## Gates run this pass
+
+| Gate | Result |
+|---|---|
+| `bun run lint` (oxlint) | clean, **exit 0** |
+| `bun run type-check --force` | **6/6 successful, 0 cached**, exit 0 (re-run uncached — the first invocation replayed FULL TURBO from cache, which is not a measurement) |
+| `scripts/__tests__/embedding-defaults-parity.test.ts` | **9 pass / 0 fail**; completeness population 32, width-writer population 5 |
+| `scripts/__tests__/turbo-passthrough-env.test.ts` | **4 pass / 0 fail** |
+| `scripts/__tests__/diagnose.test.ts` | **33 pass / 0 fail** |
+| `scripts/__tests__/provider-list-parity.test.ts` | **9 pass / 0 fail** |
+| `scripts/__tests__/probe-dialect-parity.test.ts` | **14 pass / 0 fail** |
+| **M14b re-induced** (both files drifted together) | parity **7 pass / 2 fail** naming both providers; `diagnose.test.ts` **33/0** |
+| G12 regex executed at 5 revisions | exactly **1** match at each, correct block, stable values |
+| L1 population re-measured | **58 / 27 / 24** — exact |
+| LIP-22 aggregates | every hit@k an exact n/14; both MRRs inside their ladder bounds; both miss lists consistent with hit@10 |
+
+**Note on coverage.** `packages/core/tsconfig.json` excludes `src/__tests__`, so neither
+`14.needles.test.ts` nor `e2e/_helpers.ts` is reached by `type-check`. oxlint (which surfaces
+oxc semantic errors regardless of rule severity) runs repo-wide and is clean, which is the
+only static gate covering those two files.
+
+---
+
+## What was not reproduced, and why
+
+**`packages/core/src/__tests__/e2e/14.needles.test.ts` was not re-run.** Stated plainly
+because it is the single largest input to the H2 verdict. The ephemeral stack it ran on
+(scratch PostgreSQL on `127.0.0.1:5433/massa_ai_test`, API on `127.0.0.1:3334`, scratch
+`XDG_CONFIG_HOME` per arm) has been torn down, and reproducing it costs a **~1h 12m cold
+index on the Ollama arm alone** — the figure the run itself measured. A verification gate
+does not get to spend that, and re-running on the developer's own database is exactly what
+the author correctly avoided.
+
+**What was done instead**, and what it is worth: source reading of every mechanism the
+figures claim (the store's two branches, the route, the probe, the floor derivation), plus
+full internal-consistency checking of the aggregates — exact-n/14, MRR-within-ladder-bounds,
+miss-lists-versus-hit@10, and the cross-arm/cross-harness coherence checks above. Those are
+sufficient to catch a fabricated or mis-transcribed figure (the 2560 MRR drifting from the
+header's 0.586 to 0.5893 in exactly the way a real re-index would, and the full-precision
+`0.14285714285714285` in the observed-red transcript, are both positive evidence of a real
+run). They are **not** sufficient to catch a run that executed correctly against a
+misconfigured stack — that residual risk is mitigated by, but not eliminated by, the
+double width attestation (`curl` + stamped fingerprint) and the arm-mismatch guard at
+`14.needles.test.ts:281-290`, which throws if the API's reported model disagrees with the
+test process's resolver.
+
+**Also not run:** `bun run bench:needles` (slow, mutates the index, and nothing in this range
+touched it); the full `bun run test` turbo aggregate (turbo cancels siblings on failure and
+would hide reds — targeted per-package gates were used instead, as in the previous pass);
+Docker/Swagger smoke and the 90% coverage floor, both out of scope for this gate.
+
+**Pre-existing and explicitly not this feature's:** `bun run test:scripts` exits 1 on
+`scripts/tests/test-install-skills-cli.sh` (2 failures), measured identically on `d523f06f`
+in an earlier pass; both that script and `scripts/install-skills.sh` have an empty diff over
+the range. And `tasks.md` has never passed `validate_tasks.ts` ("no tasks parsed") because it
+writes `### T19 — ` against `/^#{2,4}\s+T\d+\s*:/m`.
+
+---
+
+## What would have falsified this PASS
+
+Named explicitly, because a PASS without its falsifier is an opinion:
+
+1. **M14b surviving the co-drift.** If drifting `diagnose.ts` *and* `diagnose.test.ts`
+   together had left the parity gate at 9/0, H1 would still be FAIL — the new surface entries
+   would be pinning an agreement rather than an anchor. It went 7/2.
+2. **The G12 regex matching 0 or 2 anywhere in the window**, or matching the interface block
+   instead of `defaultMassaAiConfig`. Either would make the accepted deviation's stated reason
+   false and return LIP-19b to FAIL, because the record would then be an excuse rather than an
+   argument. It matched exactly 1, on the right block, at all five revisions.
+3. **Any hit@k not being an exact n/14**, or **either MRR falling outside its own ladder
+   bounds**, or **a miss list disagreeing with hit@10**. Any one of those would mean the LIP-22
+   figures were not produced by a single coherent run over 14 needles, and H2 would stay FAIL
+   regardless of how the run was narrated. All ten checks passed.
+4. **The LM Studio floors sitting at or above the measured values**, or being derived by a
+   different rule than the one stated — i.e. a gate fitted to pass. They are ~80% rounded down
+   to whole needles, below the measurement with headroom, and demonstrably armed.
+5. **`/api/v1/system/inference` not existing, or not returning a boolean `available`.** The
+   probe rewrite would then have unblocked nothing and the run could not have happened as
+   described. The route exists and returns it.
+
+---
 
 ## Restore verification
 
-`git status --porcelain` in the worktree was **empty before the first mutation and is empty
-after the last**, checked between every mutation. Eleven files were backed up to
-`/tmp/lip-p8-backup` **before** any mutation and restored **from those copies**:
-`.env.example`, `packages/core/src/services/embeddings/config.ts`,
-`scripts/setup-local-first.sh`, `scripts/diagnose.ts`,
-`scripts/__tests__/diagnose.test.ts`,
-`packages/shared/src/config/inference-providers.ts`,
-`packages/shared/dist/config/inference-providers.js`,
-`apps/mcp-client/src/config-cli.ts`, `apps/opencode-plugin/src/config-cli.ts`,
-`turbo.json`, `packages/core/src/__tests__/lmstudio-embedding-live.test.ts`.
+`git status --porcelain` was **empty before the first mutation and is empty after the last**.
+Five files were copied to `/tmp/lip-p9-backup` before any mutation; the two that were
+mutated were restored **from those copies**. sha256, post-restore, all matching:
 
-A `diff` of the post-restore sha256 manifest against the pre-mutation manifest is **empty**
-for all ten manifest entries, and `scripts/__tests__/diagnose.test.ts` matches its backup at
-`affeb49bf7ffdd735f6e89424c623c89de33d13fab1cd4ff16e2072cb187a74f`. The `dist/` artifact —
-which `git status` is structurally blind to, being gitignored — is back at
-`4c8474f1b80b8685bff20c22fd0ec9c991284ca8feed13a8365a7defeb828ac9`, its recorded
-pre-mutation value.
+| File | sha256 |
+|---|---|
+| `scripts/diagnose.ts` | `dfea7f56c87b7c3b64edd3d2f1f48e18f9f536ab873fd66ce4b88108cf311fb9` |
+| `scripts/__tests__/diagnose.test.ts` | `affeb49bf7ffdd735f6e89424c623c89de33d13fab1cd4ff16e2072cb187a74f` |
+| `scripts/__tests__/embedding-defaults-parity.test.ts` | `0a562c58ce402087aa90e59a6515b25dde43f3faa7ca9657451530adb6c82fd6` |
+| `packages/core/src/__tests__/e2e/14.needles.test.ts` | `c5d49f03198c6b01348a39271e8408b04368d13347e580303633911976594f98` |
+| `packages/core/src/__tests__/e2e/_helpers.ts` | `36ef896ee0647724dfae5381e493fb5b46bc39ef6a875a309fdcf5d10335ecbf` |
 
-**No `git checkout`, `git restore` or `git stash` was used at any point.** The only file this
-verification wrote inside the repository is this one.
+The `14.needles.test.ts` hash independently matches the `c5d49f03…` the author recorded when
+restoring their own floor-row mutation — a small but real corroboration that that restore was
+genuine.
+
+**No `git checkout`, `git restore` or `git stash` was used at any point.** The developer's
+tools-api on `:3333` was left down as instructed and was not restarted; no broad `pkill` was
+issued. The only repository file this verification wrote is this one.
+
+---
 
 ## Exact next step
 
-Land **H1** first — it is one entry in each of two existing arrays plus a re-induced M14b, and
-it closes the only surviving mutant in the feature. Then decide **H2** deliberately: LIP-22 is
-now the only requirement whose AC names a mechanism nobody has executed, and amending it a
-second time without measuring anything would be the third iteration of the same move. **M1** is
-a paragraph. `FEATURES.json` `status` must stay `in_progress` until H1 and H2 are resolved.
+**N1 is the one to land**, and it is prose, not code: the LIP-22 block, `tasks.md`,
+`HANDOFF.md` and `STATE.md` state a causal claim the control arm refutes. The measurement is
+good and should be kept exactly as it is — what needs replacing is the sentence assigning the
+doubling to the ranker. The control-arm table above (4 needles at hit@10, −0.0530 MRR, same
+model, same fixture) is the replacement evidence.
+
+Then **N2**, one line, which closes the last gate in this feature whose failure mode is
+green. **N3** and **N4** are single-token edits and can ride along. **M2** remains the oldest
+open item.
+
+`FEATURES.json` `status` is `in_progress`. Nothing above blocks moving it: no requirement is
+unmet, no mutant survives, and every new finding is a bookkeeping or hardening item rather
+than a defect in shipped behaviour. **That is a decision for the orchestrator, not the
+verifier** — but this pass does not withhold it.

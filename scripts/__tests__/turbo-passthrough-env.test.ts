@@ -33,11 +33,14 @@
  *
  * The absent count is a moving baseline, not a constant: it read **25** before
  * `MASSA_AI_INFERENCE_PROVIDER` was itself added to the allowlist, and **24**
- * after. A different read-definition gives a different total — an independent
- * re-measure counting only `local`-scoped assignment found 30/25 — so quote
- * the method beside the number or the number decays into folklore. What is
- * stable across every definition tried, and is the only load-bearing part, is
- * that the absent set is two dozen names and almost none of them are ours.
+ * after — the fix moved the number the fix was justified by. A different
+ * read-definition also gives a different total; an independent re-measure
+ * reported 30/25, and its definition is not recorded here because it was not
+ * reproduced (an earlier draft of this comment guessed at it, and the guess
+ * did not reproduce either — the guess is the mistake worth remembering, not
+ * the discrepancy). Quote the method beside the number, or claim no method.
+ * What is stable across every definition tried, and the only load-bearing
+ * part, is that the absent set is two dozen names and almost none are ours.
  */
 
 import { describe, expect, test } from "bun:test";

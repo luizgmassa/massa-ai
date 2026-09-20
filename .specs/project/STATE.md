@@ -29,17 +29,20 @@ twice, by direct `curl` and by the LIP-15 fingerprint each workspace stamped its
 (`ollama:qwen3-embedding:4b:2560`, `custom:text-embedding-nomic-embed-text-v1.5:768`).
 
 The `bench:needles` bound this replaces put the cost at ΔMRR −0.1773; through the real
-store it is **ΔMRR −0.3777**. The in-process exact-cosine ranker did not merely fail to
-observe the branch — by removing approximate search from *both* sides it understated the
-risk by roughly half, which is the direction the gap list predicted. **A benchmark that
-cannot reach the mechanism does not return a conservative answer; it returns a flattering
-one.**
+store it is **ΔMRR −0.3777**. **Do not read that as "the old benchmark understated the risk
+by half" — an earlier draft here did, and it was wrong.** Three variables separate the two
+harnesses: the ranker, the pipeline, and the embedding stack, since `bench:needles` ran its
+768 arm on Ollama's `nomic-embed-text` rather than LM Studio's model. On the *shared* 2560
+control arm the two instruments already disagree by 4 needles at hit@10 and −0.0530 MRR, so
+the instrument alone moves the control by a quarter of the difference-of-deltas being
+explained. **Two instruments' deltas are only comparable once their shared control agrees —
+check that before attributing the gap to the variable you care about.**
 
 Three defects had to be fixed before the file could measure anything, and the first is the
-one with reach: its gate read `/system/ollama`, and **all 16 E2E files gating on
+one with reach: its gate read `/system/ollama`, and **all 15 E2E files gating on
 `OLLAMA_UP` skip silently under any other provider** — a whole suite reporting "0 fail"
 while testing nothing. Resolving that flag from the neutral `/system/inference` in
-`probeAvailability` unblocks all 16 from one edit. The other two: floors were a single
+`probeAvailability` unblocks the other 14 from one edit. The other two: floors were a single
 Ollama-calibrated triple (now keyed per arm — asserting an uncalibrated number against a
 different stack is inventing one), and the `beforeAll` budget was 700s against a cold index
 that measured **1h 12m**, so the file could not complete a cold run at all. That budget is

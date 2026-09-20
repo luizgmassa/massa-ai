@@ -211,9 +211,11 @@ export interface Availability {
   /**
    * The configured local inference provider is reachable and can embed.
    *
-   * Provider-neutral since LIP-10 shipped a second one. 16 E2E files gate on
-   * this, and in every case they mean "embeddings are available", not "Ollama
-   * specifically" — so resolving it from `/system/ollama` alone made the whole
+   * Provider-neutral since LIP-10 shipped a second one. **14** other E2E test
+   * files still read this flag (measured, `grep -l` over `e2e/*.test.ts` minus
+   * this definer; `14.needles.test.ts` reads `INFERENCE_UP` directly, so 15
+   * files gated on an Ollama-specific value before the change). In every case
+   * they mean "embeddings are available", not "Ollama specifically" — so resolving it from `/system/ollama` alone made the whole
    * suite skip silently under an LM Studio config, which reads as a pass. It
    * now resolves from `/system/inference` (the neutral counterpart) and falls
    * back to `/system/ollama` only when that route is absent, i.e. against a

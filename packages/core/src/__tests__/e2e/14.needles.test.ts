@@ -377,6 +377,21 @@ describe.skipIf(!READY)("T10 needles benchmark", () => {
       // with no calibrated baseline still runs, still asserts the
       // provider-independent invariants (non-empty, determinism), and records
       // its aggregate as the candidate baseline.
+      // An arm the table does not mention at all is a misconfiguration, not a
+      // new provider: `FLOORS` is keyed on the same ids `embeddingProviders`
+      // uses, so an id that is absent means this run measured something other
+      // than what it claims to. Distinguish that from a DELIBERATE `null`
+      // (recorded, awaiting calibration) — without this, an unknown id takes
+      // the no-assertion path and F-NEEDLE-1 passes green having asserted
+      // nothing. That is not hypothetical: reading the provider's dispatch
+      // path instead of its id produced exactly this, `"custom"`, and it was
+      // caught by eye rather than by a gate.
+      if (!(profile.id in FLOORS)) {
+        throw new Error(
+          `unknown arm "${profile.id}": not a key of FLOORS. Add a row (or an explicit ` +
+            `null pending calibration) before trusting a run labelled with it.`,
+        );
+      }
       const floors = FLOORS[profile.id];
 
       console.log("\n=== T10 regression floors ===");

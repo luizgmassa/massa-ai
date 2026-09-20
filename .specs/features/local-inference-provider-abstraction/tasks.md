@@ -1303,10 +1303,10 @@ Ollama with no 768 arm — so it could not observe the subject either. Both are
 now closed by running it, not by amending again.
 
 Three things had to change before the file could measure anything. Its gate
-read `/system/ollama`, so **all 16 E2E files that gate on `OLLAMA_UP` skip
+read `/system/ollama`, so **all 15 E2E files that gate on that flag skip
 silently under any other provider** — which reads as a pass; `probeAvailability`
 now resolves that flag from the neutral `/system/inference` and falls back only
-against a server predating LIP-10, so one edit unblocks all 16. Its floors were
+against a server predating LIP-10, so one edit unblocks the other 14. Its floors were
 a single Ollama-calibrated triple; they are now keyed per arm, because
 asserting an uncalibrated number against a different stack is inventing one.
 And its `beforeAll` budget was **700s against a cold index that measured 1h
@@ -1316,9 +1316,17 @@ why it had never been run.
 Full figures and the two-arm table are in `spec.md`'s LIP-22 block. The
 headline: through the real `postgres-vector-store.ts`, 2560 (binary
 quantization) scores hit@1 0.5000 / MRR 0.5893 and 768 (HNSW cosine) scores
-hit@1 0.1429 / MRR 0.2116 — **ΔMRR −0.3777** against the **−0.1773** the
-`bench:needles` record claimed. The in-process ranker understated the risk by
-about half, exactly the direction G14 predicted.
+hit@1 0.1429 / MRR 0.2116.
+
+**The attribution that first went in here was wrong, and the control arm is
+what caught it.** Reading ΔMRR −0.3777 against `bench:needles`' −0.1773 as "the
+in-process ranker understated the risk by half" assumes one variable moved.
+Three did: the ranker, the pipeline, and the embedding stack — `bench:needles`
+ran its 768 arm on Ollama's `nomic-embed-text`, not LM Studio's model, as its
+own table header records. On the shared 2560 control arm the two instruments
+disagree by 4 needles at hit@10 and −0.0530 MRR, so the instrument alone moves
+the control that much. Keep the measurement; drop the decomposition. Separating
+store branch from embedding model needs a third arm nobody ran.
 
 Method notes worth reusing. The harness already keyed `SHARED_PID` on
 `{commit, provider, model, dimensions}`, so the two arms got independent
@@ -1344,6 +1352,18 @@ would have been published under the wrong name. It now carries `id` (the
 selected provider) and `dispatchPath` (the code path) separately. LM Studio
 being an alias over the `custom` entry is precisely what makes the two
 distinct.
+
+**One guard added without an observed red, recorded rather than glossed.** The
+unknown-arm throw in `14.needles.test.ts` (`profile.id` absent from `FLOORS`
+now fails instead of silently asserting nothing) was added *after* the
+ephemeral measurement stack was torn down. Its `describe` is `RUN_E2E`-gated,
+so nothing exercises it without rebuilding that stack — a ~1h 12m cold Ollama
+index. It is therefore a defensive throw whose red has **not** been observed.
+What would observe it: bring the stack back up and run either arm with a
+`FLOORS` key renamed. Flagged because the failure it prevents is the green
+kind — an unknown id previously took the no-assertion path and F-NEEDLE-1
+passed having asserted nothing, which is exactly what happened when the arm
+briefly reported itself as `"custom"`.
 
 **T23 gate.** `bun run lint` (oxlint) clean, exit 0. `bun run test:scripts`
 exits 1 on exactly the two **pre-existing** `install-skills CLI` failures
