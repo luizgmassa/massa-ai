@@ -814,15 +814,28 @@ re-anchoring holds; and LIP-24's substitute sensor exists at
   same heading text but README has **no** TOC link to it.
 - Every changed command is **executed once** before it is written down.
 
-  **AC amended, with its reason (Plan Challenge, verified).** The exclusion is
-  the LM Studio install/daemon lines — `curl … lmstudio.ai/install.sh | bash`,
-  `lms daemon up`, `lms get -y`. Phase 5's bounded residual #1 (`:549-552`)
-  already recorded them as deliberately never executed, because T12 forbids
-  running the LM Studio installer; and on this host **`lms` is not on `PATH`**
-  (`which lms` → not found) while the LM Studio server itself is live on
-  `:1234`, so they are unexecutable here, not merely unmeasured. Every *other*
-  changed command is executed once and its exit code transcribed. Writing the
-  narrower AC down beats silently failing the wider one.
+  ~~**AC amended, with its reason.** The exclusion is the LM Studio
+  install/daemon lines — `curl … lmstudio.ai/install.sh | bash`,
+  `lms daemon up`, `lms get -y` … on this host `lms` is not on `PATH`, so they
+  are unexecutable here.~~
+
+  **That exclusion was TOO WIDE, and Phase 8 narrowed it after actually looking
+  for the binary.** `lms` is not on `PATH`, but it **is present and executable**
+  at `~/.lmstudio/bin/lms` — the bundled path that `setup-local-first.sh`'s
+  `lms_cli_path` checks and that T19's `diagnose.ts` now checks too. `which lms`
+  returning nothing was taken as "absent" when it only ever meant "not on
+  `PATH`", which is precisely the false negative LIP-14 exists to prevent — the
+  exclusion reproduced the bug the requirement is about. Measured in Phase 8:
+  `lms version` exit 0, `lms ls` exit 0 (3 models, the embedding model `LOADED`),
+  `lms daemon up` exit 0 (idempotent — "LM Studio is already running"), and
+  `lms get --help` exit 0 confirming the `-y, --yes` flag shape without
+  downloading.
+
+  **The surviving exclusion is one line, and for a different reason.**
+  `curl -fsSL https://lmstudio.ai/install.sh | bash` is excluded because T12
+  forbids running the vendor installer — a scope rule, not a reachability
+  problem. Every other changed command is executed once and its exit code
+  transcribed.
 - ~~**`README.md:47` and `:49-53` are the `install.sh` quick start, and
   `install.sh` has no provider menu**~~ — **both halves withdrawn by the T16
   worker and the Phase 7 reviewer, independently, and Phase 5 bounded residual
@@ -1158,16 +1171,29 @@ and observe the membership assertion name it.
   binary-quantization branch the requirement exists to measure. Strike it as the
   sensor and name `packages/core/src/__tests__/e2e/14.needles.test.ts`. The
   measured figures stay; what changes is which mechanism the AC demands.
-- **G13:** the matrix attributes LIP-23's sensor to
-  `llm-client-json-schema.test.ts`, which **cannot** sense the entrypoint — its
-  `@ai-sdk/openai` mock has no `.chat` member. The real sensor is
-  `llm-client.test.ts:832`/`:839`. Correct `tasks.md:1052`.
+- **G13 — half right; the finding holds, the target does not.** Verified:
+  `llm-client-json-schema.test.ts` genuinely **cannot** sense the entrypoint,
+  because its mock is `createOpenAI: () => (model) => ({ model, __mock: true })`
+  with no `.chat` member. But the two places that name that file are T06's
+  **write set** (`:186`) and nothing else — the Test Coverage Matrix row for
+  LIP-23 says only "entrypoint-recording sensor", which is vague rather than
+  misattributed, so there is no wrong citation to correct. The real fix is to
+  make the row **name** its sensor: `llm-client.test.ts:832` (`lmstudio →
+  entrypoint "chat"`) and `:839` (`ollama → "responses"`), both confirmed
+  present and asserting `lastProviderEntrypoint`.
 - **G12:** LIP-19b's AC says "in the same commit"; the union was deleted in
   `7987443d` and the extractor re-anchored in `018e1529`, four phases apart. End
   state correct, gate never vacuous. Record as an accepted deviation or amend
   the clause — with the reason either way.
-- **G16:** `spec.md:450` lists `config-section-coverage.test.ts` among the
-  fixtures to update. No such file exists at HEAD **or** at `d523f06f`. Strike it.
+- **G16 — REJECTED, the gap is wrong and the spec is right.** It claims
+  `config-section-coverage.test.ts` exists at neither HEAD nor `d523f06f`.
+  Measured both ways: `git ls-files` and `git ls-tree -r d523f06f` each resolve
+  it to `apps/tools-api/src/routes/config-section-coverage.test.ts`, and
+  `git diff --stat d523f06f..HEAD` shows the feature **added 22 lines to it** —
+  T14's LM Studio-shaped installer-config case, exactly as the Phase 6 landed
+  note records. Striking the clause would have deleted a correct spec line on a
+  false premise. The likely cause is a bare-filename search that missed the
+  path; no action beyond this record.
 - **G15:** two vacuous-skip guards at `test-lms-model-exists.sh:191` — reshaping
   `lms_cli_path` silently drops all four LIP-14 assertions with no failure.
   Contrast `:334-341`, where the same risk *is* handled with an explicit `fail`.
@@ -1224,7 +1250,7 @@ T25                   last, then re-verification
 | LIP-20 | `turbo-passthrough-env.test.ts` | T15 |
 | LIP-21 | `check_specs_delivered.ts` exit 0 | T18 |
 | LIP-22 | both needles figures (768 + 2560) with both observed vector lengths, in the Phase 7 landed note, plus both halves of the recorded bound — the algorithm change itself stays UNMEASURED, sensor named | T17 |
-| LIP-23 | entrypoint-recording sensor + live parsed-object run | done in Phase 3 (`c838837d`) |
+| LIP-23 | `llm-client.test.ts:832` (`lmstudio` → entrypoint `"chat"`) and `:839` (`ollama` → `"responses"`), both asserting `lastProviderEntrypoint`; plus the live parsed-object run. **Not** `llm-client-json-schema.test.ts` — its `@ai-sdk/openai` mock has no `.chat` member and structurally cannot sense the entrypoint (G13) | done in Phase 3 (`c838837d`) |
 | LIP-24 | completeness shrinkage accounted for, not waved through | T15 |
 
 ## Dependencies

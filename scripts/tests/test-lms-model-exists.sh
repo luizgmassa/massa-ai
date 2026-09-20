@@ -188,8 +188,25 @@ fi
 # `lms` is not on PATH until LM Studio has bootstrapped it, so a detection that
 # asks `command -v lms` first reports absent on a machine that has it. Both
 # cases run against a scratch HOME; the real LM Studio installer is never run.
+# A failed extraction must FAIL, not skip — and the reason the old form did not
+# is subtler than it looks. `extract` DOES call `fail` when it finds nothing
+# (`:52-56`), but it is invoked inside a command substitution, so that
+# `FAIL=$((FAIL + 1))` lands in a SUBSHELL and is discarded. The message reaches
+# stderr while the tally and the exit code stay green: measured by renaming the
+# extracted function, the pre-fix form printed
+# `FAIL - lms_cli_path_RENAMED ... (found nothing)` and still reported
+# `Results: 53 passed, 0 failed` — 4 assertions gone, exit 0. A `fail` called
+# from inside `$( )` is cosmetic.
+#
+# The three sibling extractions at `:68-70` are safe for a different reason:
+# each guards with `|| { echo ...; exit 1; }`, so the exit code is correct even
+# though their FAIL count is lost the same way. This one alone had `|| CLI_SRC=""`,
+# which swallowed it entirely. The explicit `fail` below runs in the MAIN shell,
+# where the counter survives — same intent as the PTY block at `:334-341`.
 CLI_SRC="$(extract lms_cli_path)" || CLI_SRC=""
-if [ -n "$CLI_SRC" ]; then
+if [ -z "$CLI_SRC" ]; then
+  fail "lms_cli_path could not be extracted from the wizard — the 4 LIP-14 assertions below did not run"
+else
   FAKE_HOME="${TMP_ROOT}/lmshome"
   mkdir -p "${FAKE_HOME}/.lmstudio/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${FAKE_HOME}/.lmstudio/bin/lms"

@@ -439,9 +439,32 @@ note.
   The measured LM Studio model moves the store off the binary-quantization
   path entirely (see the Premise correction). This is inherent to the model's
   width and not preventable — but it must not ship as an unmeasured claim.
-  AC: one `bun run bench:needles` run at 768 is recorded in `validation.md` as
-  a number beside the 2560 baseline. `needles-gate.yml` stays out of scope, so
-  this runs manually; a promise to measure later is not an AC.
+  ~~AC: one `bun run bench:needles` run at 768 is recorded in `validation.md`
+  as a number beside the 2560 baseline.~~
+
+  **AC amended in Phase 8 (gap G14), because the mechanism it named cannot
+  observe this requirement's own subject.** `benchmarks/needles/run.ts` is a
+  self-contained in-process **exact-cosine** ranker (`:5-16`); it never
+  constructs `packages/core/src/data/vector/postgres-vector-store.ts`, so
+  neither the `dimensions > 2000` two-phase binary-quantization search
+  (`:616-621`) nor the ≤2000 plain-HNSW path executes on *either* arm of a
+  2560-vs-768 comparison. The approximate-search component is absent from both
+  sides, which biases the delta in exactly the direction that hides the risk
+  this requirement names. It also speaks only Ollama `/api/embeddings`
+  (`:113-140`), so it cannot reach the LM Studio client the feature ships.
+
+  **Amended AC:** the retrieval-algorithm change at 768 is measured by
+  `packages/core/src/__tests__/e2e/14.needles.test.ts` — a full-stack run
+  against a real pgvector index at each width, the only sensor that exercises
+  the branch. `needles-gate.yml` stays out of scope, so this runs manually; a
+  promise to measure later is not an AC.
+
+  **What was already measured stands, under a narrower label.** The
+  `bench:needles` figures are recorded in `tasks.md`'s "Phase 7 landed — T17"
+  note — 2560: hit@1 0.5000, MRR 0.6423; 768: hit@1 0.2857, MRR 0.4650, widths
+  asserted by independent curl rather than inferred. They are a valid
+  **chunk-embedding-quality** comparison and are kept as one. What this
+  amendment changes is which mechanism the AC demands, not the data.
 - **LIP-19 — Web UI fixtures.** `config-sections.ts` is a mapped type over
   `keyof MassaAiConfig` (`:19`, `:36`): a config key with no section, or a
   section with no key, **fails `bun run type-check`**. Regenerate
