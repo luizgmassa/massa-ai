@@ -239,7 +239,7 @@ describe("detectProviderUrl — body shape, never HTTP status (discriminating ch
 
   test("falls through to the next candidate when the first is unreachable", async () => {
     let call = 0;
-    globalThis.fetch = ((url: string) => {
+    globalThis.fetch = ((_url: string) => {
       call += 1;
       if (call === 1) return Promise.reject(new TypeError("fetch failed"));
       return Promise.resolve(jsonResponse({ models: [{ name: "qwen3-embedding:4b" }] }, 200));
