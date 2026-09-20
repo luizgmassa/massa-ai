@@ -32,12 +32,44 @@ const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
  *  time — step 2 of 2 — renaming this const from `CONFIG_VIEW_JS` since the
  *  name is now wrong twice over. The regex and the assertions are unchanged. */
 const CONFIG_SECTIONS_SRC = path.join(REPO_ROOT, "apps/web-ui/src/static/views/config-sections.ts");
+const SCHEMA_SRC = path.join(REPO_ROOT, "packages/shared/src/config/massa-ai-config.ts");
 
 /** The `key:` of every entry in the portal's Config-tab section table. */
 function portalSectionKeys(): string[] {
   const source = fs.readFileSync(CONFIG_SECTIONS_SRC, "utf8");
   const keys = [...source.matchAll(/^\s*key:\s*"([^"]+)",/gm)].map((m) => m[1]);
   return [...new Set(keys)];
+}
+
+function extractBalancedBlock(source: string, startIndex: number, open: string, close: string): string {
+  let depth = 1;
+  let i = startIndex;
+  const blockStart = i;
+  while (depth > 0 && i < source.length) {
+    if (source[i] === open) depth++;
+    else if (source[i] === close) depth--;
+    i++;
+  }
+  return source.slice(blockStart, i - 1);
+}
+
+function schemaSectionFieldNames(sectionKey: string): string[] {
+  const source = fs.readFileSync(SCHEMA_SRC, "utf8");
+  const open = new RegExp(`\\b${sectionKey}\\??:\\s*\\{`).exec(source);
+  if (!open) throw new Error(`schemaSectionFieldNames: section "${sectionKey}" not found in ${SCHEMA_SRC}`);
+  const block = extractBalancedBlock(source, open.index + open[0].length, "{", "}");
+  const fields = [...block.matchAll(/^\s*(\w+)\??:\s/gm)].map((m) => m[1]);
+  return [...new Set(fields)];
+}
+
+function portalSectionFieldNames(sectionKey: string): string[] {
+  const source = fs.readFileSync(CONFIG_SECTIONS_SRC, "utf8");
+  const keyMatch = new RegExp(`key:\\s*"${sectionKey}",`).exec(source);
+  if (!keyMatch) throw new Error(`portalSectionFieldNames: section "${sectionKey}" not found in ${CONFIG_SECTIONS_SRC}`);
+  const fieldsOpen = source.indexOf("fields: [", keyMatch.index);
+  if (fieldsOpen === -1) throw new Error(`portalSectionFieldNames: no fields array for "${sectionKey}"`);
+  const block = extractBalancedBlock(source, fieldsOpen + "fields: [".length, "[", "]");
+  return [...block.matchAll(/name:\s*"([^"]+)"/g)].map((m) => m[1]);
 }
 
 /** `loadConfig()` under a scratch XDG home, with no config.json at all. */
@@ -120,4 +152,20 @@ describe("Admin Portal config sections all resolve", () => {
     const missing = portalSectionKeys().filter((key) => config[key] === undefined);
     expect(missing).toEqual([]);
   });
+});
+
+describe("Admin Portal config sections cover every schema field (PDM-14)", () => {
+  const FIELD_LEVEL_SECTIONS = ["embedding", "llm"] as const;
+
+  for (const sectionKey of FIELD_LEVEL_SECTIONS) {
+    test(`${sectionKey}: every MassaAiConfig field has a matching Portal field entry`, () => {
+      const schemaFields = schemaSectionFieldNames(sectionKey);
+      const portalFields = portalSectionFieldNames(sectionKey);
+      console.log(
+        `[config-coverage] ${sectionKey} schema fields: ${schemaFields.length} — ${schemaFields.join(", ")}`,
+      );
+      const missing = schemaFields.filter((f) => !portalFields.includes(f));
+      expect(missing).toEqual([]);
+    });
+  }
 });

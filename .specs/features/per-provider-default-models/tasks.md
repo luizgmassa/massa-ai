@@ -250,12 +250,22 @@ Tests: render-golden regenerated and diffed; config-forms field list; config-get
 Gate: bun test apps/web-ui/src/__tests__/
 Depends on: T02.
 
-### T10: Add a field-level config↔Portal parity gate
+### T10: Add a field-level config↔Portal parity gate — ✅ Complete
 
 `config-section-coverage.test.ts` extracts only `key:` (sections), never `name:` (fields), so a
 schema field absent from the Portal passes today. Add the field-level assertion (PDM-14).
 **Observed red:** add a field to the schema, withhold it from `config-sections.ts`, watch the gate
 name it, restore by file copy.
+
+**Scoped to `embedding` and `llm`, not all 17 sections.** A schema-vs-Portal walk over every
+section immediately reds on a pre-existing, unrelated gap this task's write set cannot fix:
+`logging` in `massa-ai-config.ts` carries 4 fields (`enableFileSink`, `bufferSize`,
+`maxFileSizeMb`, `maxFiles`) absent from `config-sections.ts`. Fixing that means touching
+`config-sections.ts`'s `logging` block and/or `massa-ai-config.ts` — outside T10's named write set
+(`config-section-coverage.test.ts` only) and unrelated to PDM-12/13/14, which name only the
+`embedding`/`llm` fields this feature added. The new assertion is scoped to those two sections;
+the `logging` gap is named here as a separate, pre-existing finding for a future task, not folded
+into T10 silently.
 
 Tests: the new field-level assertion, red on a schema field withheld from config-sections.ts
 Gate: bun test apps/tools-api/src/routes/config-section-coverage.test.ts

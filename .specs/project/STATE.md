@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 19 Tasks (T06b, T07b added mid-Execute); T01-T09 complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below), T10-T17 pending)
+## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 19 Tasks (T06b, T07b added mid-Execute); T01-T10 complete (W1 Phase 1, W2 Phase 2, W3+W4 Phase 3, W4+W5 Phase 4 closed — T07b partial, see below, W5 Phase 5 closed), T11-T17 pending)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -428,6 +428,38 @@ Observed red: removed the `batchSize` field entry from `config-sections.ts`'s `e
 `git status --porcelain` clean before commit, re-ran green (157/0 across the two files).
 Next: T10 (field-level config↔Portal parity gate) — depends on T09, same `apps/tools-api` /
 `apps/web-ui` write-set boundary.
+
+**T10 (W5) — Complete — Phase 5 closed.** Added a field-level assertion to
+`config-section-coverage.test.ts`: `schemaSectionFieldNames(sectionKey)` reads `MassaAiConfig`'s
+interface **source text** (not a loaded runtime object) and brace-balances the named section's
+block to list its top-level `field?:`/`field:` declarations — reading the schema text rather than
+an instantiated config is what keeps `embedding.contextWindow`/`embedding.batchSize` (both
+optional, absent from a fresh `loadConfig()` result) visible to the gate; a runtime-object-keyed
+extractor would have missed exactly the two fields this feature made optional.
+`portalSectionFieldNames(sectionKey)` mirrors it on `config-sections.ts`'s `fields: [...]` array via
+the same balanced-bracket approach (safe here since neither `embedding` nor `llm` declares a
+`string[]`-typed field whose literal brackets could confuse the counter). New test: for
+`sectionKey` in `["embedding", "llm"]`, every schema field name must appear in the Portal's field
+list.
+**Scoped to `embedding`+`llm`, not all 17 sections** — see the reasoning recorded in tasks.md's T10
+entry. Measured directly: a full-schema walk reds immediately on `logging` (4 fields —
+`enableFileSink`, `bufferSize`, `maxFileSizeMb`, `maxFiles` — present in `massa-ai-config.ts`,
+absent from `config-sections.ts`), a pre-existing gap this task's write set cannot fix and PDM-14
+does not name. Recorded as a separate finding, not silently folded in or silently excluded.
+Gate: `bun test apps/tools-api/src/routes/config-section-coverage.test.ts` → 6 pass / 0 fail (up
+from 4/0 — 2 new tests), printing `embedding schema fields: 7` and `llm schema fields: 12`,
+matching T09's field counts exactly. `bun run type-check` → 0 (6/6 packages).
+Observed red (optional field, per the task's own requirement to prove the gate sees one): withheld
+`contextWindow` from `config-sections.ts`'s `embedding` section → the new test failed naming
+exactly `["contextWindow"]` as missing (5 pass / 1 fail). Restored via file copy,
+`git status --porcelain` clean before commit, re-ran green (6/0).
+**Phase-closing gate (last task in Phase 5):** see the dedicated report immediately below this
+entry.
+Phase 5 (Admin Portal) is closed. Batch (W5: T07b, T09, T10) complete. Next: Phase 6 (T11 sweep
+the single-dialect surfaces; T12 repair setup-local-first.sh) — depends on T01, disjoint from
+Phase 4/5's CLI and Web UI files. T13 (Phase 7) should additionally absorb the three
+`embedding-defaults-parity.test.ts`/`massa-ai-config.ts` defects T07b documented, beyond the one
+(`referencePairLmStudio()`'s entry-#1 anchor) its own task text already names.
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
