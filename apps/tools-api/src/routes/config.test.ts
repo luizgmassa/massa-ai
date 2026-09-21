@@ -19,6 +19,11 @@ mock.module("@massa-ai/shared", () => ({
   defaultMassaAiConfig,
 }));
 
+import {
+  INFERENCE_PROVIDERS,
+  INFERENCE_ROLE_DEFAULTS,
+} from "@massa-ai/shared/inference-providers";
+
 import { configRoutes } from "./config.js";
 
 const app = new Elysia().use(configRoutes);
@@ -77,10 +82,55 @@ describe("GET /api/v1/config", () => {
     expect(res.status).toBe(200);
     expect(res.json.data.config).toEqual(testConfig);
     expect(res.json.data.restartNeededSections).toEqual([]);
-    expect(res.json.data.defaults).toEqual(defaultMassaAiConfig);
+    // `defaults` is the shipped config plus the two derived embedding fields
+    // (see the embedding-defaults test below); everything else round-trips.
+    expect(res.json.data.defaults).toEqual({
+      ...defaultMassaAiConfig,
+      embedding: { contextWindow: 8192, batchSize: 64 },
+    });
     expect(maskSensitive.mock.calls.length).toBe(2);
     expect(maskSensitive.mock.calls[0][0]).toBe(testConfig);
     expect(maskSensitive.mock.calls[1][0]).toBe(defaultMassaAiConfig);
+  });
+
+  // PDM-13: `defaultMassaAiConfig.embedding` carries no contextWindow and no
+  // batchSize by PDM-12 contract, so the Admin Portal rendered both blank —
+  // the fields exist in CONFIG_SECTIONS with nothing behind them. The route
+  // derives them into `defaults` instead. These assertions fail if the
+  // derivation is dropped, or if batchSize stops following the persisted
+  // provider.
+  // Asserted against the seam entries rather than the literal 64 they both
+  // hold today: ollama and lmstudio share a width, so a literal would pass
+  // even if the provider lookup were deleted. Reading the seam per provider
+  // keeps the assertion discriminating the day the two widths diverge.
+  test("derives embedding.contextWindow + batchSize into `defaults` (PDM-13)", async () => {
+    loadConfig.mockImplementationOnce(() => ({ embedding: { provider: "lmstudio" } }));
+    const res = await get("/api/v1/config");
+    expect(res.json.data.defaults.embedding.contextWindow).toBe(
+      INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
+    );
+    expect(res.json.data.defaults.embedding.batchSize).toBe(
+      INFERENCE_PROVIDERS.lmstudio.embedBatchSize,
+    );
+  });
+
+  test("an embedding provider outside the local-inference set falls back to ollama's batch width (PDM-13)", async () => {
+    loadConfig.mockImplementationOnce(() => ({ embedding: { provider: "openai" } }));
+    const res = await get("/api/v1/config");
+    expect(res.json.data.defaults.embedding.batchSize).toBe(
+      INFERENCE_PROVIDERS.ollama.embedBatchSize,
+    );
+  });
+
+  test("a config with no embedding block still yields both derived defaults (PDM-13)", async () => {
+    loadConfig.mockImplementationOnce(() => ({}));
+    const res = await get("/api/v1/config");
+    expect(res.json.data.defaults.embedding.contextWindow).toBe(
+      INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
+    );
+    expect(res.json.data.defaults.embedding.batchSize).toBe(
+      INFERENCE_PROVIDERS.ollama.embedBatchSize,
+    );
   });
 
   test("masks all four sensitive fields", async () => {

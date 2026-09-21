@@ -6,10 +6,37 @@ import {
   restartNeededSections,
   defaultMassaAiConfig,
 } from "@massa-ai/shared";
+import {
+  INFERENCE_PROVIDERS,
+  INFERENCE_ROLE_DEFAULTS,
+  LOCAL_INFERENCE_IDS,
+  type InferenceProviderId,
+} from "@massa-ai/shared/inference-providers";
 
 const CONFIG_DETAIL = {
   tags: ["config"],
 };
+
+/**
+ * `defaultMassaAiConfig.embedding` deliberately carries no `contextWindow` and
+ * no `batchSize` (PDM-12): the role table and the provider seam are their
+ * default source, applied at each consumption site, and the loader contract
+ * requires both to stay `undefined` on a config that never set them. The Admin
+ * Portal still has to show what is in force, so the two are derived here for
+ * the response's `defaults` block only. That block is display state — it is
+ * never merged back into a config — so deriving it does not reopen PDM-12.
+ *
+ * `batchSize` is provider-dependent, so it reads the persisted
+ * `embedding.provider` and mirrors `_resolveEmbedBatchSize`'s own fallback
+ * (an id outside the local-inference set answers with ollama's width).
+ */
+function defaultEmbedBatchSize(provider: unknown): number {
+  const spec =
+    typeof provider === "string" && (LOCAL_INFERENCE_IDS as readonly string[]).includes(provider)
+      ? INFERENCE_PROVIDERS[provider as InferenceProviderId]
+      : INFERENCE_PROVIDERS.ollama;
+  return spec.embedBatchSize;
+}
 
 const SENSITIVE_FIELDS: Record<string, string[]> = {
   database: ["url"],
@@ -44,7 +71,15 @@ export const configRoutes = new Elysia({ prefix: "/api/v1/config" })
       // given file (non-goal: do not repurpose restartNeededSections here —
       // its contract is "present in the config", which every default would
       // satisfy vacuously).
-      const defaults = maskSensitive(defaultMassaAiConfig);
+      const shipped = maskSensitive(defaultMassaAiConfig);
+      const defaults = {
+        ...shipped,
+        embedding: {
+          ...shipped.embedding,
+          contextWindow: INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
+          batchSize: defaultEmbedBatchSize(config.embedding?.provider),
+        },
+      };
       set.status = 200;
       return {
         success: true as const,
@@ -56,7 +91,7 @@ export const configRoutes = new Elysia({ prefix: "/api/v1/config" })
         ...CONFIG_DETAIL,
         summary: "Get current config with sensitive fields masked",
         description:
-          "Returns the current config.json with security.apiKey, llm.apiKey, embedding.apiKey, and database.url masked to '***'. Includes restartNeededSections — the subset of [database, embedding, llm, security] present in the config — and defaults, the shipped default config (also masked) the Config tab falls back to for any field the persisted file omits.",
+          "Returns the current config.json with security.apiKey, llm.apiKey, embedding.apiKey, and database.url masked to '***'. Includes restartNeededSections — the subset of [database, embedding, llm, security] present in the config — and defaults, the shipped default config (also masked) the Config tab falls back to for any field the persisted file omits. defaults.embedding.contextWindow and defaults.embedding.batchSize are derived rather than shipped: they come from the role table and the resolved provider's seam entry, because defaultMassaAiConfig deliberately leaves both unset (PDM-12).",
       },
     },
   )
