@@ -375,22 +375,151 @@ installer_model_format_label() {
 
 # installer_warn_mlx_embedding
 #
-# The MLX branch is measured broken for ONE of the three roles, and silence
-# here would leave the user with a config that indexes nothing and no clue why.
-# LM Studio types a model by architecture and only prefixes `text-embedding-`
-# onto what it types EMBEDDING; the MLX build of Qwen3-Embedding is
-# Qwen3ForCausalLM, so it is typed LLM and /v1/embeddings refuses it. There is
-# no MLX embedding engine to route to either — `lms runtime get -l` lists
-# exactly one MLX entry, mlx-llm. Measured 2026-09-21; originally spec A-01.
+# Announces that the embedding role does not go through LM Studio on the MLX
+# path, and why.
+#
+# This used to tell the user to abandon the MLX build and switch
+# `embedding.model` back to the GGUF one. That advice was wrong: the model is
+# perfectly capable of embedding — `mlx_embeddings.generate` returns (n, 1024)
+# on the identical weights, already L2-normalized — and it was LM Studio, not
+# MLX, that could not serve it. Three levers were measured and all failed:
+#
+#   1. its own SDK, `lms.embedding_model("qwen3-embedding-0.6b-dwq")` ->
+#      "Model not found", with `totalModels: 2` listing only GGUF embedders;
+#   2. `domain: "llm"` -> `"embedding"` in its model index cache -> the API
+#      kept reporting `llm`, and the next re-index wrote `llm` back;
+#   3. the model's own `architectures` -> `Qwen3Model` -> LM Studio re-indexed
+#      (its cached dir mtime moved to match) and still typed it `llm`.
+#
+# Its /v1/embeddings serves whatever model is typed `embeddings` and ignores
+# the request's `model` field, so the failure is either HTTP 400 "No models
+# loaded" or — the dangerous one — HTTP 200 carrying a DIFFERENT model's
+# vector when a GGUF embedder is loaded beside it. Upstream:
+# lmstudio-ai/lmstudio-bug-tracker#808, open. Measured 2026-09-21;
+# originally spec A-01, whose conclusion ("cannot be the embedding default")
+# was right about LM Studio and wrong about the model.
 installer_warn_mlx_embedding() {
   echo ""
-  echo "  ⚠  MLX selected. Instruct and coding run natively on Metal."
-  echo "     The embedding role does NOT: LM Studio types the MLX build of"
-  echo "     Qwen3-Embedding as an LLM, so /v1/embeddings answers"
-  echo "     'No models loaded' for it and indexing will fail."
-  echo "     To embed, switch embedding.model back to the GGUF build:"
-  echo "         text-embedding-qwen3-embedding-0.6b"
-  echo "     (Admin Portal -> Config -> Embedding, or config.json directly.)"
+  echo "  •  MLX selected. All three roles run on Metal."
+  echo "     Instruct and coding are served by LM Studio. Embedding is not:"
+  echo "     LM Studio types every safetensors model as an LLM and its"
+  echo "     /v1/embeddings will not serve one (upstream bug #808)."
+  echo "     massa-ai runs a small sidecar for that role instead —"
+  echo "     ${MASSA_AI_MLX_EMBED_URL:-http://127.0.0.1:1235/v1}, same weights,"
+  echo "     ~40 MB resident. Set up in the next step."
+}
+
+# installer_setup_mlx_embedding_sidecar <repo_root>
+#
+# Installs and starts the OpenAI-compatible embedding endpoint that the MLX
+# path's `embedding.baseURL` points at. No-op on every other path.
+#
+# Deliberately NOT fatal: an install whose embedding sidecar failed still has a
+# working database, LLM and harness, and the failure is recoverable by hand
+# from the lines this prints. A `die` here would strand all of that.
+installer_setup_mlx_embedding_sidecar() {
+  local repo_root="$1"
+  local home_dir="${HOME}"
+  local root="${home_dir}/.config/massa-ai"
+  local venv="${root}/mlx-embed"
+  local script="${root}/mlx-embedding-server.py"
+  local source_script="${repo_root}/scripts/mlx-embedding-server.py"
+  local port="${MASSA_AI_MLX_EMBED_PORT:-1235}"
+
+  [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] || return 0
+  [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ] || return 0
+
+  echo ""
+  echo "  Setting up the MLX embedding sidecar..."
+
+  if [ ! -f "$source_script" ]; then
+    echo "  ⚠  ${source_script} not found — skipping. Indexing will fail until"
+    echo "     an /v1/embeddings endpoint serves the MLX model."
+    return 0
+  fi
+
+  # `uv` only. python3 -m venv would work, but the wheel set here (mlx,
+  # mlx-embeddings, transformers) is resolved against a specific interpreter
+  # version, and uv is the one tool that can FETCH that interpreter rather than
+  # failing on whatever python3 happens to be first on PATH — measured: this
+  # machine's python3 is 3.14, which has no mlx wheel.
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "  ⚠  uv not found — cannot build the sidecar environment."
+    echo "     Install it (https://docs.astral.sh/uv/) and re-run, or serve"
+    echo "     ${script} from any environment with mlx-embeddings installed."
+    return 0
+  fi
+
+  mkdir -p "$root"
+  cp "$source_script" "$script"
+
+  if [ ! -x "${venv}/bin/python" ]; then
+    uv venv --python 3.12 "$venv" >/dev/null 2>&1 \
+      || { echo "  ⚠  could not create ${venv}"; return 0; }
+  fi
+  VIRTUAL_ENV="$venv" uv pip install -q mlx-embeddings >/dev/null 2>&1 \
+    || { echo "  ⚠  could not install mlx-embeddings into ${venv}"; return 0; }
+
+  installer_start_mlx_embedding_sidecar "$venv" "$script" "$port"
+}
+
+# installer_start_mlx_embedding_sidecar <venv> <script> <port>
+#
+# Starts the sidecar and, on macOS, registers it with launchd so it survives a
+# reboot. Separate from the setup above so the shell suite can drive the start
+# path without building a virtualenv.
+#
+# The health probe is what decides success. A launchd job that loaded is not
+# evidence the endpoint answers — it is evidence launchd accepted a plist.
+installer_start_mlx_embedding_sidecar() {
+  local venv="$1" script="$2" port="$3"
+  local plist="${HOME}/Library/LaunchAgents/ai.massa.mlx-embed.plist"
+  local log="${HOME}/.config/massa-ai/mlx-embed.log"
+
+  if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && [ -d "${HOME}/Library/LaunchAgents" ]; then
+    cat > "$plist" <<PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>ai.massa.mlx-embed</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${venv}/bin/python</string>
+        <string>${script}</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict><key>MASSA_AI_MLX_EMBED_PORT</key><string>${port}</string></dict>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+    <key>StandardOutPath</key><string>${log}</string>
+    <key>StandardErrorPath</key><string>${log}</string>
+    <key>ProcessType</key><string>Background</string>
+</dict>
+</plist>
+PLISTEOF
+    launchctl unload "$plist" >/dev/null 2>&1 || true
+    launchctl load -w "$plist" >/dev/null 2>&1 || true
+    echo "  ✓ launchd agent installed: ai.massa.mlx-embed"
+  else
+    # No launchd: start it detached and say plainly that it will not come back
+    # by itself, rather than implying a service was installed.
+    nohup "${venv}/bin/python" "$script" >> "$log" 2>&1 &
+    echo "  •  started in the background — it will NOT restart after a reboot."
+    echo "     Run it again with: ${venv}/bin/python ${script}"
+  fi
+
+  local attempt=0
+  while [ "$attempt" -lt 10 ]; do
+    if curl -s --max-time 2 "http://127.0.0.1:${port}/health" | grep -q '"status"'; then
+      echo "  ✓ MLX embedding sidecar answering on port ${port}"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+  echo "  ⚠  sidecar did not answer on port ${port} within 10s — see ${log}"
+  return 0
 }
 
 # installer_resolve_lmstudio_models

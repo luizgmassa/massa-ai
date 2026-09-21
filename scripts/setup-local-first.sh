@@ -409,20 +409,39 @@ if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
     # LMSTUDIO_CLI is resolved by setup_lmstudio() (lms_cli_path — checks
     # ~/.lmstudio/bin before PATH) earlier in this same run; reuse it rather
     # than a bare `command -v lms`, which misses that exact case.
+    # The embedding role is loaded into LM Studio only when LM Studio is the
+    # one serving it. On the MLX path the sidecar below owns that role, and
+    # loading the same weights here too would hold ~335 MB resident for a model
+    # LM Studio cannot answer an embedding request with — measured on a live
+    # install: dropping exactly that duplicate freed 335 MB with the endpoint
+    # still returning 1024 floats.
+    LMS_LOADS_EMBEDDING=true
+    if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
+        LMS_LOADS_EMBEDDING=false
+    fi
     if [ -n "${LMSTUDIO_CLI:-}" ]; then
-        "$LMSTUDIO_CLI" load -c 8192 --ttl "$LMS_LOAD_TTL_SECONDS" "$EMBEDDING_MODEL" || true
+        if [ "$LMS_LOADS_EMBEDDING" = true ]; then
+            "$LMSTUDIO_CLI" load -c 8192 --ttl "$LMS_LOAD_TTL_SECONDS" "$EMBEDDING_MODEL" || true
+        fi
         "$LMSTUDIO_CLI" load -c 16384 --ttl "$LMS_LOAD_TTL_SECONDS" "$LLM_MODEL" || true
         if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
             "$LMSTUDIO_CLI" load -c 32768 --ttl "$LMS_LOAD_TTL_SECONDS" "$CODE_MODEL" || true
         fi
     else
         echo -e "  ${YELLOW}⚠${NC} lms CLI not found — skipping per-role context load. Load manually:"
-        echo -e "      lms load -c 8192 --ttl ${LMS_LOAD_TTL_SECONDS} ${EMBEDDING_MODEL}"
+        if [ "$LMS_LOADS_EMBEDDING" = true ]; then
+            echo -e "      lms load -c 8192 --ttl ${LMS_LOAD_TTL_SECONDS} ${EMBEDDING_MODEL}"
+        fi
         echo -e "      lms load -c 16384 --ttl ${LMS_LOAD_TTL_SECONDS} ${LLM_MODEL}"
         if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
             echo -e "      lms load -c 32768 --ttl ${LMS_LOAD_TTL_SECONDS} ${CODE_MODEL}"
         fi
     fi
+
+    # The MLX embedding endpoint. `installer_provider_defaults` already points
+    # `embedding.baseURL` here on this path, so without this call the written
+    # config names a port nothing listens on.
+    installer_setup_mlx_embedding_sidecar "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fi
 
 
@@ -779,17 +798,18 @@ echo -e "    2. ${BLUE}bun run build${NC}"
 echo -e "    3. ${BLUE}bun run start:api${NC}"
 echo ""
 
-# PDM-13. The MLX warning is issued at Step 0, before six steps and several GB
-# of downloads have scrolled it off the screen. It is the one thing standing
-# between this user and a workspace that cannot index, so it is repeated here,
-# where the eye actually lands.
-if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ "${EMBEDDING_MODEL}" = "qwen3-embedding-0.6b-dwq" ]; then
-    echo -e "  ${YELLOW}⚠  MLX embedding model configured — indexing will fail.${NC}"
-    echo -e "     LM Studio types this build as an LLM, so /v1/embeddings"
-    echo -e "     answers 'No models loaded' for it."
-    echo -e "     Switch Embedding -> Model to ${BOLD}text-embedding-qwen3-embedding-0.6b${NC}"
-    echo -e "     in the Admin Portal, or re-run with"
-    echo -e "     ${BLUE}LMSTUDIO_EMBEDDING_MODEL=text-embedding-qwen3-embedding-0.6b${NC}"
+# PDM-13. The MLX embedding role is served by a sidecar, not by LM Studio, and
+# the note saying so is issued at Step 0 — before six steps and several GB of
+# downloads have scrolled it off the screen. It is repeated here, where the eye
+# actually lands, because it is the one piece of this install that is not a
+# process the user already knows about: if it is not running, indexing stops.
+if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
+    echo -e "  ${BLUE}•  Embedding runs outside LM Studio on the MLX path.${NC}"
+    echo -e "     LM Studio types every safetensors model as an LLM and will not"
+    echo -e "     serve it on /v1/embeddings (upstream bug #808), so massa-ai"
+    echo -e "     serves the same weights at ${BOLD}${EMBEDDING_BASE_URL}${NC}."
+    echo -e "     Check it with: ${BLUE}curl ${EMBEDDING_BASE_URL%/v1}/health${NC}"
+    echo -e "     Restart it with: ${BLUE}launchctl kickstart -k gui/\$(id -u)/ai.massa.mlx-embed${NC}"
     echo ""
 fi
 

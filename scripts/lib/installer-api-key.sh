@@ -203,6 +203,25 @@ installer_provider_defaults() {
     lmstudio)
       EMBEDDING_PROVIDER="lmstudio"
       EMBEDDING_BASE_URL="${LMSTUDIO_URL:-http://localhost:1234/v1}"
+      # On the MLX path the embedding role is NOT served by LM Studio, and
+      # cannot be. LM Studio types a safetensors model `llm` — measured, and not
+      # reachable by configuration: flipping `domain` in its own model index
+      # left the API still reporting `llm` and was overwritten on the next
+      # re-index, and rewriting the model's `architectures` to `Qwen3Model` made
+      # LM Studio re-index (the cached dir mtime moved) and still type it `llm`.
+      # Its /v1/embeddings then serves whatever model is typed `embeddings` and
+      # ignores the request's `model` field entirely, so the endpoint answers
+      # HTTP 400 "No models loaded" — or, worse, 200 with a DIFFERENT model's
+      # vector when a GGUF embedder happens to be loaded beside it. That is
+      # upstream bug lmstudio-ai/lmstudio-bug-tracker#808, open.
+      #
+      # `installer_setup_mlx_embedding_sidecar` serves the same weights over an
+      # OpenAI-shaped endpoint instead. Gated on the embedding override being
+      # unset, like every other MLX substitution: a user who pinned their own
+      # embedding id means LM Studio's own endpoint.
+      if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
+        EMBEDDING_BASE_URL="${MASSA_AI_MLX_EMBED_URL:-http://127.0.0.1:1235/v1}"
+      fi
       LLM_BASE_URL="${LMSTUDIO_URL:-http://localhost:1234/v1}"
       # Measured: LM Studio does not enforce auth, but the OpenAI client still
       # requires the header to exist.

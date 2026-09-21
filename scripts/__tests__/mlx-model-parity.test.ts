@@ -26,6 +26,8 @@ const REPO_ROOT = join(import.meta.dir, "..", "..");
  *  its own beyond the repeated end-of-run warning asserted at the bottom. */
 const LIB = "scripts/lib/installer-feature-prompts.sh";
 const WIZARD = "scripts/setup-local-first.sh";
+const API_KEY_LIB = "scripts/lib/installer-api-key.sh";
+const SERVER = "scripts/mlx-embedding-server.py";
 
 function read(file: string): string {
   return readFileSync(join(REPO_ROOT, file), "utf8");
@@ -156,18 +158,36 @@ describe("MLX model parity — setup-local-first.sh vs the seam (PDM-13)", () =>
     expect(read(WIZARD)).toContain('get -y "--${LMSTUDIO_MODEL_FORMAT:-gguf}"');
   });
 
-  // The GGUF id named by the two recovery messages is a THIRD hand copy of
-  // `defaultModels.embedding`. Both are the instruction a user follows to make
-  // an MLX install able to index at all, so a stale literal here sends them to
-  // a model LM Studio does not have. Asserted against the seam rather than
-  // against its own text — the assertion in test-model-format-select.sh
-  // hardcodes the same string and would drift with it.
-  test("both recovery messages name the seam's GGUF embedding id", () => {
-    const gguf = INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
-    for (const file of [LIB, WIZARD]) {
-      const hits = [...read(file).matchAll(/text-embedding-qwen3-embedding-[0-9.a-z]+/g)];
-      expect(`${file} recovery mentions=${hits.length}`).not.toBe(`${file} recovery mentions=0`);
-      for (const hit of hits) expect(`${file}:${hit[0]}`).toBe(`${file}:${gguf}`);
-    }
+  // The MLX embedding sidecar's port is a hand copy in four places: the
+  // `embedding.baseURL` default the installer writes, the notice shown at the
+  // format prompt, the sidecar launcher's own default, and the server's. A
+  // drift between the first two is silent and total — the config names a port
+  // nothing listens on, and the only symptom is the HTTP 400 this whole branch
+  // exists to remove.
+  //
+  // There is deliberately no seam entry to check these against: nothing in
+  // TypeScript reads this URL (the runtime reads `embedding.baseURL` from the
+  // written config), so a seam field would be a fifth copy, not a source.
+  test("every installer copy of the MLX sidecar port agrees", () => {
+    const PORT_SURFACES: Array<{ file: string; pattern: RegExp }> = [
+      { file: API_KEY_LIB, pattern: /MASSA_AI_MLX_EMBED_URL:-http:\/\/127\.0\.0\.1:(\d+)\/v1/ },
+      { file: LIB, pattern: /MASSA_AI_MLX_EMBED_URL:-http:\/\/127\.0\.0\.1:(\d+)\/v1/ },
+      { file: LIB, pattern: /MASSA_AI_MLX_EMBED_PORT:-(\d+)/ },
+      { file: SERVER, pattern: /MASSA_AI_MLX_EMBED_PORT"\) or "(\d+)"/ },
+    ];
+    const ports = PORT_SURFACES.map((s) => `${s.file}=${extractOne(s.file, read(s.file), s.pattern)}`);
+    expect(ports).toEqual(PORT_SURFACES.map((s) => `${s.file}=1235`));
+  });
+
+  // The redirect and the sidecar setup must be gated on the SAME condition.
+  // Either one alone is a broken install: the base URL without the sidecar
+  // names a dead port, and the sidecar without the base URL runs a server
+  // nothing talks to.
+  test("the base-url redirect and the sidecar setup share one gate", () => {
+    const gate = /\[ "\$\{LMSTUDIO_MODEL_FORMAT:-gguf\}" = "mlx" \] && \[ -z "\$\{LMSTUDIO_EMBEDDING_MODEL:-\}" \]/;
+    expect(gate.test(read(API_KEY_LIB))).toBe(true);
+    const setup = read(LIB).slice(read(LIB).indexOf("installer_setup_mlx_embedding_sidecar() {"));
+    expect(setup).toContain('[ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] || return 0');
+    expect(setup).toContain('[ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ] || return 0');
   });
 });

@@ -115,13 +115,25 @@ case "$out" in
   *) ok "an unrecognised format stops the install" ;;
 esac
 
-# The warning is the whole reason the MLX branch is safe to offer: its
-# embedding role is measured broken, and silence would leave the user with a
-# config that indexes nothing.
+# The notice is the whole reason the MLX branch is safe to offer: its embedding
+# role is served by a process outside LM Studio, and silence would leave the
+# user with one moving part they do not know exists.
+#
+# These three assertions used to pin the OPPOSITE advice — "switch
+# embedding.model back to text-embedding-qwen3-embedding-0.6b". That advice was
+# wrong. It read "LM Studio cannot serve this model" (true, measured three ways
+# and upstream bug #808) as "this model cannot embed" (false: mlx_embeddings
+# returns (n, 1024) on the identical weights). A test asserting the wrong cure
+# is worse than no test, because it defends it.
 warn="$(MASSA_AI_LMSTUDIO_MODEL_FORMAT=mlx run_lib "$DARWIN_SHIM" 'installer_select_model_format')"
-check_contains "an MLX choice warns about /v1/embeddings" "No models loaded" "$warn"
-check_contains "the MLX warning names the GGUF model to switch back to" \
-  "text-embedding-qwen3-embedding-0.6b" "$warn"
+check_contains "an MLX choice says embedding does not go through LM Studio" \
+  "/v1/embeddings" "$warn"
+check_contains "and names the endpoint that does serve it" "127.0.0.1:1235" "$warn"
+case "$warn" in
+  *"switch embedding.model"*|*"text-embedding-qwen3-embedding-0.6b"*)
+    fail "the MLX notice still tells the user to abandon the MLX model" ;;
+  *) ok "the MLX notice no longer prescribes the GGUF build" ;;
+esac
 # Asserted in two halves on purpose. `grep -c ... | sed 's/^0$//'` alone also
 # yields "" when run_lib produced no output at all, so a sourcing failure would
 # have read as a pass.
@@ -129,8 +141,8 @@ gguf_out="$(MASSA_AI_LMSTUDIO_MODEL_FORMAT=gguf run_lib "$DARWIN_SHIM" \
   'installer_select_model_format; echo "SENTINEL:${LMSTUDIO_MODEL_FORMAT}"')"
 check_contains "the gguf run actually executed" "SENTINEL:gguf" "$gguf_out"
 case "$gguf_out" in
-  *"No models loaded"*) fail "a GGUF choice printed the MLX embedding warning" ;;
-  *) ok "a GGUF choice prints no embedding warning" ;;
+  *"/v1/embeddings"*) fail "a GGUF choice printed the MLX embedding notice" ;;
+  *) ok "a GGUF choice prints no embedding notice" ;;
 esac
 
 echo "── installer_select_model_format: provider gating ──"
@@ -518,7 +530,8 @@ if [ -n "$PTY_FORM" ]; then
 
   lnx_two="$(require_menu "Linux choice 2" "$LNX_PROBE" "$TYPE_2")"
   check_eq "off macOS, choosing 2 takes MLX" "mlx" "$(result_of "$lnx_two")"
-  check_contains "the Linux MLX choice still warns about embeddings" "No models loaded" "$lnx_two"
+  check_contains "the Linux MLX choice still notices the embedding sidecar" \
+    "/v1/embeddings" "$lnx_two"
 else
   echo "  skip - no usable script(1); the pty menu-order assertions did not run"
 fi

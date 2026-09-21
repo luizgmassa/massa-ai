@@ -37,6 +37,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The MLX path shipped an embedding model that could not produce a vector — and the
+  stated reason for that was wrong.** `mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ` was
+  written into `config.json` pointing at LM Studio, whose `/v1/embeddings` answers HTTP 400
+  `No models loaded` for it. The installer warned and told the user to switch to the GGUF
+  build. That cure was wrong: the model embeds fine — `mlx_embeddings.generate` returns
+  `(n, 1024)`, already L2-normalized, on the identical weights — and it is LM Studio, not
+  MLX, that cannot serve it. Three levers were measured and all failed: its own SDK
+  (`lms.embedding_model(...)` → `Model not found`, `totalModels: 2`, both GGUF); flipping
+  `domain` to `embedding` in its model index (the API kept reporting `llm`, and the next
+  re-index wrote `llm` back); and rewriting the model's `architectures` to `Qwen3Model`
+  (LM Studio re-indexed — its cached dir mtime moved to match — and still typed it `llm`).
+  Upstream: lmstudio-ai/lmstudio-bug-tracker#808, open.
+
+  The MLX path now serves that role itself. `scripts/mlx-embedding-server.py` is an
+  OpenAI-shaped `/v1/embeddings` over `mlx-embeddings` (~40 MB resident, measured), and
+  `installer_setup_mlx_embedding_sidecar` builds its environment with `uv`, registers a
+  launchd agent on macOS, and health-probes the port before reporting success.
+  `embedding.baseURL` points there instead of at LM Studio, and the wizard no longer loads
+  the embedding weights into LM Studio on this path — that duplicate held 335 MB for a
+  model LM Studio could not answer with. Both the redirect and the setup are gated on the
+  same condition, which `mlx-model-parity.test.ts` now asserts along with the four hand
+  copies of the port. Also worth noting for anyone re-measuring: `/v1/embeddings` ignores
+  the request's `model` field, so with a GGUF embedder loaded beside the MLX one it answers
+  **200 with the GGUF's vector** — a passing probe that measures the wrong model.
 - **The GGUF install path could not fetch a model on any machine that did not already have
   it.** `lms get` cannot resolve a catalog id in *any* format — measured,
   `lms get text-embedding-qwen3-embedding-0.6b` answers `Error: No staff picks found with
