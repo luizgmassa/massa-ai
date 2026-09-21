@@ -1122,7 +1122,7 @@ changes (`package.json`, the new `scripts/run-shell-suites.sh`, plus this file).
 
 SPEC_DEVIATION: none.
 
-### F7: `scripts/diagnose.ts:22` docblock still names the retired LM Studio default
+### F7: `scripts/diagnose.ts:22` docblock still names the retired LM Studio default — ✅ Complete
 
 Lines 21 and 128-129 were repointed; `:22` still says
 `text-embedding-nomic-embed-text-v1.5`. Invisible twice over: the extractor only reaches the
@@ -1131,6 +1131,38 @@ table, and the file sits in the Tier-3 `known` set.
 Tests: covered by F4's widened scan if the docblock falls in its population; otherwise verified by reading
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts && bun test scripts/__tests__/diagnose.test.ts
 Depends on: F4.
+
+**Resolution (2026-09-20).** Repointed `scripts/diagnose.ts:22` from
+`text-embedding-nomic-embed-text-v1.5` to `text-embedding-qwen3-embedding-0.6b`, matching the
+`DEFAULT_MODEL` table at `:129` and the docblock's own Ollama line at `:20`.
+
+**F4's scan does not cover this shape — confirmed by evidence, not assumed.** `scripts/diagnose.ts`
+is a member of `MODEL_ONLY_SURFACES` (line 22 lists it, via a note explaining it is hand-pinned
+because it is keyed on the provider id rather than a `*_EMBEDDING_MODEL` token) and
+`LMSTUDIO_MODEL_ONLY_SURFACES`, and both arrays feed the `known` set the
+`*_EMBEDDING_MODEL/DIMENSIONS` completeness scan (F4's own widened tier) skips outright
+(`if (known.has(f) || ...) continue;`). The completeness scan's own regex extractors
+(`/^ {2}ollama: "([^"]+)",$/gm` / `/^ {2}lmstudio: "([^"]+)",$/gm`) only reach the `DEFAULT_MODEL`
+table's two lines — the docblock's prose line 22 matches neither anchor. So `diagnose.ts` being
+"known" means the file is excluded from the very scan whose job is to catch an unlisted stale
+value, and the two by-value extractors that do reach the file never touch line 22 at all.
+
+Whole-docblock check: read the full comment block (lines 2-24) against current behaviour. Line 22
+was the only stale claim — no instruct/coding token or other retired model id appears anywhere
+else in the file (`grep` for `nomic`, `qwen2.5-coder`, `qwen3-vl`, `instruct`, `coding`,
+`codeModel`, `LLM_` returned only line 22's original text; `diagnose.ts` has no instruct/coding
+surface at all, only embedding).
+
+Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 15/15 (unchanged).
+`bun test scripts/__tests__/diagnose.test.ts` → 33/33 (unchanged; its "nomic" mentions are an
+unrelated mock model id for a probe test, not an assertion on the docblock).
+
+Observed red: reverted line 22 only (by line number, not a global replace, so the real table's
+line 129 was never touched) to `text-embedding-nomic-embed-text-v1.5` and re-ran both gates —
+both stayed fully green (15/15 and 33/33), confirming neither sensor senses this line. Restored
+by file copy; `git status --porcelain` showed only the intended one-line change.
+
+SPEC_DEVIATION: none.
 
 ### F8: `config-sections.ts:128` documents behaviour PDM-01 AC-5 reversed
 

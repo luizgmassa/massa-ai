@@ -19,7 +19,7 @@
  *   OLLAMA_BASE_URL           - Ollama API URL (default: http://localhost:11434)
  *   OLLAMA_EMBEDDING_MODEL    - Ollama model to test (default: qwen3-embedding:0.6b)
  *   LMSTUDIO_BASE_URL         - LM Studio API URL (default: http://localhost:1234/v1)
- *   LMSTUDIO_EMBEDDING_MODEL  - LM Studio model to test (default: text-embedding-nomic-embed-text-v1.5)
+ *   LMSTUDIO_EMBEDDING_MODEL  - LM Studio model to test (default: text-embedding-qwen3-embedding-0.6b)
  *   DATABASE_URL              - Required PostgreSQL connection string
  */
 import { existsSync } from "fs";

@@ -999,6 +999,16 @@ own artifacts exactly and now produced by the gate itself. Observed red: induced
 file copy in `test-setup-wizard-db-selection.sh`; the full run reported all 4 suites together,
 aggregate exit 1; restored by file copy, re-ran green alone.
 
+**Fix Pass 1, Batch 3 (F6-F8), F7 — Complete.** Repointed `scripts/diagnose.ts:22`'s stale
+`text-embedding-nomic-embed-text-v1.5` to `text-embedding-qwen3-embedding-0.6b`, matching the
+`DEFAULT_MODEL` table at `:129`. Confirmed F4's widened scan does NOT cover this shape: the file
+is in the `known`-set exclusion for the `*_EMBEDDING_MODEL/DIMENSIONS` completeness scan (it is
+hand-pinned in `MODEL_ONLY_SURFACES`/`LMSTUDIO_MODEL_ONLY_SURFACES` instead, and those extractors
+only reach the `DEFAULT_MODEL` table, not the docblock). Whole-docblock re-check found no other
+stale claim in the file. Gate: parity 15/15, diagnose.test.ts 33/33, both unchanged. Observed red:
+reverted line 22 only (by line number); both gates stayed green, confirming the lack of coverage;
+restored by file copy.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
