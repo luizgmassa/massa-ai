@@ -125,7 +125,7 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
       { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., `http://localhost:11434/v1` for Ollama, `http://localhost:1234/v1` for LM Studio — both OpenAI-compatible endpoints)." },
       { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for the LLM provider. Not needed for local Ollama or LM Studio. Changing this requires a restart." },
       { name: "model", type: "text", label: "Model", guide: "Primary LLM model name (e.g., `qwen3-vl:8b` for Ollama, `qwen3-vl-8b-instruct` for LM Studio)." },
-      { name: "codeModel", type: "text", label: "Code Model", guide: "Model used for code-related tasks. When empty, falls back to the primary model." },
+      { name: "codeModel", type: "text", label: "Code Model", guide: "Model used for code-related tasks. When empty, falls back to that provider's coding default (e.g., `qwen2.5-coder:7b` for Ollama, `qwen2.5-coder-7b-instruct` for LM Studio), never the primary model." },
       { name: "temperature", type: "number", label: "Temperature", guide: "Sampling temperature (0 = deterministic, 1 = creative). Typically 0.2 for tasks." },
       { name: "maxOutputTokens", type: "number", label: "Max Output Tokens", guide: "Maximum tokens the LLM can generate in a single response." },
       { name: "timeoutMs", type: "number", label: "Timeout (ms)", guide: "Request timeout in milliseconds. Increase for slow models." },

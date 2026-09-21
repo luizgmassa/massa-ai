@@ -1164,7 +1164,7 @@ by file copy; `git status --porcelain` showed only the intended one-line change.
 
 SPEC_DEVIATION: none.
 
-### F8: `config-sections.ts:128` documents behaviour PDM-01 AC-5 reversed
+### F8: `config-sections.ts:128` documents behaviour PDM-01 AC-5 reversed — ✅ Complete
 
 The `codeModel` Portal guide still reads "When empty, falls back to the primary model". PDM-01
 AC-5 requires the fallback to be that provider's **coding** default, never the instruct model —
@@ -1174,6 +1174,50 @@ T05 was written to close.
 Tests: the golden render reflects the corrected guide string
 Gate: bun test apps/web-ui/src/__tests__/
 Depends on: none.
+
+**Resolution (2026-09-20).** `apps/web-ui/src/static/views/config-sections.ts:128`'s `codeModel`
+guide changed from "Model used for code-related tasks. When empty, falls back to the primary
+model." to "Model used for code-related tasks. When empty, falls back to that provider's coding
+default (e.g., `qwen2.5-coder:7b` for Ollama, `qwen2.5-coder-7b-instruct` for LM Studio), never
+the primary model." — matching `INFERENCE_PROVIDERS.{ollama,lmstudio}.defaultModels.coding` and
+the `model` field's own existing "e.g., ... for Ollama, ... for LM Studio" phrasing one row above.
+
+**All-guide-strings scan.** Read every `guide:` string in the file (111 fields across 17
+sections) against current behaviour. The `embedding.model` (line 47), `embedding.dimensions`
+(line 50), and `llm.model` (line 127) examples were already corrected by T09 (PDM-13) and remain
+current: `qwen3-embedding:0.6b`/`text-embedding-qwen3-embedding-0.6b`, `1024`, and
+`qwen3-vl:8b`/`qwen3-vl-8b-instruct` all match `INFERENCE_PROVIDERS`' live values. `llm.contextWindow`
+(16384), `llm.codeContextWindow` (32768), and `llm.codeTemperature` (0.0) match
+`INFERENCE_ROLE_DEFAULTS.instruct.contextWindow`/`.coding.contextWindow`/`.coding.temperature`
+exactly. `codeModel` (line 128) was the only offender.
+
+**Golden regeneration — predicted before running, diffed after.** Predicted: only
+`renderConfig/read` and `renderConfig/write` would change (the two cases that render the `llm`
+section), by exactly the `codeModel` guide substitution, HTML-escaped (`'` to `&#39;`, backticks
+to `<code>...</code>`, matching every other guide string's existing rendering) — no case added or
+removed, no other byte touched.
+
+Regenerated with `MASSA_AI_WRITE_GOLDEN=1 bun test src/__tests__/render-golden.test.ts` from
+`apps/web-ui/`. Diffed the 88-case fixture programmatically: exactly 2 keys changed
+(`renderConfig/read`, `renderConfig/write`; +145 bytes each), 0 added, 0 removed, 86 untouched.
+Both changed cases are a pure insertion — old and new share an identical prefix ending at "falls
+back to " and an identical suffix starting at "the primary model.</dd>..."; the only new bytes are
+"that provider's coding default (e.g., `qwen2.5-coder:7b` for Ollama, `qwen2.5-coder-7b-instruct`
+for LM Studio), never " (HTML-escaped in the rendered output). Every changed byte is accounted for
+by the predicted change; no unexplained diff line. Logged as regeneration entry 4 in
+`render-golden.test.ts`'s "Deliberate regenerations" header.
+
+Gate: `bun test src/__tests__/` (from `apps/web-ui/`) → 784/0 (was 782/2 before the fix — the 2
+failures were exactly `renderConfig/read` and `renderConfig/write`, naming the stale string).
+`bun run type-check` (apps/web-ui) clean. `bun run lint` (root oxlint) clean.
+
+Observed red: ran the gate with the guide-text fix applied but the golden fixture still frozen at
+its pre-fix content — `renderConfig/read` and `renderConfig/write` failed with
+`expect(received).toBe(expected)`, both naming the exact stale-vs-corrected byte span quoted above.
+Regenerated the golden (the correct fix for a golden fixture, not a revert) rather than reverting
+the source change; re-ran green at 784/0.
+
+SPEC_DEVIATION: none.
 
 ### F9: Correct the feature's status claim and record the verification outcome
 

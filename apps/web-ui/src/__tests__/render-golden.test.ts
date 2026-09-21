@@ -59,6 +59,20 @@
  *    closing `</div>` (the five new field blocks) plus the three guide-text
  *    substitutions — every other case and every byte before that point is
  *    untouched.
+ *
+ * 4. F8 (Fix Pass 1, per-provider-default-models) — `renderConfig/read` and
+ *    `renderConfig/write` moved because `llm.codeModel`'s guide text was
+ *    wrong: it read "falls back to the primary model", which PDM-01 AC-5
+ *    reverses (the fallback is the provider's coding default, never the
+ *    instruct model). Diffed before regenerating: exactly those 2 cases
+ *    changed, no case was added or dropped, and both are a pure insertion —
+ *    the old and new strings share an identical prefix up to "falls back to
+ *    " and an identical suffix from "the primary model." onward; the only
+ *    new bytes are "that provider's coding default (e.g., `qwen2.5-coder:7b`
+ *    for Ollama, `qwen2.5-coder-7b-instruct` for LM Studio), never " inserted
+ *    between them (HTML-escaped by the renderer: `'` to `&#39;`, backticks to
+ *    `<code>`, matching the existing treatment of every other guide string).
+ *    Every other case and every byte outside that one span is untouched.
  */
 
 import { describe, it, expect } from "bun:test";

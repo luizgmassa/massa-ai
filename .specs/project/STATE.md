@@ -1009,6 +1009,18 @@ stale claim in the file. Gate: parity 15/15, diagnose.test.ts 33/33, both unchan
 reverted line 22 only (by line number); both gates stayed green, confirming the lack of coverage;
 restored by file copy.
 
+**Fix Pass 1, Batch 3 (F6-F8), F8 — Complete. Batch 3 closed.** `config-sections.ts:128`'s
+`codeModel` guide corrected from "falls back to the primary model" to "falls back to that
+provider's coding default (...), never the primary model", per PDM-01 AC-5. All-guide-strings
+scan of the file's 111 fields found no other offender. Predicted the golden diff (only
+`renderConfig/read`/`write`, one substitution, HTML-escaped) before regenerating with
+`MASSA_AI_WRITE_GOLDEN=1`; diffed programmatically after — exactly those 2 keys changed, both a
+pure insertion matching the prediction, 86 cases untouched. Logged as regeneration entry 4. Gate:
+`apps/web-ui` 784/0 (was 782/2), type-check clean, root lint clean.
+
+All of Batch 3 (F6-F8) is closed. Remaining: F9 (orchestrator's, per tasks.md — status/STATE/
+HANDOFF update, run last after F1-F8) and re-verification once F9 lands.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
