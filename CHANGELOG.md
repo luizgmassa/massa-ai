@@ -7,6 +7,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The installer asks LM Studio users which weight format to pull, ordered by platform.**
+  A new `installer_select_model_format` step offers MLX first on macOS and GGUF first
+  everywhere else, overridable with `MASSA_AI_LMSTUDIO_MODEL_FORMAT` (`gguf` | `mlx`; an
+  unrecognised value is fatal and names itself). Choosing MLX verifies LM Studio's MLX
+  engine and installs it (`lms runtime get mlx-llm`) when absent. `lms get` now always
+  receives an explicit `--gguf`/`--mlx` flag — with neither, it considers "only options
+  supported by your system", which on Apple Silicon can resolve MLX weights for a GGUF
+  install. The non-interactive default stays `gguf` on every platform: a scripted install
+  has nobody there to read the warning below. `INFERENCE_PROVIDERS.lmstudio` gained
+  `mlxModels`, one Hugging Face repo + catalog id per role, held identical to the wizard's
+  copy by `scripts/__tests__/mlx-model-parity.test.ts`.
+- **Measured limitation, surfaced at the point of choice:** MLX covers the instruct and
+  coding roles only. LM Studio types a model by architecture and only prefixes
+  `text-embedding-` onto what it types EMBEDDING; the MLX build of Qwen3-Embedding is
+  `Qwen3ForCausalLM`, so it is typed LLM and `/v1/embeddings` answers
+  `{"error":"No models loaded..."}` for it while the GGUF build returns 1024 floats on the
+  same server in the same second. `lms runtime get -l` lists exactly one MLX engine,
+  `mlx-llm`, with no embedding counterpart. The installer warns and names the GGUF model to
+  switch back to rather than silently substituting it.
+- **The installer evicts resident models before loading its own.** A new
+  `installer_unload_loaded_models` sweeps both runtimes — `lms unload --all` when
+  `lms ps --json` reports anything but `[]`, and `ollama stop` per name in `ollama ps` —
+  before the three per-role `lms load` calls. Both runtimes are swept whichever provider
+  was chosen, because what runs out is one shared pool of RAM/VRAM: a model still resident
+  from an earlier session costs the same gigabytes either way.
+
+### Fixed
+
+- **The MLX path shipped an embedding model that could not produce a vector — and the
+  stated reason for that was wrong.** `mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ` was
+  written into `config.json` pointing at LM Studio, whose `/v1/embeddings` answers HTTP 400
+  `No models loaded` for it. The installer warned and told the user to switch to the GGUF
+  build. That cure was wrong: the model embeds fine — `mlx_embeddings.generate` returns
+  `(n, 1024)`, already L2-normalized, on the identical weights — and it is LM Studio, not
+  MLX, that cannot serve it. Three levers were measured and all failed: its own SDK
+  (`lms.embedding_model(...)` → `Model not found`, `totalModels: 2`, both GGUF); flipping
+  `domain` to `embedding` in its model index (the API kept reporting `llm`, and the next
+  re-index wrote `llm` back); and rewriting the model's `architectures` to `Qwen3Model`
+  (LM Studio re-indexed — its cached dir mtime moved to match — and still typed it `llm`).
+  Upstream: lmstudio-ai/lmstudio-bug-tracker#808, open.
+
+  The MLX path now serves that role itself. `scripts/mlx-embedding-server.py` is an
+  OpenAI-shaped `/v1/embeddings` over `mlx-embeddings` (~40 MB resident, measured), and
+  `installer_setup_mlx_embedding_sidecar` builds its environment with `uv`, registers a
+  launchd agent on macOS, and health-probes the port before reporting success.
+  `embedding.baseURL` points there instead of at LM Studio, and the wizard no longer loads
+  the embedding weights into LM Studio on this path — that duplicate held 335 MB for a
+  model LM Studio could not answer with. Both the redirect and the setup are gated on the
+  same condition, which `mlx-model-parity.test.ts` now asserts along with the four hand
+  copies of the port. Also worth noting for anyone re-measuring: `/v1/embeddings` ignores
+  the request's `model` field, so with a GGUF embedder loaded beside the MLX one it answers
+  **200 with the GGUF's vector** — a passing probe that measures the wrong model.
+- **The GGUF install path could not fetch a model on any machine that did not already have
+  it.** `lms get` cannot resolve a catalog id in *any* format — measured,
+  `lms get text-embedding-qwen3-embedding-0.6b` answers `Error: No staff picks found with
+  the specified search criteria` with `--gguf`, with `--mlx`, and with no flag — and the
+  GGUF branch handed it exactly those ids, so a fresh install died on `LM Studio could not
+  fetch …`. It stayed invisible on developer machines because `inference_model_exists`
+  short-circuits every model already on disk. Both formats now fetch by Hugging Face repo
+  URL; the GGUF repos live in the new `INFERENCE_PROVIDERS.lmstudio.ggufRepos`, gated
+  against the installer's copy by `scripts/__tests__/mlx-model-parity.test.ts`.
+- **Five of the six LM Studio model ids the installer wrote into `config.json` were never
+  measured.** Only the GGUF embedding id was read off a live install; the rest were
+  literals, and a wrong one writes a config pointing at a model LM Studio does not serve —
+  which degrades silently, since every LLM feature already falls back when a call fails.
+  The installer now reconciles each id after the fetch: `installer_lmstudio_model_key`
+  matches the repo it fetched against the `path` field of `lms ls --json` and writes the
+  `modelKey` LM Studio itself reports, falling back to the literal when the CLI, the JS
+  runtime, or the entry is absent. The retracted evidence for those literals is recorded on
+  `mlxModels` — `lms get --mlx <repo>` answering "Model already downloaded" was read as
+  proof that a format change keeps the id, but the builds on that disk were themselves MLX,
+  so the command never touched a GGUF sibling.
+
+- **The Admin Portal's Config tab rendered `embedding.contextWindow` and
+  `embedding.batchSize` blank.** Both are declared fields, but
+  `defaultMassaAiConfig.embedding` deliberately carries neither — the role table and the
+  provider seam are their default source — so the tab's `defaults` fallback had nothing to
+  show. `GET /api/v1/config` now derives the pair into its `defaults` block (display state,
+  never merged back into a config, so the loader contract is unchanged); `batchSize`
+  follows the persisted `embedding.provider`. Unresolved fields on a bare config drop from
+  7 of 110 to 5.
+- **`PgObservationStore.__drain()` was a sleep wearing a flush's name, and it made the
+  coverage gate flaky.** Its docstring said "await in-flight writes"; its body was
+  `setTimeout(10)` against a persist fired as an untracked `void (async () => …)()`, so
+  there was nothing to await. `observation-repository-pg-coverage.test.ts` padded it with a
+  further fixed 120 ms and still failed on a loaded CI runner — a `SELECT … WHERE id = $1`
+  issued right after an insert read zero rows. The persist is now chained per observation
+  id through a `chainWrite` helper (the same `inflight` shape `PgJobStore` and
+  `PgSynapseSessionStore` already use — 4 of the 7 `__drain()` implementations tracked their
+  writes; this was the outlier), and `__drain()` awaits that chain. The test's 120 ms sleep
+  is deleted rather than raised. Chaining per id also closes the same-id commit-order
+  caveat the `insert` comment has carried since 2026-07-12: repeated upserts on one id now
+  land in call order instead of whichever async IIFE committed last. `PgHandoffStore` and
+  `PgProposalStore` were checked and are not affected — they issue no fire-and-forget
+  writes, so their `ensureHydrated()`-only drain is correct for them.
+- **`CHANGELOG.md` carried two stray `>>>>>>> origin/main` lines** in the `[1.40.0]`
+  section, committed by an earlier merge. Removed.
+- **A fresh LM Studio install wrote `llm.disableThink: false`, which silently disabled
+  json_schema constrained decoding on every LM Studio install.** The literal was written on
+  the stated grounds that `think:false` is an Ollama-only request-body key. That is true of
+  the *injection* — `llm-client.ts` gates it on the provider seam's `injectsDisableThink` —
+  but the flag is read at five sites and only that one is gated. The load-bearing ungated
+  read is `const useJsonSchema = llm.disableThink && (await _checkJsonSchemaSupport())`, and
+  `_checkJsonSchemaSupport()` short-circuits to `true` for any provider with no Ollama
+  version probe, LM Studio included and by design (LIP-07: it implements OpenAI-native
+  `response_format: {type: "json_schema"}` directly). So a `false` there sent every
+  structured-output call down the `json_object` + manual-validation fallback instead of the
+  native constrained-decoding path the seam exists to select. Both providers now write the
+  shipped default, restoring that path; three reasoning-channel recovery branches come back
+  with it. `packages/core/src/__tests__/llm-client-disable-think-json-schema.test.ts` pins
+  the coupling from the `false` side so the "it is inert on LM Studio" reading cannot
+  return.
+
 ## [1.59.0] - 2026-09-21
 
 ### Changed
@@ -1492,8 +1607,6 @@ the toggle never touched.
   prints the parsed population (files scanned, rows parsed) beside the
   verdict, and exits non-zero when any Number row is unwired or when the
   figma directory exists but zero rows were parsed.
->>>>>>> origin/main
->>>>>>> origin/main
 
 ## [1.39.0] - 2026-08-07
 

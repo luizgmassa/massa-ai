@@ -98,6 +98,10 @@ installer_select_provider "$DETECTED_PROVIDER"
 if [ -n "$INFERENCE_PROVIDER_FROM" ]; then
     migrate_provider "$INFERENCE_PROVIDER_FROM" "$INFERENCE_PROVIDER"
 fi
+# PDM-13. Runs right after the provider is settled because it is a no-op on
+# every provider but LM Studio, and because Step 1's MLX-engine check and
+# Step 2's `lms get` flag both read the format it sets.
+installer_select_model_format
 
 # ---- Step 1: Check the selected provider ----
 # Echo the path to the lms CLI, or nothing. ~/.lmstudio/bin/lms is checked
@@ -137,6 +141,12 @@ setup_lmstudio() {
     massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio \
         || die "LM Studio API not reachable at ${LMSTUDIO_URL}. Start it: ${LMSTUDIO_CLI} daemon up"
     echo -e "  ${GREEN}✓${NC} LM Studio API reachable at ${LMSTUDIO_URL}"
+
+    # PDM-13: MLX weights need LM Studio's MLX engine, which is a separate
+    # runtime extension from llama.cpp. A no-op unless the MLX format was
+    # chosen. Runs after the daemon is confirmed up — `lms runtime ls` talks to
+    # it.
+    installer_ensure_mlx_runtime "$LMSTUDIO_CLI"
 }
 
 setup_ollama() {
@@ -301,16 +311,27 @@ echo -e "${BOLD}[2/6] Pulling models...${NC}"
 # One pull path, provider-dispatched. The three blocks this replaces were the
 # same twelve lines with the model variable and a parenthetical swapped, which
 # is how the Ollama-only `ollama pull` survived into a provider-neutral wizard.
+#
+# <fetch_spec> is what `lms get` is handed, which is NOT always the model id.
+# On the MLX path it must be the Hugging Face repo URL: `lms get --mlx` run
+# against a catalog id answers "No staff picks found with the specified search
+# criteria", and run against a bare search term resolves to whatever staff pick
+# ranks first — measured 2026-09-21, `--mlx qwen3-vl` picked the 4B and
+# `--mlx qwen2.5-coder` the 32B. Only the repo URL pins a build. Defaults to
+# the model id, which is what every GGUF/Ollama caller wants.
 ensure_inference_model() {
-    local model="$1" note="$2"
+    local model="$1" note="$2" fetch="${3:-$1}"
     if [ "$(inference_model_exists "$model")" = "yes" ]; then
         echo -e "  ${GREEN}✓${NC} Model ${model} already available"
         return 0
     fi
     echo -e "  Pulling ${model}${note}..."
     if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
-        "$LMSTUDIO_CLI" get -y "$model" \
-            || die "LM Studio could not fetch ${model}. Pull it from the app, then re-run this script."
+        # The format flag is always passed, never omitted: with neither flag
+        # `lms get` considers "only options supported by your system", which on
+        # Apple Silicon can resolve an MLX build for a GGUF install.
+        "$LMSTUDIO_CLI" get -y "--${LMSTUDIO_MODEL_FORMAT:-gguf}" "$fetch" \
+            || die "LM Studio could not fetch ${fetch}. Pull it from the app, then re-run this script."
     elif [ "$OLLAMA_HAS_CLI" = true ]; then
         ollama pull "$model"
     else
@@ -330,19 +351,37 @@ ensure_inference_model() {
 # the defaults are too. The LM Studio values are the ones measured for this
 # feature; the env overrides keep their existing names.
 if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
-    EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-qwen3-embedding-0.6b}"
-    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
-    CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
+    # PDM-13. The id/fetch split and the whole MLX override matrix live in
+    # scripts/lib/installer-feature-prompts.sh so they can be executed by
+    # scripts/tests/test-model-format-select.sh — a grep over this file cannot
+    # observe which string reaches `lms get`.
+    # scripts/__tests__/mlx-model-parity.test.ts holds that function's literals
+    # identical to INFERENCE_PROVIDERS.lmstudio.mlxModels.
+    installer_resolve_lmstudio_models
 else
     EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:0.6b}"
     LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl:8b}"
     CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+    # Ollama pulls by the id itself; there is no second name to resolve.
+    EMBEDDING_FETCH="$EMBEDDING_MODEL"
+    LLM_FETCH="$LLM_MODEL"
+    CODE_FETCH="$CODE_MODEL"
 fi
 
-ensure_inference_model "$EMBEDDING_MODEL" ""
-ensure_inference_model "$LLM_MODEL" " (instruct model)"
+ensure_inference_model "$EMBEDDING_MODEL" "" "$EMBEDDING_FETCH"
+ensure_inference_model "$LLM_MODEL" " (instruct model)" "$LLM_FETCH"
 if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
-    ensure_inference_model "$CODE_MODEL" " (code-oriented LLM)"
+    ensure_inference_model "$CODE_MODEL" " (code-oriented LLM)" "$CODE_FETCH"
+fi
+
+# What was fetched is a repo; what config.json has to record is the catalog id
+# LM Studio assigned to it. Ask LM Studio rather than trusting the literal —
+# five of the six ids in the seam were never measured, and a wrong one writes a
+# config pointing at a model that does not exist, which degrades silently.
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    EMBEDDING_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$EMBEDDING_FETCH" "$EMBEDDING_MODEL")"
+    LLM_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$LLM_FETCH" "$LLM_MODEL")"
+    CODE_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$CODE_FETCH" "$CODE_MODEL")"
 fi
 # PDM-12/design R-08: LM Studio exposes no per-request context length, so the
 # only way to bound a role's context window is to load the model with it.
@@ -361,24 +400,48 @@ fi
 # an explicit `lms unload` after each role's use) if idle memory pressure is
 # reported.
 LMS_LOAD_TTL_SECONDS=600
+# Evict whatever is already resident before adding three more models to the same
+# RAM/VRAM pool. A machine that has been serving a 32B model all afternoon has
+# no room for the trio below, and LM Studio's failure mode for that is a load
+# error per role rather than anything the wizard could recover from.
+installer_unload_loaded_models "${LMSTUDIO_CLI:-}"
 if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
     # LMSTUDIO_CLI is resolved by setup_lmstudio() (lms_cli_path — checks
     # ~/.lmstudio/bin before PATH) earlier in this same run; reuse it rather
     # than a bare `command -v lms`, which misses that exact case.
+    # The embedding role is loaded into LM Studio only when LM Studio is the
+    # one serving it. On the MLX path the sidecar below owns that role, and
+    # loading the same weights here too would hold ~335 MB resident for a model
+    # LM Studio cannot answer an embedding request with — measured on a live
+    # install: dropping exactly that duplicate freed 335 MB with the endpoint
+    # still returning 1024 floats.
+    LMS_LOADS_EMBEDDING=true
+    if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
+        LMS_LOADS_EMBEDDING=false
+    fi
     if [ -n "${LMSTUDIO_CLI:-}" ]; then
-        "$LMSTUDIO_CLI" load -c 8192 --ttl "$LMS_LOAD_TTL_SECONDS" "$EMBEDDING_MODEL" || true
+        if [ "$LMS_LOADS_EMBEDDING" = true ]; then
+            "$LMSTUDIO_CLI" load -c 8192 --ttl "$LMS_LOAD_TTL_SECONDS" "$EMBEDDING_MODEL" || true
+        fi
         "$LMSTUDIO_CLI" load -c 16384 --ttl "$LMS_LOAD_TTL_SECONDS" "$LLM_MODEL" || true
         if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
             "$LMSTUDIO_CLI" load -c 32768 --ttl "$LMS_LOAD_TTL_SECONDS" "$CODE_MODEL" || true
         fi
     else
         echo -e "  ${YELLOW}⚠${NC} lms CLI not found — skipping per-role context load. Load manually:"
-        echo -e "      lms load -c 8192 --ttl ${LMS_LOAD_TTL_SECONDS} ${EMBEDDING_MODEL}"
+        if [ "$LMS_LOADS_EMBEDDING" = true ]; then
+            echo -e "      lms load -c 8192 --ttl ${LMS_LOAD_TTL_SECONDS} ${EMBEDDING_MODEL}"
+        fi
         echo -e "      lms load -c 16384 --ttl ${LMS_LOAD_TTL_SECONDS} ${LLM_MODEL}"
         if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
             echo -e "      lms load -c 32768 --ttl ${LMS_LOAD_TTL_SECONDS} ${CODE_MODEL}"
         fi
     fi
+
+    # The MLX embedding endpoint. `installer_provider_defaults` already points
+    # `embedding.baseURL` here on this path, so without this call the written
+    # config names a port nothing listens on.
+    installer_setup_mlx_embedding_sidecar "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fi
 
 
@@ -734,6 +797,21 @@ echo -e "    1. ${BLUE}bun install${NC}"
 echo -e "    2. ${BLUE}bun run build${NC}"
 echo -e "    3. ${BLUE}bun run start:api${NC}"
 echo ""
+
+# PDM-13. The MLX embedding role is served by a sidecar, not by LM Studio, and
+# the note saying so is issued at Step 0 — before six steps and several GB of
+# downloads have scrolled it off the screen. It is repeated here, where the eye
+# actually lands, because it is the one piece of this install that is not a
+# process the user already knows about: if it is not running, indexing stops.
+if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
+    echo -e "  ${BLUE}•  Embedding runs outside LM Studio on the MLX path.${NC}"
+    echo -e "     LM Studio types every safetensors model as an LLM and will not"
+    echo -e "     serve it on /v1/embeddings (upstream bug #808), so massa-ai"
+    echo -e "     serves the same weights at ${BOLD}${EMBEDDING_BASE_URL}${NC}."
+    echo -e "     Check it with: ${BLUE}curl ${EMBEDDING_BASE_URL%/v1}/health${NC}"
+    echo -e "     Restart it with: ${BLUE}launchctl kickstart -k gui/\$(id -u)/ai.massa.mlx-embed${NC}"
+    echo ""
+fi
 
 # ---- Run diagnose to validate the full stack ----
 if command -v bun &> /dev/null && [ -f "${SCRIPT_DIR}/../scripts/diagnose.ts" 2>/dev/null ] || [ -f "${PROJECT_ROOT}/scripts/diagnose.ts" ]; then

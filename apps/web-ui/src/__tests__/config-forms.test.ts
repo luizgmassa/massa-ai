@@ -622,6 +622,43 @@ describe("resolveConfigFieldValue — the unresolved-field sweep (WUT-18 T43, AC
     ]);
     expect(unresolved.length).toBe(7);
   });
+
+  /** PDM-13. The sweep above measures the SHIPPED template, which is not what
+   *  the browser receives: `GET /api/v1/config` derives
+   *  `embedding.contextWindow` and `embedding.batchSize` into its `defaults`
+   *  block precisely because the template cannot carry them. Re-running the
+   *  same sweep over the payload the route actually sends is what says whether
+   *  the Admin Portal still renders those two blank — the defect this fix
+   *  closes. The two derived values are restated here rather than imported,
+   *  because importing the route into a browser-module suite would drag
+   *  `loadConfigSafe` in; `apps/tools-api/src/routes/config.test.ts` is the
+   *  half that pins them against the seam. */
+  it("the route's derived defaults leave only 5 of 110 unresolved (PDM-13)", () => {
+    const persisted: Record<string, unknown> = { synapse: { enabled: true } };
+    const shipped = defaultMassaAiConfig as unknown as Record<string, unknown>;
+    const routeDefaults: Record<string, unknown> = {
+      ...shipped,
+      embedding: {
+        ...(shipped.embedding as Record<string, unknown>),
+        contextWindow: 8192,
+        batchSize: 64,
+      },
+    };
+    const unresolved: string[] = [];
+    for (const section of CONFIG_SECTIONS as { key: string; fields: { name: string }[] }[]) {
+      for (const field of section.fields) {
+        const resolved = resolveConfigFieldValue(persisted, routeDefaults, section.key, field.name);
+        if (resolved.value === undefined) unresolved.push(section.key + "." + field.name);
+      }
+    }
+    expect(unresolved.sort()).toEqual([
+      "compression.prompt",
+      "embedding.apiKey",
+      "logging.file",
+      "security.allowedExtensions",
+      "security.apiKey",
+    ]);
+  });
 });
 
 // ── T43 (WUT-18 AC6): Save must not clobber an inherited-true default ───────

@@ -208,8 +208,13 @@ assert_eq "an LM Studio write keeps the embedding model it was given" \
     "text-embedding-nomic-embed-text-v1.5" "$(json_field "$LMS_CFG" 'c.embedding.model')"
 assert_eq "an LM Studio write resolves 768, not the retired 2560 catch-all" \
     "768" "$(json_field "$LMS_CFG" 'c.embedding.dimensions')"
-assert_eq "an LM Studio write does not ask for Ollama's think:false" \
-    "false" "$(json_field "$LMS_CFG" 'c.llm.disableThink')"
+# PDM-13: this used to assert "false". The injection is gated by the provider
+# seam's `injectsDisableThink`, not by this field, so writing "false" on the LM
+# Studio path changed no request and only made the Admin Portal render the
+# toggle off against a shipped default of on. Both providers now write the
+# shipped default; the provider difference stays in the seam.
+assert_eq "an LM Studio write agrees with the shipped disableThink default" \
+    "true" "$(json_field "$LMS_CFG" 'c.llm.disableThink')"
 if [ "$(json_field "$LMS_CFG" 'c.llm.apiKey')" = "ollama" ]; then
     fail "an LM Studio write still carries the hardcoded ollama llm.apiKey"
 else
