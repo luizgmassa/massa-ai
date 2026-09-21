@@ -1031,3 +1031,29 @@ fix tasks. **Run this task last**, after F1-F8, so it records the post-fix state
 Tests: none — the delivery gate is this task's check
 Gate: bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models --root .
 Depends on: F1, F2, F3, F4, F5, F6, F7, F8.
+
+### F2b: Correct F2's precedence — it was specified backwards
+
+**This is an orchestrator error, not the implementer's.** F2's task text above says "Resolve
+config first, then env, then the seam". That inverts this project's documented convention, and
+FW1 implemented it exactly as written while flagging the divergence — the right call on their
+side.
+
+The convention is `env > config.json > literal defaults`, stated in `CLAUDE.md:321`, restated for
+this feature in `design.md:51` and `design.md:268` ("resolution is already env > file > default,
+so a written field wins by construction"), and again in T02's own text ("Resolution stays env >
+file > role-table default"). `packages/core/src/services/embeddings/config.ts` and A-05 follow it.
+Shipping one route with inverted precedence would make `/api/v1/system/ollama` the only surface in
+the codebase where an env var loses to a config file.
+
+`apps/tools-api/src/routes/system.ts` — reorder `resolveConfiguredOllamaEmbeddingModel()` to
+`process.env.OLLAMA_EMBEDDING_MODEL` → `loadRawUserConfig().embedding?.model` → the seam default.
+Keep everything else F2 delivered: the raw-config read (no defaults folded in), the
+`mock.module` seam that keeps the tests off a real `config.json`, and the repointed assertion.
+F2's second test currently asserts `'from-config-json'` beats `'from-env'`; that expected value is
+wrong against the convention and must be inverted with it — the test encodes the spec, and the
+spec here is the documented precedence.
+
+Tests: env beats a config.json value; config.json beats the seam default when no env var is set; the seam default applies when neither is present
+Gate: bun test apps/tools-api/src/routes/system.test.ts && bun run type-check
+Depends on: F2.
