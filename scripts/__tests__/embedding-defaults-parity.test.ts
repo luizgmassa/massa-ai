@@ -254,7 +254,29 @@ const LMSTUDIO_MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
 const CONFIG_CLI_FILES = ["apps/mcp-client/src/config-cli.ts", "apps/opencode-plugin/src/config-cli.ts"];
 const BOUND = "(?:(?!\\} else)[\\s\\S])*?";
 
-const DERIVED_SURFACES: StructuralSurface[] = CONFIG_CLI_FILES.flatMap((file) => [
+// The two `embeddings/config.ts` rows below name a fixed file, not the loop
+// variable `file` — pushing them inside `CONFIG_CLI_FILES.flatMap(...)` would
+// re-emit both of them once per CLI file (G3: measured `length === 28` while
+// distinct labels `=== 26`, because these two rows do not vary per iteration
+// and were duplicated by the loop instead of being independent of it).
+// Declared once, outside the flatMap, and concatenated below.
+const CONFIG_TS_DERIVED_SURFACES: StructuralSurface[] = [
+  {
+    file: "packages/core/src/services/embeddings/config.ts",
+    label: "packages/core/src/services/embeddings/config.ts (lmstudio, embedding model)",
+    pattern: /LMSTUDIO_EMBEDDING_MODEL \|\| file\?\.model \|\| (INFERENCE_PROVIDERS\.lmstudio\.defaultModels\.embedding);/g,
+    expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding",
+  },
+  {
+    file: "packages/core/src/services/embeddings/config.ts",
+    label: "packages/core/src/services/embeddings/config.ts (lmstudio, embedding dims by-key lookup)",
+    pattern: /file\?\.dimensions \|\|\s*\n\s*(INFERENCE_PROVIDERS\.lmstudio\.knownDimensions\[model\]) \|\|/g,
+    expected: "INFERENCE_PROVIDERS.lmstudio.knownDimensions[model]",
+  },
+];
+
+const DERIVED_SURFACES: StructuralSurface[] = [
+  ...CONFIG_CLI_FILES.flatMap((file) => [
   {
     file,
     label: `${file} (init --lmstudio, embedding model)`,
@@ -330,19 +352,9 @@ const DERIVED_SURFACES: StructuralSurface[] = CONFIG_CLI_FILES.flatMap((file) =>
     pattern: new RegExp(`provider === "lmstudio"\\) \\{${BOUND}config\\.llm\\.codeModel = (INFERENCE_PROVIDERS\\.lmstudio\\.defaultModels\\.coding);`, "g"),
     expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.coding",
   },
-  {
-    file: "packages/core/src/services/embeddings/config.ts",
-    label: "packages/core/src/services/embeddings/config.ts (lmstudio, embedding model)",
-    pattern: /LMSTUDIO_EMBEDDING_MODEL \|\| file\?\.model \|\| (INFERENCE_PROVIDERS\.lmstudio\.defaultModels\.embedding);/g,
-    expected: "INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding",
-  },
-  {
-    file: "packages/core/src/services/embeddings/config.ts",
-    label: "packages/core/src/services/embeddings/config.ts (lmstudio, embedding dims by-key lookup)",
-    pattern: /file\?\.dimensions \|\|\s*\n\s*(INFERENCE_PROVIDERS\.lmstudio\.knownDimensions\[model\]) \|\|/g,
-    expected: "INFERENCE_PROVIDERS.lmstudio.knownDimensions[model]",
-  },
-]);
+  ]),
+  ...CONFIG_TS_DERIVED_SURFACES,
+];
 
 // ── Instruct/coding tiers (T13/P1 "the parity gate covers all three roles") ─
 // Bash/env surfaces cannot import the seam, so instruct/coding stay literal
@@ -528,6 +540,21 @@ describe("embedding defaults parity (EDC-06)", () => {
   });
 
   test("derived (structural) config-cli.ts surfaces still delegate to the seam", () => {
+    // G3 — the printed population is a claim (PDM-05 AC-3): a row appearing
+    // twice (e.g. re-pushed inside a loop that does not vary it) would both
+    // inflate this count and let a single mutation be reported twice. Assert
+    // the printed length equals the distinct-label count BEFORE checking the
+    // rows themselves, so a reintroduced duplicate fails by name here instead
+    // of silently inflating "surfaces checked".
+    const distinctLabels = new Set(DERIVED_SURFACES.map((s) => s.label));
+    if (distinctLabels.size !== DERIVED_SURFACES.length) {
+      const seen = new Set<string>();
+      const dupes = DERIVED_SURFACES.map((s) => s.label).filter((l) => (seen.has(l) ? true : (seen.add(l), false)));
+      throw new Error(
+        `DERIVED_SURFACES has ${DERIVED_SURFACES.length} rows but only ${distinctLabels.size} distinct labels — ` +
+          `duplicated: ${[...new Set(dupes)].join(", ")}`,
+      );
+    }
     const violations = DERIVED_SURFACES.map(checkStructural).filter((v): v is string => v !== null);
     console.log(`[parity] derived structural surfaces checked: ${DERIVED_SURFACES.length}`);
     expect(violations).toEqual([]);

@@ -1123,6 +1123,30 @@ confirming only the new TS sensor (not the shell suite) catches it. Restored via
 All three of this batch (G1, G2, G5) are closed. G3, G4, G6 are another worker's; G6 depends on
 all five (G1-G5), so it cannot close until that worker's G3/G4 and this batch both land.
 
+**Fix Pass 2 (G3, G4, G6 batch), G3 — Complete.** `scripts/__tests__/embedding-defaults-parity.test.ts`'s
+`DERIVED_SURFACES` carried two `embeddings/config.ts` rows declared inside
+`CONFIG_CLI_FILES.flatMap((file) => [...])` without depending on `file` — so they were re-emitted
+once per CLI (`length === 28`, distinct labels `=== 26`; F4's "24 → 28" carried the same +2
+inflation). Detection was unaffected; this was an accounting defect. Pulled those two rows into a
+standalone `CONFIG_TS_DERIVED_SURFACES` array, concatenated once. Added a self-check at the top of
+the derived-surfaces test comparing `DERIVED_SURFACES.length` to the distinct-label-set size,
+throwing with every duplicated label named if they diverge, so a future re-introduction of a
+loop-independent row fails by name instead of silently re-inflating the printed count.
+Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 21/0, 41 expect() calls
+(unchanged — G3 corrects a count, not a coverage gap; `[parity] derived structural surfaces
+checked:` now prints 26, was 28).
+Observed red: duplicated the `...CONFIG_TS_DERIVED_SURFACES` spread a second time (reproducing the
+once-per-CLI duplication shape) → the new self-check threw `DERIVED_SURFACES has 28 rows but only
+26 distinct labels — duplicated: packages/core/src/services/embeddings/config.ts (lmstudio,
+embedding model), packages/core/src/services/embeddings/config.ts (lmstudio, embedding dims
+by-key lookup)` (20 pass / 1 fail). Restored via file copy; `git status --porcelain` clean before
+the commit; re-ran green (21/0). Checked every other `.flatMap(` in the file — only
+`INSTRUCT_CODING_SURFACES.flatMap(checkMultiMatch)`, which maps to violation strings and cannot
+duplicate rows — and every other printed `[parity] ... checked: N` line, all reading off flat
+array literals with no loop-independent per-item constructor: no other instance of this defect
+shape found. `tasks.md`'s F4 entry corrected in place with a note pointing at this fix rather than
+edited silently.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),

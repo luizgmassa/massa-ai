@@ -974,7 +974,15 @@ provider (ollama, lmstudio) × branch (`init --lmstudio`, `use ollama`, `use lms
 (embedding model, embedding dims, instruct, coding) × CLI (mcp-client, opencode-plugin) that
 writes via property access rather than a config-cli literal. Added the two missing
 `DERIVED_SURFACES` rows — `(use ollama, instruct)` and `(use ollama, coding)` — per CLI (4 new
-entries; 24 → 28 structural rows), closing the exact gap G0 exploited.
+entries; 24 → 28 structural rows).
+
+**Correction (G3, 2026-09-20): "24 → 28" was wrong by 2 — the true distinct figures are 22 → 26.**
+Two `embeddings/config.ts` rows were declared inside `CONFIG_CLI_FILES.flatMap(...)` without
+depending on the loop variable, so they were emitted once per CLI file (`DERIVED_SURFACES.length
+=== 28`, distinct labels `=== 26`), not "closing the exact gap G0 exploited" cleanly — detection
+was unaffected, but the printed population was a duplicate-inflated claim. Fixed by pulling those
+two rows into their own `CONFIG_TS_DERIVED_SURFACES` array, concatenated once; see G3's own entry
+below for the observed red and the added self-check.
 
 Narrowed the Tier-3 completeness scan's `process.env` exclusion from a blanket
 `line.includes("process.env")` skip to a bare-read check (`isBareEnvRead`/`envLiteralDefaultFor`):
@@ -1336,7 +1344,7 @@ Tests: `use <provider> --base-url <url>` writes an embedding base and an LLM bas
 Gate: bun test apps/mcp-client/src/__tests__/config-cli.test.ts && bun test apps/opencode-plugin/src/__tests__/config-cli.test.ts && bun test scripts/__tests__/embedding-defaults-parity.test.ts
 Depends on: none.
 
-### G3: The parity gate's printed population count overstates by 2
+### G3: The parity gate's printed population count overstates by 2 — ✅ Complete
 
 `scripts/__tests__/embedding-defaults-parity.test.ts:258-341`. The two `embeddings/config.ts` rows
 sit inside `CONFIG_CLI_FILES.flatMap(...)`, so they are emitted **once per CLI**: `length === 28`
@@ -1349,6 +1357,34 @@ T13, but F4 re-derived this population and did not catch it.
 Tests: the printed population equals the distinct-label count; a duplicated row is rejected or deduplicated
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts
 Depends on: none.
+
+**Result (GW2, 2026-09-20).** Pulled the two `embeddings/config.ts` structural rows out of
+`CONFIG_CLI_FILES.flatMap(...)` into their own `CONFIG_TS_DERIVED_SURFACES` array (they name a
+fixed file, not the loop variable, so they never varied per iteration) and concatenated it once
+into `DERIVED_SURFACES`. `DERIVED_SURFACES.length` is now 26, matching the distinct-label count.
+Added a self-check at the top of the "derived (structural) config-cli.ts surfaces still delegate
+to the seam" test: it computes `new Set(DERIVED_SURFACES.map(s => s.label))` and throws, naming
+every duplicated label, if its size differs from `DERIVED_SURFACES.length` — so a future row added
+back inside the loop without varying by `file` fails by name instead of silently re-inflating the
+printed count.
+
+**Observed red:** duplicated `...CONFIG_TS_DERIVED_SURFACES` a second time in the concatenation
+(reproducing the original once-per-CLI duplication shape) → `DERIVED_SURFACES has 28 rows but only
+26 distinct labels — duplicated: packages/core/src/services/embeddings/config.ts (lmstudio,
+embedding model), packages/core/src/services/embeddings/config.ts (lmstudio, embedding dims
+by-key lookup)` (20 pass / 1 fail). Restored by file copy (`/tmp/g3-premutation.bak`), confirmed
+`git status --porcelain` showed only the intended file, re-ran green: **21 pass / 0 fail / 41
+expect() calls** (unchanged count from before this fix — G3 is an accounting correction, not a new
+assertion count; the printed `[parity] derived structural surfaces checked:` line now reads 26,
+was 28).
+
+**Other duplicated row or claimed count found:** none. Grepped the file for every other `.flatMap(`
+— the only other one (`INSTRUCT_CODING_SURFACES.flatMap(checkMultiMatch)`) maps each row to zero
+or more violation strings and introduces no row duplication. Every other printed
+`[parity] ... checked: N` line reads directly off a flat array literal (`PAIR_SURFACES`,
+`MODEL_ONLY_SURFACES`, `DIMS_ONLY_SURFACES`, `LMSTUDIO_PAIR_SURFACES`,
+`LMSTUDIO_MODEL_ONLY_SURFACES`, `INSTRUCT_CODING_SURFACES`) with no loop-independent row inside a
+per-item constructor, so none carries the same defect shape.
 
 ### G4: The declared `NEEDLE_MODEL` residual names 1 of 2 files
 
