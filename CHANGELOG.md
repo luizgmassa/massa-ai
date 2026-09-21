@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.60.0] - 2026-09-21
+
 ### Added
 
 - **The installer asks LM Studio users which weight format to pull, ordered by platform.**
