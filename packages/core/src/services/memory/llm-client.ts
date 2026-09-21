@@ -17,10 +17,11 @@
 
 import { generateText, generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import { config, logger, DEFAULT_LLM_MODEL } from "@massa-ai/shared";
+import { config, logger } from "@massa-ai/shared";
 import { loadConfigSafe } from "@massa-ai/shared/config";
 import {
   INFERENCE_PROVIDERS,
+  INFERENCE_ROLE_DEFAULTS,
   LOCAL_INFERENCE_IDS,
   inferenceProviderList,
   type InferenceProviderId,
@@ -182,25 +183,73 @@ export function _setLlmBaseUrlForTesting(url: string | null): void {
   testBaseUrlOverride = url;
 }
 
-/** Read the llm config block with safe defaults (defensive against partial/missing config). */
-function getLlmConfig(opts?: { modelRole?: LlmModelRole }) {
-  const cfg = config.get("llm");
-  const role = opts?.modelRole ?? "instruct";
-  // Resolve the per-call model. Instruct → `model`, code → `codeModel`. The
-  // instruct fallback uses the shared DEFAULT_LLM_MODEL constant (no bare literal).
+/**
+ * Pure resolution of the effective LLM config for one call from the raw
+ * `config.llm` block (possibly partial/undefined — defensive against a
+ * partial or missing config) and the requested role. Every fallback reads
+ * the resolved provider's own seam entry (`inference-providers.ts`), never a
+ * bare Ollama-shaped literal: code role falls back to `defaultModels.coding`
+ * — never to the instruct model, which after this feature is a
+ * vision-language model (COVERAGE #5) — and `disableThink` follows the
+ * resolved provider's `injectsDisableThink` (LIP-07) instead of a hardcoded
+ * `true`.
+ *
+ * Exported so this fallback behavior can be unit-tested with a synthetic
+ * config shape — this file's test suite deliberately does not
+ * `mock.module("@massa-ai/shared")` (see llm-client.test.ts's docblock).
+ * @internal
+ */
+export function _resolveLlmConfig(
+  cfg:
+    | Partial<{
+        baseUrl: string;
+        apiKey: string;
+        model: string;
+        codeModel: string;
+        temperature: number;
+        codeTemperature: number;
+        contextWindow: number;
+        codeContextWindow: number;
+        maxOutputTokens: number;
+        timeoutMs: number;
+        disableThink: boolean;
+      }>
+    | undefined,
+  role: LlmModelRole,
+  baseUrlOverride: string | null,
+) {
+  const baseUrl = baseUrlOverride ?? cfg?.baseUrl ?? INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl;
+  const spec = resolveInferenceSpec(baseUrl);
   const model =
     role === "code"
-      ? cfg?.codeModel ?? cfg?.model ?? DEFAULT_LLM_MODEL
-      : cfg?.model ?? DEFAULT_LLM_MODEL;
+      ? cfg?.codeModel ?? spec.defaultModels.coding
+      : cfg?.model ?? spec.defaultModels.instruct;
+  const temperature =
+    role === "code"
+      ? cfg?.codeTemperature ?? INFERENCE_ROLE_DEFAULTS.coding.temperature
+      : cfg?.temperature ?? INFERENCE_ROLE_DEFAULTS.instruct.temperature;
+  // Context window per role (PDM-08/PDM-09); sent as `options.num_ctx` only
+  // where `spec.appliesContextPerRequest` (buildProvider) — LM Studio applies
+  // it at load time (spec A-07) and must never receive this field.
+  const contextWindow =
+    role === "code"
+      ? cfg?.codeContextWindow ?? INFERENCE_ROLE_DEFAULTS.coding.contextWindow
+      : cfg?.contextWindow ?? INFERENCE_ROLE_DEFAULTS.instruct.contextWindow;
   return {
-    baseUrl: testBaseUrlOverride ?? cfg?.baseUrl ?? "http://localhost:11434/v1",
-    apiKey: cfg?.apiKey ?? "ollama",
+    baseUrl,
+    apiKey: cfg?.apiKey ?? spec.id,
     model,
-    temperature: cfg?.temperature ?? 0.2,
+    temperature,
+    contextWindow,
     maxOutputTokens: cfg?.maxOutputTokens ?? 8000,
     timeoutMs: cfg?.timeoutMs ?? 90000,
-    disableThink: cfg?.disableThink ?? true,
+    disableThink: cfg?.disableThink ?? spec.injectsDisableThink,
   };
+}
+
+/** Read the llm config block with safe defaults (defensive against partial/missing config). */
+function getLlmConfig(opts?: { modelRole?: LlmModelRole }) {
+  return _resolveLlmConfig(config.get("llm"), opts?.modelRole ?? "instruct", testBaseUrlOverride);
 }
 
 /** host:port for a URL, or `null` when it doesn't parse. */
@@ -275,16 +324,51 @@ export function _wrapFetchDisableThink(
   return wrapped as unknown as typeof globalThis.fetch;
 }
 
+/**
+ * Best-effort `options.num_ctx` injection (PDM-08/PDM-09). Ollama's
+ * OpenAI-compat chat layer honors a top-level `options` object; LM Studio
+ * has no per-request context-length field (spec A-07, `appliesContextPerRequest:
+ * false`) and must never receive this — gated at the call site in
+ * `buildProvider`. Merges into any existing `options` object rather than
+ * overwriting it, mirroring `_wrapFetchDisableThink`'s shape.
+ * @internal
+ */
+export function _wrapFetchContextWindow(
+  baseFetch: typeof globalThis.fetch,
+  contextWindow: number,
+): typeof globalThis.fetch {
+  const wrapped = async (input: any, init?: any): Promise<Response> => {
+    try {
+      if (init?.body && typeof init.body === "string") {
+        const parsed = JSON.parse(init.body);
+        if (parsed && typeof parsed === "object") {
+          parsed.options = { ...parsed.options, num_ctx: contextWindow };
+          init = { ...init, body: JSON.stringify(parsed) };
+        }
+      }
+    } catch {
+      // Not JSON or unparseable — leave the request untouched.
+    }
+    return baseFetch(input as any, init as any);
+  };
+  return wrapped as unknown as typeof globalThis.fetch;
+}
+
 function buildProvider(llm: ReturnType<typeof getLlmConfig>) {
   // Ollama exposes an OpenAI-compatible API at /v1; createOpenAI over baseURL
   // is sufficient (no special compatibility flag in @ai-sdk/openai v3).
   const spec = resolveInferenceSpec(llm.baseUrl);
+  let fetchImpl: typeof globalThis.fetch | undefined;
+  if (spec.appliesContextPerRequest) {
+    fetchImpl = _wrapFetchContextWindow(fetchImpl ?? globalThis.fetch, llm.contextWindow);
+  }
+  if (llm.disableThink && spec.injectsDisableThink) {
+    fetchImpl = _wrapFetchDisableThink(fetchImpl ?? globalThis.fetch);
+  }
   const openai = createOpenAI({
     baseURL: llm.baseUrl,
     apiKey: llm.apiKey,
-    ...(llm.disableThink && spec.injectsDisableThink
-      ? { fetch: _wrapFetchDisableThink(globalThis.fetch) }
-      : {}),
+    ...(fetchImpl ? { fetch: fetchImpl } : {}),
   });
   // The default callable resolves to the Responses API, which LM Studio serves
   // while dropping `text.format` — gating json_schema on correctly still yields

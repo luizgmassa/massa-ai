@@ -79,9 +79,12 @@ import {
   _extractJsonObject,
   _checkJsonSchemaSupport,
   _wrapFetchDisableThink,
+  _wrapFetchContextWindow,
   _isAbortOrTimeoutError,
   resolveInferenceSpec,
+  _resolveLlmConfig,
 } from "../services/memory/llm-client.js";
+import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
 import { z } from "zod";
 
 const sampleSchema = z.object({
@@ -334,10 +337,16 @@ describe("llm-client — per-task model routing (T4)", () => {
     // undefined and llm-client falls back to DEFAULT_LLM_MODEL — assert that
     // fallback instead. Otherwise the resolved model must match config exactly.
     expect(lastModel).toBe(cfgModel ?? DEFAULT_LLM_MODEL);
-    // The constant itself must be the pure-instruct default (not the legacy
-    // thinking model).
-    expect(DEFAULT_LLM_MODEL).toBe("qwen2.5:7b-instruct");
+    // The constant itself must be the pure-instruct default of whichever
+    // provider the running config is active for (per-provider-default-models
+    // T01/T03) — not the retired "qwen2.5:7b-instruct"/"qwen3.5:9b" literals.
+    // Provider-agnostic on purpose: this suite intentionally does not pin
+    // embedding.provider (see docblock), and this host's own config may name
+    // either provider.
+    const instructDefaults = Object.values(INFERENCE_PROVIDERS).map((p) => p.defaultModels.instruct);
+    expect(instructDefaults).toContain(DEFAULT_LLM_MODEL);
     expect(DEFAULT_LLM_MODEL).not.toBe("qwen3.5:9b");
+    expect(DEFAULT_LLM_MODEL).not.toBe("qwen2.5:7b-instruct");
   });
 
   test("#7 WARN: empty reasoning recovery emits one structured warn (dormant on instruct)", async () => {
@@ -774,6 +783,199 @@ describe("llm-client — resolveInferenceSpec (LIP-07 provider identity)", () =>
 
   test("an unmatched baseUrl (no known provider's port) falls back to ollama", () => {
     expect(resolveInferenceSpec("http://example.com:9999/v1").id).toBe("ollama");
+  });
+});
+
+// ─── T05: getLlmConfig reads the seam instead of Ollama-shaped fallbacks ────
+
+describe("llm-client — _resolveLlmConfig seam-derived fallbacks (T05)", () => {
+  test("code role falls back to defaultModels.coding, never to the instruct model", () => {
+    // A config that only carries an instruct `model` (no `codeModel`) is the
+    // exact shape that used to regress the code role onto the instruct
+    // model — a vision-language model after this feature (COVERAGE #5).
+    const result = _resolveLlmConfig({ model: "some-instruct-model" }, "code", null);
+    expect(result.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
+    expect(result.model).not.toBe("some-instruct-model");
+  });
+
+  test("instruct role falls back to defaultModels.instruct when config carries no model", () => {
+    const result = _resolveLlmConfig(undefined, "instruct", null);
+    expect(result.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+  });
+
+  test("code role falls back to the resolved provider's own coding default (LM Studio)", () => {
+    const result = _resolveLlmConfig(undefined, "code", "http://localhost:1234/v1");
+    expect(result.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.coding);
+  });
+
+  test("disableThink follows the resolved provider's injectsDisableThink, not a hardcoded true", () => {
+    const ollamaResult = _resolveLlmConfig(undefined, "instruct", null);
+    expect(ollamaResult.disableThink).toBe(INFERENCE_PROVIDERS.ollama.injectsDisableThink);
+    expect(ollamaResult.disableThink).toBe(true);
+
+    const lmstudioResult = _resolveLlmConfig(undefined, "instruct", "http://localhost:1234/v1");
+    expect(lmstudioResult.disableThink).toBe(INFERENCE_PROVIDERS.lmstudio.injectsDisableThink);
+    expect(lmstudioResult.disableThink).toBe(false);
+  });
+
+  test("apiKey and baseUrl fall back to the resolved provider's seam entry, not a bare Ollama literal", () => {
+    const ollamaResult = _resolveLlmConfig(undefined, "instruct", null);
+    expect(ollamaResult.baseUrl).toBe(INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl);
+    expect(ollamaResult.apiKey).toBe("ollama");
+
+    const lmstudioResult = _resolveLlmConfig(undefined, "instruct", "http://localhost:1234/v1");
+    expect(lmstudioResult.baseUrl).toBe("http://localhost:1234/v1");
+    expect(lmstudioResult.apiKey).toBe("lmstudio");
+    expect(lmstudioResult.apiKey).not.toBe("ollama");
+  });
+
+  test("per-role temperature resolves from INFERENCE_ROLE_DEFAULTS: instruct 0.2, coding 0.0", () => {
+    expect(_resolveLlmConfig(undefined, "instruct", null).temperature).toBe(0.2);
+    expect(_resolveLlmConfig(undefined, "code", null).temperature).toBe(0.0);
+  });
+
+  test("per-role context window resolves from INFERENCE_ROLE_DEFAULTS: instruct 16384, coding 32768", () => {
+    expect(_resolveLlmConfig(undefined, "instruct", null).contextWindow).toBe(16384);
+    expect(_resolveLlmConfig(undefined, "code", null).contextWindow).toBe(32768);
+  });
+
+  test("config values win over every role-table/seam default (PDM-12 AC-2 shape)", () => {
+    const cfg = {
+      model: "cfg-instruct",
+      codeModel: "cfg-code",
+      temperature: 0.9,
+      codeTemperature: 0.1,
+      contextWindow: 1111,
+      codeContextWindow: 2222,
+      apiKey: "cfg-key",
+      baseUrl: "http://custom-host:9999/v1",
+      disableThink: false,
+    };
+    const instructResult = _resolveLlmConfig(cfg, "instruct", null);
+    expect(instructResult.model).toBe("cfg-instruct");
+    expect(instructResult.temperature).toBe(0.9);
+    expect(instructResult.contextWindow).toBe(1111);
+    expect(instructResult.apiKey).toBe("cfg-key");
+    expect(instructResult.baseUrl).toBe("http://custom-host:9999/v1");
+    expect(instructResult.disableThink).toBe(false);
+
+    const codeResult = _resolveLlmConfig(cfg, "code", null);
+    expect(codeResult.model).toBe("cfg-code");
+    expect(codeResult.temperature).toBe(0.1);
+    expect(codeResult.contextWindow).toBe(2222);
+  });
+});
+
+// ─── T06: per-role options.num_ctx, gated on appliesContextPerRequest ───────
+
+describe("llm-client — _wrapFetchContextWindow", () => {
+  test("injects options.num_ctx into JSON body", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 16384);
+    await wrapped("http://test", {
+      method: "POST",
+      body: JSON.stringify({ messages: [] }),
+    });
+    const parsed = JSON.parse(capturedInit.body);
+    expect(parsed.options.num_ctx).toBe(16384);
+    expect(parsed.messages).toEqual([]);
+  });
+
+  test("merges into an existing options object rather than overwriting it", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 32768);
+    await wrapped("http://test", {
+      body: JSON.stringify({ options: { seed: 1 } }),
+    });
+    const parsed = JSON.parse(capturedInit.body);
+    expect(parsed.options).toEqual({ seed: 1, num_ctx: 32768 });
+  });
+
+  test("leaves non-JSON body untouched (no throw)", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 8192);
+    await wrapped("http://test", { body: "not-json-at-all" });
+    expect(capturedInit.body).toBe("not-json-at-all");
+  });
+
+  test("leaves request with no body untouched", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 8192);
+    await wrapped("http://test", { method: "GET" });
+    expect(capturedInit.body).toBeUndefined();
+  });
+});
+
+describe("llm-client — buildProvider sends per-role num_ctx (T06 / PDM-08, PDM-09)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test("ollama: instruct role's chat request carries options.num_ctx = 16384", async () => {
+    let captured: any = null;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (_input: any, init?: any) => {
+      captured = init;
+      return new Response("{}");
+    };
+    try {
+      await llmComplete("hello");
+      expect(typeof lastProviderOpts.fetch).toBe("function");
+      await lastProviderOpts.fetch("http://test", {
+        method: "POST",
+        body: JSON.stringify({ messages: [] }),
+      });
+      const parsed = JSON.parse(captured.body);
+      expect(parsed.options.num_ctx).toBe(16384);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("ollama: code role's chat request carries options.num_ctx = 32768", async () => {
+    let captured: any = null;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (_input: any, init?: any) => {
+      captured = init;
+      return new Response("{}");
+    };
+    try {
+      await llmComplete("hello", { modelRole: "code" });
+      await lastProviderOpts.fetch("http://test", {
+        method: "POST",
+        body: JSON.stringify({ messages: [] }),
+      });
+      const parsed = JSON.parse(captured.body);
+      expect(parsed.options.num_ctx).toBe(32768);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("lmstudio: buildProvider attaches no fetch wrapper at all — num_ctx never sent (spec A-07)", async () => {
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    await llmComplete("hello");
+    // LM Studio has both appliesContextPerRequest=false and
+    // injectsDisableThink=false, so no wrapped fetch is attached — the
+    // strongest available proof that num_ctx is never sent to it.
+    expect(lastProviderOpts.fetch).toBeUndefined();
   });
 });
 

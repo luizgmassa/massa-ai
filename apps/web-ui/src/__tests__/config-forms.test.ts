@@ -508,13 +508,13 @@ describe("renderConfig — field guide machine tokens render in <code> (T12, APU
   });
 
   it("wraps the embedding model + base URL examples in <code>", () => {
-    expect(html).toContain("<code>qwen3-embedding:4b</code>");
+    expect(html).toContain("<code>qwen3-embedding:0.6b</code>");
     expect(html).toContain("<code>http://localhost:11434</code>");
   });
 
   it("wraps the LLM base URL + model examples in <code>", () => {
     expect(html).toContain("<code>http://localhost:11434/v1</code>");
-    expect(html).toContain("<code>qwen2.5:7b-instruct</code>");
+    expect(html).toContain("<code>qwen3-vl:8b</code>");
   });
 
   it("wraps the capturePolicy DEFAULT_POLICY identifier in <code>", () => {
@@ -580,7 +580,9 @@ describe("resolveConfigFieldValue — the unresolved-field sweep (WUT-18 T43, AC
    *  at the section level; this sweep is the field-level version.
    *
    *  16 → 17 sections and 104 → 105 fields at a3ba8a6e, which added the single
-   *  `bootstrap.rules` json field. */
+   *  `bootstrap.rules` json field. 105 → 110 for per-provider-default-models
+   *  (PDM-13), which added `embedding.contextWindow` + `embedding.batchSize`
+   *  and `llm.contextWindow` + `llm.codeContextWindow` + `llm.codeTemperature`. */
   function declaredFieldPaths(): string[] {
     const paths: string[] = [];
     for (const section of CONFIG_SECTIONS as { key: string; fields: { name: string }[] }[]) {
@@ -589,12 +591,12 @@ describe("resolveConfigFieldValue — the unresolved-field sweep (WUT-18 T43, AC
     return paths;
   }
 
-  it("the declared population is 105 fields across 17 sections", () => {
+  it("the declared population is 110 fields across 17 sections", () => {
     expect(CONFIG_SECTIONS.length).toBe(17);
-    expect(declaredFieldPaths().length).toBe(105);
+    expect(declaredFieldPaths().length).toBe(110);
   });
 
-  it("measures the unresolved-field count against a fixture with only synapse.enabled persisted: 5 of 105, named", () => {
+  it("measures the unresolved-field count against a fixture with only synapse.enabled persisted: 7 of 110, named", () => {
     const persisted: Record<string, unknown> = { synapse: { enabled: true } };
     const defaults = defaultMassaAiConfig as unknown as Record<string, unknown>;
     const unresolved: string[] = [];
@@ -604,14 +606,21 @@ describe("resolveConfigFieldValue — the unresolved-field sweep (WUT-18 T43, AC
         if (resolved.value === undefined) unresolved.push(section.key + "." + field.name);
       }
     }
+    // embedding.contextWindow/batchSize join the pre-existing 5 (PDM-12: both
+    // are deliberately absent from `defaultMassaAiConfig.embedding` — the
+    // role-table default applies at the consumption site, not the shipped
+    // template). llm.contextWindow/codeContextWindow/codeTemperature do NOT
+    // join this list — they are required fields with real shipped defaults.
     expect(unresolved.sort()).toEqual([
       "compression.prompt",
       "embedding.apiKey",
+      "embedding.batchSize",
+      "embedding.contextWindow",
       "logging.file",
       "security.allowedExtensions",
       "security.apiKey",
     ]);
-    expect(unresolved.length).toBe(5);
+    expect(unresolved.length).toBe(7);
   });
 });
 

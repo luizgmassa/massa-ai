@@ -25,12 +25,23 @@ export interface InferenceProviderEnvNames {
 
 export type ParseModelList = (body: unknown) => string[] | null;
 
+export type InferenceRole = "embedding" | "instruct" | "coding";
+
+export const INFERENCE_ROLE_DEFAULTS = {
+  embedding: { contextWindow: 8192 },
+  instruct: { contextWindow: 16384, temperature: 0.2 },
+  coding: { contextWindow: 32768, temperature: 0.0 },
+} as const;
+
 export interface InferenceProviderSpec {
   readonly id: InferenceProviderId;
   readonly defaultEmbeddingBaseUrl: string;
   readonly defaultLlmBaseUrl: string;
   readonly envNames: InferenceProviderEnvNames;
   readonly knownDimensions: Readonly<Record<string, number>>;
+  readonly defaultModels: Readonly<Record<InferenceRole, string>>;
+  readonly appliesContextPerRequest: boolean;
+  readonly embedBatchSize: number;
   readonly supportsOllamaVersionProbe: boolean;
   readonly injectsDisableThink: boolean;
   /**
@@ -79,6 +90,13 @@ export const INFERENCE_PROVIDERS: Readonly<
       dimensions: "OLLAMA_EMBEDDING_DIMENSIONS",
     },
     knownDimensions: KNOWN_EMBEDDING_DIMENSIONS,
+    defaultModels: {
+      embedding: "qwen3-embedding:0.6b",
+      instruct: "qwen3-vl:8b",
+      coding: "qwen2.5-coder:7b",
+    },
+    appliesContextPerRequest: true,
+    embedBatchSize: 64,
     supportsOllamaVersionProbe: true,
     injectsDisableThink: true,
     requiresChatCompletionsApi: false,
@@ -95,7 +113,15 @@ export const INFERENCE_PROVIDERS: Readonly<
     },
     knownDimensions: {
       "text-embedding-nomic-embed-text-v1.5": 768,
+      "text-embedding-qwen3-embedding-0.6b": 1024,
     },
+    defaultModels: {
+      embedding: "text-embedding-qwen3-embedding-0.6b",
+      instruct: "qwen3-vl-8b-instruct",
+      coding: "qwen2.5-coder-7b-instruct",
+    },
+    appliesContextPerRequest: false,
+    embedBatchSize: 64,
     supportsOllamaVersionProbe: false,
     injectsDisableThink: false,
     requiresChatCompletionsApi: true,
@@ -105,4 +131,30 @@ export const INFERENCE_PROVIDERS: Readonly<
 
 export function inferenceProviderList(): readonly InferenceProviderSpec[] {
   return LOCAL_INFERENCE_IDS.map((id) => INFERENCE_PROVIDERS[id]);
+}
+
+const SLASH = "/".charCodeAt(0);
+
+/** Derive the embedding + LLM base URL pair for one provider's `--base-url`. */
+export function deriveInferenceBaseUrls(
+  providerId: InferenceProviderId,
+  explicitBaseUrl: string | undefined,
+): { embeddingBaseUrl: string; llmBaseUrl: string } {
+  const spec = INFERENCE_PROVIDERS[providerId];
+  if (!explicitBaseUrl) {
+    return {
+      embeddingBaseUrl: spec.defaultEmbeddingBaseUrl,
+      llmBaseUrl: spec.defaultLlmBaseUrl,
+    };
+  }
+  let end = explicitBaseUrl.length;
+  while (end > 0 && explicitBaseUrl.charCodeAt(end - 1) === SLASH) end--;
+  const base = explicitBaseUrl.slice(0, end);
+  const suffix = spec.defaultLlmBaseUrl.startsWith(spec.defaultEmbeddingBaseUrl)
+    ? spec.defaultLlmBaseUrl.slice(spec.defaultEmbeddingBaseUrl.length)
+    : "";
+  return {
+    embeddingBaseUrl: base,
+    llmBaseUrl: `${base}${suffix}`,
+  };
 }

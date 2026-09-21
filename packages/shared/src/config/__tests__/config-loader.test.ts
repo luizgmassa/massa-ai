@@ -24,6 +24,7 @@ import {
   __resetMigrationForTests,
 } from "../config-loader";
 import { defaultMassaAiConfig } from "../massa-ai-config";
+import { INFERENCE_ROLE_DEFAULTS } from "../inference-providers";
 
 const CONFIG_PATH = getConfigPath();
 const CONFIG_DIR = getConfigDir();
@@ -224,6 +225,57 @@ describe("saveConfig / loadConfig (with file)", () => {
     vfs.set(CONFIG_PATH, "not json");
     existing.add(CONFIG_PATH);
     expect(loadConfigSafe()).toEqual(defaultMassaAiConfig);
+  });
+});
+
+describe("PDM-12: a config.json value beats the role-table default (T02)", () => {
+  test("the shipped llm defaults are the role-table values, not disconnected literals", () => {
+    const loaded = loadConfig();
+    expect(loaded.llm.contextWindow).toBe(INFERENCE_ROLE_DEFAULTS.instruct.contextWindow);
+    expect(loaded.llm.codeContextWindow).toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+    expect(loaded.llm.codeTemperature).toBe(INFERENCE_ROLE_DEFAULTS.coding.temperature);
+  });
+
+  test("embedding.contextWindow / batchSize are absent when config.json does not set them", () => {
+    // Unlike `llm`, the shipped `embedding` template does not restate the role-table
+    // values — the role table is the default source at the consumption site, not a
+    // second copy in this file (Tech Decision 4).
+    const loaded = loadConfig();
+    expect(loaded.embedding.contextWindow).toBeUndefined();
+    expect(loaded.embedding.batchSize).toBeUndefined();
+  });
+
+  test("a file value beats the role-table default for llm.contextWindow", () => {
+    const partial: any = { llm: { contextWindow: 999 } };
+    saveConfig(partial);
+    expect(loadConfig().llm.contextWindow).toBe(999);
+    expect(loadConfig().llm.contextWindow).not.toBe(INFERENCE_ROLE_DEFAULTS.instruct.contextWindow);
+  });
+
+  test("a file value beats the role-table default for llm.codeContextWindow", () => {
+    const partial: any = { llm: { codeContextWindow: 4242 } };
+    saveConfig(partial);
+    expect(loadConfig().llm.codeContextWindow).toBe(4242);
+    expect(loadConfig().llm.codeContextWindow).not.toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+  });
+
+  test("a file value beats the role-table default for llm.codeTemperature", () => {
+    const partial: any = { llm: { codeTemperature: 0.55 } };
+    saveConfig(partial);
+    expect(loadConfig().llm.codeTemperature).toBe(0.55);
+    expect(loadConfig().llm.codeTemperature).not.toBe(INFERENCE_ROLE_DEFAULTS.coding.temperature);
+  });
+
+  test("a file value beats the absent role-table default for embedding.contextWindow", () => {
+    const partial: any = { embedding: { provider: "ollama", contextWindow: 2048 } };
+    saveConfig(partial);
+    expect(loadConfig().embedding.contextWindow).toBe(2048);
+  });
+
+  test("a file value beats the absent provider default for embedding.batchSize", () => {
+    const partial: any = { embedding: { provider: "ollama", batchSize: 16 } };
+    saveConfig(partial);
+    expect(loadConfig().embedding.batchSize).toBe(16);
   });
 });
 

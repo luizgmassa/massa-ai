@@ -82,8 +82,8 @@ describe("embeddings config: config.json file layer", () => {
     // These double as the alignment sensor: with no user file, loadConfigSafe
     // returns defaultMassaAiConfig, so a drifted shared embedding default
     // would surface here as a wrong model/dims.
-    expect(r.ollama.model).toBe("qwen3-embedding:4b");
-    expect(r.ollama.dimensions).toBe(2560);
+    expect(r.ollama.model).toBe("qwen3-embedding:0.6b");
+    expect(r.ollama.dimensions).toBe(1024);
     expect(r.ollama.priority).toBe(1);
   }, 30_000);
 

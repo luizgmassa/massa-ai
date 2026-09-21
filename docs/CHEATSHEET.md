@@ -166,8 +166,8 @@ Examples:
 ```bash
 massa-ai-config init --mistral your-api-key
 massa-ai-config init --lmstudio
-massa-ai-config use ollama --model qwen3-embedding:4b
-massa-ai-config use lmstudio --model text-embedding-nomic-embed-text-v1.5
+massa-ai-config use ollama --model qwen3-embedding:0.6b
+massa-ai-config use lmstudio --model text-embedding-qwen3-embedding-0.6b
 massa-ai-config set embedding.dimensions 1024
 massa-ai-config recover my-project --path /home/user/renamed-dir
 massa-ai-config profile set work --dry-run
@@ -510,12 +510,12 @@ output into the reasoning channel and silently burns the 90 s timeout.
 
 ### Embeddings
 
-Ollama: `OLLAMA_BASE_URL`, `OLLAMA_EMBEDDING_MODEL` (default `qwen3-embedding:4b`),
-`OLLAMA_EMBEDDING_DIMENSIONS` (default `2560`).
+Ollama: `OLLAMA_BASE_URL`, `OLLAMA_EMBEDDING_MODEL` (default `qwen3-embedding:0.6b`),
+`OLLAMA_EMBEDDING_DIMENSIONS` (default `1024`).
 
 LM Studio: `LMSTUDIO_BASE_URL` (default `http://localhost:1234/v1`),
-`LMSTUDIO_EMBEDDING_MODEL` (default `text-embedding-nomic-embed-text-v1.5`,
-resolved to `768` dims automatically), `LMSTUDIO_EMBEDDING_DIMENSIONS`. Select
+`LMSTUDIO_EMBEDDING_MODEL` (default `text-embedding-qwen3-embedding-0.6b`,
+resolved to `1024` dims automatically), `LMSTUDIO_EMBEDDING_DIMENSIONS`. Select
 either provider via `EMBEDDING_PROVIDER=ollama|lmstudio` or
 `massa-ai-config use <provider>`.
 

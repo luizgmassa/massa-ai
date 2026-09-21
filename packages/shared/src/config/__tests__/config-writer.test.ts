@@ -214,6 +214,76 @@ describe("config-writer: savePartialConfig validation", () => {
     expect(result.details.some((d: string) => d.includes("embedding.provider"))).toBe(true);
   });
 
+  test("rejects a non-number llm.codeTemperature (PDM-12)", () => {
+    const { exitCode, stdout } = runWriter(
+      "bad-code-temperature",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+
+      const result = savePartialConfig({
+        llm: { ...defaultMassaAiConfig.llm, codeTemperature: "hot" as any },
+      });
+      console.log(JSON.stringify(result));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const result = JSON.parse(stdout);
+    expect(result.success).toBe(false);
+    expect(result.details.some((d: string) => d.includes("llm.codeTemperature"))).toBe(true);
+  });
+
+  test("accepts numeric llm.contextWindow / codeContextWindow / codeTemperature (PDM-12)", () => {
+    const { exitCode, stdout } = runWriter(
+      "good-llm-role-fields",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+      import { defaultMassaAiConfig } from ${JSON.stringify(CONFIG_TYPES)};
+
+      const result = savePartialConfig({
+        llm: { ...defaultMassaAiConfig.llm, contextWindow: 16384, codeContextWindow: 32768, codeTemperature: 0 },
+      });
+      console.log(JSON.stringify({ success: result.success }));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout).success).toBe(true);
+  });
+
+  test("rejects a non-number embedding.batchSize when present (PDM-12)", () => {
+    const { exitCode, stdout } = runWriter(
+      "bad-batch-size",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+
+      const result = savePartialConfig({
+        embedding: { provider: "ollama", model: "test", batchSize: "many" as any },
+      });
+      console.log(JSON.stringify(result));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    const result = JSON.parse(stdout);
+    expect(result.success).toBe(false);
+    expect(result.details.some((d: string) => d.includes("embedding.batchSize"))).toBe(true);
+  });
+
+  test("accepts embedding without contextWindow / batchSize (optional, PDM-12)", () => {
+    const { exitCode, stdout } = runWriter(
+      "embedding-without-role-fields",
+      `
+      import { savePartialConfig } from ${JSON.stringify(WRITER)};
+
+      const result = savePartialConfig({
+        embedding: { provider: "ollama", model: "test" },
+      });
+      console.log(JSON.stringify({ success: result.success }));
+      `,
+    );
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(stdout).success).toBe(true);
+  });
+
   test("rejects bad logging level enum", () => {
     const { exitCode, stdout } = runWriter(
       "bad-level",

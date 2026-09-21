@@ -330,12 +330,12 @@ ensure_inference_model() {
 # the defaults are too. The LM Studio values are the ones measured for this
 # feature; the env overrides keep their existing names.
 if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
-    EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
-    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen/qwen3-4b-2507}"
-    CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen/qwen3-4b-2507}"
+    EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-qwen3-embedding-0.6b}"
+    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
+    CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
 else
-    EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:4b}"
-    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen2.5:7b-instruct}"
+    EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:0.6b}"
+    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl:8b}"
     CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
 fi
 
@@ -343,6 +343,42 @@ ensure_inference_model "$EMBEDDING_MODEL" ""
 ensure_inference_model "$LLM_MODEL" " (instruct model)"
 if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
     ensure_inference_model "$CODE_MODEL" " (code-oriented LLM)"
+fi
+# PDM-12/design R-08: LM Studio exposes no per-request context length, so the
+# only way to bound a role's context window is to load the model with it.
+# Ollama gets its per-request num_ctx from the runtime seam (T06); this loads
+# each LM Studio model once, at the context its role needs.
+#
+# design R-09: the new trio makes LLM_MODEL and CODE_MODEL distinct LM Studio
+# ids (8B@16k + 7B@32k, beside the 0.6B@8k embedder), so all three can now be
+# asked to load at once — unsized total VRAM/RAM. Resolved by staggering
+# residency rather than sizing it (sizing needs a real box, which this script
+# cannot assume): --ttl evicts an idle model instead of holding all three
+# loaded forever, so peak residency tracks actual usage, not the sum of all
+# three roles.
+# ponytail: one flat 600s TTL for every role, not sized per model footprint.
+# Upgrade path: measure real VRAM per model and pick a role-specific TTL (or
+# an explicit `lms unload` after each role's use) if idle memory pressure is
+# reported.
+LMS_LOAD_TTL_SECONDS=600
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    # LMSTUDIO_CLI is resolved by setup_lmstudio() (lms_cli_path — checks
+    # ~/.lmstudio/bin before PATH) earlier in this same run; reuse it rather
+    # than a bare `command -v lms`, which misses that exact case.
+    if [ -n "${LMSTUDIO_CLI:-}" ]; then
+        "$LMSTUDIO_CLI" load -c 8192 --ttl "$LMS_LOAD_TTL_SECONDS" "$EMBEDDING_MODEL" || true
+        "$LMSTUDIO_CLI" load -c 16384 --ttl "$LMS_LOAD_TTL_SECONDS" "$LLM_MODEL" || true
+        if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
+            "$LMSTUDIO_CLI" load -c 32768 --ttl "$LMS_LOAD_TTL_SECONDS" "$CODE_MODEL" || true
+        fi
+    else
+        echo -e "  ${YELLOW}⚠${NC} lms CLI not found — skipping per-role context load. Load manually:"
+        echo -e "      lms load -c 8192 --ttl ${LMS_LOAD_TTL_SECONDS} ${EMBEDDING_MODEL}"
+        echo -e "      lms load -c 16384 --ttl ${LMS_LOAD_TTL_SECONDS} ${LLM_MODEL}"
+        if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
+            echo -e "      lms load -c 32768 --ttl ${LMS_LOAD_TTL_SECONDS} ${CODE_MODEL}"
+        fi
+    fi
 fi
 
 
@@ -497,7 +533,7 @@ ENV_FILE="${PROJECT_ROOT}/.env"
 # `inference_model_exists` echoes yes/no; the prompt only offers the LLM-gated
 # toggles when the model is genuinely pulled.
 LLM_MODEL_PRESENT=false
-if [ "$(inference_model_exists "${LLM_MODEL:-qwen2.5:7b-instruct}")" = "yes" ]; then
+if [ "$(inference_model_exists "${LLM_MODEL:-qwen3-vl:8b}")" = "yes" ]; then
     LLM_MODEL_PRESENT=true
 fi
 

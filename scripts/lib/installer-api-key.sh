@@ -150,7 +150,7 @@ installer_resolve_embedding_dimensions() {
      || [ -z "$repo_root" ] \
      || ! command -v bun >/dev/null 2>&1 \
      || [ ! -f "${repo_root}/packages/shared/src/config/embedding-dimensions.ts" ]; then
-    echo "${OLLAMA_EMBEDDING_DIMENSIONS:-2560}"
+    echo "${OLLAMA_EMBEDDING_DIMENSIONS:-1024}"
     return 0
   fi
 
@@ -183,10 +183,17 @@ installer_resolve_embedding_dimensions() {
 # which is what lets the existing contract test drive the write with OLLAMA_URL
 # alone.
 #
-# Every assignment is unconditional. An earlier `${VAR:-...}` form let a value
-# left over from a previous call win, so a second write in the same shell
-# emitted the first write's provider — caught by the LM Studio case in
-# test-setup-local-first-api-key.sh, which ran after an Ollama write.
+# Every assignment is unconditional in terms of the `LLM_MODEL`/`CODE_MODEL`
+# globals themselves — an earlier `${LLM_MODEL:-...}` form let a value left
+# over from a PREVIOUS call win, so a second write in the same shell emitted
+# the first write's provider (caught by the LM Studio case in
+# test-setup-local-first-api-key.sh, which ran after an Ollama write). The
+# fix for that must not reopen F3/G5 (`installer_write_config` silently
+# discarding an explicit `MASSA_AI_LLM_MODEL`/`MASSA_AI_LLM_CODE_MODEL`), so
+# the override signal is read from those two env vars directly — stable
+# across repeated calls in the same shell, unlike the derived `LLM_MODEL`/
+# `CODE_MODEL` globals — exactly like `OLLAMA_URL`/`LMSTUDIO_URL` already are
+# for `EMBEDDING_BASE_URL`/`LLM_BASE_URL` below.
 #
 # `llm.baseUrl` used to be the literal http://localhost:11434/v1 regardless of
 # OLLAMA_URL, so a remote or WSL Ollama got a config pointing the LLM client at
@@ -202,6 +209,8 @@ installer_provider_defaults() {
       LLM_API_KEY="lmstudio"
       # think:false is an Ollama-only request-body key (LIP-07).
       LLM_DISABLE_THINK="false"
+      LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
+      CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
       ;;
     *)
       EMBEDDING_PROVIDER="ollama"
@@ -209,6 +218,8 @@ installer_provider_defaults() {
       LLM_BASE_URL="${OLLAMA_URL:-http://localhost:11434}/v1"
       LLM_API_KEY="ollama"
       LLM_DISABLE_THINK="true"
+      LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl:8b}"
+      CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
       ;;
   esac
 }
@@ -278,9 +289,15 @@ POLICYEOF
 # installer_write_config <config_file> <api_key>
 #
 # Write the wizard's config.json. Reads the tunables the wizard resolved as
-# globals (DATABASE_URL, EMBEDDING_MODEL, OLLAMA_URL, LLM_MODEL, CODE_MODEL,
-# DATA_DIR, and one *_ENABLED global per prompted feature) and takes the key
-# explicitly, because the key is the one field that must survive a rewrite.
+# globals (DATABASE_URL, EMBEDDING_MODEL, OLLAMA_URL, DATA_DIR, and one
+# *_ENABLED global per prompted feature) and takes the key explicitly, because
+# the key is the one field that must survive a rewrite. `LLM_MODEL`/
+# `CODE_MODEL` are not wizard-supplied inputs — `installer_provider_defaults`
+# (called first below) derives both from `INFERENCE_PROVIDER` plus an optional
+# `MASSA_AI_LLM_MODEL`/`MASSA_AI_LLM_CODE_MODEL` override (F3/G5: an explicit
+# override must survive this call, the same trio `config-cli.ts`'s
+# `INFERENCE_PROVIDERS[provider].defaultModels` names otherwise, so the
+# written baseUrl/model/codeModel always agree (PDM-02 AC-2).
 #
 # Every *_ENABLED default below is the literal this template used to hardcode,
 # so a caller that sets none of them writes the same config.json as before.

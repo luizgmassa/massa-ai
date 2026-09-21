@@ -24,6 +24,12 @@ import {
   type VectorEmbeddingProviderFactory,
 } from '@massa-ai/shared';
 import { logger } from '@massa-ai/shared';
+import { loadConfigSafe } from '@massa-ai/shared/config';
+import {
+  INFERENCE_PROVIDERS,
+  LOCAL_INFERENCE_IDS,
+  type InferenceProviderId,
+} from '@massa-ai/shared/inference-providers';
 import { installGuardOnTable } from '../../kernel/identity-guard-installer.js';
 import type { Pool, PoolConfig } from 'pg';
 
@@ -45,6 +51,33 @@ export interface PostgresConfig {
    * `BaseVectorStore.getEmbeddingProvider`.
    */
   embeddingProviderFactory?: VectorEmbeddingProviderFactory;
+}
+
+/**
+ * Pure resolution of the per-document embed sub-batch size (PDM-11): config's
+ * `embedding.batchSize` wins when set (PDM-12 AC-2), otherwise the resolved
+ * provider's own `embedBatchSize` from the seam (`inference-providers.ts`).
+ * Mirrors `resolveInferenceSpec`'s own provider-id fallback in
+ * `services/memory/llm-client.ts`, duplicated here rather than imported
+ * because that module sits in `services/` and this one in `data/` (one-way
+ * `tools -> services -> data` layering, CLAUDE.md "Architecture").
+ *
+ * Exported as a pure function (config object in, number out) so PDM-12 AC-2
+ * is unit-testable without an `XDG_CONFIG_HOME`/import-order dance — `loadConfigSafe`
+ * freezes its config directory at first import (`config-loader.ts`'s
+ * module-level `CONFIG_DIR`), so a test cannot flip the *file* backing this
+ * value mid-suite.
+ * @internal
+ */
+export function _resolveEmbedBatchSize(
+  embeddingConfig: Partial<{ provider: string; batchSize: number }> | undefined,
+): number {
+  const providerId = embeddingConfig?.provider;
+  const spec =
+    providerId && (LOCAL_INFERENCE_IDS as readonly string[]).includes(providerId)
+      ? INFERENCE_PROVIDERS[providerId as InferenceProviderId]
+      : INFERENCE_PROVIDERS.ollama;
+  return embeddingConfig?.batchSize ?? spec.embedBatchSize;
 }
 
 export class PostgresVectorStore extends BaseVectorStore {
@@ -417,8 +450,7 @@ export class PostgresVectorStore extends BaseVectorStore {
     if (documents.length === 0) return;
     const pool = await this.ensureInitialized();
 
-    // Match PostgresVectorStore: Ollama bge-m3 crashes on large batches (50+)
-    const EMBED_SUB_BATCH_SIZE = 8;
+    const EMBED_SUB_BATCH_SIZE = _resolveEmbedBatchSize(loadConfigSafe().embedding);
 
     let totalInserted = 0;
     let totalFailed = 0;

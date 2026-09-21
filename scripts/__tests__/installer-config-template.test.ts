@@ -21,6 +21,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { DEFAULT_CAPTURE_POLICY } from "../../packages/shared/src/config/massa-ai-config";
+import { INFERENCE_PROVIDERS } from "../../packages/shared/src/config/inference-providers";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const LIB = path.join(REPO_ROOT, "scripts/lib/installer-api-key.sh");
@@ -36,7 +37,7 @@ const CONFIG_SECTIONS_SRC = path.join(REPO_ROOT, "apps/web-ui/src/static/views/c
 
 interface WrittenConfig {
   embedding: { model: string; dimensions: number };
-  llm: { enabled: boolean };
+  llm: { enabled: boolean; baseUrl: string; model: string; codeModel: string };
   hooks: { enabled: boolean; bridge: { enabled: boolean } };
   handoffs: { enabled: boolean };
   impact: { bfsCteEnabled: boolean };
@@ -155,6 +156,28 @@ describe("installer config template — embedding width", () => {
 
     const config = writeConfig({ EMBEDDING_MODEL: model as string });
     expect(config.embedding.dimensions).toBe(Number(dims));
+  });
+});
+
+describe("installer config template — LLM model trio (PDM-02 AC-2, T08)", () => {
+  test("INFERENCE_PROVIDER=ollama (or unset) writes ollama's instruct/coding trio", () => {
+    const config = writeConfig({ INFERENCE_PROVIDER: "ollama" });
+    expect(config.llm.baseUrl).toBe(`${INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl}`);
+    expect(config.llm.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+    expect(config.llm.codeModel).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
+
+    const unset = writeConfig();
+    expect(unset.llm.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+    expect(unset.llm.codeModel).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
+  });
+
+  test("INFERENCE_PROVIDER=lmstudio writes LM Studio's instruct/coding trio, not Ollama's", () => {
+    const config = writeConfig({ INFERENCE_PROVIDER: "lmstudio" });
+    expect(config.llm.baseUrl).toBe(INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl);
+    expect(config.llm.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct);
+    expect(config.llm.codeModel).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.coding);
+    expect(config.llm.model).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+    expect(config.llm.codeModel).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
   });
 });
 

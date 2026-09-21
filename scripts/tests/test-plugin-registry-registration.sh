@@ -39,15 +39,10 @@ skip() { echo -e "  ↷ SKIP $*"; }
 WANT_COMMAND_COUNT="$(find "$PROJECT_ROOT/apps/claude-plugin/commands" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
 
 # A PATH with node/bun but deliberately without the host CLIs, used to prove
-# the fallback. Derived from the live PATH minus the dir holding each CLI.
-path_without() { # path_without <cli>...
-  local out="$PATH" cli dir
-  for cli in "$@"; do
-    dir="$(dirname "$(command -v "$cli" 2>/dev/null || echo /nonexistent/x)")"
-    out="$(echo "$out" | tr ':' '\n' | grep -vx "$dir" | paste -sd: -)"
-  done
-  echo "$out"
-}
+# the fallback. Built as a positive list of runtime symlinks — see
+# runtime_shim_path; subtracting each CLI's directory from the live PATH looks
+# equivalent and is not, on either of the two shapes a dev box actually has.
+NO_HOST_PATH="$(runtime_shim_path "$ROOT/runtime-shim")"
 
 echo "Scenario 1: --plugin-source mode resolution"
 assert_eq "auto in a checkout resolves to local" \
@@ -97,7 +92,7 @@ assert_eq "present and accepting --help is supported" \
 echo ""
 echo "Scenario 4: Claude falls back to the file route when the CLI is missing"
 FB="$ROOT/fallback"; mkdir -p "$FB"
-FB_OUT="$(env -i HOME="$FB" PATH="$(path_without claude)" MASSA_AI_VERBOSE=0 \
+FB_OUT="$(env -i HOME="$FB" PATH="$NO_HOST_PATH" MASSA_AI_VERBOSE=0 \
   bash "$PROJECT_ROOT/apps/claude-plugin/install.sh" --user 2>&1)"
 assert_file "file-route settings.json written" "$FB/.claude/settings.json"
 assert_eq "loose commands installed" \
@@ -158,7 +153,7 @@ if ! command -v claude >/dev/null 2>&1; then
   skip "claude CLI not installed — migration path unverified here"
 else
   MIG="$ROOT/migrate"; mkdir -p "$MIG"
-  env -i HOME="$MIG" PATH="$(path_without claude)" MASSA_AI_VERBOSE=0 \
+  env -i HOME="$MIG" PATH="$NO_HOST_PATH" MASSA_AI_VERBOSE=0 \
     bash "$PROJECT_ROOT/apps/claude-plugin/install.sh" --user >/dev/null 2>&1
   assert_eq "seeded file-route commands" \
     "$(find "$MIG/.claude/commands" -name 'massa-ai-*.md' | wc -l | tr -d ' ')" "$WANT_COMMAND_COUNT"

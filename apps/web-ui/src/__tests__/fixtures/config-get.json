@@ -5,10 +5,10 @@
       "database": { "url": "***" },
       "embedding": {
         "provider": "lmstudio",
-        "model": "text-embedding-nomic-embed-text-v1.5",
+        "model": "text-embedding-qwen3-embedding-0.6b",
         "baseURL": "http://localhost:1234/v1",
         "apiKey": "***",
-        "dimensions": 768
+        "dimensions": 1024
       },
       "compression": {
         "defaultStrategy": "code_structure",
@@ -43,8 +43,8 @@
         "enabled": false,
         "baseUrl": "http://localhost:1234/v1",
         "apiKey": "***",
-        "model": "qwen2.5:7b-instruct",
-        "codeModel": "qwen2.5-coder:7b",
+        "model": "qwen3-vl-8b-instruct",
+        "codeModel": "qwen2.5-coder-7b-instruct",
         "temperature": 0.2,
         "maxOutputTokens": 8000,
         "timeoutMs": 90000,

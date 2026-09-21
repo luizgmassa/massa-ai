@@ -7,6 +7,7 @@ import {
   saveConfig,
   initConfig,
   defaultMassaAiConfig,
+  knownEmbeddingDimensions,
 } from "@massa-ai/shared/config";
 import {
   listProfiles,
@@ -28,7 +29,7 @@ import {
   type SwitchReport,
   type VariantSyncHostResult,
 } from "@massa-ai/shared";
-import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
+import { INFERENCE_PROVIDERS, deriveInferenceBaseUrls } from "@massa-ai/shared/inference-providers";
 import os from "os";
 import path from "path";
 
@@ -103,7 +104,7 @@ Examples:
   massa-ai-config init
   massa-ai-config init --lmstudio
   massa-ai-config init --mistral your-api-key
-  massa-ai-config use ollama --model qwen3-embedding:4b
+  massa-ai-config use ollama --model qwen3-embedding:0.6b
   massa-ai-config use lmstudio
   massa-ai-config use mistral --api-key your-key
   massa-ai-config set embedding.dimensions 1024
@@ -199,7 +200,7 @@ export async function runCli(argv: string[]): Promise<number> {
       console.log("✓ Configured for OpenAI embeddings");
     } else if (options.lmstudio) {
       const config = loadConfig();
-      const model = "text-embedding-nomic-embed-text-v1.5";
+      const model = INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
       config.embedding = {
         provider: "lmstudio",
         model,
@@ -208,6 +209,8 @@ export async function runCli(argv: string[]): Promise<number> {
       };
       // LIP-09: keep llm.baseUrl off Ollama's :11434 so resolveInferenceSpec resolves lmstudio.
       config.llm.baseUrl = INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl;
+      config.llm.model = INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct;
+      config.llm.codeModel = INFERENCE_PROVIDERS.lmstudio.defaultModels.coding;
       saveConfig(config);
       console.log("✓ Configured for LM Studio (local) embeddings");
     } else {
@@ -271,27 +274,36 @@ export async function runCli(argv: string[]): Promise<number> {
     const config = loadConfig();
 
     if (provider === "ollama") {
+      const model = (options.model as string) || INFERENCE_PROVIDERS.ollama.defaultModels.embedding;
+      const urls = deriveInferenceBaseUrls("ollama", options["base-url"] as string | undefined);
       config.embedding = {
         provider: "ollama",
-        model: (options.model as string) || "qwen3-embedding:4b",
-        baseURL: (options["base-url"] as string) || "http://localhost:11434",
-        // Must match the default model's output width: qwen3-embedding:4b
-        // emits 2560-d vectors, and refuseOnDimensionMismatch fails loudly
-        // on a config that disagrees with what the model returns.
-        dimensions: 2560,
+        model,
+        baseURL: urls.embeddingBaseUrl,
+        // ponytail: G6 — 768 fallback for a custom --model outside
+        // knownDimensions; see embeddings/config.ts's matching comment.
+        dimensions: knownEmbeddingDimensions(model) ?? 768,
       };
+      // G0/PDM-02 AC-2: same fix as the lmstudio branch below — a switch
+      // away from lmstudio must not leave llm.* naming lmstudio's ids.
+      config.llm.baseUrl = urls.llmBaseUrl;
+      config.llm.model = INFERENCE_PROVIDERS.ollama.defaultModels.instruct;
+      config.llm.codeModel = INFERENCE_PROVIDERS.ollama.defaultModels.coding;
     } else if (provider === "lmstudio") {
-      const model = (options.model as string) || "text-embedding-nomic-embed-text-v1.5";
+      const model = (options.model as string) || INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
+      const urls = deriveInferenceBaseUrls("lmstudio", options["base-url"] as string | undefined);
       config.embedding = {
         provider: "lmstudio",
         model,
-        baseURL: (options["base-url"] as string) || INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+        baseURL: urls.embeddingBaseUrl,
         // ponytail: G6 — 768 fallback for a custom --model outside
         // knownDimensions; see embeddings/config.ts's matching comment.
         dimensions: INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ?? 768,
       };
       // LIP-09: same fix as init --lmstudio above.
-      config.llm.baseUrl = (options["base-url"] as string) || INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl;
+      config.llm.baseUrl = urls.llmBaseUrl;
+      config.llm.model = INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct;
+      config.llm.codeModel = INFERENCE_PROVIDERS.lmstudio.defaultModels.coding;
     } else if (provider === "mistral") {
       if (!options["api-key"]) {
         console.error("Error: --api-key required for Mistral");

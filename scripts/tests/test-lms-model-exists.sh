@@ -166,6 +166,63 @@ check_eq "ollama dispatches to the /api/tags listing"    "yes" "$(run_dispatch o
 check_eq "ollama does not see LM Studio's ids"           "no"  "$(run_dispatch ollama 'text-embedding-nomic-embed-text-v1.5')"
 check_eq "an empty provider falls back to Ollama"        "yes" "$(run_dispatch '' 'qwen3-embedding:8b')"
 
+# ── The `:500` LLM-enable decision (T12, PDM-06 AC-3) ────────
+# `LLM_MODEL_PRESENT` gates MASSA_AI_LLM_ENABLED via installer_feature_flow:
+# when the instruct model is not actually pulled, LLM features must stay off
+# rather than writing a config that 404s on every call. Extracted by content
+# anchor, not by function name — this decision is inline script, not a named
+# function, and its surrounding line numbers drift release to release.
+DECISION_SRC="$(sed -n '/^LLM_MODEL_PRESENT=false$/,/^fi$/p' "$SETUP_SCRIPT")"
+if [ -z "$DECISION_SRC" ]; then
+  fail "the :500 LLM-enable decision extracted from setup-local-first.sh (found nothing)"
+else
+  ok "the :500 LLM-enable decision extracted from setup-local-first.sh"
+  case "$DECISION_SRC" in
+    *'${LLM_MODEL:-qwen3-vl:8b}'*)
+      ok "the enable decision falls back to the new instruct default (qwen3-vl:8b)" ;;
+    *)
+      fail "the enable decision does not fall back to qwen3-vl:8b — retired literal or extractor rotted" ;;
+  esac
+
+  run_decision() {
+    local exists_answer="$1" llm_model="$2"
+    EXISTS_ANSWER="$exists_answer" LLM_MODEL_INPUT="$llm_model" bash -c '
+      inference_model_exists() { echo "$EXISTS_ANSWER"; }
+      LLM_MODEL="$LLM_MODEL_INPUT"
+      eval "$1"
+      echo "$LLM_MODEL_PRESENT"
+    ' _ "$DECISION_SRC" 2>/dev/null
+  }
+
+  check_eq "instruct model present -> LLM_MODEL_PRESENT=true (default id)" \
+    "true" "$(run_decision yes '')"
+  check_eq "instruct model absent -> LLM_MODEL_PRESENT stays false (default id)" \
+    "false" "$(run_decision no '')"
+  check_eq "instruct model present -> LLM_MODEL_PRESENT=true (explicit id)" \
+    "true" "$(run_decision yes 'custom-instruct-model')"
+  check_eq "instruct model absent -> LLM_MODEL_PRESENT stays false (explicit id)" \
+    "false" "$(run_decision no 'custom-instruct-model')"
+fi
+
+# ── The `:344` dedup guard flip (T12, design R-09) ───────────
+# Before this feature both LM Studio chat slots defaulted to the same id
+# (qwen/qwen3-4b-2507), so `[ "$CODE_MODEL" != "$LLM_MODEL" ]` skipped the
+# second pull. The new trio gives LM Studio distinct instruct/coding ids, so
+# the guard must now read true (pull both) on that branch — asserted on the
+# actual literals the lmstudio branch resolves to, not a re-implementation of
+# the guard.
+LMS_LLM_DEFAULT="$(grep -oE 'LLM_MODEL="\$\{MASSA_AI_LLM_MODEL:-[^}]+\}"' "$SETUP_SCRIPT" | sed -n '1p' | sed -E 's/.*:-([^}]+)\}.*/\1/')"
+LMS_CODE_DEFAULT="$(grep -oE 'CODE_MODEL="\$\{MASSA_AI_LLM_CODE_MODEL:-[^}]+\}"' "$SETUP_SCRIPT" | sed -n '1p' | sed -E 's/.*:-([^}]+)\}.*/\1/')"
+if [ -n "$LMS_LLM_DEFAULT" ] && [ -n "$LMS_CODE_DEFAULT" ]; then
+  if [ "$LMS_LLM_DEFAULT" != "$LMS_CODE_DEFAULT" ]; then
+    ok "the LM Studio dedup guard now pulls both models (${LMS_LLM_DEFAULT} != ${LMS_CODE_DEFAULT})"
+  else
+    fail "the LM Studio dedup guard still skips the code model (${LMS_LLM_DEFAULT} = ${LMS_CODE_DEFAULT})"
+  fi
+else
+  fail "could not extract the LM Studio LLM_MODEL/CODE_MODEL defaults"
+fi
+
 # ── The caller contract the byte-identity AC does not cover ──
 # test-setup-ollama-model-exists.sh injects OLLAMA_URL / OLLAMA_HAS_CLI itself,
 # so byte-identity stays green even if the wizard renames the globals the real

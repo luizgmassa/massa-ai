@@ -171,9 +171,9 @@ describe("resolveModelName", () => {
   });
 
   test("falls back to the per-provider default", () => {
-    expect(resolveModelName("ollama", {}, undefined)).toBe("qwen3-embedding:4b");
+    expect(resolveModelName("ollama", {}, undefined)).toBe("qwen3-embedding:0.6b");
     expect(resolveModelName("lmstudio", {}, undefined)).toBe(
-      "text-embedding-nomic-embed-text-v1.5",
+      "text-embedding-qwen3-embedding-0.6b",
     );
   });
 });

@@ -75,7 +75,7 @@ if massa_ai_probe_provider "$OLLAMA_URL"; then
     
     # Check embedding model — exact name:tag match (a bare name normalizes to
     # :latest, mirroring Ollama); a sibling tag must not read as present.
-    MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:4b}"
+    MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:0.6b}"
     case "$MODEL" in *:*) MODEL_FULL="$MODEL" ;; *) MODEL_FULL="${MODEL}:latest" ;; esac
     MODEL_EXISTS=$(curl -s "${OLLAMA_URL}/api/tags" 2>/dev/null | python3 -c '
 import sys, json

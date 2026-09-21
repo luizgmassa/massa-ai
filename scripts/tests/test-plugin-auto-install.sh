@@ -185,8 +185,9 @@ STUB
 for host in claude codex cursor opencode; do make_plugin_stub "$host"; done
 
 # The scrubbed PATH for harness runs: the runner must stay resolvable (the
-# gate reads state through it), so it is BASE_PATH plus the runner's own dir.
-SAFE_PATH="$(dirname "$RUNNER"):$(dirname "$BUN_BIN"):$BASE_PATH"
+# gate reads state through it) without admitting its whole directory, which on
+# a common dev setup is ~/.local/bin and holds the host CLIs this suite mocks.
+SAFE_PATH="$(runtime_shim_path "$ROOT/runtime-shim")"
 
 run_shadow() { # run_shadow PATH HOME [extra harness args...] → OUT, RC
   local path="$1" home="$2"; shift 2

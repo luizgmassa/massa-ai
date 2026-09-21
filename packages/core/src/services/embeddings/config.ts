@@ -243,7 +243,7 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
 
   ollama: (() => {
     const file = fileFor("ollama");
-    const model = process.env.OLLAMA_EMBEDDING_MODEL || file?.model || "qwen3-embedding:4b";
+    const model = process.env.OLLAMA_EMBEDDING_MODEL || file?.model || INFERENCE_PROVIDERS.ollama.defaultModels.embedding;
     // `env > the model's known native width > config.json > default`. The
     // known width outranks config.json deliberately: fixing the installer
     // template only fixes what a NEW install writes, and an install carrying
@@ -408,7 +408,7 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
   lmstudio: (() => {
     const file = fileFor("lmstudio");
     const model =
-      process.env.LMSTUDIO_EMBEDDING_MODEL || file?.model || "text-embedding-nomic-embed-text-v1.5";
+      process.env.LMSTUDIO_EMBEDDING_MODEL || file?.model || INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
     return {
       provider: "custom",
       model,
