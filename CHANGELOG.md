@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the coupling from the `false` side so the "it is inert on LM Studio" reading cannot
   return.
 
+## [1.59.0] - 2026-09-21
+
 ### Changed
 
 - **BREAKING — the Ollama embedding default moves from `qwen3-embedding:4b` (2560d) to
