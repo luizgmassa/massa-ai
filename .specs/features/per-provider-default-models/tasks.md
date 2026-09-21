@@ -1077,7 +1077,7 @@ SPEC_DEVIATION: none.
 
 Depends on: none.
 
-### F6: `test:scripts` must report every failing shell suite, not the first
+### F6: `test:scripts` must report every failing shell suite, not the first — ✅ Complete
 
 T15b fixed the `&&` between the halves; the intra-half `|| exit 1` remains, so the run aborts at
 suite **16 of 39** and reports 1 failing suite. Running all 39 with no early exit gives **3 suites
@@ -1093,6 +1093,34 @@ primary checkout. Do not fix, skip or exclude them.
 Tests: a run with two failing shell suites reports both
 Gate: induce a second shell-suite failure by file copy, confirm both are reported and the exit code is non-zero, restore by file copy
 Depends on: none.
+
+**Resolution (2026-09-20).** Extracted the shell-suite loop out of `package.json`'s inline
+`test:scripts` line into a new script, `scripts/run-shell-suites.sh`: it runs every
+`scripts/tests/*.sh` suite unconditionally (no `|| exit 1` per iteration), collects the names of
+every suite that failed, prints them together as one list, and exits non-zero only if that list
+is non-empty. `package.json`'s `test:scripts` now delegates to it (`bash
+scripts/run-shell-suites.sh`) instead of the inline for-loop, keeping T15b's own half-to-half
+aggregation (`s1`/`s2`/`[ $s1 -eq 0 ] && [ $s2 -eq 0 ]`) unchanged — this task's fix is entirely
+inside the shell half, per its own scope.
+
+Gate (full 39-suite run, `bash scripts/run-shell-suites.sh` — the real `test:scripts` shell half):
+**3 of 39 suites failed, exactly the named ones** — `test-install-skills-cli.sh` (44 passed / 2
+failed), `test-plugin-auto-install.sh` (194 passed / 16 failed), and
+`test-plugin-registry-registration.sh` (43 passed / 4 failed) — 22 failing cases total, matching
+this feature's own artifacts exactly, and now **produced by the gate itself** rather than a manual
+run. All 39 suites ran to completion (no early exit); aggregate exit code **1**.
+
+Observed red (second failure, induced by file copy): backed up
+`scripts/tests/test-setup-wizard-db-selection.sh` (a suite that was passing at 11/0), inserted one
+`assert_contains` call for a token that does not exist in `setup-local-first.sh`
+(`ZZZ_NONEXISTENT_TOKEN_F6_PROBE`), confirmed the mutated suite alone now fails (11 passed / 1
+failed, exit 1), then re-ran the full 39-suite gate. Result: **4 of 39 suites failed** — the same
+3 host-specific suites plus `test-setup-wizard-db-selection.sh`, all four named together in one
+`FAILED SHELL SUITES` list — aggregate exit **1**. Restored the suite file by file copy; re-ran it
+alone (11 passed / 0 failed, exit 0); `git status --porcelain` showed only this task's intended
+changes (`package.json`, the new `scripts/run-shell-suites.sh`, plus this file).
+
+SPEC_DEVIATION: none.
 
 ### F7: `scripts/diagnose.ts:22` docblock still names the retired LM Studio default
 

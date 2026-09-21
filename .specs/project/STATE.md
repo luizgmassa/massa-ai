@@ -989,6 +989,16 @@ re-run green.
 All of Batch 2 (F2b, F4, F5) is closed. Remaining: F6-F9 (other workers, per tasks.md's
 "Fix Pass 1" heading) and re-verification once every fix task lands.
 
+**Fix Pass 1, Batch 3 (F6-F8), F6 — Complete.** Extracted the shell-suite loop from
+`package.json`'s `test:scripts` into `scripts/run-shell-suites.sh`, which runs all 39
+`scripts/tests/*.sh` suites unconditionally, collects and reports every failing suite together,
+and exits non-zero if any failed — closing the intra-half `|| exit 1` T15b left in place.
+Real-gate run: 3 of 39 suites failed (`install-skills-cli` 2, `plugin-auto-install` 16,
+`plugin-registry-registration` 4 — 22 cases), all 39 ran to completion, matching this feature's
+own artifacts exactly and now produced by the gate itself. Observed red: induced a 4th failure by
+file copy in `test-setup-wizard-db-selection.sh`; the full run reported all 4 suites together,
+aggregate exit 1; restored by file copy, re-ran green alone.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
