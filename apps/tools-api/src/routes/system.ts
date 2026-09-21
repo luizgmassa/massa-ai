@@ -12,10 +12,24 @@
 
 import { Elysia } from "elysia";
 import { config } from "@massa-ai/shared";
+import { loadRawUserConfig } from "@massa-ai/shared/config";
+import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
 import { getHealthChecker } from "@massa-ai/core";
 import path from "path";
 import fs from "fs";
 import os from "os";
+
+/** G2/PDM-03 AC-1: config first (the user's own `config.json`, raw — no
+ *  defaults folded in, so an unset field falls through instead of masking
+ *  env/the seam), then env, then the seam default — never the retired
+ *  `qwen3-embedding:4b` literal. */
+function resolveConfiguredOllamaEmbeddingModel(): string {
+  return (
+    loadRawUserConfig().embedding?.model ||
+    process.env.OLLAMA_EMBEDDING_MODEL ||
+    INFERENCE_PROVIDERS.ollama.defaultModels.embedding
+  );
+}
 
 interface DatabaseInfo {
   backend: "postgres";
@@ -181,8 +195,7 @@ export const systemRoutes = new Elysia({ prefix: "/api/v1/system" })
       return {
         ...ollamaStatus,
         models,
-        configuredModel:
-          process.env.OLLAMA_EMBEDDING_MODEL || "qwen3-embedding:4b",
+        configuredModel: resolveConfiguredOllamaEmbeddingModel(),
         baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
       };
     },

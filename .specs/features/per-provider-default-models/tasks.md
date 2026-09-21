@@ -864,7 +864,7 @@ fail with `TypeError: undefined is not an object (evaluating
 `cd packages/shared && bun run build` to regenerate `dist/` from current `src/`; no source file
 was edited to fix this.
 
-### F2: `/api/v1/system/ollama` must stop reporting the retired default — PDM-03 AC-1
+### F2: `/api/v1/system/ollama` must stop reporting the retired default — PDM-03 AC-1 — ✅ Complete
 
 `apps/tools-api/src/routes/system.ts:185` reads `process.env.OLLAMA_EMBEDDING_MODEL ||
 "qwen3-embedding:4b"` and **ignores `config.embedding.model` entirely**.
@@ -878,6 +878,35 @@ then the seam; repoint the test to the spec-defined outcome, not to the current 
 Tests: the route reports the configured model when config names one, and the seam default otherwise
 Gate: bun test apps/tools-api/src/routes/system.test.ts
 Depends on: none.
+
+**Resolution (2026-09-20).** Added `resolveConfiguredOllamaEmbeddingModel()` in `system.ts`:
+`loadRawUserConfig().embedding?.model` (the raw, no-defaults-folded-in file read — a merged
+`loadConfigSafe()` read would always return a value and starve the env/seam fallbacks) ||
+`process.env.OLLAMA_EMBEDDING_MODEL` || `INFERENCE_PROVIDERS.ollama.defaultModels.embedding`,
+exactly the config → env → seam order this task specifies. The old test asserting
+`toBe("qwen3-embedding:4b")` pinned the defect as the contract — repointed to assert the seam
+value and added two new cases (config wins over both env and the seam; env wins over the seam
+when config names nothing), per an explicit `SPEC_DEVIATION` note below. Test file gained a
+`mock.module("@massa-ai/shared/config", …)` override for `loadRawUserConfig` (mirroring the
+existing `@massa-ai/shared` mock) so the three cases are deterministic and never touch a real
+`config.json`.
+
+SPEC_DEVIATION: none in the fix itself — the test-assertion change is the one Execute-sanctioned
+exception (a test that pins a known defect as the contract), called out per the Test Integrity
+rule rather than changed quietly.
+
+Gate: `bun test apps/tools-api/src/routes/system.test.ts` → 13 pass / 1 fail, 14 total (was 11
+pass / 1 fail, 12 total before this task — the 3 new `/ollama` tests replace 1). **The 1 failure
+is pre-existing and out of scope**: `LocalHealthChecker.checkOllama — provider-aware probe (LIP-10)
+> a genuine Ollama /api/tags body is reported available with its models`, confirmed failing
+identically on the pre-fix file via `git stash` (same assertion, same line, `available: false`
+received instead of `true`) — a real-class probe/fetch-mock test unrelated to `configuredModel`
+resolution, not named in this task's scope, not touched. Observed red: reverting
+`resolveConfiguredOllamaEmbeddingModel()`'s call site to the old literal failed both new
+config-precedence tests exactly as expected (seam-default test got `qwen3-embedding:4b`;
+config-wins test got `from-env` instead of `from-config-json`); restored by file copy, `git
+status` clean, re-run 13/14 green (same 1 pre-existing failure).
+`apps/tools-api` `bun run type-check` clean.
 
 ### F3: `installer_provider_defaults` must not clobber an explicit `MASSA_AI_LLM_MODEL`
 

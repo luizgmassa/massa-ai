@@ -903,6 +903,18 @@ this worktree): `packages/shared/dist/` was stale relative to `src/` — the `lm
 this fix. Repaired with `cd packages/shared && bun run build` (no source edit); `dist/` is
 gitignored build output, not part of this commit.
 
+**Fix Pass 1, Batch 1 (F1-F3), F2 — Complete.** `apps/tools-api/src/routes/system.ts`'s `/ollama`
+route resolves `configuredModel` through a new `resolveConfiguredOllamaEmbeddingModel()`: raw
+`config.json` (`loadRawUserConfig().embedding?.model`) → `OLLAMA_EMBEDDING_MODEL` env →
+`INFERENCE_PROVIDERS.ollama.defaultModels.embedding` — closing G2 (the route ignored config
+entirely and reported the retired `qwen3-embedding:4b` literal). The pre-existing test asserting
+that retired literal as the contract was repointed to the seam value; two new tests assert the
+config→env→seam precedence itself. Gate: 13/14 (was 11/12) — the 1 remaining failure
+(`LocalHealthChecker.checkOllama` real-class probe test) is confirmed pre-existing via
+`git stash`, unrelated to this task, not touched. `apps/tools-api` type-check clean. Observed
+red: reverting the call site to the old literal failed both new precedence tests on the exact
+values changed; restored by file copy, `git status` clean before commit.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),

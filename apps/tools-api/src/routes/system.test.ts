@@ -3,8 +3,9 @@
  * health checker is stubbed so no live Postgres/Ollama is required.
  */
 
-import { describe, test, expect, mock } from "bun:test";
+import { describe, test, expect, mock, afterEach } from "bun:test";
 import { Elysia } from "elysia";
+import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
 
 const checkPostgres = mock(async (): Promise<any> => ({ details: { sizeBytes: 2048 } }));
 const checkAll = mock(async (): Promise<any> => ({
@@ -27,6 +28,10 @@ const checkInference = mock(async () => ({
 }));
 const getOllamaModels = mock(async () => ["qwen3-embedding:4b", "qwen2.5:7b-instruct"]);
 let dataDir: any = "/data";
+// G2/PDM-03 AC-1: undefined = "nothing set in config.json" (raw, no defaults
+// folded in — see loadRawUserConfig's own contract), so /ollama falls
+// through to env then the seam default.
+let rawEmbeddingModel: string | undefined;
 
 // Captured before `mock.module` registers the interception below: a nested
 // `require("@massa-ai/core")` taken from *inside* that factory resolves empty
@@ -45,6 +50,14 @@ mock.module("@massa-ai/core", () => {
 mock.module("@massa-ai/shared", () => {
   const actual = require("@massa-ai/shared");
   return { ...actual, config: { get: (k: string) => (k === "dataDir" ? dataDir : undefined) } };
+});
+
+mock.module("@massa-ai/shared/config", () => {
+  const actual = require("@massa-ai/shared/config");
+  return {
+    ...actual,
+    loadRawUserConfig: () => (rawEmbeddingModel ? { embedding: { model: rawEmbeddingModel } } : {}),
+  };
 });
 
 import { systemRoutes } from "./system.js";
@@ -141,12 +154,34 @@ describe("GET /api/v1/system/health/local", () => {
 });
 
 describe("GET /api/v1/system/ollama", () => {
-  test("returns ollama status + models + configured model", async () => {
+  afterEach(() => {
+    rawEmbeddingModel = undefined;
+    delete process.env.OLLAMA_EMBEDDING_MODEL;
+  });
+
+  // G2/PDM-03 AC-1: neither config.json nor OLLAMA_EMBEDDING_MODEL is set —
+  // must report the current seam default, never the retired
+  // "qwen3-embedding:4b" literal this test used to pin as the contract.
+  test("returns ollama status + models + the seam default when nothing is configured", async () => {
     const res = await get("/api/v1/system/ollama");
     expect(res.json.available).toBe(true);
     expect(res.json.models).toEqual(["qwen3-embedding:4b", "qwen2.5:7b-instruct"]);
-    expect(res.json.configuredModel).toBe("qwen3-embedding:4b");
+    expect(res.json.configuredModel).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.embedding);
+    expect(res.json.configuredModel).not.toBe("qwen3-embedding:4b");
     expect(res.json.baseUrl).toBe("http://localhost:11434");
+  });
+
+  test("config.json's embedding.model wins over both env and the seam default", async () => {
+    rawEmbeddingModel = "from-config-json";
+    process.env.OLLAMA_EMBEDDING_MODEL = "from-env";
+    const res = await get("/api/v1/system/ollama");
+    expect(res.json.configuredModel).toBe("from-config-json");
+  });
+
+  test("OLLAMA_EMBEDDING_MODEL wins over the seam default when config.json names none", async () => {
+    process.env.OLLAMA_EMBEDDING_MODEL = "from-env";
+    const res = await get("/api/v1/system/ollama");
+    expect(res.json.configuredModel).toBe("from-env");
   });
 });
 
