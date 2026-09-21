@@ -1386,7 +1386,7 @@ or more violation strings and introduces no row duplication. Every other printed
 `LMSTUDIO_MODEL_ONLY_SURFACES`, `INSTRUCT_CODING_SURFACES`) with no loop-independent row inside a
 per-item constructor, so none carries the same defect shape.
 
-### G4: The declared `NEEDLE_MODEL` residual names 1 of 2 files
+### G4: The declared `NEEDLE_MODEL` residual names 1 of 2 files — ✅ Complete
 
 `benchmarks/needles/README.md:66-73` honestly declares `benchmarks/needles/run.ts`'s retired
 `qwen3-embedding:4b` pin — but `scripts/needles-rename-control.ts:118` carries the **byte-identical
@@ -1401,6 +1401,42 @@ set half-declared.
 Tests: covered by the parity gate's Markdown tier for the declaration; the code pins verified by reading
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts && bun run test:scripts
 Depends on: none.
+
+**Result (GW2, 2026-09-20).** Chose **repoint both**, not declare-as-history: unlike
+`benchmarks/llm-judge/`'s fixtures and `run.ts:171` (frozen JSON/prose *describing a past
+decision*, design.md's own "Must NOT change" list), `NEEDLE_MODEL`'s default in both
+`benchmarks/needles/run.ts:114` and `scripts/needles-rename-control.ts:118` is a live fallback
+read at call time to pick which model actually embeds text when the env var is unset — nothing
+about it records history, and T14 already repointed the sibling `needles-gate.yml` pins to
+`qwen3-embedding:0.6b` for the same reason. Repointing also resolves the `run.ts:9`
+contradiction for free: the docblock's "same model as the E2E baseline" becomes true again instead
+of needing a retraction.
+
+Changed: `benchmarks/needles/run.ts:9,27,114` (docblock comment, usage-help line, and the literal
+default itself) and `scripts/needles-rename-control.ts:118`, all `qwen3-embedding:4b` →
+`qwen3-embedding:0.6b`. `benchmarks/needles/README.md`: the harness description (`:45`) and the
+`Env:` line (`:63`) updated to `0.6b`; the "Known drift" note (`:66-75`) rewritten to "Drift
+closed", naming both files (the previously-undeclared `needles-rename-control.ts` included) and
+stating the override now runs the retired default instead of the current one.
+
+**Search for further pins, three dialects:** `grep`/`git grep -E`/`/usr/bin/grep -E` for
+`NEEDLE_MODEL` across the repo, all three agreeing. Only the two now-fixed code sites exist;
+`.github/workflows/needles-gate.yml` already reads `qwen3-embedding:0.6b` (T14); every remaining
+`qwen3-embedding:4b` hit is inside `.specs/` (history) or this README's own retained-for-contrast
+prose (the override example, deliberately still naming the retired value).
+
+Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 21/0, 41 expect() (unchanged
+— confirms `NEEDLE_MODEL` is genuinely outside every tier, as the task text says). `bun test
+scripts/__tests__/needles-rename-control.test.ts` → 17/0, unaffected by the literal swap. Both
+edited `.ts` files build cleanly (`bun build ... --target node`).
+
+**Observed red:** no unit sensor exists for this pair by design (a `NEEDLE_MODEL` mismatch is
+outside every parity tier). Reverted `needles-rename-control.ts:118` to `qwen3-embedding:4b` alone
+→ confirmed the parity gate stayed **21/0** (proving it truly cannot see this pair, the failure
+mode this task exists to close in prose rather than in a gate) and that the two harnesses now
+read different literals by direct grep. Restored by file copy (`/tmp/g4-premutation-nrc.bak`);
+`git status --porcelain` showed only the three intended files; re-verified both literals agree at
+`0.6b`.
 
 ### G5: PDM-10 AC-3's `lms load -c` values are unsensed — the surviving mutant ✅ Complete
 

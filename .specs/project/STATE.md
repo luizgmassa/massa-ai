@@ -1147,6 +1147,33 @@ array literals with no loop-independent per-item constructor: no other instance 
 shape found. `tasks.md`'s F4 entry corrected in place with a note pointing at this fix rather than
 edited silently.
 
+**Fix Pass 2 (G3, G4, G6 batch), G4 — Complete.** `benchmarks/needles/README.md` declared only
+one of the two files carrying the retired `qwen3-embedding:4b` `NEEDLE_MODEL` default —
+`scripts/needles-rename-control.ts:118`'s byte-identical pin was named in no artifact. Chose to
+**repoint both** rather than declare-as-history: unlike the llm-judge fixtures (frozen prose
+describing a past decision, design.md's "Must NOT change" list), this is a live env-var fallback
+read at call time, and T14 already repointed the sibling `needles-gate.yml` pins for the same
+reason. Changed `benchmarks/needles/run.ts:9,27,114` and `scripts/needles-rename-control.ts:118`
+from `qwen3-embedding:4b` to `qwen3-embedding:0.6b`; this also makes `run.ts:9`'s "same model as
+the E2E baseline" claim true again instead of needing a retraction. Rewrote the README's "Known
+drift" note to "Drift closed", naming both files.
+Search for further pins (3 dialects — this host's default `grep`, `git grep -E`, BSD
+`/usr/bin/grep -E`, all agreeing): only the two now-fixed code sites exist; `needles-gate.yml`
+already reads `0.6b` (T14); every other `qwen3-embedding:4b` hit is `.specs/` history or this
+README's own retained override-example prose.
+Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 21/0, 41 expect() calls
+(unchanged — confirms `NEEDLE_MODEL` is genuinely outside every tier). `bun test
+scripts/__tests__/needles-rename-control.test.ts` → 17/0, unaffected. Both edited files build
+cleanly (`bun build --target node`).
+Observed red: no unit sensor exists for this pair by design. Reverted
+`needles-rename-control.ts:118` alone to `qwen3-embedding:4b` → confirmed the parity gate stayed
+21/0 (proving it truly cannot see this pair) while the two harnesses now read different literals
+by direct grep. Restored by file copy; `git status --porcelain` clean before the commit; re-ran
+green.
+
+All of G3 and G4 (this worker's batch) are closed. G6 depends on G1-G5, all now landed, so it is
+unblocked.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
