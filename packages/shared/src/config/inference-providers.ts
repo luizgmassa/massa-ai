@@ -132,3 +132,25 @@ export const INFERENCE_PROVIDERS: Readonly<
 export function inferenceProviderList(): readonly InferenceProviderSpec[] {
   return LOCAL_INFERENCE_IDS.map((id) => INFERENCE_PROVIDERS[id]);
 }
+
+/** Derive the embedding + LLM base URL pair for one provider's `--base-url`. */
+export function deriveInferenceBaseUrls(
+  providerId: InferenceProviderId,
+  explicitBaseUrl: string | undefined,
+): { embeddingBaseUrl: string; llmBaseUrl: string } {
+  const spec = INFERENCE_PROVIDERS[providerId];
+  if (!explicitBaseUrl) {
+    return {
+      embeddingBaseUrl: spec.defaultEmbeddingBaseUrl,
+      llmBaseUrl: spec.defaultLlmBaseUrl,
+    };
+  }
+  const base = explicitBaseUrl.replace(/\/+$/, "");
+  const suffix = spec.defaultLlmBaseUrl.startsWith(spec.defaultEmbeddingBaseUrl)
+    ? spec.defaultLlmBaseUrl.slice(spec.defaultEmbeddingBaseUrl.length)
+    : "";
+  return {
+    embeddingBaseUrl: base,
+    llmBaseUrl: `${base}${suffix}`,
+  };
+}

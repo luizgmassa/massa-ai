@@ -29,7 +29,7 @@ import {
   type SwitchReport,
   type VariantSyncHostResult,
 } from "@massa-ai/shared";
-import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
+import { INFERENCE_PROVIDERS, deriveInferenceBaseUrls } from "@massa-ai/shared/inference-providers";
 import os from "os";
 import path from "path";
 
@@ -275,31 +275,33 @@ export async function runCli(argv: string[]): Promise<number> {
 
     if (provider === "ollama") {
       const model = (options.model as string) || INFERENCE_PROVIDERS.ollama.defaultModels.embedding;
+      const urls = deriveInferenceBaseUrls("ollama", options["base-url"] as string | undefined);
       config.embedding = {
         provider: "ollama",
         model,
-        baseURL: (options["base-url"] as string) || "http://localhost:11434",
+        baseURL: urls.embeddingBaseUrl,
         // ponytail: G6 — 768 fallback for a custom --model outside
         // knownDimensions; see embeddings/config.ts's matching comment.
         dimensions: knownEmbeddingDimensions(model) ?? 768,
       };
       // G0/PDM-02 AC-2: same fix as the lmstudio branch below — a switch
       // away from lmstudio must not leave llm.* naming lmstudio's ids.
-      config.llm.baseUrl = (options["base-url"] as string) || INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl;
+      config.llm.baseUrl = urls.llmBaseUrl;
       config.llm.model = INFERENCE_PROVIDERS.ollama.defaultModels.instruct;
       config.llm.codeModel = INFERENCE_PROVIDERS.ollama.defaultModels.coding;
     } else if (provider === "lmstudio") {
       const model = (options.model as string) || INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
+      const urls = deriveInferenceBaseUrls("lmstudio", options["base-url"] as string | undefined);
       config.embedding = {
         provider: "lmstudio",
         model,
-        baseURL: (options["base-url"] as string) || INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+        baseURL: urls.embeddingBaseUrl,
         // ponytail: G6 — 768 fallback for a custom --model outside
         // knownDimensions; see embeddings/config.ts's matching comment.
         dimensions: INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ?? 768,
       };
       // LIP-09: same fix as init --lmstudio above.
-      config.llm.baseUrl = (options["base-url"] as string) || INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl;
+      config.llm.baseUrl = urls.llmBaseUrl;
       config.llm.model = INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct;
       config.llm.codeModel = INFERENCE_PROVIDERS.lmstudio.defaultModels.coding;
     } else if (provider === "mistral") {

@@ -5,6 +5,7 @@ import {
   INFERENCE_ROLE_DEFAULTS,
   LOCAL_INFERENCE_IDS,
   inferenceProviderList,
+  deriveInferenceBaseUrls,
   type InferenceRole,
 } from "../config/inference-providers";
 
@@ -141,6 +142,36 @@ describe("per-provider mechanism fields", () => {
   test("both providers embed in batches of 64 (design R-03)", () => {
     expect(INFERENCE_PROVIDERS.ollama.embedBatchSize).toBe(64);
     expect(INFERENCE_PROVIDERS.lmstudio.embedBatchSize).toBe(64);
+  });
+});
+
+describe("deriveInferenceBaseUrls (G2)", () => {
+  test("omitted --base-url returns ollama's declared pair unchanged", () => {
+    expect(deriveInferenceBaseUrls("ollama", undefined)).toEqual({
+      embeddingBaseUrl: INFERENCE_PROVIDERS.ollama.defaultEmbeddingBaseUrl,
+      llmBaseUrl: INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl,
+    });
+  });
+
+  test("omitted --base-url returns lmstudio's declared pair unchanged", () => {
+    expect(deriveInferenceBaseUrls("lmstudio", undefined)).toEqual({
+      embeddingBaseUrl: INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+      llmBaseUrl: INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl,
+    });
+  });
+
+  test("an explicit --base-url re-applies ollama's declared /v1 suffix to the LLM URL", () => {
+    expect(deriveInferenceBaseUrls("ollama", "http://h:11434")).toEqual({
+      embeddingBaseUrl: "http://h:11434",
+      llmBaseUrl: "http://h:11434/v1",
+    });
+  });
+
+  test("an explicit --base-url writes the same URL to both fields for lmstudio", () => {
+    expect(deriveInferenceBaseUrls("lmstudio", "http://h:1234/v1")).toEqual({
+      embeddingBaseUrl: "http://h:1234/v1",
+      llmBaseUrl: "http://h:1234/v1",
+    });
   });
 });
 

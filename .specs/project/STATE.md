@@ -1062,6 +1062,42 @@ wins over a config value — Expected: 20000, Received: 12000`, naming `_resolve
 directly. Restored via `cp provider.ts.bak provider.ts`; `git status --porcelain` clean before
 the commit; re-ran green (41/0, type-check 6/6).
 
+**Fix Pass 2 (G1, G2, G5 batch), G2 — Complete.** Added `deriveInferenceBaseUrls(providerId,
+explicitBaseUrl)` to the seam (`packages/shared/src/config/inference-providers.ts`): omitted
+returns the provider's declared `{defaultEmbeddingBaseUrl, defaultLlmBaseUrl}` pair unchanged;
+given an explicit URL, the embedding field gets it verbatim (trailing slash trimmed) and the LLM
+field gets it with the suffix `defaultLlmBaseUrl` declares beyond `defaultEmbeddingBaseUrl`
+re-applied — `/v1` for ollama, empty for lmstudio, derived from the seam's own two fields rather
+than a literal `/v1`, so a third provider added later needs no edit here. Both `use ollama`/`use
+lmstudio` branches in `apps/mcp-client/src/config-cli.ts` and `apps/opencode-plugin/src/
+config-cli.ts` (byte-identical branches, same fix in both) now call it once and assign both
+`config.embedding.baseURL`/`config.llm.baseUrl` from its result, replacing the duplicated
+`(options["base-url"] as string) || …` pair that fed the same raw flag value to both fields.
+Full matrix (`--base-url` × {ollama, lmstudio} × {init, use} × {mcp-client, opencode-plugin}):
+- `use`, supplied, both providers, both CLIs: fixed — embedding gets the raw URL, llm gets the
+  URL with the provider's declared suffix (ollama `/v1`, lmstudio none). Verified by 4 new
+  config-cli tests (2 per CLI) plus 2 new seam-level tests.
+- `use`, omitted, both providers, both CLIs: unchanged, already correct — writes the seam's
+  literal `defaultEmbeddingBaseUrl`/`defaultLlmBaseUrl` pair (pre-existing tests cover this).
+- `init`, both providers, both CLIs: **no `--base-url` flag exists on `init` at all** (only
+  `use` accepts it, per both CLIs' own `help()` text) — `init --lmstudio` writes the seam's
+  literal defaults with no flag to derive from, and `init` (bare, ollama) writes nothing,
+  matching the pre-existing default-only config. Not a gap this task's scope covers: G2's cited
+  regression sites (`config-cli.ts:288`/`:293`) are both inside the `use` branch; adding
+  `--base-url` to `init` would be new flag surface, out of this task's write set.
+Gate: `bun test apps/mcp-client/src/__tests__/config-cli.test.ts` → 38/0 (was 36/0, +2 new).
+`bun test apps/opencode-plugin/src/__tests__/config-cli.test.ts` → 34/0 (was 32/0, +2 new).
+`bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 15/0 (unchanged population).
+`bun test packages/shared/src/__tests__/inference-providers.test.ts` → 29/0 (was 25 per T01,
++4 new). `bun run type-check` → 6/6.
+Observed red (two mutations, each restored by file copy, `git status --porcelain` clean before
+commit): (1) reverted `apps/mcp-client/src/config-cli.ts`'s ollama `config.llm.baseUrl` line to
+the round-2 shape (`(options["base-url"] as string) || defaultLlmBaseUrl`) → the new test failed
+by name: `use ollama --base-url writes an ollama-shaped embedding/llm base pair (G2) — Expected:
+"http://h:11434/v1", Received: "http://h:11434"`. (2) dropped the `${suffix}` from
+`deriveInferenceBaseUrls`'s return → the seam-level test failed by name: `an explicit --base-url
+re-applies ollama's declared /v1 suffix to the LLM URL`. Both restored; re-ran green.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),

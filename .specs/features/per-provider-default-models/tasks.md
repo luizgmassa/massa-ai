@@ -1313,7 +1313,7 @@ Tests: env beats a config value; config beats the role-table default when no env
 Gate: bun test packages/core/src/__tests__/embeddings-provider.test.ts && bun run type-check
 Depends on: none.
 
-### G2: `use ollama --base-url` must not write an LLM base URL missing `/v1`
+### G2: `use ollama --base-url` must not write an LLM base URL missing `/v1` ✅ Complete
 
 `apps/mcp-client/src/config-cli.ts:288` and `apps/opencode-plugin/src/config-cli.ts:293` assign
 `config.llm.baseUrl = (options["base-url"] as string) || INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl`.

@@ -163,6 +163,22 @@ describe("config-cli runCli", () => {
     expect(r.out).toContain("nomic");
   });
 
+  test("use ollama --base-url writes an ollama-shaped embedding/llm base pair (G2)", async () => {
+    // Ollama's two declared base URLs differ by `/v1`: an explicit
+    // --base-url must reach embedding.baseURL unchanged and reach
+    // llm.baseUrl with that same `/v1` suffix re-applied — not the raw flag
+    // value copied onto both fields (the round-2 regression).
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() =>
+      runCli(["use", "ollama", "--base-url", "http://h:11434"]),
+    );
+    expect(r.code).toBe(0);
+    const show = await captureConsole(() => runCli(["show"]));
+    const config = JSON.parse(show.out);
+    expect(config.embedding.baseURL).toBe("http://h:11434");
+    expect(config.llm.baseUrl).toBe("http://h:11434/v1");
+  });
+
   test("use ollama defaults write the provider's embedding pair (EDC-03, PDM-02 AC-2)", async () => {
     // The written pair must match the default model's real output width —
     // a mismatched pair shipped a config that refuseOnDimensionMismatch
@@ -239,6 +255,20 @@ describe("config-cli runCli", () => {
     );
     expect(r.code).toBe(0);
     expect(r.out).toContain("custom-model");
+  });
+
+  test("use lmstudio --base-url writes an identical embedding/llm base pair (G2)", async () => {
+    // LM Studio's two declared base URLs are byte-identical: an explicit
+    // --base-url must reach both fields unchanged, with no suffix added.
+    await captureConsole(() => runCli(["init"]));
+    const r = await captureConsole(() =>
+      runCli(["use", "lmstudio", "--base-url", "http://h:1234/v1"]),
+    );
+    expect(r.code).toBe(0);
+    const show = await captureConsole(() => runCli(["show"]));
+    const config = JSON.parse(show.out);
+    expect(config.embedding.baseURL).toBe("http://h:1234/v1");
+    expect(config.llm.baseUrl).toBe("http://h:1234/v1");
   });
 
   test("use google without api-key → exit 1", async () => {
