@@ -1491,13 +1491,13 @@
       "id": "per-provider-default-models",
       "slug": "per-provider-default-models",
       "title": "Per-provider default models: one equivalent trio per provider, with per-role runtime parameters configurable in config.json and the Admin Portal",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
         "design": true,
         "tasks": true,
-        "execute": false
+        "execute": true
       },
       "branch": "feat/per-provider-default-models",
       "created": "2026-09-20",
@@ -1508,7 +1508,8 @@
       "design": ".specs/features/per-provider-default-models/design.md",
       "tasks": ".specs/features/per-provider-default-models/tasks.md",
       "validation": null,
-      "notes": "Planning complete 2026-09-20: 8 Phases = 17 Tasks, all three artifacts validator-clean. Execute NOT started — the user explicitly chose to stop after planning, so no implementation commit exists and no delivery authorization was given. BREAKING when executed: the Ollama embedding default moves to qwen3-embedding:0.6b/1024, invalidating every embedding_fingerprint and flipping the vector store from the >2000 binary-quantization branch to direct HNSW cosine. Retrieval quality at 1024 is unmeasured by the user's choice. Resume at T01 (the seam); everything depends on it."
+      "notes": "EXECUTE COMPLETE 2026-09-20 (8 Phases = 21 Tasks, T06b/T07b/T03b/T15b added mid-Execute; 8 batch workers, one atomic commit per task). One equivalent trio per provider (embedding qwen3-embedding:0.6b/text-embedding-qwen3-embedding-0.6b 1024d; instruct qwen3-vl:8b/qwen3-vl-8b-instruct; coding qwen2.5-coder:7b/qwen2.5-coder-7b-instruct, unchanged), all runtime-tunable in config.json and the Admin Portal Config tab with a field-level parity gate. BREAKING: the Ollama embedding default moved from qwen3-embedding:4b/2560d to qwen3-embedding:0.6b/1024d, invalidating every workspace's embedding_fingerprint and flipping postgres-vector-store.ts from the >2000 binary-quantization branch to direct HNSW cosine; the fingerprint gates fail closed with an actionable message; no migration is built. CHANGELOG.md carries the breaking ### Changed entry under [Unreleased]. STATUS IS 'complete' FOR EXECUTE ONLY — independent verification (author != verifier, per spec.md's Verification Approach) has NOT run yet; validation is null on purpose. Success Criteria, reported honestly: bun test scripts/__tests__/embedding-defaults-parity.test.ts green (14/0); lint/type-check/build/test all green; bun run test:scripts is RED on this host by design (T15b fixed the gate's own && short-circuit that used to hide 37 shell suites behind a bun-half pass; once fixed it surfaces 3 pre-existing host-specific shell failures — test-install-skills-cli.sh, test-plugin-auto-install.sh, test-plugin-registry-registration.sh — unrelated to this feature, 36/39 shell suites pass, bun-half 2057/0). Two accepted, unmeasured risks carried forward: retrieval quality at 1024 dimensions was never re-measured against the retired 2560d default (explicit user choice, LIP-22 harness not run at the new width); T14's needles claims were verified statically and with an isolated reproduction script, not by a live run (no Ollama/LM Studio/API stack in this environment — 14.needles.test.ts reports 0 pass / 2 skip / 0 fail, READY=false). Other named residuals: the 3 host-specific shell failures above; bun skills/massa-ai/scripts/lessons.ts list destructively rewrites .specs/lessons.json (measured 25 to 6 entries on a scratch copy this session — do not run it to re-verify); T15's population discrepancy (design.md's '~16 test files' estimate vs 2 behaviorally-confirmed true positives); T13's SPEC_DEVIATION (6 one-line pre-existing production fixes found by the repaired parity gate, outside its named write set); benchmarks/needles/run.ts's own NEEDLE_MODEL default is still qwen3-embedding:4b, untouched by any task and unscanned by the parity gate (found during T16, documented in its README rather than fixed). Full detail in .specs/HANDOFF.md and .specs/project/STATE.md. Delivery gate: bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models --root . — see STATE.md for the exact exit code and output. Unpushed; push and PR are the user's call.",
+      "completed": "2026-09-20"
     }
   ],
   "active_feature": "local-inference-provider-abstraction"

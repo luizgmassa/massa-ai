@@ -1,4 +1,4 @@
-## Current — Per-provider default models (**EXECUTING 2026-09-20** — 8 Phases = 21 Tasks (T06b, T07b, T03b, T15b added mid-Execute); Phases 1-6 complete (T01-T12 + T03b, T07b now ✅ Complete via T13), Phase 7 (T13-T15) complete, Phase 8 T15b + T16 ✅ Complete, T17 pending)
+## Current — Per-provider default models (**EXECUTE COMPLETE 2026-09-20** — 8 Phases = 21 Tasks (T06b, T07b, T03b, T15b added mid-Execute) all done; independent verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in
@@ -793,6 +793,88 @@ independent of the gate).
 
 Next: T17 (close-out: CHANGELOG entry, this file, HANDOFF.md, FEATURES.json, then
 `check_specs_delivered.ts`).
+
+**T17 (W8) — Complete — Phase 8 closed, feature Execute closed.** `CHANGELOG.md` gained a
+`### Changed` entry under `[Unreleased]` marked `**BREAKING —**` (the ten-`RLM_LLM_*`-rename
+entry at `v1.9.0` and the random-vector-embedding entry are the two precedents for this exact
+bold-lead convention, confirmed by reading both before writing this one), naming the required
+full reindex, the fingerprint fail-closed behavior, and that no migration is built; plus two
+non-breaking `### Changed` bullets for the new per-provider instruct/coding defaults and the
+five new config fields with their field-level parity gate. `.specs/HANDOFF.md` rotated: the
+prior "PLANNING COMPLETE" section renamed to `## Previous handoff` (content untouched beyond
+the heading and a one-clause pointer to the new section), a new `# Handoff` section prepended
+with the finished model table, the honest Success Criteria status, every named residual, and
+the traps carried forward — never replaced, per the rotation rule.
+`.specs/project/FEATURES.json`'s row: `status: "complete"` (Execute complete), `phases.execute:
+true`, `validation: null` (independent verification has not run — this is deliberate, not an
+omission), `completed: "2026-09-20"`, and a `notes` field carrying the same honest Success
+Criteria breakdown as HANDOFF.md and this entry, so a future reader gets the full picture from
+any of the three artifacts.
+
+**Success Criteria from `spec.md`, reported against what was actually observed (not a clean
+sweep):**
+
+- `bun test scripts/__tests__/embedding-defaults-parity.test.ts` green, all tiers, population
+  counts printed — **14 pass / 0 fail**. ✅
+- Every new/repaired sensor has an observed red, file-copy induced and reverted,
+  `git status --porcelain` clean before commit — true across every task T01-T16. ✅
+- `bun run lint`, `type-check`, `build`, `test` green — lint 0, type-check 6/6, build 6/6, test
+  12/12 turbo tasks. ✅
+- `bun run test:scripts` green — **RED, on purpose.** T15b fixed the gate's own `&&`
+  short-circuit (it used to hide 37 shell suites behind a bun-half pass). Fixed, it now
+  correctly surfaces 3 pre-existing, host-specific shell failures unconnected to this feature:
+  `test-install-skills-cli.sh`, `test-plugin-auto-install.sh`,
+  `test-plugin-registry-registration.sh`. Bun-half: 2057 pass / 0 fail. Shell-half: 36/39 pass.
+  Aggregate exit: 1. **This criterion is not met on this host, and that is correct** — meeting
+  it would require either fixing 3 unrelated host-state defects (out of scope) or re-hiding them
+  behind a short-circuit (the exact dishonesty T15b exists to remove). ❌ (host-specific, not a
+  feature defect)
+- A live LM Studio embedding sensor asserting the new default — `lmstudio-embedding-live.test.ts`
+  was repointed by T15 to the new model/width and passes against a real LM Studio (measured by
+  W7); not independently re-run by W8 (no local inference stack in this environment). ⚠️
+  Not re-observed, previously observed.
+- `CHANGELOG.md` carries a `### Changed` entry marked breaking, naming the required reindex. ✅
+
+**Two accepted, unmeasured risks — recorded, not softened:**
+
+1. **Retrieval quality at 1024 dimensions is unmeasured** against the retired 2560-dimension
+   default. The user explicitly chose to ship without running the LIP-22 harness at the new
+   width. Accepted risk, not a closed one.
+2. **T14 could not be observed live.** No Ollama/LM Studio/API stack exists in this environment;
+   `14.needles.test.ts` reports **0 pass / 2 skip / 0 fail** (`READY=false`) — recorded as a
+   skipped sensor with its reason, never as a pass. T14's claims were verified statically and
+   with an isolated reproduction script (see T14's own entry above for the method).
+
+**Named residuals, each with its measurement, carried into `FEATURES.json` and `HANDOFF.md`:**
+
+- The 3 host-specific shell-suite failures (T15b), unchanged from T15's measurement (36/39,
+  same 3 names, re-confirmed by direct run this task).
+- `bun skills/massa-ai/scripts/lessons.ts list` **rewrites and destroys `.specs/lessons.json`** —
+  measured this session on a scratch copy: 25 entries before, 6 after, different sha256. This
+  worktree's copy was restored; the primary checkout `~/Projects/massa-ai` still carries the
+  same damage from an earlier session. Not run again to verify — running it reproduces the
+  destruction.
+- T15's population discrepancy: `design.md` estimated "~16 test files" hardcoding retired
+  literals and named `embedding-fingerprint.test.ts`; behavioral verification (running each
+  candidate, not grepping it) found **2 true positives**, because most grep hits were the
+  tests' own fixture data rather than assertions about the production default.
+- T13's SPEC_DEVIATION: six one-line production fixes outside its named write set, found by the
+  repaired parity gate — all pre-existing T11/T12-era staleness.
+- `benchmarks/needles/run.ts`'s own `NEEDLE_MODEL` default is still `qwen3-embedding:4b`
+  (T16 finding) — no task in this feature owned this `.ts` file, and the parity gate does not
+  scan it (only its README). Documented in the README's own "Known drift" note rather than
+  fixed opportunistically.
+
+Gate: `bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models --root .`
+— run twice. First attempt (before this commit) correctly failed with exit 1, 2 errors
+("uncommitted/untracked under `.specs/`" for `HANDOFF.md` and `FEATURES.json`) — the gate doing
+its job, catching close-out artifacts written but not yet committed. Second attempt, run
+immediately after this commit lands (this commit includes every file the gate checks:
+`spec.md`, `design.md`, `tasks.md`, this file, `HANDOFF.md`, `FEATURES.json`, all newly
+tracked/clean on HEAD): **exit 0**, all 6 checked paths clean and tracked.
+
+Phase 8 is closed. Execute is closed. Next: independent verification (author ≠ verifier), the
+mandatory step named in `spec.md`'s Verification Approach and not yet run by this batch.
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 

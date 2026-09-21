@@ -1,4 +1,116 @@
-# Handoff — per-provider-default-models (PLANNING COMPLETE 2026-09-20 — Specify, Design and Tasks closed and validated; Execute NOT started, by the user's explicit choice)
+# Handoff — per-provider-default-models (EXECUTE COMPLETE 2026-09-20 — 8 Phases = 21 Tasks (T06b, T07b, T03b, T15b added mid-Execute), all done via 8 batch workers; independent verification pending; unpushed, push/PR is the user's call)
+
+**Branch:** `feat/per-provider-default-models`, off `origin/main@8ea21839` (v1.58.0).
+Worktree `~/Projects/massa-ai-feat-per-provider-default-models`.
+
+## Objective (delivered)
+
+One equivalent trio per provider — embedding, instruct, coding — plus per-role runtime
+parameters exposed in `config.json` and the Admin Portal Config tab, where a configured value
+always beats the code default.
+
+| Role | Ollama | LM Studio | Context | Other |
+| --- | --- | --- | --- | --- |
+| Embedding | `qwen3-embedding:0.6b` | `text-embedding-qwen3-embedding-0.6b` | 8192 | batch 64, 1024 dims |
+| Instruct | `qwen3-vl:8b` | `qwen3-vl-8b-instruct` | 16384 | temperature 0.2 |
+| Coding | `qwen2.5-coder:7b` | `qwen2.5-coder-7b-instruct` | 32768 | temperature 0.0 |
+
+**Breaking.** The Ollama embedding default moves from `qwen3-embedding:4b`/2560 to
+`qwen3-embedding:0.6b`/1024, invalidating every existing workspace's `embedding_fingerprint` and
+flipping `postgres-vector-store.ts` from its `> 2000` binary-quantization branch to the `<= 2000`
+direct-HNSW-cosine branch. The fingerprint read and write gates fail closed with an actionable
+message; no migration is built. **Retrieval quality at 1024 is unmeasured** — the user chose to
+ship without running the LIP-22 harness at the new width. This is an accepted risk, not a closed
+one.
+
+## State
+
+All 21 Tasks across 8 Phases done, 8 batch workers (W1-W8), one atomic commit per task.
+`CHANGELOG.md` carries the `### Changed` entry under `[Unreleased]`. `.specs/project/STATE.md`
+and `.specs/project/FEATURES.json` updated. `check_specs_delivered.ts` result is recorded in
+`STATE.md` and `FEATURES.json`'s `notes` field — read those for the exact exit code, since this
+file is a snapshot and will not update after this write.
+
+**Success Criteria from `spec.md`, reported honestly, not as a clean sweep:**
+
+- `bun test scripts/__tests__/embedding-defaults-parity.test.ts` — green, 14/0, all tiers.
+- Every repaired sensor has an observed red, induced and reverted by file copy — done across
+  T01-T16, `git status --porcelain` clean before every commit.
+- `bun run lint` / `type-check` / `build` / `test` — green (0 / 6/6 / 6/6 / 12/12 turbo tasks).
+- **`bun run test:scripts` is RED on this host** — not a clean sweep. T15b fixed the gate itself
+  (it used to short-circuit past 37 shell suites on a bun-half failure with `&&`); once fixed,
+  it surfaces 3 pre-existing, host-specific shell failures unrelated to this feature:
+  `test-install-skills-cli.sh`, `test-plugin-auto-install.sh`,
+  `test-plugin-registry-registration.sh` (36/39 shell suites pass; bun-half 2057/0). Do not
+  read a green `test:scripts` claim anywhere in older per-Phase notes as still current — it
+  never ran the shell half honestly until T15b.
+- A live LM Studio embedding sensor (`lmstudio-embedding-live.test.ts`) was repointed by T15 and
+  passes when a real LM Studio is reachable; not independently re-verified by W8 (no local stack
+  in this environment — see below).
+- **T14 could not be observed live.** No Ollama/LM Studio/API stack exists in this environment,
+  so `14.needles.test.ts` reports 0 pass / 2 skip / 0 fail (`READY=false`) — a **skipped sensor**,
+  never a pass. Its claims were verified statically and with an isolated reproduction script.
+
+## Next step
+
+Independent verification (`massa-ai-verification-agent`, author ≠ verifier) is the mandatory
+next step per `spec.md`'s Verification Approach — not yet run by this batch. After that: push
+and PR are the user's call, same as every other unpushed feature in this project's history.
+
+## Named residuals carried forward (true and unflattering — do not soften)
+
+1. **Retrieval quality at 1024 dimensions is unmeasured**, accepted as a risk by explicit user
+   choice rather than closed by measurement.
+2. **T14's claims are statically verified, not live-observed** — no local inference stack in
+   this environment. `14.needles.test.ts` reports skip, not pass.
+3. **3 shell-suite failures are host-specific**, caused by this development machine's own Claude
+   install state, unrelated to this feature. Do not fix, skip, or exclude them to force a green
+   `test:scripts` — T15b exists specifically to stop that gate from hiding this exact class of
+   news.
+4. **`bun skills/massa-ai/scripts/lessons.ts list` rewrites and destroys `.specs/lessons.json`.**
+   Measured this session on a scratch copy: 25 entries before, 6 after, different sha256. The
+   file in this worktree was restored; the primary checkout `~/Projects/massa-ai` still carries
+   the same damage from an earlier session. **Do not run this script to verify the claim** — it
+   reproduces the destruction.
+5. **T15's population discrepancy.** `design.md` estimated "~16 test files" hardcoding retired
+   literals; behavioral verification (running each candidate, not just grepping it) found
+   **2 true positives** — most grep hits were the tests' own fixture data, not assertions about
+   the production default.
+6. **T13's SPEC_DEVIATION.** Six one-line production fixes outside its named write set, found by
+   the repaired parity gate — all pre-existing T11/T12-era staleness (`.env.example`,
+   `setup-local-first.sh`, `installer-api-key.sh`, `embeddings/config.ts` ×2, `diagnose.ts`).
+7. **`benchmarks/needles/run.ts`'s own `NEEDLE_MODEL` default is stale** (`qwen3-embedding:4b`),
+   unlike the E2E baseline and everything the parity gate covers. Found during T16; the parity
+   gate does not scan this `.ts` file (only its README), and no task in this feature owned it.
+   `benchmarks/needles/README.md` now says so explicitly rather than silently repeating a claim
+   ("same model as the E2E baseline") that went false when the E2E side moved.
+
+## Traps worth carrying forward (from planning, still true post-Execute)
+
+1. **LM Studio model ids are catalog names, underivable from the HuggingFace repo path.** Three
+   measured samples: `mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ` → `qwen3-embedding-0.6b-dwq`;
+   `mlx-community/Qwen3-VL-8B-Instruct-4bit` → `qwen3-vl-8b-instruct`;
+   `lmstudio-community/Qwen3-4B-Instruct-2507-MLX-4bit` → `qwen/qwen3-4b-2507`. The only way to
+   know is to download and read `GET /v1/models`.
+2. **LM Studio types a model by architecture, and MLX Qwen3-Embedding types as an LLM** —
+   invisible to `/v1/embeddings`. This is why the embedding default is GGUF, not MLX.
+3. **`knownDimensions` must stay additive.** Four call sites resolve
+   `knownDimensions[model] ?? 768` (two branches × two CLIs). Dropping the nomic row corrupts an
+   existing user's resolved width.
+4. **`benchmarks/llm-judge/fixtures/known-{dup,distinct}.json`, `run.ts:171`, and
+   `benchmarks/llm-judge/reports/llm-judge-baseline.md` must NOT change** — they carry
+   `qwen2.5:7b-instruct` as historical memory content or a dated run record, not as a default.
+   `design.md`'s "Must NOT change" section now names all three explicitly (T16 added the third).
+5. **The Portal coverage gate used to be section-level only.** T10 added the field-level parity
+   gate (`config-section-coverage.test.ts` now checks `name:`, not just `key:`).
+
+## Environment notes
+
+No live Ollama, LM Studio, or Postgres-backed API stack was available to this batch worker
+(W8). Every claim above marked "statically verified" or "not live-observed" reflects that
+constraint, not a skipped check that should have been run.
+
+## Previous handoff — per-provider-default-models (PLANNING COMPLETE 2026-09-20 — Specify, Design and Tasks closed and validated; Execute NOT started, by the user's explicit choice; superseded the same session once Execute ran to completion — see the current handoff above)
 
 **Branch:** `feat/per-provider-default-models`, off `origin/main@8ea21839` (v1.58.0).
 Worktree `~/Projects/massa-ai-feat-per-provider-default-models`, provisioned

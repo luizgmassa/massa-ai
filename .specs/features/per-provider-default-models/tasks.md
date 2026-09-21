@@ -706,7 +706,7 @@ existed). `git status --porcelain` before commit: seven files
 `docs/ONBOARDING.md`) plus `benchmarks/needles/README.md`, `tasks.md`, `STATE.md` — all within
 this task's declared write set (the 7 docs + the two named extra surfaces + status updates).
 
-### T17: Close out
+### T17: Close out — ✅ Complete
 
 `CHANGELOG.md` `### Changed` entry marked breaking, naming the required reindex; `.specs/project/STATE.md`;
 `.specs/HANDOFF.md`; `.specs/project/FEATURES.json`. Then
@@ -715,6 +715,56 @@ this task's declared write set (the 7 docs + the two named extra surfaces + stat
 Tests: none — close-out artifacts are checked by the delivery gate, not by a unit test
 Gate: bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models --root .
 Depends on: T16.
+
+**Result (W8, 2026-09-20).** `CHANGELOG.md` gained a `### Changed` entry under `[Unreleased]`
+led with `**BREAKING —**` (matching the two existing precedents for that convention, `v1.9.0`'s
+`RLM_LLM_*` rename and the random-vector-embedding entry, both read before writing this one),
+naming the reindex requirement, the fingerprint fail-closed behavior, and that no migration is
+built, plus two non-breaking bullets for the new per-provider instruct/coding defaults and the
+5 new config fields with their field-level parity gate. No literal skip-ci marker anywhere in
+this commit's message.
+
+`.specs/project/STATE.md`'s `## Current` header updated to EXECUTE COMPLETE, and the T17
+entry appended (never overwritten) with the honest Success Criteria breakdown, the two accepted
+unmeasured risks, and every named residual.
+
+`.specs/HANDOFF.md` **rotated, not replaced**: the prior "PLANNING COMPLETE" section's H1 was
+renamed to `## Previous handoff` (its body left untouched beyond the heading and a one-clause
+superseded-pointer), and a new `# Handoff` section was prepended with the finished model table,
+the same honest Success Criteria breakdown, every named residual, and the carried-forward traps.
+
+`.specs/project/FEATURES.json`'s row: `status: "complete"` (Execute complete — deliberately
+distinct from independent-verification-complete), `phases.execute: true`, `validation: null`
+(no `validation.md` exists — the Verifier has not run), `completed: "2026-09-20"`, `notes`
+carrying the same honest breakdown as `STATE.md`/`HANDOFF.md`. Round-tripped the file through
+`json.dumps(..., indent=2)` first and confirmed byte-identical to the original before editing,
+to avoid a reformat-as-diff.
+
+**Gate:** `bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models
+--root .` — run twice. Before this commit: **exit 1**, 2 errors (`HANDOFF.md`, `FEATURES.json`
+uncommitted) — correct behavior, the gate catching artifacts written but not yet landed. After
+this commit: **exit 0**, all 6 checked paths (`spec.md`, `design.md`, `tasks.md`, `STATE.md`,
+`HANDOFF.md`, `FEATURES.json`) clean and tracked on HEAD.
+
+**Reported honestly, per this task's own instruction — not a clean sweep:**
+`bun run test:scripts` is red on this host (3 pre-existing, host-specific shell failures,
+T15b); retrieval quality at the new 1024-dimension embedding width is unmeasured (accepted
+risk, explicit user choice); T14's needles claims were verified statically, not by a live run
+(no local inference stack in this environment — 0 pass / 2 skip / 0 fail, `READY=false`).
+Independent verification (author ≠ verifier) has not run — that is the mandatory next step,
+not part of this batch's scope per the orchestrator's own framing ("after you, an independent
+verification agent runs").
+
+**Named residuals recorded in `STATE.md`/`HANDOFF.md`/`FEATURES.json`:** the 3 host-specific
+shell failures (T15b); `bun skills/massa-ai/scripts/lessons.ts list` destructively rewrites
+`.specs/lessons.json` (measured 25→6 entries on a scratch copy this session, not re-run to
+verify); T15's population discrepancy (design's "~16" estimate vs 2 behaviorally-confirmed true
+positives); T13's SPEC_DEVIATION (6 pre-existing one-line production fixes outside its write
+set); `benchmarks/needles/run.ts`'s stale `NEEDLE_MODEL` default, found during T16, outside
+every task's write set and unscanned by the parity gate.
+
+**Phase 8 closed. Execute closed. Feature status: EXECUTE COMPLETE, independent verification
+pending.**
 
 ---
 

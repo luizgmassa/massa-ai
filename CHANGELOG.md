@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING — the Ollama embedding default moves from `qwen3-embedding:4b` (2560d) to
+  `qwen3-embedding:0.6b` (1024d); the LM Studio equivalent moves to
+  `text-embedding-qwen3-embedding-0.6b` (1024d).** This invalidates every existing
+  workspace's stored `embedding_fingerprint` and flips `postgres-vector-store.ts` from its
+  `> 2000`-dimension binary-quantization search path to the `<= 2000` direct-HNSW-cosine
+  path — a different algorithm, not just a smaller vector. **Action required: reindex every
+  workspace.** The fingerprint read and write gates fail closed with an actionable message
+  rather than silently mixing vector spaces of different widths; there is no migration —
+  none is built, by design, because there is no way to convert an existing 2560-dimension
+  vector into a 1024-dimension one. **Retrieval quality at the new 1024-dimension width has
+  not been re-measured** against the retired 2560-dimension default; this ships as an
+  accepted, unmeasured risk rather than a validated improvement.
+- **Every inference role — embedding, instruct, coding — now has an explicit per-provider
+  default model, instead of the instruct/coding roles sharing one provider-agnostic pair.**
+  Ollama: `qwen3-vl:8b` (instruct, was `qwen2.5:7b-instruct`) and `qwen2.5-coder:7b`
+  (coding, unchanged). LM Studio: `qwen3-vl-8b-instruct` and `qwen2.5-coder-7b-instruct`.
+  `packages/shared/src/config/inference-providers.ts` gained `InferenceRole` and
+  `INFERENCE_ROLE_DEFAULTS` (per-role context window + temperature); every installer,
+  config writer, and the Admin Portal Config tab derive from this one seam rather than
+  restating literals.
+- **Five new runtime-tunable config fields, exposed in `config.json` and the Admin Portal
+  Config tab, with a configured value always beating the code default:** `llm.contextWindow`,
+  `llm.codeContextWindow`, `llm.codeTemperature`, `embedding.contextWindow`,
+  `embedding.batchSize`. A new field-level parity gate
+  (`apps/tools-api/src/routes/config-section-coverage.test.ts`) fails if a schema field is
+  ever added to the config without a matching Admin Portal field — the previous gate only
+  checked section names, so a missing field passed silently.
+
 ## [1.58.0] - 2026-09-20
 
 ### Added
