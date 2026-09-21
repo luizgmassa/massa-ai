@@ -915,6 +915,27 @@ config→env→seam precedence itself. Gate: 13/14 (was 11/12) — the 1 remaini
 red: reverting the call site to the old literal failed both new precedence tests on the exact
 values changed; restored by file copy, `git status` clean before commit.
 
+**Fix Pass 1, Batch 1 (F1-F3), F3 — Complete. Batch 1 closed.**
+`scripts/lib/installer-api-key.sh`'s `installer_provider_defaults` now derives `LLM_MODEL`/
+`CODE_MODEL` from `${MASSA_AI_LLM_MODEL:-<provider literal>}` /
+`${MASSA_AI_LLM_CODE_MODEL:-<provider literal>}` instead of an unconditional literal, closing G5
+(the wizard pulled/loaded one model per `MASSA_AI_LLM_MODEL` and then wrote a different one to
+`config.json`). Reads the stable env var, not the mutable `LLM_MODEL`/`CODE_MODEL` globals, so
+the function's existing "no cross-call leak" invariant (a second `installer_write_config` call
+for a different provider in the same shell) still holds. Found in the process: the existing
+bash test asserted `"$CODE_MODEL" == json_field(...)` **after** the call that itself reassigns
+the global `CODE_MODEL`, so it compared the mutated value against itself and passed regardless
+of the actual defect — exactly why G5 shipped undetected. Removed that shallow assertion and
+the now-inert `LLM_MODEL`/`CODE_MODEL` presets; added a subshell-isolated block proving both the
+override-survives and default-applies cases. Gate: `test-setup-local-first-api-key.sh` 43/0 (was
+40/0), `installer-config-template.test.ts` 34/0 (unchanged). Observed red: restoring the
+unconditional literal failed exactly the two new override tests; restored by file copy, `git
+status` clean before commit.
+
+All of Batch 1 (F1-F3) is closed. Next: Batch 2 (F4-F5, per tasks.md — F4 depends on F1+F2, both
+now done) or F9's final status/STATE/HANDOFF update once every fix task lands, per tasks.md's
+explicit "run this task last" ordering.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),

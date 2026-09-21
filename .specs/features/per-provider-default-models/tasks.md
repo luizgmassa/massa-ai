@@ -908,7 +908,7 @@ config-wins test got `from-env` instead of `from-config-json`); restored by file
 status` clean, re-run 13/14 green (same 1 pre-existing failure).
 `apps/tools-api` `bun run type-check` clean.
 
-### F3: `installer_provider_defaults` must not clobber an explicit `MASSA_AI_LLM_MODEL`
+### F3: `installer_provider_defaults` must not clobber an explicit `MASSA_AI_LLM_MODEL` — ✅ Complete
 
 `scripts/lib/installer-api-key.sh:205-206,214-215`, called at `:312` from
 `installer_write_config`, which `setup-local-first.sh:576` invokes **after** `:334-339` has already
@@ -919,6 +919,34 @@ wait for a later feature.
 Tests: an explicit MASSA_AI_LLM_MODEL survives installer_write_config; the default still applies when unset
 Gate: bash scripts/tests/test-setup-local-first-api-key.sh && bun test scripts/__tests__/installer-config-template.test.ts
 Depends on: none.
+
+**Resolution (2026-09-20).** `installer_provider_defaults`'s `LLM_MODEL`/`CODE_MODEL`
+assignments now read `${MASSA_AI_LLM_MODEL:-<provider literal>}` /
+`${MASSA_AI_LLM_CODE_MODEL:-<provider literal>}` in both the `lmstudio` and default (`ollama`)
+branches, instead of the unconditional literal. This targets the actual override signal
+(the stable env var `setup-local-first.sh:334-339` already reads) rather than the mutable
+`LLM_MODEL`/`CODE_MODEL` globals themselves — preserving the existing "no cross-call leak"
+invariant the function's own docstring records (a second `installer_write_config` call in the
+same shell, for a different provider, must not inherit the first call's derived model), since
+neither branch reads the previous call's `LLM_MODEL`/`CODE_MODEL` value at all.
+
+Found and fixed while implementing: `scripts/tests/test-setup-local-first-api-key.sh` pre-set
+`LLM_MODEL="qwen3:8b"`/`CODE_MODEL="qwen3-coder:30b"` as globals, then asserted
+`"$CODE_MODEL" == json_field(...)` **after** `installer_write_config` ran — but
+`installer_provider_defaults` reassigns the same global `CODE_MODEL` as a side effect, so the
+assertion compared the post-call value against itself and passed regardless of what the file
+actually held (a default-shares-the-success-branch shape). This is exactly why G5 shipped
+undetected. Removed the shallow assertion and the now-inert `LLM_MODEL`/`CODE_MODEL` presets
+(orphaned by this fix — they are outputs of `installer_provider_defaults`, never inputs, per the
+function's own pre-existing docstring); added a dedicated subshell-isolated block asserting both
+the override-survives and default-still-applies cases for `llm.model` and `llm.codeModel`.
+
+Gate: `bash scripts/tests/test-setup-local-first-api-key.sh` → 43/0 (was 40/0 — net +3: one
+shallow assertion removed, four real ones added). `bun test
+scripts/__tests__/installer-config-template.test.ts` → 34/0 (unchanged, already green).
+Observed red: restoring the unconditional literal assignment failed exactly the two new
+override-survives assertions (`expected 'custom-instruct-model', got 'qwen3-vl:8b'` and the
+codeModel equivalent); restored by file copy, `git status` clean, re-run 43/0 and 34/0 green.
 
 ### F4: The parity gate must enumerate rows from the requirement, not the diff — PDM-05 AC-1
 

@@ -121,12 +121,10 @@ fi
 DATABASE_URL="postgresql://massa_ai:pw@localhost:5432/massa_ai"
 EMBEDDING_MODEL="qwen3-embedding:4b"
 OLLAMA_URL="http://localhost:11434"
-LLM_MODEL="qwen3:8b"
-CODE_MODEL="qwen3-coder:30b"
 SEARCH_QU_ENABLED=false
 SEARCH_RERANK_ENABLED=false
 DATA_DIR="${TMP_ROOT}/data"
-export DATABASE_URL EMBEDDING_MODEL OLLAMA_URL LLM_MODEL CODE_MODEL DATA_DIR
+export DATABASE_URL EMBEDDING_MODEL OLLAMA_URL DATA_DIR
 
 WRITTEN_CFG="${TMP_ROOT}/written/config.json"
 mkdir -p "$(dirname "$WRITTEN_CFG")"
@@ -153,8 +151,6 @@ assert_eq "written config keeps database.url" \
     "$DATABASE_URL" "$(json_field "$WRITTEN_CFG" 'c.database.url')"
 assert_eq "written config keeps embedding.model" \
     "$EMBEDDING_MODEL" "$(json_field "$WRITTEN_CFG" 'c.embedding.model')"
-assert_eq "written config keeps llm.codeModel" \
-    "$CODE_MODEL" "$(json_field "$WRITTEN_CFG" 'c.llm.codeModel')"
 assert_eq "written config keeps dataDir" \
     "$DATA_DIR" "$(json_field "$WRITTEN_CFG" 'c.dataDir')"
 
@@ -199,9 +195,7 @@ mkdir -p "$(dirname "$LMS_CFG")"
 (
     INFERENCE_PROVIDER="lmstudio"
     EMBEDDING_MODEL="text-embedding-nomic-embed-text-v1.5"
-    LLM_MODEL="qwen/qwen3-4b-2507"
-    CODE_MODEL="qwen/qwen3-4b-2507"
-    export INFERENCE_PROVIDER EMBEDDING_MODEL LLM_MODEL CODE_MODEL
+    export INFERENCE_PROVIDER EMBEDDING_MODEL
     installer_write_config "$LMS_CFG" "$FIRST_KEY"
 )
 assert_eq "an LM Studio write records provider lmstudio" \
@@ -221,6 +215,39 @@ if [ "$(json_field "$LMS_CFG" 'c.llm.apiKey')" = "ollama" ]; then
 else
     ok "an LM Studio write does not carry the hardcoded ollama llm.apiKey"
 fi
+
+# ---- F3/G5: an explicit MASSA_AI_LLM_MODEL survives installer_write_config -
+# setup-local-first.sh:334-339 honours MASSA_AI_LLM_MODEL/MASSA_AI_LLM_CODE_MODEL
+# before installer_write_config ever runs (pulls, loads and announces that
+# model); installer_provider_defaults used to overwrite LLM_MODEL/CODE_MODEL
+# from INFERENCE_PROVIDER unconditionally, silently discarding the override.
+# Each case runs in its own subshell so the override never leaks into a
+# sibling assertion — the isolation this suite's own comment above already
+# names as the reason `installer_provider_defaults`'s assignments must not
+# read a previous call's leftover state.
+OVERRIDE_CFG="${TMP_ROOT}/override/config.json"
+mkdir -p "$(dirname "$OVERRIDE_CFG")"
+(
+    MASSA_AI_LLM_MODEL="custom-instruct-model"
+    MASSA_AI_LLM_CODE_MODEL="custom-code-model"
+    export MASSA_AI_LLM_MODEL MASSA_AI_LLM_CODE_MODEL
+    installer_write_config "$OVERRIDE_CFG" "$FIRST_KEY"
+)
+assert_eq "an explicit MASSA_AI_LLM_MODEL survives installer_write_config" \
+    "custom-instruct-model" "$(json_field "$OVERRIDE_CFG" 'c.llm.model')"
+assert_eq "an explicit MASSA_AI_LLM_CODE_MODEL survives installer_write_config" \
+    "custom-code-model" "$(json_field "$OVERRIDE_CFG" 'c.llm.codeModel')"
+
+NO_OVERRIDE_CFG="${TMP_ROOT}/no-override/config.json"
+mkdir -p "$(dirname "$NO_OVERRIDE_CFG")"
+(
+    unset MASSA_AI_LLM_MODEL MASSA_AI_LLM_CODE_MODEL
+    installer_write_config "$NO_OVERRIDE_CFG" "$FIRST_KEY"
+)
+assert_eq "the ollama llm.model default still applies when MASSA_AI_LLM_MODEL is unset" \
+    "qwen3-vl:8b" "$(json_field "$NO_OVERRIDE_CFG" 'c.llm.model')"
+assert_eq "the ollama llm.codeModel default still applies when MASSA_AI_LLM_CODE_MODEL is unset" \
+    "qwen2.5-coder:7b" "$(json_field "$NO_OVERRIDE_CFG" 'c.llm.codeModel')"
 
 # ---- Re-run idempotency: the whole point of the task ------------------------
 
