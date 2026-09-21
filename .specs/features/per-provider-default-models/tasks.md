@@ -948,7 +948,7 @@ Observed red: restoring the unconditional literal assignment failed exactly the 
 override-survives assertions (`expected 'custom-instruct-model', got 'qwen3-vl:8b'` and the
 codeModel equivalent); restored by file copy, `git status` clean, re-run 43/0 and 34/0 green.
 
-### F4: The parity gate must enumerate rows from the requirement, not the diff — PDM-05 AC-1
+### F4: The parity gate must enumerate rows from the requirement, not the diff — PDM-05 AC-1 — ✅ Complete
 
 Two population defects, one cause:
 
@@ -967,6 +967,65 @@ Two population defects, one cause:
 Tests: one induced red per added row and per the new completeness scan; a red proving the env-default shape is now in population
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts
 Depends on: F1, F2.
+
+**Resolution (2026-09-20).** Row set derived from PDM-02 AC-2 ("any installer or config CLI
+writes config.json for a provider ... SHALL write that provider's three model ids"): every
+provider (ollama, lmstudio) × branch (`init --lmstudio`, `use ollama`, `use lmstudio`) × role
+(embedding model, embedding dims, instruct, coding) × CLI (mcp-client, opencode-plugin) that
+writes via property access rather than a config-cli literal. Added the two missing
+`DERIVED_SURFACES` rows — `(use ollama, instruct)` and `(use ollama, coding)` — per CLI (4 new
+entries; 24 → 28 structural rows), closing the exact gap G0 exploited.
+
+Narrowed the Tier-3 completeness scan's `process.env` exclusion from a blanket
+`line.includes("process.env")` skip to a bare-read check (`isBareEnvRead`/`envLiteralDefaultFor`):
+a `process.env.TOKEN` mention with no `||`/`??` literal fallback stays invisible by design
+(LIP-24), but the same mention followed by `||`/`??` and a quote/digit literal is now flagged as
+a default declaration — exactly F2's original defect shape
+(`process.env.OLLAMA_EMBEDDING_MODEL || "qwen3-embedding:4b"`). Scoped per-scan to its own token
+(embedding vs instruct/coding) so an unrelated `process.env.X || "..."` on a neighbouring line
+(e.g. `OLLAMA_BASE_URL`) is never misattributed.
+
+Added a second completeness scan, "no unlisted tracked file assigns a `*_LLM_MODEL/CODE_MODEL`
+default" — the instruct/coding half never had one outside the narrow Markdown tier. Population:
+20 tracked files mention the token; known/reviewed set is `INSTRUCT_CODING_SURFACES`'s 4 files
+plus `packages/shared/src/config/index.ts`/`index.ts` (the seam-derived production reader and its
+barrel export), `docker-compose.yml` (empty passthrough), `turbo.json` (bare passthrough
+allowlist), and `benchmarks/llm-judge/run.ts` (a deliberately provider-independent benchmark
+judge-model default, reviewed, not a PDM-02 AC-2 writer).
+
+Found and fixed while implementing (pre-existing, not this task's defect, in this task's own
+gate file): F3 (Batch 1, already committed) changed `installer-api-key.sh`'s
+`LLM_MODEL="literal"` shape to `LLM_MODEL="${MASSA_AI_LLM_MODEL:-literal}"`, which silently broke
+`INSTRUCT_CODING_SURFACES`'s extractor regex (it started capturing the whole `${...}` expression
+instead of the literal) — confirmed red at HEAD before this task's own edits. Re-anchored the
+extractor on the new shape, mirroring `setup-local-first.sh`'s existing `${MASSA_AI_LLM_MODEL:-...}`
+pattern; the expected values are unchanged.
+
+Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 15/15 (was 14/14). `bun
+run lint` clean.
+
+Observed red, per subject:
+- `(use ollama, instruct)`/`(use ollama, coding)` rows, both CLIs: reverting either
+  `config.llm.model`/`config.llm.codeModel` assignment in the `ollama` branch to a bogus literal
+  failed the "derived (structural) config-cli.ts surfaces" test, naming both offending rows by
+  label (`... (use ollama, instruct)`/`(use ollama, coding)`) with "seam derivation missing,
+  reverted to a literal, or extractor rotted".
+- Embedding completeness scan (M16's class): reproducing F2's original defect shape in
+  `system.ts` (`return process.env.OLLAMA_EMBEDDING_MODEL || "totally-bogus-model:99b";`) failed
+  "no unlisted tracked file assigns a `*_EMBEDDING_MODEL/DIMENSIONS` default", naming
+  `apps/tools-api/src/routes/system.ts` and the exact offending line.
+- Instruct/coding completeness scan (new tier): injecting
+  `const _F4_PROBE = process.env.MASSA_AI_LLM_MODEL || "totally-bogus-instruct:1b";` into
+  `packages/core/src/services/memory/llm-client.ts` (a file with zero prior mentions of the
+  token) failed "no unlisted tracked file assigns a `*_LLM_MODEL/CODE_MODEL` default", naming the
+  file and the injected line.
+
+All four mutations restored by file copy; `git status` clean before commit; re-run 15/15 green
+each time.
+
+SPEC_DEVIATION: none — the `installer-api-key.sh` extractor fix is a sensor-fidelity correction
+in this task's own gate file (F3's syntax change broke the regex, not the assertion's target
+value), not a deviation from F4's own scope.
 
 ### F5: Sense the production `llm.*` config reader — PDM-12 AC-2
 

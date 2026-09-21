@@ -39,6 +39,25 @@ import { INFERENCE_PROVIDERS } from "../../packages/shared/src/config/inference-
 const ROOT = join(import.meta.dir, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
+// F4/G1 — a `process.env.X` mention with no `||`/`??` literal fallback is a
+// bare read through the seam (LIP-24) and stays invisible to a completeness
+// scan by design. The same mention followed by `||`/`??` and a literal IS a
+// default declaration: F2's original defect
+// (`process.env.OLLAMA_EMBEDDING_MODEL || "qwen3-embedding:4b"`) was exactly
+// this shape, and the old blanket `line.includes("process.env")` skip carved
+// every env-guarded literal default out of the scan's population, including
+// this one. The literal-default check is scoped to the scan's own token
+// (embedding vs instruct/coding) so an unrelated `process.env.X || "..."`
+// read on a neighbouring line (e.g. `OLLAMA_BASE_URL`) never gets flagged as
+// this scan's offender — only requires a quote or digit immediately after
+// the operator so a seam property-access fallback is never mistaken for one.
+function envLiteralDefaultFor(tokenPattern: string): RegExp {
+  return new RegExp(`process\\.env\\.${tokenPattern}\\s*(?:\\|\\||\\?\\?)\\s*["'\\d]`);
+}
+function isBareEnvRead(line: string, literalDefault: RegExp): boolean {
+  return line.includes("process.env") && !literalDefault.test(line);
+}
+
 function extractOne(surface: string, text: string, re: RegExp): string {
   const matches = [...text.matchAll(re)].map((m) => m[1]);
   if (matches.length !== 1) {
@@ -273,6 +292,21 @@ const DERIVED_SURFACES: StructuralSurface[] = CONFIG_CLI_FILES.flatMap((file) =>
     expected: "knownEmbeddingDimensions(model)",
   },
   {
+    // F4 — this row and its coding sibling were the gap that made F1 (the
+    // "use ollama" branch never writing instruct/coding ids) invisible: the
+    // table had the lmstudio counterparts (below) but no ollama ones.
+    file,
+    label: `${file} (use ollama, instruct)`,
+    pattern: new RegExp(`provider === "ollama"\\) \\{${BOUND}config\\.llm\\.model = (INFERENCE_PROVIDERS\\.ollama\\.defaultModels\\.instruct);`, "g"),
+    expected: "INFERENCE_PROVIDERS.ollama.defaultModels.instruct",
+  },
+  {
+    file,
+    label: `${file} (use ollama, coding)`,
+    pattern: new RegExp(`provider === "ollama"\\) \\{${BOUND}config\\.llm\\.codeModel = (INFERENCE_PROVIDERS\\.ollama\\.defaultModels\\.coding);`, "g"),
+    expected: "INFERENCE_PROVIDERS.ollama.defaultModels.coding",
+  },
+  {
     file,
     label: `${file} (use lmstudio, embedding model)`,
     pattern: new RegExp(`provider === "lmstudio"\\) \\{${BOUND}const model = \\(options\\.model as string\\) \\|\\| (INFERENCE_PROVIDERS\\.lmstudio\\.defaultModels\\.embedding);`, "g"),
@@ -343,15 +377,22 @@ const INSTRUCT_CODING_SURFACES: MultiMatchRow[] = [
     expected: [INFERENCE_PROVIDERS.ollama.defaultModels.coding],
   },
   {
+    // F3 (Fix Pass 1, Batch 1) changed this file's shape from a bare
+    // `LLM_MODEL="<literal>"` to `LLM_MODEL="${MASSA_AI_LLM_MODEL:-<literal>}"`
+    // (an explicit-override survives, per G5) — the old extractor captured
+    // the whole `${...}` expression instead of the literal and this test
+    // regressed silently until this gate ran again. Re-anchored on the new
+    // shape, mirroring setup-local-first.sh's own `${MASSA_AI_LLM_MODEL:-...}`
+    // extractor below.
     file: "scripts/lib/installer-api-key.sh",
     label: "installer-api-key.sh installer_provider_defaults (instruct)",
-    pattern: /LLM_MODEL="([^"]+)"/g,
+    pattern: /LLM_MODEL="\$\{MASSA_AI_LLM_MODEL:-([^}]+)\}"/g,
     expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct, INFERENCE_PROVIDERS.ollama.defaultModels.instruct],
   },
   {
     file: "scripts/lib/installer-api-key.sh",
     label: "installer-api-key.sh installer_provider_defaults (coding)",
-    pattern: /CODE_MODEL="([^"]+)"/g,
+    pattern: /CODE_MODEL="\$\{MASSA_AI_LLM_CODE_MODEL:-([^}]+)\}"/g,
     expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.coding, INFERENCE_PROVIDERS.ollama.defaultModels.coding],
   },
   {
@@ -556,6 +597,7 @@ describe("embedding defaults parity (EDC-06)", () => {
     // the passthrough allowlist (turbo.json is a bare name list, no "=").
     const mentionsToken = /[A-Za-z][A-Za-z0-9]*_EMBEDDING_(MODEL|DIMENSIONS)/;
     const assignment = /[A-Za-z][A-Za-z0-9]*_EMBEDDING_(MODEL|DIMENSIONS)\s*[=:]\s*["']?[\w.${:-]/;
+    const literalDefault = envLiteralDefaultFor("\\w*_EMBEDDING_(?:MODEL|DIMENSIONS)");
     const known = new Set([
       ...PAIR_SURFACES.map((s) => s.file),
       ...MODEL_ONLY_SURFACES.map((s) => s.file),
@@ -589,8 +631,8 @@ describe("embedding defaults parity (EDC-06)", () => {
       scanned++;
       if (known.has(f) || isTestFile(f) || allowedPrefixes.some((p) => f.startsWith(p))) continue;
       for (const line of text.split("\n")) {
-        if (line.includes("process.env")) continue;
-        if (assignment.test(line)) {
+        if (isBareEnvRead(line, literalDefault)) continue;
+        if (assignment.test(line) || literalDefault.test(line)) {
           offenders.push(`${f}: ${line.trim()}`);
           break;
         }
@@ -598,6 +640,71 @@ describe("embedding defaults parity (EDC-06)", () => {
     }
     console.log(`[parity] completeness scan population: ${scanned} tracked files mention *_EMBEDDING_MODEL/DIMENSIONS`);
     expect(scanned).toBeGreaterThan(5); // the scan itself must see its subjects
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * F4/G1 — the embedding half has two completeness scans (this file's
+   * `*_EMBEDDING_MODEL/DIMENSIONS` tier above and the width-writer tier
+   * below); the instruct/coding half had none outside the narrow Markdown
+   * tier. `INSTRUCT_CODING_SURFACES` above only checks the 4 files it
+   * already knows about *by value* — it cannot see a fifth, unlisted writer
+   * appear. This tier makes that population a gate the same way the
+   * embedding tier already is, keyed on the single `MASSA_AI_LLM_*` env
+   * prefix (AD-010) rather than a provider prefix, since instruct/coding
+   * never had per-provider env var names the way `OLLAMA_EMBEDDING_MODEL` /
+   * `LMSTUDIO_EMBEDDING_MODEL` do.
+   */
+  test("no unlisted tracked file assigns a *_LLM_MODEL/CODE_MODEL default", () => {
+    const ls = Bun.spawnSync(["git", "ls-files"], { cwd: ROOT });
+    const tracked = ls.stdout.toString().trim().split("\n");
+    const mentionsToken = /[A-Za-z][A-Za-z0-9]*_LLM_(MODEL|CODE_MODEL)/;
+    const assignment = /[A-Za-z][A-Za-z0-9]*_LLM_(MODEL|CODE_MODEL)\s*[=:]\s*["']?[\w.${:-]/;
+    const literalDefault = envLiteralDefaultFor("\\w*_LLM_(?:MODEL|CODE_MODEL)");
+    const known = new Set([
+      ...INSTRUCT_CODING_SURFACES.map((s) => s.file),
+      // The production reader itself (F5's subject) and its barrel
+      // re-export: both derive through `DEFAULT_LLM_MODEL`/
+      // `DEFAULT_LLM_CODE_MODEL` (the seam), never a literal.
+      "packages/shared/src/config/index.ts",
+      "packages/shared/src/index.ts",
+      // Pure env passthrough into the container, empty fallback — no literal
+      // model default (`${MASSA_AI_LLM_MODEL:-}`).
+      "docker-compose.yml",
+      // Turbo's passthrough allowlist — a bare name list, no "=".
+      "turbo.json",
+      // The LLM-judge benchmark's own fixed comparison-baseline default
+      // (`qwen2.5:7b-instruct`/`qwen2.5-coder:7b`) is a deliberately
+      // provider-independent judge model, not a per-provider runtime
+      // default — reviewed, not a PDM-02 AC-2 writer.
+      "benchmarks/llm-judge/run.ts",
+    ]);
+    const allowedPrefixes = [".specs/", "docs/", "CHANGELOG.md", "FEATURES.md", "README.md"];
+    const isTestFile = (f: string) => /__tests__|\.test\.ts$|^scripts\/tests\//.test(f);
+
+    const offenders: string[] = [];
+    let scanned = 0;
+    for (const f of tracked) {
+      if (!/\.(ts|js|sh|ya?ml|json)$|^Dockerfile$|^\.env/.test(f)) continue;
+      let text: string;
+      try {
+        text = read(f);
+      } catch {
+        continue;
+      }
+      if (!mentionsToken.test(text)) continue;
+      scanned++;
+      if (known.has(f) || isTestFile(f) || allowedPrefixes.some((p) => f.startsWith(p))) continue;
+      for (const line of text.split("\n")) {
+        if (isBareEnvRead(line, literalDefault)) continue;
+        if (assignment.test(line) || literalDefault.test(line)) {
+          offenders.push(`${f}: ${line.trim()}`);
+          break;
+        }
+      }
+    }
+    console.log(`[parity] instruct/coding completeness scan population: ${scanned} tracked files mention *_LLM_MODEL/CODE_MODEL`);
+    expect(scanned).toBeGreaterThan(0); // the scan itself must see its subjects
     expect(offenders).toEqual([]);
   });
 

@@ -950,6 +950,25 @@ clean. Observed red: reverting to config-first order failed exactly the new "env
 (`system.test.ts:181`, expected `from-env` got `from-config-json`); restored by file copy,
 `git status` clean before commit, re-run green.
 
+**Fix Pass 1, Batch 2 (F2b, F4, F5), F4 — Complete.** Closed the parity gate's own set/subset
+defect (G1): row/scan population now derives from PDM-02 AC-2, not from what the code already
+assigns. Added `(use ollama, instruct)`/`(use ollama, coding)` to `DERIVED_SURFACES` (4 new rows
+across both CLIs; 24 → 28), narrowed the embedding completeness scan's `process.env` exclusion to
+bare reads only (`isBareEnvRead`/`envLiteralDefaultFor`, scoped per-scan-token) so a
+`process.env.X || "<literal>"` default declaration — F2's original defect shape — is in
+population, and added a new instruct/coding completeness scan (20 tracked files) that never
+existed outside the Markdown tier. Found and fixed a pre-existing regression in this same gate
+file: F3 (Batch 1) changed `installer-api-key.sh`'s shape to
+`LLM_MODEL="${MASSA_AI_LLM_MODEL:-literal}"`, silently breaking `INSTRUCT_CODING_SURFACES`'s
+extractor (confirmed red at HEAD before this task); re-anchored the regex, expected values
+unchanged. Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 15/15 (was
+14/14). `bun run lint` clean. Observed red per subject: reverting either new `DERIVED_SURFACES`
+row to a literal on both CLIs named the row by label; reproducing F2's original
+`process.env.OLLAMA_EMBEDDING_MODEL || "<literal>"` shape in `system.ts` named that file and
+line; injecting an unlisted `process.env.MASSA_AI_LLM_MODEL || "<literal>"` probe into
+`llm-client.ts` (zero prior token mentions) named that file and line. All four restored by file
+copy, `git status` clean before commit, re-run 15/15 green each time.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
