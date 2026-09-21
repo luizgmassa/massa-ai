@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The installer asks LM Studio users which weight format to pull, ordered by platform.**
+  A new `installer_select_model_format` step offers MLX first on macOS and GGUF first
+  everywhere else, overridable with `MASSA_AI_LMSTUDIO_MODEL_FORMAT` (`gguf` | `mlx`; an
+  unrecognised value is fatal and names itself). Choosing MLX verifies LM Studio's MLX
+  engine and installs it (`lms runtime get mlx-llm`) when absent. `lms get` now always
+  receives an explicit `--gguf`/`--mlx` flag — with neither, it considers "only options
+  supported by your system", which on Apple Silicon can resolve MLX weights for a GGUF
+  install. The non-interactive default stays `gguf` on every platform: a scripted install
+  has nobody there to read the warning below. `INFERENCE_PROVIDERS.lmstudio` gained
+  `mlxModels`, one Hugging Face repo + catalog id per role, held identical to the wizard's
+  copy by `scripts/__tests__/mlx-model-parity.test.ts`.
+- **Measured limitation, surfaced at the point of choice:** MLX covers the instruct and
+  coding roles only. LM Studio types a model by architecture and only prefixes
+  `text-embedding-` onto what it types EMBEDDING; the MLX build of Qwen3-Embedding is
+  `Qwen3ForCausalLM`, so it is typed LLM and `/v1/embeddings` answers
+  `{"error":"No models loaded..."}` for it while the GGUF build returns 1024 floats on the
+  same server in the same second. `lms runtime get -l` lists exactly one MLX engine,
+  `mlx-llm`, with no embedding counterpart. The installer warns and names the GGUF model to
+  switch back to rather than silently substituting it.
+
+### Fixed
+
+- **The Admin Portal's Config tab rendered `embedding.contextWindow` and
+  `embedding.batchSize` blank.** Both are declared fields, but
+  `defaultMassaAiConfig.embedding` deliberately carries neither — the role table and the
+  provider seam are their default source — so the tab's `defaults` fallback had nothing to
+  show. `GET /api/v1/config` now derives the pair into its `defaults` block (display state,
+  never merged back into a config, so the loader contract is unchanged); `batchSize`
+  follows the persisted `embedding.provider`. Unresolved fields on a bare config drop from
+  7 of 110 to 5.
+- **A fresh LM Studio install wrote `llm.disableThink: false`,** which read as a deliberate
+  opt-out of a setting whose shipped default is on. It changed no request — the
+  `think:false` injection is gated on the provider seam's `injectsDisableThink`, not on
+  this field — and only made the Admin Portal render the toggle off. Both providers now
+  write the shipped default.
+
 ### Changed
 
 - **BREAKING — the Ollama embedding default moves from `qwen3-embedding:4b` (2560d) to

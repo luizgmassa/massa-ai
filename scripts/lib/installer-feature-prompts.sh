@@ -295,6 +295,139 @@ installer_select_provider() {
   esac
 }
 
+# installer_select_model_format
+#
+# Resolves which weight format the LM Studio models are pulled in, and sets one
+# global rather than echoing, for the same reason installer_select_provider
+# does: a `die` inside a $(...) capture only kills the subshell.
+#
+#   LMSTUDIO_MODEL_FORMAT   gguf | mlx
+#
+# A no-op on Ollama, which serves GGUF only — `INFERENCE_PROVIDERS.ollama`
+# declares no `mlxModels` at all — so the global stays "gguf" for the writer.
+#
+# The menu ORDER is OS-dependent, because the MLX engine is Apple-silicon only:
+# on macOS MLX is rung 1 and the default, everywhere else GGUF is. `uname -s`
+# rather than `$OSTYPE`: this file is sourced by both installers and by the
+# shell test suites, and $OSTYPE is a bashism that does not survive `sh`.
+#
+# The NON-INTERACTIVE default is gguf on every OS, deliberately not the
+# platform's rung 1. An install with nobody at the terminal has no offer to
+# make, and MLX is the branch whose embedding role is measured broken (see
+# below) — picking it silently would turn a CI or scripted install into a
+# config that cannot embed, with no one there to read the warning.
+#
+# MASSA_AI_LMSTUDIO_MODEL_FORMAT follows MASSA_AI_INFERENCE_PROVIDER: an
+# unrecognised value is fatal and names itself, never a silent default.
+installer_select_model_format() {
+  local reply first second
+  LMSTUDIO_MODEL_FORMAT="gguf"
+
+  [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ] || return 0
+
+  case "${MASSA_AI_LMSTUDIO_MODEL_FORMAT:-}" in
+    "") ;;
+    gguf|mlx)
+      LMSTUDIO_MODEL_FORMAT="$MASSA_AI_LMSTUDIO_MODEL_FORMAT"
+      [ "$LMSTUDIO_MODEL_FORMAT" = "mlx" ] && installer_warn_mlx_embedding
+      return 0
+      ;;
+    *)
+      die "Invalid MASSA_AI_LMSTUDIO_MODEL_FORMAT: '${MASSA_AI_LMSTUDIO_MODEL_FORMAT}'. Choose gguf or mlx."
+      ;;
+  esac
+
+  if [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
+    first="mlx"; second="gguf"
+  else
+    first="gguf"; second="mlx"
+  fi
+
+  if ! installer_can_prompt; then
+    echo "  Non-interactive install — LM Studio model format: ${LMSTUDIO_MODEL_FORMAT}"
+    return 0
+  fi
+
+  echo ""
+  echo "  LM Studio model format:"
+  echo ""
+  echo "    1) $(installer_model_format_label "$first")  (default)"
+  echo "    2) $(installer_model_format_label "$second")"
+  echo ""
+  reply=""
+  read -r -p "  Enter your choice [1]: " reply <>/dev/tty || reply=""
+  case "$reply" in
+    2) LMSTUDIO_MODEL_FORMAT="$second" ;;
+    *) LMSTUDIO_MODEL_FORMAT="$first" ;;
+  esac
+
+  [ "$LMSTUDIO_MODEL_FORMAT" = "mlx" ] && installer_warn_mlx_embedding
+  return 0
+}
+
+# installer_model_format_label <gguf|mlx>
+installer_model_format_label() {
+  case "$1" in
+    mlx) echo "MLX   (Apple Silicon only — Metal-native weights)" ;;
+    *)   echo "GGUF  (portable — llama.cpp, every platform)" ;;
+  esac
+}
+
+# installer_warn_mlx_embedding
+#
+# The MLX branch is measured broken for ONE of the three roles, and silence
+# here would leave the user with a config that indexes nothing and no clue why.
+# LM Studio types a model by architecture and only prefixes `text-embedding-`
+# onto what it types EMBEDDING; the MLX build of Qwen3-Embedding is
+# Qwen3ForCausalLM, so it is typed LLM and /v1/embeddings refuses it. There is
+# no MLX embedding engine to route to either — `lms runtime get -l` lists
+# exactly one MLX entry, mlx-llm. Measured 2026-09-21; originally spec A-01.
+installer_warn_mlx_embedding() {
+  echo ""
+  echo "  ⚠  MLX selected. Instruct and coding run natively on Metal."
+  echo "     The embedding role does NOT: LM Studio types the MLX build of"
+  echo "     Qwen3-Embedding as an LLM, so /v1/embeddings answers"
+  echo "     'No models loaded' for it and indexing will fail."
+  echo "     To embed, switch embedding.model back to the GGUF build:"
+  echo "         text-embedding-qwen3-embedding-0.6b"
+  echo "     (Admin Portal -> Config -> Embedding, or config.json directly.)"
+}
+
+# installer_ensure_mlx_runtime <lms_cli>
+#
+# Installs LM Studio's MLX engine when the MLX format was chosen and the engine
+# is absent. `lms runtime get mlx-llm` is idempotent — it answers
+# "<engine>@<version> is already installed." and exits 0 — but it is still
+# gated on `runtime ls` so an install that needs nothing prints nothing and
+# spends no network round trip.
+#
+# Non-fatal by design: a missing engine surfaces as an LM Studio load error the
+# user can act on, and a hard `die` here would strand an install that is
+# otherwise complete. The failure is announced, never swallowed.
+installer_ensure_mlx_runtime() {
+  local cli="$1"
+
+  [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] || return 0
+  if [ -z "$cli" ]; then
+    echo "  ⚠  MLX selected but no lms CLI resolved — cannot verify the MLX engine."
+    return 0
+  fi
+
+  if "$cli" runtime ls 2>/dev/null | grep -q "mlx-llm"; then
+    echo "  ✓ MLX engine already installed"
+    return 0
+  fi
+
+  echo "  ⚠  MLX engine not installed. Installing..."
+  if "$cli" runtime get mlx-llm >/dev/null 2>&1; then
+    echo "  ✓ MLX engine installed"
+  else
+    echo "  ⚠  Could not install the MLX engine. Install it from LM Studio's"
+    echo "     Runtimes page, or run: ${cli} runtime get mlx-llm"
+  fi
+  return 0
+}
+
 # installer_prompt_features <llm_available>
 #
 # Walks every Config-tab feature section. <llm_available> is "true" when an LLM
