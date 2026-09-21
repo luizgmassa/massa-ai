@@ -207,8 +207,17 @@ installer_provider_defaults() {
       # Measured: LM Studio does not enforce auth, but the OpenAI client still
       # requires the header to exist.
       LLM_API_KEY="lmstudio"
-      # think:false is an Ollama-only request-body key (LIP-07).
-      LLM_DISABLE_THINK="false"
+      # think:false is an Ollama-only request-body key, and `llm-client.ts`
+      # already gates the injection on the resolved provider's
+      # `injectsDisableThink` (LIP-07) — so `true` here is inert on LM Studio,
+      # exactly as `false` was. It used to be written `false`, which made the
+      # Admin Portal show the toggle off on every LM Studio install and read as
+      # a deliberate opt-out of a setting whose shipped default
+      # (`defaultMassaAiConfig.llm.disableThink`, and the `?? true` in
+      # `config/index.ts`) is on. The written value now agrees with the default
+      # on both providers; the per-provider behaviour still comes from the seam,
+      # never from this literal.
+      LLM_DISABLE_THINK="true"
       LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
       CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
       ;;
