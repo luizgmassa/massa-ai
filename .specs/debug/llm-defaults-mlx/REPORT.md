@@ -12,7 +12,8 @@
 ## Issue Summary
 
 Five items reported against the just-merged per-provider-default-models feature, on a
-developer machine running LM Studio as the local inference provider.
+developer machine running LM Studio as the local inference provider. Item 6 was found
+while fixing 4/5 and predates this branch; item 7 was added by the user mid-fix.
 
 | # | Symptom | Impact | Frequency | Environment |
 |---|---|---|---|---|
@@ -21,6 +22,8 @@ developer machine running LM Studio as the local inference provider.
 | 3 | LM Studio embedding default should be the MLX build of Qwen3-Embedding | — (request, not a defect) | — | Apple Silicon |
 | 4 | Installer should offer MLX first on macOS, GGUF first elsewhere | — (request) | — | any |
 | 5 | Choosing MLX should verify and install the MLX engine | — (request) | — | Apple Silicon |
+| 6 | **Found while fixing 4/5:** the GGUF path fetched by catalog id, which `lms get` cannot resolve in any format | A fresh LM Studio install cannot pull any of the three models | Every install without the models already on disk | any |
+| 7 | Installer should evict models already resident before loading its own | Three more models added to a pool that may already be full | Every install on a machine mid-session | any |
 
 ## Feedback Loop
 
@@ -166,16 +169,53 @@ non-deterministic on Apple Silicon, where both engines are present.
 
 **Measured constraints that shaped the design:**
 
-- `lms get --mlx <catalog id>` → `Error: No staff picks found with the specified search
-  criteria`. Catalog ids are not searchable terms.
+- `lms get <catalog id>` → `Error: No staff picks found with the specified search
+  criteria`. Catalog ids are not searchable terms. Re-measured with `--gguf`, with `--mlx`
+  and with **no flag**: same error every time.
 - `lms get --mlx <bare search term>` resolves to whichever staff pick ranks first —
   `--mlx qwen3-vl` picked the **4B**, `--mlx qwen2.5-coder` the **32B**. Neither is the
   configured model.
 - Only a Hugging Face repo URL pins a build. Hence `mlxModels` carries a `{repo, model}`
   pair per role rather than an id alone.
-- `lms get --mlx` against the instruct and coding repos answered `Model already downloaded.
-  To use, run: lms load qwen3-vl-8b-instruct` / `... qwen2.5-coder-7b-instruct` — i.e. **the
-  GGUF installs' own ids**. For those two roles the format selects the weights, not the id.
+
+### 6 — The GGUF fetch path (found while fixing 4/5, fixed in the same branch)
+
+The first bullet above is not MLX-specific, and that is a defect older than this branch.
+The GGUF branch handed `lms get` the three **catalog ids**, so on any machine that did not
+already have the models the install died on `LM Studio could not fetch …`. It was never
+visible on a developer box because `inference_model_exists` short-circuits every model
+already on disk — the same blindness that let it ship in the first place.
+
+Both formats now fetch by repo URL (`ggufRepos` on the seam, gated by the parity test).
+
+**Retracted evidence.** An earlier revision of this report, of `mlxModels`'s docblock, of
+the CHANGELOG and of the PR body all claimed:
+
+> `lms get --mlx` against the instruct and coding repos answered `Model already downloaded.
+> To use, run: lms load qwen3-vl-8b-instruct` — i.e. the **GGUF installs' own ids**.
+
+The command and its output are real; the inference is not. `ls ~/.lmstudio/models/` shows
+those two builds under `mlx-community/` — **they were already MLX**. `lms get --mlx`
+matched the MLX build itself and observed nothing whatsoever about a GGUF sibling. No id in
+this project was ever measured for a GGUF LLM build.
+
+Rather than measure it (which means downloading ~10 GB to learn two strings), the fix makes
+the question stop mattering: `installer_lmstudio_model_key` reads the id back from
+`lms ls --json` after the fetch, matching the repo against the entry's `path` field, and
+writes what LM Studio reports. The literals survive only as the pre-fetch existence check
+and as a fallback.
+
+The same command also produced the mechanism behind A-01, free: the MLX embedding build
+reports `"type":"llm"` where the GGUF build of the same model reports `"type":"embedding"`.
+That is why it never gets the `text-embedding-` prefix and why `/v1/embeddings` refuses it.
+
+### 7 — Resident models were never evicted (user-reported, same branch)
+
+The wizard loads three models with `lms load`. Nothing checked what was already resident,
+so an install on a machine mid-session added three models to a pool that might already hold
+a 32B. `installer_unload_loaded_models` now sweeps both runtimes first — `lms ps --json`
+prints `[]` when idle (measured), which is what gates the unload; `ollama ps` has no
+equivalent flag and no `stop --all`, so its table is parsed and each name stopped.
 
 ## Fix + Validation
 

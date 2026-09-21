@@ -38,12 +38,12 @@ export const MODEL_FORMATS = ["gguf", "mlx"] as const;
 export type ModelFormat = (typeof MODEL_FORMATS)[number];
 
 /**
- * One role's MLX alternative: the Hugging Face repo `lms get --mlx <url>`
- * resolves, and the catalog id LM Studio then exposes on `/v1/models`. Both are
- * literals read from a live install, never derived — A-02 measured that the id
- * cannot be computed from the repo path (three samples, three different rules).
+ * One role's build of a given format: the Hugging Face repo `lms get` resolves,
+ * and the catalog id LM Studio then exposes on `/v1/models`. Both are literals
+ * read from a live install, never derived — A-02 measured that the id cannot be
+ * computed from the repo path (three samples, three different rules).
  */
-export interface MlxModelVariant {
+export interface ModelVariant {
   readonly repo: string;
   readonly model: string;
 }
@@ -59,30 +59,53 @@ export interface InferenceProviderSpec {
    * The MLX build of each `defaultModels` entry, where the provider has one.
    * Absent on Ollama, which serves GGUF only and has no MLX path at all.
    *
-   * Measured 2026-09-21 against a live LM Studio (0.3.x, Apple Silicon):
-   * instruct and coding resolve to the **same catalog id** as their GGUF
-   * siblings — `lms get --mlx <repo>` answered "Model already downloaded. To
-   * use, run: lms load qwen3-vl-8b-instruct" and "... qwen2.5-coder-7b-instruct"
-   * against the GGUF installs. The format picks the weights; the id is
-   * variant-independent for those two.
+   * Every `model` here is a catalog id read back from `lms ls --json` on a live
+   * install (0.3.x, Apple Silicon, 2026-09-21), keyed to the `path` field that
+   * records which repo produced it. They are NOT claims about the GGUF ids: an
+   * earlier revision of this comment cited `lms get --mlx <repo>` answering
+   * "Model already downloaded. To use, run: lms load <id>" as proof that a
+   * format change keeps the id — but the builds already on that disk were
+   * themselves MLX (`~/.lmstudio/models/mlx-community/…`), so the command
+   * matched the MLX build and observed nothing at all about a GGUF sibling.
+   * `ggufRepos` below records what is actually known about the other format.
    *
-   * Embedding is the exception, and it is the same exception that makes the
-   * role unusable on MLX. LM Studio types a model by architecture and prefixes
-   * `text-embedding-` onto anything it types EMBEDDING. The MLX repo is
-   * `Qwen3ForCausalLM` (Hugging Face `pipeline_tag: text-generation`), so it is
-   * typed LLM, gets no prefix, and lands as `qwen3-embedding-0.6b-dwq` — which
-   * is why `/v1/embeddings` answers `{"error":"No models loaded..."}` for it
-   * while the GGUF build returns 1024 floats on the same server in the same
-   * second (re-measured 2026-09-21; originally A-01). `lms runtime get -l`
-   * lists exactly one MLX engine, `mlx-llm` — there is no MLX embedding engine
-   * to route to.
+   * Embedding is the role that breaks on MLX, and `lms ls --json` names the
+   * mechanism outright: the MLX build reports `"type":"llm"` where the GGUF
+   * build of the same model reports `"type":"embedding"`. LM Studio types a
+   * model by architecture and prefixes `text-embedding-` onto anything it types
+   * EMBEDDING; the MLX repo is `Qwen3ForCausalLM` (Hugging Face
+   * `pipeline_tag: text-generation`), so it is typed LLM, gets no prefix, and
+   * lands as `qwen3-embedding-0.6b-dwq`. That typing is why `/v1/embeddings`
+   * answers `{"error":"No models loaded..."}` for it while the GGUF build
+   * returns 1024 floats on the same server in the same second (re-measured
+   * 2026-09-21; originally A-01). `lms runtime get -l` lists exactly one MLX
+   * engine, `mlx-llm` — there is no MLX embedding engine to route to either.
    *
    * The entry is kept anyway, at the user's explicit and re-confirmed
    * direction: selecting the MLX format is meant to be possible for every role.
    * The installer warns at the point of choice rather than silently
    * substituting GGUF for this one role.
    */
-  readonly mlxModels?: Readonly<Record<InferenceRole, MlxModelVariant>>;
+  readonly mlxModels?: Readonly<Record<InferenceRole, ModelVariant>>;
+  /**
+   * The Hugging Face repo each role's GGUF build comes from. Repos, not ids,
+   * because `lms get` cannot fetch by catalog id at all: measured 2026-09-21,
+   * `lms get text-embedding-qwen3-embedding-0.6b` answers "Error: No staff
+   * picks found with the specified search criteria" — with `--gguf`, with
+   * `--mlx`, and with no flag. Only a repo URL pins a build (a bare search term
+   * resolves to whatever staff pick ranks first: `--mlx qwen3-vl` picked the 4B,
+   * `--mlx qwen2.5-coder` the 32B).
+   *
+   * Paired with `defaultModels`, which carries the ids — but only the embedding
+   * one is measured (`Qwen/Qwen3-Embedding-0.6B-GGUF` → `path` prefix in
+   * `lms ls --json` → `text-embedding-qwen3-embedding-0.6b`). The two LLM ids
+   * are the MLX builds' measured ids, reused on the assumption that the format
+   * does not change the key — the assumption the retracted paragraph above once
+   * claimed to have verified. It is deliberately not load-bearing: the installer
+   * reconciles each id against `lms ls --json` after the fetch and writes what
+   * LM Studio reports, so a wrong literal here costs nothing at install time.
+   */
+  readonly ggufRepos?: Readonly<Record<InferenceRole, string>>;
   readonly appliesContextPerRequest: boolean;
   readonly embedBatchSize: number;
   readonly supportsOllamaVersionProbe: boolean;
@@ -184,6 +207,11 @@ export const INFERENCE_PROVIDERS: Readonly<
         repo: "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
         model: "qwen2.5-coder-7b-instruct",
       },
+    },
+    ggufRepos: {
+      embedding: "Qwen/Qwen3-Embedding-0.6B-GGUF",
+      instruct: "lmstudio-community/Qwen3-VL-8B-Instruct-GGUF",
+      coding: "lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF",
     },
     appliesContextPerRequest: false,
     embedBatchSize: 64,

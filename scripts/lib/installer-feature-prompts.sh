@@ -402,11 +402,13 @@ installer_warn_mlx_embedding() {
 #   EMBEDDING_MODEL / LLM_MODEL / CODE_MODEL     what config.json records
 #   EMBEDDING_FETCH / LLM_FETCH / CODE_FETCH     what `lms get` downloads
 #
-# The id and the fetch spec are NOT the same string on the MLX path. A build is
-# pinnable only by Hugging Face repo URL: measured 2026-09-21, `lms get --mlx`
+# The id and the fetch spec are NOT the same string on EITHER path. A build is
+# pinnable only by Hugging Face repo URL: measured 2026-09-21, `lms get`
 # against a catalog id answers "No staff picks found with the specified search
-# criteria", and against a bare search term resolves to whatever staff pick
-# ranks first (`--mlx qwen3-vl` picked the 4B, `--mlx qwen2.5-coder` the 32B).
+# criteria" in every format, and against a bare search term resolves to whatever
+# staff pick ranks first (`--mlx qwen3-vl` picked the 4B, `--mlx qwen2.5-coder`
+# the 32B). The ids stay literals only as the pre-fetch existence check and as a
+# fallback; `installer_lmstudio_model_key` reconciles them afterwards.
 #
 # Each MLX substitution is gated on ITS OWN override variable, never on the
 # format alone. The first version of this block set all three fetch specs
@@ -428,27 +430,128 @@ installer_resolve_lmstudio_models() {
   LLM_FETCH="$LLM_MODEL"
   CODE_FETCH="$CODE_MODEL"
 
-  [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] || return 0
-
-  # Only the EMBEDDING id changes with the format. Measured 2026-09-21:
-  # `lms get --mlx` against the instruct and coding repos answered "Model
-  # already downloaded. To use, run: lms load <the GGUF id>" — LM Studio keys
-  # those two to one catalog id per model, whatever the variant. Embedding
-  # diverges because LM Studio types the MLX build as an LLM and so never
-  # applies its `text-embedding-` prefix; that same typing is why
-  # /v1/embeddings refuses it.
-  #
   # Nested `if` rather than `[ ... ] && VAR=...`: the wizard runs under
   # `set -e`, and a trailing false test would leak exit 1 out of this function.
+  if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ]; then
+    # Only the EMBEDDING id is known to change with the format, and the reason
+    # is the reason the role does not work on MLX at all: `lms ls --json`
+    # reports `"type":"llm"` for the MLX build where the GGUF build of the same
+    # model reports `"type":"embedding"`, so LM Studio never applies its
+    # `text-embedding-` prefix. The instruct and coding ids are the same
+    # literals on both paths — an assumption, not a measurement, and one the
+    # post-fetch reconciliation below makes harmless.
+    if [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
+      EMBEDDING_MODEL="qwen3-embedding-0.6b-dwq"
+      EMBEDDING_FETCH="https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"
+    fi
+    if [ -z "${MASSA_AI_LLM_MODEL:-}" ]; then
+      LLM_FETCH="https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit"
+    fi
+    if [ -z "${MASSA_AI_LLM_CODE_MODEL:-}" ]; then
+      CODE_FETCH="https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+    fi
+    return 0
+  fi
+
+  # GGUF fetches by repo URL for the same reason MLX does, and this half was
+  # broken from the day the trio shipped: `lms get` cannot fetch by catalog id
+  # in ANY format. Measured 2026-09-21,
+  # `lms get text-embedding-qwen3-embedding-0.6b` answers "Error: No staff
+  # picks found with the specified search criteria" with `--gguf`, with `--mlx`,
+  # and with no flag at all. The GGUF path passed exactly those ids, so a fresh
+  # machine died on `die "LM Studio could not fetch ..."`. It never showed up on
+  # a developer box because `inference_model_exists` short-circuits every model
+  # already on disk.
   if [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
-    EMBEDDING_MODEL="qwen3-embedding-0.6b-dwq"
-    EMBEDDING_FETCH="https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"
+    EMBEDDING_FETCH="https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF"
   fi
   if [ -z "${MASSA_AI_LLM_MODEL:-}" ]; then
-    LLM_FETCH="https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit"
+    LLM_FETCH="https://huggingface.co/lmstudio-community/Qwen3-VL-8B-Instruct-GGUF"
   fi
   if [ -z "${MASSA_AI_LLM_CODE_MODEL:-}" ]; then
-    CODE_FETCH="https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+    CODE_FETCH="https://huggingface.co/lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF"
+  fi
+  return 0
+}
+
+# installer_lmstudio_model_key <lms_cli> <fetch_spec> <fallback_id>
+#
+# Echoes the catalog id LM Studio actually assigned to the build at
+# <fetch_spec>, or <fallback_id> when it cannot be read back.
+#
+# Every id this installer writes into config.json used to be a hardcoded
+# literal, and only one of the six is measured. `lms ls --json` removes the
+# guess: each entry carries both `modelKey` (the id `/v1/models` serves and
+# `lms load` takes) and `path` (the Hugging Face repo it came from, plus the
+# weight file for GGUF — `Qwen/Qwen3-Embedding-0.6B-GGUF/Qwen3-…-Q8_0.gguf`),
+# so the repo just fetched maps back to the id LM Studio chose for it.
+#
+# Falls back rather than failing, at every step: a non-URL fetch spec is a user
+# override that is already an id, and a missing CLI or JS runtime is not a
+# reason to abort an otherwise complete install. The literal is then exactly as
+# good as it was before this function existed.
+installer_lmstudio_model_key() {
+  local cli="$1" spec="$2" fallback="$3" repo runner key
+
+  case "$spec" in
+    https://huggingface.co/*/*) repo="${spec#https://huggingface.co/}" ;;
+    *) echo "$fallback"; return 0 ;;
+  esac
+  [ -n "$cli" ] || { echo "$fallback"; return 0; }
+  runner="$(installer_detect_runner)" || { echo "$fallback"; return 0; }
+
+  # The repo is passed as argv, never interpolated into the program text.
+  key="$("$cli" ls --json 2>/dev/null | "$runner" -e '
+    let raw = "";
+    process.stdin.on("data", (chunk) => { raw += chunk; });
+    process.stdin.on("end", () => {
+      let models;
+      try { models = JSON.parse(raw); } catch { return; }
+      if (!Array.isArray(models)) return;
+      const repo = process.argv[1];
+      const hit = models.find(
+        (m) =>
+          m && typeof m.path === "string" &&
+          (m.path === repo || m.path.startsWith(repo + "/")),
+      );
+      if (hit && typeof hit.modelKey === "string") process.stdout.write(hit.modelKey);
+    });
+  ' "$repo" 2>/dev/null)" || key=""
+
+  if [ -n "$key" ]; then echo "$key"; else echo "$fallback"; fi
+}
+
+# installer_unload_loaded_models <lms_cli>
+#
+# Evicts every model already resident in LM Studio and Ollama before the
+# installer loads its own three. Both runtimes are swept whichever provider was
+# chosen, because what runs out is one shared pool of RAM/VRAM — an Ollama model
+# still resident from an earlier session costs the same gigabytes whether or not
+# this install talks to Ollama.
+#
+# `lms ps --json` prints `[]` when nothing is loaded (measured 2026-09-21), so
+# the unload is skipped rather than printing a line about work it did not do.
+# `ollama ps` has no such flag and no `stop --all`: its table is header-only
+# when idle, hence NR>1, and each name is stopped individually.
+installer_unload_loaded_models() {
+  local cli="${1:-}" loaded model
+
+  if [ -n "$cli" ]; then
+    loaded="$("$cli" ps --json 2>/dev/null | tr -d '[:space:]' || true)"
+    if [ -n "$loaded" ] && [ "$loaded" != "[]" ]; then
+      echo "  Unloading models already resident in LM Studio..."
+      "$cli" unload --all >/dev/null 2>&1 || true
+    fi
+  fi
+
+  if command -v ollama >/dev/null 2>&1; then
+    while IFS= read -r model; do
+      [ -n "$model" ] || continue
+      echo "  Stopping resident Ollama model ${model}..."
+      ollama stop "$model" >/dev/null 2>&1 || true
+    done <<EOF
+$(ollama ps 2>/dev/null | awk 'NR > 1 && NF > 0 { print $1 }' || true)
+EOF
   fi
   return 0
 }

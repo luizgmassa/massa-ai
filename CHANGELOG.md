@@ -28,8 +28,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same server in the same second. `lms runtime get -l` lists exactly one MLX engine,
   `mlx-llm`, with no embedding counterpart. The installer warns and names the GGUF model to
   switch back to rather than silently substituting it.
+- **The installer evicts resident models before loading its own.** A new
+  `installer_unload_loaded_models` sweeps both runtimes — `lms unload --all` when
+  `lms ps --json` reports anything but `[]`, and `ollama stop` per name in `ollama ps` —
+  before the three per-role `lms load` calls. Both runtimes are swept whichever provider
+  was chosen, because what runs out is one shared pool of RAM/VRAM: a model still resident
+  from an earlier session costs the same gigabytes either way.
 
 ### Fixed
+
+- **The GGUF install path could not fetch a model on any machine that did not already have
+  it.** `lms get` cannot resolve a catalog id in *any* format — measured,
+  `lms get text-embedding-qwen3-embedding-0.6b` answers `Error: No staff picks found with
+  the specified search criteria` with `--gguf`, with `--mlx`, and with no flag — and the
+  GGUF branch handed it exactly those ids, so a fresh install died on `LM Studio could not
+  fetch …`. It stayed invisible on developer machines because `inference_model_exists`
+  short-circuits every model already on disk. Both formats now fetch by Hugging Face repo
+  URL; the GGUF repos live in the new `INFERENCE_PROVIDERS.lmstudio.ggufRepos`, gated
+  against the installer's copy by `scripts/__tests__/mlx-model-parity.test.ts`.
+- **Five of the six LM Studio model ids the installer wrote into `config.json` were never
+  measured.** Only the GGUF embedding id was read off a live install; the rest were
+  literals, and a wrong one writes a config pointing at a model LM Studio does not serve —
+  which degrades silently, since every LLM feature already falls back when a call fails.
+  The installer now reconciles each id after the fetch: `installer_lmstudio_model_key`
+  matches the repo it fetched against the `path` field of `lms ls --json` and writes the
+  `modelKey` LM Studio itself reports, falling back to the literal when the CLI, the JS
+  runtime, or the entry is absent. The retracted evidence for those literals is recorded on
+  `mlxModels` — `lms get --mlx <repo>` answering "Model already downloaded" was read as
+  proof that a format change keeps the id, but the builds on that disk were themselves MLX,
+  so the command never touched a GGUF sibling.
 
 - **The Admin Portal's Config tab rendered `embedding.contextWindow` and
   `embedding.batchSize` blank.** Both are declared fields, but

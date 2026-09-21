@@ -163,11 +163,16 @@ describe("mlxModels (PDM-13)", () => {
     }
   });
 
-  // The measurement that makes the format switch a no-op for two of three
-  // roles: `lms get --mlx <repo>` answered "Model already downloaded. To use,
-  // run: lms load <id>" with the GGUF install's own id. An edit that "fixes"
-  // these to look MLX-flavoured ships a config LM Studio cannot resolve.
-  test("instruct and coding keep their GGUF catalog ids on MLX", () => {
+  // Two of three roles carry ONE id across both formats. That is an assumption
+  // the installer is built not to depend on, not a measurement: the earlier
+  // claim here — `lms get --mlx <repo>` answering "Model already downloaded" —
+  // proved nothing, because the builds on that disk were themselves MLX
+  // (`~/.lmstudio/models/mlx-community/…`), so the command matched the MLX
+  // build and never touched a GGUF sibling. What holds it up instead is
+  // `installer_lmstudio_model_key`, which reads the real id back from
+  // `lms ls --json` after the fetch. This test keeps the two literals in one
+  // place; it does not certify them.
+  test("instruct and coding carry one id across both formats", () => {
     const spec = INFERENCE_PROVIDERS.lmstudio;
     expect(spec.mlxModels!.instruct.model).toBe(spec.defaultModels.instruct);
     expect(spec.mlxModels!.coding.model).toBe(spec.defaultModels.coding);
@@ -189,6 +194,37 @@ describe("mlxModels (PDM-13)", () => {
     const spec = INFERENCE_PROVIDERS.lmstudio;
     expect(spec.knownDimensions[spec.mlxModels!.embedding.model]).toBe(1024);
     expect(spec.knownDimensions[spec.defaultModels.embedding]).toBe(1024);
+  });
+});
+
+describe("ggufRepos (PDM-13)", () => {
+  test("ollama declares none — `ollama pull` takes a tag, not a repo", () => {
+    expect(INFERENCE_PROVIDERS.ollama.ggufRepos).toBeUndefined();
+  });
+
+  // A repo per role, because `lms get` cannot fetch by catalog id in any
+  // format: measured 2026-09-21, `lms get text-embedding-qwen3-embedding-0.6b`
+  // answers "Error: No staff picks found with the specified search criteria"
+  // with --gguf, with --mlx, and with no flag. An id put back here would
+  // restore the defect it replaced.
+  test("lmstudio declares a Hugging Face repo, not an id, for all three roles", () => {
+    const repos = INFERENCE_PROVIDERS.lmstudio.ggufRepos;
+    expect(repos).toBeDefined();
+    expect(Object.keys(repos!).sort()).toEqual(["coding", "embedding", "instruct"]);
+    for (const role of ["embedding", "instruct", "coding"] as const) {
+      expect(`${role}=${repos![role].split("/").length}`).toBe(`${role}=2`);
+      expect(`${role} is an id=${repos![role] === INFERENCE_PROVIDERS.lmstudio.defaultModels[role]}`)
+        .toBe(`${role} is an id=false`);
+    }
+  });
+
+  // The one GGUF id that IS measured, and the pairing that measured it: the
+  // repo's `path` prefix in `lms ls --json` resolved to this modelKey on a live
+  // install. It is also the id both MLX recovery messages tell the user to type.
+  test("the embedding repo is the one whose id was read back from a live install", () => {
+    const spec = INFERENCE_PROVIDERS.lmstudio;
+    expect(spec.ggufRepos!.embedding).toBe("Qwen/Qwen3-Embedding-0.6B-GGUF");
+    expect(spec.defaultModels.embedding).toBe("text-embedding-qwen3-embedding-0.6b");
   });
 });
 

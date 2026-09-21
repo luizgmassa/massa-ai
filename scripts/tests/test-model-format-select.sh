@@ -180,9 +180,24 @@ resolve() {
     echo \"E=\${EMBEDDING_MODEL}|EF=\${EMBEDDING_FETCH}|L=\${LLM_MODEL}|LF=\${LLM_FETCH}|C=\${CODE_MODEL}|CF=\${CODE_FETCH}\"" | tail -1
 }
 
-check_eq "gguf: every fetch spec is the id itself" \
-  "E=text-embedding-qwen3-embedding-0.6b|EF=text-embedding-qwen3-embedding-0.6b|L=qwen3-vl-8b-instruct|LF=qwen3-vl-8b-instruct|C=qwen2.5-coder-7b-instruct|CF=qwen2.5-coder-7b-instruct" \
+# GGUF fetches by repo URL too. It used to hand `lms get` the catalog ids, and
+# that path could never have worked on a machine without the models already on
+# disk: `lms get <catalog id>` answers "No staff picks found with the specified
+# search criteria" in every format. The assertion this replaces pinned the
+# defect as the contract.
+check_eq "gguf: the ids stay ids and all three fetch by repo URL" \
+  "E=text-embedding-qwen3-embedding-0.6b|EF=https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF|L=qwen3-vl-8b-instruct|LF=https://huggingface.co/lmstudio-community/Qwen3-VL-8B-Instruct-GGUF|C=qwen2.5-coder-7b-instruct|CF=https://huggingface.co/lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF" \
   "$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf')"
+
+# Each GGUF substitution is gated on its own override, exactly as the MLX ones
+# are — the B1 defect, one format over.
+gguf_emb_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf; LMSTUDIO_EMBEDDING_MODEL=my-embedder')"
+check_contains "gguf + LMSTUDIO_EMBEDDING_MODEL fetches the named model" \
+  "EF=my-embedder|" "$gguf_emb_override"
+check_contains "and leaves the instruct fetch on the GGUF repo" \
+  "LF=https://huggingface.co/lmstudio-community/Qwen3-VL-8B-Instruct-GGUF" "$gguf_emb_override"
+check_contains "gguf + MASSA_AI_LLM_CODE_MODEL fetches the named model" \
+  "CF=my-coder" "$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf; MASSA_AI_LLM_CODE_MODEL=my-coder')"
 
 check_eq "mlx with no overrides: embedding id changes, all three fetch by repo URL" \
   "E=qwen3-embedding-0.6b-dwq|EF=https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ|L=qwen3-vl-8b-instruct|LF=https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit|C=qwen2.5-coder-7b-instruct|CF=https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit" \
@@ -212,7 +227,132 @@ check_contains "mlx + MASSA_AI_LLM_CODE_MODEL fetches the named model" "CF=my-co
 # The default is gguf, not "whatever was last set" — the wizard calls this
 # after installer_select_model_format, but a re-entry must not inherit.
 check_contains "an unset format resolves as gguf" \
-  "EF=text-embedding-qwen3-embedding-0.6b|" "$(resolve ':')"
+  "EF=https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF|" "$(resolve ':')"
+
+echo "── installer_lmstudio_model_key: the id comes back from LM Studio ──"
+
+# A stub `lms ls --json` returning a two-entry catalog in LM Studio's real
+# shape: MLX keeps the repo verbatim in `path`, GGUF appends the weight file.
+# Both forms are measured (2026-09-21, `lms ls --json` on a live install), and
+# both must resolve, which is why the fixture carries one of each.
+make_lms_catalog_stub() {
+  local path="${TMP_ROOT}/lms-cat-$$-${RANDOM}"
+  cat > "$path" <<'CATEOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "ls" ] && [ "${2:-}" = "--json" ]; then
+  cat <<'JSONEOF'
+[{"type":"llm","modelKey":"the-mlx-key","path":"mlx-community/Qwen3-VL-8B-Instruct-4bit"},
+ {"type":"embedding","modelKey":"the-gguf-key","path":"Qwen/Qwen3-Embedding-0.6B-GGUF/Qwen3-Embedding-0.6B-Q8_0.gguf"}]
+JSONEOF
+  exit 0
+fi
+exit 0
+CATEOF
+  chmod +x "$path"
+  printf '%s' "$path"
+}
+
+CAT_STUB="$(make_lms_catalog_stub)"
+key() { run_lib "$DARWIN_SHIM" "installer_lmstudio_model_key '${CAT_STUB}' '$1' '$2'" | tail -1; }
+
+# The whole point: the literal fallback is WRONG here and must lose. If this
+# returned the fallback the function would be indistinguishable from the
+# hardcoded ids it replaces.
+check_eq "an exact repo path resolves to LM Studio's own modelKey" \
+  "the-mlx-key" "$(key 'https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit' 'stale-literal')"
+check_eq "a GGUF repo resolves through the weight-file suffix in path" \
+  "the-gguf-key" "$(key 'https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF' 'stale-literal')"
+check_eq "a repo the catalog does not carry keeps the fallback" \
+  "stale-literal" "$(key 'https://huggingface.co/someone/Not-Installed' 'stale-literal')"
+# A user override is already an id, not a URL — there is nothing to reconcile.
+check_eq "a non-URL fetch spec is returned as the fallback untouched" \
+  "my-own-model" "$(key 'my-own-model' 'my-own-model')"
+check_eq "no lms CLI keeps the fallback instead of echoing nothing" \
+  "stale-literal" \
+  "$(run_lib "$DARWIN_SHIM" "installer_lmstudio_model_key '' 'https://huggingface.co/a/b' 'stale-literal'" | tail -1)"
+# A prefix that is not a path SEGMENT must not match: `.../Qwen3-Embedding-0.6B`
+# is a real repo and a string prefix of the installed one.
+check_eq "a partial repo name does not match a longer installed repo" \
+  "stale-literal" "$(key 'https://huggingface.co/Qwen/Qwen3-Embedding-0.6B' 'stale-literal')"
+
+echo "── installer_unload_loaded_models ──"
+
+# A stub `lms ps --json` plus a log. The gate is what matters: an idle runtime
+# prints `[]` (measured) and must cost no unload and no output line.
+make_lms_ps_stub() {
+  local loaded="$1" log="$2"
+  local path="${TMP_ROOT}/lms-ps-$$-${RANDOM}"
+  cat > "$path" <<PSEOF
+#!/usr/bin/env bash
+echo "\$*" >> '${log}'
+if [ "\${1:-}" = "ps" ]; then printf '%s\n' '${loaded}'; fi
+exit 0
+PSEOF
+  chmod +x "$path"
+  printf '%s' "$path"
+}
+
+# The Ollama half of the sweep runs whichever provider was chosen, so without a
+# shim these cases would reach the developer's REAL ollama and stop the models
+# they have loaded. Shimming it on PATH makes that impossible AND turns the
+# sweep into something observable — there is no other way to see it.
+make_ollama_shim() {
+  local ps_body="$1"
+  local log="$2"
+  local dir="${TMP_ROOT}/ollama-shim-$$-${RANDOM}"
+  mkdir -p "$dir"
+  cat > "${dir}/ollama" <<OLEOF
+#!/usr/bin/env bash
+echo "\$*" >> '${log}'
+if [ "\${1:-}" = "ps" ]; then printf '%s\n' '${ps_body}'; fi
+exit 0
+OLEOF
+  chmod +x "${dir}/ollama"
+  printf '%s' "$dir"
+}
+
+OL_HEADER='NAME    ID    SIZE    PROCESSOR    CONTEXT    UNTIL'
+
+LOG_OL_IDLE="${TMP_ROOT}/log-ollama-idle"; : > "$LOG_OL_IDLE"
+OL_IDLE="$(make_ollama_shim "$OL_HEADER" "$LOG_OL_IDLE")"
+run_lib "${OL_IDLE}:${DARWIN_SHIM}" "installer_unload_loaded_models ''" >/dev/null
+case "$(cat "$LOG_OL_IDLE")" in
+  *"stop"*) fail "an idle Ollama (header-only ps) was still asked to stop something" ;;
+  *) ok "an idle Ollama costs no stop" ;;
+esac
+
+LOG_OL_BUSY="${TMP_ROOT}/log-ollama-busy"; : > "$LOG_OL_BUSY"
+OL_BUSY="$(make_ollama_shim "${OL_HEADER}
+qwen3-vl:8b    abc123    6 GB    100% GPU    16384    4 minutes from now" "$LOG_OL_BUSY")"
+out_ol="$(run_lib "${OL_BUSY}:${DARWIN_SHIM}" "installer_unload_loaded_models ''")"
+check_contains "a resident Ollama model is stopped by name" \
+  "stop qwen3-vl:8b" "$(cat "$LOG_OL_BUSY")"
+check_contains "and the user is told which one" "qwen3-vl:8b" "$out_ol"
+
+LOG_U="${TMP_ROOT}/log-unload"; : > "$LOG_U"
+PS_IDLE="$(make_lms_ps_stub '[]' "$LOG_U")"
+out_idle="$(run_lib "${OL_IDLE}:${DARWIN_SHIM}" "installer_unload_loaded_models '${PS_IDLE}'")"
+case "$(cat "$LOG_U")" in
+  *"unload"*) fail "an idle LM Studio was still asked to unload" ;;
+  *) ok "an idle LM Studio ([] from ps --json) costs no unload" ;;
+esac
+case "$out_idle" in
+  *"Unloading"*) fail "an idle LM Studio announced work it did not do" ;;
+  *) ok "and prints no line about it" ;;
+esac
+
+LOG_V="${TMP_ROOT}/log-unload-busy"; : > "$LOG_V"
+PS_BUSY="$(make_lms_ps_stub '[{"modelKey":"qwen3-vl-8b-instruct"}]' "$LOG_V")"
+out_busy="$(run_lib "${OL_IDLE}:${DARWIN_SHIM}" "installer_unload_loaded_models '${PS_BUSY}'")"
+check_contains "a resident model is unloaded before the installer loads its own" \
+  "unload --all" "$(cat "$LOG_V")"
+check_contains "and the user is told why the pause happened" \
+  "already resident in LM Studio" "$out_busy"
+
+# No CLI is the OpenCode/remote case: the Ollama sweep must still run, and the
+# function must not abort an install under `set -e`.
+check_eq "no lms CLI is survivable" "0" \
+  "$(run_lib "${OL_IDLE}:${DARWIN_SHIM}" "installer_unload_loaded_models ''; echo \$?" | tail -1)"
 
 echo "── installer_ensure_mlx_runtime ──"
 

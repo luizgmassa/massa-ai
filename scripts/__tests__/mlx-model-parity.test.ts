@@ -42,6 +42,29 @@ function extractOne(file: string, body: string, pattern: RegExp): string {
 }
 
 const MLX = INFERENCE_PROVIDERS.lmstudio.mlxModels!;
+const GGUF = INFERENCE_PROVIDERS.lmstudio.ggufRepos!;
+
+/**
+ * The resolver's two format branches, separately.
+ *
+ * Both now assign all three `*_FETCH` variables, so a pattern applied to the
+ * whole file matches twice and `extractOne` throws — which is the correct
+ * failure for an ungated pattern, but useless as a parity assertion. Slicing
+ * the function at its `= "mlx" ]; then` … `\n  fi\n` boundary lets each branch
+ * be checked against its own format's repos. A shape change to either boundary
+ * throws here rather than quietly matching the wrong branch.
+ */
+function resolverBranches(): { mlx: string; gguf: string } {
+  const body = read(LIB);
+  const start = body.indexOf("installer_resolve_lmstudio_models() {");
+  const end = body.indexOf("\n}", start);
+  if (start < 0 || end < 0) throw new Error(`${LIB}: installer_resolve_lmstudio_models not found`);
+  const fn = body.slice(start, end);
+  const open = fn.indexOf('= "mlx" ]; then');
+  const close = fn.indexOf("\n  fi\n", open);
+  if (open < 0 || close < 0) throw new Error(`${LIB}: the resolver's mlx branch is not delimited`);
+  return { mlx: fn.slice(open, close), gguf: fn.slice(close) };
+}
 
 describe("MLX model parity — setup-local-first.sh vs the seam (PDM-13)", () => {
   test("the seam still declares MLX variants for LM Studio", () => {
@@ -49,8 +72,15 @@ describe("MLX model parity — setup-local-first.sh vs the seam (PDM-13)", () =>
     expect(Object.keys(MLX).sort()).toEqual(["coding", "embedding", "instruct"]);
   });
 
-  // The fetch specs. The wizard hands these to `lms get --mlx`, which is why
-  // they are Hugging Face URLs and not catalog ids.
+  test("the seam still declares GGUF repos for LM Studio", () => {
+    expect(GGUF).toBeDefined();
+    expect(Object.keys(GGUF).sort()).toEqual(["coding", "embedding", "instruct"]);
+  });
+
+  // The fetch specs. The wizard hands these to `lms get`, which is why they are
+  // Hugging Face URLs and not catalog ids — in BOTH formats. The GGUF half of
+  // this table is the fix for a path that could never have fetched anything on
+  // a machine that did not already have the models.
   const FETCH_SURFACES: Array<{ role: "embedding" | "instruct" | "coding"; pattern: RegExp }> = [
     { role: "embedding", pattern: /EMBEDDING_FETCH="https:\/\/huggingface\.co\/([^"]+)"/ },
     { role: "instruct", pattern: /LLM_FETCH="https:\/\/huggingface\.co\/([^"]+)"/ },
@@ -58,12 +88,41 @@ describe("MLX model parity — setup-local-first.sh vs the seam (PDM-13)", () =>
   ];
 
   for (const s of FETCH_SURFACES) {
-    test(`${s.role}: the resolver fetches the repo the seam names`, () => {
-      expect(`${s.role}=${extractOne(LIB, read(LIB), s.pattern)}`).toBe(
+    test(`${s.role}: the MLX branch fetches the repo the seam names`, () => {
+      expect(`${s.role}=${extractOne(LIB, resolverBranches().mlx, s.pattern)}`).toBe(
         `${s.role}=${MLX[s.role].repo}`,
       );
     });
+
+    test(`${s.role}: the GGUF branch fetches the repo the seam names`, () => {
+      expect(`${s.role}=${extractOne(LIB, resolverBranches().gguf, s.pattern)}`).toBe(
+        `${s.role}=${GGUF[s.role]}`,
+      );
+    });
   }
+
+  // Five of the six ids in the seam were never read off a live install, so the
+  // wizard asks LM Studio for the real one after fetching. Losing this call
+  // would restore the hardcoded guess for every role at once, silently.
+  test("the wizard reconciles all three ids against LM Studio after the fetch", () => {
+    const body = read(WIZARD);
+    for (const v of ["EMBEDDING_MODEL", "LLM_MODEL", "CODE_MODEL"]) {
+      expect(`${v} reconciled`).toBe(
+        body.includes(`${v}="$(installer_lmstudio_model_key `) ? `${v} reconciled` : `${v} NOT reconciled`,
+      );
+    }
+  });
+
+  // Residency is finite: the wizard loads three models and must evict whatever
+  // is already holding the same RAM first.
+  test("the wizard unloads resident models before loading its own", () => {
+    const body = read(WIZARD);
+    const unload = body.indexOf("installer_unload_loaded_models");
+    const load = body.indexOf('load -c 8192 --ttl');
+    expect(unload).toBeGreaterThan(-1);
+    expect(load).toBeGreaterThan(-1);
+    expect(`unload before load=${unload < load}`).toBe("unload before load=true");
+  });
 
   // The one id that changes with the format. Anchored to its own assignment
   // inside the MLX branch, so a match cannot drift onto the GGUF default a few

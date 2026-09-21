@@ -373,6 +373,16 @@ ensure_inference_model "$LLM_MODEL" " (instruct model)" "$LLM_FETCH"
 if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
     ensure_inference_model "$CODE_MODEL" " (code-oriented LLM)" "$CODE_FETCH"
 fi
+
+# What was fetched is a repo; what config.json has to record is the catalog id
+# LM Studio assigned to it. Ask LM Studio rather than trusting the literal —
+# five of the six ids in the seam were never measured, and a wrong one writes a
+# config pointing at a model that does not exist, which degrades silently.
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    EMBEDDING_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$EMBEDDING_FETCH" "$EMBEDDING_MODEL")"
+    LLM_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$LLM_FETCH" "$LLM_MODEL")"
+    CODE_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$CODE_FETCH" "$CODE_MODEL")"
+fi
 # PDM-12/design R-08: LM Studio exposes no per-request context length, so the
 # only way to bound a role's context window is to load the model with it.
 # Ollama gets its per-request num_ctx from the runtime seam (T06); this loads
@@ -390,6 +400,11 @@ fi
 # an explicit `lms unload` after each role's use) if idle memory pressure is
 # reported.
 LMS_LOAD_TTL_SECONDS=600
+# Evict whatever is already resident before adding three more models to the same
+# RAM/VRAM pool. A machine that has been serving a 32B model all afternoon has
+# no room for the trio below, and LM Studio's failure mode for that is a load
+# error per role rather than anything the wizard could recover from.
+installer_unload_loaded_models "${LMSTUDIO_CLI:-}"
 if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
     # LMSTUDIO_CLI is resolved by setup_lmstudio() (lms_cli_path — checks
     # ~/.lmstudio/bin before PATH) earlier in this same run; reuse it rather
