@@ -813,3 +813,143 @@ bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models
 
 `bun run test:plugins` is a second runner `bun run test` never reaches; `bun run test:scripts`
 covers `scripts/__tests__` and is where the parity gate lives.
+
+---
+
+## Fix Pass 1 — from the independent verification (FAIL, 2026-09-20)
+
+`validation.md` returned **FAIL**: 27/28 ACs traced, **PDM-02 AC-2 not met**, 2 spec-precision
+gaps, and **16 mutations injected / 12 killed / 4 survived**. The verifier also found the fourth
+instance of this feature's recurring defect class, which the Tasks header predicted and asked it
+to look for. Nine fix tasks, in three batches. Iteration 1 of a maximum of 3 fix→re-verify rounds.
+
+**The pattern held a fourth time, and this time in the gate as well as the code.** F1 is the
+defect; F4 is why no sensor caught it. The parity gate's `DERIVED_SURFACES` table carries
+`(use lmstudio, instruct/coding)` rows and **no `(use ollama, …)` counterparts** — the table was
+enumerated from the implementation's subset rather than from the requirement's set, so it mirrors
+the bug instead of catching it. Enumerate gate rows from the requirement.
+
+### F1: `use ollama` must write the ollama instruct and coding ids — PDM-02 AC-2
+
+`apps/mcp-client/src/config-cli.ts:276-285` and `apps/opencode-plugin/src/config-cli.ts:280-289`.
+The `lmstudio` branch assigns `config.llm.baseUrl`/`.model`/`.codeModel`; the `ollama` branch
+assigns **none of the three**. Measured, both CLIs, scratch `XDG_CONFIG_HOME`: `init --lmstudio`
+then `use ollama` yields `embedding.baseURL :11434` beside `llm.baseUrl :1234/v1`,
+`llm.model qwen3-vl-8b-instruct`, `llm.codeModel qwen2.5-coder-7b-instruct`. Baselined on `main`:
+the `baseUrl` leak pre-dates the feature, the **model leak is new**. The other three branches
+(`init`, `init --lmstudio`, `use lmstudio`) are correct on both CLIs.
+
+Tests: the Independent Test extended to the `use ollama` branch on both CLIs — all five values internally consistent for ollama after a provider switch away from lmstudio
+Gate: bun test apps/mcp-client/src/__tests__/config-cli.test.ts && bun test apps/opencode-plugin/src/__tests__/config-cli.test.ts
+Depends on: none.
+
+### F2: `/api/v1/system/ollama` must stop reporting the retired default — PDM-03 AC-1
+
+`apps/tools-api/src/routes/system.ts:185` reads `process.env.OLLAMA_EMBEDDING_MODEL ||
+"qwen3-embedding:4b"` and **ignores `config.embedding.model` entirely**.
+`apps/tools-api/src/routes/system.test.ts:148` asserts `toBe("qwen3-embedding:4b")`, which is why
+`bun run test` is green over a wrong value — the test pins the defect as the contract. `git log -L
+185,185` shows the line was last touched by `ceaa275d "chore(defaults): sweep qwen3-embedding:4b
+across surfaces"`, so it is a **known member of the sweep population** that fell between T11 (bash
+and env surfaces), T15 (scoped to `*.test.ts`) and T16 (7 docs). Resolve config first, then env,
+then the seam; repoint the test to the spec-defined outcome, not to the current behaviour.
+
+Tests: the route reports the configured model when config names one, and the seam default otherwise
+Gate: bun test apps/tools-api/src/routes/system.test.ts
+Depends on: none.
+
+### F3: `installer_provider_defaults` must not clobber an explicit `MASSA_AI_LLM_MODEL`
+
+`scripts/lib/installer-api-key.sh:205-206,214-215`, called at `:312` from
+`installer_write_config`, which `setup-local-first.sh:576` invokes **after** `:334-339` has already
+honoured the user's override. The wizard pulls, loads and announces one model and then writes
+another. **Not an AC failure — a silent regression this feature introduced**, so it does not get to
+wait for a later feature.
+
+Tests: an explicit MASSA_AI_LLM_MODEL survives installer_write_config; the default still applies when unset
+Gate: bash scripts/tests/test-setup-local-first-api-key.sh && bun test scripts/__tests__/installer-config-template.test.ts
+Depends on: none.
+
+### F4: The parity gate must enumerate rows from the requirement, not the diff — PDM-05 AC-1
+
+Two population defects, one cause:
+
+- `DERIVED_SURFACES` has no `(use ollama, instruct)` / `(use ollama, coding)` rows, so F1 was
+  invisible to a gate whose whole purpose is to see it. Add the missing rows for **every**
+  provider × branch × role × CLI combination the requirement names, and derive that list from
+  PDM-02 AC-2 rather than from what the code currently assigns.
+- There is **no instruct/coding completeness scan** outside the `.md` tier, and
+  `process.env.X || "literal"` is excluded from the scan population (`:592`). M16 survived: a bogus
+  default injected there left the gate at 14/0. A `process.env.X || "literal"` is **both a read and
+  a default declaration**; excluding env reads carves a real writer out of the gate's own
+  population. F2's defect lives in exactly that shape.
+
+**Observed red required per new row and per new scan**, each on its own subject, naming the surface.
+
+Tests: one induced red per added row and per the new completeness scan; a red proving the env-default shape is now in population
+Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts
+Depends on: F1, F2.
+
+### F5: Sense the production `llm.*` config reader — PDM-12 AC-2
+
+`packages/shared/src/config/index.ts:781,783,785`. Mutations M12a/b/c each survived **both**
+`bun test packages/shared/src` (945/0) and `llm-client.test.ts` (74/0). Cause: `config.get("llm")`
+always returns a populated `defaultConfig.llm`, so `_resolveLlmConfig`'s `cfg?.X ??` fallbacks —
+which M10/M11 do kill — are dead in production. The three tests that look like coverage
+(`config-loader.test.ts:248-265`) exercise `loadConfig()`, **a different function on a different
+type**. Add a test against the production reader itself; a passing test on the loader is not a
+test of the reader.
+
+Tests: the three llm.* fields resolved through the production reader, each killing a mutation that M12a/b/c survived
+Gate: bun test packages/shared/src/config/__tests__/ && bun test packages/core/src/__tests__/llm-client.test.ts
+Depends on: none.
+
+### F6: `test:scripts` must report every failing shell suite, not the first
+
+T15b fixed the `&&` between the halves; the intra-half `|| exit 1` remains, so the run aborts at
+suite **16 of 39** and reports 1 failing suite. Running all 39 with no early exit gives **3 suites
+/ 22 cases** failing (`install-skills-cli` 2, `plugin-auto-install` 16,
+`plugin-registry-registration` 4). The "3 failing suites" figure in this feature's artifacts
+therefore **could not have come from the gate as wired** — it came from a manual run. A gate that
+reports one third of its failures is the same defect T15b was written to remove, one level down.
+Collect every suite's result and report them together.
+
+The three failures are **verified host-specific**: identical counts measured on `main` in the
+primary checkout. Do not fix, skip or exclude them.
+
+Tests: a run with two failing shell suites reports both
+Gate: induce a second shell-suite failure by file copy, confirm both are reported and the exit code is non-zero, restore by file copy
+Depends on: none.
+
+### F7: `scripts/diagnose.ts:22` docblock still names the retired LM Studio default
+
+Lines 21 and 128-129 were repointed; `:22` still says
+`text-embedding-nomic-embed-text-v1.5`. Invisible twice over: the extractor only reaches the
+table, and the file sits in the Tier-3 `known` set.
+
+Tests: covered by F4's widened scan if the docblock falls in its population; otherwise verified by reading
+Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts && bun test scripts/__tests__/diagnose.test.ts
+Depends on: F4.
+
+### F8: `config-sections.ts:128` documents behaviour PDM-01 AC-5 reversed
+
+The `codeModel` Portal guide still reads "When empty, falls back to the primary model". PDM-01
+AC-5 requires the fallback to be that provider's **coding** default, never the instruct model —
+and the instruct default is now a vision-language model, so the guide advises the exact failure
+T05 was written to close.
+
+Tests: the golden render reflects the corrected guide string
+Gate: bun test apps/web-ui/src/__tests__/
+Depends on: none.
+
+### F9: Correct the feature's status claim and record the verification outcome
+
+`.specs/project/FEATURES.json` records `status: "complete"` with `validation: null`, written
+before the verifier ran. The run does not support it. Move it to `needs_fix` (or this registry's
+equivalent), point `validation` at `validation.md`, and clear `completed` until a PASS exists.
+Update `STATE.md` and `HANDOFF.md` with the FAIL verdict, the 4 surviving mutants, and the nine
+fix tasks. **Run this task last**, after F1-F8, so it records the post-fix state.
+
+Tests: none — the delivery gate is this task's check
+Gate: bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models --root .
+Depends on: F1, F2, F3, F4, F5, F6, F7, F8.
