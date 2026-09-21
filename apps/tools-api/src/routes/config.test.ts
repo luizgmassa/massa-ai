@@ -136,6 +136,43 @@ describe("GET /api/v1/config", () => {
     );
   });
 
+  /** The surviving mutation this file could not see. `defaultMassaAiConfig` is
+   *  mocked to `{}` at module scope, so `{...shipped.embedding}` spreads
+   *  nothing in every other test here and deleting that spread leaves them all
+   *  green — while taking the Config tab from 5 blank fields to 9, strictly
+   *  worse than the 7-blank bug this change fixes. The sibling sweep in
+   *  apps/web-ui does not catch it either: it builds the route's payload by
+   *  hand rather than calling the route.
+   *
+   *  Closed by handing the SECOND maskSensitive call (the `defaults` one) a
+   *  realistic shipped block and asserting the non-derived keys survive
+   *  alongside the two derived ones. */
+  test("the derived fields are added to the shipped embedding block, not substituted for it (PDM-13)", async () => {
+    loadConfig.mockImplementationOnce(() => ({ embedding: { provider: "ollama" } }));
+    maskSensitive.mockImplementationOnce((cfg: unknown) => cfg);
+    maskSensitive.mockImplementationOnce(() => ({
+      embedding: {
+        provider: "ollama",
+        model: "qwen3-embedding:0.6b",
+        baseURL: "http://localhost:11434",
+        dimensions: 1024,
+      },
+      logging: { level: "info" },
+    }));
+
+    const res = await get("/api/v1/config");
+    expect(res.json.data.defaults.embedding).toEqual({
+      provider: "ollama",
+      model: "qwen3-embedding:0.6b",
+      baseURL: "http://localhost:11434",
+      dimensions: 1024,
+      contextWindow: INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
+      batchSize: INFERENCE_PROVIDERS.ollama.embedBatchSize,
+    });
+    // Sections outside `embedding` must round-trip untouched by the spread.
+    expect(res.json.data.defaults.logging).toEqual({ level: "info" });
+  });
+
   test("masks all four sensitive fields", async () => {
     const testConfig = {
       security: { apiKey: "sec-key" },

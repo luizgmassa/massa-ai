@@ -1,7 +1,7 @@
 # Debug Report — llm-defaults-mlx
 
 - **projectId**: `massa-ai` · **workflowSessionId**: `debug-llm-defaults-mlx`
-- **workflow**: debug · **fix size**: Standard+ (4 commits, 14 files, public installer surface)
+- **workflow**: debug · **fix size**: Standard+ (8 commits, 17 files, public installer surface)
 - **branch**: `fix/llm-defaults-mlx-format` from `main` @ `cca0b66e` (v1.58.0)
 - **worktree**: `/Users/luizmassa/Projects/massa-ai-fix-llm-defaults-mlx-format`
 - **Isolation Gate**: satisfied — dedicated worktree + branch, recorded above. The main
@@ -17,7 +17,7 @@ developer machine running LM Studio as the local inference provider.
 | # | Symptom | Impact | Frequency | Environment |
 |---|---|---|---|---|
 | 1 | Admin Portal → Config → Embedding shows Context Window and Batch Size blank | 2 of 110 fields uneditable-by-default; reads as "no default exists" | Every load | macOS, local API on `:3333` |
-| 2 | `llm.disableThink` renders off although the shipped default is on | Reads as a deliberate opt-out nobody made | Every LM Studio install | any |
+| 2 | `llm.disableThink` renders off although the shipped default is on | Reported as cosmetic; **measured to disable json_schema constrained decoding** on LM Studio (see Root Cause 2) | Every LM Studio install | any |
 | 3 | LM Studio embedding default should be the MLX build of Qwen3-Embedding | — (request, not a defect) | — | Apple Silicon |
 | 4 | Installer should offer MLX first on macOS, GGUF first elsewhere | — (request) | — | any |
 | 5 | Choosing MLX should verify and install the MLX engine | — (request) | — | Apple Silicon |
@@ -30,7 +30,7 @@ Every loop below ran before and after the fix.
 |---|---|---|---|
 | 1 | `bun test apps/tools-api/src/routes/config.test.ts` + `apps/web-ui/.../config-forms.test.ts` | the two fields resolve `undefined`, 7 of 110 unresolved | 18/0 and 68/0; 5 of 110 unresolved against the route's payload |
 | 2 | `bash scripts/tests/test-setup-local-first-api-key.sh` | asserted the written value was `false` | 43/0 with the assertion flipped to `true` |
-| 3,4,5 | live LM Studio (`curl /v1/embeddings`, `lms ls`, `lms runtime get -l`, `lms get --mlx`) + `bash scripts/tests/test-model-format-select.sh` | no format concept existed | 28/0 |
+| 3,4,5 | live LM Studio (`curl /v1/embeddings`, `lms ls`, `lms runtime get -l`, `lms get --mlx`) + `bash scripts/tests/test-model-format-select.sh` | no format concept existed | 42/0 |
 
 Root-cause proof for items 1–2 is the code path, not a crash: both are wrong-value
 defects, reproduced by reading the value the writer emits and the value the renderer
@@ -43,7 +43,8 @@ receives.
 | H1 | The portal renders the two embedding fields blank because the route never sends a default for them | `config-sections.ts:51-52` declares both; `apps/web-ui/.../config.ts:61-68` already names them in its own "no shipped default" list | Read `defaultMassaAiConfig.embedding` | **Confirmed.** `massa-ai-config.ts:401-409` omits both on purpose (PDM-12) and the route sent `maskSensitive(defaultMassaAiConfig)` unmodified |
 | H2 | Adding the two fields to `defaultMassaAiConfig` is the fix | — | Check the loader contract | **Disproven.** `config-loader.test.ts:245` pins `embedding.batchSize` to `undefined` on an unset config; the shipped template is also the loader's middle merge layer, so filling it changes merge semantics, not just display. Fix moved to the route's display-only `defaults` block |
 | H3 | `disableThink` defaults false somewhere in config resolution | `~/.config/massa-ai/config.json` holds `"disableThink": false` | Grep every writer | **Refuted for the defaults; confirmed for the writer.** `config/index.ts:779` is `?? true` and `massa-ai-config.ts:459` is `true`. The literal `false` comes from `installer-api-key.sh:211`, the LM Studio branch |
-| H4 | Writing `false` there changes request behaviour | comment claims "think:false is an Ollama-only request-body key" | Read `llm-client.ts:365` | **Disproven.** The injection is `llm.disableThink && spec.injectsDisableThink`; `lmstudio.injectsDisableThink` is `false`, so the field is inert on that provider. The literal only affected what the portal displayed |
+| H4 | Writing `false` there changes request behaviour | comment claims "think:false is an Ollama-only request-body key" | Read `llm-client.ts:365` | **Answered "no" — and the answer was wrong.** See the correction below. The probe read one call site of five; four are ungated and one of them decides constrained decoding |
+| H4' | `disableThink` is read somewhere `injectsDisableThink` does not gate | H4's probe stopped at the first match | Enumerate **every** read of the flag, then measure the resolved value's effect | **Confirmed.** `llm.disableThink` is read at `llm-client.ts:365, 520, 570, 607, 633`. Only 365 is gated. Line 570 is `useJsonSchema = llm.disableThink && (await _checkJsonSchemaSupport())`, and `_checkJsonSchemaSupport()` (line 76) returns `true` unconditionally for a provider with no Ollama version probe — LM Studio, by design (LIP-07). Measured through `config.get("llm")`: env/file `false` → `useJsonSchema` false; unset → `true` |
 | H5 | A-01 (the MLX build cannot serve LM Studio embeddings) has become stale | the user asked for exactly the model A-01 ruled out | Re-measure against a live server | **A-01 holds.** See Root Cause |
 | H6 | An MLX catalog id can be derived from its Hugging Face repo path | it would remove three pinned literals | Measure three repos | **Disproven** (A-02 already measured it; re-measured here). Instruct and coding resolve to the *GGUF* id; embedding resolves to a third shape |
 
@@ -70,17 +71,56 @@ is never merged back into a config, so PDM-12's loader contract and `defaultMass
 are untouched. `batchSize` reads the persisted `embedding.provider` and mirrors
 `_resolveEmbedBatchSize`'s own fallback for an id outside the local-inference set.
 
-### 2 — `llm.disableThink`
+### 2 — `llm.disableThink` (root cause corrected after independent verification)
 
-`scripts/lib/installer-api-key.sh:211` wrote `false` on the LM Studio branch. The comment
-justifying it ("think:false is an Ollama-only request-body key") is true and irrelevant:
-`packages/core/src/services/memory/llm-client.ts:365` already gates the injection on
-`llm.disableThink && spec.injectsDisableThink`, and `lmstudio.injectsDisableThink` is
-`false`. The literal changed no request. Its only effect was a persisted `false` that the
-Admin Portal rendered as an unchecked box, against a shipped default of `true`.
+`scripts/lib/installer-api-key.sh:211` wrote `false` on the LM Studio branch, justified by
+the comment "think:false is an Ollama-only request-body key".
 
-**Fix:** write the shipped default on both providers. The per-provider behaviour stays in
-the seam, where it already was.
+**The first diagnosis in this report was wrong, and it was wrong in an instructive way.**
+H4 read `llm-client.ts:365` — `if (llm.disableThink && spec.injectsDisableThink)` — saw
+`lmstudio.injectsDisableThink === false`, and concluded the field was inert on LM Studio
+with only a cosmetic effect on the Admin Portal checkbox. That probe stopped at the call
+site the comment named. **`llm.disableThink` is read at five sites — 365, 520, 570, 607,
+633 — and only 365 is gated by the seam.**
+
+The load-bearing one is line 570:
+
+```ts
+const useJsonSchema = llm.disableThink && (await _checkJsonSchemaSupport());
+```
+
+`_checkJsonSchemaSupport()` (line 76) short-circuits to `true` for any provider with no
+Ollama version probe, LM Studio included and deliberately — the comment there says LM
+Studio "implements the OpenAI-native `response_format:{type:"json_schema"}` path directly
+— no version handshake exists to probe, and none is needed (LIP-07)".
+
+Measured through `config.get("llm")`, the accessor `getLlmConfig` uses:
+
+```
+env/file disableThink=false  ->  false  ->  useJsonSchema = false   (main)
+unset / true                 ->  true   ->  useJsonSchema = true    (branch)
+_checkJsonSchemaSupport() on http://localhost:1234/v1  ->  true      (both)
+```
+
+So the literal **did** change the request. Every LM Studio install sent structured output
+down the `json_object` + manual-validation fallback instead of the native constrained
+decoding the seam exists to select, and three reasoning-channel recovery branches (520,
+607, 633) stayed off. The defect was larger than reported, not cosmetic.
+
+**Fix:** write the shipped default on both providers — same one-line change, now for the
+right reason. The per-provider `think:false` injection still lives in the seam; what
+changes is that LM Studio's own json_schema path stops being suppressed.
+
+**Corollary worth recording:** `llm-client.ts:246`'s `cfg?.disableThink ?? spec.injectsDisableThink`
+fallback is dead for any real config, because `packages/shared/src/config/index.ts:779`
+resolves `fileConfig.llm?.disableThink ?? true` and therefore always defines the field.
+Reading that line as "the seam decides" is what made the `false` look defensible. Not
+changed here — it is reachable only from a hand-built config object in a test — but it is
+the line that misleads.
+
+**Sensor:** `packages/core/src/__tests__/llm-client-disable-think-json-schema.test.ts` pins
+the coupling from the `false` side (the `true` side was already implicitly covered by
+`llm-client-json-schema.test.ts`, which passes only because the shipped default is on).
 
 ### 3 — The MLX embedding model (measured impossible, shipped at the user's direction)
 
@@ -171,7 +211,19 @@ than `git checkout` (a checkout would restore to HEAD, not to the pre-mutation s
 | Sensor | Mutation | Observed |
 |---|---|---|
 | `routes/config.test.ts` | `contextWindow`/`batchSize` derivation → `undefined` | 14 pass / **4 fail**, restored → 18/0 |
-| `mlx-model-parity.test.ts` | wizard's MLX embedding id → `qwen3-embedding-0.6b-mlx` | 7 pass / **1 fail**, restored → 8/0 |
+| `routes/config.test.ts` | drop `...shipped.embedding` from the `defaults` spread | 18 pass / **1 fail**, restored → 19/0 |
+| `mlx-model-parity.test.ts` | resolver's MLX embedding id → `qwen3-embedding-0.6b-mlx` | 8 pass / **1 fail**, restored → 9/0 |
+| `test-model-format-select.sh` | hoist `EMBEDDING_FETCH` out of its override guard | 40 pass / **2 fail**, restored → 42/0 |
+| `embedding-defaults-parity.test.ts` | lmstudio instruct default → `qwen3-vl-4b-instruct` | 20 pass / **1 fail**, restored → 21/0 |
+| `llm-client-disable-think-json-schema.test.ts` | env knob `0` → `1` | 1 pass / **2 fail**, restored → 3/0 |
+
+**The third row was a surviving mutation until independent verification found it.** With
+`defaultMassaAiConfig` mocked to `{}` at module scope, `{...shipped.embedding}` spread
+nothing in every assertion in the file, so deleting that spread left both the route suite
+and the web-ui sweep green — while taking the Config tab from 5 blank fields to **9**,
+strictly worse than the 7-blank bug being fixed. The web-ui sweep could not see it either:
+it builds the route's payload by hand rather than calling the route. Closed by handing the
+`defaults` call a realistic shipped block and asserting the non-derived keys survive.
 
 **One branch is not discriminable and is recorded rather than papered over.** The
 provider-dependent half of `defaultEmbedBatchSize` cannot be sensed today: `ollama` and
@@ -222,3 +274,50 @@ measurement with a date attached, re-verifiable by re-running the commands quote
    declined). It still carries `llm.disableThink: false` and no `embedding.contextWindow` /
    `batchSize`. The fixes apply to future installs and to the portal's rendering; that file
    is edited through the Config tab or by hand.
+
+## Independent Verification
+
+Two read-only agents ran against the committed branch; both findings sets were re-derived
+in the main agent before being accepted, and both produced real changes.
+
+### Round 1 — diff review
+
+One blocking finding, confirmed by reading the trace rather than taken on report: on the
+MLX path the three `*_FETCH` specs were assigned unconditionally while only the embedding
+**id** was gated on its override. `MASSA_AI_LMSTUDIO_MODEL_FORMAT=mlx
+LMSTUDIO_EMBEDDING_MODEL=<gguf id>` therefore wrote the user's id into `config.json` while
+`lms get` pulled the MLX repo, and printed "Model `<id>` pulled" for a model never fetched.
+That invocation is the recovery this very change documents — so the documented way out of
+the MLX embedding defect was itself broken. Fixed in `94d8784b`, with the resolution
+extracted into `installer_resolve_lmstudio_models` so the override matrix could be executed
+instead of grepped. Five advisory findings were also acted on (an ungated shell↔TS literal,
+an unreachable failure branch, three vacuous assertions, an inaccurate comment, and a
+warning issued too early to be read).
+
+### Round 2 — root-cause closure
+
+Verdict: **closure confirmed** for all four divergence points, each re-derived rather than
+trusted, with four mutation kills observed independently. Three hand-backs, all acted on:
+
+1. **The report's Root Cause 2 was wrong.** Corrected above — `disableThink` is not inert on
+   LM Studio, and the defect it caused was larger than reported. The correction added a
+   sensor rather than only prose.
+2. **A surviving mutation in the route fix.** Recorded in the discrimination table above and
+   closed.
+3. **A stale figure** — `test-model-format-select.sh` was 28/0 when this report was written
+   and is 42/0 at HEAD, the difference being the override-matrix cases added by the round-1
+   fix. Refreshed.
+
+The verifier could not drive the interactive menu itself (its sandbox has no `/dev/tty`);
+it substituted an audit of this branch's pty harness for vacuous-pass modes and confirmed
+the 9 menu-order assertions genuinely ran rather than skipping. It reported the tree
+restored byte-identical after every mutation.
+
+### Two lessons this produced
+
+- **A gated read is not the only read.** H4 cleared a config literal as inert from the one
+  call site its own comment named, while four ungated siblings changed request shape.
+  Enumerate every read of a flag before calling it inert.
+- **A hand-built payload fixture cannot sense its producer.** Restating a route's derived
+  values in a consumer test leaves the producer's spread unguarded — and mocking the
+  producer's own input to `{}` makes that spread structurally unobservable in its own suite.

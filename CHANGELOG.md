@@ -39,11 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never merged back into a config, so the loader contract is unchanged); `batchSize`
   follows the persisted `embedding.provider`. Unresolved fields on a bare config drop from
   7 of 110 to 5.
-- **A fresh LM Studio install wrote `llm.disableThink: false`,** which read as a deliberate
-  opt-out of a setting whose shipped default is on. It changed no request — the
-  `think:false` injection is gated on the provider seam's `injectsDisableThink`, not on
-  this field — and only made the Admin Portal render the toggle off. Both providers now
-  write the shipped default.
+- **A fresh LM Studio install wrote `llm.disableThink: false`, which silently disabled
+  json_schema constrained decoding on every LM Studio install.** The literal was written on
+  the stated grounds that `think:false` is an Ollama-only request-body key. That is true of
+  the *injection* — `llm-client.ts` gates it on the provider seam's `injectsDisableThink` —
+  but the flag is read at five sites and only that one is gated. The load-bearing ungated
+  read is `const useJsonSchema = llm.disableThink && (await _checkJsonSchemaSupport())`, and
+  `_checkJsonSchemaSupport()` short-circuits to `true` for any provider with no Ollama
+  version probe, LM Studio included and by design (LIP-07: it implements OpenAI-native
+  `response_format: {type: "json_schema"}` directly). So a `false` there sent every
+  structured-output call down the `json_object` + manual-validation fallback instead of the
+  native constrained-decoding path the seam exists to select. Both providers now write the
+  shipped default, restoring that path; three reasoning-channel recovery branches come back
+  with it. `packages/core/src/__tests__/llm-client-disable-think-json-schema.test.ts` pins
+  the coupling from the `false` side so the "it is inert on LM Studio" reading cannot
+  return.
 
 ### Changed
 
