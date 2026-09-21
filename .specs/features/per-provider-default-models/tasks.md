@@ -1219,7 +1219,7 @@ the source change; re-ran green at 784/0.
 
 SPEC_DEVIATION: none.
 
-### F9: Correct the feature's status claim and record the verification outcome
+### F9: Correct the feature's status claim and record the verification outcome — ✅ Complete
 
 `.specs/project/FEATURES.json` records `status: "complete"` with `validation: null`, written
 before the verifier ran. The run does not support it. Move it to `needs_fix` (or this registry's

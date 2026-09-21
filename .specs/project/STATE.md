@@ -1,4 +1,12 @@
-## Current — Per-provider default models (**EXECUTE COMPLETE 2026-09-20** — 8 Phases = 21 Tasks (T06b, T07b, T03b, T15b added mid-Execute) all done; independent verification pending; unpushed, push/PR is the user's call)
+## Current — Per-provider default models (**FIX PASS 1 APPLIED, RE-VERIFICATION PENDING 2026-09-20** — 21 Tasks delivered, then independent verification returned **FAIL** (PDM-02 AC-2 not met; 16 mutations injected, 12 killed, **4 survived**); 9 fix tasks F1-F9 applied; `status` is back to `in_progress` and stays there until a PASS exists; unpushed, push/PR is the user's call)
+
+**The verification is the part worth reading, not the delivery.** It found the **fourth** instance
+of this feature's recurring defect class: the `use ollama` config-CLI branch assigned none of the
+three `config.llm.*` fields while the `lmstudio` branch immediately below assigned all three, so
+`init --lmstudio` followed by `use ollama` left the LLM pointing at the old provider. The parity
+gate could not see it, because its surface table had `(use lmstudio, instruct/coding)` rows and no
+`(use ollama, …)` counterparts — **enumerated from the implementation's subset, so it mirrored the
+bug instead of catching it.** Full account in `.specs/HANDOFF.md` and `FEATURES.json`'s notes.
 
 Branch `feat/per-provider-default-models` off `origin/main@8ea21839` (v1.58.0),
 worktree `~/Projects/massa-ai-feat-per-provider-default-models`. Full account in

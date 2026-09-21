@@ -1,4 +1,60 @@
-# Handoff — per-provider-default-models (EXECUTE COMPLETE 2026-09-20 — 8 Phases = 21 Tasks (T06b, T07b, T03b, T15b added mid-Execute), all done via 8 batch workers; independent verification pending; unpushed, push/PR is the user's call)
+# Handoff — per-provider-default-models (FIX PASS 1 APPLIED, RE-VERIFICATION PENDING 2026-09-20 — 21 Tasks delivered via 8 batch workers, then independent verification returned FAIL; 9 fix tasks F1-F9 applied via 3 more workers; unpushed, push/PR is the user's call)
+
+## Verification outcome — read this before the delivery account below
+
+The independent run (author ≠ verifier) returned **FAIL** over `main..bc7caa4b`: 27/28 ACs traced
+to `file:line`, **PDM-02 AC-2 not met**, 2 spec-precision gaps, and **16 mutations injected, 12
+killed, 4 survived**. The four surviving mutants were worth more than every green suite in this
+feature.
+
+**The defect class that dominated this feature: a requirement names a set, and the task meant to
+implement it names a subset.** It produced four separate defects, and only the first three were
+caught before the verifier:
+
+1. PDM-12 AC-2 named **five** config fields; four got a reader (→ T06b).
+2. PDM-02 AC-2 said "that provider's **three** model ids"; the writers shipped two (→ T07b).
+3. PDM-03 AC-1 named the ollama embedding default; T03 derived only `.llm` (→ T03b).
+4. The `use ollama` CLI branch assigned **none** of the three `config.llm.*` fields while the
+   `lmstudio` branch below it assigned all three (→ F1). `init --lmstudio` then `use ollama` left
+   the LLM on the old provider. The `baseUrl` leak pre-dated the feature; **the model leak was
+   new**.
+
+**The gate corollary is the part to carry forward.** The parity gate could not see #4 because its
+`DERIVED_SURFACES` table had `(use lmstudio, instruct/coding)` rows and no `(use ollama, …)`
+counterparts — the population was enumerated from the implementation's subset rather than from the
+requirement's set, so it mirrored the bug. F4 re-derived it from PDM-02 AC-2's own text (provider ×
+branch × role × CLI, 24 → 28 rows), narrowed the blanket `process.env` exclusion to admit
+`process.env.X || "literal"` — which is both a read **and** a default declaration, exactly the
+shape F2's defect lived in — and added an instruct/coding completeness scan that had never existed
+outside the Markdown tier. **Acceptance was not a green gate:** F1's and F2's original defects were
+reproduced and killed by name.
+
+**The same shape, one level down, in the tests.** Three mutations in the production `llm.*` reader
+survived **945 passing tests**, because `config.get("llm")` always returns a populated
+`defaultConfig.llm`, making `_resolveLlmConfig`'s `cfg?.X ??` fallbacks dead code in production —
+while the tests that looked like coverage exercised `loadConfig()`, *a different function on a
+different type* (→ F5, all three re-injected and killed). Separately,
+`apps/tools-api/src/routes/system.test.ts` **pinned the retired `qwen3-embedding:4b` as the
+contract**, keeping `bun run test` green over a wrong answer (→ F2).
+
+**Two gates were repaired rather than trusted.** `embedding-defaults-parity.test.ts` used to
+**abort the whole file** (`0 pass / 0 fail / 1 error` — `referencePair()` ran in the `describe`
+body, and an aborted file reads as "no failures" to anything counting only `fail`), and before
+that silently slid its regex into an adjacent branch and reported `mistral-embed/1024` as though it
+were a pass. A silent wrong match is indistinguishable from a pass. `test:scripts` short-circuited
+on `&&` and skipped all 37 shell suites while still printing the bun half's counts (→ T15b), then
+still aborted at suite 16 of 39 (→ F6; `scripts/run-shell-suites.sh` now reports every failing
+suite together).
+
+**One error was the orchestrator's, not an implementer's.** F2's task text specified the precedence
+backwards — "config first, then env" — against `CLAUDE.md:321`'s documented
+`env > config.json > literal defaults`, restated twice in this feature's own design. The
+implementer followed the literal text and flagged the divergence, which was the right call; F2b
+restored the order and inverted the test's expected value with it.
+
+**Still open:** re-verification (iteration 2 of a maximum of 3). `FEATURES.json` records
+`status: in_progress` and `completed: null` until a PASS exists — the earlier `complete` was
+written before the verifier ran and was not supported by it.
 
 **Branch:** `feat/per-provider-default-models`, off `origin/main@8ea21839` (v1.58.0).
 Worktree `~/Projects/massa-ai-feat-per-provider-default-models`.
