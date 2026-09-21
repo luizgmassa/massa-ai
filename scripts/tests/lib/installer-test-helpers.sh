@@ -121,6 +121,23 @@ make_mock_agents() { # make_mock_agents DIR [names...]
   echo "$dir"
 }
 
+# A PATH that carries the JS runtimes and nothing else, for scenarios that must
+# prove the "no host CLI installed" branch. Subtracting the host CLI's directory
+# from the live PATH cannot do this: on a dev box `node` and `claude` commonly
+# share one bin dir (~/.local/bin), so the subtraction removes the runtime too —
+# and `command -v` reports only the first hit, so a CLI installed twice
+# (~/.local/bin plus /opt/homebrew/bin) survives the subtraction anyway. A
+# positive list of symlinks has neither failure mode.
+runtime_shim_path() { # runtime_shim_path DIR → PATH value
+  local dir="$1" bin src
+  mkdir -p "$dir"
+  for bin in node bun npm npx; do
+    src="$(command -v "$bin" 2>/dev/null)" || continue
+    [ -n "$src" ] && ln -sf "$src" "$dir/$bin"
+  done
+  echo "$dir:/usr/bin:/bin"
+}
+
 summary() { # summary SUITE_NAME
   echo ""
   echo -e "${BOLD}────────────────────────────────────────${NC}"

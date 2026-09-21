@@ -13,8 +13,10 @@
 set -u
 
 failed=()
+total=0
 
 for f in scripts/tests/*.sh; do
+  total=$((total + 1))
   if ! bash "$f"; then
     failed+=("$f")
   fi
@@ -22,11 +24,15 @@ done
 
 if [ "${#failed[@]}" -gt 0 ]; then
   echo ""
-  echo "FAILED SHELL SUITES (${#failed[@]} of $(ls scripts/tests/*.sh | wc -l | tr -d ' ')):"
+  echo "FAILED SHELL SUITES (${#failed[@]} of ${total}):"
   for f in "${failed[@]}"; do
     echo "  - $f"
   done
   exit 1
 fi
 
+# Report the population on success too: a gate that prints nothing when it
+# passes is indistinguishable from one that ran nothing at all.
+echo ""
+echo "SHELL SUITES: ${total} of ${total} passed"
 exit 0

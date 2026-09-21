@@ -1496,3 +1496,53 @@ against. Re-ran the three named host-specific shell suites directly
 to check they had not silently started passing (which would make the "known, unrelated failure"
 framing stale in the opposite direction) — all three still fail with the same symptoms named in
 T12/T15/T15b/T17, confirmed not stale.
+
+## Fix Pass 3
+
+### H1: Make the three host-specific shell suites deterministic on a dev box — ✅ Complete
+
+`test:scripts` has reported the same 3 of 39 shell suites failing on this machine for the whole
+feature, recorded throughout as "pre-existing, host-specific, unrelated" and never diagnosed.
+The user authorised investigating them after W8. They are one defect, in the test harness, and
+the product is not involved.
+
+**Root cause — one shape, two faces, both from `~/.local/bin`.** Each of the three suites builds a
+PATH that is meant to contain the JS runtime and *no* host agent CLI, in order to exercise the
+"no host installed" branch. Both constructions are subtractive, and subtraction fails here:
+
+1. `node` and `claude` share one directory. `test-install-skills-cli.sh:65` took
+   `$(dirname "$(command -v node)")` as a safe addition and `test-plugin-auto-install.sh:189` took
+   `$(dirname "$RUNNER"):$(dirname "$BUN_BIN")`; on this host both resolve to `~/.local/bin`, which
+   also holds `claude`. Admitting the runtime re-admitted the CLI.
+2. `claude` is installed **twice** on PATH (`~/.local/bin` and `/opt/homebrew/bin`).
+   `test-plugin-registry-registration.sh`'s `path_without` stripped the directory reported by
+   `command -v`, which reports only the first hit — so the homebrew copy survived the strip.
+
+CI has no host CLI at all, so `command -v` finds nothing, the subtraction is a no-op on an
+already-clean PATH, and all three pass. The failure is invisible to the gate that would catch it.
+
+**Fix.** `runtime_shim_path` in `scripts/tests/lib/installer-test-helpers.sh` — build a scratch
+directory of symlinks to `node`/`bun`/`npm`/`npx` and return `<shim>:/usr/bin:/bin`. A positive
+list has neither failure mode. All three suites now call it; `path_without` is deleted.
+
+**Measured** on `0e1bbc43` + this change, run directly:
+
+| Suite | Before | After |
+|---|---|---|
+| `test-plugin-registry-registration.sh` | 43 passed / **4 failed** (47) | **47 / 0** |
+| `test-install-skills-cli.sh` | 44 passed / **2 failed** (46) | **46 / 0** |
+| `test-plugin-auto-install.sh` | 194 passed / **16 failed** (210) | **210 / 0** |
+
+The before/after pair *is* the discrimination: the same assertions invert on the single variable
+of whether a host CLI is reachable through the constructed PATH.
+
+**This also explains a contradiction older than this feature.**
+`.specs/features/web-ui-typescript/tasks.md:1685` recorded `test-plugin-auto-install.sh` as
+"18 failures" and then "**Contradicted** — 201/0 green on `main`". Both readings were honest: the
+suite's verdict depended on whether the machine and PATH that ran it could reach a host CLI. Any
+"pre-existing failure" note naming these three suites, in this feature or an earlier one, is a
+record of the harness defect fixed here, not of a product regression.
+
+Tests: the three suites themselves, re-run before and after
+Gate: bash scripts/run-shell-suites.sh
+Depends on: F6 (which is what made these visible at all — before it, `&&` short-circuited the shell half away).

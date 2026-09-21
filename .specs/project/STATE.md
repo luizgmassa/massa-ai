@@ -1216,6 +1216,18 @@ directly (`test-install-skills-cli.sh`, `test-plugin-auto-install.sh`,
 `test-plugin-registry-registration.sh`) — all three still fail with the same symptoms, confirmed
 not stale in the other direction.
 
+**Correction (H1, 2026-09-21).** Those three were never "pre-existing, unrelated, host-specific"
+in the sense recorded throughout this feature. They are one test-harness defect, diagnosed and
+fixed in Fix Pass 3: each suite builds a PATH meant to hold the JS runtime and no host agent CLI
+by *subtracting* the CLI's directory from the live PATH, which fails on this host two ways — `node`
+and `claude` share `~/.local/bin`, and `claude` is installed twice so `command -v` reports only the
+first. `runtime_shim_path` replaces the subtraction with a positive list of runtime symlinks.
+After the fix: 47/0, 46/0, 210/0 (39/39 shell suites). CI never saw it because CI has no host CLI
+at all, which makes the subtraction a no-op on an already-clean PATH. This also resolves the
+contradiction recorded at `.specs/features/web-ui-typescript/tasks.md:1685` (same suite read as
+18 failures and as 201/0 green on `main`) — both readings were honest, and the variable was
+whether the running machine could reach a host CLI.
+
 All six of Fix Pass 2 (G1, G2, G3, G4, G5, G6) are now closed. Round 3 independent verification
 (author ≠ verifier) is the mandatory next step — the third and final iteration of the bounded
 fix→re-verify loop per this batch's own instructions.

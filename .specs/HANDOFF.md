@@ -112,13 +112,13 @@ file is a snapshot and will not update after this write.
 - Every repaired sensor has an observed red, induced and reverted by file copy — done across
   T01-T16, `git status --porcelain` clean before every commit.
 - `bun run lint` / `type-check` / `build` / `test` — green (0 / 6/6 / 6/6 / 12/12 turbo tasks).
-- **`bun run test:scripts` is RED on this host** — not a clean sweep. T15b fixed the gate itself
-  (it used to short-circuit past 37 shell suites on a bun-half failure with `&&`); once fixed,
-  it surfaces 3 pre-existing, host-specific shell failures unrelated to this feature:
-  `test-install-skills-cli.sh`, `test-plugin-auto-install.sh`,
-  `test-plugin-registry-registration.sh` (36/39 shell suites pass; bun-half 2057/0). Do not
-  read a green `test:scripts` claim anywhere in older per-Phase notes as still current — it
-  never ran the shell half honestly until T15b.
+- **`bun run test:scripts`** — T15b/F6 fixed the gate itself (it used to short-circuit past 37
+  shell suites on a bun-half failure with `&&`). Once fixed it surfaced 3 shell failures recorded
+  through most of this feature as "pre-existing, host-specific, unrelated": 36/39 shell suites,
+  bun-half 2057/0. **H1 diagnosed and fixed them** — a test-harness defect, not a product one, and
+  not actually pre-existing in the sense the note implied: the three suites now measure 47/0, 46/0
+  and 210/0 on this host (39/39). Do not read a green `test:scripts` claim anywhere in older
+  per-Phase notes as still current — it never ran the shell half honestly until T15b.
 - A live LM Studio embedding sensor (`lmstudio-embedding-live.test.ts`) was repointed by T15 and
   passes when a real LM Studio is reachable; not independently re-verified by W8 (no local stack
   in this environment — see below).

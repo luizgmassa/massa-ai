@@ -37,6 +37,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ever added to the config without a matching Admin Portal field — the previous gate only
   checked section names, so a missing field passed silently.
 
+### Fixed
+
+- **`bun run test:scripts` no longer skips its shell half when the bun half fails.** The script
+  joined the two halves with `&&`, so one failing TypeScript test short-circuited all 39
+  `scripts/tests/*.sh` suites away and the gate reported a single failure where there could be
+  many. Both halves now always run, through the new `scripts/run-shell-suites.sh`, which also
+  reports every failing suite together instead of aborting at the first one — and prints its
+  population on success, so a passing run is distinguishable from a run that executed nothing.
+- **Three installer shell suites could not prove their "no host CLI installed" branch on a
+  developer machine.** `test-install-skills-cli.sh`, `test-plugin-auto-install.sh` and
+  `test-plugin-registry-registration.sh` each built a scrubbed PATH by *subtracting* a host
+  CLI's directory from the live PATH, which leaks two ways: the JS runtime and the host CLI
+  commonly share one bin directory (`~/.local/bin`), and `command -v` reports only the first of
+  two installs. The suites then exercised the CLI route while asserting the fallback route,
+  producing 22 failures that were repeatedly recorded as "pre-existing and host-specific". CI
+  never saw it, because with no host CLI installed the subtraction is a no-op on an already
+  clean PATH. Replaced with `runtime_shim_path`, a positive list of runtime symlinks:
+  43/4 → 47/0, 44/2 → 46/0, 194/16 → 210/0.
+
 ## [1.58.0] - 2026-09-20
 
 ### Added

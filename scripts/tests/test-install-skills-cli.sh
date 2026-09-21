@@ -61,9 +61,11 @@ echo ""
 echo "Scenario 3: no agent tool on PATH exits 2 (apply only)"
 H3="$ROOT/h3"; mkdir -p "$H3"
 EMPTY_BIN="$ROOT/empty-bin"; mkdir -p "$EMPTY_BIN"
-# Keep the runner reachable, drop the agent mocks.
-NODE_DIR="$(dirname "$(command -v node || command -v bun)")"
-OUT3="$(PATH="$EMPTY_BIN:$NODE_DIR:/usr/bin:/bin" bash "$INSTALLER" --apply --platform all \
+# Keep the runner reachable, drop the agent mocks. The runner's own directory
+# is not safe to admit: on a common dev setup it is ~/.local/bin, where the
+# host CLIs live too, so this scenario would silently find one.
+RUNTIME_PATH="$(runtime_shim_path "$ROOT/runtime-shim")"
+OUT3="$(PATH="$EMPTY_BIN:$RUNTIME_PATH" bash "$INSTALLER" --apply --platform all \
   --target "$H3" --repo-root "$PROJECT_ROOT" --yes 2>&1)"
 RC3=$?
 assert_eq "no tools exits 2" "$RC3" "2"
@@ -71,7 +73,7 @@ assert_contains "reason is reported" "$OUT3" "No requested agent tools are insta
 
 echo ""
 echo "Scenario 4: --check runs for every platform even when no tool is on PATH"
-RC4="$(PATH="$EMPTY_BIN:$NODE_DIR:/usr/bin:/bin" bash "$INSTALLER" --check --platform all \
+RC4="$(PATH="$EMPTY_BIN:$RUNTIME_PATH" bash "$INSTALLER" --check --platform all \
   --target "$H3" --repo-root "$PROJECT_ROOT" >/dev/null 2>&1; echo $?)"
 assert_eq "check on a bare home reports drift (exit 1)" "$RC4" "1"
 
