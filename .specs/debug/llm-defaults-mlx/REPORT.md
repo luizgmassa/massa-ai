@@ -1,7 +1,7 @@
 # Debug Report — llm-defaults-mlx
 
 - **projectId**: `massa-ai` · **workflowSessionId**: `debug-llm-defaults-mlx`
-- **workflow**: debug · **fix size**: Standard+ (8 commits, 17 files, public installer surface)
+- **workflow**: debug · **fix size**: Standard+ (10 commits, 19 files, public installer surface)
 - **branch**: `fix/llm-defaults-mlx-format` from `main` @ `cca0b66e` (v1.58.0)
 - **worktree**: `/Users/luizmassa/Projects/massa-ai-fix-llm-defaults-mlx-format`
 - **Isolation Gate**: satisfied — dedicated worktree + branch, recorded above. The main
@@ -33,7 +33,7 @@ Every loop below ran before and after the fix.
 |---|---|---|---|
 | 1 | `bun test apps/tools-api/src/routes/config.test.ts` + `apps/web-ui/.../config-forms.test.ts` | the two fields resolve `undefined`, 7 of 110 unresolved | 18/0 and 68/0; 5 of 110 unresolved against the route's payload |
 | 2 | `bash scripts/tests/test-setup-local-first-api-key.sh` | asserted the written value was `false` | 43/0 with the assertion flipped to `true` |
-| 3,4,5 | live LM Studio (`curl /v1/embeddings`, `lms ls`, `lms runtime get -l`, `lms get --mlx`) + `bash scripts/tests/test-model-format-select.sh` | no format concept existed | 42/0 |
+| 3,4,5 | live LM Studio (`curl /v1/embeddings`, `lms ls`, `lms runtime get -l`, `lms get --mlx`) + `bash scripts/tests/test-model-format-select.sh` | no format concept existed | 59/0 |
 
 Root-cause proof for items 1–2 is the code path, not a crash: both are wrong-value
 defects, reproduced by reading the value the writer emits and the value the renderer
@@ -225,6 +225,7 @@ equivalent flag and no `stop --all`, so its table is parsed and each name stoppe
 | `70b614fd` | 2 | `installer-api-key.sh`, `test-setup-local-first-api-key.sh` |
 | `4768c3fb` | 3 | `inference-providers.ts`, `inference-providers.test.ts` |
 | `4ef71e66` | 4, 5 | `installer-feature-prompts.sh`, `setup-local-first.sh`, `test-model-format-select.sh`, `mlx-model-parity.test.ts`, `.env.example`, `CHANGELOG.md` |
+| `ef8f2894` | 6, 7 | `inference-providers.ts`, `inference-providers.test.ts`, `installer-feature-prompts.sh`, `setup-local-first.sh`, `test-model-format-select.sh`, `mlx-model-parity.test.ts`, `CHANGELOG.md` |
 
 ### Verification recipe
 
@@ -256,6 +257,16 @@ than `git checkout` (a checkout would restore to HEAD, not to the pre-mutation s
 | `test-model-format-select.sh` | hoist `EMBEDDING_FETCH` out of its override guard | 40 pass / **2 fail**, restored → 42/0 |
 | `embedding-defaults-parity.test.ts` | lmstudio instruct default → `qwen3-vl-4b-instruct` | 20 pass / **1 fail**, restored → 21/0 |
 | `llm-client-disable-think-json-schema.test.ts` | env knob `0` → `1` | 1 pass / **2 fail**, restored → 3/0 |
+| `test-model-format-select.sh` | `installer_lmstudio_model_key` forced to its fallback | 54 pass / **2 fail**, restored → 56/0 |
+| `test-model-format-select.sh` | `[ "$loaded" != "[]" ]` unload gate → `true` | 54 pass / **2 fail**, restored → 56/0 |
+| `test-model-format-select.sh` | ollama `awk 'NR > 1'` → `awk` with no header skip | 58 pass / **1 fail**, restored → 59/0 |
+| `mlx-model-parity.test.ts` | seam GGUF instruct repo → `…/Qwen3-VL-4B-Instruct-GGUF` | 14 pass / **1 fail**, restored → 15/0 |
+| `mlx-model-parity.test.ts` | delete the `LLM_MODEL` reconciliation call from the wizard | 14 pass / **1 fail**, restored → 15/0 |
+
+The GGUF fetch fix needed no constructed mutation: the pre-fix suite asserted the defect as
+the contract (`gguf: every fetch spec is the id itself`), so changing the code failed those
+two assertions on the first run — 40 pass / **2 fail** — and the assertions were rewritten
+against the measured behaviour.
 
 **The third row was a surviving mutation until independent verification found it.** With
 `defaultMassaAiConfig` mocked to `{}` at module scope, `{...shipped.embedding}` spread
@@ -345,8 +356,8 @@ trusted, with four mutation kills observed independently. Three hand-backs, all 
 2. **A surviving mutation in the route fix.** Recorded in the discrimination table above and
    closed.
 3. **A stale figure** — `test-model-format-select.sh` was 28/0 when this report was written
-   and is 42/0 at HEAD, the difference being the override-matrix cases added by the round-1
-   fix. Refreshed.
+   and is 59/0 at HEAD — the override-matrix cases added by the round-1 fix, then the
+   GGUF-fetch, id-reconciliation and unload cases of items 6-7. Refreshed.
 
 The verifier could not drive the interactive menu itself (its sandbox has no `/dev/tty`);
 it substituted an audit of this branch's pty harness for vacuous-pass modes and confirmed
