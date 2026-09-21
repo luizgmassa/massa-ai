@@ -829,7 +829,7 @@ defect; F4 is why no sensor caught it. The parity gate's `DERIVED_SURFACES` tabl
 enumerated from the implementation's subset rather than from the requirement's set, so it mirrors
 the bug instead of catching it. Enumerate gate rows from the requirement.
 
-### F1: `use ollama` must write the ollama instruct and coding ids — PDM-02 AC-2
+### F1: `use ollama` must write the ollama instruct and coding ids — PDM-02 AC-2 — ✅ Complete
 
 `apps/mcp-client/src/config-cli.ts:276-285` and `apps/opencode-plugin/src/config-cli.ts:280-289`.
 The `lmstudio` branch assigns `config.llm.baseUrl`/`.model`/`.codeModel`; the `ollama` branch
@@ -842,6 +842,27 @@ the `baseUrl` leak pre-dates the feature, the **model leak is new**. The other t
 Tests: the Independent Test extended to the `use ollama` branch on both CLIs — all five values internally consistent for ollama after a provider switch away from lmstudio
 Gate: bun test apps/mcp-client/src/__tests__/config-cli.test.ts && bun test apps/opencode-plugin/src/__tests__/config-cli.test.ts
 Depends on: none.
+
+**Resolution (2026-09-20).** Mirrored the lmstudio branch's three `config.llm.*` assignments
+into the `ollama` branch of both CLIs (`config-cli.ts`), using
+`INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl`/`.defaultModels.instruct`/`.defaultModels.coding`
+— no hardcoded `baseUrl` literal. Added the switch-away regression test (`init --lmstudio` then
+`use ollama`) to both `config-cli.test.ts` files, the case that exposed G0 (a fresh `use ollama`
+on an already-ollama config can't observe the defect). Full provider × branch × CLI matrix
+verified by direct CLI invocation under scratch `XDG_CONFIG_HOME`s (`init`, `init --lmstudio`,
+`init --ollama`, `init`→`use ollama`, `init`→`use lmstudio`, `init --lmstudio`→`use ollama`) —
+all six cells internally consistent on both CLIs. Gate: 36/0 (mcp-client), 32/0 (opencode-plugin).
+Observed red: reverting `config.llm.codeModel` (mcp-client) and `config.llm.baseUrl`
+(opencode-plugin) each failed the new switch-away test on the exact field removed; restored by
+file copy, `git status` clean, re-run green.
+
+Provisioning note (not part of this task's scope, but required before any gate in this worktree
+could run): `packages/shared/dist/` was stale — missing `defaultModels` on the `lmstudio` entry
+of `INFERENCE_PROVIDERS`, present only on `ollama` — causing every `config-cli.test.ts` run to
+fail with `TypeError: undefined is not an object (evaluating
+'INFERENCE_PROVIDERS.lmstudio.defaultModels...')` regardless of this task's fix. Ran
+`cd packages/shared && bun run build` to regenerate `dist/` from current `src/`; no source file
+was edited to fix this.
 
 ### F2: `/api/v1/system/ollama` must stop reporting the retired default — PDM-03 AC-1
 

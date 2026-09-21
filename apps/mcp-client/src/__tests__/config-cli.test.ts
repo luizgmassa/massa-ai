@@ -179,6 +179,24 @@ describe("config-cli runCli", () => {
     expect(config.embedding.model).not.toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding);
   });
 
+  test("use ollama after init --lmstudio writes the ollama instruct/coding trio, not LM Studio's (G0/PDM-02 AC-2)", async () => {
+    // The switch-away case that exposed G0: a fresh `use ollama` on an
+    // already-ollama config can't observe the defect, since the trio was
+    // already ollama's. Start from an lmstudio config and switch to ollama.
+    rmSync(getConfigPath(), { force: true });
+    await captureConsole(() => runCli(["init", "--lmstudio"]));
+    const r = await captureConsole(() => runCli(["use", "ollama"]));
+    expect(r.code).toBe(0);
+    const show = await captureConsole(() => runCli(["show"]));
+    const config = JSON.parse(show.out);
+    expect(config.llm.baseUrl).toBe(INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl);
+    expect(config.llm.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+    expect(config.llm.codeModel).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
+    expect(config.llm.model).not.toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct);
+    expect(config.llm.codeModel).not.toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.coding);
+    expect(config.llm.baseUrl).not.toBe(INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl);
+  });
+
   test("use lmstudio defaults write the provider's embedding pair (PDM-02 AC-2)", async () => {
     await captureConsole(() => runCli(["init"]));
     const r = await captureConsole(() => runCli(["use", "lmstudio"]));

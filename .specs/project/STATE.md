@@ -876,6 +876,33 @@ tracked/clean on HEAD): **exit 0**, all 6 checked paths clean and tracked.
 Phase 8 is closed. Execute is closed. Next: independent verification (author ≠ verifier), the
 mandatory step named in `spec.md`'s Verification Approach and not yet run by this batch.
 
+**Independent verification ran and returned FAIL (2026-09-20).** 27/28 ACs traced, PDM-02 AC-2
+not met, 2 spec-precision gaps, 16 mutations injected / 12 killed / 4 survived. Report:
+`.specs/features/per-provider-default-models/validation.md`. Nine fix tasks recorded under
+tasks.md's "Fix Pass 1" heading (F1-F9), dispatched in three batches; iteration 1 of a maximum
+of 3 fix→re-verify rounds.
+
+**Fix Pass 1, Batch 1 (F1-F3), F1 — Complete.** `use ollama` in both `config-cli.ts` copies
+(`apps/mcp-client`, `apps/opencode-plugin`) now assigns `config.llm.baseUrl`/`.model`/`.codeModel`
+from `INFERENCE_PROVIDERS.ollama` (`.defaultLlmBaseUrl`/`.defaultModels.instruct`/`.coding`),
+mirroring the `lmstudio` branch — closing the fourth instance of this feature's set/subset
+defect (G0). Added the switch-away regression test (`init --lmstudio` then `use ollama`) to both
+`config-cli.test.ts` files. Gate: `bun test apps/mcp-client/src/__tests__/config-cli.test.ts &&
+bun test apps/opencode-plugin/src/__tests__/config-cli.test.ts` → 36/0, 32/0. Full provider ×
+branch × CLI matrix verified by direct invocation under scratch `XDG_CONFIG_HOME`s: `init`,
+`init --lmstudio`, `init --ollama`, `init`→`use ollama`, `init`→`use lmstudio`, and the
+switch-away case `init --lmstudio`→`use ollama` — all six cells internally consistent on both
+CLIs. Observed red: reverting `config.llm.codeModel` (mcp-client) and `config.llm.baseUrl`
+(opencode-plugin) each failed the new test on the exact field removed; restored by file copy,
+`git status` clean before commit.
+
+Provisioning finding (not this task's defect, fixed as a prerequisite to running any gate in
+this worktree): `packages/shared/dist/` was stale relative to `src/` — the `lmstudio` entry of
+`INFERENCE_PROVIDERS` was missing `defaultModels` in `dist/config/inference-providers.js` while
+`ollama`'s was present, throwing `TypeError` in every `config-cli.test.ts` run regardless of
+this fix. Repaired with `cd packages/shared && bun run build` (no source edit); `dist/` is
+gitignored build output, not part of this commit.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),

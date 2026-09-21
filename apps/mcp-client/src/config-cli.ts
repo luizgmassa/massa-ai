@@ -283,6 +283,11 @@ export async function runCli(argv: string[]): Promise<number> {
         // knownDimensions; see embeddings/config.ts's matching comment.
         dimensions: knownEmbeddingDimensions(model) ?? 768,
       };
+      // G0/PDM-02 AC-2: same fix as the lmstudio branch below — a switch
+      // away from lmstudio must not leave llm.* naming lmstudio's ids.
+      config.llm.baseUrl = (options["base-url"] as string) || INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl;
+      config.llm.model = INFERENCE_PROVIDERS.ollama.defaultModels.instruct;
+      config.llm.codeModel = INFERENCE_PROVIDERS.ollama.defaultModels.coding;
     } else if (provider === "lmstudio") {
       const model = (options.model as string) || INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
       config.embedding = {
