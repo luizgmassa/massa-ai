@@ -1274,3 +1274,118 @@ Observed red: reverting to config-first order failed exactly the new "env wins" 
 
 SPEC_DEVIATION: none — the inverted test value is this task's own explicitly sanctioned
 exception, not a deviation from it.
+
+---
+
+## Fix Pass 2 — from round-2 verification (FAIL, 2026-09-20)
+
+Round 2 measured real progress: **28/28 ACs met and traced**, **9 of round 1's 10 gaps confirmed
+closed** by re-injecting each original defect, and **16 mutations injected / 15 killed / 1
+survived**. It also found four new defects. Six fix tasks. **This is iteration 3 of the bounded
+fix→re-verify loop's maximum of 3** — if round 3 does not pass, the feature stops as `Blocked` and
+goes to the user rather than looping again.
+
+**G1 is the fifth instance of this feature's dominant defect class, and it is the orchestrator's
+error twice over.** T06b's task text specified `config ?? env ?? default`, and F2's task text
+specified the same inversion for a different file. F2b corrected one of them. The other shipped.
+Its own rationale — "would make this the only surface where an env var loses to a config file" —
+now describes `_resolveEmbedContextWindow`. Implementers followed both texts literally, which was
+correct of them.
+
+### G1: Restore env-over-config in `_resolveEmbedContextWindow` — design conformance
+
+`packages/core/src/services/embeddings/provider.ts:39-49` returns
+`embeddingConfig?.contextWindow ?? parsePositiveIntEnv(process.env.OLLAMA_EMBEDDING_NUM_CTX, …)`
+— config beats env. `CLAUDE.md:320-321` documents `env > config.json > literal defaults`, and
+`design.md:268` says of this very feature "**No precedence machinery changes** — resolution is
+already env > file > default", which is now false about its own code. Its ~10 sibling resolvers in
+`services/embeddings/config.ts` are all env-first. `OLLAMA_EMBEDDING_NUM_CTX` is a shipped knob
+(`.env.example:211`).
+
+Three artifacts encode the inversion and all three move together: the resolver, the docblock at
+`:36-37` that states it, and `packages/core/src/__tests__/embeddings-provider.test.ts:469-471`,
+which asserts `_resolveEmbedContextWindow({contextWindow:12000})` is `12000` with
+`OLLAMA_EMBEDDING_NUM_CTX="20000"` set — **a test asserting the divergence as the contract**, the
+same shape as the retired-literal assertion F2 had to repoint. Changing it is sanctioned because it
+encodes the wrong spec; say so explicitly rather than editing it quietly.
+
+Tests: env beats a config value; config beats the role-table default when no env var is set; the role-table default applies when neither is present
+Gate: bun test packages/core/src/__tests__/embeddings-provider.test.ts && bun run type-check
+Depends on: none.
+
+### G2: `use ollama --base-url` must not write an LLM base URL missing `/v1`
+
+`apps/mcp-client/src/config-cli.ts:288` and `apps/opencode-plugin/src/config-cli.ts:293` assign
+`config.llm.baseUrl = (options["base-url"] as string) || INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl`.
+For ollama the seam declares **two different** URLs — `defaultEmbeddingBaseUrl:
+"http://localhost:11434"` and `defaultLlmBaseUrl: "http://localhost:11434/v1"` — so one
+`--base-url` flag cannot serve both. Measured: `use ollama --base-url http://h:11434` writes
+`llm.baseUrl: "http://h:11434"`, and `llm-client.ts:369` passes it straight through as `baseURL`.
+
+**This is a regression F1 introduced, and it came from F1's own task text**, which said to mirror
+the lmstudio branch. That branch is safe only because lmstudio's two URLs are byte-identical — a
+coincidence, not a rule. Mirroring a case whose distinguishing property is absent is the same
+subset error one more time.
+
+Decide where the derivation belongs — the seam is the better home than either CLI, since both CLIs
+would otherwise each carry a copy — and make an explicit `--base-url` produce a correct pair for
+**both** providers. Do not special-case ollama with a hardcoded `/v1`; derive from what the seam
+declares about each provider.
+
+Tests: `use <provider> --base-url <url>` writes an embedding base and an LLM base that each match that provider's declared shape, for both providers, both CLIs
+Gate: bun test apps/mcp-client/src/__tests__/config-cli.test.ts && bun test apps/opencode-plugin/src/__tests__/config-cli.test.ts && bun test scripts/__tests__/embedding-defaults-parity.test.ts
+Depends on: none.
+
+### G3: The parity gate's printed population count overstates by 2
+
+`scripts/__tests__/embedding-defaults-parity.test.ts:258-341`. The two `embeddings/config.ts` rows
+sit inside `CONFIG_CLI_FILES.flatMap(...)`, so they are emitted **once per CLI**: `length === 28`
+while distinct labels `=== 26`. PDM-05 AC-3's printed count is a claim, and a duplicated row also
+means one mutation can be reported twice. F4's "24 → 28" carries the same inflation; the true
+distinct figures are 22 → 26. Detection is unaffected — this is an accounting defect, not a
+coverage one, and the correction is to the count and the artifacts that quote it. Pre-existing from
+T13, but F4 re-derived this population and did not catch it.
+
+Tests: the printed population equals the distinct-label count; a duplicated row is rejected or deduplicated
+Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts
+Depends on: none.
+
+### G4: The declared `NEEDLE_MODEL` residual names 1 of 2 files
+
+`benchmarks/needles/README.md:66-73` honestly declares `benchmarks/needles/run.ts`'s retired
+`qwen3-embedding:4b` pin — but `scripts/needles-rename-control.ts:118` carries the **byte-identical
+default** and is named in no artifact. A residual that names one member of a two-member set is the
+same defect class as the code ones, in prose. Separately, `benchmarks/needles/run.ts:9` still claims
+"same model as the E2E baseline", which the README itself retracts at `:68-69` — a file contradicting
+the doc that documents it.
+
+Either repoint both pins or declare both, with the same reasoning applied to each; do not leave the
+set half-declared.
+
+Tests: covered by the parity gate's Markdown tier for the declaration; the code pins verified by reading
+Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts && bun run test:scripts
+Depends on: none.
+
+### G5: PDM-10 AC-3's `lms load -c` values are unsensed — the surviving mutant
+
+Mutating `scripts/setup-local-first.sh:371`'s `-c 16384` to `-c 4096` left the parity gate at 15/0
+and **five shell suites at 0 failures**. This is the one mutation of sixteen that survived round 2.
+The per-role context values are a requirement (PDM-10 AC-3) with no sensor at all.
+
+Add one. Its acceptance is the mutation above dying by name, not a green run.
+
+Tests: each role's `lms load -c <context>` value asserted against `INFERENCE_ROLE_DEFAULTS`, so a changed literal fails by name
+Gate: bash scripts/tests/test-lms-model-exists.sh && bun test scripts/__tests__/embedding-defaults-parity.test.ts
+Depends on: none.
+
+### G6: Correct a stale measurement in this feature's own artifacts
+
+F2 and F2b both recorded a "pre-existing failure" in `apps/tools-api/src/routes/system.test.ts`
+(`LocalHealthChecker.checkOllama` — 13 pass / 1 fail). Round 2 measured that file at **14 pass / 0
+fail**. The claim is stale, and a stale "known failure" note is how a real failure later gets waved
+through as expected. Re-measure, correct every place this feature's artifacts repeat it, and state
+the figure with the commit it was measured on.
+
+Tests: none — this is an artifact correction, verified by re-running the named file and quoting the result
+Gate: bun test apps/tools-api/src/routes/system.test.ts && bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models --root .
+Depends on: G1, G2, G3, G4, G5.
