@@ -1027,7 +1027,7 @@ SPEC_DEVIATION: none — the `installer-api-key.sh` extractor fix is a sensor-fi
 in this task's own gate file (F3's syntax change broke the regex, not the assertion's target
 value), not a deviation from F4's own scope.
 
-### F5: Sense the production `llm.*` config reader — PDM-12 AC-2
+### F5: Sense the production `llm.*` config reader — PDM-12 AC-2 — ✅ Complete
 
 `packages/shared/src/config/index.ts:781,783,785`. Mutations M12a/b/c each survived **both**
 `bun test packages/shared/src` (945/0) and `llm-client.test.ts` (74/0). Cause: `config.get("llm")`
@@ -1039,6 +1039,42 @@ test of the reader.
 
 Tests: the three llm.* fields resolved through the production reader, each killing a mutation that M12a/b/c survived
 Gate: bun test packages/shared/src/config/__tests__/ && bun test packages/core/src/__tests__/llm-client.test.ts
+
+**Resolution (2026-09-20).** Added a new describe block to
+`packages/shared/src/config/__tests__/llm-env-prefix.test.ts` (the file already exercising
+`config.get("llm")` in an isolated subprocess) rather than `config-loader.test.ts` or
+`llm-client.test.ts` — neither reaches the actual production call path. `contextWindow`/
+`codeContextWindow`/`codeTemperature` take no env var of their own (per the existing `KNOBS`
+comment), so `config.json` is the only way to reach `defaultConfig`'s
+`fileConfig.llm?.X ?? INFERENCE_ROLE_DEFAULTS...` fallback at `index.ts:781,783,785`. The new
+test writes a real `config.json` with probe values for all three fields, spawns a subprocess that
+imports `config/index.ts` fresh and reads `config.get("llm")` (the exact call `getLlmConfig()`
+makes in production), and asserts each field equals the probe — proving config wins over the
+seam default through the real reader, not a synthetic `cfg` object. A second test asserts the
+seam default applies when config.json sets none of them (negative control).
+
+Gate: `bun test packages/shared/src/config/__tests__/` → 270/0 (was 268/0), `bun test
+packages/core/src/__tests__/llm-client.test.ts` → 74/0. Both run with a scratch
+`XDG_CONFIG_HOME` (a pre-existing, unrelated flake in a sibling file within the same directory —
+observed 1/9 runs — and a pre-existing real-config read/write from a sibling file's own
+defensive-fallback test were both confirmed present identically before this task's edit and out
+of scope; the real `~/.config/massa-ai/config.json` mtime was confirmed unchanged before and
+after). `packages/shared` `bun run build` (its `tsc` type-check) clean.
+
+Observed red — M12a/b/c re-injected one at a time, each restored by file copy before the next:
+- M12b (`index.ts:781`, dropped `fileConfig.llm?.contextWindow ??`): new test failed on
+  `contextWindow` — expected `12000`, got `16384` (the seam default).
+- M12a (`index.ts:783`, dropped `fileConfig.llm?.codeContextWindow ??`): failed on
+  `codeContextWindow` — expected `40000`, got `32768`.
+- M12c (`index.ts:785`, dropped `fileConfig.llm?.codeTemperature ??`): failed on
+  `codeTemperature` — expected `0.66`, got `0` (`INFERENCE_ROLE_DEFAULTS.coding.temperature`, the
+  seam default, confirming config.json is bypassed exactly as M12a/b were).
+
+All three restored by file copy; `git status` clean before commit; re-run 7/7 (this file) and
+74/74 green after each restore.
+
+SPEC_DEVIATION: none.
+
 Depends on: none.
 
 ### F6: `test:scripts` must report every failing shell suite, not the first

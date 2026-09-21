@@ -969,6 +969,26 @@ line; injecting an unlisted `process.env.MASSA_AI_LLM_MODEL || "<literal>"` prob
 `llm-client.ts` (zero prior token mentions) named that file and line. All four restored by file
 copy, `git status` clean before commit, re-run 15/15 green each time.
 
+**Fix Pass 1, Batch 2 (F2b, F4, F5), F5 — Complete. Batch 2 closed.** Added a new describe block
+to `packages/shared/src/config/__tests__/llm-env-prefix.test.ts` sensing the actual production
+call path (`config.get("llm")` inside a subprocess with a real `config.json`), rather than
+`config-loader.test.ts`'s `loadConfig()` (a different function) or `llm-client.test.ts`'s
+`_resolveLlmConfig` (tested with a synthetic `cfg` that never goes through `config.get`).
+`contextWindow`/`codeContextWindow`/`codeTemperature` have no env var of their own, so
+config.json is the only path to `index.ts:781,783,785`'s `fileConfig.llm?.X ??` fallback. Gate:
+`packages/shared/src/config/__tests__/` → 270/0 (was 268/0), `llm-client.test.ts` → 74/0, both
+under a scratch `XDG_CONFIG_HOME` (a pre-existing ~11% flake in a sibling file and a pre-existing
+real-config read/write from another sibling's own defensive test were both confirmed present
+identically before this task and out of scope; real `~/.config/massa-ai/config.json` mtime
+confirmed unchanged). `bun run build` (packages/shared) clean. Observed red: M12a, M12b, M12c
+re-injected one at a time in `index.ts` — each failed the new test on exactly its own field
+(`codeContextWindow` expected 40000 got 32768; `contextWindow` expected 12000 got 16384;
+`codeTemperature` expected 0.66 got 0) — restored by file copy each time, `git status` clean,
+re-run green.
+
+All of Batch 2 (F2b, F4, F5) is closed. Remaining: F6-F9 (other workers, per tasks.md's
+"Fix Pass 1" heading) and re-verification once every fix task lands.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
