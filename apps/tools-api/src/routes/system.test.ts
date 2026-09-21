@@ -171,17 +171,20 @@ describe("GET /api/v1/system/ollama", () => {
     expect(res.json.baseUrl).toBe("http://localhost:11434");
   });
 
-  test("config.json's embedding.model wins over both env and the seam default", async () => {
+  // F2b: F2 originally asserted config.json beats env here, which inverted
+  // this project's documented precedence (env > config.json > seam default —
+  // CLAUDE.md:321, design.md:51,268, T02). Inverted with the implementation.
+  test("OLLAMA_EMBEDDING_MODEL wins over config.json's embedding.model", async () => {
     rawEmbeddingModel = "from-config-json";
     process.env.OLLAMA_EMBEDDING_MODEL = "from-env";
     const res = await get("/api/v1/system/ollama");
-    expect(res.json.configuredModel).toBe("from-config-json");
+    expect(res.json.configuredModel).toBe("from-env");
   });
 
-  test("OLLAMA_EMBEDDING_MODEL wins over the seam default when config.json names none", async () => {
-    process.env.OLLAMA_EMBEDDING_MODEL = "from-env";
+  test("config.json's embedding.model wins over the seam default when no env var is set", async () => {
+    rawEmbeddingModel = "from-config-json";
     const res = await get("/api/v1/system/ollama");
-    expect(res.json.configuredModel).toBe("from-env");
+    expect(res.json.configuredModel).toBe("from-config-json");
   });
 });
 

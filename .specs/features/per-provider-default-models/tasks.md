@@ -1032,7 +1032,7 @@ Tests: none — the delivery gate is this task's check
 Gate: bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models --root .
 Depends on: F1, F2, F3, F4, F5, F6, F7, F8.
 
-### F2b: Correct F2's precedence — it was specified backwards
+### F2b: Correct F2's precedence — it was specified backwards — ✅ Complete
 
 **This is an orchestrator error, not the implementer's.** F2's task text above says "Resolve
 config first, then env, then the seam". That inverts this project's documented convention, and
@@ -1057,3 +1057,21 @@ spec here is the documented precedence.
 Tests: env beats a config.json value; config.json beats the seam default when no env var is set; the seam default applies when neither is present
 Gate: bun test apps/tools-api/src/routes/system.test.ts && bun run type-check
 Depends on: F2.
+
+**Resolution (2026-09-20).** Reordered `resolveConfiguredOllamaEmbeddingModel()` in
+`apps/tools-api/src/routes/system.ts` to `process.env.OLLAMA_EMBEDDING_MODEL` →
+`loadRawUserConfig().embedding?.model` → `INFERENCE_PROVIDERS.ollama.defaultModels.embedding`.
+Inverted F2's second test (`'from-config-json'` beating `'from-env'`) to assert env wins,
+per this task's explicit sanction — the test encoded the orchestrator's inverted spec, not a
+genuinely-wrong assertion changed quietly. Added a third case (config.json beats the seam
+default when no env var is set) so the three-tier precedence in "Tests" above is fully covered.
+
+Gate: `bun test apps/tools-api/src/routes/system.test.ts` → 13 pass / 1 fail, 14 total — the 1
+failure is the same pre-existing `LocalHealthChecker.checkOllama` real-class probe test named in
+F2's own resolution note, confirmed unchanged. `bun run type-check` (apps/tools-api) clean.
+Observed red: reverting to config-first order failed exactly the new "env wins" test
+(`system.test.ts:181`, expected `from-env`, got `from-config-json`); restored by file copy,
+`git status` clean, re-run 13/14 green (same 1 pre-existing failure).
+
+SPEC_DEVIATION: none — the inverted test value is this task's own explicitly sanctioned
+exception, not a deviation from it.

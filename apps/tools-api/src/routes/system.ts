@@ -19,14 +19,16 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 
-/** G2/PDM-03 AC-1: config first (the user's own `config.json`, raw — no
+/** G2/PDM-03 AC-1: env first, then the user's own `config.json` (raw — no
  *  defaults folded in, so an unset field falls through instead of masking
- *  env/the seam), then env, then the seam default — never the retired
- *  `qwen3-embedding:4b` literal. */
+ *  the seam), then the seam default — never the retired
+ *  `qwen3-embedding:4b` literal. Precedence is env > config.json > seam
+ *  default, per CLAUDE.md's Configuration section and this feature's
+ *  design.md. */
 function resolveConfiguredOllamaEmbeddingModel(): string {
   return (
-    loadRawUserConfig().embedding?.model ||
     process.env.OLLAMA_EMBEDDING_MODEL ||
+    loadRawUserConfig().embedding?.model ||
     INFERENCE_PROVIDERS.ollama.defaultModels.embedding
   );
 }

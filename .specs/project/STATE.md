@@ -936,6 +936,20 @@ All of Batch 1 (F1-F3) is closed. Next: Batch 2 (F4-F5, per tasks.md — F4 depe
 now done) or F9's final status/STATE/HANDOFF update once every fix task lands, per tasks.md's
 explicit "run this task last" ordering.
 
+**Fix Pass 1, Batch 2 (F2b, F4, F5), F2b — Complete.** `resolveConfiguredOllamaEmbeddingModel()`
+in `apps/tools-api/src/routes/system.ts` was reordered to `process.env.OLLAMA_EMBEDDING_MODEL` →
+`loadRawUserConfig().embedding?.model` → the seam default — this project's documented
+`env > config.json > literal default` convention (`CLAUDE.md:321`, `design.md:51,268`, T02),
+which F2's task text had inverted. F2's second test asserted `'from-config-json'` beat
+`'from-env'`; inverted to assert env wins, per the Execute-sanctioned exception for a test that
+encoded a spec inverted by the orchestrator, not a genuinely-wrong test. Added a third case
+(config.json beats the seam default when no env var is set) so all three precedence tiers are
+covered. Gate: `bun test apps/tools-api/src/routes/system.test.ts` → 13/14 (same 1 pre-existing
+`LocalHealthChecker.checkOllama` failure, confirmed identical). `apps/tools-api` type-check
+clean. Observed red: reverting to config-first order failed exactly the new "env wins" test
+(`system.test.ts:181`, expected `from-env` got `from-config-json`); restored by file copy,
+`git status` clean before commit, re-run green.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
