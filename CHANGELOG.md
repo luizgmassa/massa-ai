@@ -39,6 +39,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never merged back into a config, so the loader contract is unchanged); `batchSize`
   follows the persisted `embedding.provider`. Unresolved fields on a bare config drop from
   7 of 110 to 5.
+- **`PgObservationStore.__drain()` was a sleep wearing a flush's name, and it made the
+  coverage gate flaky.** Its docstring said "await in-flight writes"; its body was
+  `setTimeout(10)` against a persist fired as an untracked `void (async () => …)()`, so
+  there was nothing to await. `observation-repository-pg-coverage.test.ts` padded it with a
+  further fixed 120 ms and still failed on a loaded CI runner — a `SELECT … WHERE id = $1`
+  issued right after an insert read zero rows. The persist is now chained per observation
+  id through a `chainWrite` helper (the same `inflight` shape `PgJobStore` and
+  `PgSynapseSessionStore` already use — 4 of the 7 `__drain()` implementations tracked their
+  writes; this was the outlier), and `__drain()` awaits that chain. The test's 120 ms sleep
+  is deleted rather than raised. Chaining per id also closes the same-id commit-order
+  caveat the `insert` comment has carried since 2026-07-12: repeated upserts on one id now
+  land in call order instead of whichever async IIFE committed last. `PgHandoffStore` and
+  `PgProposalStore` were checked and are not affected — they issue no fire-and-forget
+  writes, so their `ensureHydrated()`-only drain is correct for them.
+- **`CHANGELOG.md` carried two stray `>>>>>>> origin/main` lines** in the `[1.40.0]`
+  section, committed by an earlier merge. Removed.
 - **A fresh LM Studio install wrote `llm.disableThink: false`, which silently disabled
   json_schema constrained decoding on every LM Studio install.** The literal was written on
   the stated grounds that `think:false` is an Ollama-only request-body key. That is true of
@@ -1540,8 +1556,6 @@ the toggle never touched.
   prints the parsed population (files scanned, rows parsed) beside the
   verdict, and exits non-zero when any Number row is unwired or when the
   figma directory exists but zero rows were parsed.
->>>>>>> origin/main
->>>>>>> origin/main
 
 ## [1.39.0] - 2026-08-07
 
