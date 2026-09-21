@@ -466,9 +466,12 @@ describe("_resolveEmbedContextWindow (PDM-12 AC-2)", () => {
     expect(_resolveEmbedContextWindow({ contextWindow: 12000 })).toBe(12000);
   });
 
-  test("config value wins over an explicit env override", () => {
+  // SPEC_DEVIATION: this assertion previously encoded config-beats-env, the
+  // wrong precedence per CLAUDE.md ("env > config.json > literal defaults")
+  // and design.md:268. Fixed to assert the documented env-over-config order.
+  test("an explicit env override wins over a config value", () => {
     process.env.OLLAMA_EMBEDDING_NUM_CTX = "20000";
-    expect(_resolveEmbedContextWindow({ contextWindow: 12000 })).toBe(12000);
+    expect(_resolveEmbedContextWindow({ contextWindow: 12000 })).toBe(20000);
   });
 
   test("absent config, the env override wins over the role-table default", () => {

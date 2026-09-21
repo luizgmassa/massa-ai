@@ -1292,7 +1292,7 @@ Its own rationale — "would make this the only surface where an env var loses t
 now describes `_resolveEmbedContextWindow`. Implementers followed both texts literally, which was
 correct of them.
 
-### G1: Restore env-over-config in `_resolveEmbedContextWindow` — design conformance
+### G1: Restore env-over-config in `_resolveEmbedContextWindow` — design conformance ✅ Complete
 
 `packages/core/src/services/embeddings/provider.ts:39-49` returns
 `embeddingConfig?.contextWindow ?? parsePositiveIntEnv(process.env.OLLAMA_EMBEDDING_NUM_CTX, …)`

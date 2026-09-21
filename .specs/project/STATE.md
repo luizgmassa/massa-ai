@@ -1029,6 +1029,39 @@ pure insertion matching the prediction, 86 cases untouched. Logged as regenerati
 All of Batch 3 (F6-F8) is closed. Remaining: F9 (orchestrator's, per tasks.md — status/STATE/
 HANDOFF update, run last after F1-F8) and re-verification once F9 lands.
 
+**Fix Pass 2 (G1, G2, G5 batch), G1 — Complete.** Restored env-over-config precedence in
+`_resolveEmbedContextWindow` (`packages/core/src/services/embeddings/provider.ts:39-48`):
+`OLLAMA_EMBEDDING_NUM_CTX` now wins over `embeddingConfig.contextWindow`, which wins over
+`INFERENCE_ROLE_DEFAULTS.embedding.contextWindow` — the documented `env > config.json >
+default` order (CLAUDE.md, design.md:268). This is the fifth instance of this feature's
+set/subset defect: T06b's task text specified `config ?? env ?? default` and the implementer
+followed it literally. The docblock at `:35-39` is corrected in prose to match. The test at
+`embeddings-provider.test.ts:469-474` that asserted the inversion (`config beats an explicit
+env override`) is rewritten to assert the correct order — sanctioned per the round-2 report,
+called out with a `SPEC_DEVIATION` comment rather than changed silently; its sibling assertion
+("config wins over the role-table default" with no env set) needed no change, since it holds
+under either precedence order.
+Swept the rest of this feature's 65-file diff for the same inversion: `services/embeddings/
+config.ts`'s ~10 sibling resolvers are all `env-var || file?.field || literal` (env-first,
+confirmed by reading every entry in `embeddingProviders`). `llm-client.ts`'s `_resolveLlmConfig`
+reads an already-merged `config.get("llm")`, so no separate precedence logic lives there.
+`config/index.ts`'s `llm.contextWindow`/`codeContextWindow`/`embedding.batchSize` have **no**
+corresponding env var at all (confirmed: no `CONTEXT_WINDOW`/`BATCH_SIZE` env knob exists in
+`.env.example` or `config/index.ts` for these three fields; `codeTemperature` is the only one of
+the five PDM-12 fields with an env var, `MASSA_AI_LLM_CODE_TEMPERATURE`, and it is correctly
+`envNum`-wrapped, env-first) — this matches T02's own STATE.md note ("contextWindow/
+codeContextWindow take no new env var") and design.md:268's "no precedence machinery changes":
+with no env layer, "config wins over the role-table default" was never an inversion. No other
+inverted resolver found.
+Gate: `bun test packages/core/src/__tests__/embeddings-provider.test.ts` → 41 pass / 0 fail (was
+41/0 before, same count — the fifth test's assertion changed, none added/removed). `bun run
+type-check` → 6/6.
+Observed red: reverted the resolver to `embeddingConfig?.contextWindow ?? parsePositiveIntEnv(...)`
+(the round-2 shape) by file copy → the rewritten test failed by name: `an explicit env override
+wins over a config value — Expected: 20000, Received: 12000`, naming `_resolveEmbedContextWindow`
+directly. Restored via `cp provider.ts.bak provider.ts`; `git status --porcelain` clean before
+the commit; re-ran green (41/0, type-check 6/6).
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),

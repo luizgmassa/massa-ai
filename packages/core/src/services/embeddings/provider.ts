@@ -33,18 +33,17 @@ import { LocalTransformersEmbeddingProvider } from "./providers/local-transforme
  * 4b at load time — enough to evict a resident chat model on a 24 GB host and
  * thrash. Inputs are truncated to maxChars (≤8000 chars ≈ 2k tokens) long
  * before this limit matters, so 8192 is 4× headroom. Resolved per call:
- * `config.embedding.contextWindow` wins over `OLLAMA_EMBEDDING_NUM_CTX`, which
- * wins over the role-table default.
+ * `OLLAMA_EMBEDDING_NUM_CTX` wins over `config.embedding.contextWindow`, which
+ * wins over the role-table default — the documented env > config.json >
+ * default precedence (CLAUDE.md, design.md:268), same as every sibling
+ * resolver in `services/embeddings/config.ts`.
  */
 export function _resolveEmbedContextWindow(
   embeddingConfig: Partial<{ contextWindow: number }> | undefined,
 ): number {
-  return (
-    embeddingConfig?.contextWindow ??
-    parsePositiveIntEnv(
-      process.env.OLLAMA_EMBEDDING_NUM_CTX,
-      INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
-    )
+  return parsePositiveIntEnv(
+    process.env.OLLAMA_EMBEDDING_NUM_CTX,
+    embeddingConfig?.contextWindow ?? INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
   );
 }
 
