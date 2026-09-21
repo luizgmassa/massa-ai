@@ -173,6 +173,42 @@ describe("deriveInferenceBaseUrls (G2)", () => {
       llmBaseUrl: "http://h:1234/v1",
     });
   });
+
+  test("trailing slashes are trimmed before the suffix is applied", () => {
+    expect(deriveInferenceBaseUrls("ollama", "http://h:11434/")).toEqual({
+      embeddingBaseUrl: "http://h:11434",
+      llmBaseUrl: "http://h:11434/v1",
+    });
+    expect(deriveInferenceBaseUrls("ollama", "http://h:11434////")).toEqual({
+      embeddingBaseUrl: "http://h:11434",
+      llmBaseUrl: "http://h:11434/v1",
+    });
+    expect(deriveInferenceBaseUrls("lmstudio", "http://h:1234/v1//")).toEqual({
+      embeddingBaseUrl: "http://h:1234/v1",
+      llmBaseUrl: "http://h:1234/v1",
+    });
+  });
+
+  test("an all-slash base url trims to empty rather than looping", () => {
+    expect(deriveInferenceBaseUrls("ollama", "////")).toEqual({
+      embeddingBaseUrl: "",
+      llmBaseUrl: "/v1",
+    });
+  });
+
+  // js/polynomial-redos, CodeQL alert on PR #122. The input shape matters: a
+  // *trailing* run of slashes is benign, because `/\/+$/` matches at the run's
+  // first position and returns. The quadratic case is a long run followed by a
+  // non-slash, where every start position matches greedily and then fails `$`.
+  // Measured on the retired regex: 20k slashes 142 ms, 50k slashes 648 ms; the
+  // character loop is 0.0 ms at both. A trailing-run input discriminates
+  // nothing and would pass under either implementation.
+  test("trimming stays linear on a long run of slashes followed by a non-slash", () => {
+    const adversarial = `${"/".repeat(50_000)}x`;
+    const started = performance.now();
+    expect(deriveInferenceBaseUrls("ollama", adversarial).embeddingBaseUrl).toBe(adversarial);
+    expect(performance.now() - started).toBeLessThan(100);
+  });
 });
 
 describe("parseModelList", () => {

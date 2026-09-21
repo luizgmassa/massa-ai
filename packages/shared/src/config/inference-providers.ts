@@ -133,6 +133,8 @@ export function inferenceProviderList(): readonly InferenceProviderSpec[] {
   return LOCAL_INFERENCE_IDS.map((id) => INFERENCE_PROVIDERS[id]);
 }
 
+const SLASH = "/".charCodeAt(0);
+
 /** Derive the embedding + LLM base URL pair for one provider's `--base-url`. */
 export function deriveInferenceBaseUrls(
   providerId: InferenceProviderId,
@@ -145,7 +147,9 @@ export function deriveInferenceBaseUrls(
       llmBaseUrl: spec.defaultLlmBaseUrl,
     };
   }
-  const base = explicitBaseUrl.replace(/\/+$/, "");
+  let end = explicitBaseUrl.length;
+  while (end > 0 && explicitBaseUrl.charCodeAt(end - 1) === SLASH) end--;
+  const base = explicitBaseUrl.slice(0, end);
   const suffix = spec.defaultLlmBaseUrl.startsWith(spec.defaultEmbeddingBaseUrl)
     ? spec.defaultLlmBaseUrl.slice(spec.defaultEmbeddingBaseUrl.length)
     : "";
