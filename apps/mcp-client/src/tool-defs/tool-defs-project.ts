@@ -309,7 +309,9 @@ export const PROJECT_TOOL_DEFINITIONS: ToolDefinition[] = [
     description:
       "List shipped model profiles and, per detected host, the currently active profile (from recorded state; " +
       "'balanced' shown when unrecorded) and bundle version. Offline — reads on-disk variant directories only, " +
-      "never the registry.",
+      "never the registry. The claude row also carries agent-runtime-drift fields: liveRoot + sourceVersion " +
+      "(the live tree the host actually loads, beside the recorded bundleVersion) and envOverride (a host env " +
+      "var such as CLAUDE_CODE_SUBAGENT_MODEL that overrides every per-agent model at runtime).",
     apiEndpoint: "/api/v1/profiles",
     apiMethod: "GET",
     inputSchema: {

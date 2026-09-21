@@ -193,8 +193,13 @@ function resolveDirectorySourceRoot(targetHome: string, pluginKey: string): stri
  * last entry in array order. `>=` (not `>`) in the comparison below is what
  * makes "most recent, then last entry" a single loop: on a tie, the
  * later-indexed record always replaces the earlier one.
+ *
+ * Exported for the profile-switch doctor (agent-runtime-drift), which reports
+ * the pinned version of the selected record beside the live-tree version —
+ * sharing this selector keeps the doctor's "pinned" answer identical to the
+ * root this module resolves.
  */
-function selectRecord(records: InstalledPluginRecord[]): InstalledPluginRecord | undefined {
+export function selectRecord(records: InstalledPluginRecord[]): InstalledPluginRecord | undefined {
   if (records.length === 0) return undefined;
   const userScoped = records.filter((r) => r.scope === "user");
   const pool = userScoped.length > 0 ? userScoped : records;
@@ -211,27 +216,41 @@ function selectRecord(records: InstalledPluginRecord[]): InstalledPluginRecord |
   return best ?? pool[pool.length - 1];
 }
 
+/** The resolved install, with the route kind that decides runtime semantics
+ *  (agent-runtime-drift): a `directory-source` install is loaded LIVE by the
+ *  host from the composed source directory, so version/agent drift there
+ *  means "the tree moved — re-switch or re-generate"; a `registry-cache`
+ *  install is a pinned snapshot, so the same drift means "plugin update
+ *  needed". */
+export type ClaudeMarketplaceInstall =
+  | { root: string; route: "directory-source" }
+  | { root: string; route: "registry-cache" };
+
 /**
- * Resolves the live plugin root Claude actually reads. For a directory-
- * source marketplace (MDS-01/D1) that is the composed live source directory
- * (see `resolveDirectorySourceRoot`); for every other kind it is the
- * versioned install root Claude copied the plugin bundle into, or null when
- * the registry is absent, unparseable, lists no record for the plugin, or
- * names a path that does not exist on disk.
+ * Resolves the live plugin root Claude actually reads PLUS the route kind.
+ * Route rules are exactly `resolveClaudeMarketplaceRoot`'s historical
+ * fall-through (AC-01.1/AC-01.3/AC-01.6): a named directory source owns the
+ * answer — a composed root with route `directory-source` on success, `null`
+ * on every failure inside that branch (a broken directory install is a
+ * broken install, never "must be the cache kind"); only an ABSENT directory
+ * naming falls through to the `installed_plugins.json` cache path with route
+ * `registry-cache`.
  *
- * NEVER cached: the path is version pinned
- * (~/.claude/plugins/cache/<mp>/<plugin>/<version>) and moves on every
+ * NEVER cached: the cache path is version pinned and moves on every
  * `claude plugin update`; the directory-source branch re-reads both its
  * registries on every call for the same reason.
  */
-export function resolveClaudeMarketplaceRoot(
+export function resolveClaudeMarketplaceInstall(
   opts: ClaudeMarketplaceRootOptions = {},
-): string | null {
+): ClaudeMarketplaceInstall | null {
   const targetHome = opts.targetHome ?? os.homedir();
   const pluginKey = opts.pluginKey ?? DEFAULT_PLUGIN_KEY;
 
   const directoryResult = resolveDirectorySourceRoot(targetHome, pluginKey);
-  if (directoryResult !== undefined) return directoryResult; // AC-01.1 / AC-01.3 / AC-01.6
+  if (directoryResult !== undefined) {
+    // AC-01.1 / AC-01.3 / AC-01.6 — the directory branch owns the answer.
+    return directoryResult === null ? null : { root: directoryResult, route: "directory-source" };
+  }
 
   const registryPath = path.join(targetHome, ".claude", "plugins", "installed_plugins.json");
 
@@ -258,5 +277,44 @@ export function resolveClaudeMarketplaceRoot(
     return null;
   }
 
-  return installPath;
+  return { root: installPath, route: "registry-cache" };
+}
+
+/**
+ * Resolves the live plugin root Claude actually reads. For a directory-
+ * source marketplace (MDS-01/D1) that is the composed live source directory
+ * (see `resolveDirectorySourceRoot`); for every other kind it is the
+ * versioned install root Claude copied the plugin bundle into, or null when
+ * the registry is absent, unparseable, lists no record for the plugin, or
+ * names a path that does not exist on disk. Route-aware callers (the doctor)
+ * use `resolveClaudeMarketplaceInstall` instead.
+ */
+export function resolveClaudeMarketplaceRoot(
+  opts: ClaudeMarketplaceRootOptions = {},
+): string | null {
+  return resolveClaudeMarketplaceInstall(opts)?.root ?? null;
+}
+
+/**
+ * Version pinned for the plugin key by `installed_plugins.json`'s selected
+ * record (same selector as the root resolution), or null when the registry
+ * is absent/unparseable/has no record. Doctor input — the honest "what
+ * Claude's registry thinks is installed" beside the live tree's own version.
+ */
+export function readInstalledPluginVersion(
+  opts: ClaudeMarketplaceRootOptions = {},
+): string | null {
+  const targetHome = opts.targetHome ?? os.homedir();
+  const pluginKey = opts.pluginKey ?? DEFAULT_PLUGIN_KEY;
+  const registryPath = path.join(targetHome, ".claude", "plugins", "installed_plugins.json");
+
+  let records: InstalledPluginRecord[] | undefined;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(registryPath, "utf8")) as InstalledPluginsFile;
+    records = parsed?.plugins?.[pluginKey];
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(records) || records.length === 0) return null;
+  return selectRecord(records)?.version ?? null;
 }

@@ -28,6 +28,10 @@ import {
 } from "./lib/model-profiles.ts";
 import { HOSTS, capabilitiesFor, type Host } from "./lib/host-capabilities.ts";
 export { HOSTS, type Host };
+// agent-runtime-drift T02: one parser, two consumers — the generator (writer)
+// and the profile-switch doctor (reader). A second parser here would let the
+// writer and the reader disagree about what `model:` means.
+import { parseFrontmatter } from "../packages/shared/src/profile-switch/frontmatter.ts";
 
 // ── Paths ───────────────────────────────────────────────────────────────────
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -185,72 +189,6 @@ export interface Charter {
   modelTier: string;
   permission: Permission;
   body: string;
-}
-
-// ── YAML frontmatter parser (minimal, charter-shaped) ───────────────────────
-export function parseFrontmatter(raw: string): {
-  frontmatter: Record<string, unknown>;
-  body: string;
-} {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(raw);
-  if (!match) {
-    throw new Error(
-      "charter missing YAML frontmatter (--- ... ---) block"
-    );
-  }
-  const yamlText = match[1] ?? "";
-  const body = (match[2] ?? "").replace(/^\r?\n/, "");
-  const frontmatter = parseSimpleYaml(yamlText);
-  return { frontmatter, body };
-}
-
-export function parseSimpleYaml(text: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const lines = text.split(/\r?\n/);
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i] ?? "";
-    if (line.trim() === "" || line.trim().startsWith("#")) {
-      i++;
-      continue;
-    }
-    const m = /^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/.exec(line);
-    if (!m) {
-      i++;
-      continue;
-    }
-    const key = m[1] as string;
-    const rest = (m[2] ?? "").trim();
-    if (rest !== "") {
-      result[key] = unquoteScalar(rest);
-      i++;
-      continue;
-    }
-    // Nested mapping (e.g. metadata: block). Only one level of nesting is
-    // used by the charters (metadata.model_tier / metadata.permission).
-    const nested: Record<string, unknown> = {};
-    i++;
-    while (i < lines.length) {
-      const nestedLine = lines[i] ?? "";
-      if (/^\s{2,}\S/.test(nestedLine) === false) break;
-      const nm = /^\s{2,}([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/.exec(nestedLine);
-      if (!nm) break;
-      nested[nm[1] as string] = unquoteScalar((nm[2] ?? "").trim());
-      i++;
-    }
-    result[key] = nested;
-  }
-  return result;
-}
-
-export function unquoteScalar(s: string): string {
-  if (
-    (s.startsWith('"') && s.endsWith('"')) ||
-    (s.startsWith("'") && s.endsWith("'"))
-  ) {
-    return s.slice(1, -1);
-  }
-  return s;
 }
 
 // ── Charter loader ──────────────────────────────────────────────────────────

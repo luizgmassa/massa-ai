@@ -28,8 +28,10 @@
 
 import { describe, test, expect } from "bun:test";
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 import { resolveHostLayout } from "../../packages/shared/src/profile-switch/hosts";
+import { resolveClaudeMarketplaceInstall } from "../../packages/shared/src/profile-switch/claude-marketplace";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const SKILL_DIR = path.join(REPO_ROOT, "skills", "massa-ai");
@@ -1027,6 +1029,48 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(suffix).toBe("agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain("<marketplaceRoot>/agents");
+  });
+
+  test("claude directory-source marketplace: the doc's example root is the resolver's composed live root (agent-runtime-drift)", async () => {
+    // Fixed fixture (never the real home): a directory-source marketplace
+    // whose composed bundle root is <repo>/apps/claude-plugin — the exact
+    // shape the doc's example names. The host loads this root LIVE (D1,
+    // measured 2026-09-21); the doc must teach the resolver's answer, not the
+    // versioned cache snapshot.
+    const outer = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-s9-"));
+    try {
+      const repoRoot = path.join(outer, "repo");
+      const bundleRoot = path.join(repoRoot, "apps", "claude-plugin");
+      await fs.mkdir(path.join(repoRoot, ".claude-plugin"), { recursive: true });
+      await fs.writeFile(
+        path.join(repoRoot, ".claude-plugin", "marketplace.json"),
+        JSON.stringify({ plugins: [{ name: "massa-ai", source: "./apps/claude-plugin" }] }),
+      );
+      await fs.mkdir(bundleRoot, { recursive: true });
+      await fs.mkdir(path.join(outer, "home", ".claude", "plugins"), { recursive: true });
+      await fs.writeFile(
+        path.join(outer, "home", ".claude", "plugins", "known_marketplaces.json"),
+        JSON.stringify({ "massa-ai": { source: { source: "directory" }, installLocation: repoRoot } }),
+      );
+      const install = resolveClaudeMarketplaceInstall({ targetHome: path.join(outer, "home") });
+      expect(install?.route).toBe("directory-source");
+      expect(install?.root).toBe(bundleRoot);
+      const body = await readReference("agent-orchestration.md");
+      expect(body).toContain("<repo>/apps/claude-plugin/agents");
+    } finally {
+      await fs.rm(outer, { recursive: true, force: true });
+    }
+  });
+
+  test("negative control: the cache path is the qualified fallback, never the marketplace route's definition", async () => {
+    const body = await readReference("agent-orchestration.md");
+    // The old table taught the versioned cache AS the marketplace-route root —
+    // the exact drift that made agents announce stale models. Retired wording
+    // must stay retired:
+    expect(body).not.toContain("a *versioned* bundle root, e.g.");
+    // ...while the non-directory fallback example survives, qualified:
+    expect(body).toContain("~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents");
+    expect(body).toContain("profile_list");
   });
 
   test("codex: the doc's ~/.codex/agents literal equals the resolver's home-relative path", async () => {

@@ -233,6 +233,23 @@ describe("switchProfile — happy path", () => {
     expect(fs.readFileSync(sp, "utf-8")).toBe(before);
   });
 
+  test("dry-run reports would-switch and never switched; a real run is the reverse (INV2)", () => {
+    stageVariant(home, "claude", "work", { "massa-ai-planner.md": "opus" });
+    stageActive(home, "claude", { "massa-ai-planner.md": "sonnet" });
+    writeState(home, {
+      version: 2,
+      platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
+    });
+
+    const dry = switchProfile({ profile: "work", host: "claude", targetHome: home, dryRun: true });
+    expect(dry.hosts[0].status).toBe("would-switch");
+    expect(dry.hosts.some((h) => h.status === "switched")).toBe(false);
+
+    const real = switchProfile({ profile: "work", host: "claude", targetHome: home });
+    expect(real.hosts[0].status).toBe("switched");
+    expect(real.hosts.some((h) => h.status === "would-switch")).toBe(false);
+  });
+
   test("idempotent re-run: switching to the already-active profile is safe and repeatable", () => {
     stageVariant(home, "claude", "work", { "massa-ai-planner.md": "opus" });
     stageActive(home, "claude", { "massa-ai-planner.md": "sonnet" });
@@ -246,6 +263,71 @@ describe("switchProfile — happy path", () => {
     expect(second.hosts[0]).toEqual({ host: "claude", status: "switched", filesChanged: 1 });
     const activeFile = path.join(layoutFor(home, "claude").activeDir, "massa-ai-planner.md");
     expect(fs.readFileSync(activeFile, "utf-8")).toBe("opus");
+  });
+});
+
+describe("agent-runtime-drift (INV3 + claude drift row)", () => {
+  test("reportSucceeded treats would-switch as success and keeps failure semantics", () => {
+    expect(
+      reportSucceeded({
+        profile: "work",
+        dryRun: true,
+        hosts: [
+          { host: "claude", status: "would-switch" },
+          { host: "cursor", status: "skipped", reason: "skip" },
+        ],
+        restartRequired: false,
+      }),
+    ).toBe(true);
+    expect(
+      reportSucceeded({
+        profile: "work",
+        dryRun: false,
+        hosts: [{ host: "claude", status: "failed", reason: "x" }],
+        restartRequired: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("claude row carries liveRoot/sourceVersion (registry-cache fixture) and envOverride; other rows null", () => {
+    const cacheRoot = path.join(home, "cache", "massa-ai", "1.56.0");
+    stageMarketplaceRegistry(home, cacheRoot);
+    fs.mkdirSync(path.join(cacheRoot, ".claude-plugin"), { recursive: true });
+    fs.writeFileSync(
+      path.join(cacheRoot, ".claude-plugin", "plugin.json"),
+      JSON.stringify({ version: "1.56.0" }),
+    );
+    fs.mkdirSync(path.join(cacheRoot, "agents"), { recursive: true });
+    fs.writeFileSync(
+      path.join(cacheRoot, "agents", "massa-ai-investigator.md"),
+      "---\nmodel: glm-5.2\neffort: max\n---\nbody",
+    );
+    writeState(home, {
+      version: 2,
+      platforms: {
+        claude: {
+          root: "/x", skills: [], skillsOwner: "plugin",
+          installRoute: "marketplace",
+          plugin: { version: "1.56.0" },
+          modelProfile: { profile: "work", switchedAt: "t" },
+        },
+      },
+    });
+
+    const inventory = listProfiles({ targetHome: home, env: { CLAUDE_CODE_SUBAGENT_MODEL: "minimax-m3" } });
+    const claude = inventory.hosts.find((h) => h.host === "claude");
+    expect(claude?.liveRoot).toBe(cacheRoot);
+    expect(claude?.sourceVersion).toBe("1.56.0");
+    expect(claude?.bundleVersion).toBe("1.56.0");
+    expect(claude?.envOverride).toBe("CLAUDE_CODE_SUBAGENT_MODEL=minimax-m3");
+    for (const row of inventory.hosts.filter((h) => h.host !== "claude")) {
+      expect(row.liveRoot).toBeNull();
+      expect(row.sourceVersion).toBeNull();
+      expect(row.envOverride).toBeNull();
+    }
+
+    const clean = listProfiles({ targetHome: home, env: {} });
+    expect(clean.hosts.find((h) => h.host === "claude")?.envOverride).toBeNull();
   });
 });
 

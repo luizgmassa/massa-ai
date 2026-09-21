@@ -27,6 +27,7 @@ import { HOSTS, type Host, resolveHostLayout, detectRoute, type HostFileLayout }
 import { readInstallState, updatePlatform, UnwritableInstallStateError, type InstallState } from "./state.js";
 import { acquireLock, type AcquireLockOptions } from "./lock.js";
 import { resolveClaudeMarketplaceRoot } from "./claude-marketplace.js";
+import { runtimeDriftReport } from "./doctor.js";
 import type { HostProfileState, ProfileInventory, HostSwitchResult, HostSwitchStatus, SwitchReport } from "./report.js";
 
 export class SwitchEngineError extends Error {
@@ -100,6 +101,8 @@ function claudeMarketplaceUnresolvedReason(targetHome: string): string {
 
 export interface ListProfilesOptions extends CommonOpts {
   hosts?: readonly Host[];
+  /** Injectable env for the claude drift row (tests); defaults to process.env. */
+  env?: Readonly<Record<string, string | undefined>>;
   /** Per-host declared default profile (registry `hostDefaults`, rank 3 of
    *  profile resolution — `scripts/lib/model-profiles.ts:356`). Used only
    *  when a host has no recorded `modelProfile` in install-state: that
@@ -131,6 +134,25 @@ export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
   const roots = marketplaceRoots(targetHome, state);
   const universe = opts.hosts ?? HOSTS;
 
+  // agent-runtime-drift: the claude row additionally carries the LIVE root,
+  // the live tree's own version, and any host env override — the three
+  // recordings `bundleVersion` alone used to let drift silently hide.
+  // Read-only, offline, never-throw (doctor contract); injected state avoids
+  // a second state read.
+  const claudeDrift = universe.includes("claude")
+    ? runtimeDriftReport({ targetHome, stateFilePath, state, env: opts.env })
+    : null;
+  const claudeDriftFields = (host: Host) =>
+    host === "claude" && claudeDrift !== null
+      ? {
+          liveRoot: claudeDrift.liveRoot,
+          sourceVersion: claudeDrift.sourceVersion,
+          envOverride: claudeDrift.envOverride
+            ? `${claudeDrift.envOverride.name}=${claudeDrift.envOverride.value}`
+            : null,
+        }
+      : { liveRoot: null, sourceVersion: null, envOverride: null };
+
   const hosts: HostProfileState[] = universe.map((host) => {
     // CPP-06: a marketplace route whose install root is unresolvable reports
     // installed:false with no available profiles — never the file-route
@@ -145,6 +167,7 @@ export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
         activeProfile: platform.modelProfile?.profile ?? opts.hostDefaults?.[host] ?? "balanced",
         bundleVersion: platform.plugin?.version ?? null,
         availableProfiles: [],
+        ...claudeDriftFields(host),
       };
     }
     const layout = resolveHostLayout(host, { targetHome, projectRoot: opts.projectRoot, marketplaceRoot: roots });
@@ -157,6 +180,7 @@ export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
         activeProfile: null,
         bundleVersion: null,
         availableProfiles: [],
+        ...claudeDriftFields(host),
       };
     }
     const installed = fs.existsSync(layout.activeDir);
@@ -170,6 +194,7 @@ export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
       activeProfile: platform?.modelProfile?.profile ?? opts.hostDefaults?.[host] ?? "balanced",
       bundleVersion: platform?.plugin?.version ?? null,
       availableProfiles,
+      ...claudeDriftFields(host),
     };
   });
 
@@ -465,7 +490,11 @@ export function switchProfile(opts: SwitchProfileOptions): SwitchReport {
       }
 
       if (dryRun) {
-        rows.push({ host: h.host, status: "switched" });
+        // INV2 (agent-runtime-drift): a dry run never claims the real run's
+        // terminal state — "would-switch" is its own status; negative tests
+        // pin both directions (real run never emits it, dry run never emits
+        // "switched").
+        rows.push({ host: h.host, status: "would-switch" });
         continue;
       }
 
