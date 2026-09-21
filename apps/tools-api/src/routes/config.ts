@@ -23,12 +23,24 @@ const CONFIG_DETAIL = {
  * default source, applied at each consumption site, and the loader contract
  * requires both to stay `undefined` on a config that never set them. The Admin
  * Portal still has to show what is in force, so the two are derived here for
- * the response's `defaults` block only. That block is display state — it is
- * never merged back into a config — so deriving it does not reopen PDM-12.
+ * the response's `defaults` block only. The route never merges that block back
+ * into a config, so PDM-12's loader contract and `defaultMassaAiConfig` are
+ * untouched.
  *
- * `batchSize` is provider-dependent, so it reads the persisted
- * `embedding.provider` and mirrors `_resolveEmbedBatchSize`'s own fallback
- * (an id outside the local-inference set answers with ollama's width).
+ * It is not display-ONLY end to end, and the difference matters for one of
+ * these two fields. `collectConfigSectionFields` in the Config tab submits
+ * every rendered input, inherited or not (WUT-18 T43 behaviour, for every
+ * inherited field, not something introduced here) — so the first Save of the
+ * Embedding section persists whatever was displayed. For `contextWindow` that
+ * writes the same 8192 the role table would have applied. For `batchSize` it
+ * freezes a PROVIDER-DEPENDENT value at whichever provider was configured when
+ * the page rendered, and a later provider switch will not move it. Both
+ * providers declare 64 today, so nothing diverges yet; the day they differ,
+ * this is where to look.
+ *
+ * `batchSize` reads the persisted `embedding.provider` and mirrors
+ * `_resolveEmbedBatchSize`'s own fallback (an id outside the local-inference
+ * set answers with ollama's width).
  */
 function defaultEmbedBatchSize(provider: unknown): number {
   const spec =

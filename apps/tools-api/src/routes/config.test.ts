@@ -86,7 +86,10 @@ describe("GET /api/v1/config", () => {
     // (see the embedding-defaults test below); everything else round-trips.
     expect(res.json.data.defaults).toEqual({
       ...defaultMassaAiConfig,
-      embedding: { contextWindow: 8192, batchSize: 64 },
+      embedding: {
+        contextWindow: INFERENCE_ROLE_DEFAULTS.embedding.contextWindow,
+        batchSize: INFERENCE_PROVIDERS.ollama.embedBatchSize,
+      },
     });
     expect(maskSensitive.mock.calls.length).toBe(2);
     expect(maskSensitive.mock.calls[0][0]).toBe(testConfig);

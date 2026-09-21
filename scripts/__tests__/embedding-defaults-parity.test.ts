@@ -236,7 +236,12 @@ const LMSTUDIO_PAIR_SURFACES: Array<{ file: string; label?: string; model: RegEx
  *  (measured: zero `lmstudio`/`LMSTUDIO` occurrences besides the bash probe
  *  dialect's dispatch key) — genuinely Ollama-only surfaces, not a gap. */
 const LMSTUDIO_MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
-  { file: "scripts/setup-local-first.sh", model: /\$\{LMSTUDIO_EMBEDDING_MODEL:-([^}]+)\}/g },
+  // PDM-13 moved the wizard's LM Studio model resolution into
+  // `installer_resolve_lmstudio_models`, so this literal lives in the prompt
+  // library now. The wizard's LM Studio branch is a single call with no
+  // literal left in it; its Ollama branch is untouched and still anchored in
+  // MODEL_ONLY_SURFACES above.
+  { file: "scripts/lib/installer-feature-prompts.sh", model: /\$\{LMSTUDIO_EMBEDDING_MODEL:-([^}]+)\}/g },
   // The LM Studio half of `diagnose.ts`'s DEFAULT_MODEL table — see the note
   // on its Ollama sibling in MODEL_ONLY_SURFACES above.
   { file: "scripts/diagnose.ts", model: /^ {2}lmstudio: "([^"]+)",$/gm },
@@ -407,17 +412,36 @@ const INSTRUCT_CODING_SURFACES: MultiMatchRow[] = [
     pattern: /CODE_MODEL="\$\{MASSA_AI_LLM_CODE_MODEL:-([^}]+)\}"/g,
     expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.coding, INFERENCE_PROVIDERS.ollama.defaultModels.coding],
   },
+  // PDM-13 split what used to be one two-branch block in the wizard: the LM
+  // Studio half moved into `installer_resolve_lmstudio_models` (prompt
+  // library), the Ollama half stayed. Each file now carries exactly ONE
+  // literal per role, so each gets its own row with a one-element `expected`.
+  // Left as two rows rather than one relaxed row: a single row expecting one
+  // match "somewhere" would pass if one of the two branches lost its default
+  // entirely.
   {
-    file: "scripts/setup-local-first.sh",
-    label: "setup-local-first.sh provider branches (instruct)",
+    file: "scripts/lib/installer-feature-prompts.sh",
+    label: "installer_resolve_lmstudio_models (instruct)",
     pattern: /\$\{MASSA_AI_LLM_MODEL:-([^}]+)\}/g,
-    expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct, INFERENCE_PROVIDERS.ollama.defaultModels.instruct],
+    expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct],
+  },
+  {
+    file: "scripts/lib/installer-feature-prompts.sh",
+    label: "installer_resolve_lmstudio_models (coding)",
+    pattern: /\$\{MASSA_AI_LLM_CODE_MODEL:-([^}]+)\}/g,
+    expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.coding],
   },
   {
     file: "scripts/setup-local-first.sh",
-    label: "setup-local-first.sh provider branches (coding)",
+    label: "setup-local-first.sh ollama branch (instruct)",
+    pattern: /\$\{MASSA_AI_LLM_MODEL:-([^}]+)\}/g,
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.instruct],
+  },
+  {
+    file: "scripts/setup-local-first.sh",
+    label: "setup-local-first.sh ollama branch (coding)",
     pattern: /\$\{MASSA_AI_LLM_CODE_MODEL:-([^}]+)\}/g,
-    expected: [INFERENCE_PROVIDERS.lmstudio.defaultModels.coding, INFERENCE_PROVIDERS.ollama.defaultModels.coding],
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.coding],
   },
 ];
 
@@ -629,6 +653,12 @@ describe("embedding defaults parity (EDC-06)", () => {
       ...PAIR_SURFACES.map((s) => s.file),
       ...MODEL_ONLY_SURFACES.map((s) => s.file),
       ...DIMS_ONLY_SURFACES.map((s) => s.file),
+      // PDM-13: this list was absent, which was invisible only because every
+      // file it names also appeared in one of the three above. It stopped
+      // being true when `installer_resolve_lmstudio_models` moved the LM
+      // Studio default into a file with no Ollama sibling — a surface this
+      // suite already gates, reported as ungated.
+      ...LMSTUDIO_MODEL_ONLY_SURFACES.map((s) => s.file),
       "packages/shared/src/config/massa-ai-config.ts",
       "packages/core/src/services/embeddings/config.ts",
       "packages/shared/src/config/config-loader.ts", // seeds env FROM config.json
@@ -642,7 +672,11 @@ describe("embedding defaults parity (EDC-06)", () => {
       "packages/shared/src/config/embedding-dimensions.ts",
     ]);
     const allowedPrefixes = [".specs/", "docs/", "CHANGELOG.md", "FEATURES.md", "README.md"];
-    const isTestFile = (f: string) => /__tests__|\.test\.ts$/.test(f);
+    // `^scripts/tests/` matches the instruct/coding scan's own predicate
+    // below — the shell suites there are sensors, not installed surfaces, and
+    // a suite that DRIVES an override var necessarily writes it. This scan was
+    // the only one of the three still missing that arm.
+    const isTestFile = (f: string) => /__tests__|\.test\.ts$|^scripts\/tests\//.test(f);
 
     const offenders: string[] = [];
     let scanned = 0;

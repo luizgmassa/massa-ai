@@ -393,6 +393,66 @@ installer_warn_mlx_embedding() {
   echo "     (Admin Portal -> Config -> Embedding, or config.json directly.)"
 }
 
+# installer_resolve_lmstudio_models
+#
+# Resolves the three LM Studio model ids AND the three specs `lms get` is
+# handed, from LMSTUDIO_MODEL_FORMAT plus the three override env vars. Sets six
+# globals rather than echoing, like every other function in this file:
+#
+#   EMBEDDING_MODEL / LLM_MODEL / CODE_MODEL     what config.json records
+#   EMBEDDING_FETCH / LLM_FETCH / CODE_FETCH     what `lms get` downloads
+#
+# The id and the fetch spec are NOT the same string on the MLX path. A build is
+# pinnable only by Hugging Face repo URL: measured 2026-09-21, `lms get --mlx`
+# against a catalog id answers "No staff picks found with the specified search
+# criteria", and against a bare search term resolves to whatever staff pick
+# ranks first (`--mlx qwen3-vl` picked the 4B, `--mlx qwen2.5-coder` the 32B).
+#
+# Each MLX substitution is gated on ITS OWN override variable, never on the
+# format alone. The first version of this block set all three fetch specs
+# unconditionally inside `if format = mlx`, so
+# `LMSTUDIO_EMBEDDING_MODEL=<gguf id> MASSA_AI_LMSTUDIO_MODEL_FORMAT=mlx` wrote
+# the GGUF id into config.json while `lms get` pulled the MLX repo — and then
+# printed "Model <gguf id> pulled" for a model that was never fetched. That
+# combination is not a corner: it is the exact recovery
+# `installer_warn_mlx_embedding` tells the user to perform.
+#
+# Lives here rather than inline in the wizard so the override matrix can be
+# executed by scripts/tests/test-model-format-select.sh. A grep over the
+# wizard's source cannot observe which string reaches `lms get`.
+installer_resolve_lmstudio_models() {
+  EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-qwen3-embedding-0.6b}"
+  LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
+  CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
+  EMBEDDING_FETCH="$EMBEDDING_MODEL"
+  LLM_FETCH="$LLM_MODEL"
+  CODE_FETCH="$CODE_MODEL"
+
+  [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] || return 0
+
+  # Only the EMBEDDING id changes with the format. Measured 2026-09-21:
+  # `lms get --mlx` against the instruct and coding repos answered "Model
+  # already downloaded. To use, run: lms load <the GGUF id>" — LM Studio keys
+  # those two to one catalog id per model, whatever the variant. Embedding
+  # diverges because LM Studio types the MLX build as an LLM and so never
+  # applies its `text-embedding-` prefix; that same typing is why
+  # /v1/embeddings refuses it.
+  #
+  # Nested `if` rather than `[ ... ] && VAR=...`: the wizard runs under
+  # `set -e`, and a trailing false test would leak exit 1 out of this function.
+  if [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
+    EMBEDDING_MODEL="qwen3-embedding-0.6b-dwq"
+    EMBEDDING_FETCH="https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"
+  fi
+  if [ -z "${MASSA_AI_LLM_MODEL:-}" ]; then
+    LLM_FETCH="https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit"
+  fi
+  if [ -z "${MASSA_AI_LLM_CODE_MODEL:-}" ]; then
+    CODE_FETCH="https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+  fi
+  return 0
+}
+
 # installer_ensure_mlx_runtime <lms_cli>
 #
 # Installs LM Studio's MLX engine when the MLX format was chosen and the engine

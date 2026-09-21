@@ -350,44 +350,28 @@ ensure_inference_model() {
 # Model ids are provider-specific — an Ollama tag is not an LM Studio id — so
 # the defaults are too. The LM Studio values are the ones measured for this
 # feature; the env overrides keep their existing names.
-EMBEDDING_FETCH=""
-LLM_FETCH=""
-CODE_FETCH=""
 if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
-    EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-qwen3-embedding-0.6b}"
-    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
-    CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
-    # PDM-13. The MLX builds are fetched by repo URL (see ensure_inference_model)
-    # and mirror INFERENCE_PROVIDERS.lmstudio.mlxModels —
-    # scripts/__tests__/mlx-model-parity.test.ts holds the two copies identical.
-    #
-    # Only the EMBEDDING id changes with the format. Measured 2026-09-21:
-    # `lms get --mlx` against the instruct and coding repos answered "Model
-    # already downloaded. To use, run: lms load <the GGUF id>" — LM Studio keys
-    # those two to one catalog id per model, whatever the variant. Embedding
-    # diverges because LM Studio types the MLX build as an LLM and so never
-    # applies its `text-embedding-` prefix; that same typing is why
-    # /v1/embeddings refuses it (installer_warn_mlx_embedding says so at the
-    # point of choice). An explicit LMSTUDIO_EMBEDDING_MODEL still wins, as on
-    # the GGUF path.
-    if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ]; then
-        if [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
-            EMBEDDING_MODEL="qwen3-embedding-0.6b-dwq"
-        fi
-        EMBEDDING_FETCH="https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"
-        LLM_FETCH="https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit"
-        CODE_FETCH="https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
-    fi
+    # PDM-13. The id/fetch split and the whole MLX override matrix live in
+    # scripts/lib/installer-feature-prompts.sh so they can be executed by
+    # scripts/tests/test-model-format-select.sh — a grep over this file cannot
+    # observe which string reaches `lms get`.
+    # scripts/__tests__/mlx-model-parity.test.ts holds that function's literals
+    # identical to INFERENCE_PROVIDERS.lmstudio.mlxModels.
+    installer_resolve_lmstudio_models
 else
     EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:0.6b}"
     LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl:8b}"
     CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+    # Ollama pulls by the id itself; there is no second name to resolve.
+    EMBEDDING_FETCH="$EMBEDDING_MODEL"
+    LLM_FETCH="$LLM_MODEL"
+    CODE_FETCH="$CODE_MODEL"
 fi
 
-ensure_inference_model "$EMBEDDING_MODEL" "" "${EMBEDDING_FETCH:-$EMBEDDING_MODEL}"
-ensure_inference_model "$LLM_MODEL" " (instruct model)" "${LLM_FETCH:-$LLM_MODEL}"
+ensure_inference_model "$EMBEDDING_MODEL" "" "$EMBEDDING_FETCH"
+ensure_inference_model "$LLM_MODEL" " (instruct model)" "$LLM_FETCH"
 if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
-    ensure_inference_model "$CODE_MODEL" " (code-oriented LLM)" "${CODE_FETCH:-$CODE_MODEL}"
+    ensure_inference_model "$CODE_MODEL" " (code-oriented LLM)" "$CODE_FETCH"
 fi
 # PDM-12/design R-08: LM Studio exposes no per-request context length, so the
 # only way to bound a role's context window is to load the model with it.
@@ -779,6 +763,20 @@ echo -e "    1. ${BLUE}bun install${NC}"
 echo -e "    2. ${BLUE}bun run build${NC}"
 echo -e "    3. ${BLUE}bun run start:api${NC}"
 echo ""
+
+# PDM-13. The MLX warning is issued at Step 0, before six steps and several GB
+# of downloads have scrolled it off the screen. It is the one thing standing
+# between this user and a workspace that cannot index, so it is repeated here,
+# where the eye actually lands.
+if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ "${EMBEDDING_MODEL}" = "qwen3-embedding-0.6b-dwq" ]; then
+    echo -e "  ${YELLOW}⚠  MLX embedding model configured — indexing will fail.${NC}"
+    echo -e "     LM Studio types this build as an LLM, so /v1/embeddings"
+    echo -e "     answers 'No models loaded' for it."
+    echo -e "     Switch Embedding -> Model to ${BOLD}text-embedding-qwen3-embedding-0.6b${NC}"
+    echo -e "     in the Admin Portal, or re-run with"
+    echo -e "     ${BLUE}LMSTUDIO_EMBEDDING_MODEL=text-embedding-qwen3-embedding-0.6b${NC}"
+    echo ""
+fi
 
 # ---- Run diagnose to validate the full stack ----
 if command -v bun &> /dev/null && [ -f "${SCRIPT_DIR}/../scripts/diagnose.ts" 2>/dev/null ] || [ -f "${PROJECT_ROOT}/scripts/diagnose.ts" ]; then

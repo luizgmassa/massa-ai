@@ -122,9 +122,16 @@ warn="$(MASSA_AI_LMSTUDIO_MODEL_FORMAT=mlx run_lib "$DARWIN_SHIM" 'installer_sel
 check_contains "an MLX choice warns about /v1/embeddings" "No models loaded" "$warn"
 check_contains "the MLX warning names the GGUF model to switch back to" \
   "text-embedding-qwen3-embedding-0.6b" "$warn"
-check_eq "a GGUF choice prints no embedding warning" "" \
-  "$(MASSA_AI_LMSTUDIO_MODEL_FORMAT=gguf run_lib "$DARWIN_SHIM" 'installer_select_model_format' \
-     | grep -c 'No models loaded' | tr -d ' ' | sed 's/^0$//')"
+# Asserted in two halves on purpose. `grep -c ... | sed 's/^0$//'` alone also
+# yields "" when run_lib produced no output at all, so a sourcing failure would
+# have read as a pass.
+gguf_out="$(MASSA_AI_LMSTUDIO_MODEL_FORMAT=gguf run_lib "$DARWIN_SHIM" \
+  'installer_select_model_format; echo "SENTINEL:${LMSTUDIO_MODEL_FORMAT}"')"
+check_contains "the gguf run actually executed" "SENTINEL:gguf" "$gguf_out"
+case "$gguf_out" in
+  *"No models loaded"*) fail "a GGUF choice printed the MLX embedding warning" ;;
+  *) ok "a GGUF choice prints no embedding warning" ;;
+esac
 
 echo "── installer_select_model_format: provider gating ──"
 
@@ -153,19 +160,79 @@ check_contains "a non-interactive run says which format it kept" \
   "Non-interactive install — LM Studio model format: gguf" \
   "$(MASSA_AI_NONINTERACTIVE=1 run_lib "$DARWIN_SHIM" 'installer_select_model_format')"
 
+echo "── installer_resolve_lmstudio_models: the id/fetch split ──"
+
+# The id written to config.json and the spec handed to `lms get` are NOT the
+# same string on the MLX path, and each MLX substitution is gated on its own
+# override variable. The first version of that block gated only the id: an
+# explicit LMSTUDIO_EMBEDDING_MODEL wrote the user's id into config.json while
+# `lms get` still pulled the MLX repo, and the progress line then named a model
+# that was never fetched. Nothing in the suite could see it, because nothing
+# exercised the third argument at all.
+#
+# That combination is the documented recovery from the MLX embedding defect —
+# installer_warn_mlx_embedding tells the user to make exactly this change — so
+# it is the case that must not regress.
+resolve() {
+  local vars="$1"
+  run_lib "$DARWIN_SHIM" "${vars}
+    installer_resolve_lmstudio_models
+    echo \"E=\${EMBEDDING_MODEL}|EF=\${EMBEDDING_FETCH}|L=\${LLM_MODEL}|LF=\${LLM_FETCH}|C=\${CODE_MODEL}|CF=\${CODE_FETCH}\"" | tail -1
+}
+
+check_eq "gguf: every fetch spec is the id itself" \
+  "E=text-embedding-qwen3-embedding-0.6b|EF=text-embedding-qwen3-embedding-0.6b|L=qwen3-vl-8b-instruct|LF=qwen3-vl-8b-instruct|C=qwen2.5-coder-7b-instruct|CF=qwen2.5-coder-7b-instruct" \
+  "$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf')"
+
+check_eq "mlx with no overrides: embedding id changes, all three fetch by repo URL" \
+  "E=qwen3-embedding-0.6b-dwq|EF=https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ|L=qwen3-vl-8b-instruct|LF=https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit|C=qwen2.5-coder-7b-instruct|CF=https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit" \
+  "$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx')"
+
+emb_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx; LMSTUDIO_EMBEDDING_MODEL=text-embedding-qwen3-embedding-0.6b')"
+check_contains "mlx + LMSTUDIO_EMBEDDING_MODEL keeps the user's id" \
+  "E=text-embedding-qwen3-embedding-0.6b|" "$emb_override"
+check_contains "mlx + LMSTUDIO_EMBEDDING_MODEL DOWNLOADS the user's model, not the MLX repo" \
+  "EF=text-embedding-qwen3-embedding-0.6b|" "$emb_override"
+case "$emb_override" in
+  *"EF=https://"*) fail "the embedding override was overruled by the MLX repo URL" ;;
+  *) ok "no MLX repo URL survives an explicit embedding override" ;;
+esac
+# The other two roles are untouched by an embedding override.
+check_contains "an embedding override leaves the instruct fetch on MLX" \
+  "LF=https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit" "$emb_override"
+
+llm_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx; MASSA_AI_LLM_MODEL=my-instruct')"
+check_contains "mlx + MASSA_AI_LLM_MODEL fetches the named model" "LF=my-instruct|" "$llm_override"
+check_contains "and leaves the embedding fetch on MLX" \
+  "EF=https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ" "$llm_override"
+
+code_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx; MASSA_AI_LLM_CODE_MODEL=my-coder')"
+check_contains "mlx + MASSA_AI_LLM_CODE_MODEL fetches the named model" "CF=my-coder" "$code_override"
+
+# The default is gguf, not "whatever was last set" — the wizard calls this
+# after installer_select_model_format, but a re-entry must not inherit.
+check_contains "an unset format resolves as gguf" \
+  "EF=text-embedding-qwen3-embedding-0.6b|" "$(resolve ':')"
+
 echo "── installer_ensure_mlx_runtime ──"
 
 # A stub lms: `runtime ls` reports whichever engine list the scenario sets, and
 # every invocation is appended to a log so "did it try to install?" is an
 # observation rather than an inference.
 make_lms_stub() {
-  local engines="$1" log="$2" path="${TMP_ROOT}/lms-stub-$$-${RANDOM}"
+  local engines="$1"
+  local log="$2"
+  local get_exit="${3:-0}"
+  local path="${TMP_ROOT}/lms-stub-$$-${RANDOM}"
   cat > "$path" <<STUBEOF
 #!/usr/bin/env bash
 echo "\$*" >> '${log}'
 if [ "\${1:-}" = "runtime" ] && [ "\${2:-}" = "ls" ]; then
   printf '%s\n' '${engines}'
   exit 0
+fi
+if [ "\${1:-}" = "runtime" ] && [ "\${2:-}" = "get" ]; then
+  exit ${get_exit}
 fi
 exit 0
 STUBEOF
@@ -178,6 +245,8 @@ STUB_A="$(make_lms_stub "llama.cpp-mac-arm64-apple-metal-advsimd@2.41.0" "$LOG_A
 check_eq "a gguf install never touches the runtime" "" \
   "$(LMSTUDIO_MODEL_FORMAT=gguf run_lib "$DARWIN_SHIM" \
      "LMSTUDIO_MODEL_FORMAT=gguf; installer_ensure_mlx_runtime '${STUB_A}'")"
+# An empty log is only evidence because the MLX cases below write to theirs
+# through the same stub — that pair is the positive control for this assertion.
 check_eq "a gguf install issues no lms call at all" "0" "$(wc -l < "$LOG_A" | tr -d ' ')"
 
 LOG_B="${TMP_ROOT}/log-b"; : > "$LOG_B"
@@ -198,6 +267,20 @@ esac
 check_contains "MLX with no lms CLI warns instead of dying silently" \
   "cannot verify the MLX engine" \
   "$(run_lib "$DARWIN_SHIM" 'LMSTUDIO_MODEL_FORMAT=mlx; installer_ensure_mlx_runtime ""')"
+
+# The failure branch. A `runtime get` that exits non-zero must name the manual
+# command and must NOT abort the install — the wizard runs under `set -e`, and
+# a missing engine is recoverable from LM Studio's own Runtimes page.
+LOG_D="${TMP_ROOT}/log-d"; : > "$LOG_D"
+STUB_D="$(make_lms_stub "llama.cpp-mac-arm64-apple-metal-advsimd@2.41.0" "$LOG_D" 1)"
+out_d="$(run_lib "$DARWIN_SHIM" \
+  "set -e; LMSTUDIO_MODEL_FORMAT=mlx; installer_ensure_mlx_runtime '${STUB_D}'; echo 'SURVIVED'")"
+check_contains "a failed engine install names the manual command" "runtime get mlx-llm" "$out_d"
+check_contains "and the install keeps going under set -e" "SURVIVED" "$out_d"
+case "$out_d" in
+  *"MLX engine installed"*) fail "a failed runtime get still reported success" ;;
+  *) ok "a failed runtime get does not report success" ;;
+esac
 
 echo "── the menu order, on a real terminal ──"
 
