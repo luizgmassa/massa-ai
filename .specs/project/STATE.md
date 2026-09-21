@@ -1,4 +1,16 @@
-## Current — Per-provider default models (**FIX PASS 1 APPLIED, RE-VERIFICATION PENDING 2026-09-20** — 21 Tasks delivered, then independent verification returned **FAIL** (PDM-02 AC-2 not met; 16 mutations injected, 12 killed, **4 survived**); 9 fix tasks F1-F9 applied; `status` is back to `in_progress` and stays there until a PASS exists; unpushed, push/PR is the user's call)
+## Current — Per-provider default models (**COMPLETE 2026-09-21** — 21 Tasks across 8 Phases, two fix passes (F1-F9 + F2b, then G1-G6), three independent verification rounds: **FAIL, FAIL, then PASS at 25/25 ACs**; unpushed, push/PR is the user's call)
+
+**Sensor across the three rounds — this is the number, not the suite counts:** 16 injected / 12
+killed / **4 survived** → 16 / 15 / 1 → 14 / 11 / 3, the last three all documentation prose whose
+values are currently correct, recorded as a residual with their mutation evidence.
+
+**Five instances of one defect class, none caught by a gate: a requirement names a set, and the
+thing meant to implement it covers a subset.** Two of the five were written into task texts by the
+orchestrator and followed literally by implementers — which is correct implementer behaviour; the
+task text is what has to be checked against the requirement. The transferable part is the gate
+corollary: the parity gate's surface table was enumerated from the implementation's subset, so it
+**mirrored the bug instead of catching it**. Full account in `.specs/HANDOFF.md`,
+`FEATURES.json`'s notes and `validation.md`.
 
 **The verification is the part worth reading, not the delivery.** It found the **fourth** instance
 of this feature's recurring defect class: the `use ollama` config-CLI branch assigned none of the

@@ -1,6 +1,25 @@
-# Handoff — per-provider-default-models (FIX PASS 1 APPLIED, RE-VERIFICATION PENDING 2026-09-20 — 21 Tasks delivered via 8 batch workers, then independent verification returned FAIL; 9 fix tasks F1-F9 applied via 3 more workers; unpushed, push/PR is the user's call)
+# Handoff — per-provider-default-models (COMPLETE 2026-09-21 — 21 Tasks across 8 Phases via 8 batch workers, two fix passes via 5 more, three independent verification rounds: FAIL, FAIL, then PASS at 25/25 ACs; unpushed, push/PR is the user's call)
 
-## Verification outcome — read this before the delivery account below
+## Final verdict — round 3, PASS
+
+**25/25 ACs matched, 0 spec-precision gaps.** Round 3 also corrected round 2's own "28/28" as an
+overcount — `spec.md`'s six Acceptance Criteria lists hold 5+3+4+5+5+3 = 25 — and flagged one of
+its own mutations as an **invalid measurement**, because the CLIs resolve `@massa-ai/shared` from
+`dist/` while only `src/` had been mutated; it re-ran that one with a rebuild. Both self-corrections
+are why the verdict is worth something.
+
+**Discrimination sensor across the three rounds:** 16 injected / 12 killed / **4 survived** → 16 /
+15 / 1 → 14 / 11 / 3. The three round-3 survivors are all documentation prose whose values are
+currently correct, recorded as a residual with their mutation evidence so the judgement can be
+overturned on it rather than argued about.
+
+**Gates on `54298e10`, turbo cache forced** (a cached replay is not a measurement): `lint` 0,
+`type-check` 0 (0 cached), `build` 0 (0 cached), `test` 0 (12/12), `test:plugins` 0 (142/0),
+parity 0 (21/0, 41 assertions), `check_specs_delivered` 0 (7 paths). `test:scripts` exits **1** on
+3 host-specific shell suites — a real `~/.claude` leaking into host detection plus a missing CLI —
+deliberately not skipped or excluded.
+
+## Verification outcome across all three rounds — read this before the delivery account below
 
 The independent run (author ≠ verifier) returned **FAIL** over `main..bc7caa4b`: 27/28 ACs traced
 to `file:line`, **PDM-02 AC-2 not met**, 2 spec-precision gaps, and **16 mutations injected, 12
