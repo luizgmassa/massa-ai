@@ -140,6 +140,41 @@ and PR are the user's call, same as every other unpushed feature in this project
    gate does not scan this `.ts` file (only its README), and no task in this feature owned it.
    `benchmarks/needles/README.md` now says so explicitly rather than silently repeating a claim
    ("same model as the E2E baseline") that went false when the E2E side moved.
+   **Closed (G4, 2026-09-20).** Also found: `scripts/needles-rename-control.ts:118` carried the
+   same undeclared, byte-identical pin — the residual above had named only one of two files.
+   Both repointed to `qwen3-embedding:0.6b`, matching the E2E baseline again; the README's note
+   now reads "Drift closed" and names both files. Kept here as the before-state of record.
+
+## Fix Pass 2 (G1-G6, 2026-09-20/21)
+
+Round 2 independent verification returned **FAIL** again: 28/28 ACs met and traced, 9 of round 1's
+10 gaps confirmed closed, 16 mutations injected / 15 killed / 1 survived, plus 4 new defects. Six
+fix tasks, all now closed:
+
+- **G1** — restored env-over-config precedence in `_resolveEmbedContextWindow`
+  (`packages/core/src/services/embeddings/provider.ts`), the only surface where config had been
+  beating env, against `CLAUDE.md`'s own documented `env > config.json > default` order.
+- **G2** — `use <provider> --base-url` now derives an embedding base URL AND an LLM base URL per
+  provider from the seam, instead of writing one URL for both (a regression F1's mirrored-branch
+  fix had introduced, safe only for lmstudio's coincidentally-identical pair).
+- **G3** — the parity gate's printed structural-surface population was inflated by 2 (28 vs 26
+  distinct labels) by a duplicate-row accounting defect inside `DERIVED_SURFACES` — two
+  `embeddings/config.ts` rows sat inside a `flatMap` without depending on the loop variable, so
+  they were emitted once per CLI. Detection was unaffected. Fixed, and a self-check added so a
+  future loop-independent row fails by name instead of re-inflating the count.
+- **G4** — closed the half-declared `NEEDLE_MODEL` residual above.
+- **G5** — added the sensor PDM-10 AC-3 had none of, for `setup-local-first.sh`'s `lms load -c`
+  per-role context values — the one mutation of sixteen that survived round 2.
+- **G6** — corrected F2/F2b's stale "`system.test.ts` 13 pass / 1 fail" claim: re-measured
+  **14 pass / 0 fail, 36 expect() calls** on `d556c6d9`, matching round 2's own figure exactly.
+  Corrected in `tasks.md`'s and `STATE.md`'s own F2/F2b entries, each with a dated correction note
+  rather than a silent edit. The three host-specific shell-suite failures named in residual 3 above
+  were re-confirmed still failing, not stale in the other direction.
+
+Round 3 independent verification (author ≠ verifier) is the mandatory next step — this is
+iteration 3 of the bounded fix→re-verify loop's maximum of 3. If round 3 does not pass, the
+feature stops as `Blocked` and goes to the user rather than looping again; the status flip on a
+PASS is the orchestrator's, not this batch's.
 
 ## Traps worth carrying forward (from planning, still true post-Execute)
 

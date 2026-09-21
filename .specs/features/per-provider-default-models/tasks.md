@@ -908,6 +908,12 @@ config-wins test got `from-env` instead of `from-config-json`); restored by file
 status` clean, re-run 13/14 green (same 1 pre-existing failure).
 `apps/tools-api` `bun run type-check` clean.
 
+**Correction (G6, 2026-09-20/21):** the "13/14, 1 pre-existing failure" figure is stale. Re-measured
+on `d556c6d9`: `XDG_CONFIG_HOME=$(mktemp -d) bun test apps/tools-api/src/routes/system.test.ts` →
+**14 pass / 0 fail, 36 expect() calls**. Round 2's independent verification measured the same 14/0
+figure and flagged this note as stale (`validation.md:306`); no `LocalHealthChecker.checkOllama`
+failure reproduces today.
+
 ### F3: `installer_provider_defaults` must not clobber an explicit `MASSA_AI_LLM_MODEL` — ✅ Complete
 
 `scripts/lib/installer-api-key.sh:205-206,214-215`, called at `:312` from
@@ -1280,6 +1286,11 @@ Observed red: reverting to config-first order failed exactly the new "env wins" 
 (`system.test.ts:181`, expected `from-env`, got `from-config-json`); restored by file copy,
 `git status` clean, re-run 13/14 green (same 1 pre-existing failure).
 
+**Correction (G6, 2026-09-20/21):** the "13/14, same 1 pre-existing failure" figure is stale.
+Re-measured on `d556c6d9`: `XDG_CONFIG_HOME=$(mktemp -d) bun test
+apps/tools-api/src/routes/system.test.ts` → **14 pass / 0 fail, 36 expect() calls**. The file is
+fully green; no `LocalHealthChecker.checkOllama` failure reproduces today.
+
 SPEC_DEVIATION: none — the inverted test value is this task's own explicitly sanctioned
 exception, not a deviation from it.
 
@@ -1450,7 +1461,7 @@ Tests: each role's `lms load -c <context>` value asserted against `INFERENCE_ROL
 Gate: bash scripts/tests/test-lms-model-exists.sh && bun test scripts/__tests__/embedding-defaults-parity.test.ts
 Depends on: none.
 
-### G6: Correct a stale measurement in this feature's own artifacts
+### G6: Correct a stale measurement in this feature's own artifacts — ✅ Complete
 
 F2 and F2b both recorded a "pre-existing failure" in `apps/tools-api/src/routes/system.test.ts`
 (`LocalHealthChecker.checkOllama` — 13 pass / 1 fail). Round 2 measured that file at **14 pass / 0
@@ -1461,3 +1472,27 @@ the figure with the commit it was measured on.
 Tests: none — this is an artifact correction, verified by re-running the named file and quoting the result
 Gate: bun test apps/tools-api/src/routes/system.test.ts && bun skills/massa-ai/scripts/check_specs_delivered.ts per-provider-default-models --root .
 Depends on: G1, G2, G3, G4, G5.
+
+**Result (GW2, 2026-09-20/21).** Re-measured with `XDG_CONFIG_HOME=$(mktemp -d) bun test
+apps/tools-api/src/routes/system.test.ts` on `d556c6d9` (G3+G4 landed, G1/G2/G5 already on the
+branch): **14 pass / 0 fail, 36 expect() calls** — confirms round 2's figure and F2/F2b's "13
+pass / 1 fail" note is stale.
+
+**Every place this feature's artifacts repeat the stale figure, corrected in place (original text
+kept, a dated `**Correction (G6, ...)**` note appended rather than silently edited):**
+- `tasks.md` F2's own resolution note (this file, `### F2` section)
+- `tasks.md` F2b's own resolution note (this file, `### F2b` section)
+- `STATE.md`'s F2 entry ("Fix Pass 1, Batch 1 (F1-F3), F2 — Complete")
+- `STATE.md`'s F2b entry ("Fix Pass 1, Batch 2 (F2b, F4, F5), F2b — Complete")
+
+`validation.md:306` (round 2's own report) already states the correct 14/0 figure and flags F2/F2b
+as stale — it is the source of this correction, not itself stale, and was left untouched as
+append-only history. `HANDOFF.md` and `FEATURES.json` were grepped for "13 pass / 1 fail" /
+"13/14" / "checkOllama" and carry no mention of this specific figure — nothing to correct there.
+
+**Other stale measurement found:** none in the "known failure" class this task exists to guard
+against. Re-ran the three named host-specific shell suites directly
+(`test-install-skills-cli.sh`, `test-plugin-auto-install.sh`, `test-plugin-registry-registration.sh`)
+to check they had not silently started passing (which would make the "known, unrelated failure"
+framing stale in the opposite direction) — all three still fail with the same symptoms named in
+T12/T15/T15b/T17, confirmed not stale.

@@ -923,6 +923,13 @@ config→env→seam precedence itself. Gate: 13/14 (was 11/12) — the 1 remaini
 red: reverting the call site to the old literal failed both new precedence tests on the exact
 values changed; restored by file copy, `git status` clean before commit.
 
+**Correction (G6, 2026-09-20/21):** the "13/14, 1 pre-existing failure" figure above is stale.
+Re-measured on `d556c6d9`: `XDG_CONFIG_HOME=$(mktemp -d) bun test
+apps/tools-api/src/routes/system.test.ts` → **14 pass / 0 fail, 36 expect() calls**. Round 2's
+independent verification had already measured this same 14/0 figure and flagged F2/F2b's "13/1"
+note as stale (`validation.md:306`); this is that correction landing in the artifact that
+originated the claim.
+
 **Fix Pass 1, Batch 1 (F1-F3), F3 — Complete. Batch 1 closed.**
 `scripts/lib/installer-api-key.sh`'s `installer_provider_defaults` now derives `LLM_MODEL`/
 `CODE_MODEL` from `${MASSA_AI_LLM_MODEL:-<provider literal>}` /
@@ -957,6 +964,11 @@ covered. Gate: `bun test apps/tools-api/src/routes/system.test.ts` → 13/14 (sa
 clean. Observed red: reverting to config-first order failed exactly the new "env wins" test
 (`system.test.ts:181`, expected `from-env` got `from-config-json`); restored by file copy,
 `git status` clean before commit, re-run green.
+
+**Correction (G6, 2026-09-20/21):** the "13/14, same 1 pre-existing failure" figure above is
+stale. Re-measured on `d556c6d9`: `XDG_CONFIG_HOME=$(mktemp -d) bun test
+apps/tools-api/src/routes/system.test.ts` → **14 pass / 0 fail, 36 expect() calls** — the file is
+fully green; no `LocalHealthChecker.checkOllama` failure reproduces today.
 
 **Fix Pass 1, Batch 2 (F2b, F4, F5), F4 — Complete.** Closed the parity gate's own set/subset
 defect (G1): row/scan population now derives from PDM-02 AC-2, not from what the code already
@@ -1173,6 +1185,28 @@ green.
 
 All of G3 and G4 (this worker's batch) are closed. G6 depends on G1-G5, all now landed, so it is
 unblocked.
+
+**Fix Pass 2 (G3, G4, G6 batch), G6 — Complete. Fix Pass 2 (G1-G6) fully closed.** F2 and F2b
+both recorded a "pre-existing failure" in `apps/tools-api/src/routes/system.test.ts`
+(`LocalHealthChecker.checkOllama` — 13 pass / 1 fail); round 2 measured that file at 14 pass / 0
+fail, and the F2/F2b claim was stale. Re-measured with `XDG_CONFIG_HOME=$(mktemp -d) bun test
+apps/tools-api/src/routes/system.test.ts` on `d556c6d9`: **14 pass / 0 fail, 36 expect() calls**,
+confirming round 2's figure. Corrected in place (original text kept, a dated correction note
+appended rather than silently edited) in `tasks.md`'s F2 and F2b entries and in this file's F2 and
+F2b entries above. `validation.md:306` already stated the correct 14/0 figure and needed no
+change. `HANDOFF.md`/`FEATURES.json` were grepped for the stale figure and carried no mention of
+it; both instead gained a Fix Pass 2 (G1-G6) closing summary and `FEATURES.json`'s notes field had
+its own stale `NEEDLE_MODEL=qwen3-embedding:4b` residual line corrected to reflect G4's fix —
+`status`/`completed` left untouched (`in_progress`/`null`), per instruction: that flip is the
+orchestrator's, after a round-3 PASS.
+Checked for other stale "known failure" claims: re-ran the three named host-specific shell suites
+directly (`test-install-skills-cli.sh`, `test-plugin-auto-install.sh`,
+`test-plugin-registry-registration.sh`) — all three still fail with the same symptoms, confirmed
+not stale in the other direction.
+
+All six of Fix Pass 2 (G1, G2, G3, G4, G5, G6) are now closed. Round 3 independent verification
+(author ≠ verifier) is the mandatory next step — the third and final iteration of the bounded
+fix→re-verify loop per this batch's own instructions.
 
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
