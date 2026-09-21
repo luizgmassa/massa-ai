@@ -366,6 +366,63 @@ check_contains "and the user is told why the pause happened" \
 check_eq "no lms CLI is survivable" "0" \
   "$(run_lib "${OL_IDLE}:${DARWIN_SHIM}" "installer_unload_loaded_models ''; echo \$?" | tail -1)"
 
+echo "── installer_start_mlx_embedding_sidecar: launchd registration ──"
+
+# A stub `launchctl` on PATH, plus a stub `curl` that always reports healthy so
+# the 10-attempt probe does not cost the suite 10 seconds. HOME is already
+# TMP_ROOT under run_lib, so the plist lands in the scratch tree and never
+# touches the developer's real ~/Library/LaunchAgents.
+make_launchctl_shim() {
+  local bootstrap_exit="$1"
+  local log="$2"
+  local dir="${TMP_ROOT}/lc-shim-$$-${RANDOM}"
+  mkdir -p "$dir"
+  cat > "${dir}/launchctl" <<LCEOF
+#!/usr/bin/env bash
+echo "\$*" >> '${log}'
+case "\${1:-}" in
+  bootstrap) exit ${bootstrap_exit} ;;
+  load) exit 0 ;;
+esac
+exit 0
+LCEOF
+  cat > "${dir}/curl" <<'CURLEOF'
+#!/usr/bin/env bash
+echo '{"status": "ok"}'
+CURLEOF
+  chmod +x "${dir}/launchctl" "${dir}/curl"
+  printf '%s' "$dir"
+}
+
+mkdir -p "${TMP_ROOT}/Library/LaunchAgents" "${TMP_ROOT}/.config/massa-ai"
+
+LOG_LC="${TMP_ROOT}/log-launchctl"; : > "$LOG_LC"
+LC_OK="$(make_launchctl_shim 0 "$LOG_LC")"
+out_lc="$(run_lib "${LC_OK}:${DARWIN_SHIM}" \
+  "installer_start_mlx_embedding_sidecar '${TMP_ROOT}/venv' '${TMP_ROOT}/srv.py' 1235")"
+check_contains "a successful bootstrap reports the agent registered" \
+  "launchd agent registered" "$out_lc"
+check_contains "and it is bootstrap, not the deprecated load" "bootstrap gui/" "$(cat "$LOG_LC")"
+case "$(cat "$LOG_LC")" in
+  *"load -w"*) fail "load -w ran even though bootstrap succeeded" ;;
+  *) ok "a successful bootstrap costs no legacy load" ;;
+esac
+check_contains "the plist is written where launchd reads it" "ai.massa.mlx-embed" \
+  "$(cat "${TMP_ROOT}/Library/LaunchAgents/ai.massa.mlx-embed.plist" 2>/dev/null)"
+check_contains "the health probe is what reports success" \
+  "answering on port 1235" "$out_lc"
+
+# `bootstrap` failing is the whole reason the fallback exists: it is the
+# supported spelling but is refused in some session contexts, where the
+# deprecated `load -w` still works.
+LOG_LC2="${TMP_ROOT}/log-launchctl-fallback"; : > "$LOG_LC2"
+LC_FAIL="$(make_launchctl_shim 1 "$LOG_LC2")"
+out_lc2="$(run_lib "${LC_FAIL}:${DARWIN_SHIM}" \
+  "installer_start_mlx_embedding_sidecar '${TMP_ROOT}/venv' '${TMP_ROOT}/srv.py' 1235")"
+check_contains "a refused bootstrap falls back to the legacy load" \
+  "legacy load" "$out_lc2"
+check_contains "and the fallback actually ran load -w" "load -w" "$(cat "$LOG_LC2")"
+
 echo "── installer_ensure_mlx_runtime ──"
 
 # A stub lms: `runtime ls` reports whichever engine list the scenario sets, and

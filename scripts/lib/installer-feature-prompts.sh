@@ -498,9 +498,25 @@ installer_start_mlx_embedding_sidecar() {
 </dict>
 </plist>
 PLISTEOF
-    launchctl unload "$plist" >/dev/null 2>&1 || true
-    launchctl load -w "$plist" >/dev/null 2>&1 || true
-    echo "  ✓ launchd agent installed: ai.massa.mlx-embed"
+    # `bootstrap` first, `load -w` only as the fallback. `load` has been the
+    # deprecated spelling since 10.11 and fails outright on recent macOS with
+    # "Load failed: 5: Input/output error"; `bootstrap` is the supported one and
+    # takes an explicit domain. Both are run through `|| true`: a registration
+    # that fails must not abort an otherwise complete install, and the health
+    # probe below is what actually decides whether this worked.
+    local domain="gui/$(id -u)"
+    launchctl bootout "${domain}/ai.massa.mlx-embed" >/dev/null 2>&1 || true
+    if launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1; then
+      launchctl enable "${domain}/ai.massa.mlx-embed" >/dev/null 2>&1 || true
+      echo "  ✓ launchd agent registered: ai.massa.mlx-embed"
+    elif launchctl load -w "$plist" >/dev/null 2>&1; then
+      echo "  ✓ launchd agent registered (legacy load): ai.massa.mlx-embed"
+    else
+      echo "  ⚠  could not register the launchd agent — starting it directly."
+      echo "     It will not come back after a reboot. Register by hand with:"
+      echo "         launchctl bootstrap ${domain} ${plist}"
+      nohup "${venv}/bin/python" "$script" >> "$log" 2>&1 &
+    fi
   else
     # No launchd: start it detached and say plainly that it will not come back
     # by itself, rather than implying a service was installed.
