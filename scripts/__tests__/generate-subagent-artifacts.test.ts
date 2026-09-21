@@ -13,9 +13,6 @@ import path from "path";
 import os from "os";
 import toml from "toml";
 import {
-  parseFrontmatter,
-  parseSimpleYaml,
-  unquoteScalar,
   claudeToolPolicyFor,
   emitClaude,
   emitCursor,
@@ -36,6 +33,13 @@ import {
   type Charter,
   type Host,
 } from "../generate-subagent-artifacts";
+// The frontmatter parser moved out of the generator into the shared module the
+// doctor also reads (agent-runtime-drift T02) — one parser, two consumers.
+import {
+  parseFrontmatter,
+  parseSimpleYaml,
+  unquoteScalar,
+} from "../../packages/shared/src/profile-switch/frontmatter.ts";
 import { loadRegistry, PROFILE_ENV_VAR, type Registry, type Resolved } from "../lib/model-profiles.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");

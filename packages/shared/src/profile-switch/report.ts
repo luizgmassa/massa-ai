@@ -20,13 +20,31 @@ export interface HostProfileState {
    * separately-recorded `bundleVersion`. */
   readonly bundleVersion: string | null;
   readonly availableProfiles: readonly string[];
+  // ── agent-runtime-drift additions (claude rows only; null elsewhere) ──
+  /** Live plugin root the host actually loads (directory-source resolution),
+   *  null for non-marketplace routes and non-claude hosts. */
+  readonly liveRoot: string | null;
+  /** Version declared by the LIVE root's own plugin.json — beside
+   *  `bundleVersion` (the install-state recording), this is what makes stale
+   *  version recordings visible instead of silent. */
+  readonly sourceVersion: string | null;
+  /** `NAME=value` of the first host env var that overrides per-agent models
+   *  at runtime (e.g. CLAUDE_CODE_SUBAGENT_MODEL), null when none — the
+   *  product can only surface this override, never defeat it. */
+  readonly envOverride: string | null;
 }
 
 export interface ProfileInventory {
   readonly hosts: readonly HostProfileState[];
 }
 
-export type HostSwitchStatus = "switched" | "skipped" | "unsupported" | "failed";
+/**
+ * Terminal states of a switch row. `would-switch` is the dry-run-only
+ * analogue of `switched` (agent-runtime-drift INV2): a dry run reports
+ * `would-switch` and never `switched`; a real run reports `switched` and
+ * never `would-switch` — pinned by negative tests on both sides.
+ */
+export type HostSwitchStatus = "switched" | "would-switch" | "skipped" | "unsupported" | "failed";
 
 export interface HostSwitchResult {
   readonly host: Host;
@@ -44,10 +62,13 @@ export interface SwitchReport {
   readonly restartRequired: boolean;
 }
 
-/** True when every host row is "switched" or "skipped" — no "unsupported"/
- * "failed" rows. Callers (CLI/route/MCP — later tasks) use this to decide a
- * non-zero exit for a partial multi-host failure, per the design's Error
- * Handling Strategy table ("mixed report" / "non-zero exit"). */
+/** True when every host row is "switched", "would-switch" (dry runs succeed
+ *  by definition — INV3), or "skipped" — no "unsupported"/"failed" rows.
+ *  Callers (CLI/route/MCP — later tasks) use this to decide a non-zero exit
+ *  for a partial multi-host failure, per the design's Error Handling Strategy
+ *  table ("mixed report" / "non-zero exit"). */
 export function reportSucceeded(report: SwitchReport): boolean {
-  return report.hosts.every((h) => h.status === "switched" || h.status === "skipped");
+  return report.hosts.every(
+    (h) => h.status === "switched" || h.status === "would-switch" || h.status === "skipped",
+  );
 }

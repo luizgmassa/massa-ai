@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Agent model drift is now visible instead of silent (agent-runtime-drift).**
+  A directory-source marketplace install loads the plugin LIVE from the source
+  directory (measured: session skill base dir = the repo tree, not the versioned
+  cache), yet three surfaces described a stale world: the announcement contract's
+  per-host table taught the **versioned cache** as the marketplace-route root
+  (agents following it announced models from a stale snapshot — glm-5.2/minimax-m3
+  while the live tree carried glm-5.3-flash); `profile_list.bundleVersion` read
+  install-state's stale recording instead of the live tree; and dry runs claimed
+  the real run's terminal `switched` status. The table now names
+  `resolveClaudeMarketplaceInstall`'s route-aware root (directory-source → live
+  bundle root, e.g. `<repo>/apps/claude-plugin/agents`; any other kind → the
+  qualified, stale-able cache snapshot) and the S9 sensor pins both routes plus a
+  negative control on the retired wording. `profile_list` claude rows carry
+  additive `liveRoot`/`sourceVersion`/`envOverride` (the host env var such as
+  `CLAUDE_CODE_SUBAGENT_MODEL` that overrides every per-agent model at runtime —
+  reported, never hidden). New `profile-switch/doctor.ts` is the one-shot offline
+  read-only drift report (three version recordings, per-role frontmatter,
+  variant staleness with no false positives on incomparable pairs); the
+  frontmatter parser is extracted from the generator into
+  `profile-switch/frontmatter.ts` so the writer and the reader share one parser.
+  The session-start hook prints a ≤2-line drift line (version drift, agent drift,
+  env override), silent when healthy — the fix path stays the existing profile
+  switch, never the hook. Dry runs now report `would-switch`, pinned by negative
+  tests in both directions.
+
 ## [1.60.0] - 2026-09-21
 
 ### Added

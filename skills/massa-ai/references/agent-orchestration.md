@@ -303,7 +303,7 @@ like every other dispatch.
 ```md
 🤖 [Agent Started] Investigator — model opus, effort high. Scope: the four emitters.
 🤖 [Agent Started] Designer — model/effort unknown (no installed agent file at
-   ~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents/massa-ai-designer.md). Dispatching anyway.
+   <liveRoot>/agents/massa-ai-designer.md). Dispatching anyway.
 ```
 
 That second line is a measured case, not a hypothetical: on a machine with plugin
@@ -316,7 +316,7 @@ this table so the two cannot drift silently:
 
 | Host | Installed agents directory | Glob | Model / effort keys |
 | --- | --- | --- | --- |
-| Claude — marketplace route | `<marketplaceRoot>/agents` — a *versioned* bundle root, e.g. `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents` | `massa-ai-*.md` | `model:` / `effort:` |
+| Claude — marketplace route | `<marketplaceRoot>/agents`, where `<marketplaceRoot>` is `resolveClaudeMarketplaceInstall`'s live root: for a **directory-source** marketplace the host loads the plugin LIVE from the source bundle — e.g. `<repo>/apps/claude-plugin/agents`; for any other kind it is the *versioned* cache snapshot, e.g. `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents` (a stale-able snapshot — never hardcode it; read `profile_list`'s `liveRoot`) | `massa-ai-*.md` | `model:` / `effort:` |
 | Claude — file route | `~/.claude/agents` | `massa-ai-*.md` | `model:` / `effort:` |
 | Codex | `~/.codex/agents` | `massa-ai-*.toml` | `model` / `model_reasoning_effort` |
 | OpenCode | `~/.config/opencode/agents` | `massa-ai-*.md` | `model:` / `reasoningEffort:` |
