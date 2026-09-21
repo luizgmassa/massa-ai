@@ -1366,7 +1366,7 @@ Tests: covered by the parity gate's Markdown tier for the declaration; the code 
 Gate: bun test scripts/__tests__/embedding-defaults-parity.test.ts && bun run test:scripts
 Depends on: none.
 
-### G5: PDM-10 AC-3's `lms load -c` values are unsensed — the surviving mutant
+### G5: PDM-10 AC-3's `lms load -c` values are unsensed — the surviving mutant ✅ Complete
 
 Mutating `scripts/setup-local-first.sh:371`'s `-c 16384` to `-c 4096` left the parity gate at 15/0
 and **five shell suites at 0 failures**. This is the one mutation of sixteen that survived round 2.

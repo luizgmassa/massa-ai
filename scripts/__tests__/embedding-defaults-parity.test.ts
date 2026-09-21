@@ -34,7 +34,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { defaultMassaAiConfig } from "../../packages/shared/src/config/massa-ai-config";
-import { INFERENCE_PROVIDERS } from "../../packages/shared/src/config/inference-providers";
+import { INFERENCE_PROVIDERS, INFERENCE_ROLE_DEFAULTS } from "../../packages/shared/src/config/inference-providers";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -858,4 +858,43 @@ describe("embedding defaults parity (EDC-06)", () => {
     expect(tsPairs).toEqual(shellPairs);
     expect(tsPairs[ref.model]).toBe(Number(ref.dims));
   });
+});
+
+/**
+ * G5 (PDM-10 AC-3) — `scripts/setup-local-first.sh`'s three `lms load -c`
+ * invocations hardcoded 8192/16384/32768 with no sensor: mutating one
+ * (`-c 16384` → `-c 4096`) left the parity gate and every shell suite green.
+ * Each role's context value is asserted against `INFERENCE_ROLE_DEFAULTS`
+ * directly (imported above), never against a copied literal, so this test
+ * cannot drift out of sync with the seam the same way the shell script did.
+ */
+describe("setup-local-first.sh lms load -c values (PDM-10 AC-3, G5)", () => {
+  const SETUP_SCRIPT = read("scripts/setup-local-first.sh");
+
+  const LMS_LOAD_ROLES: Array<{
+    role: keyof typeof INFERENCE_ROLE_DEFAULTS;
+    varName: string;
+  }> = [
+    { role: "embedding", varName: "EMBEDDING_MODEL" },
+    { role: "instruct", varName: "LLM_MODEL" },
+    { role: "coding", varName: "CODE_MODEL" },
+  ];
+
+  for (const { role, varName } of LMS_LOAD_ROLES) {
+    test(`the real "$LMSTUDIO_CLI" load command for the ${role} role matches INFERENCE_ROLE_DEFAULTS.${role}.contextWindow`, () => {
+      const match = SETUP_SCRIPT.match(
+        new RegExp(`"\\$LMSTUDIO_CLI" load -c (\\d+) --ttl "\\$LMS_LOAD_TTL_SECONDS" "\\$${varName}"`),
+      );
+      expect(match).not.toBeNull();
+      expect(Number(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
+    });
+
+    test(`the echo fallback for the ${role} role matches INFERENCE_ROLE_DEFAULTS.${role}.contextWindow`, () => {
+      const match = SETUP_SCRIPT.match(
+        new RegExp(`lms load -c (\\d+) --ttl \\$\\{LMS_LOAD_TTL_SECONDS\\} \\$\\{${varName}\\}`),
+      );
+      expect(match).not.toBeNull();
+      expect(Number(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
+    });
+  }
 });

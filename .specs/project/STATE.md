@@ -1098,6 +1098,31 @@ by name: `use ollama --base-url writes an ollama-shaped embedding/llm base pair 
 `deriveInferenceBaseUrls`'s return → the seam-level test failed by name: `an explicit --base-url
 re-applies ollama's declared /v1 suffix to the LLM URL`. Both restored; re-ran green.
 
+**Fix Pass 2 (G1, G2, G5 batch), G5 — Complete. Batch closed (G1, G2, G5).** PDM-10 AC-3's three
+`lms load -c` values in `scripts/setup-local-first.sh:369-372` (real commands) and `:376-379`
+(echo fallback for a missing `lms` CLI) had no sensor — round 2's mutation `-c 16384 → -c 4096`
+(the instruct role) left the parity gate and five shell suites green. Added a new `describe`
+block to `scripts/__tests__/embedding-defaults-parity.test.ts` importing `INFERENCE_ROLE_DEFAULTS`
+directly and regex-extracting each of the 3 real-command and 3 echo-fallback `-c <N>` values by
+the role's shell variable name (`$EMBEDDING_MODEL`/`$LLM_MODEL`/`$CODE_MODEL`), asserting each
+against `INFERENCE_ROLE_DEFAULTS.<role>.contextWindow` — never a copied literal, so the test
+cannot independently drift from the seam the way the shell script did. All three roles PDM-10
+AC-3 names (embedding, instruct, coding) are sensed, at both surfaces each.
+Gate: `bun test scripts/__tests__/embedding-defaults-parity.test.ts` → 21/0 (was 15/0, +6 new).
+`bash scripts/tests/test-lms-model-exists.sh` → 64/0 (unchanged — this file was not touched;
+the new sensor lives at the TS layer, which can import the seam constant directly, rather than
+in bash, which cannot). `bun run type-check` → 6/6.
+Observed red: re-injected the exact round-2 mutation (`-c 16384` → `-c 4096` on the real
+`$LLM_MODEL` load line) by file copy → the new sensor failed by name: `the real "$LMSTUDIO_CLI"
+load command for the instruct role matches INFERENCE_ROLE_DEFAULTS.instruct.contextWindow —
+Expected: 16384, Received: 4096`, while `test-lms-model-exists.sh` stayed at 64/0 under the same
+mutation — reproducing round 2's exact "gate green, sensor absent" finding before the fix, and
+confirming only the new TS sensor (not the shell suite) catches it. Restored via file copy;
+`git status --porcelain` clean before the commit; re-ran green (21/0, 64/0).
+
+All three of this batch (G1, G2, G5) are closed. G3, G4, G6 are another worker's; G6 depends on
+all five (G1-G5), so it cannot close until that worker's G3/G4 and this batch both land.
+
 ## Previous — Local inference provider abstraction: LM Studio beside Ollama (**PHASE 8 COMPLETE 2026-09-20** — 25 Tasks across 8 Phases; the independent validation returned **FAIL** on 7 ACs with 4 surviving mutants, and Phase 8 exists to close that list; re-verification pending; unpushed, push/PR is the user's call)
 
 Branch `feat/local-inference-provider-abstraction` off `main@d523f06f` (v1.57.0),
