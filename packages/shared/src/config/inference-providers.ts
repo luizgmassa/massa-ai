@@ -33,6 +33,21 @@ export const INFERENCE_ROLE_DEFAULTS = {
   coding: { contextWindow: 32768, temperature: 0.0 },
 } as const;
 
+export const MODEL_FORMATS = ["gguf", "mlx"] as const;
+
+export type ModelFormat = (typeof MODEL_FORMATS)[number];
+
+/**
+ * One role's MLX alternative: the Hugging Face repo `lms get --mlx <url>`
+ * resolves, and the catalog id LM Studio then exposes on `/v1/models`. Both are
+ * literals read from a live install, never derived — A-02 measured that the id
+ * cannot be computed from the repo path (three samples, three different rules).
+ */
+export interface MlxModelVariant {
+  readonly repo: string;
+  readonly model: string;
+}
+
 export interface InferenceProviderSpec {
   readonly id: InferenceProviderId;
   readonly defaultEmbeddingBaseUrl: string;
@@ -40,6 +55,34 @@ export interface InferenceProviderSpec {
   readonly envNames: InferenceProviderEnvNames;
   readonly knownDimensions: Readonly<Record<string, number>>;
   readonly defaultModels: Readonly<Record<InferenceRole, string>>;
+  /**
+   * The MLX build of each `defaultModels` entry, where the provider has one.
+   * Absent on Ollama, which serves GGUF only and has no MLX path at all.
+   *
+   * Measured 2026-09-21 against a live LM Studio (0.3.x, Apple Silicon):
+   * instruct and coding resolve to the **same catalog id** as their GGUF
+   * siblings — `lms get --mlx <repo>` answered "Model already downloaded. To
+   * use, run: lms load qwen3-vl-8b-instruct" and "... qwen2.5-coder-7b-instruct"
+   * against the GGUF installs. The format picks the weights; the id is
+   * variant-independent for those two.
+   *
+   * Embedding is the exception, and it is the same exception that makes the
+   * role unusable on MLX. LM Studio types a model by architecture and prefixes
+   * `text-embedding-` onto anything it types EMBEDDING. The MLX repo is
+   * `Qwen3ForCausalLM` (Hugging Face `pipeline_tag: text-generation`), so it is
+   * typed LLM, gets no prefix, and lands as `qwen3-embedding-0.6b-dwq` — which
+   * is why `/v1/embeddings` answers `{"error":"No models loaded..."}` for it
+   * while the GGUF build returns 1024 floats on the same server in the same
+   * second (re-measured 2026-09-21; originally A-01). `lms runtime get -l`
+   * lists exactly one MLX engine, `mlx-llm` — there is no MLX embedding engine
+   * to route to.
+   *
+   * The entry is kept anyway, at the user's explicit and re-confirmed
+   * direction: selecting the MLX format is meant to be possible for every role.
+   * The installer warns at the point of choice rather than silently
+   * substituting GGUF for this one role.
+   */
+  readonly mlxModels?: Readonly<Record<InferenceRole, MlxModelVariant>>;
   readonly appliesContextPerRequest: boolean;
   readonly embedBatchSize: number;
   readonly supportsOllamaVersionProbe: boolean;
@@ -114,11 +157,33 @@ export const INFERENCE_PROVIDERS: Readonly<
     knownDimensions: {
       "text-embedding-nomic-embed-text-v1.5": 768,
       "text-embedding-qwen3-embedding-0.6b": 1024,
+      // The MLX build of the same base model. 1024 is inherited from
+      // Qwen/Qwen3-Embedding-0.6B, NOT measured from this build: LM Studio
+      // refuses it on /v1/embeddings (see `mlxModels` above), so there is no
+      // vector to read a length off. The entry exists so the installer can
+      // resolve a width without a live probe that is known to fail —
+      // `installer_resolve_embedding_dimensions` would otherwise make the
+      // install fatal on the MLX path.
+      "qwen3-embedding-0.6b-dwq": 1024,
     },
     defaultModels: {
       embedding: "text-embedding-qwen3-embedding-0.6b",
       instruct: "qwen3-vl-8b-instruct",
       coding: "qwen2.5-coder-7b-instruct",
+    },
+    mlxModels: {
+      embedding: {
+        repo: "mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ",
+        model: "qwen3-embedding-0.6b-dwq",
+      },
+      instruct: {
+        repo: "mlx-community/Qwen3-VL-8B-Instruct-4bit",
+        model: "qwen3-vl-8b-instruct",
+      },
+      coding: {
+        repo: "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+        model: "qwen2.5-coder-7b-instruct",
+      },
     },
     appliesContextPerRequest: false,
     embedBatchSize: 64,

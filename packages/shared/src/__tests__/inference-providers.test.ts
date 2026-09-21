@@ -145,6 +145,53 @@ describe("per-provider mechanism fields", () => {
   });
 });
 
+// PDM-13. Every literal below was read from a live LM Studio on 2026-09-21,
+// never derived — A-02 measured that a catalog id cannot be computed from its
+// Hugging Face repo path.
+describe("mlxModels (PDM-13)", () => {
+  test("ollama declares no MLX variants — it serves GGUF only", () => {
+    expect(INFERENCE_PROVIDERS.ollama.mlxModels).toBeUndefined();
+  });
+
+  test("lmstudio declares an MLX variant for all three roles", () => {
+    const mlx = INFERENCE_PROVIDERS.lmstudio.mlxModels;
+    expect(mlx).toBeDefined();
+    expect(Object.keys(mlx!).sort()).toEqual(["coding", "embedding", "instruct"]);
+    for (const role of ["embedding", "instruct", "coding"] as const) {
+      expect(mlx![role].repo.startsWith("mlx-community/")).toBe(true);
+      expect(mlx![role].model.length).toBeGreaterThan(0);
+    }
+  });
+
+  // The measurement that makes the format switch a no-op for two of three
+  // roles: `lms get --mlx <repo>` answered "Model already downloaded. To use,
+  // run: lms load <id>" with the GGUF install's own id. An edit that "fixes"
+  // these to look MLX-flavoured ships a config LM Studio cannot resolve.
+  test("instruct and coding keep their GGUF catalog ids on MLX", () => {
+    const spec = INFERENCE_PROVIDERS.lmstudio;
+    expect(spec.mlxModels!.instruct.model).toBe(spec.defaultModels.instruct);
+    expect(spec.mlxModels!.coding.model).toBe(spec.defaultModels.coding);
+  });
+
+  // Embedding is the one role whose id changes, because LM Studio types the
+  // MLX build as an LLM and so never applies its `text-embedding-` prefix.
+  // Same cause as the /v1/embeddings refusal documented on the field.
+  test("embedding is the only role whose MLX id diverges, losing the text-embedding- prefix", () => {
+    const spec = INFERENCE_PROVIDERS.lmstudio;
+    expect(spec.defaultModels.embedding.startsWith("text-embedding-")).toBe(true);
+    expect(spec.mlxModels!.embedding.model.startsWith("text-embedding-")).toBe(false);
+    expect(spec.mlxModels!.embedding.model).not.toBe(spec.defaultModels.embedding);
+  });
+
+  // Without this the MLX install path is fatal: the width resolver falls
+  // through to one real embed call, and that call is the one measured to fail.
+  test("both embedding ids resolve a width from the table, with no live probe", () => {
+    const spec = INFERENCE_PROVIDERS.lmstudio;
+    expect(spec.knownDimensions[spec.mlxModels!.embedding.model]).toBe(1024);
+    expect(spec.knownDimensions[spec.defaultModels.embedding]).toBe(1024);
+  });
+});
+
 describe("deriveInferenceBaseUrls (G2)", () => {
   test("omitted --base-url returns ollama's declared pair unchanged", () => {
     expect(deriveInferenceBaseUrls("ollama", undefined)).toEqual({
