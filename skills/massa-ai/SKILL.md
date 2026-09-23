@@ -116,7 +116,7 @@ Examples:
 - `feature-user-onboarding`
 - `refactor-auth-module`
 - `spec-billing-workflow`
-- `adr-postgres-migration`
+- `create-adr-postgres-migration`
 
 Resolve `projectId`:
 
