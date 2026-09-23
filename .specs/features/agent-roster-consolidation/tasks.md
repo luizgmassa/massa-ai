@@ -201,7 +201,7 @@ T12 → T13
 
 **Done when**:
 
-- [ ] Test green on the current 18 charters; observed red when one field is deleted from its source charter (then restored by file copy, not git)
+- [x] Test green on the current 18 charters; observed red when one field is deleted from its source charter (then restored by file copy, not git)
 
 **Tests**: content
 **Gate**: quick
