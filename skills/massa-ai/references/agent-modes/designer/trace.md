@@ -35,3 +35,7 @@ Output:
 - Findings: context summary (screens/features/flows in prose) plus the partition proposal
 - Risks and skipped checks (Figma MCP unavailable, a node that could not be read)
 - Exact next step
+
+Validation sensors: every composition claim (page, screen, frame, component set, token)
+carries a node id, frame name, or link; the partition proposal states its size, coupling,
+and feature-flow basis.
