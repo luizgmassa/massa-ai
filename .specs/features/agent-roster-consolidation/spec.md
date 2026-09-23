@@ -136,8 +136,8 @@ after what they produce.
 5. The Plan Challenge policy sentence SHALL name `spec-driven`, `feature`, `create-adr`, `create-rfc`, `create-tdd`, `refactor`, and each named file SHALL exist and contain "Plan Challenge Gate".
 6. WHEN `bun run generate:artifacts` runs THEN the generated workflow commands SHALL be exactly the 36 new stems (plus the 6 quick commands), with no command for a removed or old stem.
 7. The web UI `WORKFLOW_STEMS` list SHALL equal the 36 current stems.
-9. The workflow-owned references and guides SHALL follow the new stems: `references/create-tdd/`, `references/create-rfc/`, `references/create-ticket/`, `references/create-adr.md` (was `adr-authoring.md`), `docs/massa-ai-create-rfc.md`, `docs/massa-ai-create-tdd.md`, `docs/massa-ai-create-ticket.md`, and no tracked file outside `.specs/`, `.ua/`, and CHANGELOG history SHALL point at an old path.
 8. `bun scripts/check-stale-pointers.ts` (and the reference-graph orphan check) SHALL report no dangling pointer to a removed or renamed workflow or reference.
+9. The workflow-owned references and guides SHALL follow the new stems: `references/create-tdd/`, `references/create-rfc/`, `references/create-ticket/`, `references/create-adr.md` (was `adr-authoring.md`), `docs/massa-ai-create-rfc.md`, `docs/massa-ai-create-tdd.md`, `docs/massa-ai-create-ticket.md`, and no tracked file outside `.specs/`, `.ua/`, and CHANGELOG history SHALL point at an old path.
 
 ### P1: Unprefixed names with marker ownership ⭐ MVP
 
