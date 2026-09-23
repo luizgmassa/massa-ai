@@ -1515,7 +1515,7 @@
       "id": "agent-roster-consolidation",
       "slug": "agent-roster-consolidation",
       "title": "Agent roster consolidation: remove personas, 18 sub-agents to 7 unprefixed agents with content-marker ownership, drop general/maestro workflows and rename six to create-*/product-*",
-      "status": "in_progress",
+      "status": "complete",
       "priority": "P1",
       "phases": {
         "specify": true,
@@ -1530,7 +1530,8 @@
       "design": ".specs/features/agent-roster-consolidation/design.md",
       "tasks": ".specs/features/agent-roster-consolidation/tasks.md",
       "validation": ".specs/features/agent-roster-consolidation/validation.md",
-      "notes": "EXECUTE COMPLETE 2026-09-23 (T1-T13 across 5 Phases, three review fix commits); INDEPENDENT VALIDATION PENDING -- validation.md does not exist yet and the verifier (code-reviewer verify mode, author != verifier) is the next step. Final T13 gate on b30c9956 + records: build/type-check forced uncached 0, lint 0, generate:artifacts --check 0, scripts 2172/0, shell suites 41/41, plugins 175/0, shared 975/0, stale pointers PASS. Deferred advisories (F3, F4, F5, A8, A10, fix-3 deviation, host noise) are listed in .specs/HANDOFF.md. Unpushed."
+      "notes": "COMPLETE 2026-09-23: T1-T13 across 5 Phases (phase-batch workers), three review fix commits (161b9a62 OpenCode symlink ownership, b655d16f roster-swap gaps, d9326551 retired-skill prune hardening incl. a blocking rm -rf header-injection regression). Independent validation: FAIL (18/23 killed, test gaps) -> FAIL (48/49 ACs, ROS AC-7 prose spellings) -> PASS 49/49 ACs, 0 spec-precision gaps, 9/9 killed at 738010a8; post-PASS test-only sweep hardening e057feb5. Deferred advisories in .specs/HANDOFF.md. Push/PR authorized at Execute start; merge is the user's call.",
+      "completed": "2026-09-23"
     }
   ],
   "active_feature": "agent-roster-consolidation"

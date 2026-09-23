@@ -1,10 +1,11 @@
-# Handoff — agent-roster-consolidation (EXECUTE COMPLETE 2026-09-23 — T1–T13 across 5 Phases; independent validation PENDING; unpushed)
+# Handoff — agent-roster-consolidation (COMPLETE 2026-09-23 — T1–T13 across 5 Phases; independent validation PASS at 49/49 ACs, 9/9 mutations killed)
 
 - **Feature**: `.specs/features/agent-roster-consolidation/` (spec, design, tasks, `fixtures/`)
-- **Phase / Task**: Phase 5 / T13 done — Execute complete; validation is the remaining gate
+- **Phase / Task**: Phase 5 / T13 done — Execute and validation complete
+- **Validation**: Independent validation: round 1 at `bde889aa` FAIL (23 mutations, 18 killed, 5 survived — all test gaps, no live defect); test-only fix `40299644` + spec amendments `6a78d0c0`; round 2 at `6a78d0c0` FAIL (49 ACs, 48 matched; 15/15 killed; ROS AC-7 prose spellings the sweep missed); fix `738010a8`; round 3 at `738010a8` **PASS — 49/49 ACs, 0 spec-precision gaps, 9/9 mutations killed**. Post-PASS test-only hardening `e057feb5` (massa-ai-prefixed + underscore retired-name sweep, observed red 59/1, 58/2, 59/1).
 - **Completed**: T1–T13 (commits in `.specs/project/STATE.md` → Current)
 - **In-progress**: none
-- **Next step**: dispatch an independent `code-reviewer` in `verify` mode (author ≠ verifier) with a discrimination sensor over installer ownership (all 4 hosts + profile-switch) and the dispatch mapping; it writes `validation.md`
+- **Next step**: push the branch, open the PR, watch CI; merge is the user's call
 - **Blockers**: none
 - **Uncommitted files**: none
 - **Branch**: `feat/agent-roster-consolidation` @ `~/Projects/massa-ai-wt-roster`, off `origin/main@f582b602`
@@ -16,7 +17,7 @@
   listed in the row's reason, so the refusal reads as unexplained.
 - **Phase 2 review F4** — a `massa-ai-handoff-writer.md` installed by ≤v1.3 is not pruned on
   Claude/Cursor: it is not one of the 18 legacy names. Accepted under A17 (exact names only).
-- **Phase 2 review F5** — `doctor` has no unmarked-`.md` fixture; the engine suite lacks a
+- **Phase 2 review F5** — (the `doctor` unmarked-`.md` fixture was added in `40299644`); the engine suite lacks a
   symlink-destination case; the `_copy_agents_unprefixed` test helper is a no-op; the ownership
   shell suite exits 0 reporting "0 passed" when the generated bundles are missing.
 - **Phase 3 review A8** — the frozen `retired-charter-outputs.json` fixture freezes too little of

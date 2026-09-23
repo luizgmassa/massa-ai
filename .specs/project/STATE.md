@@ -1,4 +1,4 @@
-## Current — Agent roster consolidation (**EXECUTE COMPLETE 2026-09-23** — 13 Tasks across 5 Phases via phase-batch workers, three review fix commits; **independent validation pending**, the orchestrator dispatches the verifier next; unpushed)
+## Current — Agent roster consolidation (**COMPLETE 2026-09-23** — 13 Tasks across 5 Phases via phase-batch workers, three review fix commits, three independent verification rounds: **FAIL, FAIL, then PASS at 49/49 ACs**)
 
 Branch `feat/agent-roster-consolidation` off `origin/main@f582b602` (v1.60.1), worktree
 `~/Projects/massa-ai-wt-roster`. Full account in `.specs/HANDOFF.md` and
@@ -15,7 +15,9 @@ legacy `massa-ai-<18 names>` agents and a plugin-recorded `persona-router` skill
 **Commits:** T1 `7d245183`, T2 `e7730585`, T3 `fb242b33`, T4 `f9776f41`, T5 `57dc9538`,
 T6 `c793377f`, fix `161b9a62`, T7 `9814cfd0`, T8 `dc7ed630`, fix `b655d16f`, T9 `32e8cd1c`,
 T10 `12700369`, T11 `8bf1abcf`, fix `d9326551`, `ae926f21` (tasks.md sweep-allowlist amendment),
-T12 `b30c9956`, T13 = the commit carrying this block.
+T12 `b30c9956`, T13 `bde889aa`, test fix `40299644`, spec amendments `6a78d0c0`, fix `738010a8`, test `e057feb5`.
+
+**Validation.** Independent validation: round 1 at `bde889aa` FAIL (23 mutations, 18 killed, 5 survived — all test gaps, no live defect); test-only fix `40299644` + spec amendments `6a78d0c0`; round 2 at `6a78d0c0` FAIL (49 ACs, 48 matched; 15/15 killed; ROS AC-7 prose spellings the sweep missed); fix `738010a8`; round 3 at `738010a8` **PASS — 49/49 ACs, 0 spec-precision gaps, 9/9 mutations killed**. Post-PASS test-only hardening `e057feb5` (massa-ai-prefixed + underscore retired-name sweep, observed red 59/1, 58/2, 59/1).
 
 **Final gate (T13, measured on `b30c9956` + the T13 CHANGELOG/removed-features edits,
 `XDG_CONFIG_HOME` scratch):** `build --force` 0 (6/6, 0 cached), `type-check --force` 0 (6/6,
@@ -29,9 +31,8 @@ this batch: core and mcp-client hit a known Bun napi SIGTRAP at exit, red at bas
 write permission, A16 plugin-only update keeps the old `MASSA-AI.md`, A17 exact legacy names,
 A18 no namespace off the Claude plugin route, A20 test-engineer audit mode is write-capable).
 
-**Next step:** independent verification by a fresh `code-reviewer` (`verify` mode, author ≠
-verifier) with a discrimination sensor over installer ownership and dispatch mapping; it writes
-`validation.md`. Then push/PR is the user's call.
+**Next step:** push `feat/agent-roster-consolidation` and open the PR (authorized at Execute
+start); watch CI. Merge is the user's call.
 
 ## Previous — Per-provider default models (**COMPLETE 2026-09-21** — 21 Tasks across 8 Phases, two fix passes (F1-F9 + F2b, then G1-G6), three independent verification rounds: **FAIL, FAIL, then PASS at 25/25 ACs**; unpushed, push/PR is the user's call)
 
