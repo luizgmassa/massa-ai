@@ -254,18 +254,15 @@ function modeHeadings(text: string): string[] {
 }
 
 describe("lazy-mode stub binding (agent-roster-revision AC3, real charters)", () => {
-  // A LAZY_AGENTS member not yet converted to stubs on this branch (T7/T9 land
-  // separately from this task) still holds an inline `Mode:` section with zero
-  // `references/agent-modes/...` citations. That is a different lifecycle
-  // state, not a binding failure — this check only fires once a mode has
-  // actually become a stub (>=1 citation), so it stays generically correct as
-  // each remaining charter converts without needing another edit here.
+  // Every LAZY_AGENTS charter is converted to stubs (T7/T8/T9 all landed): an
+  // inline `Mode:` section with zero `references/agent-modes/...` citations
+  // is now a regression, not a mid-migration lifecycle state, and fails.
   const lazyPresent = LAZY_AGENTS.filter((name) => existsSync(charterPath(name)));
 
   test(`binding checked against every real lazy-mode stub present (charters scanned: ${lazyPresent.join(", ") || "none"})`, () => {
     expect(lazyPresent.length).toBeGreaterThan(0);
     let stubsChecked = 0;
-    let inlineSkipped = 0;
+    let inlineFound = 0;
     for (const agent of lazyPresent) {
       const content = readCharter(agent);
       for (const mode of modeHeadings(content)) {
@@ -273,9 +270,12 @@ describe("lazy-mode stub binding (agent-roster-revision AC3, real charters)", ()
         expect(section, `${agent} Mode \`${mode}\` section not found`).not.toBeNull();
         const citations = stubCitations(section!);
         if (citations.length === 0) {
-          inlineSkipped += 1;
-          continue;
+          inlineFound += 1;
         }
+        expect(
+          citations.length,
+          `${agent} Mode \`${mode}\` section is inline (no references/agent-modes/... citation) — every lazy mode must be a stub`,
+        ).toBeGreaterThan(0);
         expect(
           citesOwnMode(agent, mode, citations),
           `${agent} Mode \`${mode}\` stub does not bind to its own contract file (citations: ${citations.join(", ")})`,
@@ -284,7 +284,7 @@ describe("lazy-mode stub binding (agent-roster-revision AC3, real charters)", ()
       }
     }
     console.log(
-      `[charter-contract-preservation] real lazy-charter binding population: ${stubsChecked} stub mode(s) checked, ${inlineSkipped} still-inline mode(s) skipped`,
+      `[charter-contract-preservation] real lazy-charter binding population: ${stubsChecked} stub mode(s) checked, ${inlineFound} inline mode(s) found`,
     );
     expect(stubsChecked).toBeGreaterThan(0);
   });
