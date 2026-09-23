@@ -333,3 +333,46 @@ describe("no retired agent name in skills prose, backticked or not, any case, hy
     expect([...text.matchAll(RETIRED_WORD)].length).toBeGreaterThanOrEqual(14);
   });
 });
+
+// agent-roster-revision follow-up: closes a coverage gap the verifier found —
+// the whole `> **Dispatch: `product-manager`**` block under spec-driven.md's
+// Specify step, and the figma-pre-analysis.md Stage 1 designer/trace
+// dispatch, were both deletable without failing any existing test. Neither
+// lives in `EXPECTED` above (`dispatchTargets`/`RETIRED` only cover
+// `workflows/<family>/*.md`, and spec-driven.md is not in that map), and
+// figma-pre-analysis.md's Stage 1 line is prose, not a `> **Dispatch:**`
+// block, so no existing sensor reads it either.
+describe("Specify step names product-manager audit before the Requirement Closure Gate (coverage gap)", () => {
+  test("spec-driven.md's Specify step dispatches product-manager in audit mode with lens: requirements, before the gate", () => {
+    const text = read(path.join(WORKFLOWS, "spec-driven.md"));
+    const block = dispatchBlocks(text).find(
+      (b) => b.agent === "product-manager" && b.mode === "audit",
+    );
+    expect(block).toBeDefined();
+    expect(block!.lenses).toEqual(["requirements"]);
+    expect(block!.header).toContain("mode: `audit`");
+
+    const dispatchIndex = text.indexOf(block!.header);
+    const gateIndex = text.indexOf("Apply the Requirement Closure Gate");
+    expect(dispatchIndex).toBeGreaterThan(-1);
+    expect(gateIndex).toBeGreaterThan(dispatchIndex);
+
+    const blockLines = block!.header + "\n" + text.slice(text.indexOf("\n", dispatchIndex) + 1);
+    const bodyEnd = blockLines.split("\n").findIndex((l) => !l.startsWith(">") && l.trim() !== "");
+    const body = blockLines.split("\n").slice(0, bodyEnd === -1 ? undefined : bodyEnd).join("\n");
+    expect(body).toMatch(/trigger: every Specify run/);
+  });
+});
+
+describe("figma-pre-analysis.md Stage 1 dispatches designer in trace mode, not code-explorer (coverage gap)", () => {
+  test("Stage 1 names designer/trace and no longer names code-explorer", () => {
+    const text = read(path.join(SKILLS, "massa-ai", "references", "figma-pre-analysis.md"));
+    const stage1Start = text.indexOf("## Stage 1");
+    const stage2Start = text.indexOf("## Stage 2");
+    expect(stage1Start).toBeGreaterThan(-1);
+    expect(stage2Start).toBeGreaterThan(stage1Start);
+    const stage1 = text.slice(stage1Start, stage2Start);
+    expect(stage1).toContain("`designer`, `trace` mode");
+    expect(stage1).not.toContain("code-explorer");
+  });
+});
