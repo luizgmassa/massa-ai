@@ -265,7 +265,7 @@ describe("every dispatch packet names a real charter mode and lens (repo-wide)",
 
 describe("no retired agent name in skills prose, backticked or not, any case, hyphenated or spaced, suffixed", () => {
   const RETIRED_WORD =
-    /(?<![\w-])(?<!code[-\s])(planner|context[-\s]curator|documentation[-\s]agent|investigator|navigator|meta[-\s]judge|plan[-\s]critic|furps[-\s]analyst|requirements[-\s]analyst|verification[-\s]agent|mobile[-\s]specialist|architecture[-\s]specialist|audit[-\s]specialist|reviewer)(?!\w)/gi;
+    /(?<![\w-])(?<!code[-\s])(planner|context[-\s_]curator|documentation[-\s_]agent|investigator|navigator|meta[-\s_]judge|plan[-\s_]critic|furps[-\s_]analyst|requirements[-\s_]analyst|verification[-\s_]agent|mobile[-\s_]specialist|architecture[-\s_]specialist|audit[-\s_]specialist|reviewer)(?!\w)/gi;
 
   // Sanctioned exceptions, each scoped to one file and one line shape.
   const SANCTIONED: Array<{ file: string; line: RegExp; why: string }> = [
@@ -287,6 +287,21 @@ describe("no retired agent name in skills prose, backticked or not, any case, hy
           // A sanctioned line carries its one sanctioned word, never a second name.
           if (hits === 1 && SANCTIONED.some((s) => s.file === rel && s.line.test(line))) return;
           bad.push(`${rel}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        });
+    }
+    expect(bad).toEqual([]);
+  });
+
+  test("no massa-ai-<retired> prefixed name in skills (a rename leftover dispatches a dead agent)", () => {
+    const PREFIXED =
+      /massa-ai[-_:](planner|context-curator|documentation-agent|investigator|navigator|meta-judge|plan-critic|furps-analyst|requirements-analyst|verification-agent|mobile-specialist|architecture-specialist|audit-specialist|reviewer)(?![\w-])/gi;
+    const bad: string[] = [];
+    for (const rel of ALL_SKILL_MD) {
+      read(path.join(REPO_ROOT, rel))
+        .split("\n")
+        .forEach((line, i) => {
+          if (PREFIXED.test(line)) bad.push(`${rel}:${i + 1}: ${line.trim().slice(0, 120)}`);
+          PREFIXED.lastIndex = 0;
         });
     }
     expect(bad).toEqual([]);
