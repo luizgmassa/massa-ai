@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A symbol name/qualifiedName containing `#` (e.g. a markdown heading like `## Fixes issue
+  #456`) no longer aborts the whole project's indexing.** `normalizeSymbolText` escapes every
+  `#` to `%23` instead of throwing on any `#`; the persisted symbol row now carries the same
+  escaped name as its `#`-delimited fqn, closing a downstream `definition_fqn_name_mismatch`
+  the escape alone didn't cover.
+- **Postgres `connectionTimeoutMillis` raised from a hardcoded 5s to 15s (overridable via
+  `DB_CONNECTION_TIMEOUT_MS`) across all three connection pools** — `kernel/db-connection.ts`,
+  `kernel/prisma-client.ts`, and `data/vector/postgres-vector-store.ts`. A shared local
+  Postgres under normal concurrent-reindex load was timing out new connection handshakes and
+  interactive transactions well short of any real outage.
+
 ## [1.63.0] - 2026-09-23
 
 ### Added
