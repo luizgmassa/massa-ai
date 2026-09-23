@@ -1,4 +1,22 @@
-## Current — Agent roster consolidation (**COMPLETE 2026-09-23** — 13 Tasks across 5 Phases via phase-batch workers, three review fix commits, three independent verification rounds: **FAIL, FAIL, then PASS at 49/49 ACs**)
+## Current — Agent roster revision (**COMPLETE 2026-09-23** — 11 Tasks in 4 parallel waves, independent verification PASS)
+
+Branch `feat/agent-roster-revision` off `origin/main@11fb8bb1`, worktree
+`~/Projects/massa-ai-feat-agent-roster-revision`. Full account in
+`.specs/features/agent-roster-revision/{spec,validation}.md`.
+
+**What shipped.** `builder` renamed `senior-engineer` (overlay alias keeps pre-rename user overrides
+applying); `profile` skill removed (MCP + CLI switch fronts stay); code-reviewer `guide` removed and
+`review` merged into `audit` lens `diff`; code-explorer `lookup` removed; product-manager
+`requirements` merged into `audit` and dispatched in every spec-driven Specify; test-engineer `plan`
+removed; designer gained `trace` (Figma pre-analysis moved to it); designer/judge/test-engineer mode
+contracts moved to `skills/massa-ai/references/agent-modes/` and inlined by the dispatcher as
+`mode_contract`; router `SKILL.md` 20,254 → 12,953 B (cap 13,000).
+
+**Gates (foreground, merged tree):** test:scripts 2185/0 + 41/41 shell, test:plugins 183/0, lint 0,
+type-check 0, `bun run test` all packages 0 test failures; core and mcp-client exit 137 on the known
+Bun 1.3.14 teardown panic (same bun.report hash on `origin/main`).
+
+## Previous — Agent roster consolidation (**COMPLETE 2026-09-23** — 13 Tasks across 5 Phases via phase-batch workers, three review fix commits, three independent verification rounds: **FAIL, FAIL, then PASS at 49/49 ACs**)
 
 Branch `feat/agent-roster-consolidation` off `origin/main@f582b602` (v1.60.1), worktree
 `~/Projects/massa-ai-wt-roster`. Full account in `.specs/HANDOFF.md` and
