@@ -62,7 +62,7 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
    - Do not weaken tests, fixtures, snapshots, types, or public contracts to make the fix pass.
 9. Use agent orchestration only when it improves signal, except independent verification of the bug fix, which is mandated at the tiers named in `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated bug finding with a disjoint write set
 > - permissions: write (disjoint write set)

@@ -81,7 +81,7 @@ async function isSymlink(p: string): Promise<boolean> {
 }
 
 const SPECIALIST_NAMES = [
-  "builder",
+  "senior-engineer",
   "code-explorer",
   "code-reviewer",
   "designer",

@@ -72,10 +72,10 @@ describe("diffHost — full-inventory variant diff (MPS-01 AC2)", () => {
 
       const checkedInWorkDir = path.join(root, "checked-in", "claude-plugin", "agent-profiles", "work");
       await copyDir(genWorkDir, checkedInWorkDir);
-      await fs.rm(path.join(checkedInWorkDir, "builder.md"));
+      await fs.rm(path.join(checkedInWorkDir, "senior-engineer.md"));
 
       const diffs = await diffHost(genWorkDir, checkedInWorkDir, "claude");
-      expect(diffs).toContain("- builder.md (missing in checked-in)");
+      expect(diffs).toContain("- senior-engineer.md (missing in checked-in)");
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }

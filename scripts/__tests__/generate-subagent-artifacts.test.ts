@@ -127,7 +127,7 @@ describe("claudeToolPolicyFor (STI-01/STI-02)", () => {
   });
 
   test("every WRITE_AGENTS member returns inherit", () => {
-    for (const name of ["builder", "designer", "judge", "test-engineer"] as const) {
+    for (const name of ["senior-engineer", "designer", "judge", "test-engineer"] as const) {
       expect(claudeToolPolicyFor(name)).toEqual({ kind: "inherit" });
     }
   });
@@ -193,15 +193,15 @@ describe("emitClaude", () => {
     expect(out.endsWith("Do the thing.\n")).toBe(true);
   });
 
-  test("write agent (builder) gets neither tools: nor disallowedTools:", () => {
-    const out = emitClaude(charter({ name: "builder" }), resolved("sonnet", "high"));
+  test("write agent (senior-engineer) gets neither tools: nor disallowedTools:", () => {
+    const out = emitClaude(charter({ name: "senior-engineer" }), resolved("sonnet", "high"));
     expect(out).not.toContain("tools:");
     expect(out).not.toContain("disallowedTools:");
     expect(out).toContain("model: sonnet");
   });
 
   test("no agent emits a tools: allowlist — the navigator exception is retired (A9)", () => {
-    for (const name of ["builder", "code-explorer", "code-reviewer", "designer", "judge", "product-manager", "test-engineer"] as const) {
+    for (const name of ["senior-engineer", "code-explorer", "code-reviewer", "designer", "judge", "product-manager", "test-engineer"] as const) {
       expect(emitClaude(charter({ name }), resolved("opus", "high"))).not.toMatch(/^tools:/m);
     }
   });
@@ -210,7 +210,7 @@ describe("emitClaude", () => {
     expect(keyOrder(emitClaude(charter({ name: "code-explorer" }), resolved("haiku", "high")))).toEqual([
       "name", "description", "disallowedTools", "model", "effort",
     ]);
-    expect(keyOrder(emitClaude(charter({ name: "builder" }), resolved("sonnet", "high")))).toEqual([
+    expect(keyOrder(emitClaude(charter({ name: "senior-engineer" }), resolved("sonnet", "high")))).toEqual([
       "name", "description", "model", "effort",
     ]);
   });
@@ -252,7 +252,7 @@ describe("emitCursor", () => {
   });
 
   test("write charter omits readonly (false is already the documented default)", () => {
-    const out = emitCursor(charter({ name: "builder" }), resolved(null, null));
+    const out = emitCursor(charter({ name: "senior-engineer" }), resolved(null, null));
     expect(out).not.toContain("readonly");
   });
 
@@ -278,7 +278,7 @@ describe("emitCursor", () => {
 
 describe("emitOpenCode", () => {
   test("write agent -> edit: allow, bash: allow", () => {
-    const out = emitOpenCode(charter({ name: "builder" }), resolved("opencode-go/glm-5.2", "max"));
+    const out = emitOpenCode(charter({ name: "senior-engineer" }), resolved("opencode-go/glm-5.2", "max"));
     expect(out).toContain("edit: allow");
     expect(out).toContain("bash: allow");
     // `all`, not `subagent` — OpenCode's Tab switcher lists primary/all only.
@@ -356,8 +356,8 @@ describe("emitCodex + TOML helpers", () => {
     expect(parsed.name).toBe("code-explorer");
   });
 
-  test("write codex agent (builder) -> sandbox workspace-write", () => {
-    const out = emitCodex(charter({ name: "builder" }), resolved("gpt-5.6-terra", "high"));
+  test("write codex agent (senior-engineer) -> sandbox workspace-write", () => {
+    const out = emitCodex(charter({ name: "senior-engineer" }), resolved("gpt-5.6-terra", "high"));
     expect(out).toContain('sandbox_mode = "workspace-write"');
     expect(out).toContain('model = "gpt-5.6-terra"');
   });
@@ -510,11 +510,11 @@ describe("emitAll + diffHost", () => {
         await fs.copyFile(path.join(generated, f), path.join(checkedIn, f));
       }
       // remove from generated -> "+ <rel> (missing in generated)"
-      await fs.rm(path.join(generated, "builder.md"));
+      await fs.rm(path.join(generated, "senior-engineer.md"));
       // remove from checked-in (different file) -> "- <rel> (missing in checked-in)"
       await fs.rm(path.join(checkedIn, "judge.md"));
       const diffs = await diffHost(generated, checkedIn, "claude");
-      expect(diffs).toContain("+ builder.md (missing in generated)");
+      expect(diffs).toContain("+ senior-engineer.md (missing in generated)");
       expect(diffs).toContain("- judge.md (missing in checked-in)");
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
@@ -636,7 +636,7 @@ describe("main()/runCheck thread the recorded install-state profile end-to-end (
       const code = runGeneratorInSubprocess([], homeDir);
       expect(code).toBe(0);
 
-      const out = await fs.readFile(path.join(CLAUDE_AGENTS_DIR, "builder.md"), "utf8");
+      const out = await fs.readFile(path.join(CLAUDE_AGENTS_DIR, "senior-engineer.md"), "utf8");
       // Compare against an independent "cheap" emission (the same production
       // resolver, a throwaway target dir) instead of a hardcoded model literal.
       const tmpOut = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
@@ -645,10 +645,10 @@ describe("main()/runCheck thread the recorded install-state profile end-to-end (
         { profileFlag: "cheap", env: {} },
         ["claude"],
       );
-      const expected = await fs.readFile(path.join(tmpOut, "builder.md"), "utf8");
+      const expected = await fs.readFile(path.join(tmpOut, "senior-engineer.md"), "utf8");
       expect(out).toBe(expected);
       // And it must actually have moved off the checked-in ("balanced") baseline.
-      expect(out).not.toBe(backup.get("builder.md")!.toString("utf8"));
+      expect(out).not.toBe(backup.get("senior-engineer.md")!.toString("utf8"));
     } finally {
       await restoreDir(CLAUDE_AGENTS_DIR, backup);
     }
@@ -770,13 +770,13 @@ describe("generator profile selection", () => {
       });
       await emitAll(dirsFor("a"), { env: {} });
       await emitAll(dirsFor("b"), { profileFlag: "heavy", env: {} });
-      // builder is a standard-tier charter: balanced pins sonnet, heavy pins opus.
+      // senior-engineer is a standard-tier charter: balanced pins sonnet, heavy pins opus.
       const a = await fs.readFile(
-        path.join(dirsFor("a").claude, "builder.md"),
+        path.join(dirsFor("a").claude, "senior-engineer.md"),
         "utf8"
       );
       const b = await fs.readFile(
-        path.join(dirsFor("b").claude, "builder.md"),
+        path.join(dirsFor("b").claude, "senior-engineer.md"),
         "utf8"
       );
       expect(a).toContain("model: sonnet"); // balanced, standard tier
@@ -968,7 +968,7 @@ describe("stale agent-override warn (registry v2)", () => {
     const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     try {
       // The FULL real charter set — every override the shipped registry already carries
-      // (builder, designer, test-engineer) names a real charter too,
+      // (senior-engineer, designer, test-engineer) names a real charter too,
       // so only a singleton fake charter list would make those look stale.
       const charters = await loadAllCharters();
       warnStaleAgentOverrides(registry, charters, new Set());

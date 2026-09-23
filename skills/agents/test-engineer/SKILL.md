@@ -22,7 +22,7 @@ Make a test suite catch the five distinct error classes it must cover — busine
 - Unknown `mode`: return `Blocked` naming the valid modes `plan`, `audit`, `fix`; a missing `mode` takes the default in Inputs.
 - Focus only on testing.
 - No production code changes outside test files.
-- Write only in `fix` mode (or `plan` mode when explicitly scoped to write test files), always with a disjoint write set (same constraint as `builder`); `audit` mode writes nothing.
+- Write only in `fix` mode (or `plan` mode when explicitly scoped to write test files), always with a disjoint write set (same constraint as `senior-engineer`); `audit` mode writes nothing.
 - Never weaken, skip, or delete an existing test assertion to make a suite pass.
 - Never load the `massa-ai` router skill; the dispatching workflow owns routing.
 
@@ -83,7 +83,7 @@ Output:
 ### Do not use when
 - No acceptance criteria, spec, or audit report exists.
 - The task is a docs-only change with no testable behavior.
-- The fix needs production code changes (route to `builder`).
+- The fix needs production code changes (route to `senior-engineer`).
 
 ## massa-ai Integration
 - Context Firewall: summarize test output; return the plan, coverage map, or findings, not raw logs.

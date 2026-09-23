@@ -62,7 +62,7 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
    - Prefer small reversible edits; verify after each finding or coherent group.
 10. Use agent orchestration only when it improves signal — except the `code-reviewer` `verify` dispatch below, which `references/agent-orchestration.md`'s Independent Verification Exception mandates at the tiers named in its trigger regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated code-quality finding or disjoint file group
 > - permissions: write (disjoint write set)

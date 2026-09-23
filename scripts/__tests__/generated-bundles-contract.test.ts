@@ -63,8 +63,8 @@ describe("managed subtrees stay gitignored (UGB-01)", () => {
     // cover a cursor representative without this entry.
     "apps/codex-plugin/skills/persona-router/references/routing-details.md",
     "apps/opencode-plugin/skills/agents/code-explorer/SKILL.md",
-    "apps/claude-plugin/agents/builder.md",
-    "apps/opencode-plugin/agent-profiles/work/builder.md",
+    "apps/claude-plugin/agents/senior-engineer.md",
+    "apps/opencode-plugin/agent-profiles/work/senior-engineer.md",
     "apps/codex-plugin/hooks/massa-ai-hook",
     "apps/cursor-plugin/hooks/massa-ai-hook",
     "apps/opencode-plugin/lib/opencode-config.cjs",

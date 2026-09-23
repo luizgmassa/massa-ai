@@ -90,7 +90,7 @@ Output:
 ### Do not use when
 - Requirements are already closed and accepted, or the work is a trivial fix with no requirement surface.
 - The task needs full conversation history or requires writes.
-- The task needs a fix (route to `requirements-fix` or `builder`).
+- The task needs a fix (route to `requirements-fix` or `senior-engineer`).
 
 ## massa-ai Integration
 - Context Firewall: summarize the document or spec; return evidence and findings only, never the source text.

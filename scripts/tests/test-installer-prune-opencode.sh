@@ -59,9 +59,9 @@ ROOT="$(mktemp -d "${TMPDIR:-/tmp}/massa-ai-prune-opencode.XXXXXX")"
 # source bundle for scenario (c), and always restores. Chosen because it is
 # generated content (safe to touch, gitignored under AD-016) and is not a
 # file any other in-flight worker in this worktree reads.
-FIXTURE_AGENT_NAME="builder.md"
+FIXTURE_AGENT_NAME="senior-engineer.md"
 FIXTURE_AGENT_PATH="${SOURCE_AGENTS_DIR}/${FIXTURE_AGENT_NAME}"
-FIXTURE_BACKUP="${ROOT}/builder.md.bak"
+FIXTURE_BACKUP="${ROOT}/senior-engineer.md.bak"
 
 restore_fixture_agent() {
   if [[ -f "$FIXTURE_BACKUP" && ! -f "$FIXTURE_AGENT_PATH" ]]; then

@@ -230,7 +230,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
 
   // ── T3: subagent specialists (CLA-01, CLA-02, CLA-05, CLA-06, DOC-01) ──
   const SPECIALIST_NAMES = [
-    "builder",
+    "senior-engineer",
     "code-explorer",
     "code-reviewer",
     "designer",
@@ -265,7 +265,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
   // the PRESENCE of the expected gating key, so neither can pass on an empty line.
   test("CLA-02: read-only agents deny writes via disallowedTools; write agents inherit; no agent carries an allowlist", async () => {
     runInstall(["--user"], { HOME: tmp });
-    const writeAgents = ["builder", "designer", "judge", "test-engineer"];
+    const writeAgents = ["senior-engineer", "designer", "judge", "test-engineer"];
     const denylistAgents = SPECIALIST_NAMES.filter(
       (n) => !writeAgents.includes(n),
     );

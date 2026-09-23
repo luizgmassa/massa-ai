@@ -158,7 +158,7 @@ resolves to a current agent.
 
 | Legacy role | Current agent | Note |
 |---|---|---|
-| `implementer` | `builder` | renamed |
+| `implementer` | `senior-engineer` | renamed |
 | `verifier` | `code-reviewer` | folded in; `mode: verify`, which centralizes the Verification Ladder |
 | `domain-mapper` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: domain` (packet field defined in the `code-reviewer` charter Inputs) |
 | `coupling-auditor` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: coupling` |

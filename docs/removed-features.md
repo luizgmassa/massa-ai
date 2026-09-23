@@ -113,3 +113,18 @@ switch engine (PRO-01..03).
 
 The switch engine (`packages/shared/src/profile-switch/`), the MCP tools, and the CLIs
 are unchanged; only the skill front is gone.
+
+## Agent roster revision — builder renamed to senior-engineer
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-revision/` (REN-01..05)
+**Rationale**: `builder` named the agent's write permission, not its seniority or scope,
+and read as a build-tool rather than an implementation specialist.
+
+`skills/agents/builder/` moved to `skills/agents/senior-engineer/` with the same one
+output contract, the same disjoint-write-set implementation role, and the same charter
+identity — no behavior changed. Every dispatch block, registry row, model-profile
+override key, and generator constant now names `senior-engineer`. The mapping table in
+`skills/AGENTS.md` records `builder → senior-engineer`. A user's model-profile overlay
+still keyed under the pre-rename `builder` name keeps applying: the overlay merge maps it
+onto `senior-engineer` unless the overlay already sets `senior-engineer` directly.

@@ -69,7 +69,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: isolated finding with disjoint write set and concrete verification
 > - scope: one isolated implementation finding with a disjoint write set
 > - permissions: write (disjoint write set)

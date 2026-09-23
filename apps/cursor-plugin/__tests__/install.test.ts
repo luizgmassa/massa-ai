@@ -269,7 +269,7 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
 
   // ── T6: subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
   const SPECIALIST_NAMES = [
-    "builder",
+    "senior-engineer",
     "code-explorer",
     "code-reviewer",
     "designer",

@@ -111,7 +111,7 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists reusable testing patterns
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: a selected TST finding whose fix needs a production seam for deterministic testing (step 7 Standard) — never for a test-file change, which belongs to `test-engineer`, and never for a production behavior change, which routes to `workflows/spec-driven.md`
 > - scope: the seam-only production change for one TST finding, with a write set disjoint from the `test-engineer` test files
 > - permissions: write (disjoint write set, production seam files only; no behavior change)

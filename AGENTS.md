@@ -31,7 +31,7 @@ with several output contracts selects one per dispatch through the capability
 packet's `mode` field; `skills/AGENTS.md` lists the modes and maps retired agents
 to current ones.
 
-- `builder/` — write-permitted implementation (disjoint write set)
+- `senior-engineer/` — write-permitted implementation (disjoint write set)
 - `code-explorer/` — read-only codebase exploration: index-first lookup, flow tracing, dependencies, impact
 - `code-reviewer/` — read-only diff review, independent verification, findings-only audits (bugs, architecture, security, code-quality, performance), architecture and mobile guidance
 - `designer/` — reads and writes user-facing screens from Figma, screenshots, or other design direction (UI-layer writes when scoped)

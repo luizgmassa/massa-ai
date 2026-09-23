@@ -19,7 +19,7 @@ Plus 36 generated workflow commands, one per massa-ai workflow, each auto-loaded
 
 MCP server: `massa-ai` (`npx @massa-ai/mcp-client` with `MASSA_AI_API_URL`) — registered into `~/.cursor/mcp.json` by `scripts/install-agents.sh`, which this installer calls for you. That script is the single writer of host MCP config; the plugin ships no `mcp.json`.
 
-Subagents: the 7 massa-ai specialists — `builder`, `code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, `test-engineer` — under their bare names. The installer identifies its own agent files by the `massa-ai-owned` content marker: a same-named agent you own is skipped with a warning, and pre-consolidation `massa-ai-<name>` files are pruned on upgrade.
+Subagents: the 7 massa-ai specialists — `senior-engineer`, `code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, `test-engineer` — under their bare names. The installer identifies its own agent files by the `massa-ai-owned` content marker: a same-named agent you own is skipped with a warning, and pre-consolidation `massa-ai-<name>` files are pruned on upgrade.
 
 Hooks: 7 Cursor lifecycle events wired to the shared `massa-ai-hook` binary (fire-and-forget POSTs to the tools-api):
 
