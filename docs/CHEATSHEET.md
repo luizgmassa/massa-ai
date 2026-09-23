@@ -381,7 +381,7 @@ per dispatch through the capability packet's `mode` field.
 | Agent | Purpose | Modes | Permission |
 |---|---|---|---|
 | `senior-engineer` | Implement approved plans | — | write |
-| `code-explorer` | Understand an existing codebase, index-first | `lookup`, `trace` | read-only |
+| `code-explorer` | Understand an existing codebase, index-first | `trace` | read-only |
 | `code-reviewer` | Review, verify, audit, and guide existing or changed code | `review`, `verify`, `audit`, `guide` | read-only |
 | `designer` | Read and write screens from Figma, screenshots, or other design direction | `audit`, `implement` | read-only (UI-layer write when scoped) |
 | `judge` | Evaluate artifacts and challenge plans with quoted evidence | `spec-author`, `scorer`, `plan-critique` | write (own judge-N report, `scorer` only) |

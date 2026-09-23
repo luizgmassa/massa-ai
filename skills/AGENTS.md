@@ -266,7 +266,7 @@ drift, and did.
 | Name | Purpose | Permission | Modes | Charter |
 |---|---|---|---|---|
 | senior-engineer | Implement approved plans | write | — (one contract) | `skills/agents/senior-engineer/SKILL.md` |
-| code-explorer | Understand an existing codebase, index-first | read-only | `lookup` (index-first answer), `trace` (flow, dependencies, impact) | `skills/agents/code-explorer/SKILL.md` |
+| code-explorer | Understand an existing codebase, index-first | read-only | `trace` (index-first answer, flow, dependencies, impact) | `skills/agents/code-explorer/SKILL.md` |
 | code-reviewer | Review, verify, audit, and guide existing or changed code | read-only | `review` (diff), `verify` (Verification Ladder + discrimination sensor), `audit` (lenses bugs, architecture, security, code-quality, performance), `guide` (architecture, mobile platform) | `skills/agents/code-reviewer/SKILL.md` |
 | designer | Read and write user-facing screens from Figma, screenshots, or other design direction | read-only (UI-layer write when scoped) | `audit` (conformance), `implement` (UI layer) | `skills/agents/designer/SKILL.md` |
 | judge | Evaluate artifacts and challenge plans with quoted evidence | write (own judge-N report, `scorer` mode only) | `spec-author` (evaluation specification), `scorer` (debate panel), `plan-critique` (lite or full Plan Challenge gate) | `skills/agents/judge/SKILL.md` |
@@ -281,7 +281,7 @@ The single old→new table for the charters retired by the roster consolidation.
 |---|---|---|
 | builder | senior-engineer | `—` (renamed) |
 | investigator | code-explorer | `trace` |
-| navigator | code-explorer | `lookup` |
+| navigator | code-explorer | `trace` |
 | reviewer | code-reviewer | `review` |
 | verification-agent | code-reviewer | `verify` |
 | audit-specialist | code-reviewer | `audit` (the `requirements` lens moved to product-manager `audit`, the `tests` lens to test-engineer `audit`) |

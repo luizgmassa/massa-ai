@@ -2,9 +2,9 @@
   "sourceRef": "f582b602",
   "description": "Role-specific output fields of the charters merged or retired by agent-roster-consolidation, read from `git show f582b602:skills/agents/<source>/SKILL.md`. Generic wrapper fields (Status, Scope, Evidence, Exact next step) are excluded. `absorbedBy` names the roster charter and mode section that must carry the field after the roster swap; null means the role is dropped with no absorbing charter (design C1).",
   "fields": [
-    { "source": "navigator", "field": "index tools called and files read", "absorbedBy": { "agent": "code-explorer", "mode": "lookup" } },
-    { "source": "navigator", "field": "compact, cited answer", "absorbedBy": { "agent": "code-explorer", "mode": "lookup" } },
-    { "source": "navigator", "field": "index staleness, zero-result searches, unresolved symbols", "absorbedBy": { "agent": "code-explorer", "mode": "lookup" } },
+    { "source": "navigator", "field": "index tools called and files read", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
+    { "source": "navigator", "field": "compact, cited answer", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
+    { "source": "navigator", "field": "index staleness, zero-result searches, unresolved symbols", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
 
     { "source": "investigator", "field": "architecture summary", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
     { "source": "investigator", "field": "flow trace", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
