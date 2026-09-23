@@ -12,6 +12,7 @@ import path from "node:path";
 import os from "node:os";
 import { runtimeDriftReport } from "../doctor.js";
 import { resolveClaudeMarketplaceInstall, readInstalledPluginVersion } from "../claude-marketplace.js";
+import type { Host } from "../hosts.js";
 
 let home: string;
 
@@ -223,5 +224,61 @@ describe("runtimeDriftReport — degraded and guarded (INV1)", () => {
     for (const [rel, content] of before) {
       expect(after.get(rel)).toBe(content);
     }
+  });
+
+  test("a plugin.json that is not valid JSON degrades sourceVersion to null instead of throwing", () => {
+    const bundleRoot = stageDirectorySource("1.57.0");
+    fs.writeFileSync(path.join(bundleRoot, ".claude-plugin", "plugin.json"), "{ not json");
+    writeText(path.join(bundleRoot, "agents", "massa-ai-investigator.md"), AGENT_FILE);
+
+    const report = runtimeDriftReport({ targetHome: home, env: {} });
+    expect(report.sourceVersion).toBeNull();
+    expect(report.roles).toHaveLength(1);
+  });
+
+  test("a live root with no agents/ directory reports empty roles instead of throwing", () => {
+    stageDirectorySource("1.57.0");
+    // No agents/ subdirectory ever created under the bundle root.
+
+    const report = runtimeDriftReport({ targetHome: home, env: {} });
+    expect(report.roles).toEqual([]);
+  });
+});
+
+describe("runtimeDriftReport — non-claude host (host !== \"claude\" short-circuit)", () => {
+  test("reports route unresolved, recorded activeProfile, and env override, without touching the claude marketplace", () => {
+    fs.mkdirSync(path.join(home, ".config", "massa-ai"), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, ".config", "massa-ai", "install-state.json"),
+      JSON.stringify({
+        version: 2,
+        platforms: {
+          codex: { plugin: { version: "9.9.9" }, modelProfile: { profile: "cheap", switchedAt: "t" } },
+        },
+      }),
+    );
+
+    const report = runtimeDriftReport({
+      targetHome: home,
+      host: "codex" as Host,
+      env: { CLAUDE_CODE_SUBAGENT_MODEL: "opus" },
+    });
+
+    expect(report.host).toBe("codex");
+    expect(report.route).toBe("unresolved");
+    expect(report.liveRoot).toBeNull();
+    expect(report.sourceVersion).toBeNull();
+    expect(report.stateVersion).toBe("9.9.9");
+    expect(report.pinnedVersion).toBeNull();
+    expect(report.activeProfile).toBe("cheap");
+    expect(report.roles).toEqual([]);
+    expect(report.versionDrift).toBe(false);
+    expect(report.profileMaterialized).toBe(false);
+    expect(report.envOverride).toEqual({ name: "CLAUDE_CODE_SUBAGENT_MODEL", value: "opus" });
+  });
+
+  test("defaults host to \"claude\" when opts.host is omitted", () => {
+    const report = runtimeDriftReport({ targetHome: home, env: {} });
+    expect(report.host).toBe("claude");
   });
 });
