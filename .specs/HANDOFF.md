@@ -1,4 +1,53 @@
-# Handoff — per-provider-default-models (COMPLETE 2026-09-21 — 21 Tasks across 8 Phases via 8 batch workers, two fix passes via 5 more, three independent verification rounds: FAIL, FAIL, then PASS at 25/25 ACs; unpushed, push/PR is the user's call)
+# Handoff — agent-roster-consolidation (EXECUTE COMPLETE 2026-09-23 — T1–T13 across 5 Phases; independent validation PENDING; unpushed)
+
+- **Feature**: `.specs/features/agent-roster-consolidation/` (spec, design, tasks, `fixtures/`)
+- **Phase / Task**: Phase 5 / T13 done — Execute complete; validation is the remaining gate
+- **Completed**: T1–T13 (commits in `.specs/project/STATE.md` → Current)
+- **In-progress**: none
+- **Next step**: dispatch an independent `code-reviewer` in `verify` mode (author ≠ verifier) with a discrimination sensor over installer ownership (all 4 hosts + profile-switch) and the dispatch mapping; it writes `validation.md`
+- **Blockers**: none
+- **Uncommitted files**: none
+- **Branch**: `feat/agent-roster-consolidation` @ `~/Projects/massa-ai-wt-roster`, off `origin/main@f582b602`
+
+## Deferred advisories (recorded, not fixed — true and unflattering)
+
+- **Phase 2 review F3** — the profile-switch tracked-path guard refuses a switch when a user's
+  git-tracked file shares an agent's name. It fails safe (no write), but the skipped file is not
+  listed in the row's reason, so the refusal reads as unexplained.
+- **Phase 2 review F4** — a `massa-ai-handoff-writer.md` installed by ≤v1.3 is not pruned on
+  Claude/Cursor: it is not one of the 18 legacy names. Accepted under A17 (exact names only).
+- **Phase 2 review F5** — `doctor` has no unmarked-`.md` fixture; the engine suite lacks a
+  symlink-destination case; the `_copy_agents_unprefixed` test helper is a no-op; the ownership
+  shell suite exits 0 reporting "0 passed" when the generated bundles are missing.
+- **Phase 3 review A8** — the frozen `retired-charter-outputs.json` fixture freezes too little of
+  some retired contracts, so `charter-contract-preservation.test.ts` passing does not prove every
+  former output contract survived the merge intact.
+- **Phase 3 review A10** — reviewer and verifier are now one agent and one model
+  (`code-reviewer`, deep tier), so "author ≠ verifier" is a fresh-context guarantee, not a
+  different-model one.
+- **Fix-3 deviation (`d9326551`)** — `install-skills.sh` prunes only `RETIRED_SKILL_NAMES` on a
+  plugin → repo handover, not every plugin-recorded skill, to keep the version-skew
+  `ghost-plugin` guard (a newer plugin may record a skill this checkout does not know).
+  `RETIRED_SKILL_NAMES` must equal `generate-skill-artifacts.ts` `RETIRED_BUNDLE_ROOTS`
+  (asserted in `generate-skill-artifacts-prune.test.ts` since T12).
+- **Host noise, not code** — gate runs detached or in the background fake installer reds;
+  run them in the foreground. `packages/core` and `apps/mcp-client` hit a Bun napi SIGTRAP at
+  process exit (red at base too), so `bun run test` (turbo) was replaced by per-suite runs.
+
+## T12/T13 notes
+
+- The T12 `ROSTER = 7` scan now skips `.ua/` (a generated historical snapshot, out of scope per
+  the spec) — its `knowledge-graph.json` still says 18.
+- Sweep residuals left on purpose: persona hits are only absence/prune sensors, the retired-id
+  literals (`RETIRED_RULE_IDS`, `RETIRED_BUNDLE_ROOTS`, `RETIRED_SKILL_NAMES`), the `.gitignore`
+  `apps/*-plugin/skills/persona-router/` ignore, `docs/removed-features.md`, and
+  `references/the-fool/`; old-name hits are the `skills/AGENTS.md` mapping table, the A17
+  legacy-name lists, legacy-prune fixtures, review-finding ids (`plan-critic C3`), and ordinary
+  English (`reviewer`, `planner`, `navigator state`).
+- CHANGELOG `[Unreleased]` carries `### Removed` + `### Changed` (minor bump) with the A16
+  upgrade note.
+
+## Previous handoff — per-provider-default-models (COMPLETE 2026-09-21 — 21 Tasks across 8 Phases via 8 batch workers, two fix passes via 5 more, three independent verification rounds: FAIL, FAIL, then PASS at 25/25 ACs; unpushed, push/PR is the user's call)
 
 ## Final verdict — round 3, PASS
 

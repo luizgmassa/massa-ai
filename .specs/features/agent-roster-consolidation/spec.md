@@ -185,17 +185,17 @@ installer ever touching my own agent files.
 | PER-02 | Bootstrap registry 9→8, AGENTS.md spans, retired-id silence (AC-2, AC-6) | Personas removed | Execute (T9) | Done |
 | PER-03 | Generator + installers drop persona-router, prune installed copy (AC-3, AC-4, AC-5) | Personas removed | Execute (T10) | Done |
 | PER-04 | Observation-extractor `/persona` trigger removed (AC-8) | Personas removed | Execute (T11) | Done |
-| ROS-01 | Seven charters authored from merged sources + contract-preservation fixture test (ROS AC-1..6, AC-9) | Seven-agent roster | Design | Pending |
-| ROS-02 | Old agent names purged; single mapping table (AC-7) | Seven-agent roster | Design | Pending |
-| ROS-03 | Counts 18→7 everywhere (AC-8) | Seven-agent roster | Design | Pending |
-| WFL-01 | Dispatch mapping per workflow family (Dispatch AC-1..9) | Workflow dispatch mapping | Design | Pending |
+| ROS-01 | Seven charters authored from merged sources + contract-preservation fixture test (ROS AC-1..6, AC-9) | Seven-agent roster | Execute (T7, T8) | Done |
+| ROS-02 | Old agent names purged; single mapping table (AC-7) | Seven-agent roster | Execute (T8, T12) | Done |
+| ROS-03 | Counts 18→7 everywhere (AC-8) | Seven-agent roster | Execute (T8, T12) | Done |
+| WFL-01 | Dispatch mapping per workflow family (Dispatch AC-1..9) | Workflow dispatch mapping | Execute (T8) | Done |
 | WFL-02 | Remove general + maestro, fallback rewrite (Inventory AC-1, AC-3, AC-4) | Workflow inventory | Execute (T1) | Done |
 | WFL-03 | Six renames incl. policy sentence, commands, web UI, owned references and docs guides (AC-2, AC-5, AC-6, AC-7, AC-9) | Workflow inventory | Execute (T2, T3) | Done |
 | WFL-04 | No dangling pointers (AC-8) | Workflow inventory | Execute (T1, T2) | Done |
-| NAM-01 | Generator emits unprefixed names + markers (NAM AC-1, AC-2, AC-9) | Unprefixed names | Design | Pending |
-| NAM-02 | Installers: marker ownership, collision skip, legacy prune (AC-3, AC-4, AC-5) | Unprefixed names | Design | Pending |
-| NAM-03 | Profile-switch, config-cli, verify, installer-shared, hook sentinel, Claude name resolution (AC-6, AC-7, AC-8, AC-10, AC-11) | Unprefixed names | Design | Pending |
-| DOC-01 | Docs, removed-features, CHANGELOG (Docs AC-1..3) | Docs and records | Design | Pending |
+| NAM-01 | Generator emits unprefixed names + markers (NAM AC-1, AC-2, AC-9) | Unprefixed names | Execute (T4, T6) | Done |
+| NAM-02 | Installers: marker ownership, collision skip, legacy prune (AC-3, AC-4, AC-5) | Unprefixed names | Execute (T5) | Done |
+| NAM-03 | Profile-switch, config-cli, verify, installer-shared, hook sentinel, Claude name resolution (AC-6, AC-7, AC-8, AC-10, AC-11) | Unprefixed names | Execute (T5, T6, T8) | Done |
+| DOC-01 | Docs, removed-features, CHANGELOG (Docs AC-1..3) | Docs and records | Execute (T12, T13) | Done |
 
 ## Implicit-Requirement Sweep (Large)
 

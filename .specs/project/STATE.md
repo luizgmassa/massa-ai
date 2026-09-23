@@ -1,4 +1,39 @@
-## Current — Per-provider default models (**COMPLETE 2026-09-21** — 21 Tasks across 8 Phases, two fix passes (F1-F9 + F2b, then G1-G6), three independent verification rounds: **FAIL, FAIL, then PASS at 25/25 ACs**; unpushed, push/PR is the user's call)
+## Current — Agent roster consolidation (**EXECUTE COMPLETE 2026-09-23** — 13 Tasks across 5 Phases via phase-batch workers, three review fix commits; **independent validation pending**, the orchestrator dispatches the verifier next; unpushed)
+
+Branch `feat/agent-roster-consolidation` off `origin/main@f582b602` (v1.60.1), worktree
+`~/Projects/massa-ai-wt-roster`. Full account in `.specs/HANDOFF.md` and
+`.specs/features/agent-roster-consolidation/`.
+
+**What shipped.** Personas removed (router skill, catalog, `persona-router` bootstrap rule 9 → 8,
+`/persona` extractor trigger); 18 sub-agents → 7 (`builder`, `code-explorer`, `code-reviewer`,
+`designer`, `judge`, `product-manager`, `test-engineer`), merged charters keep every former output
+contract behind a packet `mode`; `massa-ai-` agent prefix dropped, ownership moved to the
+`massa-ai-owned` content marker on every host; `general` + three `maestro*` workflows removed
+(40 → 36) and six renamed (`product-discovery`, `create-adr|prd|rfc|tdd|ticket`); upgrades prune
+legacy `massa-ai-<18 names>` agents and a plugin-recorded `persona-router` skill.
+
+**Commits:** T1 `7d245183`, T2 `e7730585`, T3 `fb242b33`, T4 `f9776f41`, T5 `57dc9538`,
+T6 `c793377f`, fix `161b9a62`, T7 `9814cfd0`, T8 `dc7ed630`, fix `b655d16f`, T9 `32e8cd1c`,
+T10 `12700369`, T11 `8bf1abcf`, fix `d9326551`, `ae926f21` (tasks.md sweep-allowlist amendment),
+T12 `b30c9956`, T13 = the commit carrying this block.
+
+**Final gate (T13, measured on `b30c9956` + the T13 CHANGELOG/removed-features edits,
+`XDG_CONFIG_HOME` scratch):** `build --force` 0 (6/6, 0 cached), `type-check --force` 0 (6/6,
+0 cached), `lint` 0, `generate:artifacts` 0 → `--check` 0 (no drift), `bun test scripts/__tests__
+scripts/tests/*.test.ts` 2172/0, `run-shell-suites.sh` 41/41, `test:plugins` 175/0,
+`packages/shared` 975/0, `check-stale-pointers` PASS (0 broken, historical pin 28),
+`validate_spec` 0 errors / 13 EARS-keyword warnings. `bun run test` (turbo) was not re-run for
+this batch: core and mcp-client hit a known Bun napi SIGTRAP at exit, red at base too.
+
+**Decisions recorded in the feature, not project-level:** A1–A20 in `spec.md` (notably A10 judge
+write permission, A16 plugin-only update keeps the old `MASSA-AI.md`, A17 exact legacy names,
+A18 no namespace off the Claude plugin route, A20 test-engineer audit mode is write-capable).
+
+**Next step:** independent verification by a fresh `code-reviewer` (`verify` mode, author ≠
+verifier) with a discrimination sensor over installer ownership and dispatch mapping; it writes
+`validation.md`. Then push/PR is the user's call.
+
+## Previous — Per-provider default models (**COMPLETE 2026-09-21** — 21 Tasks across 8 Phases, two fix passes (F1-F9 + F2b, then G1-G6), three independent verification rounds: **FAIL, FAIL, then PASS at 25/25 ACs**; unpushed, push/PR is the user's call)
 
 **Sensor across the three rounds — this is the number, not the suite counts:** 16 injected / 12
 killed / **4 survived** → 16 / 15 / 1 → 14 / 11 / 3, the last three all documentation prose whose

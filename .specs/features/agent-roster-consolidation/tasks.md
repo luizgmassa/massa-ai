@@ -14,7 +14,7 @@ restore files with `git checkout`; one atomic commit per task.
 ---
 
 **Design**: `.specs/features/agent-roster-consolidation/design.md`
-**Status**: Draft
+**Status**: Execute complete (T1–T13); independent validation pending
 
 ---
 
@@ -310,7 +310,7 @@ T12 → T13
 
 **Done when**:
 
-- [ ] Final full gate green; `check_specs_delivered.ts agent-roster-consolidation` exits 0
+- [x] Final full gate green; `check_specs_delivered.ts agent-roster-consolidation` exits 0
 
 **Tests**: none
 **Gate**: full
