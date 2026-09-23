@@ -229,7 +229,7 @@ done
 # directory it did not write (PER AC-5 handover): a plugin record alone is not
 # enough, because a plugin tarball newer than this checkout may ship a skill
 # SKILL_NAMES does not know yet.
-RETIRED_SKILL_NAMES="persona-router"
+RETIRED_SKILL_NAMES="persona-router profile"
 
 # ── Bootstrap block extraction ──────────────────────────────────────────────
 AGENTS_SOURCE="$SKILLS_ROOT/AGENTS.md"

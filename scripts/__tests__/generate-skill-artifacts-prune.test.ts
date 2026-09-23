@@ -87,6 +87,21 @@ describe("generate-skill-artifacts emitAll — prune-before-emit (T1, UGB-04)", 
     await expect(fs.access(path.join(targetRoots.cursor!, "skills", "bootstrap", "SKILL.md"))).resolves.toBeNull();
   });
 
+  test("a retired bundle root (skills/profile/) left in a checkout vanishes after emit (PRO-02)", async () => {
+    const tmp = await makeTmpRoot();
+    const targetRoots: Record<string, string> = { cursor: path.join(tmp, "cursor") };
+
+    const retiredRoot = path.join(targetRoots.cursor!, "skills", "profile");
+    await fs.mkdir(retiredRoot, { recursive: true });
+    await fs.writeFile(path.join(retiredRoot, "SKILL.md"), "stale retired bundle");
+
+    await emitAll(targetRoots, ["cursor"]);
+
+    await expect(fs.access(retiredRoot)).rejects.toThrow();
+    // The sweep is scoped to the retired root: a current bundle is still emitted.
+    await expect(fs.access(path.join(targetRoots.cursor!, "skills", "bootstrap", "SKILL.md"))).resolves.toBeNull();
+  });
+
   test("install-skills.sh RETIRED_SKILL_NAMES lists exactly RETIRED_BUNDLE_ROOTS", async () => {
     const installer = await fs.readFile(path.join(import.meta.dir, "..", "install-skills.sh"), "utf8");
     const assignment = installer.match(/^RETIRED_SKILL_NAMES="([^"]*)"$/m);
@@ -100,7 +115,7 @@ describe("generate-skill-artifacts emitAll — prune-before-emit (T1, UGB-04)", 
     const targetRoots: Record<string, string> = { codex: path.join(tmp, "codex") };
 
     // Lives directly under skills/, a sibling of the managed
-    // skills/{massa-ai,profile,bootstrap,agents} roots — never inside one.
+    // skills/{massa-ai,bootstrap,agents} roots — never inside one.
     const quickSkill = path.join(targetRoots.codex!, "skills", "def.md");
     await fs.mkdir(path.dirname(quickSkill), { recursive: true });
     await fs.writeFile(quickSkill, "# quick skill\nhand-authored, not generated");

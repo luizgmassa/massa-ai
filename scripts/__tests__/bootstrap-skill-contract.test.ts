@@ -4,9 +4,9 @@
  * Two independent claims, both scripted because both are the kind a reviewer
  * reads past:
  *
- * 1. **The skill names no MCP tool.** `skills/profile/SKILL.md:23` opens with
- *    a "prefer MCP when connected" clause, and this skill is written from that
- *    template. Copying that clause would have been silent: no `bootstrap_*`
+ * 1. **The skill names no MCP tool.** The now-retired `skills/profile/SKILL.md`
+ *    opened with a "prefer MCP when connected" clause, and this skill was
+ *    written from that template. Copying that clause would have been silent: no `bootstrap_*`
  *    MCP tool exists, so an agent following it reaches for a tool that is not
  *    there, and BST-11.5 requires this surface to work with the massa-ai MCP
  *    server unreachable — which is precisely the state a user is in after
@@ -90,7 +90,7 @@ describe("skills/bootstrap/SKILL.md — the CLI is the only front (BST-11 AC-4/B
     const mcpPrefixed = [...SKILL.matchAll(/\bmcp__[a-z0-9_-]+/gi)].map((m) => m[0]);
     expect(mcpPrefixed).toEqual([]);
 
-    // The specific clause the template carries at skills/profile/SKILL.md:23.
+    // The specific clause the (now-retired) skills/profile/SKILL.md template carried.
     expect(SKILL).not.toMatch(/preferred when the massa-ai MCP server is connected/i);
     expect(SKILL).not.toMatch(/\bprefer\b[^.\n]{0,60}\bMCP\b/i);
     expect(SKILL).not.toMatch(/\bMCP\b[^.\n]{0,60}\bpreferred\b/i);

@@ -37,7 +37,6 @@ async function readFile(p: string): Promise<string> {
 describe("skill file structure validation", () => {
   const expectedSkills = [
     "massa-ai",
-    "profile",
     "bootstrap",
   ];
 

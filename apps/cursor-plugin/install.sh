@@ -353,7 +353,7 @@ NODE
 # ── Skills bundling (PDO-08, 09 / D3 two-writer ownership) ──────────────────
 # scripts/install-skills.sh remains the single writer once it has already
 # claimed this platform (skillsOwner: "repo" in the shared install-state.json).
-# This plugin installs its bundled massa-ai/profile/bootstrap skills into the
+# This plugin installs its bundled massa-ai/bootstrap skills into the
 # SAME harness skills directory ($CURSOR_DIR/skills — NOT $PLUGIN_DIR/skills,
 # which is this plugin's own registerPath-discovered skill cache) only when
 # that has not happened, mirroring the MCP single-writer precedent
@@ -392,7 +392,7 @@ try {
   const data = JSON.parse(fs.readFileSync(file, "utf8"));
   const rec = data && data.platforms && data.platforms[host];
   const owned = !!rec && rec.skillsOwner === "plugin";
-  const current = ["massa-ai", "profile", "bootstrap"];
+  const current = ["massa-ai", "bootstrap"];
   const retired = owned && Array.isArray(rec.skills)
     ? rec.skills.filter((s) => typeof s === "string" && /^[a-z0-9][a-z0-9-]*$/.test(s) && !current.includes(s))
     : [];
@@ -435,7 +435,7 @@ install_bundled_skills() {
   # authoritative constant (D6/IPT-05) — not derived by scanning the bundle's
   # skills/ directory, which would install 49 on cursor (every workflow skill
   # ships as its own directory here).
-  for name in massa-ai profile bootstrap; do
+  for name in massa-ai bootstrap; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -469,7 +469,7 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-const current = ["massa-ai", "profile", "bootstrap"];
+const current = ["massa-ai", "bootstrap"];
 data.platforms[host] = { root, skillsOwner: "plugin", skills: current };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. installRoute (T9) is installer-owned but
@@ -507,7 +507,7 @@ uninstall_bundled_skills() {
   record="$(plugin_skills_record "$runner")"
   [[ "${record%%$'\n'*}" == "plugin" ]] && {
     local name
-    for name in massa-ai profile bootstrap; do
+    for name in massa-ai bootstrap; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
     remove_retired_skills "$record"
@@ -752,14 +752,15 @@ cp "$SCRIPT_DIR/.cursor-plugin/plugin.json" "$PLUGIN_DIR/.cursor-plugin/plugin.j
 vecho "  + .cursor-plugin/plugin.json"
 
 # Copy the host-command skills (each in a subdirectory: skills/<name>/SKILL.md),
-# quick + generated workflow commands alike. massa-ai/, agents/, profile/
+# quick + generated workflow commands alike. massa-ai/, agents/,
 # and bootstrap/ are the PDO-06 harness bundle, not a Cursor
 # command skill — they are installed separately, into the shared harness skills
 # directory (see "Skills bundling" below), not into this plugin-cache
-# skills/ tree. `profile` was missing from this exclusion pre-fix, which
-# leaked it into the command-skill cache mislabeled as `/profile`; `bootstrap`
-# (T21) is the same class, and is excluded here in the same commit that
-# teaches the generator to emit it, so it never has a release where it leaks.
+# skills/ tree. `profile` was retired (PRO-01) and stays in this exclusion as
+# a defensive no-op against a stale pre-retirement bundle; `bootstrap`
+# (T21) is the harness-bundle class, and is excluded here in the same commit
+# that taught the generator to emit it, so it never had a release where it
+# leaked into the command-skill cache.
 for src in "$SCRIPT_DIR/skills/"*/SKILL.md; do
   name="$(basename "$(dirname "$src")")"
   case "$name" in
@@ -826,7 +827,7 @@ for f in "$CURSOR_AGENTS_DIR/"*.md; do
   vecho "  - $name (retired, no longer shipped)"
 done
 
-# Skills bundling (PDO-08, 09): install massa-ai/profile/bootstrap into the
+# Skills bundling (PDO-08, 09): install massa-ai/bootstrap into the
 # shared harness skills directory, unless scripts/install-skills.sh already
 # owns it for this platform. Runs in both branches (same reasoning as above).
 vecho ""

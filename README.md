@@ -341,7 +341,6 @@ The repo ships a set of repo-local skills plus a unified installer that copies t
 | Skill | Location | Purpose |
 |-------|----------|---------|
 | `massa-ai` | `skills/massa-ai/` | Workflow router (36 workflows: spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
-| `profile` | `skills/profile/` | Switch the installed agents to a registry model profile, or report the active one |
 | `bootstrap` | `skills/bootstrap/` | Inspect or toggle the eight startup-contract rules delivered by `MASSA-AI.md` |
 | `agents/<n>` | `skills/agents/` | The 7 sub-agent specialist charters |
 

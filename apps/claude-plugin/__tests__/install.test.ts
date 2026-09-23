@@ -341,12 +341,12 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
 });
 
 describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
-  test("install copies massa-ai + profile + bootstrap into ~/.claude/skills as plugin-owned", async () => {
+  test("install copies massa-ai + bootstrap into ~/.claude/skills as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("harness skills installed");
 
-    for (const name of ["massa-ai", "profile", "bootstrap"]) {
+    for (const name of ["massa-ai", "bootstrap"]) {
       const skillMd = path.join(tmp, `.claude/skills/${name}/SKILL.md`);
       expect(await pathExists(skillMd)).toBe(true);
       const lst = await fs.lstat(skillMd);
@@ -359,9 +359,10 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
   });
 
   // AC-05.3: a behavioural guard, not a static parse of the installer's
-  // `for name in …` literal (that shortcut is what let profile silently ship
-  // through the repo route while every plugin route omitted it — IPT-05).
-  test("install lands exactly the three harness skill directories (AC-05.3)", async () => {
+  // `for name in …` literal (that shortcut is what let a retired bundle
+  // silently ship through the repo route while every plugin route omitted
+  // it — IPT-05).
+  test("install lands exactly the two harness skill directories (AC-05.3)", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
@@ -370,14 +371,13 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
       .sort();
-    expect(dirs).toEqual(["bootstrap", "massa-ai", "profile"]);
+    expect(dirs).toEqual(["bootstrap", "massa-ai"]);
 
     const state = await readJson(path.join(tmp, ".config/massa-ai/install-state.json"));
     const platforms = state.platforms as Record<string, { skills: string[] }>;
     expect([...platforms.claude.skills].sort()).toEqual([
       "bootstrap",
       "massa-ai",
-      "profile",
     ]);
   });
 
@@ -390,7 +390,7 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
         {
           version: 2,
           platforms: {
-            claude: { root: path.join(tmp, ".claude"), skillsOwner: "repo", skills: ["massa-ai", "profile"] },
+            claude: { root: path.join(tmp, ".claude"), skillsOwner: "repo", skills: ["massa-ai", "bootstrap"] },
           },
         },
         null,
@@ -410,7 +410,6 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
     const res = runInstall(["--uninstall"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(await pathExists(path.join(tmp, ".claude/skills/massa-ai"))).toBe(false);
-    expect(await pathExists(path.join(tmp, ".claude/skills/profile"))).toBe(false);
     expect(await pathExists(path.join(tmp, ".claude/skills/bootstrap"))).toBe(false);
 
     const stateFile = path.join(tmp, ".config/massa-ai/install-state.json");
@@ -680,7 +679,7 @@ describe("claude-plugin retired harness-skill prune (PER AC-5)", () => {
     await fs.writeFile(stateFile(), JSON.stringify(data, null, 2));
   }
 
-  test("install removes a recorded persona-router skill and records only the current three", async () => {
+  test("install removes a recorded persona-router skill and records only the current two", async () => {
     await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
     await plantRetired();
 
@@ -690,7 +689,7 @@ describe("claude-plugin retired harness-skill prune (PER AC-5)", () => {
     expect(await pathExists(retiredDir())).toBe(false);
     const state = await readJson(stateFile());
     const platforms = state.platforms as Record<string, { skills: string[] }>;
-    expect(platforms.claude.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+    expect(platforms.claude.skills).toEqual(["massa-ai", "bootstrap"]);
   });
 
   test("uninstall removes a recorded persona-router skill", async () => {
@@ -765,7 +764,7 @@ describe("claude-plugin retired harness-skill prune (PER AC-5)", () => {
 
   test("a multi-line skillsOwner cannot smuggle a path into the prune", async () => {
     const sentinels = await plantSentinels();
-    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "profile", "bootstrap"] };
+    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "bootstrap"] };
 
     await writeRecord(hostile);
     expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
@@ -811,7 +810,7 @@ describe("claude-plugin retired harness-skill prune (PER AC-5)", () => {
       expect(await pathExists(retiredDir())).toBe(false);
       const state = await readJson(stateFile());
       const platforms = state.platforms as Record<string, { skills: string[] }>;
-      expect(platforms.claude.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+      expect(platforms.claude.skills).toEqual(["massa-ai", "bootstrap"]);
     },
   );
 });

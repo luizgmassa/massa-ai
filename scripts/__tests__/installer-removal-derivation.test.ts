@@ -118,7 +118,7 @@ function classify(iter: string): Loop["kind"] {
   if (STATE_DERIVED.some((s) => iter.includes(s))) return "state";
   if (vars.some((v) => SOURCE_VARS.includes(v))) return "source";
   if (vars.some((v) => DEST_VARS.includes(v))) return "destination";
-  if (vars.length === 0) return "literal"; // e.g. `for name in massa-ai profile bootstrap`
+  if (vars.length === 0) return "literal"; // e.g. `for name in massa-ai bootstrap`
   return "unclassified";
 }
 
@@ -254,7 +254,10 @@ describe("plugin installers install exactly the generator's harness skills", () 
 
   test("the constant names a real, non-empty set", () => {
     console.log(`[harness-skills] generator constant = [${expected.join(", ")}]`);
-    expect(expected.length).toBeGreaterThanOrEqual(3);
+    // Floor tracks the real derived count: massa-ai + bootstrap, after the
+    // profile bundle's retirement (PRO-01) dropped it from the generator's
+    // own constant.
+    expect(expected.length).toBeGreaterThanOrEqual(2);
   });
 
   for (const file of INSTALLERS.filter((f) => f.startsWith("apps/"))) {

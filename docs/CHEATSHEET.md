@@ -207,7 +207,7 @@ massa-ai-config profile list
 massa-ai-config profile set work --host claude
 ```
 
-MCP tools: `profile_list`, `profile_set`. Claude skill: `/profile`.
+MCP tools: `profile_list`, `profile_set`.
 
 **A host session restart is always required after a switch.** No host supports
 per-agent runtime indirection.
@@ -308,7 +308,6 @@ Repo-local skills live in `skills/`; generated per-host bundles land in
 | Skill | Purpose |
 |---|---|
 | `massa-ai` | Default memory-backed workflow router — load once per coding session |
-| `profile` | Switch installed agents to a model profile / report the active one |
 | `bootstrap` | Inspect or toggle the eight startup-contract rules |
 | `agents/<name>` | The 7 sub-agent charters |
 

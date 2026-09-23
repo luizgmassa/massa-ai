@@ -99,3 +99,17 @@ in `skills/AGENTS.md` is the single current-tense record of this change.
 Six workflows were renamed, not removed, with no aliases: `discovery` →
 `product-discovery`, `adr` → `create-adr`, `to-prd` → `create-prd`, `rfc` → `create-rfc`,
 `tdd` → `create-tdd`, `ticket` → `create-ticket`.
+
+## Agent roster revision — profile skill
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-revision/`
+**Rationale**: The owner no longer wants a dedicated skill front for the model-profile
+switch engine (PRO-01..03).
+
+| Removed | Replacement |
+|---|---|
+| `skills/profile/` (Claude skill front) | None — the MCP tools `profile_list`/`profile_set` and both `massa-ai-config profile` CLIs are the only fronts left |
+
+The switch engine (`packages/shared/src/profile-switch/`), the MCP tools, and the CLIs
+are unchanged; only the skill front is gone.

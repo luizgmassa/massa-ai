@@ -20,7 +20,6 @@ Check `.specs/project/STATE.md` for the current active feature and `.specs/proje
   its `references/mcp-tools.md` and `references/synapse-policy.md`
 - `AGENTS.md` (under `skills/`) — sub-agent registry: 7 reusable specialist
   agents, plus the canonical policy bootstrap block
-- `profile/` — switch the installed agents to a registry model profile
 - `bootstrap/` — inspect or toggle the startup-contract rules
 
 #### Sub-Agent Skills (invocable by any workflow)

@@ -350,7 +350,7 @@ NODE
 # ── Skills bundling (PDO-08, 09 / D3 two-writer ownership) ──────────────────
 # scripts/install-skills.sh remains the single writer once it has already
 # claimed this platform (skillsOwner: "repo" in the shared install-state.json).
-# This plugin installs its bundled massa-ai/profile/bootstrap skills into the
+# This plugin installs its bundled massa-ai/bootstrap skills into the
 # SAME harness skills directory (~/.claude/skills, not this plugin's cache)
 # only when that has not happened, mirroring the MCP single-writer precedent
 # (test-mcp-single-writer.sh). A repo checkout's own --apply always takes
@@ -388,7 +388,7 @@ try {
   const data = JSON.parse(fs.readFileSync(file, "utf8"));
   const rec = data && data.platforms && data.platforms[host];
   const owned = !!rec && rec.skillsOwner === "plugin";
-  const current = ["massa-ai", "profile", "bootstrap"];
+  const current = ["massa-ai", "bootstrap"];
   const retired = owned && Array.isArray(rec.skills)
     ? rec.skills.filter((s) => typeof s === "string" && /^[a-z0-9][a-z0-9-]*$/.test(s) && !current.includes(s))
     : [];
@@ -427,7 +427,7 @@ install_bundled_skills() {
   fi
 
   local installed=0 name src dest
-  for name in massa-ai profile bootstrap; do
+  for name in massa-ai bootstrap; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -461,7 +461,7 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-const current = ["massa-ai", "profile", "bootstrap"];
+const current = ["massa-ai", "bootstrap"];
 data.platforms[host] = { root, skillsOwner: "plugin", skills: current };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. modelProfile (T10, MPS-03 round-trip
@@ -498,7 +498,7 @@ uninstall_bundled_skills() {
   record="$(plugin_skills_record "$runner")"
   [[ "${record%%$'\n'*}" == "plugin" ]] && {
     local name
-    for name in massa-ai profile bootstrap; do
+    for name in massa-ai bootstrap; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
     remove_retired_skills "$record"
@@ -1055,7 +1055,7 @@ else
   install_variant_tree
 fi
 
-# Skills bundling (PDO-08, 09): install massa-ai/profile/bootstrap into the
+# Skills bundling (PDO-08, 09): install massa-ai/bootstrap into the
 # shared harness skills directory, unless scripts/install-skills.sh already
 # owns it for this platform.
 vecho ""
