@@ -101,6 +101,7 @@ The batching trigger above governs **when** batch workers are offered. This tabl
 | Research / codebase investigation | Yes | Read-only gatherer; returns compact findings, never decisions |
 | Implementation of an approved task | Yes (batch worker) | Task + gate already defined in `tasks.md`; worker executes the defined cycle |
 | Planning (Specify / Design / Tasks authoring) | **Do not delegate** | Planning owns the contract; delegation fragments accountability |
+| Requirements audit of the drafted spec (`product-manager` `audit`) | Yes (carve-out) | Read-only; produces findings only, the main agent keeps authorship and resolves or accepts them in the Requirement Closure Gate |
 | Task creation / task-list authoring | **Do not delegate** | The orchestrator owns `tasks.md` integrity and ordering |
 | Validation (Verifier role) | **Do not delegate to a batch worker** | Use the dedicated Verifier sub-agent; author ≠ verifier is the gate's trust basis |
 

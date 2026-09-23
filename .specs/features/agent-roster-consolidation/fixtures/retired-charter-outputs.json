@@ -45,11 +45,11 @@
     { "source": "furps-analyst", "field": "severity, confidence, status, impact, simplest fix direction, verification suggestion", "absorbedBy": { "agent": "product-manager", "mode": "furps" } },
     { "source": "furps-analyst", "field": "open questions / suggestions / insights / risks / DoR gaps", "absorbedBy": { "agent": "product-manager", "mode": "furps" } },
 
-    { "source": "requirements-analyst", "field": "ambiguity list", "absorbedBy": { "agent": "product-manager", "mode": "requirements" } },
-    { "source": "requirements-analyst", "field": "gap list", "absorbedBy": { "agent": "product-manager", "mode": "requirements" } },
-    { "source": "requirements-analyst", "field": "contradiction list", "absorbedBy": { "agent": "product-manager", "mode": "requirements" } },
-    { "source": "requirements-analyst", "field": "implicit-requirement list", "absorbedBy": { "agent": "product-manager", "mode": "requirements" } },
-    { "source": "requirements-analyst", "field": "uncovered-scenario list", "absorbedBy": { "agent": "product-manager", "mode": "requirements" } },
+    { "source": "requirements-analyst", "field": "ambiguity list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "requirements-analyst", "field": "gap list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "requirements-analyst", "field": "contradiction list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "requirements-analyst", "field": "implicit-requirement list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "requirements-analyst", "field": "uncovered-scenario list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
 
     { "source": "audit-specialist", "field": "area audited + lens used", "absorbedBy": { "agent": "code-reviewer", "mode": "audit" } },
     { "source": "audit-specialist", "field": "ranked list (severity, location, problem, suggestion)", "absorbedBy": { "agent": "code-reviewer", "mode": "audit" } },
