@@ -29,7 +29,7 @@ import {
   main,
   profilesPerHost,
   warnStaleAgentTiers,
-  OPENCODE_OWNED_MARKER,
+  OWNED_MARKER_MD,
   type Charter,
   type Host,
 } from "../generate-subagent-artifacts";
@@ -225,6 +225,13 @@ describe("emitClaude", () => {
     expect(out).toContain("model: inherit");
     expect(out).not.toContain("effort:");
   });
+
+  test("the ownership marker is the FIRST body line, outside the frontmatter", () => {
+    const out = emitClaude(charter({ name: "investigator" }), resolved("haiku", "high"));
+    const [, fm, body] = out.split("---\n");
+    expect(fm).not.toContain("massa-ai-owned");
+    expect(body!.split("\n")[0]).toBe(OWNED_MARKER_MD);
+  });
 });
 
 describe("emitCursor", () => {
@@ -258,6 +265,13 @@ describe("emitCursor", () => {
     const out = emitCursor(charter({ name: "investigator" }), resolved("composer-2", null));
     expect(out).toContain("model: composer-2");
     expect(out).not.toContain("[effort");
+  });
+
+  test("the ownership marker is the FIRST body line, never a frontmatter key", () => {
+    const out = emitCursor(charter({ name: "investigator" }), resolved(null, null));
+    const [, fm, body] = out.split("---\n");
+    expect(fm).not.toContain("massa-ai-owned");
+    expect(body!.split("\n")[0]).toBe(OWNED_MARKER_MD);
   });
 });
 
@@ -298,13 +312,13 @@ describe("emitOpenCode", () => {
     expect(fm).not.toMatch(/^metadata:/m);
     // config-cli.ts scopes `agents uninstall` on this literal substring.
     expect(out).toContain("massa-ai-owned: true");
-    expect(out).toContain(OPENCODE_OWNED_MARKER);
+    expect(out).toContain(OWNED_MARKER_MD);
   });
 
   test("the ownership marker is the FIRST body line, so uninstall scoping survives", () => {
     const out = emitOpenCode(charter({ name: "investigator" }), resolved("p/m", "max"));
     const body = out.split("---\n")[2] ?? "";
-    expect(body.split("\n")[0]).toBe(OPENCODE_OWNED_MARKER);
+    expect(body.split("\n")[0]).toBe(OWNED_MARKER_MD);
   });
 
   test("null model/effort omit both keys — OpenCode inherits from the invoking agent", () => {

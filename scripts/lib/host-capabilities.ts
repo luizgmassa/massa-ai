@@ -12,20 +12,12 @@
  * one array-first, canonical enumeration (design.md C5) — never duplicated
  * here.
  *
- * SPEC_DEVIATION (accepted, T9): design.md's `HostCapabilities.ownershipMarker`
- * is typed `"frontmatter" | "body"`. Measured reality (apps/claude-plugin/
- * install.sh:489-494, apps/cursor-plugin/install.sh:433-436) is that Claude
- * and Cursor scope ownership by the `massa-ai-` FILENAME prefix — neither a
- * frontmatter field nor a body marker is written or read for that purpose.
- * Documenting them as "frontmatter" would be inaccurate at exactly the kind
- * of doc-vs-reality gap this feature (XP-08/09) exists to stop introducing.
- * The type below adds `"filename"` as a third value; Codex's top-of-file
- * `# massa-ai-owned` TOML comment (apps/codex-plugin/install.sh:483) is
- * classed `"frontmatter"` (it plays the frontmatter role structurally — a
- * fixed top-of-file position read before any other field) to preserve
- * design's intended two-way contrast against OpenCode's `"body"`, which is
- * forced there by `forwardsUnknownFrontmatter` (see below). No production
- * code depends on this field's exact enum; only docs and the fixture test do.
+ * `ownershipMarker`: Claude, Cursor, and OpenCode carry the generated
+ * `<!-- massa-ai-owned: true -->` line (`OWNED_MARKER_MD`) as the first body
+ * line; Codex carries a top-of-file `# massa-ai-owned` TOML comment, classed
+ * `"frontmatter"` (a fixed top-of-file position read before any other field).
+ * Installers and the profile-switch engine identify owned agent files by
+ * these markers, not by filename.
  */
 
 import { HOSTS, type Host } from "./model-profiles.ts";
@@ -41,9 +33,8 @@ export interface HostCapabilities {
    * Where the "this file is massa-ai-generated" ownership signal lives, so
    * `agents uninstall` (or the equivalent per-host script) can scope itself
    * to owned files without touching a user's own agents.
-   * See the SPEC_DEVIATION note above for `"filename"`.
    */
-  ownershipMarker: "frontmatter" | "body" | "filename";
+  ownershipMarker: "frontmatter" | "body";
   /**
    * WHY `ownershipMarker` is forced to `"body"` for a host: true means the
    * host forwards unrecognized frontmatter keys to the model provider as
@@ -112,8 +103,8 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     artifactExtension: "md",
     // https://code.claude.com/docs/en/sub-agents.md — documented `name:` field.
     agentIdentity: "frontmatter-name",
-    // apps/claude-plugin/install.sh:489-494 — uninstall globs `agents/massa-ai-*.md`.
-    ownershipMarker: "filename",
+    // OWNED_MARKER_MD as the first body line (emitClaude).
+    ownershipMarker: "body",
     forwardsUnknownFrontmatter: false,
     // apps/claude-plugin/hooks/massa-ai-hook.ts IS the canonical source file.
     hookBinaryDelivery: "source",
@@ -158,9 +149,9 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     artifactExtension: "md",
     // https://cursor.com/docs/subagents.md — documented `name:` field.
     agentIdentity: "frontmatter-name",
-    // apps/cursor-plugin/install.sh:433-436 — agents copied/removed by the
-    // massa-ai- filename prefix (CRS-04), same mechanism as Claude.
-    ownershipMarker: "filename",
+    // OWNED_MARKER_MD as the first body line (emitCursor); Cursor's
+    // frontmatter schema forbids an extra marker key.
+    ownershipMarker: "body",
     forwardsUnknownFrontmatter: false,
     hookBinaryDelivery: "real-copy",
     extraManagedRoots: [],
@@ -178,7 +169,7 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // emitOpenCode's own docblock: "The markdown file name becomes the agent
     // name" — OpenCode has no `name` frontmatter key at all.
     agentIdentity: "filename",
-    // The marker MOVES to the first body line (OPENCODE_OWNED_MARKER) because
+    // The marker lives on the first body line (OWNED_MARKER_MD) because
     // frontmatter forwarding would leak it as a bogus provider model option.
     ownershipMarker: "body",
     // https://opencode.ai/docs/agents/: "Any other options you specify in

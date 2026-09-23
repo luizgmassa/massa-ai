@@ -142,8 +142,8 @@ T12 → T13
 
 **Done when**:
 
-- [ ] Every generated `.md` agent's first body line is the marker; Codex unchanged
-- [ ] Gate: scripts + plugins green (installers still glob the prefix, unaffected)
+- [x] Every generated `.md` agent's first body line is the marker; Codex unchanged
+- [x] Gate: scripts + plugins green (installers still glob the prefix, unaffected)
 
 **Tests**: unit + parity
 **Gate**: scripts, plugins

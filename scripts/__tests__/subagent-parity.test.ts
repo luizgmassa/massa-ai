@@ -825,26 +825,39 @@ describe("subagent parity — per-host frontmatter schema conformance (MPR-R9)",
   });
 });
 
-// ── OpenCode ownership marker relocation (D8/D9) ────────────────────────────
+// ── Ownership marker in the body of every .md agent (D8/D9, NAM AC-2) ────────
 
-describe("subagent parity — OpenCode ownership marker lives in the body", () => {
+describe("subagent parity — .md ownership marker is the first body line (Claude, Cursor, OpenCode)", () => {
   const MARKER = "<!-- massa-ai-owned: true -->";
+  const MD_HOSTS = ["claude", "cursor", "opencode"] as const;
 
-  test("marker is present in every file, as the first body line", async () => {
-    for (const name of SPECIALIST_NAMES) {
-      const raw = await readAgentMd("opencode-plugin", name);
-      const afterFm = raw.split(/^---\r?\n/m)[2] ?? "";
-      expect(afterFm.split(/\r?\n/)[0]).toBe(MARKER);
+  /** Every generated .md agent file of a host: active `agents/` plus every variant dir. */
+  async function mdAgentFiles(host: (typeof MD_HOSTS)[number]): Promise<string[]> {
+    const root = path.join(REPO_ROOT, `apps/${host}-plugin`);
+    const dirs = [path.join(root, "agents")];
+    for (const profile of await fs.readdir(path.join(root, "agent-profiles"))) {
+      dirs.push(path.join(root, "agent-profiles", profile));
     }
-  });
+    const files: string[] = [];
+    for (const dir of dirs) {
+      for (const f of await fs.readdir(dir)) if (f.endsWith(".md")) files.push(path.join(dir, f));
+    }
+    return files;
+  }
 
-  test("marker is NOT inside the frontmatter block", async () => {
-    for (const name of SPECIALIST_NAMES) {
-      const raw = await readAgentMd("opencode-plugin", name);
-      const fmBlock = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(raw)![1]!;
-      expect(fmBlock).not.toContain("massa-ai-owned");
-    }
-  });
+  for (const host of MD_HOSTS) {
+    test(`${host}: marker is the first body line and absent from the frontmatter, in agents/ and every agent-profiles/<p>/`, async () => {
+      const files = await mdAgentFiles(host);
+      expect(files.length).toBeGreaterThanOrEqual(SPECIALIST_NAMES.length * 2);
+      for (const file of files) {
+        const raw = await fs.readFile(file, "utf8");
+        const fmBlock = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(raw)![1]!;
+        expect(fmBlock).not.toContain("massa-ai-owned");
+        const afterFm = raw.split(/^---\r?\n/m)[2] ?? "";
+        expect(`${path.basename(file)}: ${afterFm.split(/\r?\n/)[0]}`).toBe(`${path.basename(file)}: ${MARKER}`);
+      }
+    });
+  }
 
   test("the substring config-cli.ts greps is still present, so uninstall stays scoped", async () => {
     // apps/opencode-plugin/src/config-cli.ts uses content.includes("massa-ai-owned: true").

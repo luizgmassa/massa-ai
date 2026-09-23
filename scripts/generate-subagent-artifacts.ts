@@ -267,7 +267,7 @@ export function emitClaude(c: Charter, m: Resolved): string {
   lines.push(`model: ${m.model ?? "inherit"}`);
   if (m.effort !== null) lines.push(`effort: ${m.effort}`);
   lines.push("---", "");
-  return lines.join("\n") + c.body + "\n";
+  return lines.join("\n") + OWNED_MARKER_MD + "\n" + c.body + "\n";
 }
 
 /**
@@ -296,7 +296,7 @@ export function emitCursor(c: Charter, m: Resolved): string {
   const lines = ["---", `name: ${agentName}`, `description: ${c.description}`, `model: ${model}`];
   if (!WRITE_AGENTS.has(c.name)) lines.push(`readonly: true`);
   lines.push("---", "");
-  return lines.join("\n") + c.body + "\n";
+  return lines.join("\n") + OWNED_MARKER_MD + "\n" + c.body + "\n";
 }
 
 export function escapeTomlTripleQuote(s: string): string {
@@ -340,10 +340,12 @@ export function tomlQuoted(s: string): string {
 }
 
 /**
- * Marker that scopes `massa-ai-config agents uninstall`. It lives in the BODY, not the
- * frontmatter — see emitOpenCode.
+ * Ownership marker for every generated `.md` agent (Claude, Cursor, OpenCode): the first
+ * body line. Installers and the profile-switch engine identify owned files by it. It lives
+ * in the BODY, not the frontmatter — Cursor's schema forbids extra keys and OpenCode
+ * forwards unknown keys to the provider (see emitOpenCode).
  */
-export const OPENCODE_OWNED_MARKER = "<!-- massa-ai-owned: true -->";
+export const OWNED_MARKER_MD = "<!-- massa-ai-owned: true -->";
 
 /**
  * OpenCode. https://opencode.ai/docs/agents/
@@ -389,7 +391,7 @@ export function emitOpenCode(c: Charter, m: Resolved): string {
   if (m.model !== null) lines.push(`model: ${m.model}`);
   if (m.effort !== null) lines.push(`reasoningEffort: ${m.effort}`);
   lines.push(`permission: ${permissionBlock}`, "---", "");
-  return lines.join("\n") + OPENCODE_OWNED_MARKER + "\n" + c.body + "\n";
+  return lines.join("\n") + OWNED_MARKER_MD + "\n" + c.body + "\n";
 }
 
 // ── Emit-all + check ────────────────────────────────────────────────────────
