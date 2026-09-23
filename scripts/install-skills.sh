@@ -224,6 +224,13 @@ for dir in "$SKILLS_ROOT"/*/; do
 done
 [ -n "$SKILL_NAMES" ] || integration_error "No installable skills found in $SKILLS_ROOT"
 
+# Harness skills an earlier release shipped and this one retired. A
+# plugin-owned record naming one is the only case this installer removes a
+# directory it did not write (PER AC-5 handover): a plugin record alone is not
+# enough, because a plugin tarball newer than this checkout may ship a skill
+# SKILL_NAMES does not know yet.
+RETIRED_SKILL_NAMES="persona-router"
+
 # ── Bootstrap block extraction ──────────────────────────────────────────────
 AGENTS_SOURCE="$SKILLS_ROOT/AGENTS.md"
 [ -f "$AGENTS_SOURCE" ] || integration_error "Missing canonical agents file: $AGENTS_SOURCE"
@@ -935,7 +942,8 @@ apply_platform() {
 
   # D3/PDO-09: a "plugin"-owned record means a plugin tarball install claimed
   # this platform's skills directory, not this repo installer — never remove
-  # or otherwise touch what we do not own, and never drop that record either.
+  # or otherwise touch what we do not own (save a RETIRED_SKILL_NAMES entry,
+  # see the else branch), and never drop that record either.
   # Stale: tracked in state, no longer a repo skill (SKILL_NAMES), still
   # massa-ai-owned — the --apply counterpart to check_platform's drift report
   # and uninstall_platform's removal loop (IPT-04, AC-04.1/AC-04.4/AC-04.4a).
@@ -975,6 +983,30 @@ apply_platform() {
         vinfo "Removed stale copy: $stale_target"
         record "changed" "$p" "$stale_target" "Removed stale copy: $stale_target"
       fi
+    done
+  else
+    # PER AC-5 handover: this run rewrites the plugin record to "repo", which
+    # erases the plugin's ownership proof, and the plugin phase then never
+    # prunes again — so a retired skill that record names goes now or never.
+    local retired_name retired_target
+    for retired_name in $(state_skills_for "$p"); do
+      case " $RETIRED_SKILL_NAMES " in
+        *" $retired_name "*) ;;
+        *) continue ;;
+      esac
+      case " $SKILL_NAMES " in
+        *" $retired_name "*) continue ;;
+      esac
+      retired_target="$skills_dir/$retired_name"
+      { [ -d "$retired_target" ] && [ ! -L "$retired_target" ]; } || continue
+      if [ "$DRY_RUN" = "1" ]; then
+        vinfo "Would remove retired plugin skill: $retired_target"
+        record "would-change" "$p" "$retired_target" "Would remove retired plugin skill: $retired_target"
+        continue
+      fi
+      rm -rf "$retired_target"
+      vinfo "Removed retired plugin skill: $retired_target"
+      record "changed" "$p" "$retired_target" "Removed retired plugin skill: $retired_target"
     done
   fi
 

@@ -714,4 +714,83 @@ describe("claude-plugin retired harness-skill prune (PER AC-5)", () => {
     expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
     expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
   });
+
+  async function writeRecord(rec: Record<string, unknown>): Promise<void> {
+    await fs.mkdir(path.dirname(stateFile()), { recursive: true });
+    await fs.writeFile(
+      stateFile(),
+      JSON.stringify({ version: 2, platforms: { claude: { root: path.join(tmp, ".claude"), ...rec } } }, null, 2),
+    );
+  }
+
+  // What a hostile record may try to reach: a directory beside skills/, and
+  // two inside it under names the retired-skill filter must reject.
+  async function plantSentinels(): Promise<string[]> {
+    const sentinels = [
+      path.join(tmp, ".claude/outside/keep.txt"),
+      path.join(tmp, ".claude/skills/a/b/keep.txt"),
+      path.join(tmp, ".claude/skills/Keep_Me/keep.txt"),
+    ];
+    for (const s of sentinels) {
+      await fs.mkdir(path.dirname(s), { recursive: true });
+      await fs.writeFile(s, "sentinel\n");
+    }
+    return sentinels;
+  }
+
+  async function expectSentinels(sentinels: string[]): Promise<void> {
+    for (const s of sentinels) expect(await pathExists(s)).toBe(true);
+  }
+
+  test("a multi-line skillsOwner cannot smuggle a path into the prune", async () => {
+    const sentinels = await plantSentinels();
+    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "profile", "bootstrap"] };
+
+    await writeRecord(hostile);
+    expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
+    await expectSentinels(sentinels);
+
+    await writeRecord(hostile);
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    await expectSentinels(sentinels);
+  });
+
+  test("a hostile skills list removes nothing but conforming retired names", async () => {
+    const sentinels = await plantSentinels();
+    const hostile = { skillsOwner: "plugin", skills: ["../outside", "", "a/b", "*", "Keep_Me"] };
+
+    await writeRecord(hostile);
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    await expectSentinels(sentinels);
+
+    await writeRecord(hostile);
+    expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
+    await expectSentinels(sentinels);
+  });
+
+  test.skipIf(process.getuid?.() === 0)(
+    "a failed retired-skill removal keeps the record's proof for a retry",
+    async () => {
+      await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
+      await plantRetired();
+      const locked = path.join(retiredDir(), "locked");
+      await fs.mkdir(locked);
+      await fs.writeFile(path.join(locked, "keep.txt"), "x");
+      await fs.chmod(locked, 0o555);
+      try {
+        expect(runInstall(["--user"], { HOME: tmp }).exitCode).not.toBe(0);
+        const state = await readJson(stateFile());
+        const platforms = state.platforms as Record<string, { skills: string[] }>;
+        expect(platforms.claude.skills).toContain("persona-router");
+      } finally {
+        await fs.chmod(locked, 0o755);
+      }
+
+      expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+      expect(await pathExists(retiredDir())).toBe(false);
+      const state = await readJson(stateFile());
+      const platforms = state.platforms as Record<string, { skills: string[] }>;
+      expect(platforms.claude.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+    },
+  );
 });

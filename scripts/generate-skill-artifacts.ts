@@ -250,6 +250,14 @@ async function copyEntries(
 }
 
 /**
+ * Bundle roots a previous generator emitted and this one no longer does. They
+ * left `managedRootsFor`, so without this sweep a stale copy in a checkout
+ * would survive forever — and the cursor installer would copy it into the
+ * command-skill cache once it left that installer's exclusion list (PER AC-3).
+ */
+export const RETIRED_BUNDLE_ROOTS = ["persona-router"] as const;
+
+/**
  * Removes a host's prior managed-root contents (and its hook-binary file, if
  * it is a hookBinaryHosts() member) before emit copies anything back in.
  *
@@ -264,14 +272,6 @@ async function copyEntries(
  * Impacts: UGB-03/04, T1.
  * Test: bun test scripts/__tests__/generate-skill-artifacts-prune.test.ts
  */
-/**
- * Bundle roots a previous generator emitted and this one no longer does. They
- * left `managedRootsFor`, so without this sweep a stale copy in a checkout
- * would survive forever — and the cursor installer would copy it into the
- * command-skill cache once it left that installer's exclusion list (PER AC-3).
- */
-export const RETIRED_BUNDLE_ROOTS = ["persona-router"] as const;
-
 async function pruneManagedRoots(
   targetRoot: string,
   host: string,

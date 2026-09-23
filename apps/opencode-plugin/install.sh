@@ -193,6 +193,44 @@ try {
 NODE
 }
 
+# C4: line 1 is the enumerated owner ("plugin" | "none" — never the raw
+# recorded value, so a hostile multi-line skillsOwner cannot smuggle a name
+# into the list); every further line is a harness skill this plugin recorded
+# as installed and no longer ships. The recorded list is the ownership proof,
+# so an unrecorded directory of the same name is never touched.
+plugin_skills_record() {
+  local runner="$1"
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rec = data && data.platforms && data.platforms[host];
+  const owned = !!rec && rec.skillsOwner === "plugin";
+  const current = ["massa-ai", "profile", "bootstrap"];
+  const retired = owned && Array.isArray(rec.skills)
+    ? rec.skills.filter((s) => typeof s === "string" && /^[a-z0-9][a-z0-9-]*$/.test(s) && !current.includes(s))
+    : [];
+  process.stdout.write([owned ? "plugin" : "none", ...retired].join("\n"));
+} catch {
+  process.stdout.write("none");
+}
+NODE
+}
+
+# Removes every retired name in a plugin_skills_record output. The subshell
+# body scopes `set -f` and a newline-only IFS, so no name is ever
+# glob-expanded or split on a space.
+remove_retired_skills() (
+  set -f
+  IFS=$'\n'
+  state_retired_skills="$(printf '%s\n' "$1" | sed 1d)"
+  for name in $state_retired_skills; do
+    rm -rf "$HARNESS_SKILLS_DIR/$name"
+    vecho "  - removed retired harness skill $HARNESS_SKILLS_DIR/$name"
+  done
+)
+
 install_bundled_skills() {
   local runner=""
   if command -v node &>/dev/null; then runner="node"
@@ -230,8 +268,12 @@ install_bundled_skills() {
   done
   vecho "  + ${installed} harness skills installed to $HARNESS_SKILLS_DIR (plugin-owned)"
 
-  local state_retired_skills
-  state_retired_skills="$("$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$TARGET" <<'NODE'
+  # C4: retired skills go BEFORE the record is rewritten — the recorded list
+  # is the only ownership proof, so a removal that fails (set -e aborts here)
+  # leaves it in place for the next run to retry.
+  remove_retired_skills "$(plugin_skills_record "$runner")"
+
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$TARGET" <<'NODE'
 const fs = require("fs");
 const path = require("path");
 const [, , file, host, root] = process.argv;
@@ -266,19 +308,7 @@ if (prev && typeof prev === "object" && !Array.isArray(prev)) {
 }
 fs.mkdirSync(path.dirname(file), { recursive: true });
 fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
-// C4: a harness skill this plugin recorded as installed and no longer ships is
-// printed for the caller to remove — the recorded list is the ownership proof,
-// so an unrecorded directory of the same name is never touched.
-const retired = prev && prev.skillsOwner === "plugin" && Array.isArray(prev.skills)
-  ? prev.skills.filter((s) => typeof s === "string" && /^[a-z0-9][a-z0-9-]*$/.test(s) && !current.includes(s))
-  : [];
-process.stdout.write(retired.join("\n"));
 NODE
-  )"
-  for name in $state_retired_skills; do
-    rm -rf "$HARNESS_SKILLS_DIR/$name"
-    vecho "  - removed retired harness skill $HARNESS_SKILLS_DIR/$name"
-  done
 }
 
 uninstall_bundled_skills() {
@@ -288,35 +318,16 @@ uninstall_bundled_skills() {
   else return 0
   fi
 
-  # Line 1 is the raw owner; any further lines are the C4 retired skills this
-  # plugin recorded and no longer ships.
-  local raw_owner state_retired_skills
-  state_retired_skills="$("$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
-const fs = require("fs");
-const [, , file, host] = process.argv;
-try {
-  const data = JSON.parse(fs.readFileSync(file, "utf8"));
-  const rec = data && data.platforms && data.platforms[host];
-  const current = ["massa-ai", "profile", "bootstrap"];
-  const retired = rec && rec.skillsOwner === "plugin" && Array.isArray(rec.skills)
-    ? rec.skills.filter((s) => typeof s === "string" && /^[a-z0-9][a-z0-9-]*$/.test(s) && !current.includes(s))
-    : [];
-  process.stdout.write([rec ? String(rec.skillsOwner) : "none", ...retired].join("\n"));
-} catch {
-  process.stdout.write("none");
-}
-NODE
-  )"
-  raw_owner="${state_retired_skills%%$'\n'*}"
-  state_retired_skills="${state_retired_skills#"$raw_owner"}"
-  [[ "$raw_owner" == "plugin" ]] && {
+  # Line 1 of the record is the enumerated owner; uninstall only ever acts on
+  # an exact "plugin" record.
+  local record
+  record="$(plugin_skills_record "$runner")"
+  [[ "${record%%$'\n'*}" == "plugin" ]] && {
     local name
     for name in massa-ai profile bootstrap; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
-    for name in $state_retired_skills; do
-      rm -rf "$HARNESS_SKILLS_DIR/$name"
-    done
+    remove_retired_skills "$record"
     rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
     echo "  - removed plugin-owned harness skills from $HARNESS_SKILLS_DIR"
   }

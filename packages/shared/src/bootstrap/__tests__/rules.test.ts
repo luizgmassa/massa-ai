@@ -137,6 +137,13 @@ describe("UnknownRuleError / assertKnownRuleId (BST-09 AC-8)", () => {
     }
   });
 
+  test("UnknownRuleError names a retired id as retired, not unknown", () => {
+    const err = UnknownRuleError("persona-router");
+    expect(err.name).toBe("UnknownRuleError");
+    expect(err.message).toContain('bootstrap rule "persona-router" was retired');
+    expect(err.message).not.toContain("unknown bootstrap rule");
+  });
+
   test("UnknownRuleError is a BootstrapRuleError", () => {
     expect(UnknownRuleError("bogus-rule")).toBeInstanceOf(BootstrapRuleError);
   });

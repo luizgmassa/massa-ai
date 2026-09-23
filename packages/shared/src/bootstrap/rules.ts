@@ -181,8 +181,12 @@ function namedError(name: string, message: string): BootstrapRuleError {
 export const UnknownRuleError = (
   id: string,
   known: readonly string[] = BOOTSTRAP_RULE_IDS,
-): BootstrapRuleError =>
-  namedError("UnknownRuleError", `unknown bootstrap rule "${id}" — valid ids: ${known.join(", ")}`);
+): BootstrapRuleError => {
+  const what = isRetiredRuleId(id)
+    ? `bootstrap rule "${id}" was retired and can no longer be toggled`
+    : `unknown bootstrap rule "${id}"`;
+  return namedError("UnknownRuleError", `${what} — valid ids: ${known.join(", ")}`);
+};
 
 /**
  * Throws {@link UnknownRuleError} unless `id` is one of the eight registry

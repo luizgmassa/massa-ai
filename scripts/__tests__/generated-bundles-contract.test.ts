@@ -58,6 +58,10 @@ describe("managed subtrees stay gitignored (UGB-01)", () => {
     // entries are separate lines in .gitignore, so a shared host would let one
     // line's deletion hide behind the other's.
     "apps/claude-plugin/skills/bootstrap/SKILL.md",
+    // Retired persona-router bundle: a pre-upgrade stale copy must never be
+    // committable. Codex, because cursor's skills/*/SKILL.md pattern would
+    // cover a cursor representative without this entry.
+    "apps/codex-plugin/skills/persona-router/references/routing-details.md",
     "apps/opencode-plugin/skills/agents/code-explorer/SKILL.md",
     "apps/claude-plugin/agents/builder.md",
     "apps/opencode-plugin/agent-profiles/work/builder.md",
