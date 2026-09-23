@@ -31,8 +31,9 @@ type Budget = {
 };
 
 const BUDGETS: Budget[] = [
-  // Freeze ceiling only — slimming the router SKILL.md is a separate feature.
-  { subject: "skills/massa-ai/SKILL.md", maxBytes: 21_000 },
+  // agent-roster-revision (RTR-03) slimmed the router to its routing contract
+  // (12,846 B measured); ceiling is that size rounded up to the next 500 B.
+  { subject: "skills/massa-ai/SKILL.md", maxBytes: 13_000 },
 ];
 
 function resolveFiles(b: Budget): string[] {
