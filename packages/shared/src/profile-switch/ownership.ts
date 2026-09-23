@@ -64,9 +64,15 @@ function isRegularFile(filePath: string): boolean {
  * `# massa-ai-owned`; `.md` — a legacy name or the body marker. */
 export function isOwnedAgentFile(filePath: string): boolean {
   if (!isRegularFile(filePath)) return false;
-  const content = fs.readFileSync(filePath, "utf8");
+  if (!filePath.endsWith(".toml") && isLegacyAgentName(filePath)) return true;
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return false;
+  }
   if (filePath.endsWith(".toml")) return content.split("\n")[0] === OWNED_MARKER_TOML;
-  return isLegacyAgentName(filePath) || hasOwnedMarker(content);
+  return hasOwnedMarker(content);
 }
 
 /** OpenCode: agents install as symlinks. Owned iff a symlink that is

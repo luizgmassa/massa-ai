@@ -65,6 +65,22 @@ describe("isOwnedAgentFile", () => {
   });
 });
 
+describe("isOwnedAgentFile on an unreadable file", () => {
+  test("returns false instead of throwing, like bash has_owned_marker; a legacy name still counts", () => {
+    const marked = write("builder.md", MARKED);
+    const legacy = write("massa-ai-reviewer.md", UNMARKED);
+    fs.chmodSync(marked, 0o000);
+    fs.chmodSync(legacy, 0o000);
+    try {
+      expect(isOwnedAgentFile(marked)).toBe(false);
+      expect(isOwnedAgentFile(legacy)).toBe(true);
+    } finally {
+      fs.chmodSync(marked, 0o644);
+      fs.chmodSync(legacy, 0o644);
+    }
+  });
+});
+
 describe("isOwnedAgentLink", () => {
   function link(name: string, target: string): string {
     const p = path.join(dir, "agents", name);

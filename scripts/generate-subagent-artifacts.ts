@@ -357,16 +357,12 @@ export const OWNED_MARKER_MD = "<!-- massa-ai-owned: true -->";
  *
  *   - `name`: not a frontmatter key at all. "The markdown file name becomes the agent
  *     name." The file is already <n>.md, so dropping this is behaviour-preserving.
- *   - `metadata`: not a key either. But it is NOT dead — the literal substring
- *     "massa-ai-owned: true" scopes `agents uninstall` in
- *     apps/opencode-plugin/src/config-cli.ts, which installs real file copies (the
- *     install.sh path installs symlinks and scopes by filename instead). Deleting it would
- *     make uninstall match zero files and orphan 15 installed agents.
+ *   - `metadata`: not a key either. It used to carry the ownership marker, which is not
+ *     dead: every installer and `agents install|uninstall` decides what it may overwrite or
+ *     delete by that marker (packages/shared/src/profile-switch/ownership.ts).
  *
- * So the marker MOVES to the first body line as a markdown comment. It is then body text
- * rather than a model option, while still containing the substring config-cli greps — which
- * also keeps uninstall working against agent files an older version installed in the
- * frontmatter form. No config-cli change needed.
+ * So the marker is the first body line as a markdown comment, the same `OWNED_MARKER_MD`
+ * every `.md` host carries: body text rather than a model option.
  */
 export function emitOpenCode(c: Charter, m: Resolved): string {
   const isWrite = WRITE_AGENTS.has(c.name);

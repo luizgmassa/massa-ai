@@ -264,6 +264,40 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     expect(await pathExists(path.join(agentsDir, "reviewer.md"))).toBe(false);
   });
 
+  test("NAM AC-4/AC-7: installer-style symlinks are owned — uninstall removes them, install replaces them without writing through", async () => {
+    const agentsDir = path.join(xdgConfig, "opencode/agents");
+    const bundleAgents = path.join(tmp, "checkout/apps/opencode-plugin/agents");
+    const dotfiles = path.join(tmp, "dotfiles");
+    await fs.mkdir(agentsDir, { recursive: true });
+    await fs.mkdir(bundleAgents, { recursive: true });
+    await fs.mkdir(dotfiles, { recursive: true });
+    const bundleBody = "---\nname: builder\n---\n<!-- massa-ai-owned: true -->\nold bundle\n";
+    await fs.writeFile(path.join(bundleAgents, "builder.md"), bundleBody);
+    await fs.symlink(path.join(bundleAgents, "builder.md"), path.join(agentsDir, "builder.md"));
+    await fs.symlink(path.join(bundleAgents, "judge.md"), path.join(agentsDir, "judge.md"));
+    await fs.symlink(path.join(tmp, "gone/massa-ai-reviewer.md"), path.join(agentsDir, "massa-ai-reviewer.md"));
+    const userBody = "---\ndescription: mine\n---\nmine\n";
+    await fs.writeFile(path.join(dotfiles, "designer.md"), userBody);
+    await fs.symlink(path.join(dotfiles, "designer.md"), path.join(agentsDir, "designer.md"));
+
+    const res = runCli(["agents", "install", "--user"], { HOME: tmp, XDG_CONFIG_HOME: xdgConfig });
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).not.toContain("builder.md exists and is not massa-ai-owned");
+    expect(res.stderr).toContain(`${path.join(agentsDir, "designer.md")} exists and is not massa-ai-owned — skipped`);
+    expect((await fs.lstat(path.join(agentsDir, "builder.md"))).isSymbolicLink()).toBe(false);
+    expect(await fs.readFile(path.join(bundleAgents, "builder.md"), "utf8")).toBe(bundleBody);
+    expect(await fs.readlink(path.join(agentsDir, "designer.md"))).toBe(path.join(dotfiles, "designer.md"));
+
+    await fs.rm(path.join(agentsDir, "builder.md"));
+    await fs.symlink(path.join(bundleAgents, "builder.md"), path.join(agentsDir, "builder.md"));
+    const un = runCli(["agents", "uninstall", "--user"], { HOME: tmp, XDG_CONFIG_HOME: xdgConfig });
+    expect(un.exitCode).toBe(0);
+    const left = (await fs.readdir(agentsDir)).sort();
+    expect(left).toEqual(["designer.md"]);
+    expect(await fs.readFile(path.join(dotfiles, "designer.md"), "utf8")).toBe(userBody);
+    expect(await fs.readFile(path.join(bundleAgents, "builder.md"), "utf8")).toBe(bundleBody);
+  });
+
   test("OPC-06: idempotent re-run overwrites with identical content", async () => {
     const agentsDir = path.join(xdgConfig, "opencode/agents");
     runCli(["agents", "install", "--user"], {

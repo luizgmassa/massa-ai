@@ -17,6 +17,7 @@ import {
   findRepoRootWithMarker,
   isHost,
   isOwnedAgentFile,
+  isOwnedAgentLink,
   applyBootstrapState,
   assertKnownRuleId,
   bootstrapReportSucceeded,
@@ -398,10 +399,11 @@ export async function runCli(argv: string[]): Promise<number> {
         } catch {
           destExists = false;
         }
-        if (destExists && !isOwnedAgentFile(dest)) {
+        if (destExists && !isOwnedAgentFile(dest) && !isOwnedAgentLink(dest)) {
           console.warn(`⚠ ${dest} exists and is not massa-ai-owned — skipped`);
           continue;
         }
+        if (isOwnedAgentLink(dest)) await fs.unlink(dest);
         await fs.copyFile(src, dest);
         count++;
       }
@@ -417,7 +419,7 @@ export async function runCli(argv: string[]): Promise<number> {
         for (const entry of entries) {
           if (!entry.endsWith(".md")) continue;
           const filePath = path.join(agentsDir, entry);
-          if (isOwnedAgentFile(filePath)) {
+          if (isOwnedAgentFile(filePath) || isOwnedAgentLink(filePath)) {
             await fs.unlink(filePath);
             removed++;
           }
