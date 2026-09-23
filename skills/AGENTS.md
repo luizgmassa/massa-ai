@@ -270,7 +270,7 @@ drift, and did.
 | code-reviewer | Review, verify, audit, and guide existing or changed code | read-only | `review` (diff), `verify` (Verification Ladder + discrimination sensor), `audit` (lenses bugs, architecture, security, code-quality, performance), `guide` (architecture, mobile platform) | `skills/agents/code-reviewer/SKILL.md` |
 | designer | Read and write user-facing screens from Figma, screenshots, or other design direction | read-only (UI-layer write when scoped) | `audit` (conformance), `implement` (UI layer) | `skills/agents/designer/SKILL.md` |
 | judge | Evaluate artifacts and challenge plans with quoted evidence | write (own judge-N report, `scorer` mode only) | `spec-author` (evaluation specification), `scorer` (debate panel), `plan-critique` (lite or full Plan Challenge gate) | `skills/agents/judge/SKILL.md` |
-| product-manager | Hold requirements to a clear, complete, consistent standard | read-only | `furps` (one FURPS+ dimension), `requirements` (ambiguity, gaps, contradictions, implicit needs), `audit` (requirements lens) | `skills/agents/product-manager/SKILL.md` |
+| product-manager | Hold requirements to a clear, complete, consistent standard | read-only | `furps` (one FURPS+ dimension), `audit` (requirements lens: ambiguity, gaps, contradictions, implicit needs, uncovered scenarios, or implementation drift) | `skills/agents/product-manager/SKILL.md` |
 | test-engineer | Plan, audit, and fix tests | read-only (test-write when scoped) | `plan` (strategy), `audit` (tests lens), `fix` (tests-fix implementation) | `skills/agents/test-engineer/SKILL.md` |
 
 ## Mapping — Retired Agents → Current Agents
@@ -290,7 +290,7 @@ The single old→new table for the charters retired by the roster consolidation.
 | meta-judge | judge | `spec-author` |
 | plan-critic | judge | `plan-critique` |
 | furps-analyst | product-manager | `furps` |
-| requirements-analyst | product-manager | `requirements` |
+| requirements-analyst | product-manager | `audit` |
 | planner | — | Retired; the dispatching workflow's main agent plans |
 | context-curator | — | Retired; the main agent curates context under the Context Firewall |
 | documentation-agent | — | Retired; the `create-*` workflows produce their documents |

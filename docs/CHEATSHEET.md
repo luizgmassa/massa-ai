@@ -385,7 +385,7 @@ per dispatch through the capability packet's `mode` field.
 | `code-reviewer` | Review, verify, audit, and guide existing or changed code | `review`, `verify`, `audit`, `guide` | read-only |
 | `designer` | Read and write screens from Figma, screenshots, or other design direction | `audit`, `implement` | read-only (UI-layer write when scoped) |
 | `judge` | Evaluate artifacts and challenge plans with quoted evidence | `spec-author`, `scorer`, `plan-critique` | write (own judge-N report, `scorer` only) |
-| `product-manager` | Hold requirements to a clear, complete, consistent standard | `furps`, `requirements`, `audit` | read-only |
+| `product-manager` | Hold requirements to a clear, complete, consistent standard | `furps`, `audit` | read-only |
 | `test-engineer` | Plan, audit, and fix tests | `plan`, `audit`, `fix` | read-only (test-write when scoped) |
 
 Retired agents and where their work went: the mapping table in `skills/AGENTS.md`.
