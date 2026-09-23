@@ -83,6 +83,7 @@ Output contract:
 
 Modes (only when the role owns more than one output contract):
 - One `### Mode: <name>` section per contract (the name in backticks), holding that mode's own output; the packet `mode` field selects it.
+- Lazy variant (owner decision D2, `agent-roster-revision`): instead of an inline output contract, the `### Mode: <name>` section is a stub naming exactly the contract file(s) it owns under `references/agent-modes/<agent>/<mode>.md` (a mode split by depth or similar cites `<mode>-lite.md`/`<mode>-full.md` instead of one file). The dispatching main agent reads the cited file and inlines it into the packet as `mode_contract` per `references/agent-orchestration.md`'s Capability Packet; the charter itself carries no other trace of the contract's content.
 
 Validation sensors:
 - [tests, build, typecheck, lint, static search, artifact inspection, or source-location proof]
