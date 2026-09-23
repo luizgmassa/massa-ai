@@ -392,16 +392,18 @@ where the pin comes from: `skills/model-profiles.json` is the only hand-authored
 repo that names a model or an effort level for any agent on any host. Every shipped value is
 resolved from it at generate time and asserted by `scripts/__tests__/subagent-parity.test.ts`.
 
-Resolution takes exactly three inputs:
+Resolution takes exactly two inputs:
 
 ```
-charter metadata.model_tier   +   host   +   profile   →   { model, effort }
-(skills/agents/<n>/SKILL.md)                                (skills/model-profiles.json)
+agent   +   profile   →   { model, effort }
+        (skills/model-profiles.json)
 ```
 
-The registry deliberately holds **no agent list**. A role's tier is a property of that role's
-job, so it lives beside the charter that defines the job — adding a nineteenth specialist is one
-new charter directory carrying a `model_tier`, with no registry, generator, doc, or test edit.
+Each profile defines a per-tool **default model** and optional **per-agent overrides**. For an
+agent on a given tool, resolution checks `profile.agents[agent][tool]` first; if absent, it
+uses `profile.hosts[tool]`. The registry deliberately holds **no agent list**. Adding a
+nineteenth specialist is one new charter directory discovered by `skills/agents/*/SKILL.md`
+directory scan, with no registry, generator, doc, or test edit.
 
 #### Profile selection (per host, first match wins)
 
@@ -409,12 +411,12 @@ new charter directory carrying a `model_tier`, with no registry, generator, doc,
 | --- | --- | --- |
 | 1 | `--profile=<name>` passed to the generator | wins over everything |
 | 2 | `MASSA_AI_MODEL_PROFILE` | must stay listed in `turbo.json` → `tasks.test.passThroughEnv`, or it arrives `undefined` under `bun run test` while working under a bare `bun test` |
-| 3 | registry `hostDefaults[<host>]` | the auto-select-by-host path |
+| 3 | install-state `modelProfile` | persisted when a user switches profiles |
+| 4 | `"balanced"` | the built-in fallback |
 
-There is no rank 4. An unknown profile name at any rank is a hard error: a typo'd
-`--profile=chaep` fails loudly instead of silently shipping the default. Resolution is
-**build-time**, because no host resolves a per-agent model from an env var — so switching
-profiles means regenerating:
+An unknown profile name at any rank is a hard error: a typo'd `--profile=chaep` fails loudly
+instead of silently shipping the default. Resolution is **build-time**, because no host resolves
+a per-agent model from an env var — so switching profiles means regenerating:
 
 ```bash
 bun run scripts/generate-subagent-artifacts.ts --profile=<name>
@@ -425,37 +427,20 @@ nothing else. No TypeScript type, enum, or doc table enumerates profile names �
 this document names none of them and points at the registry instead. Read
 `skills/model-profiles.json` for the profiles that ship, each with its own `description`.
 
-#### Role → tier
+#### Agent overrides in built-in profiles
 
-Derived from each charter's `metadata.model_tier`. A doc-drift test asserts this table matches
-the charters and is the only role-keyed model table in this file.
+The built-in profiles define per-tool defaults (the strongest model for each profile) and
+agent-specific overrides to achieve a mix of reasoning depth and latency:
 
-| Agent | Tier |
-| --- | --- |
-| investigator | deep |
-| planner | deep |
-| builder | standard |
-| reviewer | deep |
-| context-curator | deep |
-| verification-agent | deep |
-| requirements-analyst | deep |
-| architecture-specialist | deep |
-| test-engineer | standard |
-| documentation-agent | light |
-| audit-specialist | deep |
-| mobile-specialist | deep |
-| designer | standard |
-| plan-critic | deep |
-| furps-analyst | deep |
-| navigator | deep |
-| meta-judge | deep |
-| judge | deep |
+- **14 agents** (investigator, planner, reviewer, context-curator, verification-agent,
+  requirements-analyst, architecture-specialist, audit-specialist, mobile-specialist,
+  plan-critic, furps-analyst, navigator, meta-judge, judge) use the profile default.
+- **3 agents** (builder, designer, test-engineer) override to a standard-tier model per profile.
+- **1 agent** (documentation-agent) overrides to a light-tier model per profile.
 
-Each role's *reason* for its tier lives once, in its own charter's prose. The four per-host
-rationale columns this section used to carry were deleted rather than consolidated: a rationale
-that exists once cannot disagree with itself, and the duplicated ones already did — `navigator`
-shipped the sentence "no frontier reasoning needed" beside a standard-tier model on one host and
-a light-tier model on another, in this very file.
+Read-only agents carry no override by convention and resolve to the profile default, ensuring
+the strongest model runs on every read-only pass (see ALLWF-03 in `skills/massa-ai/references/spec-driven/sub-agents.md`).
+User overlays can customize this per profile via the Web UI Model Catalog.
 
 #### What each host actually reads
 

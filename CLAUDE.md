@@ -357,12 +357,13 @@ pattern. The per-host mechanism and its verbatim citation live in
 `.specs/features/subagent-tool-inheritance/spec.md`.
 
 **`skills/model-profiles.json` is the only hand-authored place that names a model or an
-effort level for any agent on any host.** Resolution is `charter metadata.model_tier` +
-host + profile → `{model, effort}`, done at build time by `scripts/lib/model-profiles.ts`
-and rendered into each host's own syntax by the emitters; the registry holds **no agent
-list**, so adding a specialist is one new charter directory. Profile selection is
-`--profile=<name>` > `MASSA_AI_MODEL_PROFILE` > registry `hostDefaults[host]`, with no
-rank 4 — an unknown name at any rank throws rather than shipping a default, and
+effort level for any agent on any host.** Registry v2 defines a `models` catalog and
+`profiles` with per-tool defaults plus optional per-agent overrides, resolved at build time
+by `scripts/lib/model-profiles.ts` and rendered into each host's own syntax by the emitters;
+the registry holds **no agent list**, so adding a specialist is one new charter directory
+(discovered by `skills/agents/*/SKILL.md` directory scan). Profile selection is
+`--profile=<name>` > `MASSA_AI_MODEL_PROFILE` > install-state `modelProfile` > `"balanced"`,
+with no rank 4 — an unknown name at any rank throws rather than shipping a default, and
 `validateRegistry` reports every violation in one throw. Adding a `MASSA_AI_*` knob here
 means editing `turbo.json` → `tasks.test.passThroughEnv` too (AD-010). Four traps:
 Cursor's frontmatter schema is exactly `name`/`description`/`model`/`readonly`/
@@ -370,14 +371,14 @@ Cursor's frontmatter schema is exactly `name`/`description`/`model`/`readonly`/
 **unrecognized frontmatter keys to the model provider as model options**, which is why its
 `massa-ai-owned: true` marker is a body comment and not `metadata:` — `config-cli.ts`
 scopes `agents uninstall` by that literal substring, so deleting it orphans installed
-agents; every Cursor tier resolves to `inherit` because Cursor publishes no model-ID table
-(`cursor-agent models` is the only discovery path); and **`CLAUDE_CODE_SUBAGENT_MODEL` set
-to a real model silently defeats every registry pin on Claude**, because it overrides both
-the per-invocation `model` parameter and the subagent definition's `model` frontmatter —
-set it to `inherit` to restore normal resolution. Codex's `agents.default_subagent_model`
-is the opposite, a fallback the agent file wins against. `bun run verify:model-ids` probes
-the installed harness CLIs and is advisory, not a CI gate — CI has no harness CLI, so it
-would either fail always or pass vacuously.
+agents; Cursor publishes no model-ID table (`cursor-agent models` is the only discovery
+path); and **`CLAUDE_CODE_SUBAGENT_MODEL` set to a real model silently defeats every
+registry pin on Claude**, because it overrides both the per-invocation `model` parameter
+and the subagent definition's `model` frontmatter — set it to `inherit` to restore normal
+resolution. Codex's `agents.default_subagent_model` is the opposite, a fallback the agent
+file wins against. `bun run verify:model-ids` probes the installed harness CLIs and is
+advisory, not a CI gate — CI has no harness CLI, so it would either fail always or pass
+vacuously.
 
 **Switching an already-installed machine to a different profile is a separate,
 runtime concern from the build-time registry above.** Every profile ships

@@ -178,7 +178,7 @@ When sub-agents are unavailable (a single agent executing the full feature), use
 
 **Applies only if the harness can assign a model per sub-agent.** If it cannot, ignore this section and run everything on the default model — the workflow is correct either way. The point is to spend high-reasoning capacity where ambiguity and consequence are high, and a faster tier where the work is mechanical, instead of paying top-tier cost uniformly.
 
-massa-ai resolves the actual model per agent through `metadata.model_tier` (`light` / `standard` / `deep`) in each sub-agent's charter (`skills/agents/<name>/SKILL.md`), combined with the host and the active profile in `skills/model-profiles.json` (see `CLAUDE.md` § Agent-harness surface). This section maps role/work characteristics onto that mechanism — it is not a separate free-floating table.
+massa-ai resolves the actual model per agent through the active profile in `skills/model-profiles.json` (see `CLAUDE.md` § Agent-harness surface). Most agents use the profile's per-tool default; some carry per-agent overrides. This section maps role/work characteristics onto that decision framework — it is not a separate free-floating table.
 
 Judge the tier by the work in front of the role, not by the role's title:
 
@@ -195,7 +195,7 @@ Judge the tier by the work in front of the role, not by the role's title:
 **Rules of thumb:**
 
 - When unsure, size up, not down. An under-powered worker on ambiguous logic produces gaps the Verifier then has to catch — more expensive than paying for reasoning once.
-- **The Verifier always runs on the deepest tier** — per project rule, `skills/agents/verification-agent/SKILL.md` pins `metadata.model_tier: deep`, structurally, not just as advisory guidance here. A weak Verifier defeats the author ≠ verifier gate.
-- **Read-only specialists always run on the deepest tier** — this generalizes the Verifier rule: every findings-only or investigation-only charter (`permission: read-only`) pins `metadata.model_tier: deep` structurally, because there is no later implementation pass to catch what a weaker read-only pass missed.
+- **The Verifier always runs on the deepest tier** — in built-in profiles, the verification-agent carries no per-agent override and resolves to the profile's strongest model. A weak Verifier defeats the author ≠ verifier gate.
+- **Read-only specialists always run on the deepest tier** — this generalizes the Verifier rule: in built-in profiles, every findings-only or investigation-only charter (`permission: read-only`) carries no per-agent override and resolves to the profile's strongest model, because there is no later implementation pass to catch what a weaker read-only pass missed. **Accepted risk:** user overlays via the Web UI Model Catalog can choose a weaker default; the UI help text documents this convention.
 - Set the tier per batch, from that batch's phases. A feature can mix tiers across batches.
 - Outside the Verifier's and read-only specialists' structural pins, this table is advisory metadata only — no gate, commit, or verification step depends on it.

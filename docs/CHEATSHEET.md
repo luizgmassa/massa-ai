@@ -183,21 +183,21 @@ reference for every variable.
 ## 4. Model profiles
 
 Registry: `skills/model-profiles.json` — the only hand-authored place that names a model
-or effort level for any agent on any host. Resolution is
-`charter metadata.model_tier` + host + profile → `{model, effort}`, at build time.
+or effort level for any agent on any host. Each profile defines per-tool defaults and
+optional per-agent overrides, resolved at build time.
 
-| Profile | Hosts | Tiers |
+| Profile | Hosts | Description |
 |---|---|---|
-| `balanced` (host default) | claude, codex, cursor, opencode | light, standard, deep |
-| `cheap` | all four | light, standard, deep |
-| `heavy` | all four | light, standard, deep |
-| `work` | all four | light, standard, deep |
-| `home` | all four | light, standard, deep |
-| `open_models` | opencode only | — |
-| `local_models` | opencode only | — |
+| `balanced` | claude, codex, cursor, opencode | General-purpose; strongest model as default |
+| `cheap` | all four | Cost-optimized |
+| `heavy` | all four | Maximum reasoning per agent |
+| `work` | all four | Productivity-focused |
+| `home` | all four | Consumer-friendly |
+| `open_models` | opencode only | Open models only |
+| `local_models` | opencode only | Local/offline models |
 
-Selection: `--profile=<name>` > `MASSA_AI_MODEL_PROFILE` > `hostDefaults[host]`.
-An unknown name throws rather than silently defaulting.
+Selection: `--profile=<name>` > `MASSA_AI_MODEL_PROFILE` > install-state `modelProfile` >
+`"balanced"`. An unknown name throws rather than silently defaulting.
 
 Three interchangeable switch surfaces — all wrap one engine
 (`packages/shared/src/profile-switch/`):
