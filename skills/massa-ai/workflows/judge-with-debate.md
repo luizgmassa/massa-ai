@@ -76,6 +76,7 @@ and artifact paths. Model request: `kimi-k3` (see Step 0.5).
 > - scope: the artifact under evaluation (paths supplied), task description, artifact type
 > - permissions: read-only
 > - inputs: task description, artifact type, context, artifact paths, model request per Step 0.5; inherits nothing — every needed path is named here
+> - mode_contract: `references/agent-modes/judge/spec-author.md`, read and inlined verbatim by the main agent before dispatch
 > - sensors: two-stage validation below (syntactic YAML, weights sum 1.0 ± 0.001, semantic shape)
 > - output: the evaluation-specification YAML, returned verbatim for all rounds; nothing else
 > - firewall: no artifact body quotes beyond what the rubric anchors need; no raw dumps
@@ -115,6 +116,7 @@ the reply block:
 > - scope: the artifact under evaluation, the verbatim specification YAML, own report path; debate rounds add all three report paths as peer paths and `round: R`
 > - permissions: read-only except appending to its own judge-N report file
 > - inputs: verbatim spec YAML, task description, artifact paths, own report path, round number, model request; debate rounds add peer report paths; inherits nothing — judges read peer reports from the filesystem paths supplied
+> - mode_contract: `references/agent-modes/judge/scorer.md`, read and inlined verbatim by the main agent before dispatch
 > - sensors: reply-block shape below (malformed or missing `scores` counts as `contest`; same judge malformed twice → Blocked)
 > - output: the YAML reply block below (strengths/weaknesses capped at ≤3 items); report file is the persisted channel — dual-channel rule, the chat return never carries the report body
 > - firewall: quoted evidence snippets only; no artifact or peer-report dumps in the reply

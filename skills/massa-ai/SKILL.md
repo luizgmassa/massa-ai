@@ -150,13 +150,13 @@ Apply the installed Plan Challenge Policy from `skills/AGENTS.md` (canonical
 source); prompt-level instructions override it for the current turn.
 
 - **Lite** (default, low-risk `feature`/`refactor`): dispatch `judge` in `plan-critique` mode
-  (`judge/plan-critique-lite.md`) with a bounded checklist packet (failing
+  (`references/agent-modes/judge/plan-critique-lite.md`) with a bounded checklist packet (failing
   assumption, falsifying check, risk/size check, `escalate_to_full:
   true|false` + reason); skip The Fool references unless it escalates.
 - **Full** (`spec-driven`, `design`, `create-adr`/`rfc`/`tdd`, explicit
   challenge, high-risk domain, >5 files/modules, or lite escalation): load
   `workflows/the-fool.md`, select the mode, dispatch `judge` in `plan-critique`
-  mode (`judge/plan-critique-full.md`) with `fool_mode` in the packet.
+  mode (`references/agent-modes/judge/plan-critique-full.md`) with `fool_mode` in the packet.
 - If `judge` is unavailable, run a local fresh-eyes critique and report the
   skipped reason; never retry under a different agent name.
 
