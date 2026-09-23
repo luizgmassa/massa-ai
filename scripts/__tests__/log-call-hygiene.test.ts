@@ -20,7 +20,7 @@ function productionFiles(): string[] {
   });
   return out
     .split("\n")
-    .filter((f) => f && !f.includes("__tests__") && !/\.test\.ts$/.test(f) && !f.includes("/generated/"));
+    .filter((f) => f && !f.includes("__tests__") && !f.endsWith(".test.ts") && !f.includes("/generated/"));
 }
 
 function skipString(src: string, i: number): number {
