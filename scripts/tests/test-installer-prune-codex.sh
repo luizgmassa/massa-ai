@@ -55,7 +55,7 @@ H1="$ROOT/fresh"; mkdir -p "$H1"
 run_install "$H1"
 AGENTS_DIR="$H1/.codex/agents"
 CURRENT_COUNT=0
-for src in "$SOURCE_AGENTS_DIR/"massa-ai-*.toml; do
+for src in "$SOURCE_AGENTS_DIR/"*.toml; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
   assert_file "current agent $name installed" "$AGENTS_DIR/$name"
@@ -69,8 +69,8 @@ H2="$ROOT/prune"; mkdir -p "$H2"
 run_install "$H2"
 AGENTS_DIR2="$H2/.codex/agents"
 
-RETIRED="$AGENTS_DIR2/massa-ai-retired-specialist.toml"
-printf '# massa-ai-owned\nname = "massa-ai-retired-specialist"\ndescription = "no longer shipped"\n' > "$RETIRED"
+RETIRED="$AGENTS_DIR2/retired-specialist.toml"
+printf '# massa-ai-owned\nname = "retired-specialist"\ndescription = "no longer shipped"\n' > "$RETIRED"
 assert_file "retired fixture planted with the ownership marker" "$RETIRED"
 assert_eq "retired fixture carries the exact marker first line" \
   "$(head -n1 "$RETIRED")" "# massa-ai-owned"
@@ -85,7 +85,7 @@ assert_no_file "retired massa-ai-owned agent is gone after the next install" "$R
 assert_file "user-owned unmarked file survives (AC-02.5 — the uniform-rm catcher)" "$MINE"
 assert_eq "user-owned file content is untouched" "$(cat "$MINE")" "$MINE_BEFORE"
 
-for src in "$SOURCE_AGENTS_DIR/"massa-ai-*.toml; do
+for src in "$SOURCE_AGENTS_DIR/"*.toml; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
   assert_file "current agent $name still present after the prune run" "$AGENTS_DIR2/$name"
@@ -97,7 +97,7 @@ echo "Scenario 3: an interrupted-looking mid-copy state is not worse off (copy-t
 # test) — this asserts the durable property the ordering exists to protect:
 # every currently-shipped agent is present, and pruning only ever removes
 # entries the new copy pass did not just (re)write.
-for src in "$SOURCE_AGENTS_DIR/"massa-ai-*.toml; do
+for src in "$SOURCE_AGENTS_DIR/"*.toml; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
   assert_file "post-prune: $name is the freshly copied bundle file" "$AGENTS_DIR2/$name"

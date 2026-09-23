@@ -75,7 +75,7 @@ describe("opencode-plugin agent prune ownership (IPT-02 site 4, AC-02.3/AC-02.5)
     try {
       const agentsDir = path.join(tmp, ".config/opencode/agents");
       await fs.mkdir(agentsDir, { recursive: true });
-      const regularFile = path.join(agentsDir, "massa-ai-fake-specialist.md");
+      const regularFile = path.join(agentsDir, "fake-specialist.md");
       const content = "a regular file the prune must never delete";
       await fs.writeFile(regularFile, content);
 

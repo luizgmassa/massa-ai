@@ -162,7 +162,7 @@ else
   assert_eq "upgrade removes orphaned loose commands" \
     "$(find "$MIG/.claude/commands" -name 'massa-ai-*.md' 2>/dev/null | wc -l | tr -d ' ')" "0"
   assert_eq "upgrade removes orphaned loose agents" \
-    "$(find "$MIG/.claude/agents" -name 'massa-ai-*.md' 2>/dev/null | wc -l | tr -d ' ')" "0"
+    "$(find "$MIG/.claude/agents" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')" "0"
   assert_eq "upgrade strips the file-route hooks" \
     "$(grep -c '_massaAiOwned' "$MIG/.claude/settings.json" || true)" "0"
   assert_contains "and registers the plugin" \

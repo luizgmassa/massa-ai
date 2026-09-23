@@ -153,3 +153,40 @@ summary() { # summary SUITE_NAME
   echo ""
   exit 0
 }
+
+# Checkout-shaped stage of one plugin bundle for installer tests that need a
+# bundle they may shape freely (never the shared, real apps/<host>-plugin):
+# <stage>/scripts and every bundle entry except agents/ and agent-profiles/
+# are symlinks into the real checkout; those two are real copies with any
+# legacy `massa-ai-` file prefix dropped, so the stage ships unprefixed agent
+# names whether or not the generator still emits the prefix. Codex and Cursor
+# read the shared hook binary from apps/claude-plugin, so it is linked too.
+# Callers set MASSA_AI_SKIP_ARTIFACT_GENERATION=1 (the linked scripts/ would
+# otherwise regenerate the real bundle) and define PROJECT_ROOT.
+stage_plugin_bundle() { # stage_plugin_bundle HOST STAGE_ROOT
+  local host="$1" stage="$2"
+  local src="$PROJECT_ROOT/apps/$host-plugin" dest="$2/apps/$1-plugin" entry profile
+  mkdir -p "$dest"
+  ln -s "$PROJECT_ROOT/scripts" "$stage/scripts"
+  [ "$host" = claude ] || ln -s "$PROJECT_ROOT/apps/claude-plugin" "$stage/apps/claude-plugin"
+  for entry in "$src"/* "$src"/.[!.]*; do
+    [ -e "$entry" ] || continue
+    case "$(basename "$entry")" in agents|agent-profiles|node_modules|.turbo) continue ;; esac
+    ln -s "$entry" "$dest/$(basename "$entry")"
+  done
+  _copy_agents_unprefixed "$src/agents" "$dest/agents"
+  for profile in "$src/agent-profiles"/*; do
+    [ -d "$profile" ] || continue
+    _copy_agents_unprefixed "$profile" "$dest/agent-profiles/$(basename "$profile")"
+  done
+}
+
+_copy_agents_unprefixed() { # _copy_agents_unprefixed SRC_DIR DEST_DIR
+  local f b
+  mkdir -p "$2"
+  for f in "$1"/*; do
+    [ -f "$f" ] || continue
+    b="$(basename "$f")"
+    cp "$f" "$2/${b#massa-ai-}"
+  done
+}

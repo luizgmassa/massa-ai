@@ -314,12 +314,12 @@ Per-host installed-agent path, matching `resolveHostLayout` in
 `packages/shared/src/profile-switch/hosts.ts` — a sensor executes that resolver against
 this table so the two cannot drift silently:
 
-| Host | Installed agents directory | Glob | Model / effort keys |
+| Host | Installed agents directory | Owned files | Model / effort keys |
 | --- | --- | --- | --- |
-| Claude — marketplace route | `<marketplaceRoot>/agents`, where `<marketplaceRoot>` is `resolveClaudeMarketplaceInstall`'s live root: for a **directory-source** marketplace the host loads the plugin LIVE from the source bundle — e.g. `<repo>/apps/claude-plugin/agents`; for any other kind it is the *versioned* cache snapshot, e.g. `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents` (a stale-able snapshot — never hardcode it; read `profile_list`'s `liveRoot`) | `massa-ai-*.md` | `model:` / `effort:` |
-| Claude — file route | `~/.claude/agents` | `massa-ai-*.md` | `model:` / `effort:` |
-| Codex | `~/.codex/agents` | `massa-ai-*.toml` | `model` / `model_reasoning_effort` |
-| OpenCode | `~/.config/opencode/agents` | `massa-ai-*.md` | `model:` / `reasoningEffort:` |
+| Claude — marketplace route | `<marketplaceRoot>/agents`, where `<marketplaceRoot>` is `resolveClaudeMarketplaceInstall`'s live root: for a **directory-source** marketplace the host loads the plugin LIVE from the source bundle — e.g. `<repo>/apps/claude-plugin/agents`; for any other kind it is the *versioned* cache snapshot, e.g. `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents` (a stale-able snapshot — never hardcode it; read `profile_list`'s `liveRoot`) | `*.md` whose first body line is `<!-- massa-ai-owned: true -->` | `model:` / `effort:` |
+| Claude — file route | `~/.claude/agents` | `*.md` whose first body line is `<!-- massa-ai-owned: true -->` | `model:` / `effort:` |
+| Codex | `~/.codex/agents` | `*.toml` whose first line is `# massa-ai-owned` | `model` / `model_reasoning_effort` |
+| OpenCode | `~/.config/opencode/agents` | `*.md` symlinks into the massa-ai bundle | `model:` / `reasoningEffort:` |
 | Cursor | no lookup — `resolveHostLayout` returns route `skip` | — | announce `model: inherit, effort: inherit` for every agent; Cursor publishes no resolvable model IDs |
 
 Claude's active route (`marketplace` vs `file`) comes from `install-state.json`'s

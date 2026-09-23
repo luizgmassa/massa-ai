@@ -16,6 +16,7 @@ import {
   syncGeneratedVariants,
   findRepoRootWithMarker,
   isHost,
+  isOwnedAgentFile,
   applyBootstrapState,
   assertKnownRuleId,
   bootstrapReportSucceeded,
@@ -388,9 +389,19 @@ export async function runCli(argv: string[]): Promise<number> {
       let count = 0;
       const entries = await fs.readdir(sourceAgentsDir);
       for (const entry of entries) {
-        if (!entry.startsWith("massa-ai-") || !entry.endsWith(".md")) continue;
+        if (!entry.endsWith(".md")) continue;
         const src = path.join(sourceAgentsDir, entry);
         const dest = path.join(agentsDir, entry);
+        let destExists = true;
+        try {
+          await fs.lstat(dest);
+        } catch {
+          destExists = false;
+        }
+        if (destExists && !isOwnedAgentFile(dest)) {
+          console.warn(`⚠ ${dest} exists and is not massa-ai-owned — skipped`);
+          continue;
+        }
         await fs.copyFile(src, dest);
         count++;
       }
@@ -399,15 +410,14 @@ export async function runCli(argv: string[]): Promise<number> {
       );
       console.log(`  written to: ${agentsDir}`);
     } else {
-      // uninstall: remove only files with metadata: { massa-ai-owned: true }
+      // uninstall: remove only massa-ai-owned files (body marker or legacy name)
       let removed = 0;
       try {
         const entries = await fs.readdir(agentsDir);
         for (const entry of entries) {
-          if (!entry.startsWith("massa-ai-") || !entry.endsWith(".md")) continue;
+          if (!entry.endsWith(".md")) continue;
           const filePath = path.join(agentsDir, entry);
-          const content = await fs.readFile(filePath, "utf8");
-          if (content.includes("massa-ai-owned: true")) {
+          if (isOwnedAgentFile(filePath)) {
             await fs.unlink(filePath);
             removed++;
           }

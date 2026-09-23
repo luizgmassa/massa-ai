@@ -678,16 +678,20 @@ apply_recorded_profile_after_update() {
     return 0
   fi
   mkdir -p "$install_path/agents"
-  for f in "$variant_dir/"massa-ai-*.md; do
+  for f in "$variant_dir/"*.md; do
     [[ -f "$f" ]] || continue
     name="$(basename "$f")"
+    if [[ -e "$install_path/agents/$name" || -L "$install_path/agents/$name" ]] && ! is_owned_agent "$install_path/agents/$name"; then
+      echo "  ⚠ $install_path/agents/$name exists and is not massa-ai-owned — skipped" >&2
+      continue
+    fi
     cp "$f" "$install_path/agents/$name"
     copied=$((copied + 1))
   done
   if [[ "$copied" -gt 0 ]]; then
     vecho "  ↷ re-applied recorded model profile '$profile' (${copied} files) to $install_path/agents"
   else
-    vecho "  ↷ recorded model profile '$profile' variant directory has no massa-ai-*.md files — nothing to re-apply"
+    vecho "  ↷ recorded model profile '$profile' variant directory has no agent files — nothing to re-apply"
   fi
 }
 
@@ -827,12 +831,50 @@ remove_file_route_artifacts() {
     done
   fi
   if [[ -d "$TARGET/agents" ]]; then
-    for src in "$TARGET/agents/"massa-ai-*.md; do
-      [[ -f "$src" ]] || continue
+    for src in "$TARGET/agents/"*.md; do
+      is_owned_agent "$src" || continue
       rm -f "$src"
     done
   fi
 }
+
+# >>> massa-ai agent ownership predicates >>>
+# Byte-identical in every plugin installer and scripts/lib/installer-shared.sh
+# (plugin tarballs cannot source repo-only libs); the TS twin is
+# packages/shared/src/profile-switch/ownership.ts, and
+# scripts/__tests__/agent-ownership-parity.test.ts holds all copies and both
+# languages to identical verdicts. Ownership is a content marker, never a
+# filename; the legacy rule lets an upgrade prune the pre-rename
+# massa-ai-<name> files — exact names only, never an open massa-ai-* glob.
+MASSA_AI_OWNED_MARKER_MD='<!-- massa-ai-owned: true -->'
+MASSA_AI_LEGACY_AGENT_NAMES=" architecture-specialist audit-specialist builder context-curator designer documentation-agent furps-analyst investigator judge meta-judge mobile-specialist navigator plan-critic planner requirements-analyst reviewer test-engineer verification-agent "
+is_legacy_agent() {
+  local b
+  b="$(basename "$1")"
+  b="${b%.*}"
+  [[ "$b" == massa-ai-* && "$MASSA_AI_LEGACY_AGENT_NAMES" == *" ${b#massa-ai-} "* ]]
+}
+has_owned_marker() {
+  awk -v m="$MASSA_AI_OWNED_MARKER_MD" 'NR==1{if($0!="---")exit;next} !c&&$0=="---"{c=1;next} c{ok=($0==m);exit} END{exit !ok}' "$1" 2>/dev/null
+}
+is_owned_agent() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  is_legacy_agent "$1" || has_owned_marker "$1"
+}
+is_owned_agent_toml() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  [[ "$(head -n1 "$1")" == "# massa-ai-owned" ]]
+}
+is_owned_agent_link() {
+  [[ -L "$1" ]] || return 1
+  is_legacy_agent "$1" && return 0
+  local b t
+  b="$(basename "$1")"
+  t="$(readlink "$1")"
+  [[ "$t" == */opencode-plugin/agents/"$b" || "$t" == */plugins/massa-ai/agent-profiles/*/"$b" ]] && return 0
+  [[ -f "$1" ]] && has_owned_marker "$1"
+}
+# <<< massa-ai agent ownership predicates <<<
 
 # ── Uninstall ───────────────────────────────────────────────────────────────
 if [[ "$UNINSTALL" -eq 1 ]]; then
@@ -856,15 +898,15 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     done
     echo "  - removed massa-ai-* commands from $TARGET/commands/"
   fi
-  # Remove every massa-ai-owned subagent specialist. All of them are generated
-  # from skills/agents/*/SKILL.md, so the massa-ai- name prefix is the ownership
-  # marker; user agents without that prefix are untouched.
+  # Remove every massa-ai-owned subagent specialist: the body marker, or a
+  # legacy massa-ai-<name> file (is_owned_agent). A user's own agent, even
+  # one named like a massa-ai agent, is untouched.
   if [[ -d "$TARGET/agents" ]]; then
-    for src in "$TARGET/agents/"massa-ai-*.md; do
-      [[ -f "$src" ]] || continue
+    for src in "$TARGET/agents/"*.md; do
+      is_owned_agent "$src" || continue
       rm -f "$src"
     done
-    echo "  - removed massa-ai-* subagent specialists from $TARGET/agents/"
+    echo "  - removed massa-ai-owned subagent specialists from $TARGET/agents/"
   fi
   echo ""
   echo "Done. User hooks, keys, and non-massa-ai agents preserved."
@@ -892,7 +934,7 @@ if [[ "$PLUGIN_ROUTE" -eq 1 ]]; then
   for src in "$SCRIPT_DIR/commands/"*.md; do
     [[ -f "$src" ]] && command_count=$((command_count + 1))
   done
-  for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
+  for src in "$SCRIPT_DIR/agents/"*.md; do
     [[ -f "$src" ]] && specialist_count=$((specialist_count + 1))
   done
   remove_file_route_artifacts
@@ -926,7 +968,8 @@ else
   done
 
   # Subagent specialists (generated from skills/agents/*/SKILL.md, navigator
-  # included). The massa-ai- name prefix is the ownership marker used by uninstall.
+  # included). Each carries the body ownership marker used by prune and
+  # uninstall; a same-named file the user owns is skipped, never overwritten.
   #
   # Model-profile re-apply (T8, MPS-04): if a switch previously recorded a
   # profile for this host, and the bundle ships that profile's variant, the
@@ -951,9 +994,13 @@ else
     fi
   fi
 
-  for src in "$ACTIVE_AGENTS_SRC/"massa-ai-*.md; do
+  for src in "$ACTIVE_AGENTS_SRC/"*.md; do
     [[ -f "$src" ]] || continue
     name="$(basename "$src")"
+    if [[ -e "$TARGET/agents/$name" || -L "$TARGET/agents/$name" ]] && ! is_owned_agent "$TARGET/agents/$name"; then
+      echo "  ⚠ $TARGET/agents/$name exists and is not massa-ai-owned — skipped" >&2
+      continue
+    fi
     cp "$src" "$TARGET/agents/$name"
     vecho "  + $name"
     specialist_count=$((specialist_count + 1))
@@ -966,9 +1013,9 @@ else
   # model-profile variant) no longer ships. Never prune-then-copy — an
   # interrupted run must never leave the user with fewer agents than before.
   # Removal population is the destination directory (D2); ownership test is
-  # the massa-ai- name prefix (install.sh:775-777).
-  for f in "$TARGET/agents/"massa-ai-*.md; do
-    [[ -f "$f" ]] || continue
+  # is_owned_agent — so legacy massa-ai-<name> files are pruned on upgrade.
+  for f in "$TARGET/agents/"*.md; do
+    is_owned_agent "$f" || continue
     [[ -f "$ACTIVE_AGENTS_SRC/$(basename "$f")" ]] && continue
     rm -f "$f"
     vecho "  - removed retired specialist $(basename "$f")"

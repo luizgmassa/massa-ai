@@ -299,7 +299,8 @@ describe("opencode-plugin install.sh", () => {
     const res = runInstall(["--user"], { HOME: tmp });
     // Install should still succeed overall
     expect(res.exitCode).toBe(0);
-    expect(res.stderr).toContain("exists as a regular file");
+    // NAM AC-3: the warning names the skipped file.
+    expect(res.stderr).toContain(`${agentPath} exists and is not massa-ai-owned — skipped`);
 
     // File is untouched
     const content = await fs.readFile(agentPath, "utf8");

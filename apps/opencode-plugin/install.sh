@@ -419,6 +419,44 @@ try {
 NODE
 }
 
+# >>> massa-ai agent ownership predicates >>>
+# Byte-identical in every plugin installer and scripts/lib/installer-shared.sh
+# (plugin tarballs cannot source repo-only libs); the TS twin is
+# packages/shared/src/profile-switch/ownership.ts, and
+# scripts/__tests__/agent-ownership-parity.test.ts holds all copies and both
+# languages to identical verdicts. Ownership is a content marker, never a
+# filename; the legacy rule lets an upgrade prune the pre-rename
+# massa-ai-<name> files — exact names only, never an open massa-ai-* glob.
+MASSA_AI_OWNED_MARKER_MD='<!-- massa-ai-owned: true -->'
+MASSA_AI_LEGACY_AGENT_NAMES=" architecture-specialist audit-specialist builder context-curator designer documentation-agent furps-analyst investigator judge meta-judge mobile-specialist navigator plan-critic planner requirements-analyst reviewer test-engineer verification-agent "
+is_legacy_agent() {
+  local b
+  b="$(basename "$1")"
+  b="${b%.*}"
+  [[ "$b" == massa-ai-* && "$MASSA_AI_LEGACY_AGENT_NAMES" == *" ${b#massa-ai-} "* ]]
+}
+has_owned_marker() {
+  awk -v m="$MASSA_AI_OWNED_MARKER_MD" 'NR==1{if($0!="---")exit;next} !c&&$0=="---"{c=1;next} c{ok=($0==m);exit} END{exit !ok}' "$1" 2>/dev/null
+}
+is_owned_agent() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  is_legacy_agent "$1" || has_owned_marker "$1"
+}
+is_owned_agent_toml() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  [[ "$(head -n1 "$1")" == "# massa-ai-owned" ]]
+}
+is_owned_agent_link() {
+  [[ -L "$1" ]] || return 1
+  is_legacy_agent "$1" && return 0
+  local b t
+  b="$(basename "$1")"
+  t="$(readlink "$1")"
+  [[ "$t" == */opencode-plugin/agents/"$b" || "$t" == */plugins/massa-ai/agent-profiles/*/"$b" ]] && return 0
+  [[ -f "$1" ]] && has_owned_marker "$1"
+}
+# <<< massa-ai agent ownership predicates <<<
+
 # ── Uninstall ────────────────────────────────────────────────────────────────
 if [[ "$UNINSTALL" -eq 1 ]]; then
   vecho "Uninstalling massa-ai OpenCode plugin (scope: $SCOPE)..."
@@ -439,13 +477,12 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
   # from $SCRIPT_DIR/agents/*.md would miss installed copies whenever the
   # bundle is absent or stale at uninstall time (normal under AD-016), which
   # is exactly what left this loop removing zero agents before this fix. The
-  # ownership test stays symlink-ness ([[ -L ]]), unchanged — only the
-  # population widened.
+  # ownership test is is_owned_agent_link: a symlink into a massa-ai bundle, to
+  # a marked file, or legacy-named — never a regular file or a user's link.
   if [[ -d "$AGENTS_DIR" ]]; then
     removed=0
-    for dest in "$AGENTS_DIR/"massa-ai-*.md; do
-      [[ -e "$dest" || -L "$dest" ]] || continue
-      [[ -L "$dest" ]] || continue
+    for dest in "$AGENTS_DIR/"*.md; do
+      is_owned_agent_link "$dest" || continue
       rm -f "$dest"
       removed=$((removed + 1))
     done
@@ -606,16 +643,16 @@ if [[ -n "$RECORDED_PROFILE" ]]; then
 fi
 
 specialist_count=0
-for src in "$ACTIVE_AGENTS_SRC/"massa-ai-*.md; do
+for src in "$ACTIVE_AGENTS_SRC/"*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
 
-  # Pre-flight: refuse to clobber a regular file. A symlink is always safely
-  # relinked here regardless of its current target — that is what makes an
-  # upgrade re-apply a switched profile (F3) instead of freezing it.
-  if [[ -e "$AGENTS_DIR/$name" && ! -L "$AGENTS_DIR/$name" ]]; then
-    echo "Warning: $AGENTS_DIR/$name exists as a regular file (not a symlink)" >&2
-    echo "  Skipping to avoid overwriting user content." >&2
+  # Pre-flight: refuse to clobber user content — a regular file, or a symlink
+  # massa-ai does not own. An owned symlink is always relinked regardless of
+  # which bundle copy it points into — that is what makes an upgrade re-apply
+  # a switched profile (F3) instead of freezing it.
+  if [[ -e "$AGENTS_DIR/$name" || -L "$AGENTS_DIR/$name" ]] && ! is_owned_agent_link "$AGENTS_DIR/$name"; then
+    echo "  ⚠ $AGENTS_DIR/$name exists and is not massa-ai-owned — skipped" >&2
     continue
   fi
 
@@ -631,16 +668,14 @@ vecho "  + ${specialist_count} subagent specialists (generated from skills/agent
 # user no worse off than before the upgrade (D1). The removal population is
 # the destination directory; $ACTIVE_AGENTS_SRC (the same source the copy
 # loop above just used) supplies only the keep-predicate (D2/AC-02.1a).
-# Ownership test is symlink-ness (D3/AC-02.2), not a name prefix: the
-# pre-flight check above refuses to clobber a regular file at this path
-# because that is the user's own content, so this prune must leave a regular
-# file alone too, or it would delete exactly what that check protects
-# (AC-02.3).
+# Ownership test is is_owned_agent_link (D3/AC-02.2), not a name prefix: the
+# pre-flight check above refuses to clobber a regular file or a user's own
+# symlink at this path, so this prune must leave them alone too, or it would
+# delete exactly what that check protects (AC-02.3).
 if [[ -d "$AGENTS_DIR" ]]; then
   agents_pruned=0
-  for dest in "$AGENTS_DIR/"massa-ai-*.md; do
-    [[ -e "$dest" || -L "$dest" ]] || continue
-    [[ -L "$dest" ]] || continue
+  for dest in "$AGENTS_DIR/"*.md; do
+    is_owned_agent_link "$dest" || continue
     dest_name="$(basename "$dest")"
     [[ -f "$ACTIVE_AGENTS_SRC/$dest_name" ]] && continue
     rm -f "$dest"

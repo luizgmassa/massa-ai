@@ -1011,8 +1011,8 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(relative).toBe("~/.claude/agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain(relative);
-    expect(body).toContain(layout.activeGlob);
-    expect(layout.activeGlob).toBe("massa-ai-*.md");
+    expect(layout.activeExt).toBe(".md");
+    expect(body).toContain("| `*.md` whose first body line is `<!-- massa-ai-owned: true -->` |");
   });
 
   test("claude marketplace route: the doc's <marketplaceRoot>/agents pattern equals the resolver's suffix", async () => {
@@ -1079,8 +1079,8 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(relative).toBe("~/.codex/agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain(relative);
-    expect(layout.activeGlob).toBe("massa-ai-*.toml");
-    expect(body).toContain(layout.activeGlob);
+    expect(layout.activeExt).toBe(".toml");
+    expect(body).toContain("| `*.toml` whose first line is `# massa-ai-owned` |");
   });
 
   test("opencode: the doc's ~/.config/opencode/agents literal equals the resolver's home-relative path", async () => {
@@ -1091,8 +1091,8 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(relative).toBe("~/.config/opencode/agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain(relative);
-    expect(layout.activeGlob).toBe("massa-ai-*.md");
-    expect(body).toContain(layout.activeGlob);
+    expect(layout.activeExt).toBe(".md");
+    expect(body).toContain("| `*.md` symlinks into the massa-ai bundle |");
   });
 
   test("cursor: resolveHostLayout returns route skip, and the doc names no cursor installed-agent path", async () => {

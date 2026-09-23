@@ -588,6 +588,44 @@ unregister_codex_plugin() {
   CODEX_HOME="$CODEX_CLI_HOME" codex plugin marketplace remove "$CODEX_MARKETPLACE" </dev/null >/dev/null 2>&1 || true
 }
 
+# >>> massa-ai agent ownership predicates >>>
+# Byte-identical in every plugin installer and scripts/lib/installer-shared.sh
+# (plugin tarballs cannot source repo-only libs); the TS twin is
+# packages/shared/src/profile-switch/ownership.ts, and
+# scripts/__tests__/agent-ownership-parity.test.ts holds all copies and both
+# languages to identical verdicts. Ownership is a content marker, never a
+# filename; the legacy rule lets an upgrade prune the pre-rename
+# massa-ai-<name> files — exact names only, never an open massa-ai-* glob.
+MASSA_AI_OWNED_MARKER_MD='<!-- massa-ai-owned: true -->'
+MASSA_AI_LEGACY_AGENT_NAMES=" architecture-specialist audit-specialist builder context-curator designer documentation-agent furps-analyst investigator judge meta-judge mobile-specialist navigator plan-critic planner requirements-analyst reviewer test-engineer verification-agent "
+is_legacy_agent() {
+  local b
+  b="$(basename "$1")"
+  b="${b%.*}"
+  [[ "$b" == massa-ai-* && "$MASSA_AI_LEGACY_AGENT_NAMES" == *" ${b#massa-ai-} "* ]]
+}
+has_owned_marker() {
+  awk -v m="$MASSA_AI_OWNED_MARKER_MD" 'NR==1{if($0!="---")exit;next} !c&&$0=="---"{c=1;next} c{ok=($0==m);exit} END{exit !ok}' "$1" 2>/dev/null
+}
+is_owned_agent() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  is_legacy_agent "$1" || has_owned_marker "$1"
+}
+is_owned_agent_toml() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  [[ "$(head -n1 "$1")" == "# massa-ai-owned" ]]
+}
+is_owned_agent_link() {
+  [[ -L "$1" ]] || return 1
+  is_legacy_agent "$1" && return 0
+  local b t
+  b="$(basename "$1")"
+  t="$(readlink "$1")"
+  [[ "$t" == */opencode-plugin/agents/"$b" || "$t" == */plugins/massa-ai/agent-profiles/*/"$b" ]] && return 0
+  [[ -f "$1" ]] && has_owned_marker "$1"
+}
+# <<< massa-ai agent ownership predicates <<<
+
 # ── Uninstall ───────────────────────────────────────────────────────────────
 if [[ "$UNINSTALL" -eq 1 ]]; then
   echo "Uninstalling massa-ai Codex plugin (scope: $SCOPE)..."
@@ -608,8 +646,7 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
   if [[ -d "$AGENTS_DIR" ]]; then
     removed=0
     for f in "$AGENTS_DIR/"*.toml; do
-      [[ -f "$f" ]] || continue
-      if head -n1 "$f" | grep -q "^# massa-ai-owned$"; then
+      if is_owned_agent_toml "$f"; then
         rm -f "$f"
         removed=$((removed + 1))
       fi
@@ -706,9 +743,13 @@ if [[ -n "$json_runner" ]]; then
 fi
 
 specialist_count=0
-for src in "$ACTIVE_AGENTS_SRC/"massa-ai-*.toml; do
+for src in "$ACTIVE_AGENTS_SRC/"*.toml; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
+  if [[ -e "$AGENTS_DIR/$name" || -L "$AGENTS_DIR/$name" ]] && ! is_owned_agent_toml "$AGENTS_DIR/$name"; then
+    echo "  ⚠ $AGENTS_DIR/$name exists and is not massa-ai-owned — skipped" >&2
+    continue
+  fi
   cp "$src" "$AGENTS_DIR/$name"
   vecho "  + $name"
   specialist_count=$((specialist_count + 1))
@@ -733,8 +774,7 @@ vecho "  + ${specialist_count} subagent specialists (generated from skills/agent
 # (AC-02.3, AC-02.5).
 pruned=0
 for f in "$AGENTS_DIR/"*.toml; do
-  [[ -f "$f" ]] || continue
-  head -n1 "$f" | grep -q "^# massa-ai-owned$" || continue   # ownership test (D3)
+  is_owned_agent_toml "$f" || continue                        # ownership test (D3)
   base="$(basename "$f")"
   [[ -f "$ACTIVE_AGENTS_SRC/$base" ]] && continue             # keep-list: still shipped
   rm -f "$f"

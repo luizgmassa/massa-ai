@@ -285,6 +285,18 @@ installer_glob_present() {
   return 1
 }
 
+# installer_owned_agent_present <dir> <ext> <predicate>
+# 0 when at least one <dir>/*.<ext> exists (a dangling link does not) and
+# satisfies the ownership predicate (is_owned_agent | is_owned_agent_toml |
+# is_owned_agent_link, below).
+installer_owned_agent_present() {
+  local f
+  for f in "$1"/*."$2"; do
+    [ -e "$f" ] && "$3" "$f" && return 0
+  done
+  return 1
+}
+
 # installer_hooks_wired <json_file> [runner]
 # 0 when the file's top-level `hooks` map mentions massa-ai. Scoped to that
 # subtree deliberately: ~/.claude/settings.json also carries enabledPlugins and
@@ -362,6 +374,44 @@ if (route) process.stdout.write(route);
 NODE
 }
 
+# >>> massa-ai agent ownership predicates >>>
+# Byte-identical in every plugin installer and scripts/lib/installer-shared.sh
+# (plugin tarballs cannot source repo-only libs); the TS twin is
+# packages/shared/src/profile-switch/ownership.ts, and
+# scripts/__tests__/agent-ownership-parity.test.ts holds all copies and both
+# languages to identical verdicts. Ownership is a content marker, never a
+# filename; the legacy rule lets an upgrade prune the pre-rename
+# massa-ai-<name> files — exact names only, never an open massa-ai-* glob.
+MASSA_AI_OWNED_MARKER_MD='<!-- massa-ai-owned: true -->'
+MASSA_AI_LEGACY_AGENT_NAMES=" architecture-specialist audit-specialist builder context-curator designer documentation-agent furps-analyst investigator judge meta-judge mobile-specialist navigator plan-critic planner requirements-analyst reviewer test-engineer verification-agent "
+is_legacy_agent() {
+  local b
+  b="$(basename "$1")"
+  b="${b%.*}"
+  [[ "$b" == massa-ai-* && "$MASSA_AI_LEGACY_AGENT_NAMES" == *" ${b#massa-ai-} "* ]]
+}
+has_owned_marker() {
+  awk -v m="$MASSA_AI_OWNED_MARKER_MD" 'NR==1{if($0!="---")exit;next} !c&&$0=="---"{c=1;next} c{ok=($0==m);exit} END{exit !ok}' "$1" 2>/dev/null
+}
+is_owned_agent() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  is_legacy_agent "$1" || has_owned_marker "$1"
+}
+is_owned_agent_toml() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  [[ "$(head -n1 "$1")" == "# massa-ai-owned" ]]
+}
+is_owned_agent_link() {
+  [[ -L "$1" ]] || return 1
+  is_legacy_agent "$1" && return 0
+  local b t
+  b="$(basename "$1")"
+  t="$(readlink "$1")"
+  [[ "$t" == */opencode-plugin/agents/"$b" || "$t" == */plugins/massa-ai/agent-profiles/*/"$b" ]] && return 0
+  [[ -f "$1" ]] && has_owned_marker "$1"
+}
+# <<< massa-ai agent ownership predicates <<<
+
 # installer_plugin_sentinel_present <host> <target_home> <state_file>
 # 0 = EVERY artifact class a plugin reinstall would restore is on disk; 1 = at
 # least one is absent, which also covers any parse/route-lookup failure, a
@@ -373,25 +423,25 @@ NODE
 # HOME and enumerating what landed, not read off the installers' prose:
 #
 #   claude   route=marketplace → a listed massa-ai entry whose installPath is
-#                                a real directory, holding agents/massa-ai-*.md
+#                                a real directory, holding owned agents/*.md
 #                                AND commands/*.md. The file-route copies are
 #                                deleted on this route (remove_file_route_-
 #                                artifacts) and the settings.json hook merge is
 #                                skipped, so demanding either would never
 #                                terminate. Measured live: 18 agents,
 #                                46 commands under the 1.52.0 cache dir.
-#   claude   route=file | ""   → ~/.claude/agents/massa-ai-*.md
+#   claude   route=file | ""   → an owned ~/.claude/agents/*.md
 #                              + ~/.claude/commands/massa-ai-*.md
 #                              + massa-ai entries in settings.json → hooks
 #                                (measured: 18 / 46 / 5 events)
 #   codex    (single route)    → ~/.codex/plugins/massa-ai/ (its skills/*.md
 #                                ARE the 46 workflow commands)
-#                              + ~/.codex/agents/massa-ai-*.toml
+#                              + an owned ~/.codex/agents/*.toml
 #                              + massa-ai entries in ~/.codex/hooks.json
 #                                (measured: 46 / 18 / 6 events)
 #   cursor   route=local | ""  → ~/.cursor/plugins/local/massa-ai/ (its
 #                                skills/*/SKILL.md are the 46 commands)
-#                              + ~/.cursor/agents/massa-ai-*.md
+#                              + an owned ~/.cursor/agents/*.md
 #                              + massa-ai entries in ~/.cursor/hooks.json
 #                                (measured: 46 / 18 / 7 events)
 #   cursor   route=bridge      → as local, MINUS hooks: --prefer-bridge leaves
@@ -399,7 +449,7 @@ NODE
 #                                hooks demand here reinstalls on every run.
 #   opencode (single route)    → plugins/massa-ai/index.js a regular file
 #                                (never a symlink)
-#                              + ~/.config/opencode/agents/massa-ai-*.md
+#                              + an owned ~/.config/opencode/agents/*.md link
 #                              + ~/.config/opencode/command/massa-ai-*.md
 #                                (measured: 18 / 40). AD-017: its hooks are
 #                                in-process handlers inside index.js, so the
@@ -435,11 +485,11 @@ installer_plugin_sentinel_present() {
       if [ "$route" = "marketplace" ]; then
         bundle="$(installer_claude_bundle_path "$target_home" "$runner")"
         [ -n "$bundle" ] || return 1
-        installer_glob_present "${bundle}/agents/massa-ai-*.md" || return 1
+        installer_owned_agent_present "${bundle}/agents" md is_owned_agent || return 1
         installer_glob_present "${bundle}/commands/"'*.md' || return 1
         return 0
       fi
-      installer_glob_present "${target_home}/.claude/agents/massa-ai-*.md" || return 1
+      installer_owned_agent_present "${target_home}/.claude/agents" md is_owned_agent || return 1
       installer_glob_present "${target_home}/.claude/commands/massa-ai-*.md" || return 1
       installer_hooks_wired "${target_home}/.claude/settings.json" "$runner" || return 1
       return 0
@@ -448,7 +498,7 @@ installer_plugin_sentinel_present() {
       plugin_dir="${target_home}/.codex/plugins/massa-ai"
       [ -d "$plugin_dir" ] || return 1
       installer_glob_present "${plugin_dir}/skills/"'*.md' || return 1
-      installer_glob_present "${target_home}/.codex/agents/massa-ai-*.toml" || return 1
+      installer_owned_agent_present "${target_home}/.codex/agents" toml is_owned_agent_toml || return 1
       installer_hooks_wired "${target_home}/.codex/hooks.json" "$runner" || return 1
       return 0
       ;;
@@ -456,7 +506,7 @@ installer_plugin_sentinel_present() {
       plugin_dir="${target_home}/.cursor/plugins/local/massa-ai"
       [ -d "$plugin_dir" ] || return 1
       installer_glob_present "${plugin_dir}/skills/"'*/SKILL.md' || return 1
-      installer_glob_present "${target_home}/.cursor/agents/massa-ai-*.md" || return 1
+      installer_owned_agent_present "${target_home}/.cursor/agents" md is_owned_agent || return 1
       if [ "$route" != "bridge" ]; then
         installer_hooks_wired "${target_home}/.cursor/hooks.json" "$runner" || return 1
       fi
@@ -465,7 +515,7 @@ installer_plugin_sentinel_present() {
     opencode)
       plugin_js="${target_home}/.config/opencode/plugins/massa-ai/index.js"
       if [ ! -f "$plugin_js" ] || [ -L "$plugin_js" ]; then return 1; fi
-      installer_glob_present "${target_home}/.config/opencode/agents/massa-ai-*.md" || return 1
+      installer_owned_agent_present "${target_home}/.config/opencode/agents" md is_owned_agent_link || return 1
       installer_glob_present "${target_home}/.config/opencode/command/massa-ai-*.md" || return 1
       return 0
       ;;

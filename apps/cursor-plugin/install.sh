@@ -565,6 +565,44 @@ fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
 NODE
 }
 
+# >>> massa-ai agent ownership predicates >>>
+# Byte-identical in every plugin installer and scripts/lib/installer-shared.sh
+# (plugin tarballs cannot source repo-only libs); the TS twin is
+# packages/shared/src/profile-switch/ownership.ts, and
+# scripts/__tests__/agent-ownership-parity.test.ts holds all copies and both
+# languages to identical verdicts. Ownership is a content marker, never a
+# filename; the legacy rule lets an upgrade prune the pre-rename
+# massa-ai-<name> files — exact names only, never an open massa-ai-* glob.
+MASSA_AI_OWNED_MARKER_MD='<!-- massa-ai-owned: true -->'
+MASSA_AI_LEGACY_AGENT_NAMES=" architecture-specialist audit-specialist builder context-curator designer documentation-agent furps-analyst investigator judge meta-judge mobile-specialist navigator plan-critic planner requirements-analyst reviewer test-engineer verification-agent "
+is_legacy_agent() {
+  local b
+  b="$(basename "$1")"
+  b="${b%.*}"
+  [[ "$b" == massa-ai-* && "$MASSA_AI_LEGACY_AGENT_NAMES" == *" ${b#massa-ai-} "* ]]
+}
+has_owned_marker() {
+  awk -v m="$MASSA_AI_OWNED_MARKER_MD" 'NR==1{if($0!="---")exit;next} !c&&$0=="---"{c=1;next} c{ok=($0==m);exit} END{exit !ok}' "$1" 2>/dev/null
+}
+is_owned_agent() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  is_legacy_agent "$1" || has_owned_marker "$1"
+}
+is_owned_agent_toml() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  [[ "$(head -n1 "$1")" == "# massa-ai-owned" ]]
+}
+is_owned_agent_link() {
+  [[ -L "$1" ]] || return 1
+  is_legacy_agent "$1" && return 0
+  local b t
+  b="$(basename "$1")"
+  t="$(readlink "$1")"
+  [[ "$t" == */opencode-plugin/agents/"$b" || "$t" == */plugins/massa-ai/agent-profiles/*/"$b" ]] && return 0
+  [[ -f "$1" ]] && has_owned_marker "$1"
+}
+# <<< massa-ai agent ownership predicates <<<
+
 # ── Uninstall ───────────────────────────────────────────────────────────────
 if [[ "$UNINSTALL" -eq 1 ]]; then
   echo "Uninstalling massa-ai Cursor plugin (scope: $SCOPE)..."
@@ -575,11 +613,12 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
     echo "  - removed massa-ai hook entries from $HOOKS_JSON"
   fi
   # Remove the massa-ai-owned subagents from Cursor's discovery directory.
-  # Prefix glob only: user-authored agents in the same flat dir survive.
+  # Ownership is is_owned_agent (body marker or legacy name): user-authored
+  # agents in the same flat dir survive, even when named like ours.
   if [[ -d "$CURSOR_AGENTS_DIR" ]]; then
     removed_agents=0
-    for agent in "$CURSOR_AGENTS_DIR/"massa-ai-*.md; do
-      [[ -f "$agent" ]] || continue
+    for agent in "$CURSOR_AGENTS_DIR/"*.md; do
+      is_owned_agent "$agent" || continue
       rm -f "$agent"
       removed_agents=$((removed_agents + 1))
     done
@@ -716,8 +755,8 @@ fi
 # Cursor discovers subagents only from the flat directory regardless of which
 # plugin-load path is active, and MCP/harness-skills ownership is independent
 # of it too. All of them, navigator included, are generated from
-# skills/agents/*/SKILL.md and owned by the massa-ai- name prefix (CRS-04) —
-# user-authored agents are untouched.
+# skills/agents/*/SKILL.md and carry the body ownership marker — a
+# user-authored agent is untouched, and a same-named one is skipped.
 #
 # Copy-then-prune (D1/IPT-02 AC-02.6), not prune-then-copy: this loop copies
 # the current set first, and only afterward sheds destination entries the
@@ -727,9 +766,13 @@ fi
 # order the worst case is a retired agent lingering one run longer, which is
 # the pre-fix status quo this feature already tolerates.
 mkdir -p "$CURSOR_AGENTS_DIR"
-for src in "$SCRIPT_DIR/agents/"massa-ai-*.md; do
+for src in "$SCRIPT_DIR/agents/"*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
+  if [[ -e "$CURSOR_AGENTS_DIR/$name" || -L "$CURSOR_AGENTS_DIR/$name" ]] && ! is_owned_agent "$CURSOR_AGENTS_DIR/$name"; then
+    echo "  ⚠ $CURSOR_AGENTS_DIR/$name exists and is not massa-ai-owned — skipped" >&2
+    continue
+  fi
   cp "$src" "$CURSOR_AGENTS_DIR/$name"
   vecho "  + $name"
   specialist_count=$((specialist_count + 1))
@@ -739,10 +782,10 @@ vecho "  + ${specialist_count} subagent specialists (generated from skills/agent
 # Shed owned members the bundle no longer ships (D2): the removal population
 # is the destination directory; the bundle supplies only the keep-predicate.
 # Loop over the destination, consult the bundle only to decide whether to
-# keep — never loop over the bundle to decide removals. Ownership test is the
-# massa-ai- name prefix (D3), same as the uninstall loop above.
-for f in "$CURSOR_AGENTS_DIR/"massa-ai-*.md; do
-  [[ -f "$f" ]] || continue
+# keep — never loop over the bundle to decide removals. Ownership test is
+# is_owned_agent (D3), same as the uninstall loop above.
+for f in "$CURSOR_AGENTS_DIR/"*.md; do
+  is_owned_agent "$f" || continue
   name="$(basename "$f")"
   [[ -f "$SCRIPT_DIR/agents/$name" ]] && continue   # keep-list: still shipped
   rm -f "$f"

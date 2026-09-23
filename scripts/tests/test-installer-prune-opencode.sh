@@ -5,12 +5,12 @@
 # apps/opencode-plugin/install.sh — IPT-02 sites 4-5, IPT-03 site 7, IPT-05.
 #
 #   Site 4 (agent symlinks into $AGENTS_DIR, D1 copy-then-prune): ownership is
-#   SYMLINK-NESS ([[ -L ]]), not a name prefix — the copy loop directly above
-#   refuses to clobber a regular file at an owned path (it is the user's
-#   content), so the prune must leave a regular file alone too, or it would
-#   delete exactly what that loop protects (AC-02.3). Scenario (b) below is
-#   the discriminating case: it catches a prune written as an unconditional
-#   `rm -f massa-ai-*.md` that ignores symlink-ness.
+#   is_owned_agent_link (a symlink into a massa-ai bundle or to a marked file),
+#   not a name prefix — the copy loop directly above refuses to clobber a
+#   regular file (it is the user's content), so the prune must leave a regular
+#   file alone too, or it would delete exactly what that loop protects
+#   (AC-02.3). Scenario (b) below is the discriminating case: it catches a
+#   prune written as an unconditional `rm -f *.md` that ignores symlink-ness.
 #
 #   Site 5 (workflow commands into $COMMANDS_DIR, D1 copy-then-prune):
 #   ownership IS the massa-ai- name prefix (D3, opencode's own uninstall at
@@ -105,7 +105,7 @@ H1="$ROOT/h1"; mkdir -p "$H1"
 AGENTS_DIR1="$H1/.config/opencode/agents"
 mkdir -p "$AGENTS_DIR1"
 
-RETIRED_LINK="$AGENTS_DIR1/massa-ai-retired-specialist.md"
+RETIRED_LINK="$AGENTS_DIR1/retired-specialist.md"
 ln -sfn "$FIXTURE_AGENT_PATH" "$RETIRED_LINK"
 assert_symlink_to "fixture planted as a real symlink (not a regular file)" "$RETIRED_LINK" "$FIXTURE_AGENT_PATH"
 
@@ -125,7 +125,7 @@ H2="$ROOT/h2"; mkdir -p "$H2"
 AGENTS_DIR2="$H2/.config/opencode/agents"
 mkdir -p "$AGENTS_DIR2"
 
-REGULAR_FILE="$AGENTS_DIR2/massa-ai-fake-specialist.md"
+REGULAR_FILE="$AGENTS_DIR2/fake-specialist.md"
 echo "this is a regular file the installer must never delete" > "$REGULAR_FILE"
 BEFORE_CONTENT="$(cat "$REGULAR_FILE")"
 
@@ -139,7 +139,7 @@ echo ""
 # ── Scenario (d), agents half: the current agent set is present ────────────
 echo "Scenario (d): the current agent and command sets are present after install"
 CURRENT_AGENT_COUNT=0
-for src in "$SOURCE_AGENTS_DIR/"massa-ai-*.md; do
+for src in "$SOURCE_AGENTS_DIR/"*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
   assert_file "current agent $name installed (h2)" "$AGENTS_DIR2/$name"
@@ -194,7 +194,7 @@ assert_symlink_to "pre-step: fixture agent installed as a symlink" \
 INSTALLED_BEFORE_UNINSTALL=()
 while IFS= read -r -d '' f; do
   INSTALLED_BEFORE_UNINSTALL+=("$(basename "$f")")
-done < <(find "$AGENTS_DIR4" -maxdepth 1 -name 'massa-ai-*.md' -print0)
+done < <(find "$AGENTS_DIR4" -maxdepth 1 -name '*.md' -print0)
 check "sanity: pre-step installed more than zero agent symlinks" \
   "$([ "${#INSTALLED_BEFORE_UNINSTALL[@]}" -gt 0 ] && echo 0 || echo 1)"
 

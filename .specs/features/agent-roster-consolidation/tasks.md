@@ -159,15 +159,15 @@ T12 → T13
 
 **Done when**:
 
-- [ ] Per host: planted unmarked `builder.<ext>` is byte-identical after install and uninstall; install prints the skip warning. OpenCode: a user symlink `builder.md` → `~/dotfiles/opencode/agents/builder.md` (unmarked) keeps its target
-- [ ] OpenCode cross-location: install from bundle copy A, then from copy B → all links point into B, no skip warning; profile switch then reinstall → links still follow the recorded profile; delete A, reinstall → dangling link relinked; uninstall removes it
-- [ ] Claude/Cursor legacy: an unmarked `massa-ai-reviewer.md` shaped like `git show f582b602` output (not copied from a marked bundle) is pruned; unmarked `massa-ai-mine.md` survives
-- [ ] Predicate parity: one fixture set (incl. marker mid-body, marker on line 1 of a no-frontmatter file) gives identical verdicts from the bash `is_owned_agent` and TS `isOwnedAgentFile`
-- [ ] Codex `massa-ai-mine.toml` (unmarked) still survives (`test-installer-prune-codex.sh`)
-- [ ] Legacy `massa-ai-<old>` files pruned; marked retired file pruned; re-install is a no-op
-- [ ] Engine: foreign dest untouched; legacy-named or unmarked variant entries never copied (NAM AC-11)
-- [ ] Observed red: with any one converted glob reverted, at least one updated suite fails (recorded in commit body)
-- [ ] `installer-removal-derivation` sweep green; gate: shared + scripts + plugins green
+- [x] Per host: planted unmarked `builder.<ext>` is byte-identical after install and uninstall; install prints the skip warning. OpenCode: a user symlink `builder.md` → `~/dotfiles/opencode/agents/builder.md` (unmarked) keeps its target
+- [x] OpenCode cross-location: install from bundle copy A, then from copy B → all links point into B, no skip warning; profile switch then reinstall → links still follow the recorded profile; delete A, reinstall → dangling link relinked; uninstall removes it
+- [x] Claude/Cursor legacy: an unmarked `massa-ai-reviewer.md` shaped like `git show f582b602` output (not copied from a marked bundle) is pruned; unmarked `massa-ai-mine.md` survives
+- [x] Predicate parity: one fixture set (incl. marker mid-body, marker on line 1 of a no-frontmatter file) gives identical verdicts from the bash `is_owned_agent` and TS `isOwnedAgentFile`
+- [x] Codex `massa-ai-mine.toml` (unmarked) still survives (`test-installer-prune-codex.sh`)
+- [x] Legacy `massa-ai-<old>` files pruned; marked retired file pruned; re-install is a no-op
+- [x] Engine: foreign dest untouched; legacy-named or unmarked variant entries never copied (NAM AC-11)
+- [x] Observed red: with any one converted glob reverted, at least one updated suite fails (recorded in commit body)
+- [x] `installer-removal-derivation` sweep green; gate: shared + scripts + plugins green
 
 **Tests**: integration + unit
 **Gate**: shared, scripts, plugins

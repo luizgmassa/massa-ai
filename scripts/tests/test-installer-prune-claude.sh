@@ -10,8 +10,8 @@
 #        with fewer agents/commands than before)
 #   D2 — the removal population is always the destination directory; the
 #        bundle supplies only a keep-predicate
-#   D3 — claude's ownership test is the massa-ai- name prefix
-#        (install.sh:765, :775-777)
+#   D3 — claude's agent ownership test is is_owned_agent (body marker or a
+#        legacy massa-ai-<name>); commands keep the massa-ai- name prefix
 #
 # Every scenario PLANTS a retired member in the destination first — a test
 # that only asserts the current set is present would pass identically before
@@ -48,16 +48,21 @@ CURRENT_COMMAND_COUNT="$(find "$PROJECT_ROOT/apps/claude-plugin/commands" -maxde
 
 echo "Scenario 1: agents copy-then-prune sheds a retired specialist (IPT-02 site 1)"
 H1="$ROOT/h1"; mkdir -p "$H1/.claude/agents"
-: > "$H1/.claude/agents/massa-ai-retired-specialist.md"
-: > "$H1/.claude/agents/user-owned-agent.md"   # no massa-ai- prefix — must survive
+# Ownership is the body marker, not the name (NAM AC-4): a retired, marked
+# agent is pruned; an unmarked user agent survives.
+printf -- '---\nname: retired-specialist\n---\n<!-- massa-ai-owned: true -->\nbody\n' \
+  > "$H1/.claude/agents/retired-specialist.md"
+: > "$H1/.claude/agents/user-owned-agent.md"   # no ownership marker — must survive
 run_install "$H1" --user
 RC1=$?
 check "install exits 0" "$RC1"
-assert_no_file "retired specialist removed" "$H1/.claude/agents/massa-ai-retired-specialist.md"
-assert_file "current specialist (navigator) present" "$H1/.claude/agents/massa-ai-navigator.md"
-assert_eq "every current specialist installed" \
-  "$(find "$H1/.claude/agents" -maxdepth 1 -name 'massa-ai-*.md' | wc -l | tr -d ' ')" \
-  "$(find "$PROJECT_ROOT/apps/claude-plugin/agents" -maxdepth 1 -name 'massa-ai-*.md' | wc -l | tr -d ' ')"
+assert_no_file "retired specialist removed" "$H1/.claude/agents/retired-specialist.md"
+for src in "$PROJECT_ROOT/apps/claude-plugin/agents/"*.md; do
+  assert_file "current specialist $(basename "$src") present" "$H1/.claude/agents/$(basename "$src")"
+done
+assert_eq "every current specialist installed, nothing else added" \
+  "$(find "$H1/.claude/agents" -maxdepth 1 -name '*.md' ! -name 'user-owned-agent.md' | wc -l | tr -d ' ')" \
+  "$(find "$PROJECT_ROOT/apps/claude-plugin/agents" -maxdepth 1 -name '*.md' | wc -l | tr -d ' ')"
 assert_file "non-massa-ai file untouched" "$H1/.claude/agents/user-owned-agent.md"
 
 echo ""

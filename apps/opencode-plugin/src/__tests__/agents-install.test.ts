@@ -147,8 +147,9 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
   });
 
   // D9: an agent installed by an OLDER version carries the marker in frontmatter.
-  // The substring match is unchanged, so uninstall must still remove both forms --
-  // otherwise upgrading would silently orphan whatever the previous version installed.
+  // Every older version named its agents massa-ai-<one of the 18 legacy names>, so
+  // the legacy-name rule removes that form (NAM AC-4, A17) -- otherwise upgrading
+  // would silently orphan whatever the previous version installed.
   test("D9: uninstall removes BOTH the old frontmatter-marker form and the new body form", async () => {
     const agentsDir = path.join(xdgConfig, "opencode/agents");
     runCli(["agents", "install", "--user"], {
@@ -157,10 +158,10 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     });
 
     // Simulate a file left behind by a pre-registry install: marker in frontmatter.
-    const oldForm = path.join(agentsDir, "massa-ai-legacy-shape.md");
+    const oldForm = path.join(agentsDir, "massa-ai-context-curator.md");
     await fs.writeFile(
       oldForm,
-      "---\nname: massa-ai-legacy-shape\ndescription: old\nmode: all\n" +
+      "---\nname: massa-ai-context-curator\ndescription: old\nmode: all\n" +
         "metadata: { massa-ai-owned: true }\n---\nbody\n",
     );
     // And a user agent with no marker at all, which must survive.

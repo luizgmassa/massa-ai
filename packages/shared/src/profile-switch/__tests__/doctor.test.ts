@@ -67,7 +67,7 @@ function stagePinnedRegistry(version: string, installPath: string): void {
   });
 }
 
-const AGENT_FILE = "---\nname: massa-ai-investigator\nmodel: glm-5.3-flash-tencent-claude[1m]\neffort: max\n---\nbody\n";
+const AGENT_FILE = "---\nname: investigator\nmodel: glm-5.3-flash-tencent-claude[1m]\neffort: max\n---\n<!-- massa-ai-owned: true -->\nbody\n";
 
 /** INV1: snapshot every file under `root` (relativePath → bytes). */
 function snapshot(root: string): Map<string, string> {
@@ -86,10 +86,10 @@ function snapshot(root: string): Map<string, string> {
 describe("runtimeDriftReport — directory-source route", () => {
   test("reports the live tree, both stale version recordings, roles, and drift", () => {
     const bundleRoot = stageDirectorySource("1.57.0");
-    writeText(path.join(bundleRoot, "agents", "massa-ai-investigator.md"), AGENT_FILE);
-    writeText(path.join(bundleRoot, "agents", "massa-ai-designer.md"), AGENT_FILE.replace("investigator", "designer"));
-    writeText(path.join(bundleRoot, "agent-profiles", "work", "massa-ai-investigator.md"), AGENT_FILE);
-    writeText(path.join(bundleRoot, "agent-profiles", "work", "massa-ai-designer.md"), AGENT_FILE.replace("investigator", "designer"));
+    writeText(path.join(bundleRoot, "agents", "investigator.md"), AGENT_FILE);
+    writeText(path.join(bundleRoot, "agents", "designer.md"), AGENT_FILE.replace("investigator", "designer"));
+    writeText(path.join(bundleRoot, "agent-profiles", "work", "investigator.md"), AGENT_FILE);
+    writeText(path.join(bundleRoot, "agent-profiles", "work", "designer.md"), AGENT_FILE.replace("investigator", "designer"));
     stageState({
       root: "/x", skills: [], skillsOwner: "plugin",
       installRoute: "marketplace",
@@ -108,8 +108,8 @@ describe("runtimeDriftReport — directory-source route", () => {
     expect(report.versionDrift).toBe(true);
     expect(report.activeProfile).toBe("work");
     expect(report.roles.map((r) => r.name).sort()).toEqual([
-      "massa-ai-designer.md",
-      "massa-ai-investigator.md",
+      "designer.md",
+      "investigator.md",
     ]);
     expect(report.roles.every((r) => r.model === "glm-5.3-flash-tencent-claude[1m]")).toBe(true);
     expect(report.roles.every((r) => r.effort === "max")).toBe(true);
@@ -120,9 +120,9 @@ describe("runtimeDriftReport — directory-source route", () => {
 
   test("a regenerated variant that disagrees with the active file is drift (re-switch needed)", () => {
     const bundleRoot = stageDirectorySource("1.57.0");
-    writeText(path.join(bundleRoot, "agents", "massa-ai-investigator.md"), AGENT_FILE);
+    writeText(path.join(bundleRoot, "agents", "investigator.md"), AGENT_FILE);
     writeText(
-      path.join(bundleRoot, "agent-profiles", "work", "massa-ai-investigator.md"),
+      path.join(bundleRoot, "agent-profiles", "work", "investigator.md"),
       AGENT_FILE.replace("glm-5.3-flash", "glm-5.2"),
     );
     stageState({
@@ -132,13 +132,13 @@ describe("runtimeDriftReport — directory-source route", () => {
     });
 
     const report = runtimeDriftReport({ targetHome: home, env: {} });
-    expect(report.roles.find((r) => r.name === "massa-ai-investigator.md")?.staleVariant).toBe(true);
+    expect(report.roles.find((r) => r.name === "investigator.md")?.staleVariant).toBe(true);
     expect(report.profileMaterialized).toBe(true);
   });
 
   test("an incomparable pair (variant missing) is unknown, not drift (no false positives)", () => {
     const bundleRoot = stageDirectorySource("1.57.0");
-    writeText(path.join(bundleRoot, "agents", "massa-ai-investigator.md"), AGENT_FILE);
+    writeText(path.join(bundleRoot, "agents", "investigator.md"), AGENT_FILE);
     stageState({
       root: "/x", skills: [], skillsOwner: "plugin",
       installRoute: "marketplace", plugin: { version: "1.57.0" },
@@ -146,7 +146,7 @@ describe("runtimeDriftReport — directory-source route", () => {
     });
 
     const report = runtimeDriftReport({ targetHome: home, env: {} });
-    expect(report.roles.find((r) => r.name === "massa-ai-investigator.md")?.staleVariant).toBe(false);
+    expect(report.roles.find((r) => r.name === "investigator.md")?.staleVariant).toBe(false);
     expect(report.profileMaterialized).toBe(false);
   });
 });
@@ -155,7 +155,7 @@ describe("runtimeDriftReport — registry-cache route (AC-01.2 fallback fixture)
   test("a non-directory marketplace falls through to the pinned cache, never live-load semantics", () => {
     const cacheRoot = path.join(home, "cache", "massa-ai", "1.56.0");
     writeJson(path.join(cacheRoot, ".claude-plugin", "plugin.json"), { version: "1.56.0" });
-    writeText(path.join(cacheRoot, "agents", "massa-ai-investigator.md"), AGENT_FILE);
+    writeText(path.join(cacheRoot, "agents", "investigator.md"), AGENT_FILE);
     writeJson(path.join(home, ".claude", "plugins", "known_marketplaces.json"), {
       "massa-ai": { source: { source: "github", repo: "octo/example" }, installLocation: "/opt/unused" },
     });
@@ -211,8 +211,8 @@ describe("runtimeDriftReport — degraded and guarded (INV1)", () => {
 
   test("read-only: the report leaves every staged byte identical", () => {
     const bundleRoot = stageDirectorySource("1.57.0");
-    writeText(path.join(bundleRoot, "agents", "massa-ai-investigator.md"), AGENT_FILE);
-    writeText(path.join(bundleRoot, "agent-profiles", "work", "massa-ai-investigator.md"), AGENT_FILE);
+    writeText(path.join(bundleRoot, "agents", "investigator.md"), AGENT_FILE);
+    writeText(path.join(bundleRoot, "agent-profiles", "work", "investigator.md"), AGENT_FILE);
     stageState({ root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace", plugin: { version: "1.56.0" } });
     stagePinnedRegistry("1.56.0", path.join(home, "unused-cache"));
 

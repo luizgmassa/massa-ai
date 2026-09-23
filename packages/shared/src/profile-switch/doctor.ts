@@ -28,6 +28,7 @@ import {
   resolveClaudeMarketplaceInstall,
 } from "./claude-marketplace.js";
 import { parseFrontmatter } from "./frontmatter.js";
+import { isOwnedAgentFile } from "./ownership.js";
 import { readInstallState, type InstallState } from "./state.js";
 
 /** Host env vars that override per-agent models at runtime. Extend here, not
@@ -132,7 +133,7 @@ function readRoles(
   }
   const roles: AgentRoleRuntime[] = [];
   for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.startsWith("massa-ai-") || !entry.name.endsWith(".md")) {
+    if (!entry.name.endsWith(".md") || !isOwnedAgentFile(path.join(agentsDir, entry.name))) {
       continue;
     }
     const activeRaw = readTextFile(path.join(agentsDir, entry.name));

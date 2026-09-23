@@ -850,7 +850,7 @@ print_opencode_plugin_instructions() {
   echo ""
   echo -e "  ${CYAN}3. Install the 18 subagent specialists:${NC}"
   echo -e "     ${CYAN}massa-ai-config agents install --user${NC}"
-  echo -e "     (writes 12 massa-ai-*.md to ~/.config/opencode/agents/)"
+  echo -e "     (writes the massa-ai-owned agents to ~/.config/opencode/agents/)"
 }
 
 # ── Show MCP integration instructions ────────────────────────
