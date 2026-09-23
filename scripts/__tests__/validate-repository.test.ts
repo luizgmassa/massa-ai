@@ -37,7 +37,6 @@ async function readFile(p: string): Promise<string> {
 describe("skill file structure validation", () => {
   const expectedSkills = [
     "massa-ai",
-    "profile",
     "bootstrap",
   ];
 
@@ -112,7 +111,7 @@ describe("skills/AGENTS.md bootstrap contract", () => {
   test("sub-agent registry preserved (7 agents)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "AGENTS.md"));
     for (const agent of [
-      "builder", "code-explorer", "code-reviewer", "designer",
+      "senior-engineer", "code-explorer", "code-reviewer", "designer",
       "judge", "product-manager", "test-engineer",
     ]) {
       expect(content).toContain(`| ${agent} |`);
@@ -544,7 +543,7 @@ describe("context slices", () => {
 describe("agents harness routing", () => {
   const AGENTS_SUBDIR = path.join(SKILLS_DIR, "agents");
   const EXPECTED_AGENTS = [
-    "builder", "code-explorer", "code-reviewer", "designer",
+    "senior-engineer", "code-explorer", "code-reviewer", "designer",
     "judge", "product-manager", "test-engineer",
   ];
 

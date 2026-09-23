@@ -19,7 +19,7 @@ pass reads one coherent slice.
 
 ## Stage 1 — Pre-Analysis (always first, exactly one subagent)
 
-Dispatch one read-only subagent (`code-explorer`, `trace` mode; Figma MCP — Model Context
+Dispatch one read-only subagent (`designer`, `trace` mode; Figma MCP — Model Context
 Protocol — access, no repository mutation) over the user-provided Figma links.
 Its job: understanding, **not** extraction:
 

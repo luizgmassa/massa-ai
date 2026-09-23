@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
@@ -31,7 +31,10 @@ function dispatchTargets(text: string): string[] {
   return [...found].sort();
 }
 
-const FIX_TRIO = ["builder", "code-reviewer/review", "code-reviewer/verify"];
+// `code-reviewer/audit` covers both the diff review (`lens: diff`, merged from
+// the retired `review` mode) and, on the audit-only workflows below, the
+// other lenses — `dispatchTargets` tracks `agent/mode` only, not lens.
+const FIX_TRIO = ["senior-engineer", "code-reviewer/audit", "code-reviewer/verify"];
 
 const EXPECTED: Record<string, string[]> = {
   // Dispatch AC-1: audits → code-reviewer with the matching lens; implementation-audit
@@ -45,20 +48,20 @@ const EXPECTED: Record<string, string[]> = {
     "product-manager/audit",
     "test-engineer/audit",
   ],
-  // Dispatch AC-2: fixes → builder implements, code-reviewer reviews and verifies.
+  // Dispatch AC-2: fixes → senior-engineer implements, code-reviewer reviews and verifies.
   "architecture/architecture-fix.md": FIX_TRIO,
   "bugs/bugs-fix.md": FIX_TRIO,
   "code-quality/code-quality-fix.md": FIX_TRIO,
   "security/security-fix.md": FIX_TRIO,
   "implementation/implementation-fix.md": [...FIX_TRIO, "designer/implement"],
-  // A7: requirements-fix keeps builder.
+  // A7: requirements-fix keeps senior-engineer.
   "requirements/requirements-fix.md": FIX_TRIO,
   // Dispatch AC-3: tests family → test-engineer audits and implements.
   "tests/tests-audit.md": ["test-engineer/audit"],
-  // A production seam for deterministic testing is builder's; test-engineer writes test files only.
+  // A production seam for deterministic testing is senior-engineer's; test-engineer writes test files only.
   "tests/tests-fix.md": [
-    "builder",
-    "code-reviewer/review",
+    "senior-engineer",
+    "code-reviewer/audit",
     "code-reviewer/verify",
     "test-engineer/fix",
   ],
@@ -164,9 +167,9 @@ describe("designer is unconditional in the design family (Dispatch AC-5)", () =>
     }
   });
 
-  test("mobile-figma-fix dispatches builder only for non-UI-layer wiring", () => {
+  test("mobile-figma-fix dispatches senior-engineer only for non-UI-layer wiring", () => {
     const text = read(path.join(WORKFLOWS, "mobile-figma/mobile-figma-fix.md"));
-    const start = text.indexOf("> **Dispatch: `builder`**");
+    const start = text.indexOf("> **Dispatch: `senior-engineer`**");
     expect(start).toBeGreaterThan(-1);
     const block = text.slice(start, text.indexOf("\n\n", start));
     expect(block).toContain(
@@ -224,6 +227,24 @@ function charterOf(agent: string): string {
   return read(path.join(SKILLS, "agents", agent, "SKILL.md"));
 }
 
+/**
+ * Charter text plus the content of every lazy mode-contract file it stubs
+ * (agent-roster-revision LZY-02), so a per-mode declaration such as `lens`
+ * that a lazy charter moved out of the shared body is still visible to a
+ * check that only reads the charter itself.
+ */
+function charterWithModeContracts(agent: string): string {
+  const charter = charterOf(agent);
+  const citations = [
+    ...charter.matchAll(/`references\/agent-modes\/([a-z-]+\/[a-z0-9.-]+\.md)`/g),
+  ].map((m) => m[1]!);
+  const modeFiles = citations.map((rel) => {
+    const file = path.join(SKILLS, "massa-ai", "references", "agent-modes", rel);
+    return existsSync(file) ? read(file) : "";
+  });
+  return [charter, ...modeFiles].join("\n");
+}
+
 describe("every dispatch packet names a real charter mode and lens (repo-wide)", () => {
   const blocks = ALL_SKILL_MD.flatMap((rel) =>
     dispatchBlocks(read(path.join(REPO_ROOT, rel))).map((b) => ({ rel, ...b })),
@@ -253,7 +274,7 @@ describe("every dispatch packet names a real charter mode and lens (repo-wide)",
     const bad: string[] = [];
     for (const b of blocks) {
       if (b.lenses.length === 0) continue;
-      const decl = charterOf(b.agent).match(/^- `lens`: [^\n]*?one of `([^`]+)`/m);
+      const decl = charterWithModeContracts(b.agent).match(/^- `lens`: [^\n]*?one of `([^`]+)`/m);
       const allowed = decl ? decl[1]!.split(/\s*\|\s*/) : [];
       for (const lens of b.lenses) {
         if (!allowed.includes(lens)) bad.push(`${b.rel}: ${b.agent} lens=${lens} (charter lenses: ${allowed.join(", ") || "none"})`);
@@ -310,5 +331,48 @@ describe("no retired agent name in skills prose, backticked or not, any case, hy
   test("the sweep sees the mapping table (guard the guard)", () => {
     const text = read(path.join(SKILLS, "AGENTS.md"));
     expect([...text.matchAll(RETIRED_WORD)].length).toBeGreaterThanOrEqual(14);
+  });
+});
+
+// agent-roster-revision follow-up: closes a coverage gap the verifier found —
+// the whole `> **Dispatch: `product-manager`**` block under spec-driven.md's
+// Specify step, and the figma-pre-analysis.md Stage 1 designer/trace
+// dispatch, were both deletable without failing any existing test. Neither
+// lives in `EXPECTED` above (`dispatchTargets`/`RETIRED` only cover
+// `workflows/<family>/*.md`, and spec-driven.md is not in that map), and
+// figma-pre-analysis.md's Stage 1 line is prose, not a `> **Dispatch:**`
+// block, so no existing sensor reads it either.
+describe("Specify step names product-manager audit before the Requirement Closure Gate (coverage gap)", () => {
+  test("spec-driven.md's Specify step dispatches product-manager in audit mode with lens: requirements, before the gate", () => {
+    const text = read(path.join(WORKFLOWS, "spec-driven.md"));
+    const block = dispatchBlocks(text).find(
+      (b) => b.agent === "product-manager" && b.mode === "audit",
+    );
+    expect(block).toBeDefined();
+    expect(block!.lenses).toEqual(["requirements"]);
+    expect(block!.header).toContain("mode: `audit`");
+
+    const dispatchIndex = text.indexOf(block!.header);
+    const gateIndex = text.indexOf("Apply the Requirement Closure Gate");
+    expect(dispatchIndex).toBeGreaterThan(-1);
+    expect(gateIndex).toBeGreaterThan(dispatchIndex);
+
+    const blockLines = block!.header + "\n" + text.slice(text.indexOf("\n", dispatchIndex) + 1);
+    const bodyEnd = blockLines.split("\n").findIndex((l) => !l.startsWith(">") && l.trim() !== "");
+    const body = blockLines.split("\n").slice(0, bodyEnd === -1 ? undefined : bodyEnd).join("\n");
+    expect(body).toMatch(/trigger: every Specify run/);
+  });
+});
+
+describe("figma-pre-analysis.md Stage 1 dispatches designer in trace mode, not code-explorer (coverage gap)", () => {
+  test("Stage 1 names designer/trace and no longer names code-explorer", () => {
+    const text = read(path.join(SKILLS, "massa-ai", "references", "figma-pre-analysis.md"));
+    const stage1Start = text.indexOf("## Stage 1");
+    const stage2Start = text.indexOf("## Stage 2");
+    expect(stage1Start).toBeGreaterThan(-1);
+    expect(stage2Start).toBeGreaterThan(stage1Start);
+    const stage1 = text.slice(stage1Start, stage2Start);
+    expect(stage1).toContain("`designer`, `trace` mode");
+    expect(stage1).not.toContain("code-explorer");
   });
 });

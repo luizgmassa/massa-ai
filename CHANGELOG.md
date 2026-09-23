@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`designer` gains a read-only `trace` mode** — design-source investigation (Figma MCP
+  composition, product context, and a retrieval-partition proposal), the design analogue of
+  `code-explorer` `trace`. `references/figma-pre-analysis.md` Stage 1 now dispatches
+  `designer` `trace` instead of `code-explorer` for its Stage 1 pre-analysis.
+- **Lazy-loaded mode contracts for `designer`, `judge`, and `test-engineer`.** Each mode's
+  output contract now lives in its own file under
+  `skills/massa-ai/references/agent-modes/<agent>/<mode>.md` instead of inline in the
+  charter; the charter keeps one `### Mode: \`<name>\`` stub per mode naming exactly its own
+  file, and the dispatching main agent reads and inlines it into the capability packet as
+  the new `mode_contract` field before dispatch. A lazy-mode packet missing `mode_contract`
+  returns `Blocked`. `judge` `plan-critique` splits by `depth` into
+  `plan-critique-lite.md`/`plan-critique-full.md`.
+
+### Changed
+
+- **Breaking: the `builder` agent is renamed to `senior-engineer`.**
+  `skills/agents/builder/` moved to `skills/agents/senior-engineer/` with the same charter
+  identity, output contract, and disjoint-write-set role. Every dispatch block, registry row,
+  model-profile override key, and the `WRITE_AGENTS` generator constant now name
+  `senior-engineer`; `skills/AGENTS.md`'s retired-agent mapping table records
+  `builder → senior-engineer`. A user's model-profile overlay still keyed under the
+  pre-rename `builder` name keeps applying — the overlay merge maps it onto
+  `senior-engineer` unless the overlay already sets `senior-engineer` directly.
+- **The router (`skills/massa-ai/SKILL.md`) is slimmed from 20,254 B to under 13,000 B.**
+  Content already owned elsewhere was dropped from the router body: the Dedupe Guard (owned
+  by the bootstrap block), the tool inventory (`references/mcp-tools.md`), plan-challenge
+  detail (the policy plus `references/the-fool.md`), the retrieval sequence
+  (`references/mcp-tools.md`/`references/codebase-investigation.md`), memory-tag detail
+  (`references/memory-policy.md`), and the Shared References list, replaced by a single
+  statement of the freshness and recall-budget rules. The workflow table and the six
+  deterministic-precedence rules are byte-identical to before.
+- **spec-driven `Specify` now dispatches `product-manager` `audit` in every run**, over the
+  drafted `spec.md`, as a read-only carve-out from the "Planning: do not delegate" rule
+  recorded in `references/spec-driven/sub-agents.md`.
+
+### Removed
+
+- **The `skills/profile/` Claude skill front is retired.** `profile` joins
+  `RETIRED_BUNDLE_ROOTS` and `RETIRED_SKILL_NAMES`, so no generator, installer, or harness
+  verifier ships or expects it, and a stale installed or bundled copy is pruned on upgrade.
+  The MCP tools (`profile_list`/`profile_set`) and both `massa-ai-config profile` CLIs are
+  unchanged and are the only fronts left.
+- **Five near-duplicate or never-dispatched agent modes are gone.** `code-reviewer` `guide`
+  is dropped (architecture findings route to `audit` `lens: architecture`; mobile
+  platform/lifecycle/build/offline-sync guidance is answered by the main agent from
+  `references/mobile-context.md` directly); `code-reviewer` `review` is merged into `audit`,
+  which gains a new `lens: diff` (bugs, regressions, smells, missing edge cases over a diff,
+  ranked findings) — all 13 former `review` dispatch blocks now read `mode: audit` with
+  `lens: diff`; `code-explorer` `lookup` is dropped, leaving `trace` as its sole mode and
+  default; `product-manager` `requirements` is merged into `audit`, whose single lens is
+  `requirements`; `test-engineer` `plan` is dropped and `mode` is now a required packet field
+  with no default.
+
 ## [1.62.0] - 2026-09-23
 
 ### Changed

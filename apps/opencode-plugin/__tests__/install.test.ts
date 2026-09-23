@@ -81,7 +81,7 @@ async function isSymlink(p: string): Promise<boolean> {
 }
 
 const SPECIALIST_NAMES = [
-  "builder",
+  "senior-engineer",
   "code-explorer",
   "code-reviewer",
   "designer",
@@ -628,12 +628,12 @@ describe("opencode-plugin version recording (PAI-03/07, AC-15)", () => {
 });
 
 describe("opencode-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
-  test("install copies massa-ai + profile + bootstrap into ~/.config/opencode/skills as plugin-owned", async () => {
+  test("install copies massa-ai + bootstrap into ~/.config/opencode/skills as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("harness skills installed");
 
-    for (const name of ["massa-ai", "profile", "bootstrap"]) {
+    for (const name of ["massa-ai", "bootstrap"]) {
       const skillMd = path.join(tmp, `.config/opencode/skills/${name}/SKILL.md`);
       expect(await pathExists(skillMd)).toBe(true);
       const lst = await fs.lstat(skillMd);
@@ -657,7 +657,7 @@ describe("opencode-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
             opencode: {
               root: path.join(tmp, ".config/opencode"),
               skillsOwner: "repo",
-              skills: ["massa-ai", "profile"],
+              skills: ["massa-ai", "bootstrap"],
             },
           },
         },
@@ -928,7 +928,7 @@ describe("opencode-plugin retired harness-skill prune (PER AC-5)", () => {
     await fs.writeFile(stateFile(), JSON.stringify(data, null, 2));
   }
 
-  test("install removes a recorded persona-router skill and records only the current three", async () => {
+  test("install removes a recorded persona-router skill and records only the current two", async () => {
     await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
     await plantRetired();
 
@@ -938,7 +938,7 @@ describe("opencode-plugin retired harness-skill prune (PER AC-5)", () => {
     expect(await pathExists(retiredDir())).toBe(false);
     const state = await readJson(stateFile());
     const platforms = state.platforms as Record<string, { skills: string[] }>;
-    expect(platforms.opencode.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+    expect(platforms.opencode.skills).toEqual(["massa-ai", "bootstrap"]);
   });
 
   test("uninstall removes a recorded persona-router skill", async () => {
@@ -1013,7 +1013,7 @@ describe("opencode-plugin retired harness-skill prune (PER AC-5)", () => {
 
   test("a multi-line skillsOwner cannot smuggle a path into the prune", async () => {
     const sentinels = await plantSentinels();
-    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "profile", "bootstrap"] };
+    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "bootstrap"] };
 
     await writeRecord(hostile);
     expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
@@ -1059,7 +1059,7 @@ describe("opencode-plugin retired harness-skill prune (PER AC-5)", () => {
       expect(await pathExists(retiredDir())).toBe(false);
       const state = await readJson(stateFile());
       const platforms = state.platforms as Record<string, { skills: string[] }>;
-      expect(platforms.opencode.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+      expect(platforms.opencode.skills).toEqual(["massa-ai", "bootstrap"]);
     },
   );
 });

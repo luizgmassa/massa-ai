@@ -368,7 +368,7 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 **What:** massa-ai defines 7 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
 
-**The 7 specialists:** builder, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer. A charter that owns several output contracts selects one per dispatch through the capability packet's `mode` field (for example `code-reviewer` in `review`, `verify`, `audit`, or `guide` mode); the modes per agent and the retired-agent → current-agent mapping live in `skills/AGENTS.md`.
+**The 7 specialists:** senior-engineer, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer. A charter that owns several output contracts selects one per dispatch through the capability packet's `mode` field (for example `code-reviewer` in `verify` or `audit` mode, the latter with a `lens` including `diff` for diff review); the modes per agent and the retired-agent → current-agent mapping live in `skills/AGENTS.md`.
 
 Workflows dispatch these agents by their bare charter name (for example `code-explorer`) — no `massa-ai-` prefix on any host. On the Claude plugin route the host namespaces them as `massa-ai:<name>`, which is the name to dispatch there. Installers identify massa-ai's agent files by the `massa-ai-owned` content marker, never by name: a same-named agent the user owns is skipped with a warning and never overwritten or deleted, and the pre-consolidation `massa-ai-<name>` files are pruned on upgrade.
 
@@ -433,7 +433,7 @@ The built-in profiles define per-tool defaults (the strongest model for each pro
 agent-specific overrides to achieve a mix of reasoning depth and latency:
 
 - **4 agents** (code-explorer, code-reviewer, judge, product-manager) use the profile default.
-- **3 agents** (builder, designer, test-engineer) override to a standard-tier model per profile.
+- **3 agents** (senior-engineer, designer, test-engineer) override to a standard-tier model per profile.
 
 Read-only agents carry no override by convention and resolve to the profile default, ensuring
 the strongest model runs on every read-only pass (see ALLWF-03 in `skills/massa-ai/references/spec-driven/sub-agents.md`).
@@ -510,7 +510,7 @@ always or pass vacuously.
 
 ### Permission mapping (read-only vs write)
 
-Write-permitted agents: `builder`, `test-engineer`, `judge`, `designer` (all but `builder` are scoped writers — test files / the agent's own judge-N report / UI-layer files only, each with a disjoint write set). All others are read-only. Each charter's `metadata.permission` must agree with the shipped artifact; `scripts/__tests__/skills-harness-integrity.test.ts` enforces that.
+Write-permitted agents: `senior-engineer`, `test-engineer`, `judge`, `designer` (all but `senior-engineer` are scoped writers — test files / the agent's own judge-N report / UI-layer files only, each with a disjoint write set). All others are read-only. Each charter's `metadata.permission` must agree with the shipped artifact; `scripts/__tests__/skills-harness-integrity.test.ts` enforces that.
 
 | Host | Read-only | Write |
 | --- | --- | --- |
@@ -542,9 +542,9 @@ schema conformance, and profile selection).
 **What:** Switch the *installed* massa-ai agents to a different registry profile (e.g.
 `work`, `cheap`, `home`) without a repo checkout — one switch engine
 (`packages/shared/src/profile-switch/`, published in `@massa-ai/shared`), fronted by
-MCP tools (`profile_list`, `profile_set`), a `profile list|show|set <name> [--host <h>]
-[--dry-run]` subcommand in both `massa-ai-config` CLIs (mcp-client, opencode-plugin),
-and a Claude skill (`skills/profile/`, `/massa-ai:profile`). The former OpenCode
+MCP tools (`profile_list`, `profile_set`) and a `profile list|show|set <name> [--host <h>]
+[--dry-run]` subcommand in both `massa-ai-config` CLIs (mcp-client, opencode-plugin).
+The `skills/profile/` Claude skill front was retired (PRO-01). The former OpenCode
 in-process `profile` tool was retired with the plugin's tool surface (AD-017) —
 OpenCode switches via the MCP pair or its `massa-ai-config` CLI. Every registry profile ships pre-rendered per host inside the
 plugin bundle (`agent-profiles/<profile>/`, sibling of `agents/`); switching copies the
@@ -1335,7 +1335,7 @@ The repo ships repo-local skills plus a unified bash installer that copies them 
 
 1. **Bootstrap contract** (top, between `<!-- massa-ai:bootstrap:start -->` and `<!-- massa-ai:bootstrap:end -->` markers): the coding session startup contract that activates the skill stack. Eight individually-toggleable rules — `caveman`, `massa-ai-router`, `dedupe-guardrails`, `plan-challenge`, `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`.
 
-2. **Sub-agent registry** (bottom): the 7 reusable sub-agent specialist registry (builder, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer) plus the single retired-agent → current-agent mapping table, with capability packet and output contract definitions.
+2. **Sub-agent registry** (bottom): the 7 reusable sub-agent specialist registry (senior-engineer, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer) plus the single retired-agent → current-agent mapping table, with capability packet and output contract definitions.
 
 **The contract body is delivered as a file, not inlined into `AGENTS.md`.** It is rendered to a first-class per-host `MASSA-AI.md` at that host's config root, and each host is then wired to load it through its own real mechanism:
 
@@ -1353,11 +1353,10 @@ The sub-agent registry is not written — it is consumed by workflows that dispa
 | Skill | Location | Description |
 |-------|----------|-------------|
 | `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 36 workflow files under `workflows/` and 43 top-level references under `references/` (evidence gate, context firewall, verification ladder, agent orchestration, etc.), plus 47 more in per-workflow reference subdirectories (`furps/`, `spec-driven/`, `create-tdd/`, `the-fool/`, `create-ticket/`, `create-rfc/`, `skill-architect/`, `mobile-figma-matcher/`) — 90 reference files in all. Counted 2026-09-23. |
-| `profile` | `skills/profile/` | Switch the installed agents to a registry model profile, or report the active one per host. Drives the shared switch engine — never a second switch path. |
 | `bootstrap` | `skills/bootstrap/` | Inspect or toggle the eight startup-contract rules delivered by `MASSA-AI.md`. Drives `massa-ai-config bootstrap`, never a hand-edited file. |
 | `agents/<n>` | `skills/agents/` | The 7 sub-agent specialist charters, emitted per host by `generate-subagent-artifacts.ts`. |
 
-All four roots are bundled per host by `scripts/generate-skill-artifacts.ts` into `apps/<host>-plugin/skills/`, as gitignored build output (AD-016).
+All three roots are bundled per host by `scripts/generate-skill-artifacts.ts` into `apps/<host>-plugin/skills/`, as gitignored build output (AD-016).
 
 ### Unified Skills Installer (`scripts/install-skills.sh`)
 

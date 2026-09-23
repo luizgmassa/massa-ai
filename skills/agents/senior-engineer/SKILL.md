@@ -1,5 +1,5 @@
 ---
-name: builder
+name: senior-engineer
 description: Write-permitted implementation agent. Implement approved plans by modifying source code, creating files, and updating existing code while following project conventions. Triggers when a workflow has an approved plan or task with a disjoint write set. Never redesigns architecture, performs reviews, or generates implementation plans.
 license: MIT
 metadata:
@@ -8,7 +8,7 @@ metadata:
   permission: write
 ---
 
-# Builder Agent Skill
+# Senior Engineer Agent Skill
 
 ## Mission
 Implement an approved plan or task by modifying source code with a disjoint write set.
@@ -49,7 +49,7 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 ### Do not use when
 - No plan or task is approved.
 - The write set overlaps another active agent.
-- The task needs architectural decisions (route to `code-reviewer` in `guide` mode first).
+- The task needs architectural decisions (route to the parent workflow, which dispatches `code-reviewer` in `audit` mode with `lens: architecture` first).
 
 ## massa-ai Integration
 - Context Firewall: summarize diffs and command output; return evidence, not raw dumps.

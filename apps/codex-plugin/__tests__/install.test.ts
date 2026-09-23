@@ -204,7 +204,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
 
   // ── T5: subagent TOML agents (CDX-01,02,05,06,07 + DOC-01) ──────────────
   const SPECIALIST_NAMES = [
-    "builder",
+    "senior-engineer",
     "code-explorer",
     "code-reviewer",
     "designer",
@@ -288,12 +288,12 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
 });
 
 describe("codex-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
-  test("install copies massa-ai + profile + bootstrap into ~/.codex/skills (not the plugin cache) as plugin-owned", async () => {
+  test("install copies massa-ai + bootstrap into ~/.codex/skills (not the plugin cache) as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("harness skills installed");
 
-    for (const name of ["massa-ai", "profile", "bootstrap"]) {
+    for (const name of ["massa-ai", "bootstrap"]) {
       const skillMd = path.join(tmp, `.codex/skills/${name}/SKILL.md`);
       expect(await pathExists(skillMd)).toBe(true);
       const lst = await fs.lstat(skillMd);
@@ -306,17 +306,17 @@ describe("codex-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
   });
 
   // AC-05.3: a behavioural guard — run the real install.sh against a scratch
-  // HOME and assert it lands EXACTLY the three harness skill directories the
+  // HOME and assert it lands EXACTLY the two harness skill directories the
   // generator's own constant names (generate-skill-artifacts.ts:138). Not a
   // static parse of the `for name in ...` literal — that shortcut is exactly
   // what AC-03.4 rejects for the sibling requirement.
-  test("AC-05.3: a scratch-HOME install lands exactly the three harness skill directories", async () => {
+  test("AC-05.3: a scratch-HOME install lands exactly the two harness skill directories", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
     const harnessSkillsDir = path.join(tmp, ".codex/skills");
     const entries = await fs.readdir(harnessSkillsDir);
-    expect(entries.sort()).toEqual(["massa-ai", "profile", "bootstrap"].sort());
+    expect(entries.sort()).toEqual(["massa-ai", "bootstrap"].sort());
   });
 
   test("the existing 6 host-command skills copy is unaffected — no harness skill leaks into the plugin cache", async () => {
@@ -338,7 +338,7 @@ describe("codex-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
         {
           version: 2,
           platforms: {
-            codex: { root: path.join(tmp, ".codex"), skillsOwner: "repo", skills: ["massa-ai", "profile"] },
+            codex: { root: path.join(tmp, ".codex"), skillsOwner: "repo", skills: ["massa-ai", "bootstrap"] },
           },
         },
         null,
@@ -465,12 +465,12 @@ describe("codex-plugin generated workflow-command delivery (T8, WFC-08)", () => 
     expect(await pathExists(installedSkillsDir)).toBe(true);
 
     // Sanity: generated commands never leaked into the harness skills dir —
-    // only massa-ai/profile/bootstrap (the three names
+    // only massa-ai/bootstrap (the two names
     // install_bundled_skills copies) live there, never a workflow-command stem.
     const harnessSkillsDir = path.join(tmp, ".codex/skills");
     if (await pathExists(harnessSkillsDir)) {
       const harnessEntries = await fs.readdir(harnessSkillsDir);
-      expect(harnessEntries.sort()).toEqual(["massa-ai", "profile", "bootstrap"].sort());
+      expect(harnessEntries.sort()).toEqual(["massa-ai", "bootstrap"].sort());
     }
 
     const res = runInstall(["--uninstall"], { HOME: tmp });
@@ -579,7 +579,7 @@ describe("codex-plugin retired harness-skill prune (PER AC-5)", () => {
     await fs.writeFile(stateFile(), JSON.stringify(data, null, 2));
   }
 
-  test("install removes a recorded persona-router skill and records only the current three", async () => {
+  test("install removes a recorded persona-router skill and records only the current two", async () => {
     await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
     await plantRetired();
 
@@ -589,7 +589,7 @@ describe("codex-plugin retired harness-skill prune (PER AC-5)", () => {
     expect(await pathExists(retiredDir())).toBe(false);
     const state = await readJson(stateFile());
     const platforms = state.platforms as Record<string, { skills: string[] }>;
-    expect(platforms.codex.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+    expect(platforms.codex.skills).toEqual(["massa-ai", "bootstrap"]);
   });
 
   test("uninstall removes a recorded persona-router skill", async () => {
@@ -664,7 +664,7 @@ describe("codex-plugin retired harness-skill prune (PER AC-5)", () => {
 
   test("a multi-line skillsOwner cannot smuggle a path into the prune", async () => {
     const sentinels = await plantSentinels();
-    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "profile", "bootstrap"] };
+    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "bootstrap"] };
 
     await writeRecord(hostile);
     expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
@@ -710,7 +710,7 @@ describe("codex-plugin retired harness-skill prune (PER AC-5)", () => {
       expect(await pathExists(retiredDir())).toBe(false);
       const state = await readJson(stateFile());
       const platforms = state.platforms as Record<string, { skills: string[] }>;
-      expect(platforms.codex.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+      expect(platforms.codex.skills).toEqual(["massa-ai", "bootstrap"]);
     },
   );
 });

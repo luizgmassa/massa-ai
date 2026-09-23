@@ -684,7 +684,10 @@ function mergeAgents(
   for (const [agent, hostMap] of Object.entries(builtin)) {
     result[agent] = { ...hostMap };
   }
-  for (const [agent, value] of Object.entries(overlay)) {
+  for (const [rawAgent, value] of Object.entries(overlay)) {
+    // REN-05: a pre-rename overlay keyed `builder` still applies to the renamed
+    // `senior-engineer` agent, unless the overlay already targets it directly.
+    const agent = rawAgent === "builder" && !("senior-engineer" in overlay) ? "senior-engineer" : rawAgent;
     if (value === null) {
       delete result[agent];
       continue;

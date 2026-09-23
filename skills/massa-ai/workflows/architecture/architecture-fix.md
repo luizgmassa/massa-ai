@@ -73,7 +73,7 @@ Not for findings-only architecture review — route to `workflows/architecture/a
    - Update tests, docs, and imports only where required by the architecture fix.
 10. Use agent orchestration only when it improves signal — except the verifier dispatch below, which is tier-gated mandatory rather than discretionary, carved out under `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated architecture finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -83,10 +83,10 @@ Not for findings-only architecture review — route to `workflows/architecture/a
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable architecture patterns
 
-> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation of the architecture finding complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - inputs: diff, ARCH acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, ARCH acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become architecture fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps

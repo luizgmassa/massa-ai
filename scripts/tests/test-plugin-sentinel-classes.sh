@@ -102,10 +102,10 @@ classes_for() {
 plant_user_agent() {
   local d
   case "$1" in
-    claude) d="$2/.claude/agents"; rm -f "$d/"*.md; printf -- '---\nname: builder\n---\nmine\n' > "$d/builder.md" ;;
-    codex) d="$2/.codex/agents"; rm -f "$d/"*.toml; printf 'name = "builder"\n' > "$d/builder.toml" ;;
-    cursor) d="$2/.cursor/agents"; rm -f "$d/"*.md; printf -- '---\nname: builder\n---\nmine\n' > "$d/builder.md" ;;
-    opencode) d="$2/.config/opencode/agents"; rm -f "$d/"*.md; printf -- '---\nname: builder\n---\nmine\n' > "$d/builder.md" ;;
+    claude) d="$2/.claude/agents"; rm -f "$d/"*.md; printf -- '---\nname: senior-engineer\n---\nmine\n' > "$d/senior-engineer.md" ;;
+    codex) d="$2/.codex/agents"; rm -f "$d/"*.toml; printf 'name = "senior-engineer"\n' > "$d/senior-engineer.toml" ;;
+    cursor) d="$2/.cursor/agents"; rm -f "$d/"*.md; printf -- '---\nname: senior-engineer\n---\nmine\n' > "$d/senior-engineer.md" ;;
+    opencode) d="$2/.config/opencode/agents"; rm -f "$d/"*.md; printf -- '---\nname: senior-engineer\n---\nmine\n' > "$d/senior-engineer.md" ;;
   esac
 }
 

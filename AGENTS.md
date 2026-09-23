@@ -20,7 +20,6 @@ Check `.specs/project/STATE.md` for the current active feature and `.specs/proje
   its `references/mcp-tools.md` and `references/synapse-policy.md`
 - `AGENTS.md` (under `skills/`) — sub-agent registry: 7 reusable specialist
   agents, plus the canonical policy bootstrap block
-- `profile/` — switch the installed agents to a registry model profile
 - `bootstrap/` — inspect or toggle the startup-contract rules
 
 #### Sub-Agent Skills (invocable by any workflow)
@@ -32,13 +31,13 @@ with several output contracts selects one per dispatch through the capability
 packet's `mode` field; `skills/AGENTS.md` lists the modes and maps retired agents
 to current ones.
 
-- `builder/` — write-permitted implementation (disjoint write set)
+- `senior-engineer/` — write-permitted implementation (disjoint write set)
 - `code-explorer/` — read-only codebase exploration: index-first lookup, flow tracing, dependencies, impact
-- `code-reviewer/` — read-only diff review, independent verification, findings-only audits (bugs, architecture, security, code-quality, performance), architecture and mobile guidance
+- `code-reviewer/` — read-only independent verification and findings-only audits (bugs, architecture, security, code-quality, performance, diff)
 - `designer/` — reads and writes user-facing screens from Figma, screenshots, or other design direction (UI-layer writes when scoped)
 - `judge/` — evaluation-spec authoring, debate-panel scoring, and the lite and full Plan Challenge critique
 - `product-manager/` — read-only requirements work: FURPS+ dimensions, ambiguity and gap analysis, requirements audit lens
-- `test-engineer/` — test strategy, tests audit lens, and tests-fix implementation (test-file writes when scoped)
+- `test-engineer/` — tests audit lens and tests-fix implementation (test-file writes when scoped)
 
 ### Spec Artifacts
 

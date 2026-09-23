@@ -1568,6 +1568,27 @@
       "validation": ".specs/features/agent-roster-consolidation/validation.md",
       "notes": "COMPLETE 2026-09-23: T1-T13 across 5 Phases (phase-batch workers), three review fix commits (161b9a62 OpenCode symlink ownership, b655d16f roster-swap gaps, d9326551 retired-skill prune hardening incl. a blocking rm -rf header-injection regression). Independent validation: FAIL (18/23 killed, test gaps) -> FAIL (48/49 ACs, ROS AC-7 prose spellings) -> PASS 49/49 ACs, 0 spec-precision gaps, 9/9 killed at 738010a8; post-PASS test-only sweep hardening e057feb5. Deferred advisories in .specs/HANDOFF.md. Push/PR authorized at Execute start; merge is the user's call.",
       "completed": "2026-09-23"
+    },
+    {
+      "id": "agent-roster-revision",
+      "slug": "agent-roster-revision",
+      "title": "Agent roster revision: builder -> senior-engineer, profile skill removed, unused/duplicate modes merged, lazy-loaded mode contracts (designer, judge, test-engineer), designer trace mode, product-manager audit in every Specify, router slimmed 20.2 KB -> 13 KB",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": false,
+        "execute": true
+      },
+      "branch": "feat/agent-roster-revision",
+      "created": "2026-09-23",
+      "depends_on": [
+        "agent-roster-consolidation"
+      ],
+      "spec": ".specs/features/agent-roster-revision/spec.md",
+      "validation": ".specs/features/agent-roster-revision/validation.md",
+      "notes": "COMPLETE 2026-09-23 via feature workflow: 11 Tasks in 4 parallel waves of sonnet builder sub-agents in per-task worktrees, merged into feat/agent-roster-revision; close-out + independent verification PASS (8/8 ACs, 4/4 mutants killed after coverage fix ddc03812)."
     }
   ],
   "active_feature": "agent-roster-consolidation"

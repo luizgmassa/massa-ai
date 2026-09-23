@@ -36,7 +36,7 @@ const RETIRED = [
 ] as const;
 
 const ROSTER = [
-  "builder",
+  "senior-engineer",
   "code-explorer",
   "code-reviewer",
   "designer",
@@ -71,6 +71,50 @@ function modeSection(text: string, mode: string): string | null {
     (line, index) => index > start && new RegExp(`^#{1,${level}} `).test(line),
   );
   return lines.slice(start, end === -1 ? undefined : end).join("\n");
+}
+
+const AGENT_MODES_DIR = path.join(REPO_ROOT, "skills/massa-ai/references/agent-modes");
+
+/**
+ * agent-roster-revision LZY-02: a lazy charter's `Mode:` section is a stub
+ * naming exactly its own contract file(s) under
+ * `references/agent-modes/<agent>/<mode>.md` instead of holding the output
+ * contract inline. Extracts the cited `<agent>/<file>.md` pairs, in source
+ * order; an inline (non-stub) section yields no citations.
+ */
+function stubCitations(sectionBody: string): string[] {
+  return [...sectionBody.matchAll(/`references\/agent-modes\/([a-z-]+\/[a-z0-9.-]+\.md)`/g)].map(
+    (m) => m[1]!,
+  );
+}
+
+/**
+ * Reads and concatenates every file a stub cites, so a fixture-field
+ * containment check can run against the real contract prose instead of the
+ * stub text. A dangling citation resolves to "", which fails the caller's
+ * containment check rather than silently passing.
+ */
+function resolveStubContent(citations: string[]): string {
+  return citations
+    .map((rel) => {
+      const file = path.join(AGENT_MODES_DIR, rel);
+      return existsSync(file) ? readFileSync(file, "utf8") : "";
+    })
+    .join("\n");
+}
+
+/**
+ * Binding check: the exact filename(s) a mode's own stub may cite are
+ * `<mode>.md`, or one or more `<mode>-<suffix>.md` files for a mode split by
+ * an axis such as depth (judge `plan-critique` -> `plan-critique-lite.md` /
+ * `plan-critique-full.md`, per A1). A stub with no citations, one citing a
+ * sibling mode's file, or one citing another agent's file all fail.
+ */
+function citesOwnMode(agent: string, mode: string, citations: string[]): boolean {
+  if (citations.length === 0) return false;
+  const exact = `${agent}/${mode}.md`;
+  const split = new RegExp(`^${agent}/${mode}-[a-z]+\\.md$`);
+  return citations.every((c) => c === exact || split.test(c));
 }
 
 const retiredPresent = RETIRED.filter((name) => existsSync(charterPath(name)));
@@ -119,7 +163,129 @@ describe(`output contracts (${swapped ? "after" : "before"} the roster swap)`, (
         entry.absorbedBy.mode,
       );
       expect(section).not.toBeNull();
-      expect(section!).toContain(entry.field);
+      // A lazy stub (agent-roster-revision LZY-02) holds no output contract
+      // inline; the field must resolve inside the file(s) the stub cites.
+      const citations = stubCitations(section!);
+      const haystack = citations.length > 0 ? resolveStubContent(citations) : section!;
+      expect(haystack).toContain(entry.field);
     });
   }
+});
+
+describe("lazy-mode stub binding (agent-roster-revision LZY-02, synthetic — no lazy charter exists yet on this branch)", () => {
+  // Constructed `Mode:` section bodies, not real charter text: designer,
+  // judge, and test-engineer have not been converted to lazy stubs yet
+  // (T7/T8/T9). This exercises `stubCitations`/`citesOwnMode` against the
+  // shapes those tasks will produce, so the binding check is proven before
+  // any charter depends on it.
+  const CASES: Array<{
+    label: string;
+    agent: string;
+    mode: string;
+    section: string;
+    expectBinding: boolean;
+  }> = [
+    {
+      label: "single-file stub cites its own mode file",
+      agent: "designer",
+      mode: "trace",
+      section: "### Mode: `trace`\nSee `references/agent-modes/designer/trace.md`.",
+      expectBinding: true,
+    },
+    {
+      label: "depth-split stub cites both its own lite and full files",
+      agent: "judge",
+      mode: "plan-critique",
+      section:
+        "### Mode: `plan-critique`\nSee `references/agent-modes/judge/plan-critique-lite.md` " +
+        "(lite) or `references/agent-modes/judge/plan-critique-full.md` (full), by `depth`.",
+      expectBinding: true,
+    },
+    {
+      label: "stub citing a sibling mode's file fails binding",
+      agent: "designer",
+      mode: "trace",
+      section: "### Mode: `trace`\nSee `references/agent-modes/designer/audit.md`.",
+      expectBinding: false,
+    },
+    {
+      label: "stub citing another agent's file fails binding",
+      agent: "test-engineer",
+      mode: "audit",
+      section: "### Mode: `audit`\nSee `references/agent-modes/judge/plan-critique-lite.md`.",
+      expectBinding: false,
+    },
+    {
+      label: "non-stub inline section has no citation and fails binding",
+      agent: "designer",
+      mode: "trace",
+      section: "### Mode: `trace`\nFull inline output contract here, no citation.",
+      expectBinding: false,
+    },
+  ];
+
+  test(`binding checked across ${CASES.length} synthetic stub/file pairings`, () => {
+    // Population print (SEN-04 class): visible in output, not just the verdict.
+    console.log(
+      `[charter-contract-preservation] lazy-mode binding population (${CASES.length}): ` +
+        CASES.map((c) => c.label).join("; "),
+    );
+    for (const c of CASES) {
+      const citations = stubCitations(c.section);
+      expect(citesOwnMode(c.agent, c.mode, citations)).toBe(c.expectBinding);
+    }
+  });
+});
+
+/**
+ * agent-roster-revision AC3: every lazy mode's stub must bind to exactly its
+ * own contract file. The `output contracts` describe block above only proves
+ * this for a mode a retired-charter fixture field happens to route through —
+ * `designer` has zero such fields (nothing was absorbed into it), so that
+ * describe block never exercises `designer`'s real stubs at all. This block
+ * closes that gap: it scans every `### Mode:` heading in every LAZY charter
+ * that actually exists on this branch and checks its citations bind, using
+ * the real charter text rather than a constructed section.
+ */
+const LAZY_AGENTS = ["designer", "judge", "test-engineer"] as const;
+
+function modeHeadings(text: string): string[] {
+  return [...text.matchAll(/^#{2,4} Mode: `([a-z-]+)`\s*$/gm)].map((m) => m[1]!);
+}
+
+describe("lazy-mode stub binding (agent-roster-revision AC3, real charters)", () => {
+  // Every LAZY_AGENTS charter is converted to stubs (T7/T8/T9 all landed): an
+  // inline `Mode:` section with zero `references/agent-modes/...` citations
+  // is now a regression, not a mid-migration lifecycle state, and fails.
+  const lazyPresent = LAZY_AGENTS.filter((name) => existsSync(charterPath(name)));
+
+  test(`binding checked against every real lazy-mode stub present (charters scanned: ${lazyPresent.join(", ") || "none"})`, () => {
+    expect(lazyPresent.length).toBeGreaterThan(0);
+    let stubsChecked = 0;
+    let inlineFound = 0;
+    for (const agent of lazyPresent) {
+      const content = readCharter(agent);
+      for (const mode of modeHeadings(content)) {
+        const section = modeSection(content, mode);
+        expect(section, `${agent} Mode \`${mode}\` section not found`).not.toBeNull();
+        const citations = stubCitations(section!);
+        if (citations.length === 0) {
+          inlineFound += 1;
+        }
+        expect(
+          citations.length,
+          `${agent} Mode \`${mode}\` section is inline (no references/agent-modes/... citation) — every lazy mode must be a stub`,
+        ).toBeGreaterThan(0);
+        expect(
+          citesOwnMode(agent, mode, citations),
+          `${agent} Mode \`${mode}\` stub does not bind to its own contract file (citations: ${citations.join(", ")})`,
+        ).toBe(true);
+        stubsChecked += 1;
+      }
+    }
+    console.log(
+      `[charter-contract-preservation] real lazy-charter binding population: ${stubsChecked} stub mode(s) checked, ${inlineFound} inline mode(s) found`,
+    );
+    expect(stubsChecked).toBeGreaterThan(0);
+  });
 });

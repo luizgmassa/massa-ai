@@ -59,9 +59,9 @@ ROOT="$(mktemp -d "${TMPDIR:-/tmp}/massa-ai-prune-opencode.XXXXXX")"
 # source bundle for scenario (c), and always restores. Chosen because it is
 # generated content (safe to touch, gitignored under AD-016) and is not a
 # file any other in-flight worker in this worktree reads.
-FIXTURE_AGENT_NAME="builder.md"
+FIXTURE_AGENT_NAME="senior-engineer.md"
 FIXTURE_AGENT_PATH="${SOURCE_AGENTS_DIR}/${FIXTURE_AGENT_NAME}"
-FIXTURE_BACKUP="${ROOT}/builder.md.bak"
+FIXTURE_BACKUP="${ROOT}/senior-engineer.md.bak"
 
 restore_fixture_agent() {
   if [[ -f "$FIXTURE_BACKUP" && ! -f "$FIXTURE_AGENT_PATH" ]]; then
@@ -220,15 +220,15 @@ done
 
 echo ""
 
-# ── IPT-05/AC-05.1 + PER AC-4: the three harness skills ────────────────────────────
-echo "Scenario: install_bundled_skills installs massa-ai, profile, AND bootstrap (PER AC-4)"
+# ── IPT-05/AC-05.1 + PER AC-4: the two harness skills ────────────────────────────
+echo "Scenario: install_bundled_skills installs massa-ai AND bootstrap (PER AC-4)"
 H5="$ROOT/h5"; mkdir -p "$H5"
 OUT5="$(run_install "$H5")"; RC5=$?
 assert_eq "install exits 0" "$RC5" "0"
 SKILLS_DIR5="$H5/.config/opencode/skills"
 assert_file "massa-ai skill installed" "$SKILLS_DIR5/massa-ai/SKILL.md"
-assert_file "profile skill installed" "$SKILLS_DIR5/profile/SKILL.md"
 assert_file "bootstrap skill installed" "$SKILLS_DIR5/bootstrap/SKILL.md"
 assert_no_file "retired persona-router skill is not installed" "$SKILLS_DIR5/persona-router"
+assert_no_file "retired profile skill is not installed" "$SKILLS_DIR5/profile"
 
 summary "installer prune (opencode)"

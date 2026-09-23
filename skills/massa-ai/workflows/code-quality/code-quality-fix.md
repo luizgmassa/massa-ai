@@ -62,7 +62,7 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
    - Prefer small reversible edits; verify after each finding or coherent group.
 10. Use agent orchestration only when it improves signal — except the `code-reviewer` `verify` dispatch below, which `references/agent-orchestration.md`'s Independent Verification Exception mandates at the tiers named in its trigger regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated code-quality finding or disjoint file group
 > - permissions: write (disjoint write set)
@@ -72,10 +72,10 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable code-quality patterns
 
-> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation of the CQ finding complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - inputs: diff, CQ acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, CQ acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become CQ fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps

@@ -298,9 +298,9 @@ lifecycle are independent; remove the entry with
 `bash scripts/install-agents.sh --agent opencode --uninstall` if wanted.
 
 **7 subagent specialists:** all four plugins ship the 7 massa-ai
-sub-agent specialists (builder, code-explorer, code-reviewer, designer,
+sub-agent specialists (senior-engineer, code-explorer, code-reviewer, designer,
 judge, product-manager, test-engineer) as host-native subagent definitions,
-registered under their bare names (`builder`, not `massa-ai-builder`; on the
+registered under their bare names (`test-engineer`, not `massa-ai-test-engineer`; on the
 Claude plugin route the host namespaces them as `massa-ai:<name>`). Installers
 tell their own agent files apart by a `massa-ai-owned` content marker, never by
 name: a same-named agent you own is skipped with a warning and left untouched,
@@ -341,7 +341,6 @@ The repo ships a set of repo-local skills plus a unified installer that copies t
 | Skill | Location | Purpose |
 |-------|----------|---------|
 | `massa-ai` | `skills/massa-ai/` | Workflow router (36 workflows: spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
-| `profile` | `skills/profile/` | Switch the installed agents to a registry model profile, or report the active one |
 | `bootstrap` | `skills/bootstrap/` | Inspect or toggle the eight startup-contract rules delivered by `MASSA-AI.md` |
 | `agents/<n>` | `skills/agents/` | The 7 sub-agent specialist charters |
 

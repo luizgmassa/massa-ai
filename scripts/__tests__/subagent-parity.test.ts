@@ -61,7 +61,7 @@ beforeAll(async () => {
 });
 
 const SPECIALIST_NAMES = [
-  "builder",
+  "senior-engineer",
   "code-explorer",
   "code-reviewer",
   "designer",
@@ -72,7 +72,7 @@ const SPECIALIST_NAMES = [
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
 const WRITE_AGENTS = new Set<SpecialistName>([
-  "builder",
+  "senior-engineer",
   "designer",
   "judge",
   "test-engineer",
@@ -86,7 +86,7 @@ const WRITE_AGENTS = new Set<SpecialistName>([
 const BASELINE_SUCCESSOR: Record<string, SpecialistName | null> = {
   "architecture-specialist": "code-reviewer",
   "audit-specialist": "code-reviewer",
-  builder: "builder",
+  builder: "senior-engineer",
   "context-curator": null,
   "documentation-agent": null,
   "furps-analyst": "product-manager",
@@ -1029,7 +1029,7 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
 
 describe("ALLWF-03: read-only agents carry no override in any built-in profile", () => {
   // The rule (registry v2, D1/spec ALLWF-03): a built-in profile's `agents` map holds
-  // overrides ONLY for the write-capable charters (builder/designer/test-engineer resolve
+  // overrides ONLY for the write-capable charters (senior-engineer/designer/test-engineer resolve
   // the "standard" spread, documentation-agent the "light" spread). Every read-only charter
   // must carry no override anywhere, so it resolves to the profile's own host default —
   // which, by convention, the profile author picks as the strongest model. A read-only

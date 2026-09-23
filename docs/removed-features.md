@@ -99,3 +99,63 @@ in `skills/AGENTS.md` is the single current-tense record of this change.
 Six workflows were renamed, not removed, with no aliases: `discovery` →
 `product-discovery`, `adr` → `create-adr`, `to-prd` → `create-prd`, `rfc` → `create-rfc`,
 `tdd` → `create-tdd`, `ticket` → `create-ticket`.
+
+## Agent roster revision — profile skill
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-revision/`
+**Rationale**: The owner no longer wants a dedicated skill front for the model-profile
+switch engine (PRO-01..03).
+
+| Removed | Replacement |
+|---|---|
+| `skills/profile/` (Claude skill front) | None — the MCP tools `profile_list`/`profile_set` and both `massa-ai-config profile` CLIs are the only fronts left |
+
+The switch engine (`packages/shared/src/profile-switch/`), the MCP tools, and the CLIs
+are unchanged; only the skill front is gone.
+
+## Agent roster revision — builder renamed to senior-engineer
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-revision/` (REN-01..05)
+**Rationale**: `builder` named the agent's write permission, not its seniority or scope,
+and read as a build-tool rather than an implementation specialist.
+
+`skills/agents/builder/` moved to `skills/agents/senior-engineer/` with the same one
+output contract, the same disjoint-write-set implementation role, and the same charter
+identity — no behavior changed. Every dispatch block, registry row, model-profile
+override key, and generator constant now names `senior-engineer`. The mapping table in
+`skills/AGENTS.md` records `builder → senior-engineer`. A user's model-profile overlay
+still keyed under the pre-rename `builder` name keeps applying: the overlay merge maps it
+onto `senior-engineer` unless the overlay already sets `senior-engineer` directly.
+
+## Agent roster revision — mode changes and lazy-loaded mode contracts
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-revision/` (REV-01..03, EXP-01, PMG-01..02,
+TST-01..02, DES-01..03, LZY-01..02)
+**Rationale**: The roster carried modes no workflow ever dispatched, two near-duplicate
+mode pairs, and charters whose every dispatch paid for mode contracts it never ran.
+
+| Removed or merged | Now |
+|---|---|
+| `code-reviewer` `guide` mode | Dropped. Architecture findings route to `audit` `lens: architecture`; mobile platform/lifecycle/build/offline-sync guidance is answered by the main agent from `references/mobile-context.md` directly |
+| `code-reviewer` `review` mode | Merged into `audit`; `audit` gained lens `diff` (bugs, regressions, smells, missing edge cases over a diff; ranked findings, blocking vs advisory). All 13 former `review` dispatch blocks became `mode: audit` with `lens: diff` |
+| `code-explorer` `lookup` mode | Dropped. `trace` is the sole mode and the default |
+| `product-manager` `requirements` mode | Merged into `audit`; `audit`'s single lens is `requirements`, run over either a requirement set/spec or an implementation target. spec-driven Specify now dispatches `product-manager` `audit` in every run over the drafted `spec.md` |
+| `test-engineer` `plan` mode | Dropped; `mode` is now a required packet field (no default) |
+
+`designer` gained a new read-only `trace` mode: design-source investigation (Figma MCP
+composition, product context, and a retrieval-partition proposal), the design analogue of
+`code-explorer` `trace`. `references/figma-pre-analysis.md` Stage 1 now dispatches
+`designer` `trace` instead of `code-explorer`.
+
+`designer`, `judge`, and `test-engineer` — the three charters with multiple modes and no
+single dominant one per dispatch — had every mode's output contract moved out of the
+charter file into `skills/massa-ai/references/agent-modes/<agent>/<mode>.md`. Each
+charter keeps one `### Mode: \`<name>\`` stub per mode naming exactly its own contract
+file; the dispatching main agent reads that file and inlines it into the capability
+packet as `mode_contract`. A packet missing `mode_contract` for a lazy mode returns
+`Blocked`. The inline rule and the lazy-charter list are stated once, in the router
+Core Contract (`skills/massa-ai/SKILL.md`) and `references/agent-orchestration.md`;
+individual dispatch blocks do not restate it.

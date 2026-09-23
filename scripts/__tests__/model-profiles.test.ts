@@ -450,18 +450,53 @@ describe("model-profiles: overlay merge (models + profiles)", () => {
   test("a profile's agents.<agent>.<host> leaf merges, and other host keys for that agent are retained", () => {
     const builtin = loadRegistry();
     const overlay: OverlayData = {
-      profiles: { balanced: { agents: { builder: { claude: { model: "opus", effort: "max" } } } } },
+      profiles: { balanced: { agents: { "senior-engineer": { claude: { model: "opus", effort: "max" } } } } },
     };
     const merged = mergeOverlay(builtin, overlay) as Registry;
-    expect(merged.profiles.balanced.agents!.builder!.claude).toEqual({ model: "opus", effort: "max" });
-    expect(merged.profiles.balanced.agents!.builder!.codex).toEqual(builtin.profiles.balanced.agents!.builder!.codex);
+    expect(merged.profiles.balanced.agents!["senior-engineer"]!.claude).toEqual({ model: "opus", effort: "max" });
+    expect(merged.profiles.balanced.agents!["senior-engineer"]!.codex).toEqual(
+      builtin.profiles.balanced.agents!["senior-engineer"]!.codex,
+    );
   });
 
   test("agents.<agent> = null tombstones the whole agent's overrides", () => {
     const builtin = loadRegistry();
-    const overlay: OverlayData = { profiles: { balanced: { agents: { builder: null } } } };
+    const overlay: OverlayData = { profiles: { balanced: { agents: { "senior-engineer": null } } } };
     const merged = mergeOverlay(builtin, overlay) as Registry;
+    expect("senior-engineer" in (merged.profiles.balanced.agents ?? {})).toBe(false);
+  });
+
+  // REN-01..05: `builder` was renamed to `senior-engineer`; `resolveAgent` never validates
+  // agent names, so an overlay saved under the pre-rename key must still resolve against the
+  // renamed charter instead of silently landing on a dead key nothing dispatches.
+  test("REN-05: an overlay keyed `builder` (pre-rename) still applies to the renamed `senior-engineer` agent", () => {
+    const builtin = loadRegistry();
+    const overlay: OverlayData = {
+      profiles: { balanced: { agents: { builder: { claude: { model: "opus", effort: "max" } } } } },
+    };
+    const merged = mergeOverlay(builtin, overlay) as Registry;
+    expect(merged.profiles.balanced.agents!["senior-engineer"]!.claude).toEqual({ model: "opus", effort: "max" });
     expect("builder" in (merged.profiles.balanced.agents ?? {})).toBe(false);
+    expect(resolveAgent(merged, "claude", "balanced", "senior-engineer")).toEqual({ model: "opus", effort: "max" });
+  });
+
+  test("REN-05: an overlay setting both `builder` and `senior-engineer` keeps the direct `senior-engineer` value", () => {
+    const builtin = loadRegistry();
+    const overlay: OverlayData = {
+      profiles: {
+        balanced: {
+          agents: {
+            builder: { claude: { model: "legacy-key", effort: "max" } },
+            "senior-engineer": { claude: { model: "direct-key", effort: "max" } },
+          },
+        },
+      },
+    };
+    const merged = mergeOverlay(builtin, overlay) as Registry;
+    expect(merged.profiles.balanced.agents!["senior-engineer"]!.claude).toEqual({
+      model: "direct-key",
+      effort: "max",
+    });
   });
 
   test("a profile's _delete: true tombstones the whole profile", () => {

@@ -269,7 +269,7 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
 
   // ── T6: subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
   const SPECIALIST_NAMES = [
-    "builder",
+    "senior-engineer",
     "code-explorer",
     "code-reviewer",
     "designer",
@@ -577,12 +577,12 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
 });
 
 describe("cursor-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
-  test("install copies massa-ai + profile + bootstrap into ~/.cursor/skills (not the plugin cache) as plugin-owned", async () => {
+  test("install copies massa-ai + bootstrap into ~/.cursor/skills (not the plugin cache) as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("harness skills installed");
 
-    for (const name of ["massa-ai", "profile", "bootstrap"]) {
+    for (const name of ["massa-ai", "bootstrap"]) {
       const skillMd = path.join(tmp, `.cursor/skills/${name}/SKILL.md`);
       expect(await pathExists(skillMd)).toBe(true);
       const lst = await fs.lstat(skillMd);
@@ -613,7 +613,7 @@ describe("cursor-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
         {
           version: 2,
           platforms: {
-            cursor: { root: path.join(tmp, ".cursor"), skillsOwner: "repo", skills: ["massa-ai", "profile"] },
+            cursor: { root: path.join(tmp, ".cursor"), skillsOwner: "repo", skills: ["massa-ai", "bootstrap"] },
           },
         },
         null,
@@ -879,7 +879,7 @@ describe("cursor-plugin retired harness-skill prune (PER AC-5)", () => {
     await fs.writeFile(stateFile(), JSON.stringify(data, null, 2));
   }
 
-  test("install removes a recorded persona-router skill and records only the current three", async () => {
+  test("install removes a recorded persona-router skill and records only the current two", async () => {
     await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
     await plantRetired();
 
@@ -889,7 +889,7 @@ describe("cursor-plugin retired harness-skill prune (PER AC-5)", () => {
     expect(await pathExists(retiredDir())).toBe(false);
     const state = await readJson(stateFile());
     const platforms = state.platforms as Record<string, { skills: string[] }>;
-    expect(platforms.cursor.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+    expect(platforms.cursor.skills).toEqual(["massa-ai", "bootstrap"]);
   });
 
   test("uninstall removes a recorded persona-router skill", async () => {
@@ -964,7 +964,7 @@ describe("cursor-plugin retired harness-skill prune (PER AC-5)", () => {
 
   test("a multi-line skillsOwner cannot smuggle a path into the prune", async () => {
     const sentinels = await plantSentinels();
-    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "profile", "bootstrap"] };
+    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "bootstrap"] };
 
     await writeRecord(hostile);
     expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
@@ -1010,7 +1010,7 @@ describe("cursor-plugin retired harness-skill prune (PER AC-5)", () => {
       expect(await pathExists(retiredDir())).toBe(false);
       const state = await readJson(stateFile());
       const platforms = state.platforms as Record<string, { skills: string[] }>;
-      expect(platforms.cursor.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+      expect(platforms.cursor.skills).toEqual(["massa-ai", "bootstrap"]);
     },
   );
 });

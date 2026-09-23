@@ -55,7 +55,7 @@ const STALE = path.join(
 /** A generated artifact owned by the **second** generator. Deleting it and
  *  watching a plain run restore it is what proves the no-flag path still
  *  reaches both links — every `pretest:*` hook in this repo depends on that. */
-const AGENT_ARTIFACT = path.join(REPO_ROOT, "apps/claude-plugin/agents/builder.md");
+const AGENT_ARTIFACT = path.join(REPO_ROOT, "apps/claude-plugin/agents/senior-engineer.md");
 
 function run(args: readonly string[]): SpawnSyncReturns<string> {
   return spawnSync("bun", [...args], {

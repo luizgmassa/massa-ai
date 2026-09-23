@@ -66,7 +66,7 @@ Not for findings-only requirements review — route to `workflows/requirements/r
    - If a finding exposes a product decision gap, stop and ask rather than inventing policy.
 10. Use agent orchestration only when it improves signal, with one carve-out: the `code-reviewer` `verify` dispatch below is mandatory at its tier gate rather than discretionary, per `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated requirements finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -76,10 +76,10 @@ Not for findings-only requirements review — route to `workflows/requirements/r
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable requirements patterns
 
-> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - inputs: diff, acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps

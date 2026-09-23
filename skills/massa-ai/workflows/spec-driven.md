@@ -96,9 +96,19 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 3. Run `Specify` with `references/spec-driven/specify.md`.
    - Capture stable requirement IDs, testable acceptance criteria, edge cases, and explicit out-of-scope items.
    - Run `references/spec-driven/discuss.md` inside Specify when gray areas, implicit requirements, persistence/state, external calls, auth, payments, concurrency, or state transitions affect behavior.
+
+> **Dispatch: `product-manager`** (role: `product-manager`, mode: `audit`) — charter `skills/agents/product-manager/SKILL.md`
+> - trigger: every Specify run, once `spec.md` is drafted, before the Requirement Closure Gate
+> - scope: the drafted `spec.md`
+> - permissions: read-only
+> - inputs: `lens: requirements`; the drafted spec; recalled requirement decisions
+> - output: findings — ambiguity, gap, contradiction, implicit-requirement, and uncovered-scenario lists — that the main agent resolves with the user or records as an accepted assumption in the Requirement Closure Gate
+> - firewall: raw spec text summarized, not returned raw
+> - memory: suggest-only; main agent persists reusable requirements patterns
+
    - For Android, iOS, or KMP Compose Multiplatform UI work, run the optional design-source intake gate from `references/mobile-context.md` (Design-Source Intake Gate).
    - WHERE one or more Figma links or node IDs are supplied for this work (any platform), lazily load `references/figma-pre-analysis.md`, `references/figma-wiring.md`, and `references/design-implementation.md` before Design/Tasks close; mobile targets additionally keep the Design-Source Intake Gate above.
-   - Apply the Requirement Closure Gate: every open requirement question is resolved with the user or recorded as an accepted assumption before execution begins.
+   - Apply the Requirement Closure Gate: every open requirement question is resolved with the user or recorded as an accepted assumption before execution begins, incorporating the `product-manager` `audit` findings above.
 **Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
 
 4. Decide whether `Design` is required. If yes, run `references/spec-driven/design.md`, including its deterministic validation before presenting `design.md` for confirmation; if no, record why the skip is valid. When Design is skipped and a design concern appears later, stop and create `design.md` before continuing.
@@ -123,10 +133,10 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
 
-> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the task's diff surface and its task/AC context
-> - inputs: diff, acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps

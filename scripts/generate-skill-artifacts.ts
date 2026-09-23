@@ -12,9 +12,6 @@
  * Source -> destination (design.md D2):
  *
  *   skills/massa-ai/**            -> apps/<host>-plugin/skills/massa-ai/**
- *   skills/profile/**             -> apps/<host>-plugin/skills/profile/**
- *     (model-profile-switching T15 — a whole-directory bundle, same as
- *     massa-ai/, not an agents/<n>/SKILL.md charter)
  *   skills/bootstrap/**           -> apps/<host>-plugin/skills/bootstrap/**
  *   skills/agents/<n>/SKILL.md    -> apps/<host>-plugin/skills/agents/<n>/SKILL.md
  *   scripts/lib/opencode-config.cjs -> apps/opencode-plugin/lib/opencode-config.cjs
@@ -128,7 +125,7 @@ async function walkFiles(dir: string): Promise<string[]> {
 
 /**
  * Every file this generator owns under `apps/<host>-plugin/skills/`, for all
- * four hosts: skills/massa-ai/**, skills/profile/**, skills/bootstrap/**,
+ * four hosts: skills/massa-ai/**, skills/bootstrap/**,
  * and one SKILL.md per skills/agents/<name>/ directory.
  * `relPath` is relative to the plugin's `skills/` directory.
  *
@@ -141,7 +138,7 @@ async function walkFiles(dir: string): Promise<string[]> {
 export async function collectSkillEntries(): Promise<ManagedEntry[]> {
   const entries: ManagedEntry[] = [];
 
-  for (const bundleName of ["massa-ai", "profile", "bootstrap"] as const) {
+  for (const bundleName of ["massa-ai", "bootstrap"] as const) {
     const sourceDir = path.join(SKILLS_DIR, bundleName);
     const files = await walkFiles(sourceDir);
     for (const rel of files) {
@@ -226,7 +223,6 @@ export function managedRootsFor(host: string, capsLookup: CapsLookup = REAL_CAPS
   // T21 documents at the other site.
   const common = [
     path.join("skills", "massa-ai"),
-    path.join("skills", "profile"),
     path.join("skills", "bootstrap"),
     path.join("skills", "agents"),
   ];
@@ -255,7 +251,7 @@ async function copyEntries(
  * would survive forever — and the cursor installer would copy it into the
  * command-skill cache once it left that installer's exclusion list (PER AC-3).
  */
-export const RETIRED_BUNDLE_ROOTS = ["persona-router"] as const;
+export const RETIRED_BUNDLE_ROOTS = ["persona-router", "profile"] as const;
 
 /**
  * Removes a host's prior managed-root contents (and its hook-binary file, if

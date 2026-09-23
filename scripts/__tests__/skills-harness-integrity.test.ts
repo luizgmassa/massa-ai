@@ -420,7 +420,12 @@ describe("router table matches the workflow and reference trees", () => {
     const listed = new Set(
       [...router.matchAll(/`(references\/[A-Za-z0-9._/-]+)`/g)].map((m) => m[1]!),
     );
-    expect(listed.size).toBeGreaterThan(20);
+    // agent-roster-revision (RTR-01) dropped the router's "## Shared
+    // References" list: workflows now name their own references instead of
+    // the router restating all of them. The floor is a sanity check against
+    // a total wipe-out, re-based on the post-slim count (14 measured), not a
+    // requirement that the router re-list every reference in the tree.
+    expect(listed.size).toBeGreaterThan(10);
     const missing: string[] = [];
     for (const rel of listed) {
       const target = path.join(SKILLS_DIR, "massa-ai", rel);
@@ -605,12 +610,15 @@ describe("dispatch role defaults: shared field values live in exactly one place"
 
   /**
    * Field values `agent-orchestration.md` fixes for a role. Keyed by the agent
-   * the default belongs to, or by `agent/mode` for a default that holds for one
-   * mode only. A block restating any of these has forked the contract.
+   * the default belongs to, by `agent/mode` for a default that holds for one
+   * mode only, or by `agent/mode:lens` for a default scoped to one lens within
+   * a mode (needed once `code-reviewer` `audit` covers six lenses and the
+   * fallback default must not spread from `lens: diff` to the other five). A
+   * block restating any of these has forked the contract.
    */
   const DEFAULTED_FIELDS: Record<string, string[]> = {
     "code-reviewer": ["permissions"],
-    "code-reviewer/review": ["fallback"],
+    "code-reviewer/audit:diff": ["fallback"],
     "designer": ["trigger", "sensors", "inputs", "firewall", "memory"],
   };
 
@@ -650,9 +658,11 @@ describe("dispatch role defaults: shared field values live in exactly one place"
       for (const block of blocks) {
         const agent = /\*\*Dispatch: `([^`]+)`\*\*/.exec(block)?.[1] ?? "unknown";
         const mode = /\(role: `[^`]+`, mode: `([^`]+)`\)/.exec(block)?.[1];
+        const lens = /`lens: ([a-z-]+)`/.exec(block)?.[1];
         const fields = [
           ...(DEFAULTED_FIELDS[agent] ?? []),
           ...(mode ? (DEFAULTED_FIELDS[`${agent}/${mode}`] ?? []) : []),
+          ...(mode && lens ? (DEFAULTED_FIELDS[`${agent}/${mode}:${lens}`] ?? []) : []),
         ];
         for (const field of fields) {
           if (new RegExp(`^> - ${field}:`, "m").test(block)) {

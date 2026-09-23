@@ -38,11 +38,11 @@ export const QUICK_COMMAND_NAMES = ["def", "find", "graph", "index", "map", "sta
  *  Must list every bundle `collectSkillEntries` emits under `skills/`, plus
  *  `agents`. `bootstrap` joined in T21: without it, the new bundle root is
  *  read as a workflow-command stem by `manifest.test.ts` and by cursor's
- *  install exclusion, which is how `profile` leaked into the command-skill
- *  cache before it was added here. */
+ *  install exclusion — the same leak that `profile` caused before this list
+ *  covered it. `profile` was removed here when the `profile` skill was
+ *  retired (PRO-01/02). */
 export const RESERVED_BUNDLE_ROOTS = [
   "massa-ai",
-  "profile",
   "bootstrap",
   "agents",
 ] as const;

@@ -91,7 +91,7 @@ export type SpecialistName = string;
 // Charter frontmatter and this set must agree —
 // scripts/__tests__/skills-harness-integrity.test.ts enforces that.
 const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
-  "builder",
+  "senior-engineer",
   "designer",
   "judge",
   "test-engineer",

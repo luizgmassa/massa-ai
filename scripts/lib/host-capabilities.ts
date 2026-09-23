@@ -50,7 +50,7 @@ export interface HostCapabilities {
    * handlers).
    */
   hookBinaryDelivery: "source" | "real-copy" | "none";
-  /** Extra directories (beyond skills/{massa-ai,profile,bootstrap,agents}) this
+  /** Extra directories (beyond skills/{massa-ai,bootstrap,agents}) this
    *  host's skill bundle manages, relative to the plugin root. */
   extraManagedRoots: readonly string[];
   /**

@@ -207,7 +207,7 @@ massa-ai-config profile list
 massa-ai-config profile set work --host claude
 ```
 
-MCP tools: `profile_list`, `profile_set`. Claude skill: `/profile`.
+MCP tools: `profile_list`, `profile_set`.
 
 **A host session restart is always required after a switch.** No host supports
 per-agent runtime indirection.
@@ -308,7 +308,6 @@ Repo-local skills live in `skills/`; generated per-host bundles land in
 | Skill | Purpose |
 |---|---|
 | `massa-ai` | Default memory-backed workflow router — load once per coding session |
-| `profile` | Switch installed agents to a model profile / report the active one |
 | `bootstrap` | Inspect or toggle the eight startup-contract rules |
 | `agents/<name>` | The 7 sub-agent charters |
 
@@ -381,13 +380,13 @@ per dispatch through the capability packet's `mode` field.
 
 | Agent | Purpose | Modes | Permission |
 |---|---|---|---|
-| `builder` | Implement approved plans | — | write |
-| `code-explorer` | Understand an existing codebase, index-first | `lookup`, `trace` | read-only |
-| `code-reviewer` | Review, verify, audit, and guide existing or changed code | `review`, `verify`, `audit`, `guide` | read-only |
-| `designer` | Read and write screens from Figma, screenshots, or other design direction | `audit`, `implement` | read-only (UI-layer write when scoped) |
+| `senior-engineer` | Implement approved plans | — | write |
+| `code-explorer` | Understand an existing codebase, index-first | `trace` | read-only |
+| `code-reviewer` | Verify and audit existing or changed code | `verify`, `audit` | read-only |
+| `designer` | Read, write, and investigate screens from Figma, screenshots, or other design direction | `audit`, `implement`, `trace` | read-only (UI-layer write when scoped) |
 | `judge` | Evaluate artifacts and challenge plans with quoted evidence | `spec-author`, `scorer`, `plan-critique` | write (own judge-N report, `scorer` only) |
-| `product-manager` | Hold requirements to a clear, complete, consistent standard | `furps`, `requirements`, `audit` | read-only |
-| `test-engineer` | Plan, audit, and fix tests | `plan`, `audit`, `fix` | read-only (test-write when scoped) |
+| `product-manager` | Hold requirements to a clear, complete, consistent standard | `furps`, `audit` | read-only |
+| `test-engineer` | Audit and fix tests | `audit`, `fix` | read-only (test-write when scoped) |
 
 Retired agents and where their work went: the mapping table in `skills/AGENTS.md`.
 

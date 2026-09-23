@@ -324,7 +324,7 @@ variable; copy it to `.env` and edit there.
 
 ### Agent-harness surface
 
-`skills/` holds the repo-local skills (`massa-ai` router, `profile`, `bootstrap`, `agents/`);
+`skills/` holds the repo-local skills (`massa-ai` router, `bootstrap`, `agents/`);
 `skills/AGENTS.md` is the registry for the 7 sub-agent specialists (plus the single
 retired-agent → current-agent mapping table) **and** the single source of the Plan
 Challenge / Conversation Feedback policies (the
@@ -392,17 +392,17 @@ runtime concern from the build-time registry above.** Every profile ships
 pre-rendered per host (`agent-profiles/<profile>/`, sibling of `agents/`, generated
 alongside the default `agents/` set); one switch engine
 (`packages/shared/src/profile-switch/`) copies a chosen variant over the installed
-active agent files, fronted by MCP tools (`profile_list`/`profile_set`), both
-`massa-ai-config profile list|show|set` CLIs, and the Claude `skills/profile/` skill
-(the OpenCode in-process `profile` tool was retired with the rest of the in-process
+active agent files, fronted by MCP tools (`profile_list`/`profile_set`) and both
+`massa-ai-config profile list|show|set` CLIs (the `skills/profile/` skill front was
+retired — PRO-01; the OpenCode in-process `profile` tool was retired with the rest of the in-process
 tool surface — AD-017; OpenCode switches via the MCP pair or its `massa-ai-config` CLI). A host session restart is always required
 after a switch — no host supports per-agent runtime indirection (unchanged from the
 registry's own finding); see `.specs/features/model-profile-switching/spec.md`.
 
 `scripts/generate-skill-artifacts.ts` is the analogous generator for
-`skills/massa-ai/`, `skills/profile/`, `skills/bootstrap/`, and the raw
+`skills/massa-ai/`, `skills/bootstrap/`, and the raw
 `skills/agents/<n>/SKILL.md` charters: it emits real, byte-identical files into
-`apps/<host>-plugin/skills/{massa-ai,profile,bootstrap,agents}/` for all four hosts (~6 MB /
+`apps/<host>-plugin/skills/{massa-ai,bootstrap,agents}/` for all four hosts (~6 MB /
 600 files). These bundles, plus the generated `hooks/massa-ai-hook` copies above and
 `apps/opencode-plugin/lib/opencode-config.cjs` (mirrored from
 `scripts/lib/opencode-config.cjs`, D1), are **generated-on-demand, gitignored build output —
