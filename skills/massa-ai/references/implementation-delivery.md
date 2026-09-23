@@ -65,14 +65,14 @@ worktree was never provisioned is an environment failure; say so rather than
 reporting it as a code failure.
 
 **Phased work — one branch per Phase/Wave.** When the work is phased (sourced
-from `workflows/ticket.md`, a spec-driven `tasks.md` with Phases/Waves, a TDD
+from `workflows/create-ticket.md`, a spec-driven `tasks.md` with Phases/Waves, a TDD
 PR-group table, or a `references/pr-task-fix.md` PR-group split), create
 **one branch per Phase/Wave**, not one branch per task
 and not one branch for the whole feature. All Phases/PR groups of one feature
 share that feature's single Stage 3 delivery authorization — one go-ahead
 covers every group's commits, pushes, and PR creation. Name the branch with the phase's Jira
 Task key, e.g. `feat/<PHASE-KEY>-<slug>` (so `feat/SA-100-phase-1-search-split`
-for phase SA-100). The phase key comes from `workflows/ticket.md` or the user.
+for phase SA-100). The phase key comes from `workflows/create-ticket.md` or the user.
 Each Task inside the phase is then one atomic commit on that branch, prefixed
 with its own sub-task key — the commit contract is owned by
 `workflows/commit.md`; do not restate it here. Non-phased work keeps the

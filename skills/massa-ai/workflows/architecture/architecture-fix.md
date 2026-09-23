@@ -63,7 +63,7 @@ Not for findings-only architecture review — route to `workflows/architecture/a
    - Coupling: reduce strength before distance; replace internal model sharing with explicit contracts, remove cross-boundary knowledge of internals, invert dependencies at stable seams, keep cohesive local coupling close, and avoid cycles.
    - Deepening: delete shallow pass-through modules, merge split concepts when locality improves, deepen useful interfaces by hiding invariants and ordering, test through the interface, and clarify seams only where variation, dependency direction, external I/O, or test substitution justifies it.
    - When a deepening candidate has two or more viable interface shapes, load the Interface Design Method from `references/architecture-deepening-lens.md` (Design It Twice) and pick by leverage and locality before editing.
-   - When you decide not to apply a reported refactor, record the load-bearing reason; if likely to recur, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated.
+   - When you decide not to apply a reported refactor, record the load-bearing reason; if likely to recur, offer an ADR via `workflows/create-adr.md` so the rejection is not re-litigated.
    - Prefer move, merge, inline, or clarify existing seams before adding new abstractions.
    - Use ports/adapters or anti-corruption layers only when the report evidence shows real volatility, boundary pressure, external dependency pressure, model leakage, or at least two real adapters such as production plus test.
    - Do not turn a local code-quality concern into an architecture migration; route broad new design, VSA migration, new service boundaries, or unclear ownership to `workflows/spec-driven.md`.

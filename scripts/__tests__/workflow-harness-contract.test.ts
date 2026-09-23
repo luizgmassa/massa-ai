@@ -707,7 +707,7 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
 // .specs/features/designer-agent/ — ADRG-01, ADRG-02.
 //
 // `skills/AGENTS.md` names the workflows that take the full Plan Challenge
-// Gate. `workflows/adr.md` was named there and carried no gate step at all,
+// Gate. `workflows/create-adr.md` was named there and carried no gate step at all,
 // and `workflows/refactor.md` carried none either — the policy reached both
 // only if the orchestrator recalled the bootstrap list unaided. Every other
 // workflow-side contract in this repo is inline in its own file for exactly
@@ -743,8 +743,10 @@ describe("plan challenge: every full-gate workflow carries the gate step", () =>
     // parse would make every assertion below pass by matching nothing.
     const names = await fullGateWorkflows();
     expect(names.length).toBeGreaterThanOrEqual(6);
-    expect(names).toContain("adr");
     expect(names).toContain("refactor");
+    // agent-roster-consolidation WFL-03 (Inventory AC-5): the renamed stems.
+    for (const stem of ["create-adr", "create-rfc", "create-tdd"]) expect(names).toContain(stem);
+    for (const old of ["adr", "rfc", "tdd"]) expect(names).not.toContain(old);
   });
 
   test("every named workflow exists on disk", async () => {

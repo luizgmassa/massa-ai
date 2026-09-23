@@ -1,5 +1,5 @@
 ---
-name: ticket
+name: create-ticket
 description: "Use this workflow to draft, review, create, or resume creation of Jira Epics, issues, or sub-tasks through Atlassian MCP, the only tracker and mutation path."
 license: MIT
 metadata:
@@ -14,12 +14,12 @@ Load `references/project-context.md` (intake sweep) before the first substantive
 
 ## Workflow
 
-1. Resolve or reuse `projectId` and `workflowSessionId=ticket-<entity>`.
+1. Resolve or reuse `projectId` and `workflowSessionId=create-ticket-<entity>`.
 2. Recall durable project conventions, prior Jira constraints, and ticket-writing decisions through `recall`. Treat recalled facts as leads until confirmed by the user or current Jira metadata.
 3. Load the focused contracts:
-   - `references/ticket/intake-and-sources.md` for ordered questions, reference-ticket isolation, DoR/DoD inputs, and bounded code exploration.
-   - `references/ticket/templates-and-quality.md` for title prefixes, built-in templates, decomposition, and draft validation.
-   - `references/ticket/atlassian-fix.md` before tool discovery, preflight, approval, Jira creation, resume, or cleanup.
+   - `references/create-ticket/intake-and-sources.md` for ordered questions, reference-ticket isolation, DoR/DoD inputs, and bounded code exploration.
+   - `references/create-ticket/templates-and-quality.md` for title prefixes, built-in templates, decomposition, and draft validation.
+   - `references/create-ticket/atlassian-fix.md` before tool discovery, preflight, approval, Jira creation, resume, or cleanup.
    - `references/context-firewall.md` when Jira, Confluence, supplied files, or exploration output could flood context.
 4. Discover Atlassian MCP capabilities dynamically. Require readable Jira project metadata and issue-creation capability before promising creation. If Atlassian MCP is missing or read-only, drafting may continue, but stop before approval-to-create and report the unavailable capability. Never substitute a CLI or tracker.
 5. Run ordered intake from `intake-and-sources.md`. Ask only for information not already supplied or discoverable from Atlassian metadata. Validate the exact project key without silently correcting it.

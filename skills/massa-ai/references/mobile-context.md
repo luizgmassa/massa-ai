@@ -20,7 +20,7 @@ Mobile E2E test coverage, assertion quality, flakiness, or regression-risk revie
 
 ## Design-Source Intake Gate
 
-Use this gate for `feature`, `spec-driven`, `rfc`, `adr`, and `tdd` workflows when the target is Android, iOS, KMP Compose Multiplatform UI, or plausibly mobile UI. Clear backend, CLI, docs, infrastructure, or non-UI work skips the gate entirely.
+Use this gate for `feature`, `spec-driven`, `create-rfc`, `create-adr`, and `create-tdd` workflows when the target is Android, iOS, KMP Compose Multiplatform UI, or plausibly mobile UI. Clear backend, CLI, docs, infrastructure, or non-UI work skips the gate entirely.
 
 - Ask once for one or more Figma links, node IDs, a readable desktop selection, supplied screenshots, or explicit `none`. Treat `none` as a first-class answer: record `Figma Source: none by user choice` and do not re-ask unless the mobile UI scope changes.
 - When Figma sources or screenshots are supplied for supported Android, iOS, or KMP Compose Multiplatform UI implementation/update work, keep the parent workflow as the lifecycle owner and invoke `workflows/design.md` only for the affected UI slice or visual feasibility context. Preserve mobile Figma routing by intent: compare/audit wording uses `workflows/mobile-figma/mobile-figma-audit.md`; saved `MFM-*` findings use `workflows/mobile-figma/mobile-figma-fix.md`.

@@ -105,11 +105,11 @@ T12 → T13
 
 **Done when**:
 
-- [ ] `git grep -n -F "workflows/adr.md"` (and each old stem path) returns 0 outside `.specs/`, `.ua/`, CHANGELOG
-- [ ] Same zero-hit check for `references/tdd/`, `references/rfc/`, `references/ticket/`, `adr-authoring.md`, `docs/massa-ai-rfc.md`, `docs/massa-ai-tdd.md`, `docs/massa-ai-ticket.md`
-- [ ] Plan Challenge sentence names `create-adr`, `create-rfc`, `create-tdd`; its parse test updated
-- [ ] Generated commands contain the 6 new stems and none of the old ones (assert in `workflow-command-entries.test.ts`)
-- [ ] Gate: scripts green
+- [x] `git grep -n -F "workflows/adr.md"` (and each old stem path) returns 0 outside `.specs/`, `.ua/`, CHANGELOG
+- [x] Same zero-hit check for `references/tdd/`, `references/rfc/`, `references/ticket/`, `adr-authoring.md`, `docs/massa-ai-rfc.md`, `docs/massa-ai-tdd.md`, `docs/massa-ai-ticket.md`
+- [x] Plan Challenge sentence names `create-adr`, `create-rfc`, `create-tdd`; its parse test updated
+- [x] Generated commands contain the 6 new stems and none of the old ones (assert in `workflow-command-entries.test.ts`)
+- [x] Gate: scripts green
 
 **Tests**: content/contract, generator
 **Gate**: scripts

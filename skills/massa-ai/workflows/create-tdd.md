@@ -1,5 +1,5 @@
 ---
-name: tdd
+name: create-tdd
 description: "Use this workflow to write a Technical Design Document once one product direction is selected and no unresolved API, data, security, or rollout decision blocks implementation."
 license: MIT
 metadata:
@@ -8,25 +8,25 @@ metadata:
 
 ### TDD (Technical Design Document)
 
-Use when the readiness checklist is true: one product direction is selected, a named requirements source exists, and no unresolved API, data, security/privacy, migration, rollout, or public compatibility decision blocks implementation design. Route unresolved proposals or competing directions to `workflows/rfc.md`, isolated finalized architecture decisions to `workflows/adr.md`, and broad requirements-to-delivery work to `workflows/spec-driven.md`.
+Use when the readiness checklist is true: one product direction is selected, a named requirements source exists, and no unresolved API, data, security/privacy, migration, rollout, or public compatibility decision blocks implementation design. Route unresolved proposals or competing directions to `workflows/create-rfc.md`, isolated finalized architecture decisions to `workflows/create-adr.md`, and broad requirements-to-delivery work to `workflows/spec-driven.md`.
 
 Load `references/project-context.md` (intake sweep) before the first substantive read.
 
 ## Workflow
 
-1. Resolve or reuse `projectId` and `workflowSessionId=tdd-[entity]`.
+1. Resolve or reuse `projectId` and `workflowSessionId=create-tdd-[entity]`.
 2. Establish evidence before asking questions:
    - `recall` approved RFCs, ADRs, prior TDD decisions, constraints, rejected approaches, and verification patterns.
-   - Load `references/tdd/discovery-and-sizing.md`.
+   - Load `references/create-tdd/discovery-and-sizing.md`.
    - Inspect current source, tests, source sets, project instructions, architecture documents, and existing design artifacts. Current source and approved project artifacts override stale memory.
    - For testing plans, find whether each planned test file already exists and which source set owns it before choosing a location such as `commonTest`, `androidUnitTest`, `unitTest`, or the repository's actual equivalent.
    - For UI/UX-affecting method, class, enum, sealed type, mapper, or state changes, enumerate parallel rendering surfaces and mappers that consume the affected symbol.
    - When supplied Figma links, nodes, desktop selections, or screenshots materially affect supported Android, iOS, or KMP Compose Multiplatform UI design, use `workflows/design.md` as optional child context and keep this TDD as the owner of architecture, contracts, rollout, and verification strategy. Screenshots are context-only unless paired with structured Figma evidence.
    - Run a pre-TDD `Strings Audit` when mappers branch on a type and call `stringResource`; record affected string keys/resources, branches, fallback behavior, and surfaces before proposing string changes.
    - Load `references/synapse-policy.md` when two or more related searches are expected and `references/context-firewall.md` before broad or verbose source inspection.
-3. Confirm workflow fit with the readiness checklist in `references/tdd/discovery-and-sizing.md` and classify the document as Compact, Standard, or High-Risk from the exact sizing rules there. Do not size by guessed calendar duration.
-   - Record a `project_type` intake tag from this taxonomy: `integration`, `feature`, `refactor`, `infrastructure`, `payment`, `auth`, `data`. The `project_type` selects which conditional concerns in `references/tdd/document-contract.md` apply and which calibrated reference values from `references/tdd/calibrated-examples.md` are relevant; it does not mandate section counts or a fixed document shape.
-   - Apply the critical-section MANDATORY trigger mapping below. These are workflow-level selectors that point at the Conditional Concerns table in `references/tdd/document-contract.md`; they do not duplicate that table. When a trigger fires, the matching concerns are mandatory, not optional:
+3. Confirm workflow fit with the readiness checklist in `references/create-tdd/discovery-and-sizing.md` and classify the document as Compact, Standard, or High-Risk from the exact sizing rules there. Do not size by guessed calendar duration.
+   - Record a `project_type` intake tag from this taxonomy: `integration`, `feature`, `refactor`, `infrastructure`, `payment`, `auth`, `data`. The `project_type` selects which conditional concerns in `references/create-tdd/document-contract.md` apply and which calibrated reference values from `references/create-tdd/calibrated-examples.md` are relevant; it does not mandate section counts or a fixed document shape.
+   - Apply the critical-section MANDATORY trigger mapping below. These are workflow-level selectors that point at the Conditional Concerns table in `references/create-tdd/document-contract.md`; they do not duplicate that table. When a trigger fires, the matching concerns are mandatory, not optional:
      - `payment`, `auth`, PII, or regulated data → Security is mandatory.
      - production or customer-facing rollout → Monitoring and Rollback are mandatory.
      - external or cross-service integration → Dependencies and Security are mandatory.
@@ -35,7 +35,7 @@ Load `references/project-context.md` (intake sweep) before the first substantive
    - Group related questions naturally, in the user's language — no numeric cap; ask as many as the open decisions require.
    - Distinguish verified facts, evidence-backed inferences, proposed decisions, and unresolved questions.
    - Never invent owners, links, APIs, schemas, vendors, dates, thresholds, estimates, approvals, or project facts to complete a template.
-5. Load `references/tdd/document-contract.md`, plus `references/naming-standards.md` when the design names proposed components, modules, states, events, schemas, or fields, and draft the smallest decision-complete TDD for the selected depth.
+5. Load `references/create-tdd/document-contract.md`, plus `references/naming-standards.md` when the design names proposed components, modules, states, events, schemas, or fields, and draft the smallest decision-complete TDD for the selected depth.
    - Write in the user's language while preserving established project terminology and technical identifiers.
    - Focus on architecture, ownership boundaries, stable interfaces, data flow, failure behavior, and implementation strategy.
    - Include implementation detail when it defines a contract or removes material ambiguity; exclude production implementation code and incidental framework syntax.
@@ -49,12 +49,12 @@ Load `references/project-context.md` (intake sweep) before the first substantive
    - If the target exists, treat the request as an update only when the user explicitly requested one; otherwise ask before overwriting it.
    - When file mutation is unavailable or the user requested plan-only output, present the complete draft and intended path without writing.
 7. Run the configured Plan Challenge Gate. TDD plans require the full gate under the default policy; revise valid critical or high findings before finalization.
-8. Load `references/tdd/quality-and-lifecycle.md`, validate the document, and resolve blocking gaps. Keep non-blocking unknowns explicit with owners or decision points when known.
+8. Load `references/create-tdd/quality-and-lifecycle.md`, validate the document, and resolve blocking gaps. Keep non-blocking unknowns explicit with owners or decision points when known.
 9. If the implementation task table is stable and validated, discover whether Atlassian MCP has readable Jira project metadata and issue-creation capability.
    - If Atlassian MCP is unavailable or read-only, leave the table's `Jira Key` values as `Unavailable` and report that ticket creation was skipped.
    - If Atlassian MCP is available, ask whether the user wants to create Jira tickets now. If declined, set `Jira Key` to `Not requested`.
-   - If the user accepts, invoke `workflows/ticket.md`; Jira creation remains owned solely by the ticket workflow. Create one standard Jira issue per PR group. Create row-level sub-tasks only when the selected ticket hierarchy requires them.
-   - Update `Jira Key` only with confirmed Jira keys returned by the ticket workflow. Use `Pending` for approved-but-uncreated PR groups and never fabricate keys.
+   - If the user accepts, invoke `workflows/create-ticket.md`; Jira creation remains owned solely by the `create-ticket` workflow. Create one standard Jira issue per PR group. Create row-level sub-tasks only when the selected ticket hierarchy requires them.
+   - Update `Jira Key` only with confirmed Jira keys returned by the create-ticket workflow. Use `Pending` for approved-but-uncreated PR groups and never fabricate keys.
 10. Save the document as `Draft` or `In Review`. Never mark it `Approved`, invent sign-off, or begin downstream implementation without the required human decision.
 11. Persist only durable architecture constraints, accepted trade-offs, rejected approaches, compatibility requirements, and verification recipes through `remember` after recall, deduplication, and scoring. Use `decision` with `memory:semantic` for the architectural blueprint.
 12. Complete `references/evidence-gate.md` and report the artifact path, included conditional sections, unresolved questions, Jira creation outcome, memory outcome, and residual risk.

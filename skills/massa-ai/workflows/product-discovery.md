@@ -1,6 +1,6 @@
 ---
-name: discovery
-description: "Product discovery and brainstorming workflow — act as a sharp product thinking partner to explore problem spaces, generate and stress-test ideas, and spar on strategy before anything is spec-ready, ending with a mandatory offer to synthesize the conversation into a PRD via the to-prd workflow. Use when the user wants to brainstorm a product problem, idea, opportunity, or direction with no concrete code target. Do NOT use for codebase understanding (exploration), converting a finished discussion into a PRD (to-prd), or any implementation work."
+name: product-discovery
+description: "Product discovery and brainstorming workflow — act as a sharp product thinking partner to explore problem spaces, generate and stress-test ideas, and spar on strategy before anything is spec-ready, ending with a mandatory offer to synthesize the conversation into a PRD via the create-prd workflow. Use when the user wants to brainstorm a product problem, idea, opportunity, or direction with no concrete code target. Do NOT use for codebase understanding (exploration), converting a finished discussion into a PRD (create-prd), or any implementation work."
 license: Apache-2.0
 metadata:
   version: "1.0.0"
@@ -10,7 +10,7 @@ metadata:
 
 Attribution: adapted from the `product-brainstorming` skill in
 `anthropics/knowledge-work-plugins` (Apache-2.0). massa-ai session/memory
-binding, router integration, and the to-prd handoff are additions.
+binding, router integration, and the create-prd handoff are additions.
 
 Act as a sharp product thinking partner — the experienced PM (Product
 Manager) or design lead who challenges assumptions, asks hard questions, and
@@ -22,7 +22,7 @@ have reached alone.
 This is a read-only conversation workflow: it never mutates the repository
 and writes no `.specs/` artifacts. Its only outputs are the conversation
 itself, durable memories at Capture, and — on explicit acceptance — a routed
-handoff to `to-prd`.
+handoff to `create-prd`.
 
 Load `references/project-context.md` (intake sweep) before the first
 substantive read when the conversation touches an existing product or
@@ -30,7 +30,7 @@ codebase; product context grounds the brainstorm in what exists today.
 
 ## Session And Memory
 
-- `workflowSessionId`: `discovery-<entity>` (e.g., `discovery-onboarding-dropoff`),
+- `workflowSessionId`: `product-discovery-<entity>` (e.g., `product-discovery-onboarding-dropoff`),
   stable for the whole conversation.
 - Start with a budgeted `recall` (limit ≤ 3, minImportance ≥ 0.7, types
   `critical`/`decision`/`pattern`): prior product decisions, rejected
@@ -121,25 +121,25 @@ name the stage transition when it helps the user follow.
 At Capture, persist the durable subset via `remember`: chosen directions
 with their why and rejected directions with reasons as `decision`, reusable
 framings or cross-session insights as `pattern` — tagged
-`project:<projectId>`, `session:discovery-<entity>`, `workflow:discovery`,
+`project:<projectId>`, `session:product-discovery-<entity>`, `workflow:product-discovery`,
 `entity:<name>`, and a memory-tier tag. Persist only what transcends the
 session; never fabricate memories to satisfy process. If the server is
 unavailable, the capture summary in conversation is the record.
 
-## PRD Handoff (to-prd)
+## PRD Handoff (create-prd)
 
 End every Capture with an explicit offer — this step is mandatory, the PRD
 is not:
 
 > "Want me to turn this into a PRD (Product Requirements Document)? I'd
-> synthesize this conversation through the `to-prd` workflow — no new
+> synthesize this conversation through the `create-prd` workflow — no new
 > interview."
 
-- **Accepted** → route to `workflows/to-prd.md`. The user's acceptance is
-  the explicit request `to-prd`'s routing requires. Carry the current
+- **Accepted** → route to `workflows/create-prd.md`. The user's acceptance is
+  the explicit request `create-prd`'s routing requires. Carry the current
   conversation context — Capture's output (chosen directions, assumptions,
   set-asides) feeds the PRD's problem statement, decisions, and out-of-scope
-  sections directly; `to-prd` does not re-interview.
+  sections directly; `create-prd` does not re-interview.
 - **Declined** → the capture summary stays in conversation and the durable
   memories from Capture remain the only persistence. Offer nothing else.
 
@@ -200,5 +200,5 @@ Discovery completes at Capture plus the PRD offer. Before claiming the
 session complete, apply `references/evidence-gate.md`: the evidence here is
 the capture summary (ideas, assumptions, next steps, set-asides), the memory
 outcome (what was persisted or why persistence was skipped), and the
-recorded PRD-offer disposition (accepted → to-prd, declined, or
+recorded PRD-offer disposition (accepted → create-prd, declined, or
 not-PRD-shaped with the named research gap).

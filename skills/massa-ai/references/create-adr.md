@@ -1,10 +1,10 @@
 # ADR Authoring
 
-Use from `workflows/adr.md`. Defines how massa-ai creates Architecture Decision Records without delegating orchestration to another ADR skill.
+Use from `workflows/create-adr.md`. Defines how massa-ai creates Architecture Decision Records without delegating orchestration to another ADR skill.
 
 ## Core Rule
 
-An ADR records a significant architecture decision that is already made or being finalized. If the user is still choosing among options, route to `workflows/rfc.md`. If the user needs implementation design after the decision, route to `workflows/tdd.md`.
+An ADR records a significant architecture decision that is already made or being finalized. If the user is still choosing among options, route to `workflows/create-rfc.md`. If the user needs implementation design after the decision, route to `workflows/create-tdd.md`.
 
 Route matrix:
 
@@ -26,7 +26,7 @@ Prefer sources in this order:
 1. User prompt and explicitly provided Markdown files.
 2. ADR template from Markdown or Atlassian MCP. If absent, ask fallback ADR format/status/supersession questions.
 3. PRD from Markdown or Atlassian MCP when provided. If needed but absent, ask for missing context instead of inventing.
-4. RFC from Markdown or Atlassian MCP when provided. If needed but absent, ask for missing context instead of inventing. If the user does not know, assume the decision is not made and route to `workflows/rfc.md`.
+4. RFC from Markdown or Atlassian MCP when provided. If needed but absent, ask for missing context instead of inventing. If the user does not know, assume the decision is not made and route to `workflows/create-rfc.md`.
 5. Complementary ADR from Markdown or Atlassian MCP when provided. Use it as factual context only for cross-stack constraints, contracts, dependencies, risks, and links.
 6. Same-Stack Example ADR from Markdown or Atlassian MCP when provided. Use it only for format, structure, tone, naming, metadata, and placement conventions; do not use its decision context, rationale, constraints, consequences, or claims as facts for the new ADR.
 7. UI/UX context from Figma MCP when provided and relevant. If Figma is absent, use PRD, RFC, or NotebookLM context. If none exists, ignore UI/UX.

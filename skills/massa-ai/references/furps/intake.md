@@ -18,7 +18,7 @@ A run may combine sources (e.g., a Jira PRD epic + a Confluence ADR). Record eve
 
 ## Atlassian MCP (read-only capability discovery)
 
-This workflow only reads from Atlassian; it never creates issues or pages. Reuse the capability-discovery pattern from `references/ticket/atlassian-fix.md`:
+This workflow only reads from Atlassian; it never creates issues or pages. Reuse the capability-discovery pattern from `references/create-ticket/atlassian-fix.md`:
 
 1. Inspect currently callable tools.
 2. Identify Atlassian MCP operations by capability and schema, not by provider-specific function name. Needed capabilities: Jira issue retrieval and Confluence page retrieval.

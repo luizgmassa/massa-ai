@@ -357,14 +357,14 @@ Documents and process:
 | Workflow | Use for |
 |---|---|
 | `spec-driven` | TLC v3: Specify → Design → Tasks → Execute with independent validation |
-| `adr` / `rfc` / `tdd` | Record a decision / propose a change / technical design |
-| `discovery` / `to-prd` | Product brainstorming / turn the conversation into a PRD |
+| `create-adr` / `create-rfc` / `create-tdd` | Record a decision / propose a change / technical design |
+| `product-discovery` / `create-prd` | Product brainstorming / turn the conversation into a PRD |
 | `furps-refinement` | FURPS+ refinement of a PRD or ADR before implementation |
 | `refactor` | Behavior-preserving structural cleanup |
 | `design` | Implement mobile UI from Figma evidence |
 | `commit` | Conventional Commits with Jira branch prefixes |
 | `pr-review` | Review a GitHub PR / GitLab MR, post findings via `gh`/`glab` |
-| `ticket` | Jira Epics, issues, sub-tasks through Atlassian MCP |
+| `create-ticket` | Jira Epics, issues, sub-tasks through Atlassian MCP |
 | `the-fool` | Direct challenge, red-team, pre-mortem, evidence audit |
 | `judge-with-debate` | Multi-judge debate evaluation of a supplied artifact |
 | `skill-architect` | Design and build a new skill |

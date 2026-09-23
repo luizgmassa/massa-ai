@@ -190,7 +190,7 @@ installer ever touching my own agent files.
 | WFL-01 | Dispatch mapping per workflow family (Dispatch AC-1..9) | Workflow dispatch mapping | Design | Pending |
 | WFL-02 | Remove general + maestro, fallback rewrite (Inventory AC-1, AC-3, AC-4) | Workflow inventory | Execute (T1) | Done |
 | WFL-03 | Six renames incl. policy sentence, commands, web UI, owned references and docs guides (AC-2, AC-5, AC-6, AC-7, AC-9) | Workflow inventory | Design | Pending |
-| WFL-04 | No dangling pointers (AC-8) | Workflow inventory | Design | Pending |
+| WFL-04 | No dangling pointers (AC-8) | Workflow inventory | Execute (T1, T2) | Done |
 | NAM-01 | Generator emits unprefixed names + markers (NAM AC-1, AC-2, AC-9) | Unprefixed names | Design | Pending |
 | NAM-02 | Installers: marker ownership, collision skip, legacy prune (AC-3, AC-4, AC-5) | Unprefixed names | Design | Pending |
 | NAM-03 | Profile-switch, config-cli, verify, installer-shared, hook sentinel, Claude name resolution (AC-6, AC-7, AC-8, AC-10, AC-11) | Unprefixed names | Design | Pending |

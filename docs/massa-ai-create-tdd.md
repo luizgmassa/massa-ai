@@ -1,12 +1,12 @@
 # massa-ai TDD Workflow
 
-Human-facing guide for the Technical Design Document workflow built directly into `massa-ai`. Canonical agent instructions live in [`workflows/tdd.md`](../../skills/massa-ai/workflows/tdd.md) and its [`references/tdd/`](../../skills/massa-ai/references/tdd/) contracts.
+Human-facing guide for the Technical Design Document workflow built directly into `massa-ai`. Canonical agent instructions live in [`workflows/create-tdd.md`](../../skills/massa-ai/workflows/create-tdd.md) and its [`references/create-tdd/`](../../skills/massa-ai/references/create-tdd/) contracts.
 
 ## Purpose
 
 Use this workflow after the product direction or RFC is settled and the engineering team needs an evidence-backed implementation design covering architecture, contracts, data, risks, verification, rollout, and recovery.
 
-Use the massa-ai `rfc` workflow when alternatives still need stakeholder selection. Use `adr` for one finalized architecture decision, or `spec-driven` when the request spans requirements through implementation.
+Use the massa-ai `create-rfc` workflow when alternatives still need stakeholder selection. Use `create-adr` for one finalized architecture decision, or `spec-driven` when the request spans requirements through implementation.
 
 ## Quick Start
 
@@ -38,7 +38,7 @@ The workflow follows the request language, inspects current source and approved 
 - Living TDDs include `Decisions Revised During Implementation` and a `Pre-Merge TDD Fidelity Check` so implementation divergences, extra scope, production changes, and planned tests are reconciled before merge.
 - Security, privacy, migrations, compatibility, observability, performance, rollout, and recovery become mandatory when project evidence triggers them.
 - Unknown facts stay explicit. The workflow does not invent owners, dates, APIs, vendors, metrics, estimates, or approvals.
-- Optional Jira creation is delegated to the `ticket` workflow after the task table is stable and validated. The TDD records only confirmed Jira keys, `Not requested`, `Unavailable`, or `Pending`.
+- Optional Jira creation is delegated to the `create-ticket` workflow after the task table is stable and validated. The TDD records only confirmed Jira keys, `Not requested`, `Unavailable`, or `Pending`.
 - The full Plan Challenge Gate runs before finalization, followed by deterministic artifact checks and the shared Evidence Gate.
 
 ## Output
@@ -49,6 +49,6 @@ The workflow uses an explicit path or existing project convention and otherwise 
 
 - Too many questions: provide the chosen direction, constraints, affected systems, and rollout expectations; discoverable repository facts are inspected automatically.
 - Too much detail: request a Compact TDD, but risk-triggered sections remain required.
-- Direction still open: use the `rfc` workflow first.
+- Direction still open: use the `create-rfc` workflow first.
 - Broad delivery request: use `spec-driven` for requirements, design, tasks, and execution.
 - Missing tool integration: massa-ai, Synapse, diagram rendering, and external research degrade gracefully; current repository evidence remains authoritative.

@@ -469,10 +469,10 @@ Migrated documentation for massa-ai workflows lives in `docs/`:
 | Guide | File |
 |-------|------|
 | Spec-Driven | `docs/massa-ai-spec-driven.md` |
-| TDD | `docs/massa-ai-tdd.md` |
-| RFC | `docs/massa-ai-rfc.md` |
+| TDD | `docs/massa-ai-create-tdd.md` |
+| RFC | `docs/massa-ai-create-rfc.md` |
 | Commit | `docs/massa-ai-commit.md` |
-| Ticket | `docs/massa-ai-ticket.md` |
+| Ticket | `docs/massa-ai-create-ticket.md` |
 | Mobile Figma | `docs/massa-ai-mobile-figma.md` |
 | Context Slices | `docs/context-slices.md` |
 | Cheatsheet (commands, flags, tools, skills, agents) | `docs/CHEATSHEET.md` |

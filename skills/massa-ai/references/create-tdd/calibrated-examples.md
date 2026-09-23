@@ -2,7 +2,7 @@
 
 The values below are starting reference values, not requirements. They are calibration anchors, not mandates. Treat every number as a starting-point reference to be confirmed against the project's own SLOs, load profile, and regulatory scope; override per project and record the override in the TDD. None of these tables restore a prescriptive count schema or a fixed section-count mandate.
 
-Load only when the TDD's conditional concerns (rollback, rollout, latency, compliance) apply and the team needs a concrete starting point. It complements `references/tdd/document-contract.md` (which owns the Conditional Concerns trigger table) by giving example budgets; it does not replace project-verified SLOs or legal obligations.
+Load only when the TDD's conditional concerns (rollback, rollout, latency, compliance) apply and the team needs a concrete starting point. It complements `references/create-tdd/document-contract.md` (which owns the Conditional Concerns trigger table) by giving example budgets; it does not replace project-verified SLOs or legal obligations.
 
 ## Rollback-Trigger Table
 
@@ -16,7 +16,7 @@ Calibration anchors, not mandates. Each row is a starting-point signal that typi
 | Latency regression | p95 latency exceeds 1.5x the pre-rollout p95 for the affected route | rollback (or documented forward-recovery) |
 | Failed dependency | a critical dependency the rollout relies on is confirmed down | rollback (or pause rollout and contain) |
 
-Rollback is not always technically possible; where it is not, the TDD must document forward recovery, containment, restore, or compensating actions instead of falsely promising reversibility (see `references/tdd/document-contract.md`).
+Rollback is not always technically possible; where it is not, the TDD must document forward recovery, containment, restore, or compensating actions instead of falsely promising reversibility (see `references/create-tdd/document-contract.md`).
 
 ## Rollout Percentages Reference
 
@@ -51,4 +51,4 @@ Calibration anchors, not mandates, and not legal advice. Verify applicability pe
 | PCI-DSS | cardholder-data protection, access control, logging, segmentation, vulnerability management | applicability depends on storing, processing, or transmitting cardholder data; confirm scope with security owner |
 | LGPD | legal basis, data-subject rights, purpose limitation, international transfer, DPO accountability | applicability depends on processing Brazil personal data; confirm scope with privacy owner |
 
-This matrix is a starting-point index, not a compliance attestation. Per `references/tdd/document-contract.md`, do not claim compliance from generic controls; identify each applicable obligation as verified, proposed, or unresolved.
+This matrix is a starting-point index, not a compliance attestation. Per `references/create-tdd/document-contract.md`, do not claim compliance from generic controls; identify each applicable obligation as verified, proposed, or unresolved.

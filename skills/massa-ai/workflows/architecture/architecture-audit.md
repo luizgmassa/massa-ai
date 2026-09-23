@@ -50,7 +50,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - Do not report strong coupling as a defect when strength is local, stable, or cohesive and no change friction is shown.
    - Do not recommend ports/adapters, service extraction, VSA migration, or new seams unless evidence shows real variation, volatility, external dependency pressure, or boundary friction.
    - Drop candidates disproven by evidence, downgrade candidates with partial mitigation, and mark judgment-heavy conclusions as `suspect`.
-   - When you reject a refactor candidate, record its load-bearing reason in ruled-out candidates; if likely to be re-proposed, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated next audit.
+   - When you reject a refactor candidate, record its load-bearing reason in ruled-out candidates; if likely to be re-proposed, offer an ADR via `workflows/create-adr.md` so the rejection is not re-litigated next audit.
 8. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
 > **Dispatch: `massa-ai-architecture-specialist`** (role: `architecture-specialist`) — charter `skills/agents/architecture-specialist/SKILL.md`

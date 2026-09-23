@@ -1,12 +1,12 @@
 ---
-name: to-prd
+name: create-prd
 description: "Turn the current conversation into a PRD. Use when the user asks to create, synthesize, or convert existing discussion and codebase context into a Product Requirements Document without another interview. Do NOT use for implementation plans, architecture design docs, RFCs, TDDs, or discovery interviews that require new product questioning."
 license: MIT
 metadata:
   version: "1.2.0"
 ---
 
-### To-PRD (Conversation → Product Requirements Document)
+### Create-PRD (Conversation → Product Requirements Document)
 
 This skill takes the current conversation context and codebase understanding and produces a PRD. Do NOT interview the user — just synthesize what you already know. The PRD follows the same pattern as `references/spec-driven/specify.md`: definitions, required sections, and directions are shared so a PRD produced here is structurally consistent with a feature spec produced by spec-driven Specify.
 
@@ -180,10 +180,10 @@ Apply the `ready-for-agent` triage label — no need for additional triage.
 
 ## Done
 
-To-PRD is done when every requirement has an ID, acceptance criteria are testable EARS statements, edge cases are named, out-of-scope boundaries are explicit, implicit-requirement dimensions are resolved or marked `N/A because <reason>`, the Requirement Closure Gate is satisfied, and `validate_spec.ts` exits clean (or the no-code-execution-tool fallback was applied).
+Create-PRD is done when every requirement has an ID, acceptance criteria are testable EARS statements, edge cases are named, out-of-scope boundaries are explicit, implicit-requirement dimensions are resolved or marked `N/A because <reason>`, the Requirement Closure Gate is satisfied, and `validate_spec.ts` exits clean (or the no-code-execution-tool fallback was applied).
 
 ## Massa-ai Integration
 
 - **Code analysis:** Use massa-ai tools first (`list_projects`, `search`, `project_map`, `optimized_context`) before `ast-grep`/`rg`/`grep` for the explore step. Current source overrides a stale index or memory (source-precedence rule).
-- **Memory:** Persist verified outcomes worth reusing with `remember`, tagging `project:<id>`, `session:<id>`, `workflow:to-prd`, `entity:<slug>`, `memory:working|episodic|semantic|procedural`.
+- **Memory:** Persist verified outcomes worth reusing with `remember`, tagging `project:<id>`, `session:<id>`, `workflow:create-prd`, `entity:<slug>`, `memory:working|episodic|semantic|procedural`.
 - **Validation:** Evidence-or-zero. Every requirement resolved and assumption logged is checked against current source.

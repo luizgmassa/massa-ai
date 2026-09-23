@@ -136,14 +136,14 @@ describe("workflow files referenced in SKILL.md exist", () => {
     "workflows/debug.md",
     "workflows/refactor.md",
     "workflows/the-fool.md",
-    "workflows/adr.md",
-    "workflows/rfc.md",
-    "workflows/tdd.md",
+    "workflows/create-adr.md",
+    "workflows/create-rfc.md",
+    "workflows/create-tdd.md",
     "workflows/exploration.md",
     "workflows/onboarding.md",
     "workflows/long-session.md",
     "workflows/commit.md",
-    "workflows/ticket.md",
+    "workflows/create-ticket.md",
     "workflows/design.md",
   ];
 
@@ -296,10 +296,10 @@ describe("docs migration", () => {
     "context-slices.md",
     "massa-ai-commit.md",
     "massa-ai-mobile-figma.md",
-    "massa-ai-rfc.md",
+    "massa-ai-create-rfc.md",
     "massa-ai-spec-driven.md",
-    "massa-ai-tdd.md",
-    "massa-ai-ticket.md",
+    "massa-ai-create-tdd.md",
+    "massa-ai-create-ticket.md",
   ];
 
   for (const doc of migratedDocs) {
@@ -759,19 +759,19 @@ describe("agents harness routing", () => {
 // ── RFC workflow (ported from legacy rfc tests) ──────────────────────────
 // Legacy asserted: removed rfc identifiers/artifacts detected, missing merged
 // rfc reference detected, merged rfc behavior/attribution drift detected.
-// The repo migrated RFC refs from workflows/rfc.md → references/rfc/ subdir.
+// The repo migrated RFC refs from workflows/create-rfc.md → references/create-rfc/ subdir.
 
 describe("rfc workflow and references", () => {
-  test("workflows/rfc.md exists", async () => {
-    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"))).toBe(true);
+  test("workflows/create-rfc.md exists", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"))).toBe(true);
   });
 
-  test("references/rfc/ subdir exists (migrated from inline)", async () => {
-    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "references", "rfc"))).toBe(true);
+  test("references/create-rfc/ subdir exists (migrated from inline)", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "references", "create-rfc"))).toBe(true);
   });
 
-  test("references/rfc/ contains the expected sub-references", async () => {
-    const rfcDir = path.join(SKILLS_DIR, "massa-ai", "references", "rfc");
+  test("references/create-rfc/ contains the expected sub-references", async () => {
+    const rfcDir = path.join(SKILLS_DIR, "massa-ai", "references", "create-rfc");
     const entries = await fs.readdir(rfcDir, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile()).map((e) => e.name);
     expect(files).toContain("discovery-and-sizing.md");
@@ -779,25 +779,25 @@ describe("rfc workflow and references", () => {
     expect(files).toContain("quality-and-lifecycle.md");
   });
 
-  test("rfc workflow loads references/rfc/discovery-and-sizing.md", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"));
-    expect(content).toContain("references/rfc/discovery-and-sizing.md");
+  test("rfc workflow loads references/create-rfc/discovery-and-sizing.md", async () => {
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"));
+    expect(content).toContain("references/create-rfc/discovery-and-sizing.md");
   });
 
   test("rfc workflow requires impact label HIGH/MEDIUM/LOW", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"));
     expect(content).toMatch(/HIGH.*MEDIUM.*LOW|impact label/i);
   });
 
   test("rfc workflow requires at least two options (no one-sided proposal)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"));
     expect(content).toMatch(/at least two options|one-sided|only one credible option/i);
   });
 
   test("rfc workflow routes finalized decisions to adr and settled design to tdd", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"));
-    expect(content).toContain("workflows/adr.md");
-    expect(content).toContain("workflows/tdd.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"));
+    expect(content).toContain("workflows/create-adr.md");
+    expect(content).toContain("workflows/create-tdd.md");
   });
 });
 
@@ -808,12 +808,12 @@ describe("rfc workflow and references", () => {
 // project type taxonomy, mandatory trigger mapping, document litmus.
 
 describe("tdd workflow and references", () => {
-  test("workflows/tdd.md exists", async () => {
-    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"))).toBe(true);
+  test("workflows/create-tdd.md exists", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"))).toBe(true);
   });
 
-  test("references/tdd/ subdir exists with expected sub-references", async () => {
-    const tddDir = path.join(SKILLS_DIR, "massa-ai", "references", "tdd");
+  test("references/create-tdd/ subdir exists with expected sub-references", async () => {
+    const tddDir = path.join(SKILLS_DIR, "massa-ai", "references", "create-tdd");
     expect(await fileExists(tddDir)).toBe(true);
     const entries = await fs.readdir(tddDir, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile()).map((e) => e.name);
@@ -824,22 +824,22 @@ describe("tdd workflow and references", () => {
   });
 
   test("tdd workflow references discovery-and-sizing.md (sizing rules)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
-    expect(content).toContain("references/tdd/discovery-and-sizing.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
+    expect(content).toContain("references/create-tdd/discovery-and-sizing.md");
   });
 
   test("tdd workflow references document-contract.md (the document shape)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
-    expect(content).toContain("references/tdd/document-contract.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
+    expect(content).toContain("references/create-tdd/document-contract.md");
   });
 
   test("tdd workflow references calibrated-examples.md (calibrated examples anchor)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
-    expect(content).toContain("references/tdd/calibrated-examples.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
+    expect(content).toContain("references/create-tdd/calibrated-examples.md");
   });
 
   test("tdd workflow documents project_type taxonomy (integration/feature/refactor/infrastructure/payment/auth/data)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toContain("project_type");
     expect(content).toContain("integration");
     expect(content).toContain("feature");
@@ -851,51 +851,51 @@ describe("tdd workflow and references", () => {
   });
 
   test("tdd workflow documents mandatory trigger mapping (payment/auth → security; rollout → monitoring/rollback; integration → dependencies+security)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/payment.*auth.*Security.*mandatory/i);
     expect(content).toMatch(/rollout.*Monitoring.*Rollback.*mandatory/i);
     expect(content).toMatch(/integration.*Dependencies.*Security.*mandatory/i);
   });
 
   test("tdd workflow requires small PRs (PR size contract)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/Small PR|Medium PR|Large PR|PR group/i);
   });
 
   test("tdd workflow documents layer order (Data first, then Domain, then Presentation/Navigation)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/Data first.*Domain.*Presentation|layer when applicable/i);
   });
 
   test("tdd workflow requires the full Plan Challenge Gate", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/full.*Plan Challenge Gate|full gate/i);
   });
 
   test("tdd workflow delegates Jira creation to ticket workflow (not inline)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
-    expect(content).toContain("workflows/ticket.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
+    expect(content).toContain("workflows/create-ticket.md");
     expect(content).toMatch(/Jira creation.*owned.*ticket|delegates|solely by the ticket/i);
   });
 
   test("tdd workflow never marks document Approved without human decision", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/Never mark.*Approved|without.*human decision|Never.*Approved/i);
   });
 
   test("tdd workflow includes Pre-Merge TDD Fidelity Check section", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toContain("Pre-Merge TDD Fidelity Check");
   });
 
   test("tdd workflow includes Strings Audit for mapper stringResource branches", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toContain("Strings Audit");
     expect(content).toContain("stringResource");
   });
 
   test("tdd workflow includes parallel rendering surfaces checklist for UI/UX changes", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/parallel rendering surface/i);
   });
 });
@@ -907,12 +907,12 @@ describe("tdd workflow and references", () => {
 // failure resume, forbidden cross-skill call, review artifact external.
 
 describe("ticket workflow and references", () => {
-  test("workflows/ticket.md exists", async () => {
-    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"))).toBe(true);
+  test("workflows/create-ticket.md exists", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"))).toBe(true);
   });
 
-  test("references/ticket/ subdir exists with expected sub-references", async () => {
-    const ticketDir = path.join(SKILLS_DIR, "massa-ai", "references", "ticket");
+  test("references/create-ticket/ subdir exists with expected sub-references", async () => {
+    const ticketDir = path.join(SKILLS_DIR, "massa-ai", "references", "create-ticket");
     expect(await fileExists(ticketDir)).toBe(true);
     const entries = await fs.readdir(ticketDir, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile()).map((e) => e.name);
@@ -922,47 +922,47 @@ describe("ticket workflow and references", () => {
   });
 
   test("ticket workflow names Atlassian MCP as the only tracker (no CLI/tracker fallback)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/Atlassian MCP.*only tracker|never substitute.*CLI.*tracker/i);
   });
 
   test("ticket workflow requires explicit user approval before any Jira mutation", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/explicit user approval|approval.*before.*mutation|approval of an older revision.*invalid/i);
   });
 
   test("ticket workflow: content/field revision increments Draft Revision and resets Approval Status", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/Draft Revision|increments.*Draft Revision|resets.*Approval Status/i);
   });
 
   test("ticket workflow requires duplicate detection before creation", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/duplicate|Search.*Jira project.*potential duplicates/i);
   });
 
   test("ticket workflow: review artifact must be OUTSIDE the repository", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/outside the repository|external.*plans directory|never write.*draft.*repository/i);
   });
 
   test("ticket workflow: partial failure stops immediately, no auto-compensation", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/partial failure.*stop|stop immediately|do not.*transition.*comment.*compensate/i);
   });
 
   test("ticket workflow does not persist raw ticket bodies or customer data to memory", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/Do not persist raw ticket|customer data|one-run creation/i);
   });
 
   test("ticket workflow forbids searching Git history/commits for ticket examples", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/Never search Git history|repository ticket references|do not.*search.*Git/i);
   });
 
   test("ticket workflow delegates code grounding to exploration.md (child pass)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toContain("workflows/exploration.md");
   });
 });
@@ -1007,7 +1007,7 @@ describe("commit workflow", () => {
 
   test("commit workflow routes Jira ticket creation to ticket.md (not inline)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "commit.md"));
-    expect(content).toContain("workflows/ticket.md");
+    expect(content).toContain("workflows/create-ticket.md");
   });
 });
 
@@ -1185,10 +1185,10 @@ describe("canonical tool naming (no th0th_-prefixed tool names)", () => {
 describe("docs workflow guides exist and link correctly", () => {
   const guides = [
     "massa-ai-spec-driven.md",
-    "massa-ai-tdd.md",
-    "massa-ai-rfc.md",
+    "massa-ai-create-tdd.md",
+    "massa-ai-create-rfc.md",
     "massa-ai-commit.md",
-    "massa-ai-ticket.md",
+    "massa-ai-create-ticket.md",
     "massa-ai-mobile-figma.md",
   ];
 

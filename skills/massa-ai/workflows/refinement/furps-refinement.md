@@ -12,7 +12,7 @@ Findings-only refinement of a Product Requirements Document (PRD) and/or Archite
 
 Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Not for authoring a new PRD (use `to-prd` or `spec-driven` Specify), authoring an ADR (use `adr`), proposing change (use `rfc`), auditing implementation against requirements (use `requirements-audit`), or auditing code/security/architecture. It refines the document itself; it does not edit code.
+Not for authoring a new PRD (use `create-prd` or `spec-driven` Specify), authoring an ADR (use `create-adr`), proposing change (use `create-rfc`), auditing implementation against requirements (use `requirements-audit`), or auditing code/security/architecture. It refines the document itself; it does not edit code.
 
 Findings-only: do not edit the PRD/ADR unless the user separately asks.
 

@@ -82,15 +82,15 @@ absent, it falls back to the flat evidence matrix (graceful degradation).
 | `security-audit` | flat evidence matrix |
 | `tests-audit` | flat evidence matrix |
 | `furps-refinement` | flat evidence matrix (findings-only; report written + DoR coverage gaps listed) |
-| `adr` | flat evidence matrix |
+| `create-adr` | flat evidence matrix |
 | `commit` | flat evidence matrix |
 | `design` | flat evidence matrix |
 | `long-session` | flat evidence matrix |
 | `onboarding` | flat evidence matrix |
-| `rfc` | flat evidence matrix |
-| `tdd` | flat evidence matrix |
+| `create-rfc` | flat evidence matrix |
+| `create-tdd` | flat evidence matrix |
 | `the-fool` | flat evidence matrix |
-| `ticket` | flat evidence matrix |
+| `create-ticket` | flat evidence matrix |
 
 ## massa-ai Dual-Write / Tag Contract
 

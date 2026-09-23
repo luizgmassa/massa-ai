@@ -1,12 +1,12 @@
 # massa-ai RFC Workflow
 
-Human-facing guide for RFC authoring built directly into `massa-ai`. Canonical agent instructions live in [`workflows/rfc.md`](../../skills/massa-ai/workflows/rfc.md) and its [`references/rfc/`](../../skills/massa-ai/references/rfc/) contracts.
+Human-facing guide for RFC authoring built directly into `massa-ai`. Canonical agent instructions live in [`workflows/create-rfc.md`](../../skills/massa-ai/workflows/create-rfc.md) and its [`references/create-rfc/`](../../skills/massa-ai/references/create-rfc/) contracts.
 
 ## Purpose
 
 Use this workflow when a significant technical, process, product, vendor, tool, or policy decision remains open and stakeholders need options, evidence, costs, trade-offs, and a recommendation before committing.
 
-Use `adr` when a significant architecture decision is finalized, `tdd` when the direction is settled and implementation design remains, or `spec-driven` when work spans requirements through execution.
+Use `create-adr` when a significant architecture decision is finalized, `create-tdd` when the direction is settled and implementation design remains, or `spec-driven` when work spans requirements through execution.
 
 ## Quick Start
 

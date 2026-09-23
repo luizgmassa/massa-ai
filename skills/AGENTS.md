@@ -171,7 +171,7 @@ Supported values:
 Prompt-level user instructions override this policy for the current turn.
 
 Load full `workflows/the-fool.md` when the workflow is `spec-driven`,
-`feature`, `adr`, `rfc`, `tdd`, or `refactor`; when the plan touches security,
+`feature`, `create-adr`, `create-rfc`, `create-tdd`, or `refactor`; when the plan touches security,
 data loss, migrations, irreversible actions, auth/privacy, cross-service
 contracts; or when the plan touches more than 5 files, classes, or modules. If
 The Fool or the selected Fool reference is already loaded, reuse it.

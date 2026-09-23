@@ -19,7 +19,7 @@ The document is decision-complete only when an implementer can proceed without i
 - Implementation task tables use the exact columns `Order`, `PR Group`, `Layer`, `PR Size`, `Included Work`, `Dependencies`, `Verification Gate`, and `Jira Key` when implementation work is planned.
 - PR groups are independently buildable and testable. Small PRs are preferred, Medium PRs have a dependency or coherence reason, and Large PRs include split, stacked PR, feature-flag, or containment rationale.
 - Non-breaking implementation groups are ordered Data, Domain, then Presentation/Navigation, or the TDD explicitly maps those labels to the repository's actual boundaries.
-- Jira creation remains delegated to `workflows/ticket.md`; `Jira Key` contains only confirmed keys, `Not requested`, `Unavailable`, or `Pending`.
+- Jira creation remains delegated to `workflows/create-ticket.md`; `Jira Key` contains only confirmed keys, `Not requested`, `Unavailable`, or `Pending`.
 - UI/UX-affecting symbol changes include a parallel rendering surfaces and mappers checklist, or explicitly state why none apply.
 - A `Strings Audit` is present when scoped mappers branch on a type and call `stringResource`, or the TDD records evidence that the audit was not applicable.
 - `Decisions Revised During Implementation` is present for living implementation updates.

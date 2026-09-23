@@ -1,6 +1,6 @@
 # massa-ai Ticket Workflow
 
-Human-facing guide for the Jira-only ticket workflow built directly into `massa-ai`. Canonical agent instructions live in [`workflows/ticket.md`](../../skills/massa-ai/workflows/ticket.md) and [`references/ticket/`](../../skills/massa-ai/references/ticket/).
+Human-facing guide for the Jira-only ticket workflow built directly into `massa-ai`. Canonical agent instructions live in [`workflows/create-ticket.md`](../../skills/massa-ai/workflows/create-ticket.md) and [`references/create-ticket/`](../../skills/massa-ai/references/create-ticket/).
 
 ## Purpose
 
@@ -9,7 +9,7 @@ Use this workflow to turn requirements, specs, defects, or technical work into r
 ## Quick Start
 
 ```text
-Use the ticket workflow. Create an Epic with implementation tickets for MOBILE.
+Use the create-ticket workflow. Create an Epic with implementation tickets for MOBILE.
 ```
 
 ```text

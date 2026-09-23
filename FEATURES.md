@@ -340,7 +340,7 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 **What:** massa-ai generates one host-native slash command per workflow skill under `skills/massa-ai/workflows/**/*.md` (40 at last count, scan-derived — never hardcoded). Every workflow the massa-ai router can dispatch becomes directly invocable, skipping the router's own classification step for the explicit case.
 
-**Why:** Without a dedicated command, invoking a specific workflow (e.g. `debug`, `tdd`, `security-audit`) means describing intent in prose and trusting the router's classifier. A generated command makes the choice explicit and one keystroke away, on every host, for every workflow — not just the 6 hand-authored "quick" commands (`map`/`index`/`find`/`def`/`graph`/`status`).
+**Why:** Without a dedicated command, invoking a specific workflow (e.g. `debug`, `create-tdd`, `security-audit`) means describing intent in prose and trusting the router's classifier. A generated command makes the choice explicit and one keystroke away, on every host, for every workflow — not just the 6 hand-authored "quick" commands (`map`/`index`/`find`/`def`/`graph`/`status`).
 
 **Command body:** every generated command loads the massa-ai router skill (dedupe-guarded), then routes to its named workflow under routing precedence 1 (explicit route) — it never re-classifies — and passes the invocation's arguments verbatim as the task description; the workflow's own intake gathers detail when the arguments are empty.
 
@@ -1506,10 +1506,10 @@ Documentation for massa-ai workflows lives in `docs/`:
 | Guide | File | Covers |
 |-------|------|--------|
 | Spec-Driven | `docs/massa-ai-spec-driven.md` | TLC v3 Specify → (Design) → (Tasks) → Execute flow |
-| TDD | `docs/massa-ai-tdd.md` | Technical design / implementation plan workflow |
-| RFC | `docs/massa-ai-rfc.md` | Propose a significant change |
+| TDD | `docs/massa-ai-create-tdd.md` | Technical design / implementation plan workflow |
+| RFC | `docs/massa-ai-create-rfc.md` | Propose a significant change |
 | Commit | `docs/massa-ai-commit.md` | Safe Conventional Commits with Jira branch prefixes |
-| Ticket | `docs/massa-ai-ticket.md` | Draft and create Jira Epics/issues through Atlassian MCP |
+| Ticket | `docs/massa-ai-create-ticket.md` | Draft and create Jira Epics/issues through Atlassian MCP |
 | Mobile Figma | `docs/massa-ai-mobile-figma.md` | Compare mobile UI implementation with Figma design |
 | Context Slices | `docs/context-slices.md` | Context slicing patterns |
 

@@ -156,16 +156,16 @@ current context already contains it.
 | `mobile-figma-audit` | compare an Android, iOS, or KMP UI implementation with a Figma design | `workflows/mobile-figma/mobile-figma-audit.md` |
 | `mobile-figma-fix` | fix saved mobile Figma findings | `workflows/mobile-figma/mobile-figma-fix.md` |
 | `refactor` | behavior-preserving structural cleanup | `workflows/refactor.md` |
-| `adr` | record a finalized decision | `workflows/adr.md` |
-| `rfc` | propose a significant change | `workflows/rfc.md` |
-| `tdd` | technical design / implementation plan | `workflows/tdd.md` |
-| `ticket` | draft and create Jira Epics, issues, and sub-tasks through Atlassian MCP | `workflows/ticket.md` |
+| `create-adr` | record a finalized decision | `workflows/create-adr.md` |
+| `create-rfc` | propose a significant change | `workflows/create-rfc.md` |
+| `create-tdd` | technical design / implementation plan | `workflows/create-tdd.md` |
+| `create-ticket` | draft and create Jira Epics, issues, and sub-tasks through Atlassian MCP | `workflows/create-ticket.md` |
 | `commit` | draft or create safe Conventional Commits with Jira branch prefixes and audit report exclusions | `workflows/commit.md` |
 | `the-fool` | direct challenge, red-team, pre-mortem, evidence audit | `workflows/the-fool.md` |
 | `judge-with-debate` | standalone multi-judge debate evaluation of user-supplied artifacts | `workflows/judge-with-debate.md` |
 | `pr-review` | review a hosted GitHub PR / GitLab MR and post findings via `gh`/`glab` | `workflows/pr-review.md` |
-| `discovery` | product brainstorming / problem-space thinking partner | `workflows/discovery.md` |
-| `to-prd` | turn the current conversation into a PRD without a new interview | `workflows/to-prd.md` |
+| `product-discovery` | product brainstorming / problem-space thinking partner | `workflows/product-discovery.md` |
+| `create-prd` | turn the current conversation into a PRD without a new interview | `workflows/create-prd.md` |
 | `skill-architect` | design and build a new skill through structured conversation | `workflows/skill-architect.md` |
 | `furps-refinement` | FURPS+ refinement of a PRD and/or ADR before implementation, with The Fool pre-validation and DoR coverage | `workflows/refinement/furps-refinement.md` |
 
@@ -178,9 +178,9 @@ match or no match is resolved deterministically without asking.
 Deterministic routing precedence, first match wins:
 
 1. **Explicit route:** user names a massa-ai workflow, report family, saved finding type, or asks for a direct challenge.
-2. **Requested artifact:** ADR, RFC, TDD, Jira ticket, commit, session guide, audit report, implementation audit report, mobile Figma report, FURPS refinement report, PRD synthesized from the current conversation -> `to-prd` (explicit request only; refining an existing PRD stays `furps-refinement`), or new SKILL.md / skill design -> `skill-architect`.
+2. **Requested artifact:** ADR, RFC, TDD, Jira ticket, commit, session guide, audit report, implementation audit report, mobile Figma report, FURPS refinement report, PRD synthesized from the current conversation -> `create-prd` (explicit request only; refining an existing PRD stays `furps-refinement`), or new SKILL.md / skill design -> `skill-architect`.
 3. **Target type:** broken behavior/error -> `debug`; hosted PR/MR reference (number or URL) to review with posted findings -> `pr-review` (local working diff stays with audit routes); saved audit finding -> matching `*-fix`; implementation scope review -> `implementation-audit`; security/privacy/auth finding -> security workflow; tests/flakes/coverage finding -> tests workflow; supplied Figma/screenshot mobile UI design -> `design`; mobile Figma compare/audit -> `mobile-figma-audit`; saved `MFM-*` findings -> `mobile-figma-fix`.
-4. **Primary verb:** create/add/implement -> `feature`; restructure without behavior change -> `refactor`; inspect/understand only -> `exploration`; brainstorm/explore a product problem, idea, or direction with no concrete code target -> `discovery`; record selected decision -> `adr`; compare open options -> `rfc`; design settled implementation -> `tdd`; refine/quality-check an existing PRD or ADR document (not implementation auditing) -> `furps-refinement`.
+4. **Primary verb:** create/add/implement -> `feature`; restructure without behavior change -> `refactor`; inspect/understand only -> `exploration`; brainstorm/explore a product problem, idea, or direction with no concrete code target -> `product-discovery`; record selected decision -> `create-adr`; compare open options -> `create-rfc`; design settled implementation -> `create-tdd`; refine/quality-check an existing PRD or ADR document (not implementation auditing) -> `furps-refinement`.
 5. **Risk domain escalation:** migrations, irreversible operations, auth/privacy, cross-service contracts, public compatibility, or work over 10 files routes to `spec-driven` unless the user explicitly requests a narrower workflow and accepts the containment.
 6. **No match:** proceed without loading a workflow file. The main agent works under the Core Contract above (recall, verify, Evidence Gate) and states in one line which specialized workflow it considered and why none applies.
 
@@ -210,7 +210,7 @@ Lite preserves progressive disclosure: do not load The Fool mode references
 unless the lite critique escalates to full.
 
 Low-risk `feature` and `refactor` plans receive the lite gate first. Full The
-Fool stays for `spec-driven`, `design`, `adr`, `rfc`, `tdd`, explicit challenge
+Fool stays for `spec-driven`, `design`, `create-adr`, `create-rfc`, `create-tdd`, explicit challenge
 requests, high-risk domains, or plans touching more than 5 files/classes/modules.
 When the policy selects the full gate, or lite escalates, load
 `workflows/the-fool.md`, select the mode in the main agent, load only the
@@ -278,7 +278,7 @@ Load only when a selected workflow asks for them:
 - `references/agent-orchestration.md`
 - `references/subagent-design.md`
 - `references/code-reuse-scan.md`
-- `references/adr-authoring.md`
+- `references/create-adr.md`
 - `references/audit-scope.md`
 - `references/audit-report-io.md`
 - `references/hook-enforcement.md`
@@ -308,9 +308,9 @@ Load only when a selected workflow asks for them:
 - `references/root-cause-scripts.md`
 - `references/conversation-feedback.md`
 - `references/synapse-policy.md`
-- `references/tdd/`
-- `references/rfc/`
-- `references/ticket/`
+- `references/create-tdd/`
+- `references/create-rfc/`
+- `references/create-ticket/`
 - `references/spec-driven/`
 - `references/furps/`
 
