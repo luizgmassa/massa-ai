@@ -38,8 +38,8 @@ const SKILL_DIR = path.join(REPO_ROOT, "skills", "massa-ai");
 const WORKFLOWS_DIR = path.join(SKILL_DIR, "workflows");
 const REFERENCES_DIR = path.join(SKILL_DIR, "references");
 
-/** Total workflow files expected after the overhaul removed three routes. */
-const EXPECTED_WORKFLOW_COUNT = 40;
+/** Total workflow files expected after agent-roster-consolidation removed `general` and the three `maestro` routes (WFL-02). */
+const EXPECTED_WORKFLOW_COUNT = 36;
 
 /**
  * The workflows that mutate the repository. These, and only these, carry the
@@ -53,10 +53,7 @@ const IMPLEMENTATION_WORKFLOWS = [
   "debug.md",
   "design.md",
   "feature.md",
-  "general.md",
   "implementation/implementation-fix.md",
-  "maestro/maestro-fix.md",
-  "maestro/maestro.md",
   "mobile-figma/mobile-figma-fix.md",
   "refactor.md",
   "requirements/requirements-fix.md",
@@ -295,9 +292,9 @@ describe("delivery scope: only mutating workflows carry the delivery contract", 
     expect(leaked).toEqual([]);
   });
 
-  test("the read-only complement is exactly 24 workflows", async () => {
+  test("the read-only complement is exactly 23 workflows", async () => {
     const all = await listWorkflows();
-    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(24);
+    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(23);
   });
 });
 
@@ -788,7 +785,7 @@ describe("plan challenge: every full-gate workflow carries the gate step", () =>
 // sentence is what states the dispatch is mandatory-on-condition, so one file
 // drifting to weaker wording silently makes it advisory there.
 
-describe("designer dispatch: exactly 7 workflows, one wording", () => {
+describe("designer dispatch: exactly 6 workflows, one wording", () => {
   /**
    * The screen-capable workflows (spec A1). Hardcoded deliberately, unlike
    * ADRG-02's parsed list: there is no policy sentence enumerating these, and
@@ -798,7 +795,6 @@ describe("designer dispatch: exactly 7 workflows, one wording", () => {
   const SCREEN_WORKFLOWS = [
     "design.md",
     "feature.md",
-    "general.md",
     "implementation/implementation-fix.md",
     "mobile-figma/mobile-figma-audit.md",
     "mobile-figma/mobile-figma-fix.md",
@@ -808,7 +804,7 @@ describe("designer dispatch: exactly 7 workflows, one wording", () => {
   const DISPATCH_HEADER = "> **Dispatch: `massa-ai-designer`**";
   const TRIGGER_PREFIX = "> - trigger: the task creates or modifies a user-facing screen";
 
-  test("each of the 7 carries the designer dispatch block", async () => {
+  test("each of the 6 carries the designer dispatch block", async () => {
     const without: string[] = [];
     for (const rel of SCREEN_WORKFLOWS) {
       const body = await readWorkflow(rel);

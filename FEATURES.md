@@ -614,11 +614,11 @@ switching" non-goal in `.specs/features/model-profile-registry/spec.md` in place
 | `trace_path` | `debug` | Root-cause call/data-flow path tracing |
 | `impact_analysis` | `architecture-audit`, `refactor` | Git-diff centrality-ranked blast radius |
 | `get_architecture` | `architecture-audit` | Architecture-specific deep map (packages, routes, hotspots, communities, cycles) |
-| `execute_file` / `execute` / `batch_execute` | `debug`, `general` | Run analysis code over files instead of loading into context |
+| `execute_file` / `execute` / `batch_execute` | `debug` | Run analysis code over files instead of loading into context |
 | `synapse_task_begin` / `synapse_task_end` / `synapse_prefetch` | `spec-driven`, `feature`, `debug` | Task envelopes + buffer warming for multi-search investigations |
-| `read_file` / `symbol_snippet` | `general` (and all workflows that read files) | File reads with symbol metadata; raw code snippets by line range |
-| `memory_update` / `memory_delete` | `general`, `debug`, `long-session` | Correct stale memories; remove obsolete ones |
-| `analytics` | `general`, `long-session` | Usage/cache insights |
+| `read_file` / `symbol_snippet` | all workflows that read files | File reads with symbol metadata; raw code snippets by line range |
+| `memory_update` / `memory_delete` | `debug`, `long-session` | Correct stale memories; remove obsolete ones |
+| `analytics` | `long-session` | Usage/cache insights |
 | `fetch_and_index` | `exploration` | Pull web docs/API refs into searchable index |
 
 **Graph-tool freshness gate:** `trace_path`, `impact_analysis`, and `get_architecture` only count as evidence when the index is fresh for the current repository path and commit/worktree state. When the index is stale, incomplete, or missing, workflows fall back to `search`/`get_references` and record reduced retrieval confidence.
@@ -1510,7 +1510,6 @@ Documentation for massa-ai workflows lives in `docs/`:
 | RFC | `docs/massa-ai-rfc.md` | Propose a significant change |
 | Commit | `docs/massa-ai-commit.md` | Safe Conventional Commits with Jira branch prefixes |
 | Ticket | `docs/massa-ai-ticket.md` | Draft and create Jira Epics/issues through Atlassian MCP |
-| Maestro | `docs/massa-ai-maestro.md` | Mobile E2E flow implementation |
 | Mobile Figma | `docs/massa-ai-mobile-figma.md` | Compare mobile UI implementation with Figma design |
 | Context Slices | `docs/context-slices.md` | Context slicing patterns |
 

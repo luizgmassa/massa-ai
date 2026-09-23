@@ -134,7 +134,6 @@ describe("workflow files referenced in SKILL.md exist", () => {
     "workflows/spec-driven.md",
     "workflows/feature.md",
     "workflows/debug.md",
-    "workflows/general.md",
     "workflows/refactor.md",
     "workflows/the-fool.md",
     "workflows/adr.md",
@@ -296,7 +295,6 @@ describe("docs migration", () => {
   const migratedDocs = [
     "context-slices.md",
     "massa-ai-commit.md",
-    "massa-ai-maestro.md",
     "massa-ai-mobile-figma.md",
     "massa-ai-rfc.md",
     "massa-ai-spec-driven.md",
@@ -1022,7 +1020,7 @@ describe("deterministic router contract (deep)", () => {
   test("SKILL.md documents deterministic routing precedence (first match wins, 6 tiers)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "SKILL.md"));
     expect(content).toMatch(/first match wins|Deterministic routing precedence/i);
-    expect(content).toMatch(/Explicit route|Requested artifact|Target type|Primary verb|Risk domain escalation|General fallback/i);
+    expect(content).toMatch(/Explicit route|Requested artifact|Target type|Primary verb|Risk domain escalation|No match/i);
   });
 
   test("SKILL.md routes exploration as read-only (no mutation)", async () => {
@@ -1030,9 +1028,13 @@ describe("deterministic router contract (deep)", () => {
     expect(content).toMatch(/exploration.*read-only|explicitly read-only|exploration.*no.*mutation/i);
   });
 
-  test("SKILL.md requires general fallback preflight (one-line naming the rejected workflow)", async () => {
+  test("SKILL.md no-match fallback loads no workflow file and names no `general` workflow (WFL-02, Inventory AC-4)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "SKILL.md"));
-    expect(content).toMatch(/General fallback preflight|one-line.*fallback.*preflight|names the specialized workflow considered/i);
+    const rule6 = content.split(/\r?\n/).find((l) => l.startsWith("6. "));
+    expect(rule6).toBeDefined();
+    expect(rule6).toContain("**No match:** proceed without loading a workflow file");
+    expect(rule6).toContain("Core Contract");
+    expect(content).not.toMatch(/`general`|workflows\/general\.md|General fallback/);
   });
 
   test("SKILL.md documents graph-tool freshness gate (trace_path/impact_analysis/get_architecture require fresh index)", async () => {
@@ -1187,7 +1189,6 @@ describe("docs workflow guides exist and link correctly", () => {
     "massa-ai-rfc.md",
     "massa-ai-commit.md",
     "massa-ai-ticket.md",
-    "massa-ai-maestro.md",
     "massa-ai-mobile-figma.md",
   ];
 

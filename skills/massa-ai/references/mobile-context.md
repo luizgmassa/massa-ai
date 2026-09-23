@@ -7,9 +7,6 @@ Mobile is a context modifier, not a primary workflow. Keep the selected workflow
 - New capability -> `workflows/feature.md`
 - Behavior-preserving structure change -> `workflows/refactor.md`
 - Broken behavior, crashes, regressions, or device-specific failures -> `workflows/debug.md` plus `references/mobile-diagnosis.md`
-- New Maestro mobile E2E flow implementation -> `workflows/maestro/maestro.md`
-- Findings-only Maestro mobile E2E audit -> `workflows/maestro/maestro-audit.md`
-- Child-only fix for saved Maestro audit findings -> `workflows/maestro/maestro-fix.md`
 - Findings-only test coverage review -> `workflows/tests/tests-audit.md`
 - Fix findings from a tests audit report -> `workflows/tests/tests-fix.md`
 - Direct Android Views/Compose, UIKit/SwiftUI, or KMP Compose Multiplatform implementation from Figma or screenshot context -> `workflows/design.md`
@@ -19,7 +16,7 @@ Mobile is a context modifier, not a primary workflow. Keep the selected workflow
 - Fix findings from a security audit report -> `workflows/security/security-fix.md`
 - Broad, cross-boundary, unclear, or multi-platform implementation -> `workflows/spec-driven.md`
 
-Maestro is a first-class mobile E2E workflow family when the primary target is flow implementation, existing-flow audit, or saved `MST-*` remediation. Generic test coverage, assertion quality, or regression-risk review still belongs to `workflows/tests/tests-audit.md` or `workflows/tests/tests-fix.md` when the target is not Maestro-specific.
+Mobile E2E test coverage, assertion quality, flakiness, or regression-risk review belongs to `workflows/tests/tests-audit.md` or `workflows/tests/tests-fix.md`, whatever the E2E tool.
 
 ## Design-Source Intake Gate
 

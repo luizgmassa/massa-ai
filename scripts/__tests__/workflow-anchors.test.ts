@@ -58,8 +58,8 @@ async function listWorkflows(): Promise<string[]> {
 describe("validator anchors: the fixture describes real workflows", () => {
   test("the fixture is not empty and covers the files that carried anchors", () => {
     // Guard the guard: an empty fixture makes every assertion below vacuous.
-    expect(ENTRIES.length).toBe(16);
-    expect(ENTRIES.flatMap(([, e]) => e.present).length).toBeGreaterThanOrEqual(90);
+    expect(ENTRIES.length).toBe(14);
+    expect(ENTRIES.flatMap(([, e]) => e.present).length).toBeGreaterThanOrEqual(86);
   });
 
   test("every keyed path exists on disk", async () => {

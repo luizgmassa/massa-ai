@@ -914,7 +914,7 @@ describe("dispatch role defaults: shared field values live in exactly one place"
         }
       }
     }
-    expect(designerBlocks).toBe(7);
+    expect(designerBlocks).toBe(6);
   });
 });
 
@@ -925,8 +925,8 @@ describe("dispatch role defaults: shared field values live in exactly one place"
 // developer's home directory therefore ships to every user, and resolves for
 // none of them.
 //
-// `references/maestro.md` and `references/maestro/fact-ledger.md` cited
-// `/Users/<name>/Downloads/questions.md` in three places -- once as a named
+// `references/maestro.md` and `references/maestro/fact-ledger.md` (both since
+// removed) cited `/Users/<name>/Downloads/questions.md` in three places -- once as a named
 // tier of the fact ledger's evidence taxonomy, so an agent was told to
 // quarantine claims as `excluded/unverified` unless they appeared in a file it
 // could not open. See .specs/features/skills-directive-dedup/spec.md SDD-02.
@@ -951,20 +951,20 @@ describe("portability: no shipped harness file names a developer's machine", () 
     expect(offenders).toEqual([]);
   });
 
-  test("the Maestro coverage-checklist rule survived the path removal", async () => {
-    // Absence of the path must not be reachable by deleting the rule. Both
-    // files still have to instruct the agent on how to treat a checklist.
-    const index = await read(
+  test("the Maestro files that carried the path are removed with their workflows", async () => {
+    // agent-roster-consolidation WFL-02 (Inventory AC-3) deleted the whole
+    // Maestro family, so the rule this test used to pin has no file left to
+    // live in. Absence is asserted per path, not inferred from the scan above.
+    const gone = [
       path.join(SKILLS_DIR, "massa-ai", "references", "maestro.md"),
-    );
-    const ledger = await read(
-      path.join(SKILLS_DIR, "massa-ai", "references", "maestro", "fact-ledger.md"),
-    );
-    for (const body of [index, ledger]) {
-      expect(body).toMatch(/coverage checklist/i);
+      path.join(SKILLS_DIR, "massa-ai", "references", "maestro"),
+      path.join(REPO_ROOT, "docs", "massa-ai-maestro.md"),
+    ];
+    const present: string[] = [];
+    for (const p of gone) {
+      if (await fs.stat(p).then(() => true, () => false)) present.push(path.relative(REPO_ROOT, p));
     }
-    expect(ledger).toMatch(/excluded\/unverified/);
-    expect(index).toMatch(/excluded\/unverified/);
+    expect(present).toEqual([]);
   });
 
   test("the scan actually enumerated the tree", async () => {

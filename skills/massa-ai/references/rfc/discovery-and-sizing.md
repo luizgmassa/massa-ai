@@ -8,7 +8,7 @@ Load before source investigation, RFC classification, impact selection, or clari
 - Use ADR when a significant architecture decision is finalized or being formally recorded.
 - Use TDD when the direction is settled and implementation architecture, contracts, rollout, and verification remain.
 - Use spec-driven when the request spans requirements, design, task planning, and implementation.
-- Use a feature, refactor, debug, or general workflow when a durable stakeholder proposal would add no decision value.
+- Use a feature, refactor, or debug workflow when a durable stakeholder proposal would add no decision value.
 
 Route matrix:
 

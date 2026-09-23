@@ -23,8 +23,8 @@ Activation means loading and using each available behavior. Load the installed
 `massa-ai` skill's `SKILL.md` once before substantive work begins. Use it as
 the public workflow router and load internal workflows or references only on
 demand, including `references/coding-guidelines.md` before implementation
-edits. Let it select the most specific workflow; use `workflows/general.md`
-only when no specialized workflow applies. Recall relevant durable context
+edits. Let it select the most specific workflow; when none applies, work
+under its Core Contract without loading a workflow file. Recall relevant durable context
 before work, retrieve only source context needed for the goal, remember only
 verified outcomes worth reusing, and compact context only when size reduces
 execution quality.

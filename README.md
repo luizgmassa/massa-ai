@@ -473,7 +473,6 @@ Migrated documentation for massa-ai workflows lives in `docs/`:
 | RFC | `docs/massa-ai-rfc.md` |
 | Commit | `docs/massa-ai-commit.md` |
 | Ticket | `docs/massa-ai-ticket.md` |
-| Maestro | `docs/massa-ai-maestro.md` |
 | Mobile Figma | `docs/massa-ai-mobile-figma.md` |
 | Context Slices | `docs/context-slices.md` |
 | Cheatsheet (commands, flags, tools, skills, agents) | `docs/CHEATSHEET.md` |

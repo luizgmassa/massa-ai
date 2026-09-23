@@ -8,7 +8,7 @@ metadata:
 
 ### Spec-Driven
 
-Use for explicit spec-driven requests and broad, ambiguous, migration-heavy, cross-boundary, public-contract, or long-running delivery that needs requirements-through-verification control. Ordinary localized fixes and clear small features stay in `debug`, `feature`, `refactor`, or `general` unless the user explicitly requests this workflow.
+Use for explicit spec-driven requests and broad, ambiguous, migration-heavy, cross-boundary, public-contract, or long-running delivery that needs requirements-through-verification control. Ordinary localized fixes and clear small features stay in `debug`, `feature`, or `refactor` unless the user explicitly requests this workflow.
 
 Load `references/project-context.md` (intake sweep) before the first substantive read.
 

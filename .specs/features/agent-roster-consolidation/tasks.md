@@ -86,10 +86,10 @@ T12 → T13
 
 **Done when**:
 
-- [ ] 36 workflow files remain (with T2's renames still pending, stems unchanged)
-- [ ] `EXPECTED_WORKFLOW_COUNT`, `IMPLEMENTATION_WORKFLOWS`, read-only complement, designer block count, reviewer-block counts, anchors entries updated to measured values
-- [ ] `validate-repository` "general fallback preflight" test replaced by a no-workflow-fallback assertion
-- [ ] Gate: scripts green
+- [x] 36 workflow files remain (with T2's renames still pending, stems unchanged)
+- [x] `EXPECTED_WORKFLOW_COUNT`, `IMPLEMENTATION_WORKFLOWS`, read-only complement, designer block count, reviewer-block counts, anchors entries updated to measured values
+- [x] `validate-repository` "general fallback preflight" test replaced by a no-workflow-fallback assertion
+- [x] Gate: scripts green
 
 **Tests**: content/contract
 **Gate**: scripts

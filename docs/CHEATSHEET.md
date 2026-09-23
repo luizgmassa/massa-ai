@@ -336,7 +336,6 @@ The `massa-ai` skill routes to exactly one workflow per task. Files under
 | `onboarding` | First session / missing `projectId` |
 | `feature` | New capability |
 | `debug` | Broken behavior, errors, crashes |
-| `general` | Coding work with no more specific workflow |
 | `exploration` | Read-only codebase/flow understanding |
 
 Audit/fix pairs — the `-audit` half is findings-only, the `-fix` half consumes a saved
@@ -351,7 +350,6 @@ audit report:
 | `tests-audit` / `-fix` | Coverage, regression, assertions, flakiness |
 | `bugs-audit` / `-fix` | Bug discovery |
 | `implementation-audit` / `-fix` | Multi-lens audit of a concrete implementation target |
-| `maestro-audit` / `-fix` | Maestro mobile E2E flows (plus `maestro` to author new ones) |
 | `mobile-figma-audit` / `-fix` | Android/iOS/KMP UI versus a Figma design |
 
 Documents and process:

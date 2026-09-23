@@ -188,7 +188,7 @@ installer ever touching my own agent files.
 | ROS-02 | Old agent names purged; single mapping table (AC-7) | Seven-agent roster | Design | Pending |
 | ROS-03 | Counts 18→7 everywhere (AC-8) | Seven-agent roster | Design | Pending |
 | WFL-01 | Dispatch mapping per workflow family (Dispatch AC-1..9) | Workflow dispatch mapping | Design | Pending |
-| WFL-02 | Remove general + maestro, fallback rewrite (Inventory AC-1, AC-3, AC-4) | Workflow inventory | Design | Pending |
+| WFL-02 | Remove general + maestro, fallback rewrite (Inventory AC-1, AC-3, AC-4) | Workflow inventory | Execute (T1) | Done |
 | WFL-03 | Six renames incl. policy sentence, commands, web UI, owned references and docs guides (AC-2, AC-5, AC-6, AC-7, AC-9) | Workflow inventory | Design | Pending |
 | WFL-04 | No dangling pointers (AC-8) | Workflow inventory | Design | Pending |
 | NAM-01 | Generator emits unprefixed names + markers (NAM AC-1, AC-2, AC-9) | Unprefixed names | Design | Pending |

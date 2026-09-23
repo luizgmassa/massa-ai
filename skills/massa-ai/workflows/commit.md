@@ -12,7 +12,7 @@ Use when the user wants to draft a commit message, prepare a commit, or commit c
 
 Load `references/project-context.md` (intake sweep) before the first substantive read.
 
-Not for Jira ticket creation, release notes, changelogs, PR descriptions, or history rewriting. Route Jira issue work to `workflows/ticket.md`. Route broad release documentation to the relevant feature, RFC, or general workflow.
+Not for Jira ticket creation, release notes, changelogs, PR descriptions, or history rewriting. Route Jira issue work to `workflows/ticket.md`. Route broad release documentation to the relevant feature or RFC workflow.
 
 ## Workflow
 

@@ -40,7 +40,7 @@ Never convert an inference or example into a project fact. Omit optional metadat
 - Use RFC when stakeholders still need options compared or the primary direction approved.
 - Use ADR when one significant decision and its consequences need recording without a full implementation blueprint.
 - Use spec-driven when the request spans requirements, design, tasks, and implementation or needs staged approval across those phases.
-- Use feature, refactor, debug, or general for localized work that does not need a durable design artifact.
+- Use feature, refactor, or debug for localized work that does not need a durable design artifact.
 
 TDD readiness checklist:
 

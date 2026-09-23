@@ -388,8 +388,8 @@ describe("references/spec-driven/validate.md: post-validation metric snapshot re
 });
 
 // ---------------------------------------------------------------------------
-// AEH-06: massa-ai-reviewer dispatch block wired into the 14 implementing/fix
-// workflows (T15-T17). Shared constants and target lists below are reused
+// AEH-06: massa-ai-reviewer dispatch block wired into the implementing/fix
+// workflows (T15-T17; 12 since agent-roster-consolidation removed `general` and `maestro-fix`). Shared constants and target lists below are reused
 // across the T15/T16/T17 describe blocks as each batch lands.
 // ---------------------------------------------------------------------------
 
@@ -433,13 +433,12 @@ function expectReviewerFallbackDefault(): void {
 
 const IMPLEMENTING_WORKFLOW_TARGETS: ReviewerDispatchTarget[] = [
   { file: "workflows/feature.md", scope: "the feature's diff surface and its task/AC context" },
-  { file: "workflows/general.md", scope: "the change's diff surface and its task/AC context" },
   { file: "workflows/debug.md", scope: "the fix's diff surface and its task/AC context" },
   { file: "workflows/refactor.md", scope: "the change's diff surface and its task/AC context" },
   { file: "workflows/spec-driven.md", scope: "the task's diff surface and its task/AC context" },
 ];
 
-describe("massa-ai-reviewer dispatch block: 5 implementing workflows (T15, AEH-06)", () => {
+describe("massa-ai-reviewer dispatch block: 4 implementing workflows (T15, AEH-06)", () => {
   test("the reviewer's fallback clause survived the move into the shared role defaults", () => {
     expectReviewerFallbackDefault();
   });
@@ -490,7 +489,6 @@ describe("massa-ai-reviewer dispatch block: fix workflows batch 1 (T16, AEH-06)"
 const FIX_WORKFLOW_BATCH_2_TARGETS: ReviewerDispatchTarget[] = [
   "workflows/tests/tests-fix.md",
   "workflows/implementation/implementation-fix.md",
-  "workflows/maestro/maestro-fix.md",
   "workflows/mobile-figma/mobile-figma-fix.md",
 ].map((file) => ({ file, scope: "the fix's diff surface and its task/AC context" }));
 
@@ -501,15 +499,15 @@ describe("massa-ai-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)"
     });
   }
 
-  test("all 14 wired workflows carry the reviewer dispatch block (count sensor)", () => {
+  test("all 12 wired workflows carry the reviewer dispatch block (count sensor)", () => {
     const allTargets = [
       ...IMPLEMENTING_WORKFLOW_TARGETS,
       ...FIX_WORKFLOW_BATCH_1_TARGETS,
       ...FIX_WORKFLOW_BATCH_2_TARGETS,
     ];
-    expect(allTargets.length).toBe(14);
+    expect(allTargets.length).toBe(12);
     const withBlock = allTargets.filter(({ file }) => readSkill(file).includes(REVIEWER_DISPATCH_HEADER));
-    expect(withBlock.length).toBe(14);
+    expect(withBlock.length).toBe(12);
   });
 });
 
@@ -540,14 +538,14 @@ describe("massa-ai-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)"
 // worth a gate.
 // ---------------------------------------------------------------------------
 
-describe("reviewer dispatch trigger: mandatory in all 14, and not by accident", () => {
+describe("reviewer dispatch trigger: mandatory in all 12, and not by accident", () => {
   const ALL_REVIEWER_TARGETS = [
     ...IMPLEMENTING_WORKFLOW_TARGETS,
     ...FIX_WORKFLOW_BATCH_1_TARGETS,
     ...FIX_WORKFLOW_BATCH_2_TARGETS,
   ];
 
-  /** The generic lead-in, shared byte-identically by 12 of the 14. */
+  /** The generic lead-in, shared byte-identically by 10 of the 12. */
   const GENERIC_TRIGGER =
     "> - trigger: implementation complete, before the verification gate — never optional";
 
@@ -588,12 +586,12 @@ describe("reviewer dispatch trigger: mandatory in all 14, and not by accident", 
     });
   }
 
-  test("the 12 generic triggers are byte-identical to each other", () => {
+  test("the 10 generic triggers are byte-identical to each other", () => {
     const generic = ALL_REVIEWER_TARGETS
       .map(({ file }) => file)
       .filter((file) => !(file in FINDING_SCOPED_TRIGGERS))
       .map((file) => reviewerTrigger(file));
-    expect(generic.length).toBe(12); // guard the guard: the split must stay 12/2
+    expect(generic.length).toBe(10); // guard the guard: the split must stay 10/2
     expect(new Set(generic).size).toBe(1);
   });
 
@@ -607,7 +605,7 @@ describe("reviewer dispatch trigger: mandatory in all 14, and not by accident", 
     expect(trigger).toContain("pr-review Step 2, dimension row 6");
   });
 
-  test("no workflow outside the 14 claims a never-optional reviewer dispatch", () => {
+  test("no workflow outside the 12 claims a never-optional reviewer dispatch", () => {
     const sanctioned = new Set(ALL_REVIEWER_TARGETS.map(({ file }) => file));
     const offenders: string[] = [];
     for (const rel of listWorkflowFiles()) {

@@ -1,6 +1,6 @@
 ---
 name: massa-ai
-description: Default memory-backed workflow router for every coding, planning-before-coding, debugging, code review, refactoring, or implementation conversation. Always load it once per new coding session, select specialized workflows first, and use the general fallback otherwise. Handles massa-ai recall/search, durable memory, context compaction, handoff, audits, specs, ADR/RFC/TDD, and evidence gates. Do NOT use for generic non-coding chat or bulk-loading every workflow/reference.
+description: Default memory-backed workflow router for every coding, planning-before-coding, debugging, code review, refactoring, or implementation conversation. Always load it once per new coding session, select specialized workflows first, and work under the Core Contract without a workflow file otherwise. Handles massa-ai recall/search, durable memory, context compaction, handoff, audits, specs, ADR/RFC/TDD, and evidence gates. Do NOT use for generic non-coding chat or bulk-loading every workflow/reference.
 license: MIT
 metadata:
   author: Luiz Massa
@@ -143,9 +143,6 @@ current context already contains it.
 | `security-fix` | fix security audit report findings | `workflows/security/security-fix.md` |
 | `requirements-audit` | requirements/spec/acceptance/scope alignment findings | `workflows/requirements/requirements-audit.md` |
 | `requirements-fix` | fix requirements audit report findings | `workflows/requirements/requirements-fix.md` |
-| `maestro` | implement new Maestro mobile E2E flows | `workflows/maestro/maestro.md` |
-| `maestro-audit` | run and audit existing Maestro mobile E2E flows | `workflows/maestro/maestro-audit.md` |
-| `maestro-fix` | child-only fix for saved Maestro audit findings | `workflows/maestro/maestro-fix.md` |
 | `tests-audit` | test coverage/regression/assertion/flakiness findings | `workflows/tests/tests-audit.md` |
 | `tests-fix` | fix tests audit report findings | `workflows/tests/tests-fix.md` |
 | `bugs-audit` | findings-only bug discovery | `workflows/bugs/bugs-audit.md` |
@@ -171,11 +168,10 @@ current context already contains it.
 | `to-prd` | turn the current conversation into a PRD without a new interview | `workflows/to-prd.md` |
 | `skill-architect` | design and build a new skill through structured conversation | `workflows/skill-architect.md` |
 | `furps-refinement` | FURPS+ refinement of a PRD and/or ADR before implementation, with The Fool pre-validation and DoR coverage | `workflows/refinement/furps-refinement.md` |
-| `general` | coding work with no more specific workflow | `workflows/general.md` |
 
 Explicitly requested workflows win. Otherwise choose the most specific matching
 workflow. Use `exploration` only for explicitly read-only understanding or flow
-mapping; route to `general` when no route's precedence key above matches. Ask
+mapping; when no route's precedence key above matches, load no workflow file. Ask
 the user only when two or more routes match the same precedence tier; a single
 match or no match is resolved deterministically without asking.
 
@@ -183,10 +179,10 @@ Deterministic routing precedence, first match wins:
 
 1. **Explicit route:** user names a massa-ai workflow, report family, saved finding type, or asks for a direct challenge.
 2. **Requested artifact:** ADR, RFC, TDD, Jira ticket, commit, session guide, audit report, implementation audit report, mobile Figma report, FURPS refinement report, PRD synthesized from the current conversation -> `to-prd` (explicit request only; refining an existing PRD stays `furps-refinement`), or new SKILL.md / skill design -> `skill-architect`.
-3. **Target type:** broken behavior/error -> `debug`; hosted PR/MR reference (number or URL) to review with posted findings -> `pr-review` (local working diff stays with audit routes); saved audit finding -> matching `*-fix`; implementation scope review -> `implementation-audit`; Maestro E2E/device automation target -> `maestro`, `maestro-audit`, or child-only `maestro-fix` before generic tests workflows; security/privacy/auth finding -> security workflow; tests/flakes/coverage finding -> tests workflow; supplied Figma/screenshot mobile UI design -> `design`; mobile Figma compare/audit -> `mobile-figma-audit`; saved `MFM-*` findings -> `mobile-figma-fix`.
-4. **Primary verb:** create/add/implement -> `feature` unless the concrete target is new Maestro flow work, which routes to `maestro`; restructure without behavior change -> `refactor`; inspect/understand only -> `exploration`; brainstorm/explore a product problem, idea, or direction with no concrete code target -> `discovery`; record selected decision -> `adr`; compare open options -> `rfc`; design settled implementation -> `tdd`; refine/quality-check an existing PRD or ADR document (not implementation auditing) -> `furps-refinement`.
+3. **Target type:** broken behavior/error -> `debug`; hosted PR/MR reference (number or URL) to review with posted findings -> `pr-review` (local working diff stays with audit routes); saved audit finding -> matching `*-fix`; implementation scope review -> `implementation-audit`; security/privacy/auth finding -> security workflow; tests/flakes/coverage finding -> tests workflow; supplied Figma/screenshot mobile UI design -> `design`; mobile Figma compare/audit -> `mobile-figma-audit`; saved `MFM-*` findings -> `mobile-figma-fix`.
+4. **Primary verb:** create/add/implement -> `feature`; restructure without behavior change -> `refactor`; inspect/understand only -> `exploration`; brainstorm/explore a product problem, idea, or direction with no concrete code target -> `discovery`; record selected decision -> `adr`; compare open options -> `rfc`; design settled implementation -> `tdd`; refine/quality-check an existing PRD or ADR document (not implementation auditing) -> `furps-refinement`.
 5. **Risk domain escalation:** migrations, irreversible operations, auth/privacy, cross-service contracts, public compatibility, or work over 10 files routes to `spec-driven` unless the user explicitly requests a narrower workflow and accepts the containment.
-6. **General fallback:** use `general` only after a one-line General fallback preflight names the specialized workflow considered, rejected reason, and why fallback does not change verification or mutation behavior.
+6. **No match:** proceed without loading a workflow file. The main agent works under the Core Contract above (recall, verify, Evidence Gate) and states in one line which specialized workflow it considered and why none applies.
 
 Mobile is a context modifier, not a workflow. Route by primary intent first.
 Load `references/mobile-context.md` for non-debug mobile work, or
@@ -311,8 +307,6 @@ Load only when a selected workflow asks for them:
 - `references/repo-rules-discovery.md`
 - `references/root-cause-scripts.md`
 - `references/conversation-feedback.md`
-- `references/maestro.md`
-- `references/maestro/`
 - `references/synapse-policy.md`
 - `references/tdd/`
 - `references/rfc/`

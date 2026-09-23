@@ -66,21 +66,6 @@
       "one feature-level delivery go-ahead across PR groups"
     ]
   },
-  "general.md": {
-    "present": [
-      "Independent Verification Mandate",
-      "risk-domain set named in step 3",
-      ".specs/quick/NNN-slug/SUMMARY.md",
-      "Minimum Bar sweep",
-      ".specs/project/onboarding/",
-      "Bounded Fix→Re-verify Loop"
-    ],
-    "notes": [
-      "massa-ai-verification-agent dispatch block",
-      "check_specs_delivered.ts --kind quick",
-      "Stage 3 delivery authorization"
-    ]
-  },
   "implementation/implementation-fix.md": {
     "present": [
       "Fix Closure Report defined in `references/audit-report-io.md",
@@ -93,23 +78,6 @@
       "brownfield-mapping.md` (Minimum Bar only)"
     ],
     "notes": []
-  },
-  "maestro/maestro-fix.md": {
-    "present": [
-      "references/discrimination-sensor.md",
-      "Discrimination Sensor (Flow Mutation)",
-      "first fix touching an unmapped Maestro workspace",
-      "Independent Verification Mandate",
-      "Bounded Fix→Re-verify Loop",
-      "Fix Closure Report Contract",
-      "audits/maestro/<YYYY-MM-DD maestro-fix-closure>.md",
-      "graceful degradation preserved"
-    ],
-    "notes": [
-      "references/brownfield-mapping.md (Minimum Bar only)",
-      "surviving_mutant lessons signal",
-      "check_fix_closure.ts --family maestro"
-    ]
   },
   "mobile-figma/mobile-figma-fix.md": {
     "present": [
