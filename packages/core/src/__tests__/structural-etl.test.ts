@@ -370,7 +370,12 @@ describeNative("TS/JS structural ETL adapter", () => {
     // missed by not populating ParsedFile.structure).
     const { dir, file } = await fixture("notes.md", "## C# vs F#\n");
     const [parsed] = await new ParseStage().run(context(dir), [file]);
-    const [resolved] = await new ResolveStage().run(context(dir), [parsed!]);
+    // Inject a stub repository (this file's established pattern, e.g. the
+    // AD-008/AD-009 test above) so this test doesn't require a live
+    // DATABASE_URL — ResolveStage's default constructor arg reaches the real
+    // DB-backed getSymbolRepository().
+    const repository = { listAllDefinitions: async () => [] };
+    const [resolved] = await new ResolveStage(repository as never).run(context(dir), [parsed!]);
     const symbol = resolved!.symbols[0]!;
     expect(symbol.name).toBe("C%23 vs F%23");
     expect(symbol.qualifiedName).toBe("C%23 vs F%23");
