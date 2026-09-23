@@ -31,7 +31,10 @@ function dispatchTargets(text: string): string[] {
   return [...found].sort();
 }
 
-const FIX_TRIO = ["senior-engineer", "code-reviewer/review", "code-reviewer/verify"];
+// `code-reviewer/audit` covers both the diff review (`lens: diff`, merged from
+// the retired `review` mode) and, on the audit-only workflows below, the
+// other lenses — `dispatchTargets` tracks `agent/mode` only, not lens.
+const FIX_TRIO = ["senior-engineer", "code-reviewer/audit", "code-reviewer/verify"];
 
 const EXPECTED: Record<string, string[]> = {
   // Dispatch AC-1: audits → code-reviewer with the matching lens; implementation-audit
@@ -58,7 +61,7 @@ const EXPECTED: Record<string, string[]> = {
   // A production seam for deterministic testing is senior-engineer's; test-engineer writes test files only.
   "tests/tests-fix.md": [
     "senior-engineer",
-    "code-reviewer/review",
+    "code-reviewer/audit",
     "code-reviewer/verify",
     "test-engineer/fix",
   ],

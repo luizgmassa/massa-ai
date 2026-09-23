@@ -368,7 +368,7 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 **What:** massa-ai defines 7 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
 
-**The 7 specialists:** senior-engineer, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer. A charter that owns several output contracts selects one per dispatch through the capability packet's `mode` field (for example `code-reviewer` in `review`, `verify`, `audit`, or `guide` mode); the modes per agent and the retired-agent → current-agent mapping live in `skills/AGENTS.md`.
+**The 7 specialists:** senior-engineer, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer. A charter that owns several output contracts selects one per dispatch through the capability packet's `mode` field (for example `code-reviewer` in `verify` or `audit` mode, the latter with a `lens` including `diff` for diff review); the modes per agent and the retired-agent → current-agent mapping live in `skills/AGENTS.md`.
 
 Workflows dispatch these agents by their bare charter name (for example `code-explorer`) — no `massa-ai-` prefix on any host. On the Claude plugin route the host namespaces them as `massa-ai:<name>`, which is the name to dispatch there. Installers identify massa-ai's agent files by the `massa-ai-owned` content marker, never by name: a same-named agent the user owns is skipped with a warning and never overwritten or deleted, and the pre-consolidation `massa-ai-<name>` files are pruned on upgrade.
 

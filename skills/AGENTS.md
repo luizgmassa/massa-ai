@@ -267,7 +267,7 @@ drift, and did.
 |---|---|---|---|---|
 | senior-engineer | Implement approved plans | write | — (one contract) | `skills/agents/senior-engineer/SKILL.md` |
 | code-explorer | Understand an existing codebase, index-first | read-only | `lookup` (index-first answer), `trace` (flow, dependencies, impact) | `skills/agents/code-explorer/SKILL.md` |
-| code-reviewer | Review, verify, audit, and guide existing or changed code | read-only | `review` (diff), `verify` (Verification Ladder + discrimination sensor), `audit` (lenses bugs, architecture, security, code-quality, performance), `guide` (architecture, mobile platform) | `skills/agents/code-reviewer/SKILL.md` |
+| code-reviewer | Verify and audit existing or changed code | read-only | `verify` (Verification Ladder + discrimination sensor), `audit` (lenses bugs, architecture, security, code-quality, performance, diff) | `skills/agents/code-reviewer/SKILL.md` |
 | designer | Read and write user-facing screens from Figma, screenshots, or other design direction | read-only (UI-layer write when scoped) | `audit` (conformance), `implement` (UI layer) | `skills/agents/designer/SKILL.md` |
 | judge | Evaluate artifacts and challenge plans with quoted evidence | write (own judge-N report, `scorer` mode only) | `spec-author` (evaluation specification), `scorer` (debate panel), `plan-critique` (lite or full Plan Challenge gate) | `skills/agents/judge/SKILL.md` |
 | product-manager | Hold requirements to a clear, complete, consistent standard | read-only | `furps` (one FURPS+ dimension), `requirements` (ambiguity, gaps, contradictions, implicit needs), `audit` (requirements lens) | `skills/agents/product-manager/SKILL.md` |
@@ -282,11 +282,11 @@ The single old→new table for the charters retired by the roster consolidation.
 | builder | senior-engineer | `—` (renamed) |
 | investigator | code-explorer | `trace` |
 | navigator | code-explorer | `lookup` |
-| reviewer | code-reviewer | `review` |
+| reviewer | code-reviewer | `audit` (`lens: diff`) |
 | verification-agent | code-reviewer | `verify` |
 | audit-specialist | code-reviewer | `audit` (the `requirements` lens moved to product-manager `audit`, the `tests` lens to test-engineer `audit`) |
-| architecture-specialist | code-reviewer | `guide` for architecture guidance; architecture findings (its folded `domain-mapper`, `coupling-auditor`, `deepening-architect` roles) go to `audit` with `lens: architecture` and a `sub-mode` (see `agent-orchestration.md` §Roles) |
-| mobile-specialist | code-reviewer | `guide` (mobile detection gate kept) |
+| architecture-specialist | code-reviewer | `audit` with `lens: architecture` and a `sub-mode` (its folded `domain-mapper`, `coupling-auditor`, `deepening-architect` roles; see `agent-orchestration.md` §Roles) |
+| mobile-specialist | — | Retired; mobile guidance now comes from the main agent loading `references/mobile-context.md` directly (agent-roster-revision D3) |
 | meta-judge | judge | `spec-author` |
 | plan-critic | judge | `plan-critique` |
 | furps-analyst | product-manager | `furps` |
@@ -310,7 +310,7 @@ Steps 3-4 are enforced: the parity test fails on generator drift and `scripts/__
 All agents integrate these concepts (documented per-agent in each charter):
 
 - **Massa-ai Memory**: agents suggest durable memories only when useful; the main agent persists.
-- **Synapse**: repeated-search agents (code-explorer, code-reviewer in `audit` or `guide` mode, product-manager) receive their own ephemeral Synapse session.
+- **Synapse**: repeated-search agents (code-explorer, code-reviewer in `audit` mode, product-manager) receive their own ephemeral Synapse session.
 - **Context Firewall**: agents summarize verbose output and never return raw dumps.
 - **Verification Ladder**: agents declare the deterministic sensors they run.
 - **References**: agents point to the relevant massa-ai reference files by name.

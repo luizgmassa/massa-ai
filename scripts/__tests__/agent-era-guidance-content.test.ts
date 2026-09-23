@@ -397,7 +397,15 @@ describe("references/spec-driven/validate.md: post-validation metric snapshot re
 // ---------------------------------------------------------------------------
 
 const REVIEWER_DISPATCH_HEADER =
-  "> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`";
+  "> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`";
+/**
+ * The header above no longer disambiguates: every `code-reviewer` `audit`
+ * lens shares it (pr-review.md dispatches a second `mode: audit` block for
+ * dimension rows 1/3/4, security/architecture/performance lenses). The diff
+ * review that used to be its own `mode: review` is now the `lens: diff` body
+ * line, so header matches must be filtered to the block that carries it.
+ */
+const REVIEWER_LENS_MARKER = "`lens: diff`";
 /**
  * The code-reviewer's `fallback` bullet used to be asserted here, per file,
  * because each block carried it verbatim. It is now a Role Default in
@@ -463,7 +471,7 @@ describe("code-reviewer dispatch block: 4 implementing workflows (T15, AEH-06)",
     );
   });
 
-  test("the review-mode dispatch block precedes the verify-mode dispatch block in spec-driven.md", () => {
+  test("the diff-audit dispatch block precedes the verify-mode dispatch block in spec-driven.md", () => {
     const content = readSkill("workflows/spec-driven.md");
     const reviewerIdx = content.indexOf(REVIEWER_DISPATCH_HEADER);
     const verificationIdx = content.indexOf("> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`)");
@@ -569,12 +577,20 @@ describe("code-reviewer dispatch trigger: mandatory in all 12, and not by accide
   /** The code-reviewer block's own `trigger:` line in a file, or undefined. */
   function reviewerTrigger(file: string): string | undefined {
     const lines = readSkill(file).split(/\r?\n/);
-    const headerIdx = lines.findIndex((l) => l.startsWith(REVIEWER_DISPATCH_HEADER));
-    if (headerIdx === -1) return undefined;
-    // Scan only this block: stop at the first non-blockquote line, so a later
-    // dispatch block's trigger can never be mistaken for the code-reviewer's.
-    for (let i = headerIdx + 1; i < lines.length && lines[i]!.startsWith(">"); i++) {
-      if (lines[i]!.startsWith("> - trigger:")) return lines[i];
+    for (let headerIdx = 0; headerIdx < lines.length; headerIdx++) {
+      if (!lines[headerIdx]!.startsWith(REVIEWER_DISPATCH_HEADER)) continue;
+      // Scan only this block: stop at the first non-blockquote line, so a
+      // later dispatch block's trigger can never be mistaken for this one's.
+      let trigger: string | undefined;
+      let isDiffLens = false;
+      for (let i = headerIdx + 1; i < lines.length && lines[i]!.startsWith(">"); i++) {
+        if (lines[i]!.startsWith("> - trigger:")) trigger = lines[i];
+        if (lines[i]!.includes(REVIEWER_LENS_MARKER)) isDiffLens = true;
+      }
+      // The header alone is shared by every `code-reviewer` `audit` lens
+      // (e.g. pr-review.md's separate security/architecture/performance
+      // block); only the `lens: diff` block is this suite's subject.
+      if (isDiffLens) return trigger;
     }
     return undefined;
   }
