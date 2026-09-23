@@ -264,11 +264,13 @@ export const RETIRED_BUNDLE_ROOTS = ["persona-router"] as const;
  * Why: git no longer tracks deletions once these bundles are gitignored
  * (UGB-04) — a source file removed from `skills/` must not leave a stale
  * copy behind in every plugin forever. Removal targets come only from
- * `managedRootsFor()` (the same table `--check` walks) and
- * `hookBinaryHosts()`; there is no second literal list to drift, so a
- * hand-authored file living beside a managed root (a codex/cursor quick
- * skill under `skills/`, `hooks.json` beside `hooks/massa-ai-hook`) is never
- * a prune candidate — it is not enumerated by either table.
+ * `managedRootsFor()` (the same table `--check` walks), `hookBinaryHosts()`,
+ * and `RETIRED_BUNDLE_ROOTS`. That last one is a literal list with a twin:
+ * `scripts/install-skills.sh`'s `RETIRED_SKILL_NAMES` must name the same
+ * skills, and generate-skill-artifacts-prune.test.ts asserts the two are
+ * equal. A hand-authored file living beside a managed root (a codex/cursor
+ * quick skill under `skills/`, `hooks.json` beside `hooks/massa-ai-hook`) is
+ * never a prune candidate — none of the three enumerates it.
  * Impacts: UGB-03/04, T1.
  * Test: bun test scripts/__tests__/generate-skill-artifacts-prune.test.ts
  */

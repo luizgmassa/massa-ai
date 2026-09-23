@@ -109,7 +109,7 @@ function checkSubagents(
 }
 
 // How many specialist charters the repo currently ships, measured not assumed.
-let EXPECTED_AGENTS = 18;
+let EXPECTED_AGENTS = 7;
 try {
   const charters = readdirSync(join(import.meta.dir, "..", "skills", "agents"), {
     withFileTypes: true,

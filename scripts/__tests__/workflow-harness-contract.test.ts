@@ -395,9 +395,9 @@ describe("invariants: the references still encode the decisions that were made",
 
 // ── 6. Roster count ───────────────────────────────────────────────────────
 
-describe("roster: nothing advertises a specialist count other than 18", () => {
+describe("roster: nothing advertises a specialist count other than 7", () => {
   /** The roster size every current-tense claim must agree with. */
-  const ROSTER = 18;
+  const ROSTER = 7;
 
   /**
    * A count-shaped claim, matched within one line OR across exactly one line
@@ -470,9 +470,13 @@ describe("roster: nothing advertises a specialist count other than 18", () => {
     const files = (await new Response(proc.stdout).text())
       .split("\n")
       .filter(Boolean)
-      // .specs/ is historical record and CHANGELOG.md documents each change;
+      // .specs/ is historical record, .ua/ is a generated knowledge-graph
+      // snapshot of past sources, and CHANGELOG.md documents each change;
       // this file carries the counts as assertion data.
-      .filter((f) => !f.startsWith(".specs/") && f !== "CHANGELOG.md" && f !== SELF);
+      .filter(
+        (f) =>
+          !f.startsWith(".specs/") && !f.startsWith(".ua/") && f !== "CHANGELOG.md" && f !== SELF,
+      );
 
     const offenders: string[] = [];
     for (const rel of files) {
@@ -529,6 +533,8 @@ describe("roster: nothing advertises a specialist count other than 18", () => {
       "15 specialists",
       "12 subagent specialists",
       "9 reusable sub-agent specialists",
+      // The pre-consolidation roster size is now a wrong count too.
+      "18 subagent specialists",
     ]) {
       const m = COUNT_CLAIM.exec(text);
       expect(m, `no match for ${text}`).not.toBeNull();
@@ -538,19 +544,19 @@ describe("roster: nothing advertises a specialist count other than 18", () => {
 
   test("a correct count in any spelling passes", () => {
     for (const text of [
-      "18 specialists",
-      "18 subagent specialists",
-      "18 sub-agent specialists",
-      "18 reusable sub-agent specialists",
+      "7 specialists",
+      "7 subagent specialists",
+      "7 sub-agent specialists",
+      "7 reusable sub-agent specialists",
     ]) {
       expect(COUNT_CLAIM.exec(text)![1]).toBe(String(ROSTER));
     }
   });
 
-  test("the shell installers advertise 18", async () => {
+  test("the shell installers advertise 7", async () => {
     for (const rel of ["install.sh", "scripts/install-agents.sh"]) {
       const body = await fs.readFile(path.join(REPO_ROOT, rel), "utf8");
-      expect(body).toContain("18 subagent specialists");
+      expect(body).toMatch(/(?<!\d)7 subagent specialists/);
     }
   });
 });

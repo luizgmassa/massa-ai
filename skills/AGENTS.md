@@ -314,4 +314,4 @@ All agents integrate these concepts (documented per-agent in each charter):
 - **References**: agents point to the relevant massa-ai reference files by name.
 - **Lessons**: agents surface reusable failures for lesson distillation.
 
-<!-- validator anchors: 18 agents | mapping table -->
+<!-- validator anchors: 7 agents | mapping table -->

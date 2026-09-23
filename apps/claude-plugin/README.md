@@ -17,9 +17,7 @@ Slash commands (installed as `/massa-ai-*`):
 
 Plus 36 generated workflow commands, one per massa-ai workflow (`/massa-ai:debug` on the marketplace route, `/massa-ai-debug` on the file route, etc.) — see [Workflow Commands](../../FEATURES.md#workflow-commands-generated-slash-commands) in the root feature reference for the full naming table.
 
-Subagent:
-
-- **`navigator`** — exploration specialist that prefers semantic queries over blind file reads. Protects the parent agent's context during large investigations.
+Subagents: the 7 massa-ai specialists — `builder`, `code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, `test-engineer` — dispatched as `massa-ai:<name>` on the marketplace route and as the bare `<name>` on the file route. The installer identifies its own agent files by the `massa-ai-owned` content marker: a same-named agent you own in `~/.claude/agents/` is skipped with a warning, and pre-consolidation `massa-ai-<name>` files are pruned on upgrade.
 
 ## Install
 

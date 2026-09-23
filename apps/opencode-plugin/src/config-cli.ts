@@ -90,8 +90,8 @@ Commands:
     --model <name>    Model name
     --base-url <url>  Base URL (for ollama/lmstudio)
 
-  agents            Manage the 18 subagent specialist definitions
-    agents install [--user|--project]   Write 18 agent .md files
+  agents            Manage the 7 subagent specialist definitions
+    agents install [--user|--project]   Write 7 agent .md files
     agents uninstall [--user|--project] Remove only massa-ai-owned agents
 
   profile list      List shipped model profiles + per-host active profile
