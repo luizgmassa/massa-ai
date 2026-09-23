@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: Luiz Massa
   version: "1.1.0"
-  model_tier: deep
   permission: read-only
 ---
 
@@ -74,8 +73,9 @@ overall: weighted-mean
 - References (paths relative to the `massa-ai` skill directory): `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts).
 
 ## Model Hint
-See `references/agent-orchestration.md` (Model Diversity Fallback): `metadata.model_tier`
-(`deep`) is the fallback; `workflows/judge-with-debate.md` owns the live model assignment.
+See `references/agent-orchestration.md` (Model Diversity Fallback): `meta-judge` carries no
+per-agent override in `skills/model-profiles.json`, so the active profile's host default is
+the fallback; `workflows/judge-with-debate.md` owns the live model assignment.
 
 ## Validation Sensors
 - Output parses as YAML; weights sum to 1.0 (±0.001); every criterion carries id, name, weight, scale (min 1, max 5), rubric anchors for 1/3/5, and a non-empty checklist.

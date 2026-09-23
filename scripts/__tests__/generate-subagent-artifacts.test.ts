@@ -29,7 +29,7 @@ import {
   main,
   profilesPerHost,
   stateProfilesFromInstallState,
-  warnStaleAgentTiers,
+  warnStaleAgentOverrides,
   OPENCODE_OWNED_MARKER,
   type Charter,
   type Host,
@@ -74,10 +74,10 @@ describe("parseSimpleYaml", () => {
   test("parses a single-level nested mapping (metadata block)", () => {
     const y = parseSimpleYaml([
       "metadata:",
-      "  model_tier: standard",
+      "  author: massa-ai",
       "  permission: write",
     ].join("\n")) as { metadata: Record<string, unknown> };
-    expect(y.metadata.model_tier).toBe("standard");
+    expect(y.metadata.author).toBe("massa-ai");
     expect(y.metadata.permission).toBe("write");
   });
 });
@@ -100,7 +100,6 @@ describe("parseFrontmatter", () => {
 function charter(partial: Partial<Charter> & { name: Charter["name"] }): Charter {
   return {
     description: "A charter",
-    modelTier: "standard",
     permission: "read-only",
     body: "Do the thing.",
     ...partial,
@@ -368,20 +367,11 @@ describe("emitCodex + TOML helpers", () => {
 // ── Real charter loading ────────────────────────────────────────────────────
 
 describe("loadCharter / loadAllCharters (repo charters)", () => {
-  test("loadCharter reads investigator with description + model_tier", async () => {
+  test("loadCharter reads investigator with description + read-only permission", async () => {
     const c = await loadCharter("investigator");
     expect(c.name).toBe("investigator");
     expect(c.description.length).toBeGreaterThan(0);
-    // deep since ALLWF-03: read-only specialists always run the heaviest tier.
-    expect(c.modelTier).toBe("deep");
-  });
-
-  test("every repo charter declares a tier the registry recognizes", async () => {
-    const all = await loadAllCharters();
-    const registry = loadRegistry();
-    for (const c of all) {
-      expect(registry.tiers).toContain(c.modelTier);
-    }
+    expect(c.permission).toBe("read-only");
   });
 
   /**
@@ -413,21 +403,14 @@ describe("loadCharter / loadAllCharters (repo charters)", () => {
     // wrong reason — a thrown ENOENT is still a thrown error.
     const c = await loadFromTemp((raw) => raw);
     expect(c.name).toBe("investigator");
-    expect(loadRegistry().tiers).toContain(c.modelTier);
-  });
-
-  test("loadCharter throws rather than defaulting when model_tier is absent", async () => {
-    // A silent default here would ship a different model to users with nothing to notice.
-    await expect(
-      loadFromTemp((raw) => raw.replace(/^ {2}model_tier:.*$\n/m, ""))
-    ).rejects.toThrow(/missing metadata\.model_tier/);
+    expect(c.description.length).toBeGreaterThan(0);
   });
 
   test("loadCharter throws when the retired model_hint reappears", async () => {
-    // The charter must declare a tier, never a model (MPR-R6). `model_hint` was a literal
-    // model name Cursor consumed verbatim, free to disagree with the generator's tables.
+    // A charter must never name a model (D4). `model_hint` was a literal model name Cursor
+    // consumed verbatim, free to disagree with the generator's resolution.
     await expect(
-      loadFromTemp((raw) => raw.replace(/^ {2}model_tier:.*$/m, "$&\n  model_hint: Some Model"))
+      loadFromTemp((raw) => raw.replace(/^ {2}permission:.*$/m, "$&\n  model_hint: Some Model"))
     ).rejects.toThrow(/still declares metadata\.model_hint/);
   });
 
@@ -540,10 +523,10 @@ describe("runCheck / main drift gate", () => {
 describe("generator profile selection", () => {
   const registry = loadRegistry();
 
-  test("with no flag and no env, every host uses its registry default", () => {
+  test("with no flag and no env, every host falls back to \"balanced\"", () => {
     const p = profilesPerHost(registry, { env: {} });
     for (const host of ["claude", "codex", "cursor", "opencode"] as Host[]) {
-      expect(p[host]).toBe(registry.hostDefaults[host]);
+      expect(p[host]).toBe("balanced");
     }
   });
 
@@ -642,17 +625,36 @@ describe("generator profile selection", () => {
   });
 });
 
-// ── agentTiers override resolution + stale-name warn (design D-2, APUX-02, P1-A AC4-5) ──
+// ── per-agent override resolution + stale-name warn (registry v2, D1) ───────
 
-describe("agentTiers override resolution (design D-2, APUX-02, P1-A AC4)", () => {
-  test("registry.agentTiers[agent][host] wins over the charter's own metadata.model_tier for that host only — an unmentioned host still resolves the charter tier", async () => {
+/** Clone the builtin `balanced` profile with an extra `agents.<agent>` override merged in,
+ *  for a registry that otherwise resolves exactly like the shipped one. */
+function withAgentOverride(
+  builtin: Registry,
+  agent: string,
+  hostOverrides: Record<string, { model: string | null; effort: string | null }>,
+): Registry {
+  return {
+    ...builtin,
+    profiles: {
+      ...builtin.profiles,
+      balanced: {
+        ...builtin.profiles.balanced,
+        agents: { ...builtin.profiles.balanced.agents, [agent]: hostOverrides },
+      },
+    },
+  };
+}
+
+describe("per-agent override resolution (registry v2, D1)", () => {
+  test("profile.agents[agent][host] wins over the profile's host default for that host only — an unmentioned host still resolves the host default", async () => {
     const builtin = loadRegistry();
-    // investigator's charter tier is "deep" (ALLWF-03: read-only specialists run heaviest).
-    // Override claude down to "light"; codex is never mentioned and must stay at "deep".
-    const registry: Registry = {
-      ...builtin,
-      agentTiers: { investigator: { claude: "light" } },
-    };
+    // investigator carries no override in the shipped registry, so it resolves the
+    // profile's own host default (ALLWF-03: read-only specialists run the strongest
+    // model). Override claude to "haiku"; codex is never mentioned and must stay default.
+    const registry = withAgentOverride(builtin, "investigator", {
+      claude: { model: "haiku", effort: "high" },
+    });
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
     try {
       const dirs: Record<Host, string> = {
@@ -664,21 +666,43 @@ describe("agentTiers override resolution (design D-2, APUX-02, P1-A AC4)", () =>
       await emitAll(dirs, { registry, env: {} });
       const claudeOut = await fs.readFile(path.join(dirs.claude, "massa-ai-investigator.md"), "utf8");
       const codexOut = await fs.readFile(path.join(dirs.codex, "massa-ai-investigator.toml"), "utf8");
-      expect(claudeOut).toContain("model: haiku"); // balanced, LIGHT tier (overridden)
-      expect(codexOut).toContain('model = "gpt-5.6-sol"'); // balanced, DEEP tier (unaffected)
+      expect(claudeOut).toContain("model: haiku"); // overridden
+      expect(codexOut).toContain('model = "gpt-5.6-sol"'); // balanced host default, unaffected
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test("an override changes only that agent's emitted file, not its siblings", async () => {
+    const builtin = loadRegistry();
+    const registry = withAgentOverride(builtin, "investigator", {
+      claude: { model: "haiku", effort: "high" },
+    });
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
+    try {
+      const dirs: Record<Host, string> = {
+        claude: path.join(tmp, "claude"),
+        codex: path.join(tmp, "codex"),
+        cursor: path.join(tmp, "cursor"),
+        opencode: path.join(tmp, "opencode"),
+      };
+      await emitAll(dirs, { registry, env: {} });
+      const investigatorOut = await fs.readFile(path.join(dirs.claude, "massa-ai-investigator.md"), "utf8");
+      const plannerOut = await fs.readFile(path.join(dirs.claude, "massa-ai-planner.md"), "utf8");
+      expect(investigatorOut).toContain("model: haiku");
+      expect(plannerOut).toContain("model: opus"); // balanced host default, untouched
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
   });
 });
 
-describe("agentTiers stale-name warn (design D-2, plan-critic blocking finding #2, APUX-02, P1-A AC5)", () => {
+describe("stale agent-override warn (registry v2)", () => {
   test("a real run's emitAll + emitVariants against the same registry, sharing ONE Set, print the stale-name warn EXACTLY ONCE total — not once per caller", async () => {
     const builtin = loadRegistry();
-    const registry: Registry = {
-      ...builtin,
-      agentTiers: { "an-agent-nobody-charters": { claude: "light" } },
-    };
+    const registry = withAgentOverride(builtin, "an-agent-nobody-charters", {
+      claude: { model: "haiku", effort: "high" },
+    });
     const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
     try {
@@ -700,10 +724,10 @@ describe("agentTiers stale-name warn (design D-2, plan-critic blocking finding #
       await emitVariants(pluginRootDirs, { registry, warnedStaleAgents });
 
       const staleWarnCalls = warnSpy.mock.calls.filter((args) =>
-        String(args[0] ?? "").includes('agentTiers names unknown agent "an-agent-nobody-charters"'),
+        String(args[0] ?? "").includes('names unknown agent "an-agent-nobody-charters"'),
       );
       expect(staleWarnCalls.length).toBe(1);
-      // The emission itself still succeeded — a stale overlay name must not brick the build.
+      // The emission itself still succeeded — a stale override must not brick the build.
       const claudeOut = await fs.readdir(dirs.claude);
       expect(claudeOut.length).toBe(18);
     } finally {
@@ -714,17 +738,16 @@ describe("agentTiers stale-name warn (design D-2, plan-critic blocking finding #
 
   test("without a shared Set, two independent calls each warn once — the exact bug the shared Set exists to prevent", () => {
     const builtin = loadRegistry();
-    const registry: Registry = {
-      ...builtin,
-      agentTiers: { "an-agent-nobody-charters": { claude: "light" } },
-    };
+    const registry = withAgentOverride(builtin, "an-agent-nobody-charters", {
+      claude: { model: "haiku", effort: "high" },
+    });
     const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     try {
       const charters: Charter[] = [charter({ name: "investigator" })];
-      warnStaleAgentTiers(registry, charters, new Set()); // caller A's own Set
-      warnStaleAgentTiers(registry, charters, new Set()); // caller B's own Set — no sharing
+      warnStaleAgentOverrides(registry, charters, new Set()); // caller A's own Set
+      warnStaleAgentOverrides(registry, charters, new Set()); // caller B's own Set — no sharing
       const staleWarnCalls = warnSpy.mock.calls.filter((args) =>
-        String(args[0] ?? "").includes('agentTiers names unknown agent "an-agent-nobody-charters"'),
+        String(args[0] ?? "").includes('names unknown agent "an-agent-nobody-charters"'),
       );
       expect(staleWarnCalls.length).toBe(2); // the double-print bug, reproduced deliberately
     } finally {
@@ -734,18 +757,17 @@ describe("agentTiers stale-name warn (design D-2, plan-critic blocking finding #
 
   test("a shared Set collapses that same double-print to one", () => {
     const builtin = loadRegistry();
-    const registry: Registry = {
-      ...builtin,
-      agentTiers: { "an-agent-nobody-charters": { claude: "light" } },
-    };
+    const registry = withAgentOverride(builtin, "an-agent-nobody-charters", {
+      claude: { model: "haiku", effort: "high" },
+    });
     const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     try {
       const charters: Charter[] = [charter({ name: "investigator" })];
       const shared = new Set<string>();
-      warnStaleAgentTiers(registry, charters, shared);
-      warnStaleAgentTiers(registry, charters, shared);
+      warnStaleAgentOverrides(registry, charters, shared);
+      warnStaleAgentOverrides(registry, charters, shared);
       const staleWarnCalls = warnSpy.mock.calls.filter((args) =>
-        String(args[0] ?? "").includes('agentTiers names unknown agent "an-agent-nobody-charters"'),
+        String(args[0] ?? "").includes('names unknown agent "an-agent-nobody-charters"'),
       );
       expect(staleWarnCalls.length).toBe(1);
     } finally {
@@ -753,8 +775,8 @@ describe("agentTiers stale-name warn (design D-2, plan-critic blocking finding #
     }
   });
 
-  test("empty agentTiers ({}) — the shipped default — produces ZERO stale-name warn lines, keeping --check output stable", async () => {
-    const registry = loadRegistry(); // the real shipped builtin: agentTiers === {}
+  test("the shipped builtin — no stale override — produces ZERO stale-name warn lines, keeping --check output stable", async () => {
+    const registry = loadRegistry(); // the real shipped builtin: no agent names outside the charter set
     const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
     try {
@@ -766,7 +788,7 @@ describe("agentTiers stale-name warn (design D-2, plan-critic blocking finding #
       };
       await emitAll(dirs, { registry, env: {} });
       const staleWarnCalls = warnSpy.mock.calls.filter((args) =>
-        String(args[0] ?? "").includes("agentTiers names unknown agent"),
+        String(args[0] ?? "").includes("names unknown agent"),
       );
       expect(staleWarnCalls.length).toBe(0);
     } finally {
@@ -775,16 +797,18 @@ describe("agentTiers stale-name warn (design D-2, plan-critic blocking finding #
     }
   });
 
-  test("an agentTiers entry naming a real charter never warns", () => {
+  test("an override naming a real charter never warns", async () => {
     const builtin = loadRegistry();
-    const registry: Registry = {
-      ...builtin,
-      agentTiers: { investigator: { claude: "light" } },
-    };
+    const registry = withAgentOverride(builtin, "investigator", {
+      claude: { model: "haiku", effort: "high" },
+    });
     const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     try {
-      const charters: Charter[] = [charter({ name: "investigator" })];
-      warnStaleAgentTiers(registry, charters, new Set());
+      // The FULL real charter set — every override the shipped registry already carries
+      // (builder, designer, test-engineer, documentation-agent) names a real charter too,
+      // so only a singleton fake charter list would make those look stale.
+      const charters = await loadAllCharters();
+      warnStaleAgentOverrides(registry, charters, new Set());
       expect(warnSpy).not.toHaveBeenCalled();
     } finally {
       warnSpy.mockRestore();

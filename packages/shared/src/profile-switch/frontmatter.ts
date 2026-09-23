@@ -51,7 +51,7 @@ export function parseSimpleYaml(text: string): Record<string, unknown> {
       continue;
     }
     // Nested mapping (e.g. metadata: block). Only one level of nesting is
-    // used by the charters (metadata.model_tier / metadata.permission).
+    // used by the charters (metadata.permission).
     const nested: Record<string, unknown> = {};
     i++;
     while (i < lines.length) {
