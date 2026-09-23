@@ -420,7 +420,12 @@ describe("router table matches the workflow and reference trees", () => {
     const listed = new Set(
       [...router.matchAll(/`(references\/[A-Za-z0-9._/-]+)`/g)].map((m) => m[1]!),
     );
-    expect(listed.size).toBeGreaterThan(20);
+    // agent-roster-revision (RTR-01) dropped the router's "## Shared
+    // References" list: workflows now name their own references instead of
+    // the router restating all of them. The floor is a sanity check against
+    // a total wipe-out, re-based on the post-slim count (14 measured), not a
+    // requirement that the router re-list every reference in the tree.
+    expect(listed.size).toBeGreaterThan(10);
     const missing: string[] = [];
     for (const rel of listed) {
       const target = path.join(SKILLS_DIR, "massa-ai", rel);
