@@ -65,7 +65,7 @@ function makeEl(id: string, href: string | null = null): El {
     value: "",
     checked: false,
     textContent: "",
-    dataset: { id: "x", action: "a", profile: "p", host: "h", tier: "t", section: "s", target: "tg", tab: "switch", workflow: "w" },
+    dataset: { id: "x", action: "a", profile: "p", host: "h", section: "s", target: "tg", tab: "switch" },
     addEventListener: (evt, cb) => { (handlers[evt] ||= []).push(cb); },
     querySelectorAll: () => {
       if (children.length === 0) children.push(makeEl(id + "-c"));
@@ -425,7 +425,7 @@ describe("beforeunload guard", () => {
         ? {
             success: true,
             data: {
-              registry: { tiers: ["light"], profiles: { work: { hosts: { claude: { light: { model: "m", effort: "low" } } } } }, hostDefaults: {}, workflowTiers: {} },
+              registry: { models: {}, profiles: { work: { hosts: { claude: { model: "m", effort: "low" } } } } },
               source: {},
             },
           }

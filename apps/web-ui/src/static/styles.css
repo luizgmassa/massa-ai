@@ -492,20 +492,19 @@ pre code {
   font-size: 0.8rem;
 }
 
-/* T4 (APUX-06): horizontal-scroll wrapper for the registry grid — the Tool +
- * Tier leading columns plus per-profile columns can exceed the viewport
- * width at 7+ profiles. */
+/* T4 (APUX-06): horizontal-scroll wrapper for the registry grid — the Tool
+ * leading column plus per-profile columns can exceed the viewport width at
+ * 7+ profiles. */
 .grid-scroll {
   overflow-x: auto;
 }
 
-/* DS-03: Model Registry view */
+/* DS-03: Model Catalog view */
 .registry-grid {
   width: 100%;
   border-collapse: collapse;
 }
-.registry-grid .tool-cell,
-.registry-grid .tier-cell {
+.registry-grid .tool-cell {
   font-weight: 600;
   white-space: nowrap;
 }
@@ -596,32 +595,25 @@ pre code {
   gap: 0.5rem;
   margin-top: 0.4rem;
 }
+/* model-catalog-revamp AC4: the 1M-context checkbox on the Add/Edit Model
+ * form sits inline with its label instead of stacking, unlike every other
+ * `.registry-inline-form label` (block, text input on its own line). */
+.registry-inline-form label.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
 
-.registry-hostDefaults,
-.registry-workflowTiers {
+/* model-catalog-revamp AC4/AC6: Models CRUD table + Per-Agent Model Overrides table. */
+.registry-models,
+.registry-agent-overrides {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.75rem 1rem;
   margin: 0.75rem 0;
 }
-.registry-hostDefaults select,
-.registry-workflowTiers select {
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.2rem 0.4rem;
-}
-/* T6 (APUX-04): Per-Agent Tier Overrides table. */
-.registry-agentTiers {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
-  margin: 0.75rem 0;
-}
-.registry-agentTiers select {
+.registry-agent-overrides select {
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border);

@@ -26,14 +26,16 @@ const {
   handleLogsExport,
   handleProfileSwitch,
   handleProfilesTabSwitch,
-  handleRegistryCellEdit,
-  handleRegistryHostDefaultEdit,
-  handleRegistryAgentTierEdit,
-  handleRegistryWorkflowTierEdit,
+  handleRegistryHostCellEdit,
+  handleRegistryAgentCellEdit,
+  handleAgentOverridesProfileChange,
+  handleModelFormOpenAdd,
+  handleModelFormOpenEdit,
+  handleModelFormHostChange,
+  handleModelFormSubmit,
+  handleModelDelete,
   handleRegistryFormToggle,
   handleRegistryFormCancel,
-  handleRegistryWorkflowTierAdd,
-  handleRegistryWorkflowTierRemove,
   handleRegistryAddProfile,
   handleRegistryDuplicateProfile,
   handleRegistryDeleteProfile,
@@ -47,7 +49,6 @@ const {
   mergeRegistryForDisplay,
   renderProfilesView,
   renderModelRegistry,
-  joinModelId,
 } = { ...mod, ...UI } as {
   showBanner: (root: MockRoot, type: string, message: string, opts?: { persist?: boolean }) => MockElement;
   handleConfigSave: (ctx: any, section: string) => Promise<void>;
@@ -64,14 +65,16 @@ const {
   handleLogsExport: (ctx: any) => Promise<void>;
   handleProfileSwitch: (ctx: any, profile: string, host: string) => Promise<void>;
   handleProfilesTabSwitch: (ctx: any, tab: string) => void;
-  handleRegistryCellEdit: (ctx: any, profile: string, host: string, tier: string, field: string, value: string | null) => void;
-  handleRegistryHostDefaultEdit: (ctx: any, host: string, value: string) => void;
-  handleRegistryAgentTierEdit: (ctx: any, agent: string, host: string, value: string) => void;
-  handleRegistryWorkflowTierEdit: (ctx: any, workflow: string, value: string) => void;
+  handleRegistryHostCellEdit: (ctx: any, profile: string, host: string, field: string, value: string | null) => void;
+  handleRegistryAgentCellEdit: (ctx: any, profile: string, agent: string, host: string, field: string, value: string | null) => void;
+  handleAgentOverridesProfileChange: (ctx: any, profile: string) => void;
+  handleModelFormOpenAdd: (ctx: any) => void;
+  handleModelFormOpenEdit: (ctx: any, id: string) => void;
+  handleModelFormHostChange: (ctx: any, host: string) => void;
+  handleModelFormSubmit: (ctx: any, data: Record<string, unknown>) => void;
+  handleModelDelete: (ctx: any, id: string) => void;
   handleRegistryFormToggle: (ctx: any, kind: string) => void;
   handleRegistryFormCancel: (ctx: any) => void;
-  handleRegistryWorkflowTierAdd: (ctx: any, workflow?: string, tier?: string) => void;
-  handleRegistryWorkflowTierRemove: (ctx: any, workflow: string) => void;
   handleRegistryAddProfile: (ctx: any, name?: string, description?: string) => void;
   handleRegistryDuplicateProfile: (ctx: any, sourceName?: string, newName?: string) => void;
   handleRegistryDeleteProfile: (ctx: any, name?: string) => void;
@@ -85,7 +88,6 @@ const {
   mergeRegistryForDisplay: (serverData: any, overlay: any) => any;
   renderProfilesView: (profilesData: any, registryData: any, opts?: any) => string;
   renderModelRegistry: (data: any, opts?: any) => string;
-  joinModelId: (provider: string | null | undefined, model: string | null | undefined) => string | null;
 };
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
@@ -564,9 +566,8 @@ const SAMPLE_PROFILES_DATA = {
 };
 const SAMPLE_REGISTRY_DATA = {
   registry: {
-    version: 1, tiers: ["light", "standard", "deep"],
-    hostDefaults: { claude: "balanced" }, workflowTiers: {},
-    profiles: { balanced: { description: "b", hosts: { claude: { light: { model: "m", effort: "low" } } } } },
+    models: {},
+    profiles: { balanced: { description: "b", hosts: { claude: { model: "m", effort: "low" } } } },
   },
   source: { builtin: {}, overlay: null, tombstoned: [] },
 };
@@ -696,20 +697,20 @@ describe("handleProfileSwitch — confirm + POST + banner (PROFSW-01..04)", () =
   });
 });
 
-// ── Registry in-memory overlay state + CRUD (REGWIRE-01..06) ────────────────
+// ── Registry in-memory overlay state + CRUD (model-catalog-revamp T3) ───────
 
 const SAMPLE_OVERLAY_SOURCE = {
   registry: {
-    version: 1, tiers: ["light", "standard", "deep"],
-    hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
-    workflowTiers: { search: "standard" },
+    models: {
+      "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" },
+    },
     profiles: {
-      balanced: { description: "b", hosts: { claude: { light: { model: "m-l", effort: "low" }, standard: { model: "m-s", effort: "medium" }, deep: { model: "m-d", effort: "high" } } } },
+      balanced: { description: "b", hosts: { claude: { model: "m-s", effort: "medium" } } },
     },
   },
   source: {
-    builtin: {},
-    overlay: { profiles: { balanced: { description: "overlay b" } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] },
+    builtin: { models: { "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" } } },
+    overlay: { profiles: { balanced: { description: "overlay b" } } },
     tombstoned: ["old-profile"],
   },
 };
@@ -723,20 +724,19 @@ function makeRegistryCtx(overrides: Partial<any> = {}): any {
 }
 
 describe("initRegistryOverlay — lazy init with guard (F2 fold)", () => {
-  it("initializes registryOverlay from effective registry on first load", () => {
+  it("initializes registryOverlay from source.overlay on first load", () => {
     const ctx = makeRegistryCtx();
     initRegistryOverlay(ctx, SAMPLE_OVERLAY_SOURCE.registry, SAMPLE_OVERLAY_SOURCE.source);
     expect(ctx.state.registryOverlay).toBeDefined();
     expect(ctx.state.registryOverlay.profiles).toBeDefined();
     expect(ctx.state.registryOverlay.profiles.balanced).toBeDefined();
-    expect(ctx.state.registryOverlay.tiers).toEqual(["light", "standard", "deep"]);
+    expect(ctx.state.registryOverlay.models).toEqual({});
     expect(ctx.state.registryLoaded).toBe(true);
   });
 
   it("does NOT re-initialize when registryLoaded is already true (F2 fold)", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { custom: {} } }, registryDirty: true, registryLoaded: true } });
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { custom: {} }, models: {} }, registryDirty: true, registryLoaded: true } });
     initRegistryOverlay(ctx, SAMPLE_OVERLAY_SOURCE.registry, SAMPLE_OVERLAY_SOURCE.source);
-    // overlay should still be the custom one, not overwritten
     expect(ctx.state.registryOverlay.profiles.custom).toBeDefined();
     expect(ctx.state.registryDirty).toBe(true);
   });
@@ -746,14 +746,10 @@ describe("initRegistryOverlay — lazy init with guard (F2 fold)", () => {
     initRegistryOverlay(ctx, null, { overlay: null, tombstoned: [], builtin: {} });
     expect(ctx.state.registryOverlay).toBeDefined();
     expect(ctx.state.registryOverlay.profiles).toEqual({});
-    expect(ctx.state.registryOverlay.tiers).toEqual(["light", "standard", "deep"]);
+    expect(ctx.state.registryOverlay.models).toEqual({});
   });
 
   it("seeds ONLY from source.overlay, never from the effective registry (APCR-01.8)", () => {
-    // The effective (merged) registry carries a profile the overlay never mentions. A
-    // full-registry seed here is the exact F1 defect: it would write that builtin profile
-    // into the overlay file on the next save, freezing this operator against any future
-    // builtin change to it.
     const ctx = makeRegistryCtx();
     const registryWithBuiltinOnlyProfile = {
       ...SAMPLE_OVERLAY_SOURCE.registry,
@@ -764,114 +760,88 @@ describe("initRegistryOverlay — lazy init with guard (F2 fold)", () => {
     };
     initRegistryOverlay(ctx, registryWithBuiltinOnlyProfile, SAMPLE_OVERLAY_SOURCE.source);
     expect(ctx.state.registryOverlay.profiles.builtinOnly).toBeUndefined();
-    // The overlay's own profile is still seeded.
     expect(ctx.state.registryOverlay.profiles.balanced).toBeDefined();
   });
 });
 
 describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
-  it("returns server data when overlay has no profiles", () => {
+  it("returns server data when overlay has no profiles and no models", () => {
     const server = { registry: { profiles: { balanced: { hosts: {} } } }, source: {} };
     const result = mergeRegistryForDisplay(server, { profiles: {} });
     expect(result.registry.profiles.balanced).toBeDefined();
   });
 
   it("includes newly added overlay profile in display", () => {
-    const server = { registry: { profiles: { balanced: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} }, source: {} };
-    const overlay = { profiles: { balanced: { hosts: {} }, newprof: { description: "new", hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    const server = { registry: { profiles: { balanced: { hosts: {} } }, models: {} }, source: {} };
+    const overlay = { profiles: { balanced: { hosts: {} }, newprof: { description: "new", hosts: {} } }, models: {} };
     const result = mergeRegistryForDisplay(server, overlay);
     expect(result.registry.profiles.newprof).toBeDefined();
     expect(result.registry.profiles.balanced).toBeDefined();
   });
 
   it("hides tombstoned (deleted) profiles from display", () => {
-    const server = { registry: { profiles: { balanced: { hosts: {} }, old: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} }, source: {} };
-    const overlay = { profiles: { balanced: { hosts: {} }, old: { _delete: true, hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    const server = { registry: { profiles: { balanced: { hosts: {} }, old: { hosts: {} } }, models: {} }, source: {} };
+    const overlay = { profiles: { balanced: { hosts: {} }, old: { _delete: true, hosts: {} } }, models: {} };
     const result = mergeRegistryForDisplay(server, overlay);
     expect(result.registry.profiles.old).toBeUndefined();
     expect(result.registry.profiles.balanced).toBeDefined();
   });
 
-  it("uses overlay tiers/hostDefaults/workflowTiers", () => {
-    const server = { registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: { claude: "p" }, workflowTiers: {} }, source: {} };
-    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: { claude: "p", codex: "p" }, workflowTiers: { search: "deep" }, tiers: ["light", "standard", "deep"] };
-    const result = mergeRegistryForDisplay(server, overlay);
-    expect(result.registry.tiers).toEqual(["light", "standard", "deep"]);
-    expect(result.registry.hostDefaults.codex).toBe("p");
-    expect(result.registry.workflowTiers.search).toBe("deep");
-  });
-
-  it("does not blank hostDefaults/workflowTiers when the overlay-only seed carries empty objects (APCR-01.8 / APCR-11.4)", () => {
-    // With initRegistryOverlay now seeding from source.overlay only, an overlay with no
-    // saved hostDefaults/workflowTiers edits arrives here as {} — truthy. A `||` fallback
-    // on that object blanks the server's map instead of retaining it.
+  it("merges models as a flat map: overlay replaces whole entry, null tombstones it", () => {
     const server = {
       registry: {
         profiles: { p: { hosts: {} } },
-        tiers: ["light", "standard", "deep"],
-        hostDefaults: { claude: "p", codex: "p" },
-        workflowTiers: { search: "deep" },
+        models: {
+          "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" },
+          "claude-opus-5-5": { name: "Opus 5.5", host: "claude", provider: "", model: "claude-opus-5-5" },
+        },
       },
       source: {},
     };
-    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: [] };
+    const overlay = {
+      profiles: { p: { hosts: {} } },
+      models: {
+        "claude-sonnet-5": { name: "Sonnet 5 (renamed)", host: "claude", provider: "", model: "claude-sonnet-5" },
+        "claude-opus-5-5": null,
+        "codex-gpt-5": { name: "GPT-5", host: "codex", provider: "", model: "gpt-5" },
+      },
+    };
     const result = mergeRegistryForDisplay(server, overlay);
-    expect(result.registry.hostDefaults.claude).toBe("p");
-    expect(result.registry.hostDefaults.codex).toBe("p");
-    expect(result.registry.workflowTiers.search).toBe("deep");
-    expect(result.registry.tiers).toEqual(["light", "standard", "deep"]);
+    expect(result.registry.models["claude-sonnet-5"].name).toBe("Sonnet 5 (renamed)");
+    expect(result.registry.models["claude-opus-5-5"]).toBeUndefined();
+    expect(result.registry.models["codex-gpt-5"].name).toBe("GPT-5");
   });
 
-  it("hides a null-tombstoned workflowTiers key from the display merge", () => {
-    const server = { registry: { profiles: {}, tiers: ["light"], hostDefaults: {}, workflowTiers: { search: "deep" } }, source: {} };
-    const overlay = { profiles: {}, hostDefaults: {}, workflowTiers: { search: null }, tiers: ["light"] };
+  it("does not blank the models map when the overlay-only seed carries an empty object (APCR-01.8 / APCR-11.4)", () => {
+    const server = { registry: { profiles: { p: { hosts: {} } }, models: { "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" } } }, source: {} };
+    const overlay = { profiles: { p: { hosts: {} } }, models: {} };
     const result = mergeRegistryForDisplay(server, overlay);
-    expect(result.registry.workflowTiers.search).toBeUndefined();
+    expect(result.registry.models["claude-sonnet-5"]).toBeDefined();
   });
 
   it("carries overlayOverrideCount through the display merge (APCR-01.10)", () => {
-    // The count is server-computed from the saved overlay, not the in-memory display merge —
-    // it must survive both the "overlay has no profiles, return serverData as-is" branch and
-    // the "build a fresh {registry, source}" branch that previously dropped it.
-    const server = { registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} }, source: {}, overlayOverrideCount: 5 };
-    const noProfilesOverlay = { profiles: {} };
+    const server = { registry: { profiles: { p: { hosts: {} } }, models: {} }, source: {}, overlayOverrideCount: 5 };
+    const noProfilesOverlay = { profiles: {}, models: {} };
     expect(mergeRegistryForDisplay(server, noProfilesOverlay).overlayOverrideCount).toBe(5);
 
-    const withProfilesOverlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    const withProfilesOverlay = { profiles: { p: { hosts: {} } }, models: {} };
     expect(mergeRegistryForDisplay(server, withProfilesOverlay).overlayOverrideCount).toBe(5);
   });
 
   it("defaults overlayOverrideCount to 0 when the server data omits it", () => {
-    const server = { registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} }, source: {} };
-    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    const server = { registry: { profiles: { p: { hosts: {} } }, models: {} }, source: {} };
+    const overlay = { profiles: { p: { hosts: {} } }, models: {} };
     expect(mergeRegistryForDisplay(server, overlay).overlayOverrideCount).toBe(0);
   });
 
   it("carries overlayOverrideBreakdown through the display merge (WUT-17, T46)", () => {
-    // T46: the rebuild branch (overlay.profiles present, e.g. an initialized overlay — which
-    // initRegistryOverlay always produces, APCR-01) previously listed overlayOverrideCount,
-    // agents and agentsError as survivors and left overlayOverrideBreakdown off the list — the
-    // exact field WUT-17 added to the server payload. The count line then names its categories
-    // on first paint and reverts to the unnamed sentence on every render after.
-    const breakdown = { hostDefaults: 1, workflowTiers: 0, agentTiers: 2, tiers: 0, profiles: 1 };
-    const server = {
-      registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
-      source: {},
-      overlayOverrideCount: 4,
-      overlayOverrideBreakdown: breakdown,
-    };
-    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    const breakdown = { models: 1, profiles: 2 };
+    const server = { registry: { profiles: { p: { hosts: {} } }, models: {} }, source: {}, overlayOverrideCount: 3, overlayOverrideBreakdown: breakdown };
+    const overlay = { profiles: { p: { hosts: {} } }, models: {} };
     expect(mergeRegistryForDisplay(server, overlay).overlayOverrideBreakdown).toEqual(breakdown);
   });
 
   it("class-level guard: every server-computed passthrough key survives the rebuild branch (T46)", () => {
-    // Driven by the enumerated, type-checked SERVER_COMPUTED_PASSTHROUGH_KEYS (registry-state.ts)
-    // rather than one assertion per field — a field named in RegistryServerData and forgotten in
-    // mergeRegistryForDisplay's return object fails `bun run type-check` (the list is typed
-    // `Exclude<keyof RegistryServerData, "registry">`, checked complete against the interface at
-    // compile time) as well as this runtime pass, instead of degrading silently in the browser
-    // the way overlayOverrideBreakdown did. `registry` is deliberately excluded: the rebuild
-    // branch legitimately transforms it via merge rather than passing it through.
     expect(SERVER_COMPUTED_PASSTHROUGH_KEYS.length).toBe(5);
     expect((SERVER_COMPUTED_PASSTHROUGH_KEYS as readonly string[]).slice().sort()).toEqual(
       ["agents", "agentsError", "overlayOverrideBreakdown", "overlayOverrideCount", "source"].sort(),
@@ -880,17 +850,15 @@ describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
     const sentinels: Record<string, unknown> = {
       source: { overlay: { profiles: {} }, tombstoned: ["sentinel-source"] },
       overlayOverrideCount: 7,
-      overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 1, agentTiers: 1, tiers: 1, profiles: 3 },
-      agents: [{ name: "sentinel-agent", charterTier: "deep" }],
+      overlayOverrideBreakdown: { models: 1, profiles: 3 },
+      agents: [{ name: "sentinel-agent" }],
       agentsError: "sentinel-agents-error",
     };
     const server: Record<string, unknown> = {
-      registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
+      registry: { profiles: { p: { hosts: {} } }, models: {} },
       ...sentinels,
     };
-    // overlay.profiles non-empty forces the rebuild branch (the early return only fires when
-    // overlay or overlay.profiles is falsy — unreachable once initRegistryOverlay has run).
-    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    const overlay = { profiles: { p: { hosts: {} } }, models: {} };
     const result = mergeRegistryForDisplay(server, overlay) as Record<string, unknown>;
 
     for (const key of SERVER_COMPUTED_PASSTHROUGH_KEYS) {
@@ -898,11 +866,11 @@ describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
     }
   });
 
-  // ── Profiles merge as a DELTA, per host and per tier ──────────────────────
-  // Every case above uses `hosts: {}` on both sides, where whole-object replace and
-  // deep merge are indistinguishable. These use a real single-host delta — the shape an
-  // operator's saved overlay actually has after editing one host — which is what made the
-  // claude/codex cells render "—" and become uneditable.
+  // ── Profile host/agent leaves merge as a whole-cell replace ───────────────
+  // Every case above uses `hosts: {}`, where whole-object replace and deep merge are
+  // indistinguishable. These exercise a real single-host delta the way an operator's saved
+  // overlay actually looks after editing one host — which is what made the claude/codex
+  // cells render "—" and become uneditable under the old (tier-nested) shape.
 
   it("retains hosts the overlay profile does not mention (single-host delta)", () => {
     const server = {
@@ -911,117 +879,112 @@ describe("mergeRegistryForDisplay — server + in-memory overlay merge", () => {
           balanced: {
             description: "Default.",
             hosts: {
-              claude: { light: { model: "haiku", effort: "high" }, standard: { model: "sonnet", effort: "high" } },
-              codex: { light: { model: "gpt-5.4-mini", effort: "high" }, standard: { model: "gpt-5.6-terra", effort: "high" } },
-              opencode: { light: { model: "opencode-go/deepseek-v4-pro", effort: "max" }, standard: { model: "opencode-go/glm-5.2", effort: "max" } },
+              claude: { model: "haiku", effort: "high" },
+              codex: { model: "gpt-5.4-mini", effort: "high" },
+              opencode: { model: "opencode-go/deepseek-v4-pro", effort: "max" },
             },
           },
         },
-        tiers: ["light", "standard"],
-        hostDefaults: {},
-        workflowTiers: {},
+        models: {},
+      },
+      source: {},
+    };
+    const overlay = {
+      profiles: { balanced: { hosts: { opencode: { model: "ollama-cloud/deepseek-v4-pro", effort: "max" } } } },
+      models: {},
+    };
+    const hosts = mergeRegistryForDisplay(server, overlay).registry.profiles.balanced.hosts;
+    expect(hosts.opencode.model).toBe("ollama-cloud/deepseek-v4-pro");
+    expect(hosts.claude.model).toBe("haiku");
+    expect(hosts.codex.model).toBe("gpt-5.4-mini");
+    expect(Object.keys(hosts).sort()).toEqual(["claude", "codex", "opencode"]);
+  });
+
+  it("a null host leaf tombstones that host entirely (removed from the merged profile)", () => {
+    const server = { registry: { profiles: { balanced: { hosts: { claude: { model: "haiku", effort: "high" } } } }, models: {} }, source: {} };
+    const overlay = { profiles: { balanced: { hosts: { claude: null } } }, models: {} };
+    const hosts = mergeRegistryForDisplay(server, overlay).registry.profiles.balanced.hosts;
+    expect(hosts.claude).toBeUndefined();
+  });
+
+  it("merges per-agent overrides as a two-level leaf: whole-agent null tombstone, per-host null tombstone", () => {
+    const server = {
+      registry: {
+        profiles: {
+          balanced: {
+            hosts: {},
+            agents: {
+              builder: { claude: { model: "sonnet", effort: "high" }, opencode: { model: "sonnet", effort: "high" } },
+              navigator: { claude: { model: "haiku", effort: "low" } },
+            },
+          },
+        },
+        models: {},
       },
       source: {},
     };
     const overlay = {
       profiles: {
         balanced: {
-          hosts: {
-            opencode: { light: { model: "ollama-cloud/deepseek-v4-pro", effort: "max" }, standard: { model: "ollama-cloud/glm-5.2", effort: "max" } },
+          agents: {
+            builder: { opencode: { model: "opus", effort: "max" } },
+            navigator: null,
+            reviewer: { claude: { model: "opus", effort: "max" } },
           },
         },
       },
-      hostDefaults: {},
-      workflowTiers: {},
-      tiers: ["light", "standard"],
+      models: {},
     };
-    const hosts = mergeRegistryForDisplay(server, overlay).registry.profiles.balanced.hosts;
-    // The edited host takes the overlay's values...
-    expect(hosts.opencode.standard.model).toBe("ollama-cloud/glm-5.2");
-    // ...and every unmentioned host survives, rather than rendering as an empty cell.
-    expect(hosts.claude.standard.model).toBe("sonnet");
-    expect(hosts.claude.light.model).toBe("haiku");
-    expect(hosts.codex.standard.model).toBe("gpt-5.6-terra");
-    expect(Object.keys(hosts).sort()).toEqual(["claude", "codex", "opencode"]);
+    const agents = mergeRegistryForDisplay(server, overlay).registry.profiles.balanced.agents;
+    expect(agents.builder.claude.model).toBe("sonnet");
+    expect(agents.builder.opencode.model).toBe("opus");
+    expect(agents.navigator).toBeUndefined();
+    expect(agents.reviewer.claude.model).toBe("opus");
   });
 
-  it("retains tiers the overlay's host map does not mention (single-tier delta)", () => {
-    const server = {
-      registry: {
-        profiles: {
-          balanced: {
-            hosts: { claude: { light: { model: "haiku", effort: "high" }, standard: { model: "sonnet", effort: "high" }, deep: { model: "opus", effort: "high" } } },
-          },
-        },
-        tiers: ["light", "standard", "deep"],
-        hostDefaults: {},
-        workflowTiers: {},
-      },
-      source: {},
+  it("reproduces the documented agent-overrides-parity fixture's expected merged cells", () => {
+    const fixturePath = path.join(import.meta.dir, "fixtures", "agent-overrides-parity.json");
+    const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8")) as {
+      builtinAgentCells: Record<string, Record<string, { model: string; effort: string }>>;
+      overlayAgentCells: Record<string, Record<string, { model: string; effort: string } | null> | null>;
+      expectedMergedAgentCells: Record<string, Record<string, { model: string; effort: string }>>;
     };
-    const overlay = {
-      profiles: { balanced: { hosts: { claude: { standard: { model: "sonnet-next", effort: "low" } } } } },
-      hostDefaults: {},
-      workflowTiers: {},
-      tiers: ["light", "standard", "deep"],
-    };
-    const claude = mergeRegistryForDisplay(server, overlay).registry.profiles.balanced.hosts.claude;
-    expect(claude.standard).toEqual({ model: "sonnet-next", effort: "low" });
-    expect(claude.light).toEqual({ model: "haiku", effort: "high" });
-    expect(claude.deep).toEqual({ model: "opus", effort: "high" });
+    const server = { registry: { profiles: { p: { hosts: {}, agents: fixture.builtinAgentCells } }, models: {} }, source: {} };
+    const overlay = { profiles: { p: { agents: fixture.overlayAgentCells } }, models: {} };
+    const agents = mergeRegistryForDisplay(server, overlay).registry.profiles.p.agents;
+    expect(agents).toEqual(fixture.expectedMergedAgentCells);
   });
 
   it("retains the server description when the overlay profile omits it", () => {
-    const server = {
-      registry: { profiles: { balanced: { description: "Default.", hosts: { claude: { light: { model: "haiku", effort: "high" } } } } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
-      source: {},
-    };
-    const overlay = { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] };
+    const server = { registry: { profiles: { balanced: { description: "Default.", hosts: { claude: { model: "haiku", effort: "high" } } } }, models: {} }, source: {} };
+    const overlay = { profiles: { balanced: { hosts: {} } }, models: {} };
     expect(mergeRegistryForDisplay(server, overlay).registry.profiles.balanced.description).toBe("Default.");
   });
 
   it("passes an overlay-only profile through unchanged, minus its _delete flag", () => {
-    const server = { registry: { profiles: { balanced: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} }, source: {} };
-    const overlay = {
-      profiles: { newprof: { description: "new", hosts: { claude: { light: { model: "haiku", effort: "high" } } } } },
-      hostDefaults: {},
-      workflowTiers: {},
-      tiers: ["light"],
-    };
+    const server = { registry: { profiles: { balanced: { hosts: {} } }, models: {} }, source: {} };
+    const overlay = { profiles: { newprof: { description: "new", hosts: { claude: { model: "haiku", effort: "high" } } } }, models: {} };
     const newprof = mergeRegistryForDisplay(server, overlay).registry.profiles.newprof;
-    expect(newprof.hosts.claude.light.model).toBe("haiku");
+    expect(newprof.hosts.claude.model).toBe("haiku");
     expect(newprof.description).toBe("new");
     expect("_delete" in newprof).toBe(false);
   });
 
   it("does not mutate the server data it was handed", () => {
-    const server = {
-      registry: { profiles: { balanced: { hosts: { claude: { light: { model: "haiku", effort: "high" } } } } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {} },
-      source: {},
-    };
-    const overlay = {
-      profiles: { balanced: { hosts: { claude: { light: { model: "opus", effort: "low" } } } } },
-      hostDefaults: {},
-      workflowTiers: {},
-      tiers: ["light"],
-    };
+    const server = { registry: { profiles: { balanced: { hosts: { claude: { model: "haiku", effort: "high" } } } }, models: {} }, source: {} };
+    const overlay = { profiles: { balanced: { hosts: { claude: { model: "opus", effort: "low" } } } }, models: {} };
     mergeRegistryForDisplay(server, overlay);
-    expect(server.registry.profiles.balanced.hosts.claude.light.model).toBe("haiku");
+    expect(server.registry.profiles.balanced.hosts.claude.model).toBe("haiku");
   });
 });
 
 describe("renderModelRegistry — overlay override count display (APCR-01.10)", () => {
   const minimalRegistry = {
-    registry: {
-      profiles: { p: { description: "P", hosts: {} } },
-      tiers: ["light"],
-      hostDefaults: {},
-      workflowTiers: {},
-    },
+    registry: { profiles: { p: { description: "P", hosts: {} } }, models: {} },
     source: { overlay: null, tombstoned: [] },
   };
 
-  it("renders a compact override-count line when the count is greater than 0 (T9: Nomenclature Map sentence)", () => {
+  it("renders a compact override-count line when the count is greater than 0", () => {
     const html = renderModelRegistry({ ...minimalRegistry, overlayOverrideCount: 3 }, { writeMode: false });
     expect(html).toContain("You have 3 custom overrides of the built-in defaults.");
   });
@@ -1041,335 +1004,354 @@ describe("renderModelRegistry — overlay override count display (APCR-01.10)", 
     expect(html).not.toContain("registry-override-count");
   });
 
-  it("never reports a non-zero count with nothing on screen carrying an override marker (WUT-17 AC3 — the reported bug)", () => {
-    // Reproduces the exact defect: the only surviving override lives in hostDefaults, not
-    // overlay.profiles, so the old renderer (profile-column badge only) showed "1 custom
-    // override" with zero badges and zero category names anywhere on the tab.
+  it("names the models category when the only surviving override is a catalog model (WUT-17 AC3-equivalent)", () => {
     const html = renderModelRegistry(
       {
         ...minimalRegistry,
-        registry: { ...minimalRegistry.registry, hostDefaults: { claude: "p" } },
-        source: { overlay: { hostDefaults: { claude: "p" } }, tombstoned: [] },
         overlayOverrideCount: 1,
-        overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 0, agentTiers: 0, tiers: 0, profiles: 0 },
+        overlayOverrideBreakdown: { models: 1, profiles: 0 },
       },
       { writeMode: false },
     );
-    // "Default Profile per Tool" is also the section's static <h3>, present on every
-    // render regardless of this fix — anchoring on the count line's own text (not the
-    // whole page) is what keeps this discriminating rather than vacuously true.
     const overrideLineMatch = html.match(/<p class="registry-override-count muted">([^<]*)<\/p>/);
-    const overrideLineText = overrideLineMatch ? overrideLineMatch[1] : "";
-    const hasOverlayBadge = html.includes("overlay-badge");
-    const hasNamedCategoryInLine = overrideLineText.includes("Default Profile per Tool");
-    expect(hasOverlayBadge || hasNamedCategoryInLine).toBe(true);
+    expect(overrideLineMatch?.[1]).toContain("Models");
   });
 });
 
-describe("renderModelRegistry — help guide explains Default Profile per Tool vs. the actually-installed profile (T9 nomenclature)", () => {
-  const minimalRegistry = {
-    registry: {
-      profiles: { p: { description: "P", hosts: {} } },
-      tiers: ["light"],
-      hostDefaults: {},
-      workflowTiers: {},
+// ── Profile grid cell edits (whole-cell leaf replace, model-catalog-revamp T3) ──
+
+describe("handleRegistryHostCellEdit — in-memory cell edit preserves the sibling field", () => {
+  it("initializes registryOverlay.profiles[profile].hosts[host] on first edit", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryHostCellEdit(ctx, "balanced", "claude", "model", "sonnet");
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.model).toBe("sonnet");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("editing effort alone does not blank a model already set by the server (whole-cell leaf, not field-only write)", () => {
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: {}, models: {} },
+        registryDirty: false,
+        registryLoaded: true,
+        registryServerData: { registry: { profiles: { balanced: { hosts: { claude: { model: "haiku", effort: "low" } } } }, models: {} }, source: {} },
+      },
+    });
+    handleRegistryHostCellEdit(ctx, "balanced", "claude", "effort", "high");
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude).toEqual({ model: "haiku", effort: "high" });
+  });
+
+  it("editing model alone does not blank an effort already set by the server", () => {
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: {}, models: {} },
+        registryDirty: false,
+        registryLoaded: true,
+        registryServerData: { registry: { profiles: { balanced: { hosts: { claude: { model: "haiku", effort: "low" } } } }, models: {} }, source: {} },
+      },
+    });
+    handleRegistryHostCellEdit(ctx, "balanced", "claude", "model", "opencode-go/glm-5.2");
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude).toEqual({ model: "opencode-go/glm-5.2", effort: "low" });
+  });
+
+  it("selecting Inherit (empty value) sets model to null, not an empty string", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryHostCellEdit(ctx, "balanced", "claude", "model", "");
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.model).toBeNull();
+  });
+});
+
+describe("handleRegistryAgentCellEdit — per-agent override edit (AC6)", () => {
+  it("initializes registryOverlay.profiles[profile].agents[agent][host] on first edit", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentCellEdit(ctx, "balanced", "builder", "opencode", "model", "opencode-go/glm-5.2");
+    expect(ctx.state.registryOverlay.profiles.balanced.agents.builder.opencode.model).toBe("opencode-go/glm-5.2");
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it('picking "Profile default" (empty model value) writes an explicit null tombstone, not a deleted key', () => {
+    // A built-in profile can already carry a real override for this agent (D1) — an absent
+    // overlay key would inherit that built-in override rather than resetting to the profile
+    // default, so the reset must be a written `null` leaf.
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true } });
+    handleRegistryAgentCellEdit(ctx, "balanced", "builder", "opencode", "model", "");
+    expect(ctx.state.registryOverlay.profiles.balanced.agents.builder.opencode).toBeNull();
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("editing effort alone does not blank a model already set by the server", () => {
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: {}, models: {} },
+        registryDirty: false,
+        registryLoaded: true,
+        registryServerData: { registry: { profiles: { balanced: { hosts: {}, agents: { builder: { opencode: { model: "sonnet", effort: "high" } } } } }, models: {} }, source: {} },
+      },
+    });
+    handleRegistryAgentCellEdit(ctx, "balanced", "builder", "opencode", "effort", "max");
+    expect(ctx.state.registryOverlay.profiles.balanced.agents.builder.opencode).toEqual({ model: "sonnet", effort: "max" });
+  });
+});
+
+describe("handleAgentOverridesProfileChange — selects the profile shown in the Per-Agent table", () => {
+  it("sets state.agentOverridesProfile and re-renders", () => {
+    const render = mock(() => {});
+    const ctx = makeRegistryCtx({ render, state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true } });
+    handleAgentOverridesProfileChange(ctx, "work");
+    expect(ctx.state.agentOverridesProfile).toBe("work");
+    expect(render).toHaveBeenCalled();
+  });
+});
+
+// ── Models CRUD (AC4) ────────────────────────────────────────────────────────
+
+const MODELS_SERVER_DATA = {
+  registry: {
+    models: {
+      "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" },
     },
-    source: { overlay: null, tombstoned: [] },
-  };
+    profiles: {
+      balanced: {
+        description: "b",
+        hosts: { claude: { model: "claude-sonnet-5", effort: "medium" } },
+        agents: { builder: { claude: { model: "claude-sonnet-5", effort: "high" } } },
+      },
+      work: { description: "w", hosts: { claude: { model: "claude-sonnet-5", effort: "high" } } },
+    },
+  },
+  source: { builtin: { models: { "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" } } }, overlay: null, tombstoned: [] },
+};
 
-  it("adds a Default Profile per Tool dt/dd pair distinguishing it from the currently-installed profile", () => {
-    const html = renderModelRegistry(minimalRegistry, { writeMode: false });
-    expect(html).toContain("<dt>Default Profile per Tool</dt>");
-    expect(html.toLowerCase()).toContain("not</strong> the profile currently installed");
-    expect(html).toContain("Active Profile");
-    expect(html).not.toContain("Host Defaults");
-    expect(html).not.toContain("Switch Profile");
+function makeModelsCtx(stateOverrides: Partial<any> = {}): any {
+  return makeRegistryCtx({
+    state: {
+      registryOverlay: { profiles: {}, models: {} },
+      registryDirty: false,
+      registryLoaded: true,
+      registryForm: null,
+      registryServerData: JSON.parse(JSON.stringify(MODELS_SERVER_DATA)),
+      ...stateOverrides,
+    },
+  });
+}
+
+describe("handleModelFormOpenAdd / handleModelFormOpenEdit / handleModelFormHostChange", () => {
+  it("opens a blank add form defaulting Tool to claude, and toggles closed on a second click", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenAdd(ctx);
+    expect(ctx.state.registryForm).toEqual({ kind: "model-add", host: "claude", name: "", provider: "", model: "", context1m: false, error: null });
+    handleModelFormOpenAdd(ctx);
+    expect(ctx.state.registryForm).toBeNull();
+  });
+
+  it("opens an edit form prefilled from the model being edited", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenEdit(ctx, "claude-sonnet-5");
+    expect(ctx.state.registryForm).toMatchObject({ kind: "model-edit", editId: "claude-sonnet-5", host: "claude", name: "Sonnet 5", model: "claude-sonnet-5" });
+  });
+
+  it("does nothing when the model id is not found", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenEdit(ctx, "nonexistent");
+    expect(ctx.state.registryForm).toBeNull();
+  });
+
+  it("host-change updates only the form's host field, live, without discarding the open form", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenAdd(ctx);
+    handleModelFormHostChange(ctx, "codex");
+    expect(ctx.state.registryForm?.host).toBe("codex");
+    expect(ctx.state.registryForm?.kind).toBe("model-add");
   });
 });
 
-describe("handleRegistryCellEdit — in-memory cell edit (REGWIRE-01)", () => {
-  it("updates model field in overlay + sets dirty", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "m-l", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
-    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "model", "new-model");
-    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.model).toBe("new-model");
+describe("handleModelFormSubmit — Add Model (AC4)", () => {
+  it("adds a new catalog entry under a slugified, unique id", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenAdd(ctx);
+    handleModelFormSubmit(ctx, { name: "Opus 5.5", host: "claude", provider: "", model: "claude-opus-5-5", context1m: false });
+    const models = ctx.state.registryOverlay.models;
+    const id = Object.keys(models).find((k) => models[k].name === "Opus 5.5");
+    expect(id).toBeDefined();
+    expect(models[id!]).toEqual({ name: "Opus 5.5", host: "claude", provider: "", model: "claude-opus-5-5", context1m: false });
+    expect(ctx.state.registryForm).toBeNull();
     expect(ctx.state.registryDirty).toBe(true);
   });
 
-  it("updates effort field in overlay + sets dirty", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "m-l", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
-    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "effort", "high");
-    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.effort).toBe("high");
-    expect(ctx.state.registryDirty).toBe(true);
+  it("de-duplicates a slug collision by appending -2", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenAdd(ctx);
+    handleModelFormSubmit(ctx, { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5-b", context1m: false });
+    expect(Object.keys(ctx.state.registryOverlay.models)).toContain("claude-sonnet-5-2");
   });
 
-  it("create-on-demand path leaves description absent, not stamped with the profile key (APCR-11.6)", () => {
-    // A profile the overlay has never touched (e.g. builtin-only) - the first cell edit
-    // must NOT write `description: profile`. The server's mergeProfile() only inherits the
-    // builtin description when the overlay's own is `undefined`; a stamped key permanently
-    // overwrites the real description on the next save.
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true } });
-    handleRegistryCellEdit(ctx, "builtin-only", "claude", "light", "model", "new-model");
-    expect(ctx.state.registryOverlay.profiles["builtin-only"].hosts.claude.light.model).toBe("new-model");
-    expect(ctx.state.registryOverlay.profiles["builtin-only"].description).toBeUndefined();
-    expect(Object.prototype.hasOwnProperty.call(ctx.state.registryOverlay.profiles["builtin-only"], "description")).toBe(false);
+  it("the 1M checkbox appends [1m] to the resolved string, and only for Claude", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenAdd(ctx);
+    handleModelFormSubmit(ctx, { name: "Fable (1M)", host: "claude", provider: "", model: "claude-fable-5-1", context1m: true });
+    const models = ctx.state.registryOverlay.models;
+    const id = Object.keys(models).find((k) => models[k].name === "Fable (1M)");
+    expect(models[id!].context1m).toBe(true);
+
+    const ctx2 = makeModelsCtx();
+    handleModelFormOpenAdd(ctx2);
+    // context1m: true is IGNORED for a non-claude host — the server rejects it (D2), and the
+    // checkbox is not even rendered for this host, so the submit path must not trust it either.
+    handleModelFormSubmit(ctx2, { name: "GPT-5", host: "codex", provider: "", model: "gpt-5", context1m: true });
+    const models2 = ctx2.state.registryOverlay.models;
+    const id2 = Object.keys(models2).find((k) => models2[k].name === "GPT-5");
+    expect(models2[id2!].context1m).toBe(false);
   });
 
-  // ── Provider/Model split-join (T5, APUX-14, P1-B AC2-AC5) ──────────────────
-  // The DOM change listener (wireViewHandlers) reads both sibling Provider/Model
-  // inputs, joins via `joinModelId`, and routes through this same handler with
-  // field "model" — these tests exercise that join contract directly.
+  it("rejects a blank Name/Tool/Model with an inline form error, not alert()", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenAdd(ctx);
+    handleModelFormSubmit(ctx, { name: "", host: "claude", provider: "", model: "x" });
+    expect(ctx.state.registryForm?.error).toContain("Name");
+    expect(ctx.state.registryDirty).toBe(false);
 
-  it("stores the joined provider/model string produced by joinModelId (T5)", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { opencode: { standard: { model: "old", effort: "medium" } } } } } }, registryDirty: false, registryLoaded: true } });
-    const joined = joinModelId("opencode-go", "glm-5.2");
-    handleRegistryCellEdit(ctx, "balanced", "opencode", "standard", "model", joined);
-    expect(ctx.state.registryOverlay.profiles.balanced.hosts.opencode.standard.model).toBe("opencode-go/glm-5.2");
-    expect(ctx.state.registryDirty).toBe(true);
+    const ctx2 = makeModelsCtx();
+    handleModelFormOpenAdd(ctx2);
+    handleModelFormSubmit(ctx2, { name: "X", host: "claude", provider: "", model: "" });
+    expect(ctx2.state.registryForm?.error).toContain("Model");
   });
 
-  it("stores a bare model string when provider is blank", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "old", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
-    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "model", joinModelId("", "sonnet"));
-    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.model).toBe("sonnet");
-  });
-
-  it("stores null (inherit) when both provider and model are blank", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: { balanced: { hosts: { claude: { light: { model: "old", effort: "low" } } } } } }, registryDirty: false, registryLoaded: true } });
-    handleRegistryCellEdit(ctx, "balanced", "claude", "light", "model", joinModelId("", ""));
-    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.light.model).toBeNull();
+  it("does nothing when there is no open model form", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormSubmit(ctx, { name: "X", host: "claude", model: "x" });
+    expect(ctx.state.registryOverlay.models).toEqual({});
   });
 });
 
-describe("handleRegistryHostDefaultEdit — hostDefaults edit (REGWIRE-02)", () => {
-  it("updates hostDefault in overlay + sets dirty", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, hostDefaults: { claude: "balanced" } }, registryDirty: false, registryLoaded: true } });
-    handleRegistryHostDefaultEdit(ctx, "claude", "work");
-    expect(ctx.state.registryOverlay.hostDefaults.claude).toBe("work");
-    expect(ctx.state.registryDirty).toBe(true);
+describe("handleModelFormSubmit — Edit Model rewrites matching cells (D4, AC4)", () => {
+  it("rewrites the profile-grid cell and the per-agent override whose old resolved string matches, for the same host", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenEdit(ctx, "claude-sonnet-5");
+    handleModelFormSubmit(ctx, { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5-next", context1m: false });
+
+    expect(ctx.state.registryOverlay.models["claude-sonnet-5"]).toEqual({ name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5-next", context1m: false });
+    // balanced/claude and work/claude both held "claude-sonnet-5" — both rewritten.
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.model).toBe("claude-sonnet-5-next");
+    expect(ctx.state.registryOverlay.profiles.work.hosts.claude.model).toBe("claude-sonnet-5-next");
+    // The per-agent override on balanced/builder/claude also held it.
+    expect(ctx.state.registryOverlay.profiles.balanced.agents.builder.claude.model).toBe("claude-sonnet-5-next");
+  });
+
+  it("rewrites only cells for the SAME host as the edited model — a same-string cell on a different host is untouched", () => {
+    const ctx = makeModelsCtx({
+      registryServerData: {
+        registry: {
+          models: { "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" } },
+          profiles: {
+            balanced: {
+              description: "b",
+              hosts: {
+                claude: { model: "claude-sonnet-5", effort: "medium" },
+                // Coincidentally the same literal string, but on a DIFFERENT host — must
+                // survive the edit untouched (rewriteMatchingModelCells is host-scoped).
+                codex: { model: "claude-sonnet-5", effort: "medium" },
+              },
+            },
+          },
+        },
+        source: { builtin: { models: { "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" } } }, overlay: null, tombstoned: [] },
+      },
+    });
+    handleModelFormOpenEdit(ctx, "claude-sonnet-5");
+    handleModelFormSubmit(ctx, { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5-next", context1m: false });
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.claude.model).toBe("claude-sonnet-5-next");
+    expect(ctx.state.registryOverlay.profiles.balanced.hosts.codex).toBeUndefined();
+  });
+
+  it("does not touch cells whose resolved string does not match the model's old value", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenEdit(ctx, "claude-sonnet-5");
+    handleModelFormSubmit(ctx, { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5-next", context1m: false });
+    // work profile's own cell held the same string and WAS rewritten above; a cell holding
+    // an unrelated string must not appear in the overlay at all.
+    expect(ctx.state.registryOverlay.profiles.work.hosts.cursor).toBeUndefined();
+  });
+
+  it("no-ops the rewrite when the resolved string is unchanged (e.g. renaming display name only)", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenEdit(ctx, "claude-sonnet-5");
+    handleModelFormSubmit(ctx, { name: "Sonnet 5 (renamed)", host: "claude", provider: "", model: "claude-sonnet-5", context1m: false });
+    expect(ctx.state.registryOverlay.models["claude-sonnet-5"].name).toBe("Sonnet 5 (renamed)");
+    expect(ctx.state.registryOverlay.profiles.balanced?.hosts?.claude).toBeUndefined();
   });
 });
 
-describe("handleRegistryAgentTierEdit — Per-Agent Tier Overrides edit (T6, APUX-04, P1-A AC8)", () => {
-  it("sets an override for a new agent + sets dirty", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: {} }, registryDirty: false, registryLoaded: true } });
-    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "deep");
-    expect(ctx.state.registryOverlay.agentTiers.builder.opencode).toBe("deep");
+describe("handleModelDelete — tombstone builtin, drop user-added, leave cells as custom (D4, AC4)", () => {
+  it("tombstones a builtin model with an explicit null", () => {
+    const ctx = makeModelsCtx();
+    handleModelDelete(ctx, "claude-sonnet-5");
+    expect(ctx.state.registryOverlay.models["claude-sonnet-5"]).toBeNull();
     expect(ctx.state.registryDirty).toBe(true);
   });
 
-  it("adds a second host override without disturbing the first", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: { builder: { opencode: "deep" } } }, registryDirty: false, registryLoaded: true } });
-    handleRegistryAgentTierEdit(ctx, "builder", "claude", "standard");
-    expect(ctx.state.registryOverlay.agentTiers.builder).toEqual({ opencode: "deep", claude: "standard" });
+  it("drops a user-added (non-builtin) model outright, no tombstone key left behind", () => {
+    const ctx = makeModelsCtx();
+    ctx.state.registryOverlay.models["my-custom-model"] = { name: "Mine", host: "claude", provider: "", model: "mine" };
+    handleModelDelete(ctx, "my-custom-model");
+    expect("my-custom-model" in ctx.state.registryOverlay.models).toBe(false);
   });
 
-  it("removes the override key when the value is '' (default picked)", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: { builder: { opencode: "deep", claude: "standard" } } }, registryDirty: false, registryLoaded: true } });
-    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "");
-    expect(ctx.state.registryOverlay.agentTiers.builder).toEqual({ claude: "standard" });
-    expect(ctx.state.registryDirty).toBe(true);
-  });
-
-  it("prunes the agent object entirely once its last host override is removed", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: { builder: { opencode: "deep" } } }, registryDirty: false, registryLoaded: true } });
-    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "");
-    expect(Object.prototype.hasOwnProperty.call(ctx.state.registryOverlay.agentTiers, "builder")).toBe(false);
-  });
-
-  it("is a no-op (still sets dirty) when clearing a host that was never overridden", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, agentTiers: {} }, registryDirty: false, registryLoaded: true } });
-    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "");
-    expect(ctx.state.registryOverlay.agentTiers).toEqual({});
-    expect(ctx.state.registryDirty).toBe(true);
-  });
-
-  it("initializes registryOverlay.agentTiers on demand when the overlay has never been touched", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {} }, registryDirty: false, registryLoaded: true } });
-    handleRegistryAgentTierEdit(ctx, "builder", "opencode", "deep");
-    expect(ctx.state.registryOverlay.agentTiers.builder.opencode).toBe("deep");
+  it("never rewrites cells that still hold the deleted model's resolved string", () => {
+    const ctx = makeModelsCtx();
+    handleModelDelete(ctx, "claude-sonnet-5");
+    // The profile-grid cell keeps its literal string; the renderer (registry-editor.test.ts)
+    // is what turns an unmatched catalog string into "custom: <string>" for display.
+    expect(ctx.state.registryOverlay.profiles.balanced).toBeUndefined();
   });
 });
 
-describe("renderModelRegistry — Per-Agent Tier Overrides display merge (T6, APUX-04)", () => {
-  it("shows an unsaved agentTier override before save (mergeRegistryForDisplay)", () => {
-    const server = {
-      registry: { profiles: { p: { hosts: {} } }, tiers: ["light", "standard", "deep"], hostDefaults: {}, workflowTiers: {}, agentTiers: {} },
-      source: {},
-      agents: [{ name: "builder", charterTier: "standard" }],
-    };
-    const overlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: { builder: { opencode: "deep" } }, tiers: ["light", "standard", "deep"] };
-    const display = mergeRegistryForDisplay(server, overlay);
-    expect(display.registry.agentTiers.builder.opencode).toBe("deep");
-    const html = renderModelRegistry(display, { writeMode: true });
-    expect(html).toContain('data-agent="builder" data-host="opencode"');
-    expect(html).toContain('value="deep" selected');
-  });
-
-  it("carries agents + agentsError through the display-merge rebuild branch", () => {
-    const server = {
-      registry: { profiles: { p: { hosts: {} } }, tiers: ["light"], hostDefaults: {}, workflowTiers: {}, agentTiers: {} },
-      source: {},
-      agents: [{ name: "builder", charterTier: "standard" }],
-      agentsError: undefined,
-    };
-    const overlay = { profiles: { p: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, agentTiers: {}, tiers: ["light"] };
-    const display = mergeRegistryForDisplay(server, overlay);
-    expect(display.agents).toEqual([{ name: "builder", charterTier: "standard" }]);
-  });
-
-  it("cross-boundary parity: mergeRegistryForDisplay reproduces the shared fixture's expected merged agentTiers", () => {
-    // Same fixture consumed by scripts/__tests__/model-profiles.test.ts through mergeOverlay
-    // (T1) — this proves the client's hand-copied twin (design D-4.3) is byte-identical.
-    const fixturePath = path.join(
-      import.meta.dir,
-      "fixtures",
-      "agent-tiers-parity.json",
-    );
-    const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8")) as {
-      builtinAgentTiers: Record<string, Record<string, string>>;
-      overlayAgentTiers: Record<string, Record<string, string | null> | null>;
-      expectedMergedAgentTiers: Record<string, Record<string, string>>;
-    };
-    const server = {
-      registry: { profiles: {}, tiers: ["light", "standard", "deep"], hostDefaults: {}, workflowTiers: {}, agentTiers: fixture.builtinAgentTiers },
-      source: {},
-    };
-    const overlay = { profiles: {}, hostDefaults: {}, workflowTiers: {}, agentTiers: fixture.overlayAgentTiers, tiers: ["light", "standard", "deep"] };
-    const display = mergeRegistryForDisplay(server, overlay);
-    expect(display.registry.agentTiers).toEqual(fixture.expectedMergedAgentTiers);
-  });
-});
-
-describe("handleRegistryWorkflowTierEdit — workflowTiers edit (REGWIRE-02)", () => {
-  it("updates workflowTier in overlay + sets dirty", () => {
-    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard" } }, registryDirty: false, registryLoaded: true } });
-    handleRegistryWorkflowTierEdit(ctx, "search", "deep");
-    expect(ctx.state.registryOverlay.workflowTiers.search).toBe("deep");
-    expect(ctx.state.registryDirty).toBe(true);
-  });
-});
-
-// ── Inline form toggle/cancel (T7, APUX-12, D-4.4) ──────────────────────────
-// Replaces the prompt()-driven flows: a trigger click opens/closes
-// state.registryForm, and the submit path (wireViewHandlers, exercised via
-// registry-editor.test.ts render assertions) reads field values and calls the
-// same-named handler below with explicit args instead of prompt().
-
-describe("handleRegistryFormToggle / handleRegistryFormCancel — inline form open/close (T7)", () => {
+describe("handleRegistryFormToggle / handleRegistryFormCancel — inline form open/close", () => {
   it("opens a form of the given kind + re-renders", () => {
     const render = mock(() => {});
-    const ctx = makeRegistryCtx({ render, state: { registryForm: null } });
+    const ctx = makeRegistryCtx({ render, state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true, registryForm: null } });
     handleRegistryFormToggle(ctx, "add-profile");
     expect(ctx.state.registryForm).toEqual({ kind: "add-profile", error: null });
     expect(render).toHaveBeenCalled();
   });
 
-  it("closes the form when the same trigger is clicked again", () => {
-    const ctx = makeRegistryCtx({ state: { registryForm: { kind: "add-profile", error: null } } });
+  it("clicking the same trigger again closes the form", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } } });
     handleRegistryFormToggle(ctx, "add-profile");
     expect(ctx.state.registryForm).toBeNull();
   });
 
-  it("switches to a different form when a different trigger is clicked", () => {
-    const ctx = makeRegistryCtx({ state: { registryForm: { kind: "add-profile", error: null } } });
+  it("clicking a different trigger switches forms", () => {
+    const ctx = makeRegistryCtx({ state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } } });
     handleRegistryFormToggle(ctx, "delete-profile");
     expect(ctx.state.registryForm).toEqual({ kind: "delete-profile", error: null });
   });
 
-  it("handleRegistryFormCancel closes any open form + re-renders", () => {
+  it("handleRegistryFormCancel closes any open form", () => {
     const render = mock(() => {});
-    const ctx = makeRegistryCtx({ render, state: { registryForm: { kind: "add-workflow", error: "some error" } } });
+    const ctx = makeRegistryCtx({ render, state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "model-add", host: "claude" } } });
     handleRegistryFormCancel(ctx);
     expect(ctx.state.registryForm).toBeNull();
     expect(render).toHaveBeenCalled();
   });
 });
 
-describe("handleRegistryWorkflowTierAdd — inline form submit (T7, REG-03, APUX-12)", () => {
-  it("adds a new workflow tier to the overlay + sets dirty + closes the form + re-renders", () => {
-    const render = mock(() => {});
-    const ctx = makeRegistryCtx({
-      render,
-      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
-    });
-    handleRegistryWorkflowTierAdd(ctx, "spec-driven", "deep");
-    expect(ctx.state.registryOverlay.workflowTiers["spec-driven"]).toBe("deep");
-    expect(ctx.state.registryDirty).toBe(true);
-    expect(ctx.state.registryForm).toBeNull();
-    expect(render).toHaveBeenCalled();
-  });
-
-  it("rejects a duplicate workflow name with an inline form error, not alert()", () => {
-    const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard" }, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
-    });
-    handleRegistryWorkflowTierAdd(ctx, "search", "deep");
-    expect(ctx.state.registryForm?.kind).toBe("add-workflow");
-    expect(ctx.state.registryForm?.error).toContain("search");
-    expect(ctx.state.registryDirty).toBe(false);
-  });
-
-  it("rejects an invalid tier with an inline form error, not alert()", () => {
-    const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
-    });
-    handleRegistryWorkflowTierAdd(ctx, "debug", "titanic");
-    expect(ctx.state.registryForm?.error).toContain("titanic");
-    expect(ctx.state.registryOverlay.workflowTiers["debug"]).toBeUndefined();
-  });
-
-  it("does nothing when workflow is blank", () => {
-    const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-workflow", error: null } },
-    });
-    handleRegistryWorkflowTierAdd(ctx, "", "deep");
-    expect(Object.keys(ctx.state.registryOverlay.workflowTiers)).toEqual([]);
-    expect(ctx.state.registryDirty).toBe(false);
-  });
-});
-
-describe("handleRegistryWorkflowTierRemove — remove workflow tier (REG-03 / APCR-01.6 tombstone)", () => {
-  it("writes a null tombstone (not a deleted key) + sets dirty + re-renders", () => {
-    const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, workflowTiers: { search: "standard", index: "light" }, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
-    });
-    handleRegistryWorkflowTierRemove(ctx, "search");
-    // A deleted key means "absent" under the server's deep merge, which under APCR-01 means
-    // "inherit the builtin" — the exact no-op regression design D-1 exists to prevent.
-    expect(Object.prototype.hasOwnProperty.call(ctx.state.registryOverlay.workflowTiers, "search")).toBe(true);
-    expect(ctx.state.registryOverlay.workflowTiers.search).toBeNull();
-    expect(ctx.state.registryOverlay.workflowTiers.index).toBe("light");
-    expect(ctx.state.registryDirty).toBe(true);
-  });
-
-  it("no-ops when overlay has no workflowTiers", () => {
-    const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, tiers: ["light", "standard", "deep"] }, registryDirty: false, registryLoaded: true },
-    });
-    handleRegistryWorkflowTierRemove(ctx, "search");
-    expect(ctx.state.registryDirty).toBe(false);
-  });
-});
-
 describe("handleRegistryAddProfile — inline form submit (T7, REGWIRE-03, APUX-12)", () => {
-  it("adds a new profile with null model/effort for all host/tier combos", () => {
+  it("adds a new profile with null model/effort for every host", () => {
     const ctx = makeRegistryCtx({
-      state: {
-        registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] },
-        registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null },
-      },
+      state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } },
     });
     handleRegistryAddProfile(ctx, "custom", "a custom profile");
     expect(ctx.state.registryOverlay.profiles.custom).toBeDefined();
     expect(ctx.state.registryOverlay.profiles.custom.description).toBe("a custom profile");
-    expect(ctx.state.registryOverlay.profiles.custom.hosts.claude.light).toEqual({ model: null, effort: null });
+    expect(ctx.state.registryOverlay.profiles.custom.hosts.claude).toEqual({ model: null, effort: null });
+    expect(ctx.state.registryOverlay.profiles.custom.hosts.opencode).toEqual({ model: null, effort: null });
     expect(ctx.state.registryDirty).toBe(true);
     expect(ctx.state.registryForm).toBeNull();
   });
 
   it("defaults description to profile name when description is blank", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } },
+      state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } },
     });
     handleRegistryAddProfile(ctx, "custom", "");
     expect(ctx.state.registryOverlay.profiles.custom.description).toBe("custom");
@@ -1377,7 +1359,7 @@ describe("handleRegistryAddProfile — inline form submit (T7, REGWIRE-03, APUX-
 
   it("rejects an existing profile name with an inline form error, not alert()", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "add-profile", error: null } },
     });
     handleRegistryAddProfile(ctx, "balanced", "");
     expect(ctx.state.registryForm?.error).toContain("balanced");
@@ -1386,7 +1368,7 @@ describe("handleRegistryAddProfile — inline form submit (T7, REGWIRE-03, APUX-
 
   it("does nothing when name is blank", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {} }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"], registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true },
     });
     handleRegistryAddProfile(ctx, "", "");
     expect(Object.keys(ctx.state.registryOverlay.profiles)).toHaveLength(0);
@@ -1398,20 +1380,20 @@ describe("handleRegistryDuplicateProfile — inline form submit (T7, REGWIRE-04,
   it("copies selected profile grid to a new name", () => {
     const ctx = makeRegistryCtx({
       state: {
-        registryOverlay: { profiles: { balanced: { description: "b", hosts: { claude: { light: { model: "m", effort: "low" } } } } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light", "standard", "deep"] },
+        registryOverlay: { profiles: { balanced: { description: "b", hosts: { claude: { model: "m", effort: "low" } } } }, models: {} },
         registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null },
       },
     });
     handleRegistryDuplicateProfile(ctx, "balanced", "work-copy");
     expect(ctx.state.registryOverlay.profiles["work-copy"]).toBeDefined();
-    expect(ctx.state.registryOverlay.profiles["work-copy"].hosts.claude.light.model).toBe("m");
+    expect(ctx.state.registryOverlay.profiles["work-copy"].hosts.claude.model).toBe("m");
     expect(ctx.state.registryDirty).toBe(true);
     expect(ctx.state.registryForm).toBeNull();
   });
 
   it("shows an inline error, not alert(), when the source profile is not found", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null } },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null } },
     });
     handleRegistryDuplicateProfile(ctx, "nonexistent", "copy");
     expect(ctx.state.registryForm?.error).toContain("nonexistent");
@@ -1419,7 +1401,7 @@ describe("handleRegistryDuplicateProfile — inline form submit (T7, REGWIRE-04,
 
   it("shows an inline error, not alert(), when the new name already exists", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} }, work: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null } },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} }, work: { hosts: {} } }, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "duplicate-profile", error: null } },
     });
     handleRegistryDuplicateProfile(ctx, "balanced", "work");
     expect(ctx.state.registryForm?.error).toContain("work");
@@ -1427,7 +1409,7 @@ describe("handleRegistryDuplicateProfile — inline form submit (T7, REGWIRE-04,
 
   it("does nothing when source is blank", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true },
     });
     handleRegistryDuplicateProfile(ctx, "", "copy");
     expect(ctx.state.registryDirty).toBe(false);
@@ -1437,7 +1419,7 @@ describe("handleRegistryDuplicateProfile — inline form submit (T7, REGWIRE-04,
 describe("handleRegistryDeleteProfile — inline form submit (T7, REGWIRE-05, APUX-12)", () => {
   it("sets _delete:true on existing profile", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "delete-profile", error: null } },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "delete-profile", error: null } },
     });
     handleRegistryDeleteProfile(ctx, "balanced");
     expect(ctx.state.registryOverlay.profiles.balanced._delete).toBe(true);
@@ -1447,7 +1429,7 @@ describe("handleRegistryDeleteProfile — inline form submit (T7, REGWIRE-05, AP
 
   it("shows an inline error, not alert(), when the profile is not found", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true, registryForm: { kind: "delete-profile", error: null } },
+      state: { registryOverlay: { profiles: { balanced: { hosts: {} } }, models: {} }, registryDirty: false, registryLoaded: true, registryForm: { kind: "delete-profile", error: null } },
     });
     handleRegistryDeleteProfile(ctx, "nonexistent");
     expect(ctx.state.registryForm?.error).toContain("nonexistent");
@@ -1455,7 +1437,7 @@ describe("handleRegistryDeleteProfile — inline form submit (T7, REGWIRE-05, AP
 
   it("does nothing when name is blank", () => {
     const ctx = makeRegistryCtx({
-      state: { registryOverlay: { profiles: {}, hostDefaults: {}, workflowTiers: {}, tiers: ["light"] }, registryDirty: false, registryLoaded: true },
+      state: { registryOverlay: { profiles: {}, models: {} }, registryDirty: false, registryLoaded: true },
     });
     handleRegistryDeleteProfile(ctx, "");
     expect(ctx.state.registryDirty).toBe(false);
@@ -1464,24 +1446,15 @@ describe("handleRegistryDeleteProfile — inline form submit (T7, REGWIRE-05, AP
 
 // ── APCR-11.5: Duplicate/Delete pickers must read the DISPLAY registry (server +
 // overlay), not the raw overlay - a session with no edits yet has an empty overlay
-// after APCR-01.8's revert to an overlay-only seed. These tests go THROUGH
-// initRegistryOverlay (unlike every test above, which builds ctx.state.registryOverlay
-// by hand) so they can actually observe the regression Batch Worker 1 flagged.
+// after APCR-01.8's revert to an overlay-only seed.
 describe("Registry Duplicate/Delete pickers see every effective-registry profile with an empty overlay (APCR-11.5)", () => {
-  /** Build a ctx whose registryOverlay was seeded via initRegistryOverlay (overlay-only,
-   *  APCR-01.8) from a session with NO saved overlay, and whose registryServerData mirrors
-   *  what render() caches (the same server payload initRegistryOverlay read from). */
   function makeUnEditedSessionCtx() {
     const ctx = makeRegistryCtx();
     const registry = {
-      version: 1, tiers: ["light", "standard", "deep"],
-      hostDefaults: {}, workflowTiers: {},
-      profiles: {
-        balanced: { description: "builtin balanced", hosts: { claude: { light: { model: "m-l", effort: "low" } } } },
-      },
+      profiles: { balanced: { description: "builtin balanced", hosts: { claude: { model: "m-l", effort: "low" } } } },
+      models: {},
     };
     initRegistryOverlay(ctx, registry, { overlay: null, tombstoned: [], builtin: {} });
-    // No edits this session - the raw overlay is empty, exactly APCR-01.8's revert.
     expect(ctx.state.registryOverlay.profiles).toEqual({});
     ctx.state.registryServerData = { registry, source: { overlay: null, tombstoned: [], builtin: {} } };
     return ctx;
@@ -1491,7 +1464,7 @@ describe("Registry Duplicate/Delete pickers see every effective-registry profile
     const ctx = makeUnEditedSessionCtx();
     handleRegistryDuplicateProfile(ctx, "balanced", "balanced-copy");
     expect(ctx.state.registryOverlay.profiles["balanced-copy"]).toBeDefined();
-    expect(ctx.state.registryOverlay.profiles["balanced-copy"].hosts.claude.light.model).toBe("m-l");
+    expect(ctx.state.registryOverlay.profiles["balanced-copy"].hosts.claude.model).toBe("m-l");
     expect(ctx.state.registryDirty).toBe(true);
   });
 
@@ -1760,7 +1733,7 @@ describe("runRegenerateStream — streaming SSE, no confirm of its own (T8, REGE
   it("renders variant-sync frames: synced hosts are folded into the success banner (T5)", async () => {
     const sseChunks = [
       'data: {"type":"variant-sync","host":"claude","status":"synced","profiles":["balanced"],"files":3,"retained":[]}\n\n',
-      'data: {"type":"variant-sync","host":"cursor","status":"skipped","profiles":[],"files":0,"retained":[],"reason":"all tiers inherit"}\n\n',
+      'data: {"type":"variant-sync","host":"cursor","status":"skipped","profiles":[],"files":0,"retained":[],"reason":"no variant tree installed"}\n\n',
       'data: {"type":"install","host":"claude","status":"switched","profile":"balanced","switched":"claude","skipped":"none","unsupported":"none","failed":"none"}\n\n',
       'data: {"type":"done","exitCode":0}\n\n',
     ];
@@ -1869,12 +1842,12 @@ describe("handleRegistrySaveAndApply — unified save + apply (T8, APUX-13, P1-C
 
   it("save failure shows the validation banner and does NOT start the stream (P1-C AC3)", async () => {
     (globalThis as any).confirm = mock(() => true);
-    const request = mock(async () => ({ success: false, error: "validation failed", details: ["profiles.foo missing tier 'standard'"] }));
+    const request = mock(async () => ({ success: false, error: "validation failed", details: ["profiles.foo.hosts.claude.model must be a non-empty string or null"] }));
     const fetchMock = mock(async () => makeSseResponse([]));
     (globalThis as any).fetch = fetchMock;
     const ctx = makeRegistryCtx({ api: { request }, state: { registryOverlay: { profiles: { foo: {} } }, registryDirty: true, registryLoaded: true } });
     await handleRegistrySaveAndApply(ctx);
-    expect(ctx.root.children[0].textContent).toContain("missing tier 'standard'");
+    expect(ctx.root.children[0].textContent).toContain("must be a non-empty string or null");
     expect(fetchMock).not.toHaveBeenCalled();
     // dirty stays true — the save never went through.
     expect(ctx.state.registryDirty).toBe(true);

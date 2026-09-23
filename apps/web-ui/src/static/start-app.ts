@@ -110,6 +110,9 @@ interface AppState {
   registryLoaded: boolean;
   registryForm: { kind?: string } | null;
   registryServerData?: Exclude<Parameters<typeof mergeRegistryForDisplay>[0], null>;
+  // Per-Agent Model Overrides (model-catalog-revamp AC6): which profile's overrides the
+  // table currently shows. `undefined` lets the renderer fall back to `balanced`/first.
+  agentOverridesProfile?: string;
   regenerating: boolean;
   indexJobId: string | null;
   indexJobStatus: string | null;
@@ -373,7 +376,13 @@ export function startApp(opts?: AppStartOpts): void {
         root.innerHTML = renderProfilesView(
           (profilesRes && profilesRes.data) || { hosts: [] },
           displayData,
-          { profilesTab: state.profilesTab || "switch", writeMode: isWriteModeEnabled(), unsaved: state.registryDirty, registryForm: state.registryForm },
+          {
+            profilesTab: state.profilesTab || "switch",
+            writeMode: isWriteModeEnabled(),
+            unsaved: state.registryDirty,
+            registryForm: state.registryForm,
+            agentOverridesProfile: state.agentOverridesProfile,
+          },
         );
       } else if (state.view === "model-registry") {
         const data = (await api.request("/api/v1/model-registry")) as ModelRegistryApiResult;
@@ -381,7 +390,12 @@ export function startApp(opts?: AppStartOpts): void {
         initRegistryOverlay(ctx, regData.registry, regData.source);
         state.registryServerData = regData;
         const displayData = mergeRegistryForDisplay(regData, state.registryOverlay) as unknown as Parameters<typeof renderModelRegistry>[0];
-        root.innerHTML = renderModelRegistry(displayData, { writeMode: isWriteModeEnabled(), unsaved: state.registryDirty, registryForm: state.registryForm });
+        root.innerHTML = renderModelRegistry(displayData, {
+          writeMode: isWriteModeEnabled(),
+          unsaved: state.registryDirty,
+          registryForm: state.registryForm,
+          agentOverridesProfile: state.agentOverridesProfile,
+        });
       }
     } catch (e) {
       root.innerHTML = '<div class="error">Connection error: ' + escapeHtml(String((e as { message?: unknown }).message || e)) + "</div>";

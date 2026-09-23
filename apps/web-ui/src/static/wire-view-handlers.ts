@@ -37,16 +37,18 @@ import type { LogsDoc } from "./views/logs.js";
 import { handleConfigSave, handleConfigReveal, handleServerRestart } from "./views/config.js";
 import type { ConfigDocument } from "./views/config.js";
 import { handleProfilesTabSwitch, handleProfileSwitch } from "./views/profiles.js";
-import { joinModelId } from "./views/registry.js";
+import { collectFormData } from "./lib/forms.js";
 import {
-  handleRegistryCellEdit,
-  handleRegistryHostDefaultEdit,
-  handleRegistryAgentTierEdit,
-  handleRegistryWorkflowTierEdit,
+  handleRegistryHostCellEdit,
+  handleRegistryAgentCellEdit,
+  handleAgentOverridesProfileChange,
+  handleModelFormOpenAdd,
+  handleModelFormOpenEdit,
+  handleModelFormHostChange,
+  handleModelFormSubmit,
+  handleModelDelete,
   handleRegistryFormToggle,
   handleRegistryFormCancel,
-  handleRegistryWorkflowTierAdd,
-  handleRegistryWorkflowTierRemove,
   handleRegistryAddProfile,
   handleRegistryDuplicateProfile,
   handleRegistryDeleteProfile,
@@ -67,7 +69,7 @@ import {
  * own — differently shaped but structurally compatible — `*Ctx.root` parameter.
  * `dataset` is typed as always-string (not `string | undefined`) so the many
  * `data-*` reads below that are forwarded straight into a handler's required
- * `string` parameter (e.g. `handleRegistryCellEdit`'s `profile`/`host`/`tier`)
+ * `string` parameter (e.g. `handleRegistryHostCellEdit`'s `profile`/`host`)
  * need no per-call cast — the elements are always matched by the same
  * `data-*` attribute selector that supplies the value.
  */
@@ -392,52 +394,67 @@ export function wireViewHandlers(ctx: WireViewHandlersCtx): void {
       handleProfileSwitch(ctx, profile, host);
     });
   });
-  // admin-portal-enhancements: registry in-memory CRUD + save/clear
+  // model-catalog-revamp T3: registry in-memory CRUD (models, profile grid,
+  // per-agent overrides) + save/clear.
   root.querySelectorAll('[data-action="registry-effort"]').forEach((el) => {
     el.addEventListener("change", () => {
-      handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, "effort", el.value);
+      handleRegistryHostCellEdit(ctx, el.dataset.profile, el.dataset.host, "effort", el.value);
     });
   });
-  // Provider + Model split fields (design D-4.2, APUX-14): either input's
-  // change reads BOTH sibling fields from their shared .registry-cell and
-  // joins them into the one string the overlay stores. `closest` is guarded
-  // (absent/no-match in the test fake DOM) rather than assumed present.
-  root.querySelectorAll('[data-action="registry-provider"], [data-action="registry-model"]').forEach((el) => {
+  root.querySelectorAll('[data-action="registry-model-select"]').forEach((el) => {
     el.addEventListener("change", () => {
-      const cell = typeof el.closest === "function" ? el.closest(".registry-cell") : null;
-      const sibling = cell && cell.querySelectorAll
-        ? cell.querySelectorAll('[data-action="' + (el.dataset.action === "registry-provider" ? "registry-model" : "registry-provider") + '"]')[0]
-        : null;
-      const providerVal = el.dataset.action === "registry-provider" ? el.value : (sibling ? sibling.value : "");
-      const modelVal = el.dataset.action === "registry-model" ? el.value : (sibling ? sibling.value : "");
-      handleRegistryCellEdit(ctx, el.dataset.profile, el.dataset.host, el.dataset.tier, "model", joinModelId(providerVal, modelVal));
+      handleRegistryHostCellEdit(ctx, el.dataset.profile, el.dataset.host, "model", el.value || null);
     });
   });
-  root.querySelectorAll('[data-action="registry-hostDefault"]').forEach((el) => {
+  root.querySelectorAll('[data-action="registry-agent-effort"]').forEach((el) => {
     el.addEventListener("change", () => {
-      handleRegistryHostDefaultEdit(ctx, el.dataset.host, el.value);
+      handleRegistryAgentCellEdit(ctx, el.dataset.profile, el.dataset.agent, el.dataset.host, "effort", el.value);
     });
   });
-  root.querySelectorAll('[data-action="registry-agentTier"]').forEach((el) => {
+  root.querySelectorAll('[data-action="registry-agent-model-select"]').forEach((el) => {
     el.addEventListener("change", () => {
-      handleRegistryAgentTierEdit(ctx, el.dataset.agent, el.dataset.host, el.value);
+      handleRegistryAgentCellEdit(ctx, el.dataset.profile, el.dataset.agent, el.dataset.host, "model", el.value || null);
     });
   });
-  root.querySelectorAll('[data-action="registry-workflowTier"]').forEach((el) => {
+  root.querySelectorAll('[data-action="agent-overrides-profile"]').forEach((el) => {
     el.addEventListener("change", () => {
-      handleRegistryWorkflowTierEdit(ctx, el.dataset.workflow, el.value);
+      handleAgentOverridesProfileChange(ctx, el.value);
     });
   });
-  // T7 (APUX-12, D-4.4): trigger buttons toggle the corresponding inline
-  // form instead of invoking the prompt()-driven handler directly.
-  root.querySelector('[data-action="registry-workflowTier-add"]')?.addEventListener("click", () => {
-    handleRegistryFormToggle(ctx, "add-workflow");
+  // Models CRUD (AC4).
+  root.querySelector('[data-action="model-add"]')?.addEventListener("click", () => {
+    handleModelFormOpenAdd(ctx);
   });
-  root.querySelectorAll('[data-action="registry-workflowTier-remove"]').forEach((btn) => {
+  root.querySelectorAll('[data-action="model-edit"]').forEach((btn) => {
     btn.addEventListener("click", () => {
-      handleRegistryWorkflowTierRemove(ctx, btn.dataset.workflow);
+      const id = btn.dataset.id;
+      if (!id) return;
+      handleModelFormOpenEdit(ctx, id);
     });
   });
+  root.querySelectorAll('[data-action="model-delete"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      if (!id) return;
+      if (confirm("Delete this model? Cells still referencing it keep showing it as a custom value.")) {
+        handleModelDelete(ctx, id);
+      }
+    });
+  });
+  root.querySelectorAll('[data-action="model-form-host"]').forEach((el) => {
+    el.addEventListener("change", () => {
+      handleModelFormHostChange(ctx, el.value);
+    });
+  });
+  root.querySelector('[data-action="model-form-cancel"]')?.addEventListener("click", () => {
+    handleRegistryFormCancel(ctx);
+  });
+  root.querySelector('[data-action="model-form-submit"]')?.addEventListener("click", () => {
+    const data = collectFormData(ctx.root, "model-form");
+    handleModelFormSubmit(ctx, data);
+  });
+  // Profile management (unchanged, T7/APUX-12/D-4.4): trigger buttons toggle
+  // the corresponding inline form instead of invoking a prompt()-driven handler.
   root.querySelector('[data-action="registry-add-profile"]')?.addEventListener("click", () => {
     handleRegistryFormToggle(ctx, "add-profile");
   });
@@ -452,16 +469,11 @@ export function wireViewHandlers(ctx: WireViewHandlersCtx): void {
   });
   root.querySelector('[data-action="registry-form-submit"]')?.addEventListener("click", () => {
     const kind = ctx.state.registryForm && ctx.state.registryForm.kind;
-    if (kind === "add-workflow") {
-      // Elements matched only by their own trigger button, not this
-      // handler's own selector, so — unlike the `data-*` reads above — the
-      // element itself (and so `.value`) may genuinely be absent; the
-      // downstream handlers already guard `!workflow`/`!tier`/etc., so the
-      // cast preserves the original untyped pass-through exactly.
-      const workflow = root.querySelector('[data-action="registry-form-workflow"]')?.value as string;
-      const tier = root.querySelector('[data-action="registry-form-tier"]')?.value as string;
-      handleRegistryWorkflowTierAdd(ctx, workflow, tier);
-    } else if (kind === "duplicate-profile") {
+    if (kind === "duplicate-profile") {
+      // Elements matched only by their own trigger button, not this handler's own selector,
+      // so — unlike the `data-*` reads above — the element itself (and so `.value`) may
+      // genuinely be absent; the downstream handlers already guard `!sourceName`/`!newName`,
+      // so the cast preserves the original untyped pass-through exactly.
       const source = root.querySelector('[data-action="registry-form-source"]')?.value as string;
       const newName = root.querySelector('[data-action="registry-form-new-name"]')?.value as string;
       handleRegistryDuplicateProfile(ctx, source, newName);
