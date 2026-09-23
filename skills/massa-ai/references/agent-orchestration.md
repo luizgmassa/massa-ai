@@ -189,7 +189,7 @@ When dispatching a subagent, send a compact capability packet rather than a loos
 - `memory`: whether the subagent may suggest memories and who persists them
 - `next_use`: what the main agent will do with the result
 - `mode`: conditional — for a charter that declares modes (`code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, `test-engineer`), the `Mode:` section of the charter this dispatch runs.
-- `lens`: conditional — `code-reviewer` `audit` dispatches only. One of `bugs | architecture | security | code-quality | performance`; the requirements lens is `product-manager` `audit` mode and the tests lens is `test-engineer` `audit` mode.
+- `lens`: conditional — `code-reviewer` `audit` dispatches only. One of `bugs | architecture | security | code-quality | performance | diff`; the requirements lens is `product-manager` `audit` mode and the tests lens is `test-engineer` `audit` mode.
 
 The named dispatch block that workflows embed (the quoted block whose header carries the agent name, role, and mode) is the block projection of this packet: `role`, `mode`, and `purpose` live in the block's header line, and `next_use` defaults to "the main agent synthesizes and continues the workflow" when absent. The remaining eight fields — `trigger, scope, permissions, inputs, sensors, output, firewall, memory` — appear as the block's body lines, except where Role Defaults below already fix a field's value.
 
@@ -209,7 +209,7 @@ having exactly one place a shared value can be wrong.
 
 - `permissions`: read-only
 
-**`code-reviewer`, `mode: review`**
+**`code-reviewer`, `mode: audit`, `lens: diff`**
 
 - `fallback`: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
 

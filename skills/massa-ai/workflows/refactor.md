@@ -66,17 +66,17 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - Refactored architectural decisions via `remember` as scored `decision` memories
    - Identified and decoupled anti-patterns via `remember` as scored `pattern` memories
 
-> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the change's diff surface and its task/AC context
-> - inputs: diff, acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
 > **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
-> - trigger: Standard+ refactor sizing or any PR-group execution per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once `code-reviewer` review fix items are resolved; Quick-sized refactors dispatch only when validation assets were touched, otherwise run the fresh-eyes fallback below and record the skip reason
+> - trigger: Standard+ refactor sizing or any PR-group execution per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once diff-audit fix items are resolved; Quick-sized refactors dispatch only when validation assets were touched, otherwise run the fresh-eyes fallback below and record the skip reason
 > - scope: the moved/transformed code across this refactor's PR groups and the characterization tests that must protect it
 > - inputs: the characterization baseline from step 6 (and step 7 for mobile refactors), the diff of moved code per PR group, and the PR-group map from step 9
 > - sensors: confirm the characterization tests still pass against the moved code's preserved behavior; discrimination sensor per `references/discrimination-sensor.md` (mutate the moved code — never new code — in scratch, one PR group at a time; characterization tests must kill each mutant)

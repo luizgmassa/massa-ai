@@ -147,7 +147,7 @@ the severity labels, and the reply contract.
 | 3 | Architecture & conventions | `code-reviewer` | `lens: architecture` — extract every explicit rule from the profile's CONVENTIONS/REVIEW_SKILLS docs into a numbered matrix, grade each changed file PASS/VIOLATION/N/A; no docs ⇒ minimal generic boundary sweep, stated | `architecture` |
 | 4 | Performance | `code-reviewer` | `lens: performance` — only issues clearly visible in the diff: N+1 queries, unbounded fetches, per-row lazy I/O, sequential awaits of independent calls, loop-invariant recomputation, unbatched writes | `performance` |
 | 5 | Test coverage | `test-engineer` | `mode: audit` (dedicated tests lens: coverage, regression protection, assertion quality, variation — `tests-audit.md` precedent) — new/changed behavior with no test, wrong level (unit vs integration), placement/naming vs profile TEST row, missing negative case, missing variation beyond the fixture example, assertions that exercise but never assert | `tests` |
-| 6 | Regression & hallucination | `code-reviewer` | `mode: review` — diff review — unrelated deletions, references to symbols absent from the repo, wrong signature/arity, duplicated existing logic, weakened error handling or assertions, leftover TODO/stub, dead code | `regression` |
+| 6 | Regression & hallucination | `code-reviewer` | `mode: audit`, `lens: diff` — diff review — unrelated deletions, references to symbols absent from the repo, wrong signature/arity, duplicated existing logic, weakened error handling or assertions, leftover TODO/stub, dead code | `regression` |
 
 Consolidation check (≥ 5 subagents): recorded in the feature design — rows 4 and 5
 share only the lens label, not a knowledge domain; they stay separate dispatches.
@@ -181,10 +181,10 @@ share only the lens label, not a knowledge domain; they stay separate dispatches
 > - firewall: raw diff/log/search output summarized, never returned raw
 > - memory: suggest-only; the main agent persists durable outcomes
 
-> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: pr-review Step 2, dimension row 6 (regression & hallucination)
 > - scope: the full PR/MR diff against the repository's real symbol surface; no host CLI calls, no posting
-> - inputs: exact `projectId`, parent `workflowSessionId`, dimension row 6, DISCOVERY MAP, PR/MR intent, full diff, existing-comment inventory, severity labels, reply contract
+> - inputs: `lens: diff`; exact `projectId`, parent `workflowSessionId`, dimension row 6, DISCOVERY MAP, PR/MR intent, full diff, existing-comment inventory, severity labels, reply contract
 > - sensors: verify referenced symbols exist (`search_definitions`/`get_references` when INDEX is fresh, else grep); second-pass sweep as above
 > - output: structured reply block — findings rows tagged `{unrelated-deletion | phantom-reference | wrong-signature | duplicate | weakened-check | dead-code}` + one positive highlight + files-swept-clean list; withhold uncertain findings
 > - firewall: raw diff/log/search output summarized, never returned raw

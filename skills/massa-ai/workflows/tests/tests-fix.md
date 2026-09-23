@@ -68,10 +68,10 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
    - Do not delete coverage, snapshots, fixtures, or benchmarks unless the audit report explicitly calls them obsolete and behavior remains protected elsewhere.
    - Prefer production-code changes only when required to expose a deterministic seam or fix a real bug found while writing the audited test.
 
-> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - inputs: diff, acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps

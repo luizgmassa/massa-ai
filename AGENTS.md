@@ -33,7 +33,7 @@ to current ones.
 
 - `senior-engineer/` — write-permitted implementation (disjoint write set)
 - `code-explorer/` — read-only codebase exploration: index-first lookup, flow tracing, dependencies, impact
-- `code-reviewer/` — read-only diff review, independent verification, findings-only audits (bugs, architecture, security, code-quality, performance), architecture and mobile guidance
+- `code-reviewer/` — read-only independent verification and findings-only audits (bugs, architecture, security, code-quality, performance, diff)
 - `designer/` — reads and writes user-facing screens from Figma, screenshots, or other design direction (UI-layer writes when scoped)
 - `judge/` — evaluation-spec authoring, debate-panel scoring, and the lite and full Plan Challenge critique
 - `product-manager/` — read-only requirements work: FURPS+ dimensions, ambiguity and gap analysis, requirements audit lens

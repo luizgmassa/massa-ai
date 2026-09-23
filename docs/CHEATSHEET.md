@@ -382,7 +382,7 @@ per dispatch through the capability packet's `mode` field.
 |---|---|---|---|
 | `senior-engineer` | Implement approved plans | — | write |
 | `code-explorer` | Understand an existing codebase, index-first | `lookup`, `trace` | read-only |
-| `code-reviewer` | Review, verify, audit, and guide existing or changed code | `review`, `verify`, `audit`, `guide` | read-only |
+| `code-reviewer` | Verify and audit existing or changed code | `verify`, `audit` | read-only |
 | `designer` | Read and write screens from Figma, screenshots, or other design direction | `audit`, `implement` | read-only (UI-layer write when scoped) |
 | `judge` | Evaluate artifacts and challenge plans with quoted evidence | `spec-author`, `scorer`, `plan-critique` | write (own judge-N report, `scorer` only) |
 | `product-manager` | Hold requirements to a clear, complete, consistent standard | `furps`, `audit` | read-only |
