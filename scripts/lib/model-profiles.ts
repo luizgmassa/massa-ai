@@ -498,8 +498,11 @@ function isOverlayProfile(v: unknown): v is OverlayProfile {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-export function loadEffectiveRegistry(opts?: { readonly overlayPath?: string }): EffectiveRegistryResult {
-  const builtin = loadRegistry(DEFAULT_REGISTRY_PATH);
+export function loadEffectiveRegistry(opts?: {
+  readonly overlayPath?: string;
+  readonly builtinPath?: string;
+}): EffectiveRegistryResult {
+  const builtin = loadRegistry(opts?.builtinPath ?? DEFAULT_REGISTRY_PATH);
   const overlayPath = opts?.overlayPath ?? path.join(configDir("massa-ai"), "model-profiles.json");
 
   if (!existsSync(overlayPath)) {

@@ -16,6 +16,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs
 import os from "os";
 import path from "path";
 import {
+  DEFAULT_REGISTRY_PATH,
   HOSTS,
   HOST_EFFORT_ENUM,
   PROFILE_ENV_VAR,
@@ -481,6 +482,34 @@ describe("model-profiles: overlay merge (models + profiles)", () => {
       expect(result.registry.profiles.balanced.hosts.claude).toEqual({ model: "opus", effort: "max" });
       expect(result.overlayOverrideBreakdown).toEqual({ models: 0, profiles: 1 });
       expect(result.overlayOverrideCount).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a user catalog model and the cell using it survive a built-in registry upgrade", () => {
+    const { dir, overlayPath } = tmpOverlayDir();
+    const builtinPath = path.join(dir, "builtin.json");
+    try {
+      const shipped = JSON.parse(readFileSync(DEFAULT_REGISTRY_PATH, "utf8"));
+      writeFileSync(builtinPath, JSON.stringify(shipped));
+      const overlay: OverlayData = {
+        models: { "user-model": { name: "User Model", host: "claude", provider: "", model: "claude-user-model" } },
+        profiles: { balanced: { hosts: { claude: { model: "claude-user-model", effort: "high" } } } },
+      };
+      writeFileSync(overlayPath, JSON.stringify(overlay));
+      expect(loadEffectiveRegistry({ overlayPath, builtinPath }).registry.models["user-model"]).toBeDefined();
+
+      shipped.models["release-model"] = { name: "Release Model", host: "claude", provider: "", model: "claude-release" };
+      shipped.profiles.balanced.description = "upgraded";
+      writeFileSync(builtinPath, JSON.stringify(shipped));
+
+      const after = loadEffectiveRegistry({ overlayPath, builtinPath });
+      expect(after.overlayError).toBeUndefined();
+      expect(after.registry.models["user-model"]).toEqual(overlay.models!["user-model"]!);
+      expect(after.registry.models["release-model"]).toBeDefined();
+      expect(after.registry.profiles.balanced.hosts.claude).toEqual({ model: "claude-user-model", effort: "high" });
+      expect(after.registry.profiles.balanced.description).toBe("upgraded");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

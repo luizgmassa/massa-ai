@@ -66,7 +66,6 @@ import {
   type SwitchReport,
 } from "@massa-ai/shared";
 import { getDeploymentRoot, deploymentUnavailableMessage } from "./model-registry-deployment.js";
-import { getRegistryHostDefaults } from "./model-registry.js";
 
 // configDir import is needed so mock.module can intercept @massa-ai/shared/config
 // in tests (the route shares the mock surface with model-registry.ts).
@@ -261,7 +260,7 @@ function installActiveProfiles(controller: ReadableStreamDefaultController<Uint8
       }));
     }
 
-    const inventory = listProfiles({ hostDefaults: getRegistryHostDefaults() });
+    const inventory = listProfiles();
     for (const hostEntry of inventory.hosts) {
       if (closedRef.closed) return;
       const host = hostEntry.host as Host;

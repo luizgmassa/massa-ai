@@ -49,10 +49,10 @@ const WRITABLE_PROVIDERS = ["ollama", "lmstudio", "mistral", "openai", "google",
 // cannot depend on scripts/lib/model-profiles.ts at all — that tree ships
 // only in a source checkout, not in the published package. `profile list`/
 // `show` below therefore keep listProfiles()'s own last-resort "balanced"
-// literal fallback rather than passing registry.hostDefaults (T2); the
-// generic findRepoRootWithMarker walk below is fine to use for
-// `syncGeneratedVariants`'s sourceRoot because it depends on nothing outside
-// this package.
+// literal fallback — the only fallback that exists, since v2 dropped the
+// registry's hostDefaults key (spec AC8); the generic findRepoRootWithMarker
+// walk below is fine to use for `syncGeneratedVariants`'s sourceRoot because
+// it depends on nothing outside this package.
 const GENERATOR_MARKER = "scripts/generate-subagent-artifacts.ts";
 const GENERATOR_MARKER_MAX_LEVELS = 6;
 
@@ -477,9 +477,8 @@ export async function runCli(argv: string[]): Promise<number> {
 
     if (subcommand === "list" || subcommand === "show") {
       try {
-        // No hostDefaults passed here (see the module-level comment) — this
-        // published CLI cannot reach the registry, so an unrecorded host's
-        // activeProfile falls back to listProfiles()'s own "balanced" literal.
+        // An unrecorded host's activeProfile falls back to listProfiles()'s
+        // own "balanced" literal (see the module-level comment).
         formatProfileInventory(listProfiles());
       } catch (e) {
         console.error(`Error: ${(e as Error).message}`);

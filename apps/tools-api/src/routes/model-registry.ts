@@ -27,30 +27,6 @@ function profilesLib(): Record<string, unknown> {
   return _profilesLib!;
 }
 
-/**
- * Best-effort per-host default profile map from the effective registry
- * (`registry.hostDefaults`, rank 3 of profile resolution —
- * `scripts/lib/model-profiles.ts:356`), reusing the same lazy `profilesLib()`
- * dynamic-require pattern above. Returns `undefined` — never throws — when
- * the checkout or the lib is unavailable, so every caller falls through to
- * `listProfiles`'s own last-resort `"balanced"` literal (T2) instead of
- * failing the request. Exported for `model-registry-stream.ts` and
- * `profiles.ts`, which need `hostDefaults` for `listProfiles()` but must not
- * duplicate the dynamic-require plumbing.
- */
-export function getRegistryHostDefaults(): Record<string, string> | undefined {
-  try {
-    const root = getDeploymentRoot();
-    if (!root) return undefined;
-    const lib = profilesLib();
-    const result = (lib.loadEffectiveRegistry as (opts?: { overlayPath?: string }) => any)({ overlayPath: OVERLAY_PATH });
-    const hostDefaults = result?.registry?.hostDefaults;
-    return hostDefaults && typeof hostDefaults === "object" ? (hostDefaults as Record<string, string>) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 // Same lazy dynamic-require pattern as profilesLib() above, for the same reasons: the
 // generator lives outside tools-api's rootDir, is not copied into the production Docker
 // image, and the non-literal require path keeps the bundler from trying to resolve it at
@@ -70,25 +46,47 @@ function generatorLib(): Record<string, unknown> {
 }
 
 /**
- * Best-effort `agents` inventory for the Model Catalog's Per-Agent Tier Overrides table
- * (design D-3, APUX-03). Any throw — missing checkout, a charter parse failure — degrades to
- * an empty list plus `agentsError` rather than failing the GET; the caller has already run
- * the shared 501 off-checkout gate before this is reached, so this is a second, narrower
- * failure surface on top of that one.
+ * Best-effort `agents` inventory for the Model Catalog's per-agent overrides table
+ * (spec AC6). A plain charter-directory scan (`scanCharterNames`, the same inventory the
+ * generator itself uses) rather than a full charter parse — the UI only needs names. Any
+ * throw — missing checkout, an unreadable directory — degrades to an empty list plus
+ * `agentsError` rather than failing the GET; the caller has already run the shared 501
+ * off-checkout gate before this is reached, so this is a second, narrower failure surface
+ * on top of that one.
  */
 async function loadAgentsInventory(): Promise<{
-  agents: Array<{ name: string; charterTier: string }>;
+  agents: Array<{ name: string }>;
   agentsError?: string;
 }> {
   try {
     const gen = generatorLib();
-    const charters = (await (
-      gen.loadAllCharters as () => Promise<Array<{ name: string; modelTier: string }>>
-    )()) as Array<{ name: string; modelTier: string }>;
-    return { agents: charters.map((c) => ({ name: c.name, charterTier: c.modelTier })) };
+    const names = (await (gen.scanCharterNames as () => Promise<string[]>)()) as string[];
+    return { agents: names.map((name) => ({ name })) };
   } catch (e) {
     return { agents: [], agentsError: (e as Error).message };
   }
+}
+
+const ALLOWED_OVERLAY_KEYS = new Set(["models", "profiles"]);
+const LEGACY_OVERLAY_KEYS = new Set(["tiers", "hostDefaults", "workflowTiers", "agentTiers"]);
+
+/**
+ * AC1/AC9: a v1-shaped PUT body (the four removed registry keys) is rejected outright
+ * rather than silently merged and dropped — `mergeOverlay` only reads `overlay.models`/
+ * `overlay.profiles`, so an unrecognized top-level key would otherwise vanish without
+ * telling the operator their edit did nothing.
+ */
+function overlayShapeViolations(overlay: Record<string, unknown>): string[] {
+  const violations: string[] = [];
+  for (const key of Object.keys(overlay)) {
+    if (ALLOWED_OVERLAY_KEYS.has(key)) continue;
+    violations.push(
+      LEGACY_OVERLAY_KEYS.has(key)
+        ? `overlay key "${key}" is a v1 registry key removed in v2 — only "models" and "profiles" are supported overlay sections`
+        : `overlay has unknown top-level key "${key}" — only "models" and "profiles" are supported`,
+    );
+  }
+  return violations;
 }
 
 const REGISTRY_DETAIL = {
@@ -101,10 +99,7 @@ const OVERLAY_PATH = path.join(configDir("massa-ai"), "model-profiles.json");
 // the lib only through the dynamic-require profilesLib() above, so the zero fallback below
 // (matching the existing `?? 0` pattern for overlayOverrideCount) cannot import the type.
 const ZERO_OVERLAY_OVERRIDE_BREAKDOWN = {
-  hostDefaults: 0,
-  workflowTiers: 0,
-  agentTiers: 0,
-  tiers: 0,
+  models: 0,
   profiles: 0,
 } as const;
 
@@ -139,7 +134,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         ...REGISTRY_DETAIL,
         summary: "Get effective registry (builtin + overlay) with source attribution",
         description:
-          "Returns the merged registry (builtin + overlay), source attribution (builtin, overlay, tombstoned), overlayOverrideCount (APCR-01.10 — count of overlay entries surviving normalization, so an operator can see how much of the registry their overlay is overriding), overlayOverrideBreakdown (WUT-17 — the same count broken down per category: hostDefaults, workflowTiers, agentTiers, tiers, profiles), overlayError if the overlay is corrupted, and agents (design D-3, APUX-03 — {name, charterTier} for every charter under skills/agents/, best-effort with agentsError on failure) (200 status, never fails).",
+          "Returns the merged v2 registry (builtin + overlay: models catalog + profiles, each profile carrying a per-host default cell and optional per-agent overrides), source attribution (builtin, overlay, tombstoned), overlayOverrideCount (count of overlay entries surviving normalization, so an operator can see how much of the registry their overlay is overriding), overlayOverrideBreakdown (the same count broken down per category: models, profiles), overlayError if the overlay is corrupted, and agents (spec AC6 — {name} for every charter under skills/agents/, from a directory scan, best-effort with agentsError on failure) (200 status, never fails).",
       },
     },
   )
@@ -153,6 +148,16 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
       }
       const lib = profilesLib();
       const overlay = body as Record<string, unknown>;
+
+      const shapeViolations = overlayShapeViolations(overlay);
+      if (shapeViolations.length > 0) {
+        set.status = 400;
+        return {
+          success: false as const,
+          error: "validation failed",
+          details: shapeViolations,
+        };
+      }
 
       const builtin = (lib.loadRegistry as (file?: string) => any)(lib.DEFAULT_REGISTRY_PATH as string);
       const merged = (lib.mergeOverlay as (b: unknown, o: unknown) => Record<string, unknown>)(
@@ -202,7 +207,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
         ...REGISTRY_DETAIL,
         summary: "Write overlay (full-replace, validated, atomic)",
         description:
-          "Accepts the full overlay object. Validates the merged result (builtin + overlay) via validateRegistry(). On success, writes atomically to ~/.config/massa-ai/model-profiles.json and returns the updated effective registry, including overlayOverrideCount (APCR-01.10) and overlayOverrideBreakdown (WUT-17, per-category). On failure, returns 400 with all violations.",
+          "Accepts the full v2 overlay object ({models?, profiles?} only — a v1 top-level key (tiers/hostDefaults/workflowTiers/agentTiers) or any other unknown key is rejected outright with 400 before merging). Validates the merged result (builtin + overlay) via validateRegistry(). On success, writes atomically to ~/.config/massa-ai/model-profiles.json and returns the updated effective registry, including overlayOverrideCount and overlayOverrideBreakdown (per-category: models, profiles). On failure, returns 400 with all violations.",
       },
     },
   )
