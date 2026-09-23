@@ -30,6 +30,23 @@ describe("db-connection", () => {
     process.env.DB_POOL_SIZE = original;
   });
 
+  test("getDbConfig defaults connectionTimeoutMs to 15000", () => {
+    const original = process.env.DB_CONNECTION_TIMEOUT_MS;
+    delete process.env.DB_CONNECTION_TIMEOUT_MS;
+    const config = getDbConfig();
+    expect(config.connectionTimeoutMs).toBe(15_000);
+    if (original !== undefined) process.env.DB_CONNECTION_TIMEOUT_MS = original;
+  });
+
+  test("getDbConfig reads DB_CONNECTION_TIMEOUT_MS env", () => {
+    const original = process.env.DB_CONNECTION_TIMEOUT_MS;
+    process.env.DB_CONNECTION_TIMEOUT_MS = "30000";
+    const config = getDbConfig();
+    expect(config.connectionTimeoutMs).toBe(30_000);
+    if (original === undefined) delete process.env.DB_CONNECTION_TIMEOUT_MS;
+    else process.env.DB_CONNECTION_TIMEOUT_MS = original;
+  });
+
   test("getPgPool returns a shared pool instance", async () => {
     if (!DB_AVAILABLE) return;
     const pool1 = await getPgPool();
