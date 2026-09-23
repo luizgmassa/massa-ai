@@ -34,7 +34,6 @@ own files in shared host directories.
 
 | Item | Reason |
 | --- | --- |
-| Renaming reference directories `references/{tdd,rfc,ticket}/`, `references/adr-authoring.md`, or docs guide files `docs/massa-ai-{rfc,tdd,ticket}.md` | Internal/doc file names, not workflow names; user asked for workflow renames only |
 | Dropping the `massa-ai-` prefix from slash commands (`/massa-ai-<stem>` file route, OpenCode `command/massa-ai-*.md`) or from the hook binary `massa-ai-hook` | Request item 14 scopes the prefix removal to subagents |
 | Deprecated aliases for old workflow names | User decision: hard rename |
 | Widening the `design` workflow beyond mobile UI | Request item 4 changes the agent's charter and dispatch, not the workflow's target platform |
@@ -64,6 +63,7 @@ own files in shared host directories.
 | A16 Installed `MASSA-AI.md` after a plugin-only update | Plugin installers do not render `MASSA-AI.md` today (only `install-skills.sh` does); a machine updated only through `claude plugin update` keeps the old contract text until `install-harness.sh` / `install-skills.sh --apply` or a `massa-ai-config bootstrap enable|disable` re-renders it. **Accepted risk**, stated as an upgrade note in CHANGELOG | Pre-existing delivery gap for any contract change, not introduced here | n — recorded (plan-challenge C5) |
 | A18 Dispatch interception on the Claude file route and non-Claude hosts | **Accepted risk:** no agent namespace exists there; a user agent that won a collision skip receives massa-ai dispatches; the install-time skip warning is the signal | Only Claude's plugin route has a namespace | n — recorded (lite re-gate) |
 | A17 Legacy agent names for upgrade pruning | Exactly `massa-ai-<one of the 18 pre-change charter names>`, never `massa-ai-*` | Codex AC-02.3 (`test-installer-prune-codex.sh:78-86`) requires an unmarked user `massa-ai-mine.toml` to survive | n — recorded (plan-challenge C1) |
+| A19 Reference/doc renames | Included per user annotation (2026-09-23); `adr-authoring.md` → `create-adr.md` (single file, so no directory) | User review of spec.md | y |
 | A15 CHANGELOG classification | `### Removed` + `### Changed` under `[Unreleased]` (minor bump per CONTRIBUTING table); entries call out the breaking renames | Repo release rules | n — recorded |
 
 **Open questions:** none — all behavior-changing decisions were resolved with the user; the rest are recorded defaults above.
@@ -136,6 +136,7 @@ after what they produce.
 5. The Plan Challenge policy sentence SHALL name `spec-driven`, `feature`, `create-adr`, `create-rfc`, `create-tdd`, `refactor`, and each named file SHALL exist and contain "Plan Challenge Gate".
 6. WHEN `bun run generate:artifacts` runs THEN the generated workflow commands SHALL be exactly the 36 new stems (plus the 6 quick commands), with no command for a removed or old stem.
 7. The web UI `WORKFLOW_STEMS` list SHALL equal the 36 current stems.
+9. The workflow-owned references and guides SHALL follow the new stems: `references/create-tdd/`, `references/create-rfc/`, `references/create-ticket/`, `references/create-adr.md` (was `adr-authoring.md`), `docs/massa-ai-create-rfc.md`, `docs/massa-ai-create-tdd.md`, `docs/massa-ai-create-ticket.md`, and no tracked file outside `.specs/`, `.ua/`, and CHANGELOG history SHALL point at an old path.
 8. `bun scripts/check-stale-pointers.ts` (and the reference-graph orphan check) SHALL report no dangling pointer to a removed or renamed workflow or reference.
 
 ### P1: Unprefixed names with marker ownership ⭐ MVP
@@ -188,7 +189,7 @@ installer ever touching my own agent files.
 | ROS-03 | Counts 18→7 everywhere (AC-8) | Seven-agent roster | Design | Pending |
 | WFL-01 | Dispatch mapping per workflow family (Dispatch AC-1..9) | Workflow dispatch mapping | Design | Pending |
 | WFL-02 | Remove general + maestro, fallback rewrite (Inventory AC-1, AC-3, AC-4) | Workflow inventory | Design | Pending |
-| WFL-03 | Six renames incl. policy sentence, commands, web UI (AC-2, AC-5, AC-6, AC-7) | Workflow inventory | Design | Pending |
+| WFL-03 | Six renames incl. policy sentence, commands, web UI, owned references and docs guides (AC-2, AC-5, AC-6, AC-7, AC-9) | Workflow inventory | Design | Pending |
 | WFL-04 | No dangling pointers (AC-8) | Workflow inventory | Design | Pending |
 | NAM-01 | Generator emits unprefixed names + markers (NAM AC-1, AC-2, AC-9) | Unprefixed names | Design | Pending |
 | NAM-02 | Installers: marker ownership, collision skip, legacy prune (AC-3, AC-4, AC-5) | Unprefixed names | Design | Pending |

@@ -98,7 +98,7 @@ T12 → T13
 
 ### T2: Rename six workflows
 
-**What**: `git mv` discovery→product-discovery, adr→create-adr, to-prd→create-prd, rfc→create-rfc, tdd→create-tdd, ticket→create-ticket; update frontmatter `name`, session-id prefixes, `workflow:` tags, router rows and precedence text, Plan Challenge policy sentence in `skills/AGENTS.md`, every `workflows/<old>.md` pointer and backticked stem mention (not document-type mentions), docs guides' links.
+**What**: `git mv` discovery→product-discovery, adr→create-adr, to-prd→create-prd, rfc→create-rfc, tdd→create-tdd, ticket→create-ticket; update frontmatter `name`, session-id prefixes, `workflow:` tags, router rows and precedence text, Plan Challenge policy sentence in `skills/AGENTS.md`, every `workflows/<old>.md` pointer and backticked stem mention (not document-type mentions); `git mv` the owned references (`references/{tdd,rfc,ticket}/` → `references/create-{tdd,rfc,ticket}/`, `references/adr-authoring.md` → `references/create-adr.md`) and docs guides (`docs/massa-ai-{rfc,tdd,ticket}.md` → `docs/massa-ai-create-{rfc,tdd,ticket}.md`) and repoint every pointer, including the router's Shared References list and tests pinning those paths (`validate-repository.test.ts` guide and reference lists).
 **Where**: `skills/**`, `docs/**`, tests reading those paths
 **Depends on**: T1
 **Requirement**: WFL-03, WFL-04
@@ -106,6 +106,7 @@ T12 → T13
 **Done when**:
 
 - [ ] `git grep -n -F "workflows/adr.md"` (and each old stem path) returns 0 outside `.specs/`, `.ua/`, CHANGELOG
+- [ ] Same zero-hit check for `references/tdd/`, `references/rfc/`, `references/ticket/`, `adr-authoring.md`, `docs/massa-ai-rfc.md`, `docs/massa-ai-tdd.md`, `docs/massa-ai-ticket.md`
 - [ ] Plan Challenge sentence names `create-adr`, `create-rfc`, `create-tdd`; its parse test updated
 - [ ] Generated commands contain the 6 new stems and none of the old ones (assert in `workflow-command-entries.test.ts`)
 - [ ] Gate: scripts green
