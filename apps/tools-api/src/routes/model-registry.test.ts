@@ -197,6 +197,34 @@ describe("GET /api/v1/model-registry", () => {
     expect(res.json.data.overlayOverrideBreakdown).toEqual({ models: 0, profiles: 0 });
   });
 
+  // Finding 6: loadEffectiveRegistry already exposes v1BackupPath (D5/D7) when a v1 overlay
+  // was renamed away on this load — the GET route must forward it so the UI can render a
+  // notice from that exact field name.
+  test("200 forwards v1BackupPath when the library reports a v1 overlay was just backed up", async () => {
+    loadEffectiveRegistry.mockImplementationOnce(() => ({
+      registry: builtinRegistry,
+      source: { builtin: builtinRegistry, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
+      v1BackupPath: "/tmp/massa-ai-test-overlay/model-profiles.v1.json",
+    }));
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect(res.json.data.v1BackupPath).toBe("/tmp/massa-ai-test-overlay/model-profiles.v1.json");
+  });
+
+  test("200 omits v1BackupPath when the library does not report one", async () => {
+    loadEffectiveRegistry.mockImplementationOnce(() => ({
+      registry: builtinRegistry,
+      source: { builtin: builtinRegistry, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
+    }));
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect("v1BackupPath" in res.json.data).toBe(false);
+  });
+
   test("200 on overlay corruption with overlayError surfaced", async () => {
     loadEffectiveRegistry.mockImplementationOnce(() => ({
       registry: builtinRegistry,
@@ -350,6 +378,39 @@ describe("PUT /api/v1/model-registry", () => {
       const res = await put("/api/v1/model-registry", { bogus: {} });
       expect(res.status).toBe(400);
       expect(res.json.details.some((d: string) => d.includes('"bogus"'))).toBe(true);
+    });
+
+    // Finding 7: mergeOverlay's isOverlayProfile guard silently `continue`s past a non-object
+    // profile entry, so without this check it never reaches validateRegistry — the PUT would
+    // succeed (200) and persist dead cruft to the overlay file.
+    test("rejects a non-object profile entry (profiles.x = \"junk\")", async () => {
+      const res = await put("/api/v1/model-registry", { profiles: { x: "junk" } });
+      expect(res.status).toBe(400);
+      expect(res.json.success).toBe(false);
+      expect(res.json.details.some((d: string) => d.includes("overlay.profiles.x"))).toBe(true);
+      expect(mergeOverlay).not.toHaveBeenCalled();
+    });
+
+    // A models entry may legitimately be `null` (tombstone) — only a non-object, non-null
+    // value is rejected here.
+    test("rejects a non-object, non-null models entry (models.x = \"junk\")", async () => {
+      const res = await put("/api/v1/model-registry", { models: { x: "junk" } });
+      expect(res.status).toBe(400);
+      expect(res.json.success).toBe(false);
+      expect(res.json.details.some((d: string) => d.includes("overlay.models.x"))).toBe(true);
+      expect(mergeOverlay).not.toHaveBeenCalled();
+    });
+
+    test("a null models entry (tombstone) is not rejected by the shape check", async () => {
+      validateRegistry.mockImplementationOnce(() => builtinRegistry);
+      loadEffectiveRegistry.mockImplementationOnce(() => ({
+        registry: builtinRegistry,
+        source: { builtin: builtinRegistry, overlay: { models: {} }, tombstoned: [] },
+        overlayOverrideCount: 0,
+      }));
+
+      const res = await put("/api/v1/model-registry", { models: { "claude-alias-opus": null } });
+      expect(res.status).toBe(200);
     });
 
     test("does not reject a valid {models, profiles}-only overlay", async () => {

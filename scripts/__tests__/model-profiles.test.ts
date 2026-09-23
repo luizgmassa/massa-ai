@@ -471,6 +471,43 @@ describe("model-profiles: overlay merge (models + profiles)", () => {
     expect("cheap" in merged.profiles).toBe(false);
   });
 
+  // Finding 1: a new/duplicated (non-builtin) profile's overlay carrying a null leaf is a
+  // tombstone of nothing (no builtin counterpart to delete from) and must be stripped, not
+  // passed through — a null leaf reaching validateCell always fails ("is not an object").
+  test("a brand-new profile's hosts.<host> = null is stripped (tombstone of nothing), not passed through", () => {
+    const builtin = loadRegistry();
+    const overlay: OverlayData = {
+      profiles: {
+        "brand-new-test-profile": {
+          description: "test",
+          hosts: { claude: { model: "x", effort: "high" }, codex: null },
+        },
+      },
+    };
+    const merged = mergeOverlay(builtin, overlay) as Registry;
+    const p = merged.profiles["brand-new-test-profile"] as Registry["profiles"][string];
+    expect(p.hosts.claude).toEqual({ model: "x", effort: "high" });
+    expect("codex" in p.hosts).toBe(false);
+    expect(() => validateRegistry(merged)).not.toThrow();
+  });
+
+  test("a brand-new profile's whole-agent null override is stripped, not passed through", () => {
+    const builtin = loadRegistry();
+    const overlay: OverlayData = {
+      profiles: {
+        "brand-new-test-profile-2": {
+          description: "test",
+          hosts: { claude: { model: "x", effort: "high" } },
+          agents: { builder: null },
+        },
+      },
+    };
+    const merged = mergeOverlay(builtin, overlay) as Registry;
+    const p = merged.profiles["brand-new-test-profile-2"] as Registry["profiles"][string];
+    expect(p.agents).toBeUndefined();
+    expect(() => validateRegistry(merged)).not.toThrow();
+  });
+
   test("loadEffectiveRegistry: end-to-end overlay application, and the count/breakdown reflects only surviving entries", () => {
     const { dir, overlayPath } = tmpOverlayDir();
     try {
@@ -569,6 +606,22 @@ describe("model-profiles: v1 overlay detection and backup (D5, AC7)", () => {
     );
   });
 
+  test("isV1Shaped: true for a hosts.<host> tier map using 'standard' or 'deep', not just 'light'", () => {
+    expect(
+      isV1Shaped({ profiles: { balanced: { hosts: { claude: { standard: { model: "x", effort: "high" } } } } } }),
+    ).toBe(true);
+    expect(
+      isV1Shaped({ profiles: { balanced: { hosts: { claude: { deep: { model: "x", effort: "high" } } } } } }),
+    ).toBe(true);
+  });
+
+  // Finding 6: a typo'd v2 cell key (e.g. "modle" instead of "model") lacks the retired tier
+  // names entirely — it must surface as a real validation error, not be mistaken for v1 and
+  // silently renamed away.
+  test("isV1Shaped: false for a v2 cell with a typo'd key (no tier names present)", () => {
+    expect(isV1Shaped({ profiles: { balanced: { hosts: { claude: { modle: "opus" } } } } })).toBe(false);
+  });
+
   test("isV1Shaped: false for a non-object", () => {
     expect(isV1Shaped(null)).toBe(false);
     expect(isV1Shaped("nope")).toBe(false);
@@ -626,6 +679,32 @@ describe("model-profiles: v1 overlay detection and backup (D5, AC7)", () => {
         expect(v1WarnCalls.length).toBe(1);
       } finally {
         console.warn = originalWarn;
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // Finding 5: a rename failure (EACCES, or an ENOENT race) during v1 backup must not escape
+  // loadEffectiveRegistry uncaught — the GET route calls this synchronously in its handler,
+  // and an uncaught throw there is a 500, not the "degrade to builtin" contract every other
+  // overlay failure in this function already honors.
+  test("loadEffectiveRegistry: a v1 backup rename failure degrades to overlayError instead of throwing", () => {
+    const dir = tmpDir();
+    try {
+      const overlayPath = path.join(dir, "model-profiles.json");
+      writeFileSync(overlayPath, JSON.stringify({ tiers: ["light"] }));
+      require("fs").chmodSync(dir, 0o500);
+      try {
+        let result: ReturnType<typeof loadEffectiveRegistry> | undefined;
+        expect(() => {
+          result = loadEffectiveRegistry({ overlayPath });
+        }).not.toThrow();
+        expect(result!.overlayError).toBeDefined();
+        expect(result!.overlayError).toContain("backup failed");
+        expect(JSON.stringify(result!.registry)).toBe(JSON.stringify(loadRegistry()));
+      } finally {
+        require("fs").chmodSync(dir, 0o700);
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });

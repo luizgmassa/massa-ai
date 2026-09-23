@@ -76,6 +76,10 @@ const LEGACY_OVERLAY_KEYS = new Set(["tiers", "hostDefaults", "workflowTiers", "
  * `overlay.profiles`, so an unrecognized top-level key would otherwise vanish without
  * telling the operator their edit did nothing.
  */
+function isPlainObj(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
 function overlayShapeViolations(overlay: Record<string, unknown>): string[] {
   const violations: string[] = [];
   for (const key of Object.keys(overlay)) {
@@ -85,6 +89,27 @@ function overlayShapeViolations(overlay: Record<string, unknown>): string[] {
         ? `overlay key "${key}" is a v1 registry key removed in v2 — only "models" and "profiles" are supported overlay sections`
         : `overlay has unknown top-level key "${key}" — only "models" and "profiles" are supported`,
     );
+  }
+  // A non-object profile entry is silently skipped by mergeOverlay (isOverlayProfile guard),
+  // so without this check it never reaches validateRegistry and the write would succeed with
+  // dead cruft persisted to the overlay file (profiles have no null tombstone — that is what
+  // `_delete: true` is for).
+  if (isPlainObj(overlay.profiles)) {
+    for (const [name, val] of Object.entries(overlay.profiles)) {
+      if (!isPlainObj(val)) {
+        violations.push(`overlay.profiles.${name} must be an object, got ${JSON.stringify(val)}`);
+      }
+    }
+  }
+  // A models entry may legitimately be `null` (tombstone); anything else non-object is rejected
+  // here rather than left to surface as a confusing "is not an object" error deep inside the
+  // merged registry's validation output.
+  if (isPlainObj(overlay.models)) {
+    for (const [id, val] of Object.entries(overlay.models)) {
+      if (val !== null && !isPlainObj(val)) {
+        violations.push(`overlay.models.${id} must be an object or null (tombstone), got ${JSON.stringify(val)}`);
+      }
+    }
   }
   return violations;
 }
@@ -124,6 +149,7 @@ export const modelRegistryRoutes = new Elysia({ prefix: "/api/v1/model-registry"
           overlayOverrideCount: result.overlayOverrideCount ?? 0,
           overlayOverrideBreakdown: result.overlayOverrideBreakdown ?? ZERO_OVERLAY_OVERRIDE_BREAKDOWN,
           ...(result.overlayError ? { overlayError: result.overlayError } : {}),
+          ...(result.v1BackupPath ? { v1BackupPath: result.v1BackupPath } : {}),
           agents,
           ...(agentsError ? { agentsError } : {}),
         },

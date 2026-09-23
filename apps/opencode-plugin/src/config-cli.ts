@@ -530,9 +530,10 @@ export async function runCli(argv: string[]): Promise<number> {
       console.error(`Error: unknown host "${hostOpt}"`);
       return 1;
     }
+    const host: Host = (hostOpt as Host | undefined) ?? "claude";
     const targetHome = typeof options.target === "string" ? options.target : os.homedir();
     try {
-      let report = runtimeDriftReport({ targetHome });
+      let report = runtimeDriftReport({ targetHome, host });
       if (fix) {
         const profile = report.activeProfile;
         if (!profile) {
@@ -546,13 +547,13 @@ export async function runCli(argv: string[]): Promise<number> {
         // installed variant root before switching; a published install
         // (null sourceRoot) makes it a silent no-op.
         const sourceRoot = findRepoRootWithMarker(__dirname, GENERATOR_MARKER, GENERATOR_MARKER_MAX_LEVELS);
-        formatVariantSync(syncGeneratedVariants({ sourceRoot }));
-        const switchReport = switchProfile({ profile, host: hostOpt as Host | undefined, targetHome });
+        formatVariantSync(syncGeneratedVariants({ sourceRoot, targetHome }));
+        const switchReport = switchProfile({ profile, host, targetHome });
         formatSwitchReport(switchReport);
         if (!reportSucceeded(switchReport)) {
           return 1;
         }
-        report = runtimeDriftReport({ targetHome });
+        report = runtimeDriftReport({ targetHome, host });
       }
       formatDriftReport(report);
       return 0;

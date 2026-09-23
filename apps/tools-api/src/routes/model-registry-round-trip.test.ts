@@ -75,4 +75,23 @@ describe("PUT then GET — unmocked v2 overlay round trip (design D-3, plan-crit
     expect(getRes.json.success).toBe(true);
     expect(getRes.json.data.registry.profiles.balanced.hosts.claude.model).toBe("claude-round-trip-model");
   });
+
+  // Finding 1: a brand-new profile's overlay carrying a null leaf (no builtin counterpart to
+  // tombstone) must not 400 through the REAL mergeOverlay + validateRegistry chain.
+  test("PUT a brand-new profile with a null host leaf survives the REAL mergeOverlay + validateRegistry", async () => {
+    const putRes = await put("/api/v1/model-registry", {
+      profiles: {
+        "round-trip-new-profile": {
+          description: "round trip",
+          hosts: { claude: { model: "claude-round-trip-model", effort: "high" }, codex: null },
+        },
+      },
+    });
+    expect(putRes.status).toBe(200);
+    expect(putRes.json.success).toBe(true);
+    expect(putRes.json.data.registry.profiles["round-trip-new-profile"].hosts.claude.model).toBe(
+      "claude-round-trip-model",
+    );
+    expect("codex" in putRes.json.data.registry.profiles["round-trip-new-profile"].hosts).toBe(false);
+  });
 });

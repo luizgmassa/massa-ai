@@ -779,9 +779,35 @@ export async function runCheck(opts: EmitOptions = {}): Promise<number> {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
+/**
+ * agent-drift followup T1: the recorded active profile (install-state's
+ * modelProfile) outranks "balanced" so a regeneration re-emits the ACTIVES
+ * for the profile the operator switched to instead of silently resetting
+ * them to the default. Absent/unreadable state → empty map, and every host
+ * falls through to "balanced" exactly as before (fresh installs and CI keep
+ * their behavior). Shared by both `main()`'s real run and its `--check` path
+ * (via `runCheck`) — `--check` must resolve the same rank-3 profile a real
+ * run would, or a machine with a recorded non-"balanced" profile sees
+ * phantom drift comparing a state-aware emit against a state-blind one.
+ */
+export function readStateProfiles(stateFilePath?: string): Partial<Record<Host, string>> {
+  const stateProfiles: Partial<Record<Host, string>> = {};
+  try {
+    // Same default resolution as the switch engine's defaultStatePath.
+    const filePath = stateFilePath ?? path.join(homedir(), ".config", "massa-ai", "install-state.json");
+    const state = readInstallState(filePath);
+    Object.assign(stateProfiles, stateProfilesFromInstallState(state));
+  } catch {
+    // No state / unreadable state → no rank-3 entries. Deliberately silent:
+    // a fresh checkout has no state, and that is the normal path.
+  }
+  return stateProfiles;
+}
+
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const args = argv;
-  const opts: EmitOptions = { profileFlag: profileFlagFrom(args) };
+  const stateProfiles = readStateProfiles();
+  const opts: EmitOptions = { profileFlag: profileFlagFrom(args), stateProfiles };
   const check = args.includes("--check");
   if (check) {
     return runCheck(opts);
@@ -799,26 +825,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   // emitVariants against this same registry, so a shared Set is what keeps a stale agent
   // override warning exactly once.
   const warnedStaleAgents = new Set<string>();
-  // agent-drift followup T1: the recorded active profile (install-state's
-  // modelProfile) outranks "balanced" so a regeneration re-emits the ACTIVES
-  // for the profile the operator switched to instead of silently resetting
-  // them to the default. Absent/unreadable state → empty map, and
-  // every host falls through to "balanced" exactly as before (fresh
-  // installs and CI keep their behavior). A recorded profile that no longer
-  // exists or no longer supports this host is dropped by validStateProfile
-  // and also falls through to "balanced" — a stale historical switch must
-  // degrade like an unknown variant directory does, not crash the whole
-  // regeneration (T8 section 3, test-model-profile-installer-reapply.sh).
-  const stateProfiles: Partial<Record<Host, string>> = {};
-  try {
-    // Same default resolution as the switch engine's defaultStatePath.
-    const state = readInstallState(path.join(homedir(), ".config", "massa-ai", "install-state.json"));
-    Object.assign(stateProfiles, stateProfilesFromInstallState(state));
-  } catch {
-    // No state / unreadable state → no rank-3 entries. Deliberately silent:
-    // a fresh checkout has no state, and that is the normal path.
-  }
-  const runtimeOpts: EmitOptions = { ...opts, registry, warnedStaleAgents, stateProfiles };
+  const runtimeOpts: EmitOptions = { ...opts, registry, warnedStaleAgents };
   const profiles = await emitAll(HOST_DIRS, runtimeOpts);
   const hostCount = Object.keys(HOST_DIRS).length;
   const charterCount = (await scanCharterNames()).length;

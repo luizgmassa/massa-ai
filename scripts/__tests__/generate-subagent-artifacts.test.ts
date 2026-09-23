@@ -29,6 +29,7 @@ import {
   main,
   profilesPerHost,
   stateProfilesFromInstallState,
+  readStateProfiles,
   warnStaleAgentOverrides,
   OPENCODE_OWNED_MARKER,
   type Charter,
@@ -515,6 +516,40 @@ describe("runCheck / main drift gate", () => {
   test("main(['--check']) exits 0 (parity with the parity-test subprocess gate)", async () => {
     const code = await main(["--check"]);
     expect(code).toBe(0);
+  });
+
+  test("readStateProfiles reads the rank-3 profile from an arbitrary install-state.json path", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-state-"));
+    const statePath = path.join(dir, "install-state.json");
+    await fs.writeFile(
+      statePath,
+      JSON.stringify({
+        version: 2,
+        platforms: {
+          claude: { root: "/x", skills: [], skillsOwner: "plugin", modelProfile: { profile: "cheap" } },
+        },
+      }),
+    );
+    try {
+      expect(readStateProfiles(statePath)).toEqual({ claude: "cheap" });
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("readStateProfiles degrades to an empty map for a missing/unreadable path", () => {
+    expect(readStateProfiles(path.join(os.tmpdir(), "massa-ai-state-does-not-exist.json"))).toEqual({});
+  });
+
+  test("main() resolves stateProfiles BEFORE deciding the --check branch (agent-drift followup T4 — " +
+    "--check must resolve the same rank-3 profile a real run would, not a state-blind default)", async () => {
+    const source = await fs.readFile(path.join(REPO_ROOT, "scripts/generate-subagent-artifacts.ts"), "utf8");
+    const mainBody = source.slice(source.indexOf("export async function main("));
+    const stateComputedAt = mainBody.indexOf("readStateProfiles(");
+    const checkBranchAt = mainBody.indexOf("if (check)");
+    expect(stateComputedAt).toBeGreaterThan(-1);
+    expect(checkBranchAt).toBeGreaterThan(-1);
+    expect(stateComputedAt).toBeLessThan(checkBranchAt);
   });
 });
 

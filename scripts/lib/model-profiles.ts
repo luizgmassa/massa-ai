@@ -314,9 +314,21 @@ export function effortViolation(
 
 // ── v1 detection and backup (D5) ─────────────────────────────────────────────
 const V1_MARKER_KEYS = ["tiers", "hostDefaults", "workflowTiers", "agentTiers"] as const;
+const V1_TIER_NAMES = ["light", "standard", "deep"] as const;
+
+/** True when `v` carries a v1 tier sub-map: at least one of the three retired tier names
+ *  (`light`/`standard`/`deep`) keyed to an object with a `model` or `effort` field. A v2 cell
+ *  with a typo'd key (e.g. `modle`) has none of these tier keys and is correctly left alone —
+ *  it must surface as a validation error, not be mistaken for v1 and silently discarded. */
+function isV1TierMap(v: Record<string, unknown>): boolean {
+  return V1_TIER_NAMES.some((tier) => {
+    const entry = v[tier];
+    return isPlainObject(entry) && ("model" in entry || "effort" in entry);
+  });
+}
 
 /** A v1 registry/overlay carries a v1-only top-level key, or a `hosts.<host>` leaf shaped
- *  like a tier map (no `model` key) rather than a cell. Detection only needs one profile's
+ *  like a tier map (`isV1TierMap`) rather than a cell. Detection only needs one profile's
  *  one host to prove the shape, so it returns on the first hit. */
 export function isV1Shaped(raw: unknown): boolean {
   if (!isPlainObject(raw)) return false;
@@ -328,7 +340,7 @@ export function isV1Shaped(raw: unknown): boolean {
     const hosts = pRaw.hosts;
     if (!isPlainObject(hosts)) continue;
     for (const hRaw of Object.values(hosts)) {
-      if (isPlainObject(hRaw) && !("model" in hRaw)) return true;
+      if (isPlainObject(hRaw) && isV1TierMap(hRaw)) return true;
     }
   }
   return false;
@@ -542,18 +554,29 @@ export function loadEffectiveRegistry(opts?: {
 
   // v1 overlay (D5): detected once, backed up once, and the builtin is used for this load.
   if (isV1Shaped(overlayRaw)) {
-    const backupPath = backupV1Overlay(overlayPath);
-    console.warn(
-      `[massa-ai] Overlay at ${overlayPath} is a v1 (tiers-based) format, no longer supported. ` +
-        `It has been renamed to ${backupPath} and the built-in registry is used instead.`,
-    );
-    return {
-      registry: builtin,
-      source: { builtin, overlay: null, tombstoned: [] },
-      overlayOverrideCount: 0,
-      overlayOverrideBreakdown: zeroBreakdown(),
-      v1BackupPath: backupPath,
-    };
+    try {
+      const backupPath = backupV1Overlay(overlayPath);
+      console.warn(
+        `[massa-ai] Overlay at ${overlayPath} is a v1 (tiers-based) format, no longer supported. ` +
+          `It has been renamed to ${backupPath} and the built-in registry is used instead.`,
+      );
+      return {
+        registry: builtin,
+        source: { builtin, overlay: null, tombstoned: [] },
+        overlayOverrideCount: 0,
+        overlayOverrideBreakdown: zeroBreakdown(),
+        v1BackupPath: backupPath,
+      };
+    } catch (e) {
+      console.warn(`[massa-ai] Overlay at ${overlayPath} is v1-shaped but could not be backed up: ${(e as Error).message}`);
+      return {
+        registry: builtin,
+        source: { builtin, overlay: null, tombstoned: [] },
+        overlayOverrideCount: 0,
+        overlayOverrideBreakdown: zeroBreakdown(),
+        overlayError: `v1 overlay backup failed: ${(e as Error).message}`,
+      };
+    }
   }
 
   const overlay = overlayRaw as OverlayData;
@@ -671,15 +694,45 @@ function mergeAgents(
   return result;
 }
 
+/** A null leaf in a profile that has no builtin counterpart is a tombstone of nothing —
+ *  there is no builtin value to delete. Strips those leaves instead of passing them
+ *  through, so a new/duplicated profile with a leftover null cell doesn't fail
+ *  `validateCell` (which requires an object, not null) for a key that has no builtin
+ *  meaning to tombstone. */
+function stripNullLeavesForNewProfile(overlayProfile: Omit<OverlayProfile, "_delete">): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  if (overlayProfile.description !== undefined) result.description = overlayProfile.description;
+  if (overlayProfile.hosts) {
+    const hosts: Record<string, Cell> = {};
+    for (const [host, cell] of Object.entries(overlayProfile.hosts)) {
+      if (cell !== null) hosts[host] = cell;
+    }
+    result.hosts = hosts;
+  }
+  if (overlayProfile.agents) {
+    const agents: Record<string, Record<string, Cell>> = {};
+    for (const [agent, hostMap] of Object.entries(overlayProfile.agents)) {
+      if (hostMap === null) continue; // whole-agent null on a nonexistent profile — no-op, drop
+      const hosts: Record<string, Cell> = {};
+      for (const [host, cell] of Object.entries(hostMap)) {
+        if (cell !== null) hosts[host] = cell;
+      }
+      if (Object.keys(hosts).length > 0) agents[agent] = hosts;
+    }
+    if (Object.keys(agents).length > 0) result.agents = agents;
+  }
+  return result;
+}
+
 /** Merge one overlay profile against its builtin counterpart, per host cell and per
  *  agent/host cell. A host or agent the overlay does not mention is retained from the
  *  builtin. A profile the builtin does not have (a genuinely new profile) passes through
- *  as-is. */
+ *  as-is, minus any null leaves (`stripNullLeavesForNewProfile`). */
 function mergeProfile(builtinProfile: Profile | undefined, overlayProfile: OverlayProfile): Record<string, unknown> {
   const { _delete: _unused, ...rest } = overlayProfile;
   void _unused;
   if (!builtinProfile) {
-    return rest as Record<string, unknown>;
+    return stripNullLeavesForNewProfile(rest);
   }
   const mergedHosts = rest.hosts ? mergeFlatMap(builtinProfile.hosts, rest.hosts) : { ...builtinProfile.hosts };
   const mergedAgents = rest.agents ? mergeAgents(builtinProfile.agents ?? {}, rest.agents) : builtinProfile.agents;

@@ -45,13 +45,17 @@ function report(overrides: Partial<Report> = {}): Report {
   };
 }
 
+function defaultSwitchReport(): unknown {
+  return {
+    profile: "work",
+    dryRun: false,
+    hosts: [{ host: "claude", status: "switched", filesChanged: 2 }],
+    restartRequired: true,
+  };
+}
+
 const runtimeDriftReport = mock((_opts?: unknown): unknown => report());
-const switchProfile = mock((_opts?: unknown): unknown => ({
-  profile: "work",
-  dryRun: false,
-  hosts: [{ host: "claude", status: "switched", filesChanged: 2 }],
-  restartRequired: true,
-}));
+const switchProfile = mock((_opts?: unknown): unknown => defaultSwitchReport());
 const syncGeneratedVariants = mock((_opts?: unknown): unknown => []);
 
 const actualShared = require("@massa-ai/shared");
@@ -86,6 +90,7 @@ beforeEach(() => {
   switchProfile.mockClear();
   syncGeneratedVariants.mockClear();
   runtimeDriftReport.mockImplementation(() => report());
+  switchProfile.mockImplementation(() => defaultSwitchReport());
 });
 
 afterEach(() => {
@@ -166,5 +171,32 @@ describe("massa-ai-config doctor", () => {
     expect(code).toBe(1);
     expect(err).toContain('unknown host "nope"');
     expect(runtimeDriftReport).not.toHaveBeenCalled();
+  });
+
+  test("with no --host, defaults to claude instead of switching every host", async () => {
+    const { code } = await captureConsole(() => runCli(["doctor", "--fix", "--target", "/tmp/fake-home"]));
+    expect(code).toBe(0);
+    const switchArg = switchProfile.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(switchArg.host).toBe("claude");
+  });
+
+  test("--host codex threads through to the report and the fix", async () => {
+    const { code } = await captureConsole(() =>
+      runCli(["doctor", "--host", "codex", "--fix", "--target", "/tmp/fake-home"]),
+    );
+    expect(code).toBe(0);
+    const firstReportArg = runtimeDriftReport.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(firstReportArg.host).toBe("codex");
+    const switchArg = switchProfile.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(switchArg.host).toBe("codex");
+    const secondReportArg = runtimeDriftReport.mock.calls[1]?.[0] as Record<string, unknown>;
+    expect(secondReportArg.host).toBe("codex");
+  });
+
+  test("--fix threads --target into syncGeneratedVariants, not the real home", async () => {
+    const { code } = await captureConsole(() => runCli(["doctor", "--fix", "--target", "/tmp/fake-home"]));
+    expect(code).toBe(0);
+    const syncArg = syncGeneratedVariants.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(syncArg.targetHome).toBe("/tmp/fake-home");
   });
 });

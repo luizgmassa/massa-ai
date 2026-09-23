@@ -88,17 +88,29 @@ The user wants profiles to be the only lever, with each model picked from a type
 - **Overlay** `~/.config/massa-ai/model-profiles.json` stays a delta:
   - A `models.<id>` entry is replaced whole; a `null` value tombstones it.
   - A profile merges per `hosts.<host>` leaf and per `agents.<agent>.<host>` leaf. A
-    `null` leaf is a tombstone, and `_delete: true` tombstones the whole profile.
+    `null` leaf is a tombstone, and `_delete: true` tombstones the whole profile. A profile
+    with no builtin counterpart has nothing for a null leaf to tombstone, so those leaves
+    are stripped rather than passed through (fix round, catalog-review builder, 2026-09-23) —
+    a bare `null` always failed `validateCell`, which requires a cell object.
   - Reuse `mergeFlatMap` and `normalizeFlatMap` (`model-profiles.ts:648,756`).
   - Upgrades replace only the built-in file, so the overlay survives both restart and
     upgrade.
 - **v1 overlay (D5).**
   - It is detected by any of the keys `tiers|hostDefaults|workflowTiers|agentTiers`, or by
-    a `hosts.<host>` value that has no `model` key (a tier map).
+    a `hosts.<host>` value carrying one of the three retired tier names
+    (`light|standard|deep`) mapped to a `{model, effort}`-like object (a tier map). Amended
+    (fix round, catalog-review builder, 2026-09-23): the original "has no `model` key" test
+    false-positived on a merely typo'd v2 cell (e.g. `{modle: "opus"}`), silently renaming it
+    away instead of surfacing a validation error — detection now requires an actual tier-name
+    key, not just the absence of `model`.
   - On load it is renamed to `model-profiles.v1.json`, or to `model-profiles.v1.<epoch>.json`
     if that name is taken. The loader logs one warning naming the backup path and uses the
-    built-ins.
+    built-ins. A rename failure (EACCES, or an ENOENT race) degrades to `overlayError`
+    instead of throwing (fix round, catalog-review builder, 2026-09-23) — this function is
+    called synchronously from the GET route handler.
   - This is the only mutation on the read path, and it happens once.
+  - `loadEffectiveRegistry`'s `v1BackupPath` is forwarded by `GET /api/v1/model-registry` so
+    the UI can render a notice from that field (fix round, catalog-review builder, 2026-09-23).
 - **UI edit semantics (D4).**
   - Editing a catalog model rewrites the cells whose tool matches and whose string equals
     the model's old resolved string, in the unsaved overlay state.

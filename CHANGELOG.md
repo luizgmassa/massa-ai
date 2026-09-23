@@ -66,8 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caused. `main()` now threads the recorded profile through `emitAll`
   (`stateProfilesFromInstallState`), so a regeneration re-emits the actives
   for the profile the operator actually switched to; fresh checkouts and CI
-  (no state) keep the old behavior, and an unknown recorded name still
-  throws before any file is written.
+  (no state) keep the old behavior. A stale recorded name (removed, renamed,
+  or no longer supporting the host) now degrades to the `"balanced"`
+  fallback instead of throwing — a historical switch this run did not
+  request should not crash regeneration; `--profile`/`MASSA_AI_MODEL_PROFILE`
+  still throw on an unknown name.
 - **Dashboard scheduler status now reports real `consecutiveFailures` and
   `lastSuccessAt`.** `GET /api/v1/scheduler/status` stopped hardcoding
   these fields to 0 and null, and now reflects the job's actual persistence.
