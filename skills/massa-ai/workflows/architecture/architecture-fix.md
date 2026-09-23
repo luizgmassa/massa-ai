@@ -73,7 +73,7 @@ Not for findings-only architecture review — route to `workflows/architecture/a
    - Update tests, docs, and imports only where required by the architecture fix.
 10. Use agent orchestration only when it improves signal — except the verifier dispatch below, which is tier-gated mandatory rather than discretionary, carved out under `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated architecture finding with a disjoint write set
 > - permissions: write (disjoint write set)

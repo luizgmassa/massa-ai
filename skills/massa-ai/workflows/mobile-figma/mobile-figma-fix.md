@@ -32,7 +32,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
    - `references/audit-scope.md` and `references/codebase-investigation.md` for freshness and current source.
    - `references/verification-ladder.md` before edits.
    - `references/context-firewall.md` before large design/runtime artifacts.
-   - `references/agent-orchestration.md` for the designer/builder dispatches and the tier-gated `code-reviewer` `verify` dispatch in the fix loop below.
+   - `references/agent-orchestration.md` for the designer/senior-engineer dispatches and the tier-gated `code-reviewer` `verify` dispatch in the fix loop below.
    - `references/discrimination-sensor.md` before closing any finding under the Mandatory Verification Fix Gate — the mobile-Figma token/value instantiation lives in `references/mobile-figma-matcher/core.md`'s Discrimination Sensor for Visual Parity section.
    - `references/knowledge-verification-chain.md` when a selected finding's fix direction depends on platform-API or external-library technique rather than the Figma-defined value.
    - `references/brownfield-mapping.md` (Minimum Bar only — the gate-command packet, `TESTING.md`-equivalent) when recall returns no hit for the target surface/module and no gate command is derivable from the report's evidence, for Standard+ findings; the report's Verification/Test Fidelity Checklist already carries the risk surface, so `CONCERNS.md` is satisfied-by-citation from that checklist rather than derived fresh.
@@ -60,14 +60,14 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
    - Modify tracked Maestro flows only when the selected finding explicitly identifies the flow as incorrect or missing and the user-approved scope includes that change.
 9. Dispatch per `references/agent-orchestration.md`; the `code-reviewer` `verify` block below is tier-gated mandatory, not merely discretionary — carved out of ordinary delegation gating by that reference's Independent Verification Exception:
 
-**Screen work — unconditional in this workflow:** every task here fixes a user-facing screen, so the `designer` dispatch below always runs; it is not gated on a screen-work condition (Screen Implementation Exception in `references/agent-orchestration.md`). `designer` implements every UI-layer `MFM-*` fix; `builder` is dispatched only for an `MFM-*` finding whose fix needs non-UI-layer changes (navigation, data, resource or build wiring), with a write set disjoint from the designer's.
+**Screen work — unconditional in this workflow:** every task here fixes a user-facing screen, so the `designer` dispatch below always runs; it is not gated on a screen-work condition (Screen Implementation Exception in `references/agent-orchestration.md`). `designer` implements every UI-layer `MFM-*` fix; `senior-engineer` is dispatched only for an `MFM-*` finding whose fix needs non-UI-layer changes (navigation, data, resource or build wiring), with a write set disjoint from the designer's.
 
 > **Dispatch: `designer`** (role: `designer`, mode: `implement`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: a selected `MFM-*` finding whose fix needs non-UI-layer changes (navigation, data, resource or build wiring) — never for a UI-layer fix, which belongs to `designer`
 > - scope: the non-UI-layer part of one `MFM-*` finding, or of a coherent surface group sharing one KMP root cause, with a write set disjoint from the designer's
 > - permissions: write (disjoint write set, non-UI-layer files only)

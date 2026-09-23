@@ -36,7 +36,7 @@ const RETIRED = [
 ] as const;
 
 const ROSTER = [
-  "builder",
+  "senior-engineer",
   "code-explorer",
   "code-reviewer",
   "designer",

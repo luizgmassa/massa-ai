@@ -68,7 +68,7 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 const SPECIALIST_NAMES = [
-  "builder",
+  "senior-engineer",
   "code-explorer",
   "code-reviewer",
   "designer",
@@ -184,7 +184,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     });
     const agentsDir = path.join(xdgConfig, "opencode/agents");
     const writeAgents = new Set([
-      "builder",
+      "senior-engineer",
       "designer",
       "judge",
       "test-engineer",
@@ -236,8 +236,8 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
   test("NAM AC-3: install never overwrites an unmarked same-named agent and warns; uninstall leaves it", async () => {
     const agentsDir = path.join(xdgConfig, "opencode/agents");
     await fs.mkdir(agentsDir, { recursive: true });
-    const foreign = path.join(agentsDir, "builder.md");
-    const userBody = "---\ndescription: user's own builder\nmode: all\n---\nmine\n";
+    const foreign = path.join(agentsDir, "senior-engineer.md");
+    const userBody = "---\ndescription: user's own senior-engineer\nmode: all\n---\nmine\n";
     await fs.writeFile(foreign, userBody);
 
     const res = runCli(["agents", "install", "--user"], { HOME: tmp, XDG_CONFIG_HOME: xdgConfig });
@@ -259,9 +259,9 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     await fs.mkdir(agentsDir, { recursive: true });
     await fs.mkdir(bundleAgents, { recursive: true });
     await fs.mkdir(dotfiles, { recursive: true });
-    const bundleBody = "---\nname: builder\n---\n<!-- massa-ai-owned: true -->\nold bundle\n";
-    await fs.writeFile(path.join(bundleAgents, "builder.md"), bundleBody);
-    await fs.symlink(path.join(bundleAgents, "builder.md"), path.join(agentsDir, "builder.md"));
+    const bundleBody = "---\nname: senior-engineer\n---\n<!-- massa-ai-owned: true -->\nold bundle\n";
+    await fs.writeFile(path.join(bundleAgents, "senior-engineer.md"), bundleBody);
+    await fs.symlink(path.join(bundleAgents, "senior-engineer.md"), path.join(agentsDir, "senior-engineer.md"));
     await fs.symlink(path.join(bundleAgents, "judge.md"), path.join(agentsDir, "judge.md"));
     await fs.symlink(path.join(tmp, "gone/massa-ai-reviewer.md"), path.join(agentsDir, "massa-ai-reviewer.md"));
     const userBody = "---\ndescription: mine\n---\nmine\n";
@@ -270,20 +270,20 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
 
     const res = runCli(["agents", "install", "--user"], { HOME: tmp, XDG_CONFIG_HOME: xdgConfig });
     expect(res.exitCode).toBe(0);
-    expect(res.stderr).not.toContain("builder.md exists and is not massa-ai-owned");
+    expect(res.stderr).not.toContain("senior-engineer.md exists and is not massa-ai-owned");
     expect(res.stderr).toContain(`${path.join(agentsDir, "designer.md")} exists and is not massa-ai-owned — skipped`);
-    expect((await fs.lstat(path.join(agentsDir, "builder.md"))).isSymbolicLink()).toBe(false);
-    expect(await fs.readFile(path.join(bundleAgents, "builder.md"), "utf8")).toBe(bundleBody);
+    expect((await fs.lstat(path.join(agentsDir, "senior-engineer.md"))).isSymbolicLink()).toBe(false);
+    expect(await fs.readFile(path.join(bundleAgents, "senior-engineer.md"), "utf8")).toBe(bundleBody);
     expect(await fs.readlink(path.join(agentsDir, "designer.md"))).toBe(path.join(dotfiles, "designer.md"));
 
-    await fs.rm(path.join(agentsDir, "builder.md"));
-    await fs.symlink(path.join(bundleAgents, "builder.md"), path.join(agentsDir, "builder.md"));
+    await fs.rm(path.join(agentsDir, "senior-engineer.md"));
+    await fs.symlink(path.join(bundleAgents, "senior-engineer.md"), path.join(agentsDir, "senior-engineer.md"));
     const un = runCli(["agents", "uninstall", "--user"], { HOME: tmp, XDG_CONFIG_HOME: xdgConfig });
     expect(un.exitCode).toBe(0);
     const left = (await fs.readdir(agentsDir)).sort();
     expect(left).toEqual(["designer.md"]);
     expect(await fs.readFile(path.join(dotfiles, "designer.md"), "utf8")).toBe(userBody);
-    expect(await fs.readFile(path.join(bundleAgents, "builder.md"), "utf8")).toBe(bundleBody);
+    expect(await fs.readFile(path.join(bundleAgents, "senior-engineer.md"), "utf8")).toBe(bundleBody);
   });
 
   test("OPC-06: idempotent re-run overwrites with identical content", async () => {

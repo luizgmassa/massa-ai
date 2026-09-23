@@ -16,7 +16,7 @@
 # bundle copy, a deleted bundle copy (dangling link), and a profile switch.
 #
 # Every scenario runs against a staged bundle (stage_plugin_bundle) whose agent
-# files carry unprefixed names, so a planted builder.<ext> really collides with
+# files carry unprefixed names, so a planted senior-engineer.<ext> really collides with
 # a shipped agent. HOMEs are scratch dirs; the real $HOME is never touched.
 #
 # Usage: bash scripts/tests/test-installer-agent-ownership.sh
@@ -42,7 +42,7 @@ for host in claude codex cursor opencode; do
 done
 
 MARKER='<!-- massa-ai-owned: true -->'
-UNMARKED_MD=$'---\nname: builder\ndescription: my own builder\n---\nI am the user\'s builder.\n'
+UNMARKED_MD=$'---\nname: senior-engineer\ndescription: my own senior-engineer\n---\nI am the user\'s senior-engineer.\n'
 # Shaped like an agent a pre-marker release generated: frontmatter plus the
 # charter body, no ownership marker.
 LEGACY_MD=$'---\nname: massa-ai-reviewer\ndescription: Read-only diff review agent.\nmodel: inherit\n---\n# Reviewer Agent Skill\n'
@@ -73,15 +73,15 @@ for host in claude cursor codex; do
   H="$ROOT/home-$host"; mkdir -p "$H"
   AD="$(agents_dir_for "$host" "$H")"; mkdir -p "$AD"
   ext=md; [[ "$host" == codex ]] && ext=toml
-  check "$host: staged bundle ships builder.$ext" "$([ -f "$STAGE/apps/$host-plugin/agents/builder.$ext" ] && echo 0 || echo 1)"
+  check "$host: staged bundle ships senior-engineer.$ext" "$([ -f "$STAGE/apps/$host-plugin/agents/senior-engineer.$ext" ] && echo 0 || echo 1)"
 
   if [[ "$ext" == md ]]; then
-    printf '%s' "$UNMARKED_MD" > "$AD/builder.md"
+    printf '%s' "$UNMARKED_MD" > "$AD/senior-engineer.md"
     printf '%s' "$LEGACY_MD" > "$AD/massa-ai-reviewer.md"
     printf '%s' "$UNMARKED_MD" > "$AD/massa-ai-mine.md"
     printf '%s' "$MARKED_RETIRED_MD" > "$AD/retired-specialist.md"
   else
-    printf 'name = "builder"\ndescription = "my own builder"\n' > "$AD/builder.toml"
+    printf 'name = "senior-engineer"\ndescription = "my own senior-engineer"\n' > "$AD/senior-engineer.toml"
     printf '# massa-ai-owned\nname = "massa-ai-reviewer"\n' > "$AD/massa-ai-reviewer.toml"
     printf 'name = "massa-ai-mine"\n' > "$AD/massa-ai-mine.toml"
     printf '# massa-ai-owned\nname = "retired-specialist"\n' > "$AD/retired-specialist.toml"
@@ -90,14 +90,14 @@ for host in claude cursor codex; do
   mkdir -p "$H/dotfiles"
   printf '%s' "$UNMARKED_MD" > "$H/dotfiles/judge.$ext"
   ln -s "$H/dotfiles/judge.$ext" "$AD/judge.$ext"
-  cp "$AD/builder.$ext" "$ROOT/builder-$host.orig"
+  cp "$AD/senior-engineer.$ext" "$ROOT/senior-engineer-$host.orig"
   cp "$AD/massa-ai-mine.$ext" "$ROOT/mine-$host.orig"
   cp "$H/dotfiles/judge.$ext" "$ROOT/judge-$host.orig"
 
   OUT="$(run_installer "$host" "$STAGE" "$H")"; RC=$?
   assert_eq "$host install exits 0" "$RC" "0"
-  check "$host: foreign builder.$ext is byte-identical after install" "$(cmp -s "$AD/builder.$ext" "$ROOT/builder-$host.orig" && echo 0 || echo 1)"
-  assert_contains "$host: install warns naming the foreign file" "$OUT" "$AD/builder.$ext exists and is not massa-ai-owned — skipped"
+  check "$host: foreign senior-engineer.$ext is byte-identical after install" "$(cmp -s "$AD/senior-engineer.$ext" "$ROOT/senior-engineer-$host.orig" && echo 0 || echo 1)"
+  assert_contains "$host: install warns naming the foreign file" "$OUT" "$AD/senior-engineer.$ext exists and is not massa-ai-owned — skipped"
   assert_symlink_to "$host: user symlink judge.$ext keeps its target" "$AD/judge.$ext" "$H/dotfiles/judge.$ext"
   check "$host: user symlink target is untouched" "$(cmp -s "$H/dotfiles/judge.$ext" "$ROOT/judge-$host.orig" && echo 0 || echo 1)"
   assert_contains "$host: install warns naming the foreign symlink" "$OUT" "$AD/judge.$ext exists and is not massa-ai-owned — skipped"
@@ -113,11 +113,11 @@ for host in claude cursor codex; do
 
   run_installer "$host" "$STAGE" "$H" --uninstall >/dev/null; RC=$?
   assert_eq "$host uninstall exits 0" "$RC" "0"
-  check "$host: foreign builder.$ext is byte-identical after uninstall" "$(cmp -s "$AD/builder.$ext" "$ROOT/builder-$host.orig" && echo 0 || echo 1)"
+  check "$host: foreign senior-engineer.$ext is byte-identical after uninstall" "$(cmp -s "$AD/senior-engineer.$ext" "$ROOT/senior-engineer-$host.orig" && echo 0 || echo 1)"
   assert_symlink_to "$host: user symlink survives uninstall" "$AD/judge.$ext" "$H/dotfiles/judge.$ext"
   check "$host: unmarked massa-ai-mine.$ext survives uninstall" "$(cmp -s "$AD/massa-ai-mine.$ext" "$ROOT/mine-$host.orig" && echo 0 || echo 1)"
   assert_no_file "$host: owned code-reviewer.$ext removed by uninstall" "$AD/code-reviewer.$ext"
-  assert_eq "$host: only the three user entries remain" "$(ls "$AD" | LC_ALL=C sort | tr '\n' ' ')" "builder.$ext judge.$ext massa-ai-mine.$ext "
+  assert_eq "$host: only the three user entries remain" "$(ls "$AD" | LC_ALL=C sort | tr '\n' ' ')" "judge.$ext massa-ai-mine.$ext senior-engineer.$ext "
 done
 
 # ── OpenCode (agents install as symlinks) ───────────────────────────────────
@@ -127,17 +127,17 @@ STAGE_A="$ROOT/stage-oc-a"; stage_plugin_bundle opencode "$STAGE_A"
 STAGE_B="$ROOT/stage-oc-b"; stage_plugin_bundle opencode "$STAGE_B"
 H="$ROOT/home-opencode"; mkdir -p "$H"
 AD="$(agents_dir_for opencode "$H")"; mkdir -p "$AD" "$H/dotfiles/opencode/agents"
-printf '%s' "$UNMARKED_MD" > "$AD/builder.md"
+printf '%s' "$UNMARKED_MD" > "$AD/senior-engineer.md"
 printf '%s' "$UNMARKED_MD" > "$H/dotfiles/opencode/agents/judge.md"
 ln -s "$H/dotfiles/opencode/agents/judge.md" "$AD/judge.md"
 ln -s "/deleted/checkout/apps/opencode-plugin/agents/massa-ai-reviewer.md" "$AD/massa-ai-reviewer.md"
 printf '%s' "$UNMARKED_MD" > "$AD/massa-ai-mine.md"
-cp "$AD/builder.md" "$ROOT/builder-oc.orig"
+cp "$AD/senior-engineer.md" "$ROOT/senior-engineer-oc.orig"
 
 OUT="$(run_installer opencode "$STAGE_A" "$H")"; RC=$?
 assert_eq "opencode install (copy A) exits 0" "$RC" "0"
-check "opencode: foreign regular builder.md is byte-identical" "$(cmp -s "$AD/builder.md" "$ROOT/builder-oc.orig" && echo 0 || echo 1)"
-assert_contains "opencode: install warns naming the foreign file" "$OUT" "$AD/builder.md exists and is not massa-ai-owned — skipped"
+check "opencode: foreign regular senior-engineer.md is byte-identical" "$(cmp -s "$AD/senior-engineer.md" "$ROOT/senior-engineer-oc.orig" && echo 0 || echo 1)"
+assert_contains "opencode: install warns naming the foreign file" "$OUT" "$AD/senior-engineer.md exists and is not massa-ai-owned — skipped"
 assert_symlink_to "opencode: user symlink judge.md keeps its dotfiles target" "$AD/judge.md" "$H/dotfiles/opencode/agents/judge.md"
 assert_contains "opencode: install warns naming the foreign symlink" "$OUT" "$AD/judge.md exists and is not massa-ai-owned — skipped"
 assert_no_file "opencode: legacy (dangling) massa-ai-reviewer.md link is pruned" "$AD/massa-ai-reviewer.md"
@@ -179,8 +179,8 @@ assert_eq "opencode: reinstall is a no-op on the agents dir" "$(tree_fingerprint
 
 run_installer opencode "$STAGE_B" "$H" --uninstall >/dev/null; RC=$?
 assert_eq "opencode uninstall exits 0" "$RC" "0"
-check "opencode: foreign builder.md is byte-identical after uninstall" "$(cmp -s "$AD/builder.md" "$ROOT/builder-oc.orig" && echo 0 || echo 1)"
+check "opencode: foreign senior-engineer.md is byte-identical after uninstall" "$(cmp -s "$AD/senior-engineer.md" "$ROOT/senior-engineer-oc.orig" && echo 0 || echo 1)"
 assert_symlink_to "opencode: user symlink survives uninstall" "$AD/judge.md" "$H/dotfiles/opencode/agents/judge.md"
-assert_eq "opencode: only the three user entries remain" "$(ls "$AD" | LC_ALL=C sort | tr '\n' ' ')" "builder.md judge.md massa-ai-mine.md "
+assert_eq "opencode: only the three user entries remain" "$(ls "$AD" | LC_ALL=C sort | tr '\n' ' ')" "judge.md massa-ai-mine.md senior-engineer.md "
 
 summary "installer agent ownership"

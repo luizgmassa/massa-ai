@@ -101,6 +101,16 @@
  *    `renderModelRegistry` or ending `renderProfilesView/.../registry` changed, no case
  *    was added or dropped, and every diffed byte falls into one of the four changes
  *    above; every other case is byte-untouched.
+ *
+ * 7. agent-roster-revision T1 (REN-01..04) — the `builder` charter was renamed to
+ *    `senior-engineer`; the Per-Agent Model Overrides help card's example agent name in
+ *    `src/static/views/registry.ts` was updated to match. Diffed before regenerating:
+ *    exactly the same 18 cases as entry 6 changed, no case was added or dropped, and the
+ *    only diffed bytes are that one `<code>builder</code>` -> `<code>senior-engineer</code>`
+ *    substitution repeated once per case; every other case and byte is untouched. (The
+ *    `builder` strings still present elsewhere in this fixture's per-agent-override table
+ *    rows come from this test file's own synthetic registry mock, not the real charter, and
+ *    are unaffected by the rename.)
  */
 
 import { describe, it, expect } from "bun:test";

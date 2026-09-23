@@ -66,7 +66,7 @@ Not for findings-only requirements review — route to `workflows/requirements/r
    - If a finding exposes a product decision gap, stop and ask rather than inventing policy.
 10. Use agent orchestration only when it improves signal, with one carve-out: the `code-reviewer` `verify` dispatch below is mandatory at its tier gate rather than discretionary, per `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated requirements finding with a disjoint write set
 > - permissions: write (disjoint write set)

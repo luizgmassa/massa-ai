@@ -38,7 +38,7 @@ Judge existing or changed code with source-backed evidence: review a diff, verif
 ## Modes
 
 ### Mode: `review`
-Diff review after a builder completes a task and before the verification gate.
+Diff review after a senior-engineer completes a task and before the verification gate.
 
 - Analyze the diff for correctness bugs, regressions against existing behavior, code smells, maintainability issues, and missing edge cases.
 - Suggest improvements with `path:line` pointers.
@@ -106,7 +106,7 @@ Output:
 
 ## Invocation
 ### Use when
-- A builder has completed a task and the workflow needs a diff review (`review`), or a PR or branch needs review before merge.
+- A senior-engineer has completed a task and the workflow needs a diff review (`review`), or a PR or branch needs review before merge.
 - The mandatory verification gate must run, or the workflow needs author ≠ verifier verification (`verify`).
 - A workflow needs a findings-only audit, or a high/critical finding needs independent verification (`audit`).
 - A workflow needs architectural guidance, the work crosses module or service boundaries, or a mobile project needs platform guidance (`guide`).
@@ -114,7 +114,7 @@ Output:
 ### Do not use when
 - No diff, implementation, or concrete target exists yet.
 - `guide` only: the work is a single-file fix with no architectural surface.
-- The task needs a fix (route to the matching `*-fix` workflow or `builder`).
+- The task needs a fix (route to the matching `*-fix` workflow or `senior-engineer`).
 - The lens is ambiguous (ask the user to pick one), or it is the `requirements` or `tests` lens.
 
 ## massa-ai Integration

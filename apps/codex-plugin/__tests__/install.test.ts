@@ -204,7 +204,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
 
   // ── T5: subagent TOML agents (CDX-01,02,05,06,07 + DOC-01) ──────────────
   const SPECIALIST_NAMES = [
-    "builder",
+    "senior-engineer",
     "code-explorer",
     "code-reviewer",
     "designer",

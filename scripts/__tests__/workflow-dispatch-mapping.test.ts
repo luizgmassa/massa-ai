@@ -31,7 +31,7 @@ function dispatchTargets(text: string): string[] {
   return [...found].sort();
 }
 
-const FIX_TRIO = ["builder", "code-reviewer/review", "code-reviewer/verify"];
+const FIX_TRIO = ["senior-engineer", "code-reviewer/review", "code-reviewer/verify"];
 
 const EXPECTED: Record<string, string[]> = {
   // Dispatch AC-1: audits → code-reviewer with the matching lens; implementation-audit
@@ -45,19 +45,19 @@ const EXPECTED: Record<string, string[]> = {
     "product-manager/audit",
     "test-engineer/audit",
   ],
-  // Dispatch AC-2: fixes → builder implements, code-reviewer reviews and verifies.
+  // Dispatch AC-2: fixes → senior-engineer implements, code-reviewer reviews and verifies.
   "architecture/architecture-fix.md": FIX_TRIO,
   "bugs/bugs-fix.md": FIX_TRIO,
   "code-quality/code-quality-fix.md": FIX_TRIO,
   "security/security-fix.md": FIX_TRIO,
   "implementation/implementation-fix.md": [...FIX_TRIO, "designer/implement"],
-  // A7: requirements-fix keeps builder.
+  // A7: requirements-fix keeps senior-engineer.
   "requirements/requirements-fix.md": FIX_TRIO,
   // Dispatch AC-3: tests family → test-engineer audits and implements.
   "tests/tests-audit.md": ["test-engineer/audit"],
-  // A production seam for deterministic testing is builder's; test-engineer writes test files only.
+  // A production seam for deterministic testing is senior-engineer's; test-engineer writes test files only.
   "tests/tests-fix.md": [
-    "builder",
+    "senior-engineer",
     "code-reviewer/review",
     "code-reviewer/verify",
     "test-engineer/fix",
@@ -164,9 +164,9 @@ describe("designer is unconditional in the design family (Dispatch AC-5)", () =>
     }
   });
 
-  test("mobile-figma-fix dispatches builder only for non-UI-layer wiring", () => {
+  test("mobile-figma-fix dispatches senior-engineer only for non-UI-layer wiring", () => {
     const text = read(path.join(WORKFLOWS, "mobile-figma/mobile-figma-fix.md"));
-    const start = text.indexOf("> **Dispatch: `builder`**");
+    const start = text.indexOf("> **Dispatch: `senior-engineer`**");
     expect(start).toBeGreaterThan(-1);
     const block = text.slice(start, text.indexOf("\n\n", start));
     expect(block).toContain(

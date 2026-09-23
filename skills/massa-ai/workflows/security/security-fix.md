@@ -68,7 +68,7 @@ Not for findings-only security review — route to `workflows/security/security-
    - Do not weaken existing security assertions to make tests pass.
 10. Use agent orchestration only when it improves signal — except the verifier dispatch below, which is unconditional for every SEC finding closed `fixed`, carved out under `references/agent-orchestration.md`'s Independent Verification Exception as the security-fix unconditional case (other fix families use the tier-gated one). Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated security finding with a disjoint write set
 > - permissions: write (disjoint write set)

@@ -265,7 +265,7 @@ drift, and did.
 
 | Name | Purpose | Permission | Modes | Charter |
 |---|---|---|---|---|
-| builder | Implement approved plans | write | — (one contract) | `skills/agents/builder/SKILL.md` |
+| senior-engineer | Implement approved plans | write | — (one contract) | `skills/agents/senior-engineer/SKILL.md` |
 | code-explorer | Understand an existing codebase, index-first | read-only | `lookup` (index-first answer), `trace` (flow, dependencies, impact) | `skills/agents/code-explorer/SKILL.md` |
 | code-reviewer | Review, verify, audit, and guide existing or changed code | read-only | `review` (diff), `verify` (Verification Ladder + discrimination sensor), `audit` (lenses bugs, architecture, security, code-quality, performance), `guide` (architecture, mobile platform) | `skills/agents/code-reviewer/SKILL.md` |
 | designer | Read and write user-facing screens from Figma, screenshots, or other design direction | read-only (UI-layer write when scoped) | `audit` (conformance), `implement` (UI layer) | `skills/agents/designer/SKILL.md` |
@@ -279,6 +279,7 @@ The single old→new table for the charters retired by the roster consolidation.
 
 | Retired agent | Current agent | Mode / lens |
 |---|---|---|
+| builder | senior-engineer | `—` (renamed) |
 | investigator | code-explorer | `trace` |
 | navigator | code-explorer | `lookup` |
 | reviewer | code-reviewer | `review` |
