@@ -696,21 +696,13 @@ describe("subagent parity — FEATURES.md doc-drift (MPR-R11)", () => {
   const FEATURES = readFileSync(path.join(REPO_ROOT, "FEATURES.md"), "utf8");
   const TABLES = markdownTables(FEATURES);
 
-  // The registry v2 revamp (model-catalog-revamp) deletes the tier concept entirely, so
-  // there is nothing left in a charter to compare an "Agent | Tier" doc table against.
-  // Removing that table from FEATURES.md, and this now-vacuous cross-check, is T4's docs
-  // task — the charter-side invariant (no charter names a tier) is the repo-wide AC1 grep
-  // sensor, not a unit test here, so it is not restated as one.
-
-  test("it is the ONLY role-keyed table in the file", () => {
-    // Kills the design.md section 6 mutation "reintroduce a per-host rationale column":
-    // any second table keyed by agent name — with a model column, a rationale column, or
-    // anything else — fails here regardless of what its other columns hold.
+  test("no table in the file is keyed by agent name", () => {
+    // Per-agent model choices live only in skills/model-profiles.json (profile defaults +
+    // agents overrides). Any agent-keyed doc table would restate them and drift.
     const roleKeyed = TABLES.filter(
       (t) => t.rows.filter((r) => (SPECIALIST_NAMES as readonly string[]).includes(r[0]!)).length >= 8,
     );
-    expect(roleKeyed.length).toBe(1);
-    expect(roleKeyed[0]!.header).toEqual(["Agent", "Tier"]);
+    expect(roleKeyed.map((t) => t.header)).toEqual([]);
   });
 
   test("no per-host rationale column survives anywhere in the file", () => {

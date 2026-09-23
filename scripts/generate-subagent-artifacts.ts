@@ -456,6 +456,22 @@ export function stateProfilesFromInstallState(state: InstallState): Partial<Reco
   return out;
 }
 
+/**
+ * A recorded rank-3 profile that no longer exists in the registry (removed,
+ * renamed) or no longer supports this host degrades to "no recorded profile"
+ * instead of throwing — mirroring the tolerant fallback each installer's own
+ * `recorded_profile()` re-apply step already gives an unknown variant
+ * directory. `--profile`/env stay hard errors (an operator's typo right now
+ * should fail loud); only the state-sourced value is stale-tolerant, since it
+ * reflects a historical switch this run did not request.
+ */
+function validStateProfile(registry: Registry, host: Host, profile: string | null | undefined): string | null {
+  if (!profile) return null;
+  const entry = registry.profiles[profile];
+  if (!entry || !(host in entry.hosts)) return null;
+  return profile;
+}
+
 /** Which profile each host resolves against, after the full precedence chain. */
 export function profilesPerHost(
   registry: Registry,
@@ -467,7 +483,7 @@ export function profilesPerHost(
     out[host] = selectProfile(registry, host, {
       flag: opts.profileFlag ?? null,
       env: opts.env,
-      stateProfile: opts.stateProfiles?.[host] ?? null,
+      stateProfile: validStateProfile(registry, host, opts.stateProfiles?.[host] ?? null),
     });
   }
   return out;
@@ -788,8 +804,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   // for the profile the operator switched to instead of silently resetting
   // them to the default. Absent/unreadable state → empty map, and
   // every host falls through to "balanced" exactly as before (fresh
-  // installs and CI keep their behavior). Unknown profile names at this rank
-  // throw inside selectProfile — loud, before any file is written.
+  // installs and CI keep their behavior). A recorded profile that no longer
+  // exists or no longer supports this host is dropped by validStateProfile
+  // and also falls through to "balanced" — a stale historical switch must
+  // degrade like an unknown variant directory does, not crash the whole
+  // regeneration (T8 section 3, test-model-profile-installer-reapply.sh).
   const stateProfiles: Partial<Record<Host, string>> = {};
   try {
     // Same default resolution as the switch engine's defaultStatePath.
