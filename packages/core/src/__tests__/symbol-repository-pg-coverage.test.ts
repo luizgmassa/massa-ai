@@ -1009,6 +1009,26 @@ describe("symbol-repo identity helpers (pure)", () => {
       .toThrow(/definition_fqn_signature_mismatch/);
   });
 
+  test("generationDefinitionIdentityColumns: a #-escaped id requires the persisted name to carry the same escape", () => {
+    // Regression for the resolve-stage fix that makes the persisted `name`
+    // agree with the identity's #-escaped `fqn`/`name` (normalizeSymbolText
+    // in fqn-codec.ts). Before that fix, resolve.ts kept the raw name
+    // (containing the literal #, e.g. from a markdown heading) while only
+    // the fqn was escaped, so this exact mismatch aborted the load stage
+    // with definition_fqn_name_mismatch for the whole file.
+    const escapedName = "Fixes issue %23456";
+    const out = generationDefinitionIdentityColumns({
+      id: `src/a.ts#${escapedName}`, project_id: "p", file_path: "src/a.ts", name: escapedName,
+      kind: "heading", line_start: 1, line_end: 1, exported: true, indexed_at: 1,
+    });
+    expect(out.qualifiedName).toBe(escapedName);
+    // The pre-fix shape: id escaped, name left raw — must still throw.
+    expect(() => generationDefinitionIdentityColumns({
+      id: `src/a.ts#${escapedName}`, project_id: "p", file_path: "src/a.ts", name: "Fixes issue #456",
+      kind: "heading", line_start: 1, line_end: 1, exported: true, indexed_at: 1,
+    })).toThrow(/definition_fqn_name_mismatch/);
+  });
+
   test("generationDefinitionIdentityColumns: qualified id happy path and mismatches", () => {
     const base = {
       id: modernId, project_id: "p", file_path: "src/a.ts", name: "Foo",
