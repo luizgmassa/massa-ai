@@ -78,17 +78,16 @@ Not for findings-only security review — route to `workflows/security/security-
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable security patterns
 
-> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: every SEC finding closed `fixed` — never optional, at every tier (verification-ladder Independent Verification Mandate, security-fix exception)
 > - scope: the fixed SEC finding's guard, exploit path, negative test, and report claim closure
 > - inputs: the SEC finding, the applied guard, the verification suggestion, the exploit path, and validation assets

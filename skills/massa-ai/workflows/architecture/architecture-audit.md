@@ -53,17 +53,16 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - When you reject a refactor candidate, record its load-bearing reason in ruled-out candidates; if likely to be re-proposed, offer an ADR via `workflows/create-adr.md` so the rejection is not re-litigated next audit.
 8. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `architecture-specialist`** (role: `architecture-specialist`) — charter `skills/agents/architecture-specialist/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, isolated audit slice, or independent verification of high-impact finding
 > - scope: exact files/modules/boundaries in the audit target
-> - permissions: read-only
-> - inputs: shared scope packet; lens sub-mode (`domain` for bounded-context mapping, `coupling` for dependency-graph/strength/distance/volatility, `deepening` for module-depth opportunities); recalled ADRs and rejected refactors
+> - inputs: shared scope packet; `lens: architecture` with sub-mode (`domain` for bounded-context mapping, `coupling` for dependency-graph/strength/distance/volatility, `deepening` for module-depth opportunities); recalled ADRs and rejected refactors
 > - sensors: `search_definitions` / `get_references` for exported surfaces and dependency direction; source inspection against current files
 > - output: findings with lens-specific evidence, provisional severity, tradeoff, and what would disprove it
 > - firewall: raw dependency graphs, generated reports, and broad search output summarized, not returned raw
 > - memory: suggest-only; main agent persists accepted constraints/rejected refactors
 
-> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: independent verification of a high-impact architecture finding
 > - scope: the specific finding's claimed evidence and affected boundary/module
 > - inputs: the candidate finding, its source evidence, ADRs, accepted exceptions, and the verification suggestion

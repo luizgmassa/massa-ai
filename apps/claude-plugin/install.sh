@@ -965,8 +965,7 @@ else
     vecho "  - removed retired command $(basename "$f")"
   done
 
-  # Subagent specialists (generated from skills/agents/*/SKILL.md, navigator
-  # included). Each carries the body ownership marker used by prune and
+  # Subagent specialists (generated from skills/agents/*/SKILL.md). Each carries the body ownership marker used by prune and
   # uninstall; a same-named file the user owns is skipped, never overwritten.
   #
   # Model-profile re-apply (T8, MPS-04): if a switch previously recorded a

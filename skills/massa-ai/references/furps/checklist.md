@@ -1,6 +1,6 @@
 # FURPS+ Refinement Checklist
 
-Use from `workflows/refinement/furps-refinement.md` when analyzing a PRD and/or ADR against the FURPS+ quality model. One `furps-analyst` sub-agent loads only its assigned dimension section; the main agent loads the full file only when synthesizing or when no dimension split is used.
+Use from `workflows/refinement/furps-refinement.md` when analyzing a PRD and/or ADR against the FURPS+ quality model. One `product-manager` sub-agent in `furps` mode loads only its assigned dimension section; the main agent loads the full file only when synthesizing or when no dimension split is used.
 
 ## Source
 
@@ -89,4 +89,4 @@ Non-functional requirements beyond the five core ("+").
 
 ## Cross-dimension note
 
-Some concerns span dimensions (e.g., error flows touch F3+R2+U1; components touch F2+S2). A `furps-analyst` may flag a cross-dimension concern in its findings, but must not expand its scope into another dimension. The main agent deduplicates and reconciles cross-dimension concerns during synthesis.
+Some concerns span dimensions (e.g., error flows touch F3+R2+U1; components touch F2+S2). A `product-manager` dispatch may flag a cross-dimension concern in its findings, but must not expand its scope into another dimension. The main agent deduplicates and reconciles cross-dimension concerns during synthesis.

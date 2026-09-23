@@ -1,9 +1,9 @@
 /**
  * Subagent parity test (T4).
  *
- * Asserts the 18 specialist agent files shipped across 4 hosts are byte-identical
+ * Asserts the 7 agent files shipped across 4 hosts are byte-identical
  * to generator output (drift gate), correctly pinned per spec (model + effort +
- * permission), collision-free against host built-ins, exactly 18 per host, and
+ * permission), collision-free against host built-ins, exactly 7 per host, and
  * that Codex TOML parses with the # massa-ai-owned marker.
  *
  * Model and effort expectations come from `skills/model-profiles.json` plus each
@@ -61,34 +61,45 @@ beforeAll(async () => {
 });
 
 const SPECIALIST_NAMES = [
-  "investigator",
-  "planner",
   "builder",
-  "reviewer",
-  "context-curator",
-  "verification-agent",
-  "requirements-analyst",
-  "architecture-specialist",
-  "test-engineer",
-  "documentation-agent",
-  "audit-specialist",
-  "mobile-specialist",
-  "plan-critic",
-  "furps-analyst",
-  "navigator",
-  "meta-judge",
-  "judge",
+  "code-explorer",
+  "code-reviewer",
   "designer",
+  "judge",
+  "product-manager",
+  "test-engineer",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
 const WRITE_AGENTS = new Set<SpecialistName>([
   "builder",
-  "test-engineer",
-  "documentation-agent",
-  "judge",
   "designer",
+  "judge",
+  "test-engineer",
 ]);
+
+// agent-roster-consolidation: the frozen model-profile-registry baseline names the 15
+// charters that existed at its base commit. The fixture is historical and never edited;
+// its comparisons are mapped through this old -> new table instead (null = retired with
+// no successor, so the baseline has nothing to compare against). Same mapping as the
+// single old -> new table in skills/AGENTS.md.
+const BASELINE_SUCCESSOR: Record<string, SpecialistName | null> = {
+  "architecture-specialist": "code-reviewer",
+  "audit-specialist": "code-reviewer",
+  builder: "builder",
+  "context-curator": null,
+  "documentation-agent": null,
+  "furps-analyst": "product-manager",
+  investigator: "code-explorer",
+  "mobile-specialist": "code-reviewer",
+  navigator: "code-explorer",
+  "plan-critic": "judge",
+  planner: null,
+  "requirements-analyst": "product-manager",
+  reviewer: "code-reviewer",
+  "test-engineer": "test-engineer",
+  "verification-agent": "code-reviewer",
+};
 
 // ── Model + effort come from the REGISTRY, not a table copied into this file ──
 // The four hard-coded per-host tables that used to live here are deleted. They were
@@ -215,39 +226,39 @@ describe("subagent parity — drift gate (CLA-07/CDX-08/CRS-06/OPC-08)", () => {
   });
 });
 
-describe("subagent parity — exact 18 names per host (CLA-09/CRS-07/OPC-09)", () => {
-  test("claude: exactly 18 specialist .md files with the registry names", async () => {
+describe("subagent parity — exact 7 names per host (CLA-09/CRS-07/OPC-09)", () => {
+  test("claude: exactly 7 agent .md files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/claude-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
       (f) => f.endsWith(".md"),
     );
-    expect(files.length).toBe(18);
+    expect(files.length).toBe(7);
     const names = files.map((f) => f.replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("codex: exactly 18 specialist .toml files with the registry names", async () => {
+  test("codex: exactly 7 agent .toml files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/codex-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".toml"));
-    expect(files.length).toBe(18);
+    expect(files.length).toBe(7);
     const names = files.map((f) => f.replace(/\.toml$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("cursor: exactly 18 specialist .md files", async () => {
+  test("cursor: exactly 7 agent .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/cursor-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
       (f) => f.endsWith(".md"),
     );
-    expect(files.length).toBe(18);
+    expect(files.length).toBe(7);
     const names = files.map((f) => f.replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
-  test("opencode: exactly 18 specialist .md files", async () => {
+  test("opencode: exactly 7 agent .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/opencode-plugin/agents");
     const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".md"));
-    expect(files.length).toBe(18);
+    expect(files.length).toBe(7);
     const names = files.map((f) => f.replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
@@ -259,7 +270,7 @@ describe("subagent parity — exact 18 names per host (CLA-09/CRS-07/OPC-09)", (
 // see the commit message), not copied from design.md/tasks.md — the standing lesson
 // ("subagent numbers need re-measuring") applies to a NEW population exactly as much
 // as an edited one.
-describe("subagent parity — variant bundles: exact 18 per (host, supported profile) (MPS-01/MPS-12)", () => {
+describe("subagent parity — variant bundles: exact 7 per (host, supported profile) (MPS-01/MPS-12)", () => {
   const HOST_EXT: Record<RegistryHost, string> = {
     claude: "md",
     codex: "toml",
@@ -281,13 +292,13 @@ describe("subagent parity — variant bundles: exact 18 per (host, supported pro
   });
 
   for (const { host, profile } of cases) {
-    test(`${host}/${profile}: exactly 18 specialist .${HOST_EXT[host]} files with the registry names`, async () => {
+    test(`${host}/${profile}: exactly 7 agent .${HOST_EXT[host]} files with the registry names`, async () => {
       const ext = HOST_EXT[host];
       const dir = path.join(REPO_ROOT, `apps/${host}-plugin/agent-profiles/${profile}`);
       const files = (await fs.readdir(dir)).filter(
         (f) => f.endsWith(`.${ext}`),
       );
-      expect(files.length).toBe(18);
+      expect(files.length).toBe(7);
       const names = files.map((f) =>
         f.replace(new RegExp(`\\.${ext}$`), ""),
       );
@@ -384,30 +395,22 @@ describe("subagent parity — Claude model + effort pin (CLA-10)", () => {
 });
 
 // S3 (design.md Verification Design table): emitted Claude artifacts carry no `tools:`
-// except navigator, and read-only files carry the exact denylist. Rewritten in place
+// (the navigator allowlist is retired, agent-roster-consolidation A9), and read-only
+// files carry the exact denylist. Rewritten in place
 // (Reuse Plan) rather than replaced, because the pre-change shape — `(fm.tools ?? "")`
 // checked for absence of "Write"/"Edit" substrings — passes VACUOUSLY for every
 // read-only agent once `tools` is gone entirely (design.md Risks table). The
 // replacement asserts PRESENCE of the expected gating line for each class, not only
-// absence of a substring, and covers every one of the 18 agents plus every
+// absence of a substring, and covers every one of the 7 agents plus every
 // agent-profiles/<profile> variant (STI-01.5), not a sample.
 describe("subagent parity — Claude permission boundary (CLA-02/CLA-03, STI-01/STI-02)", () => {
-  // The sole deliberately-narrowed charter (AGENT_TOOLS_OVERRIDE in the generator).
-  // Hardcoded here rather than imported — that constant is intentionally unexported —
-  // so mutation S3 (adding a second override entry) exercises the shipped bytes this
-  // sensor actually reads, not a re-derivation of the generator's own table.
-  const ALLOWLISTED: ReadonlySet<SpecialistName> = new Set(["navigator"]);
-  const NAVIGATOR_TOOLS_LINE = 'tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]';
   const DENYLIST_LINE = "disallowedTools: Write, Edit, NotebookEdit";
 
   /** Asserts the exact gating shape for one Claude agent's raw file bytes. */
   function assertGating(raw: string, name: SpecialistName, where: string): void {
     const fm = parseMdFrontmatter(raw);
     try {
-      if (ALLOWLISTED.has(name)) {
-        expect(raw).toContain(NAVIGATOR_TOOLS_LINE);
-        expect(fm.disallowedTools).toBeUndefined();
-      } else if (WRITE_AGENTS.has(name)) {
+      if (WRITE_AGENTS.has(name)) {
         expect(fm.tools).toBeUndefined();
         expect(fm.disallowedTools).toBeUndefined();
       } else {
@@ -419,13 +422,13 @@ describe("subagent parity — Claude permission boundary (CLA-02/CLA-03, STI-01/
     }
   }
 
-  test("active apps/claude-plugin/agents/: only navigator carries tools:, read-only agents carry the exact disallowedTools line, write agents carry neither key", async () => {
+  test("active apps/claude-plugin/agents/: no agent carries tools:, read-only agents carry the exact disallowedTools line, write agents carry neither key", async () => {
     for (const name of SPECIALIST_NAMES) {
       assertGating(await readAgentMd("claude-plugin", name), name, `apps/claude-plugin/agents/${name}.md`);
     }
   });
 
-  test("every apps/claude-plugin/agent-profiles/<profile>/ variant satisfies the same gating contract for all 18 agents (STI-01.5)", async () => {
+  test("every apps/claude-plugin/agent-profiles/<profile>/ variant satisfies the same gating contract for all 7 agents (STI-01.5)", async () => {
     const profiles = profilesSupporting(REGISTRY, "claude");
     // Population printed beside the verdict (CONTRIBUTING.md Measurement discipline #4) —
     // a silently-empty profile list would make the loop below pass vacuously.
@@ -442,18 +445,16 @@ describe("subagent parity — Claude permission boundary (CLA-02/CLA-03, STI-01/
     expect(checked).toBe(profiles.length * SPECIALIST_NAMES.length);
   });
 
-  // STI-02 Independent Test: "diff navigator.md against its pre-change bytes —
-  // the frontmatter must be unchanged." Pins the exact three gating-relevant lines rather
-  // than a full-file byte compare, since model/effort pins are governed by a separate
-  // registry-driven contract (the CLA-10 group) and are expected to change independently.
-  test("navigator.md is byte-identical to its recorded pre-change frontmatter (STI-02 Independent Test)", async () => {
-    const raw = await readAgentMd("claude-plugin", "navigator");
+  // STI-02 pinned navigator's allowlist frontmatter; A9 retired it. code-explorer, which
+  // absorbed navigator, must carry the plain read-only denylist and no tools: key.
+  test("code-explorer.md (successor of the allowlisted navigator) carries the denylist, not an allowlist (A9)", async () => {
+    const raw = await readAgentMd("claude-plugin", "code-explorer");
     const fmBlock = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(raw)![1]!;
     const lines = fmBlock.split(/\r?\n/);
-    expect(lines[0]).toBe("name: navigator");
+    expect(lines[0]).toBe("name: code-explorer");
     expect(lines[1]).toMatch(/^description: /);
-    expect(lines[2]).toBe(NAVIGATOR_TOOLS_LINE);
-    expect(fmBlock).not.toContain("disallowedTools");
+    expect(lines[2]).toBe(DENYLIST_LINE);
+    expect(fmBlock).not.toMatch(/^tools:/m);
   });
 
   test("no Claude agent sets hooks/mcpServers/permissionMode (CLA-04)", async () => {
@@ -654,7 +655,7 @@ describe("subagent parity — OpenCode model + effort pin (OPC-10)", () => {
 });
 
 describe("subagent parity — OpenCode permission + owned marker (OPC-07)", () => {
-  test("read-only agents have edit: deny + bash: deny (strict) or bash: ask (planner); write agents allow", async () => {
+  test("read-only agents have edit: deny + bash: deny; write agents allow", async () => {
     for (const name of SPECIALIST_NAMES) {
       const raw = await readAgentMd("opencode-plugin", name);
       const fm = parseMdFrontmatter(raw);
@@ -669,12 +670,6 @@ describe("subagent parity — OpenCode permission + owned marker (OPC-07)", () =
       if (WRITE_AGENTS.has(name)) {
         expect(perm).toContain("edit: allow");
         expect(perm).toContain("bash: allow");
-      } else if (name === "planner") {
-        expect(perm).toContain("edit: deny");
-        expect(perm).toContain('bash: { "*": "ask" }');
-      } else if (name === "navigator") {
-        expect(perm).toContain("edit: deny");
-        expect(perm).toContain('bash: { "pwd": "allow", "*": "deny" }');
       } else {
         expect(perm).toContain("edit: deny");
         expect(perm).toContain("bash: deny");
@@ -741,7 +736,7 @@ describe("subagent parity — FEATURES.md doc-drift (MPR-R11)", () => {
     // any second table keyed by agent name — with a model column, a rationale column, or
     // anything else — fails here regardless of what its other columns hold.
     const roleKeyed = TABLES.filter(
-      (t) => t.rows.filter((r) => (SPECIALIST_NAMES as readonly string[]).includes(r[0]!)).length >= 8,
+      (t) => t.rows.filter((r) => (SPECIALIST_NAMES as readonly string[]).includes(r[0]!)).length >= 5,
     );
     expect(roleKeyed.length).toBe(1);
     expect(roleKeyed[0]!.header).toEqual(["Agent", "Tier"]);
@@ -929,11 +924,22 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
   ]);
 
   // The fixture is frozen to the base commit (45daaa1) and must never be regenerated, so it
-  // only ever names the 15 specialists that existed there — `judge`/`meta-judge` landed later
-  // via a concurrently-merged PR and have no baseline entry. Diff only the names the fixture
-  // actually has an opinion about; the two new charters are covered by the registry-derived
-  // assertions above instead, which is the correct instrument for a role with no "before".
-  const BASELINE_NAMES = Object.keys(BASELINE.agents) as SpecialistName[];
+  // only ever names the 15 specialists that existed there. Each baseline name is compared
+  // against its successor under BASELINE_SUCCESSOR (agent-roster-consolidation); names
+  // retired with no successor have nothing left to compare. `judge`'s spec-author/scorer
+  // modes and `designer` have no "before" and are covered by the registry-derived
+  // assertions above instead, which is the correct instrument for a role with no baseline.
+  const BASELINE_NAMES = Object.keys(BASELINE.agents).filter((n) => BASELINE_SUCCESSOR[n] !== null);
+  const successor = (old: string): SpecialistName => BASELINE_SUCCESSOR[old]!;
+
+  test("every baseline name maps through the old -> new table, and exactly three are retired", () => {
+    expect(Object.keys(BASELINE.agents).sort()).toEqual(Object.keys(BASELINE_SUCCESSOR).sort());
+    expect(Object.keys(BASELINE_SUCCESSOR).filter((n) => BASELINE_SUCCESSOR[n] === null).sort()).toEqual([
+      "context-curator",
+      "documentation-agent",
+      "planner",
+    ]);
+  });
 
   test("baseline fixture is pinned to a commit, not read from the live tree", () => {
     expect(BASELINE.baseCommit).toMatch(/^[0-9a-f]{40}$/);
@@ -947,13 +953,13 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
         const before = BASELINE.agents[name]![host]!;
         const after =
           host === "codex"
-            ? (toml.parse(await readAgentToml(name)) as Record<string, unknown>)
-            : parseMdFrontmatter(await readAgentMd(`${host}-plugin`, name));
+            ? (toml.parse(await readAgentToml(successor(name))) as Record<string, unknown>)
+            : parseMdFrontmatter(await readAgentMd(`${host}-plugin`, successor(name)));
         const afterModel = (after.model as string | undefined) ?? null;
         if (before.model === afterModel) continue;
         if (host === "cursor") continue; // authorised wholesale
         if (ALLOWED_MODEL_CHANGES.has(`${host}/${name}`)) continue;
-        unexpected.push(`${host}/${name}: ${before.model} -> ${afterModel}`);
+        unexpected.push(`${host}/${name} (now ${successor(name)}): ${before.model} -> ${afterModel}`);
       }
     }
     expect(unexpected).toEqual([]);
@@ -962,7 +968,7 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
   test("Codex key sets are UNCHANGED from the baseline", async () => {
     for (const name of BASELINE_NAMES) {
       const codexKeys = [
-        ...(await readAgentToml(name)).matchAll(/^([a-z_]+)\s*=/gm),
+        ...(await readAgentToml(successor(name))).matchAll(/^([a-z_]+)\s*=/gm),
       ].map((m) => m[1]);
       expect(codexKeys).toEqual(BASELINE.agents[name]!.codex!.keys);
     }
@@ -970,74 +976,68 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
 
   // STI-01: Claude's key SET changing is the sanctioned point of this feature, not drift —
   // every frozen baseline entry's `tools` key becomes `disallowedTools` in the same slot for
-  // a read-only agent, or disappears entirely for a write agent (inherit). navigator is the
-  // one AGENT_TOOLS_OVERRIDE member and keeps its `tools` key unchanged (STI-02). This
+  // a read-only agent, or disappears entirely for a write agent (inherit). The navigator
+  // allowlist exception is retired (A9), so its successor follows the read-only rule. This
   // asserts exactly that substitution rather than relaxing the check to "still has some
   // keys" — a key added or removed outside that one substitution is still a real regression.
-  test("Claude key sets reflect exactly the STI-01 sanctioned change from the baseline (tools -> disallowedTools for read-only agents, tools removed for write agents, navigator unchanged)", async () => {
+  test("Claude key sets reflect exactly the STI-01 sanctioned change from the baseline (tools -> disallowedTools for read-only agents, tools removed for write agents)", async () => {
     for (const name of BASELINE_NAMES) {
-      const claudeFm = parseMdFrontmatter(await readAgentMd("claude-plugin", name));
+      const claudeFm = parseMdFrontmatter(await readAgentMd("claude-plugin", successor(name)));
       const baselineKeys = BASELINE.agents[name]!.claude!.keys;
-      const expectedKeys =
-        name === "navigator"
-          ? baselineKeys
-          : WRITE_AGENTS.has(name)
-            ? baselineKeys.filter((k) => k !== "tools")
-            : baselineKeys.map((k) => (k === "tools" ? "disallowedTools" : k));
+      const expectedKeys = WRITE_AGENTS.has(successor(name))
+        ? baselineKeys.filter((k) => k !== "tools")
+        : baselineKeys.map((k) => (k === "tools" ? "disallowedTools" : k));
       expect(Object.keys(claudeFm)).toEqual(expectedKeys);
     }
   });
 
   test("every enumerated change actually happened — the diff is not empty", async () => {
     // Guards the inverse failure: a fixture test that passes because nothing changed.
-    // navigator and requirements-analyst were re-bumped again by ALLWF-03 (T20, both
-    // now `deep`), so their expected post-change model is the T20 value, not the
-    // earlier SYNC-11-era one.
-    const claudeNav = parseMdFrontmatter(await readAgentMd("claude-plugin", "navigator"));
+    // Each check reads the baseline under the retired name and the shipped file under its
+    // successor (BASELINE_SUCCESSOR); planner and context-curator are retired with no
+    // successor, so their former checks have nothing left to read.
+    const claudeNav = parseMdFrontmatter(await readAgentMd("claude-plugin", successor("navigator")));
     expect(BASELINE.agents.navigator!.claude!.model).toBe("sonnet");
     expect(claudeNav.model).toBe("opus");
 
-    const ocPlanner = parseMdFrontmatter(await readAgentMd("opencode-plugin", "planner"));
-    expect(BASELINE.agents.planner!.opencode!.model).toBe("opencode-go/glm-5.2");
-    expect(ocPlanner.model).toBe("opencode-go/minimax-m3");
-
-    const ocReq = parseMdFrontmatter(await readAgentMd("opencode-plugin", "requirements-analyst"));
+    const ocReq = parseMdFrontmatter(
+      await readAgentMd("opencode-plugin", successor("requirements-analyst")),
+    );
     expect(BASELINE.agents["requirements-analyst"]!.opencode!.model).toBe(
       "opencode-go/deepseek-v4-pro",
     );
     expect(ocReq.model).toBe("opencode-go/minimax-m3");
 
     // ALLWF-03 (T20): read-only-specialist tier bump to `deep`, one sanity check per
-    // remaining charter (host chosen to exercise a distinct provider each time).
-    const claudeAudit = parseMdFrontmatter(await readAgentMd("claude-plugin", "audit-specialist"));
+    // successor (host chosen to exercise a distinct provider each time).
+    const claudeAudit = parseMdFrontmatter(
+      await readAgentMd("claude-plugin", successor("audit-specialist")),
+    );
     expect(BASELINE.agents["audit-specialist"]!.claude!.model).toBe("sonnet");
     expect(claudeAudit.model).toBe("opus");
 
-    const codexCtx = toml.parse(await readAgentToml("context-curator")) as Record<
-      string,
-      unknown
-    >;
-    expect(BASELINE.agents["context-curator"]!.codex!.model).toBe("gpt-5.4-mini");
-    expect(codexCtx.model).toBe("gpt-5.6-sol");
-
-    const ocFurps = parseMdFrontmatter(await readAgentMd("opencode-plugin", "furps-analyst"));
+    const ocFurps = parseMdFrontmatter(
+      await readAgentMd("opencode-plugin", successor("furps-analyst")),
+    );
     expect(BASELINE.agents["furps-analyst"]!.opencode!.model).toBe("opencode-go/glm-5.2");
     expect(ocFurps.model).toBe("opencode-go/minimax-m3");
 
     const claudeInvestigator = parseMdFrontmatter(
-      await readAgentMd("claude-plugin", "investigator"),
+      await readAgentMd("claude-plugin", successor("investigator")),
     );
     expect(BASELINE.agents["investigator"]!.claude!.model).toBe("haiku");
     expect(claudeInvestigator.model).toBe("opus");
 
-    const codexMobile = toml.parse(await readAgentToml("mobile-specialist")) as Record<
+    const codexMobile = toml.parse(await readAgentToml(successor("mobile-specialist"))) as Record<
       string,
       unknown
     >;
     expect(BASELINE.agents["mobile-specialist"]!.codex!.model).toBe("gpt-5.6-terra");
     expect(codexMobile.model).toBe("gpt-5.6-sol");
 
-    const claudeReviewer = parseMdFrontmatter(await readAgentMd("claude-plugin", "reviewer"));
+    const claudeReviewer = parseMdFrontmatter(
+      await readAgentMd("claude-plugin", successor("reviewer")),
+    );
     expect(BASELINE.agents["reviewer"]!.claude!.model).toBe("sonnet");
     expect(claudeReviewer.model).toBe("opus");
   });

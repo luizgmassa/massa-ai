@@ -61,23 +61,22 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - Before PR creation, run `bun skills/massa-ai/scripts/check_specs_delivered.ts <slug> --kind refactor` (`--kind quick` for Quick-sized work) — a non-zero exit blocks Propose. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 10. Include file-integrity checks when tests, specs, benchmarks, fixtures, or snapshots are validation assets. If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
-11. Use `references/agent-orchestration.md` for isolated implementation slices; the verification-agent dispatch below is not discretionary at Standard+ sizing or PR-group execution — that reference's Independent Verification Exception makes it a standing requirement, not a per-task judgment call.
+11. Use `references/agent-orchestration.md` for isolated implementation slices; the `code-reviewer` `verify` dispatch below is not discretionary at Standard+ sizing or PR-group execution — that reference's Independent Verification Exception makes it a standing requirement, not a per-task judgment call.
 12. At completion, persist (run the scoring rubric from `references/decision-engine.md`):
    - Refactored architectural decisions via `remember` as scored `decision` memories
    - Identified and decoupled anti-patterns via `remember` as scored `pattern` memories
 
-> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the change's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
-> - trigger: Standard+ refactor sizing or any PR-group execution per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once reviewer fix items are resolved; Quick-sized refactors dispatch only when validation assets were touched, otherwise run the fresh-eyes fallback below and record the skip reason
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
+> - trigger: Standard+ refactor sizing or any PR-group execution per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once `code-reviewer` review fix items are resolved; Quick-sized refactors dispatch only when validation assets were touched, otherwise run the fresh-eyes fallback below and record the skip reason
 > - scope: the moved/transformed code across this refactor's PR groups and the characterization tests that must protect it
 > - inputs: the characterization baseline from step 6 (and step 7 for mobile refactors), the diff of moved code per PR group, and the PR-group map from step 9
 > - sensors: confirm the characterization tests still pass against the moved code's preserved behavior; discrimination sensor per `references/discrimination-sensor.md` (mutate the moved code — never new code — in scratch, one PR group at a time; characterization tests must kill each mutant)

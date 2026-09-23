@@ -76,39 +76,27 @@ export function profilesSupporting(registry: Registry, host: Host): string[] {
 
 // ── Charter registry (every charter under skills/agents/) ───────────────────
 const SPECIALIST_NAMES = [
-  "investigator",
-  "planner",
   "builder",
-  "reviewer",
-  "context-curator",
-  "verification-agent",
-  "requirements-analyst",
-  "architecture-specialist",
-  "test-engineer",
-  "documentation-agent",
-  "audit-specialist",
-  "mobile-specialist",
-  "plan-critic",
-  "furps-analyst",
-  "navigator",
-  "meta-judge",
-  "judge",
+  "code-explorer",
+  "code-reviewer",
   "designer",
+  "judge",
+  "product-manager",
+  "test-engineer",
 ] as const;
 type SpecialistName = (typeof SPECIALIST_NAMES)[number];
 
 // ── Write-permission set (spec AC CLA-03 / design.md) ───────────────────────
-// These five charters declare `permission: write` (test-engineer,
-// documentation-agent, judge, and designer are scoped writers: test files /
-// doc files / the agent's own judge-N report / UI-layer files only, each with
-// a disjoint write set). Charter frontmatter and this set must agree —
+// These four charters declare `permission: write` (designer, judge, and
+// test-engineer are scoped writers: UI-layer files / the agent's own judge-N
+// report in `scorer` mode / test files only, each with a disjoint write set).
+// Charter frontmatter and this set must agree —
 // scripts/__tests__/skills-harness-integrity.test.ts enforces that.
 const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
   "builder",
-  "test-engineer",
-  "documentation-agent",
-  "judge",
   "designer",
+  "judge",
+  "test-engineer",
 ]);
 
 // ── Model + effort resolution ───────────────────────────────────────────────
@@ -121,19 +109,6 @@ const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
 // spells "inherit". They never know what a profile is.
 
 // ── Permission -> tool-gating mapping (STI-01/STI-02) ────────────────────────
-// Navigator precedent (apps/claude-plugin/agents/navigator.md) uses
-// JSON-array tools with capital "Glob"; match that convention for the one
-// remaining allowlisted agent.
-
-// Charters whose tool set is not the default inherit/denylist policy. The
-// navigator is index-first: it reaches the massa-ai MCP surface and needs
-// only `pwd` from the shell (charter metadata.tools: mcp-index). This is the
-// only entry point that can still narrow a Claude sub-agent to an allowlist —
-// every other charter is gated by claudeToolPolicyFor below.
-const AGENT_TOOLS_OVERRIDE: Partial<Record<SpecialistName, readonly string[]>> = {
-  navigator: ["mcp__massa-ai__*", "Read", "Grep", "Glob", "Bash(pwd)"],
-};
-
 // The three write-capable built-ins in Claude's documented sub-agent pool
 // (design.md Tech Decisions "Denylist contents"). `Bash` is excluded because it
 // was already granted to read-only agents under the old allowlist — this change
@@ -141,14 +116,12 @@ const AGENT_TOOLS_OVERRIDE: Partial<Record<SpecialistName, readonly string[]>> =
 const READ_ONLY_DISALLOWED = ["Write", "Edit", "NotebookEdit"];
 
 export type ClaudeToolPolicy =
-  | { readonly kind: "allowlist"; readonly tools: readonly string[] }
   | { readonly kind: "denylist"; readonly disallowed: readonly string[] }
   | { readonly kind: "inherit" };
 
 /**
  * Decides which of Claude's two tool-gating mechanisms a charter uses
- * (STI-01/STI-02). An `AGENT_TOOLS_OVERRIDE` entry keeps the deliberate narrow
- * allowlist (navigator). A `WRITE_AGENTS` member inherits every tool the
+ * (STI-01/STI-02). A `WRITE_AGENTS` member inherits every tool the
  * parent session has active, including MCP — Claude documents no cross-server
  * MCP wildcard for `tools`, so an allowlist can never be dynamic, and
  * `disallowedTools` (not `tools`) is the only mechanism that inherits.
@@ -159,19 +132,9 @@ export type ClaudeToolPolicy =
  * `emitCursor`/`emitCodex`/`emitOpenCode`, which already gate on that set.
  */
 export function claudeToolPolicyFor(name: SpecialistName): ClaudeToolPolicy {
-  const override = AGENT_TOOLS_OVERRIDE[name];
-  if (override) return { kind: "allowlist", tools: override };
   if (WRITE_AGENTS.has(name)) return { kind: "inherit" };
   return { kind: "denylist", disallowed: READ_ONLY_DISALLOWED };
 }
-
-// OpenCode bash permission (spec OPC-07 / design.md plan-critic F4).
-// Default: write agents -> bash: allow; planner -> bash: { "*": "ask" };
-// every other read-only agent -> bash: deny. Overrides narrow that further.
-const OPENCODE_BASH_OVERRIDE: Partial<Record<SpecialistName, string>> = {
-  planner: `{ "*": "ask" }`,
-  navigator: `{ "pwd": "allow", "*": "deny" }`,
-};
 
 // ── Types ───────────────────────────────────────────────────────────────────
 // Host is imported from ./lib/host-capabilities.ts (re-exported from
@@ -249,19 +212,16 @@ export async function loadAllCharters(): Promise<Charter[]> {
  *
  * CLA-04: omit hooks/mcpServers/permissionMode — rejected on plugin-shipped agents.
  *
- * STI-01/STI-02: the gating key is decided by claudeToolPolicyFor and stays in the slot
- * `tools` used to occupy — allowlist emits `tools:` (JSON array, unchanged for navigator),
- * denylist emits `disallowedTools:` (comma-separated, the form Claude's own docs use for
- * that field), and inherit emits neither key so the sub-agent gets every tool the parent
- * session has active, including any MCP server.
+ * STI-01/STI-02: the gating key is decided by claudeToolPolicyFor — denylist emits
+ * `disallowedTools:` (comma-separated, the form Claude's own docs use for that field), and
+ * inherit emits neither key so the sub-agent gets every tool the parent session has active,
+ * including any MCP server.
  */
 export function emitClaude(c: Charter, m: Resolved): string {
   const agentName = c.name;
   const policy = claudeToolPolicyFor(c.name);
   const lines = ["---", `name: ${agentName}`, `description: ${c.description}`];
-  if (policy.kind === "allowlist") {
-    lines.push(`tools: ${JSON.stringify(policy.tools)}`);
-  } else if (policy.kind === "denylist") {
+  if (policy.kind === "denylist") {
     lines.push(`disallowedTools: ${policy.disallowed.join(", ")}`);
   }
   lines.push(`model: ${m.model ?? "inherit"}`);
@@ -366,21 +326,13 @@ export const OWNED_MARKER_MD = "<!-- massa-ai-owned: true -->";
  */
 export function emitOpenCode(c: Charter, m: Resolved): string {
   const isWrite = WRITE_AGENTS.has(c.name);
-  // OPC-07: permission per-agent bash mapping
-  const bashOverride = OPENCODE_BASH_OVERRIDE[c.name];
-  let permissionBlock: string;
-  if (isWrite) {
-    permissionBlock = `{ edit: allow, bash: allow }`;
-  } else if (bashOverride) {
-    permissionBlock = `{ edit: deny, bash: ${bashOverride} }`;
-  } else {
-    permissionBlock = `{ edit: deny, bash: deny }`;
-  }
+  // OPC-07: write agents get bash; every read-only agent is denied edit and bash.
+  const permissionBlock = isWrite ? `{ edit: allow, bash: allow }` : `{ edit: deny, bash: deny }`;
   const lines = [
     "---",
     `description: ${c.description}`,
     // `all` (not `subagent`): OpenCode's Tab switcher lists primary/all agents
-    // only, so `subagent` made the 12 specialists unselectable by hand. `all`
+    // only, so `subagent` made the specialists unselectable by hand. `all`
     // keeps auto-delegation and @-mention while adding manual selection.
     `mode: all`,
   ];

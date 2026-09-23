@@ -67,17 +67,16 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - (a) write the test first, asserting the exact previously-broken behavior at the divergence point
    - (b) at Standard+, prove the coverage discriminates: run the sensor in `references/discrimination-sensor.md` against the just-fixed code; a surviving mutant means the regression test does not yet prove the fix
 
-> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven fix size, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`; a Quick-tier fix takes the fallback below instead
 > - scope: the fixed divergence point from step 13, its reproduction path, and the regression test added in step 14
 > - inputs: the root cause, the reproduction evidence, the regression test, and the changed files — not spec acceptance criteria
@@ -116,7 +115,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
 
 - `.specs/debug/<slug>/` unwritable at Standard+: block the `REPORT.md` write and record the blocker; never substitute a memory write or chat summary for the canonical debug artifact.
 - Fix → re-verify loop reaches the `references/verification-ladder.md` cap: stop the session `Blocked`, preserve the collected reproduction and verification evidence, and ask the user for direction.
-- Discrimination sensor mutation on the fixed divergence point is not safely reversible: mark `Blocked` unless the verification-agent can show equivalent discrimination from an existing deterministic mutation fixture.
+- Discrimination sensor mutation on the fixed divergence point is not safely reversible: mark `Blocked` unless the `code-reviewer` verifier can show equivalent discrimination from an existing deterministic mutation fixture.
 
 ## Example
 
@@ -129,4 +128,4 @@ User asks: "The login route returns 500 after deploy."
 5. Trace request → auth middleware → session lookup → response, then fix the divergence point closest to the root cause.
 6. Define the verification recipe: rerun the original route check, add or update regression coverage at the failing seam, and confirm validation assets were not weakened.
 7. If root cause is a missing `DATABASE_URL`, persist via `remember`: a semantic decision memory for the root cause and a procedural pattern memory for the deploy-env verification command.
-8. At Standard+ size, dispatch `verification-agent` to independently re-run the reproduction against the `DATABASE_URL` fix and confirm the regression test kills a mutant on the restored connection check before closing.
+8. At Standard+ size, dispatch `code-reviewer` in `verify` mode to independently re-run the reproduction against the `DATABASE_URL` fix and confirm the regression test kills a mutant on the restored connection check before closing.

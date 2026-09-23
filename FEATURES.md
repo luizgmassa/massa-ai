@@ -432,24 +432,13 @@ the charters and is the only role-keyed model table in this file.
 
 | Agent | Tier |
 | --- | --- |
-| investigator | deep |
-| planner | deep |
 | builder | standard |
-| reviewer | deep |
-| context-curator | deep |
-| verification-agent | deep |
-| requirements-analyst | deep |
-| architecture-specialist | deep |
-| test-engineer | standard |
-| documentation-agent | light |
-| audit-specialist | deep |
-| mobile-specialist | deep |
+| code-explorer | deep |
+| code-reviewer | deep |
 | designer | standard |
-| plan-critic | deep |
-| furps-analyst | deep |
-| navigator | deep |
-| meta-judge | deep |
 | judge | deep |
+| product-manager | deep |
+| test-engineer | standard |
 
 Each role's *reason* for its tier lives once, in its own charter's prose. The four per-host
 rationale columns this section used to carry were deleted rather than consolidated: a rationale

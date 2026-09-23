@@ -41,7 +41,7 @@ export interface EnvOverride {
 }
 
 export interface AgentRoleRuntime {
-  /** Agent file base name, e.g. "investigator.md". */
+  /** Agent file base name, e.g. "code-explorer.md". */
   readonly name: string;
   readonly model: string | null;
   readonly effort: string | null;

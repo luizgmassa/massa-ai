@@ -77,7 +77,7 @@ mock.module("../../../../scripts/lib/model-profiles.ts", () => ({
 // including the non-literal require path pattern the route itself uses.
 const DEFAULT_MOCK_CHARTERS = [
   { name: "builder", modelTier: "standard" },
-  { name: "investigator", modelTier: "deep" },
+  { name: "code-explorer", modelTier: "deep" },
 ];
 const loadAllCharters = mock((..._args: unknown[]): unknown => DEFAULT_MOCK_CHARTERS);
 const actualGeneratorLib = require("../../../../scripts/generate-subagent-artifacts.ts");
@@ -248,7 +248,7 @@ describe("GET /api/v1/model-registry — agents inventory (design D-3, APUX-03, 
   test("200 + agents array shaped {name, charterTier} derived from loadAllCharters()", async () => {
     loadAllCharters.mockImplementationOnce(() => [
       { name: "builder", modelTier: "standard" },
-      { name: "investigator", modelTier: "deep" },
+      { name: "code-explorer", modelTier: "deep" },
     ]);
 
     const res = await get("/api/v1/model-registry");
@@ -256,7 +256,7 @@ describe("GET /api/v1/model-registry — agents inventory (design D-3, APUX-03, 
     expect(res.json.success).toBe(true);
     expect(res.json.data.agents).toEqual([
       { name: "builder", charterTier: "standard" },
-      { name: "investigator", charterTier: "deep" },
+      { name: "code-explorer", charterTier: "deep" },
     ]);
     expect(res.json.data.agentsError).toBeUndefined();
   });

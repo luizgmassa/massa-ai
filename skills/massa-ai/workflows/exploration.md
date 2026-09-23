@@ -51,9 +51,9 @@ When researching or resolving any technical question during exploration, follow 
    - per step, state a `verify:` criterion — what concrete evidence confirms that step succeeded (a read signature, a matched call graph, a resolved data path) before moving on
    - define what evidence would be enough to answer the user
    - ask only if the objective or scope cannot be inferred from local context
-6. Recon with progressive disclosure. Dispatch `investigator` per `references/agent-orchestration.md` when the investigation justifies an isolated read-only subagent:
+6. Recon with progressive disclosure. Dispatch `code-explorer` per `references/agent-orchestration.md` when the investigation justifies an isolated read-only subagent:
 
-> **Dispatch: `investigator`** (role: `investigator`) — charter `skills/agents/investigator/SKILL.md`
+> **Dispatch: `code-explorer`** (role: `code-explorer`, mode: `trace`) — charter `skills/agents/code-explorer/SKILL.md`
 > - trigger: isolated read-only investigation justified; large scope, repeated searches, or context-firewall threshold exceeded
 > - scope: the exploration target — symbols, files, routes, commands, docs, or runtime artifacts to inspect
 > - permissions: read-only

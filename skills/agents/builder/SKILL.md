@@ -4,7 +4,7 @@ description: Write-permitted implementation agent. Implement approved plans by m
 license: MIT
 metadata:
   author: Luiz Massa
-  version: "1.0.0"
+  version: "1.1.0"
   model_tier: standard
   permission: write
 ---
@@ -51,7 +51,7 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 ### Do not use when
 - No plan or task is approved.
 - The write set overlaps another active agent.
-- The task needs architectural decisions (route to architecture-specialist or planner first).
+- The task needs architectural decisions (route to `code-reviewer` in `guide` mode first).
 
 ## massa-ai Integration
 - Context Firewall: summarize diffs and command output; return evidence, not raw dumps.

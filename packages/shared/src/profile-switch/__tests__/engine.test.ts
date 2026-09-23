@@ -109,10 +109,10 @@ function stageMarketplaceRegistry(h: string, installPath: string): void {
 
 describe("listProfiles", () => {
   test("lists available profiles per host purely from on-disk variant dirs, no registry access", () => {
-    stageVariant(home, "claude", "balanced", { "planner.md": "b" });
-    stageVariant(home, "claude", "work", { "planner.md": "w" });
-    stageVariant(home, "codex", "balanced", { "planner.toml": "b" });
-    stageActive(home, "claude", { "planner.md": "b" });
+    stageVariant(home, "claude", "balanced", { "judge.md": "b" });
+    stageVariant(home, "claude", "work", { "judge.md": "w" });
+    stageVariant(home, "codex", "balanced", { "judge.toml": "b" });
+    stageActive(home, "claude", { "judge.md": "b" });
 
     const inv = listProfiles({ targetHome: home });
     const claude = inv.hosts.find((h) => h.host === "claude")!;
@@ -129,7 +129,7 @@ describe("listProfiles", () => {
   });
 
   test("reports recorded active profile and bundle version from existing state", () => {
-    stageVariant(home, "claude", "home", { "planner.md": "h" });
+    stageVariant(home, "claude", "home", { "judge.md": "h" });
     writeState(home, {
       version: 2,
       platforms: {
@@ -150,7 +150,7 @@ describe("listProfiles", () => {
   });
 
   test("(i) honours opts.hostDefaults as the fallback for an unrecorded host", () => {
-    stageVariant(home, "claude", "local_models", { "planner.md": "b" });
+    stageVariant(home, "claude", "local_models", { "judge.md": "b" });
     // No install-state written -> claude has no recorded modelProfile.
 
     const inv = listProfiles({ targetHome: home, hostDefaults: { claude: "local_models" } });
@@ -159,7 +159,7 @@ describe("listProfiles", () => {
   });
 
   test("(i) omitting opts.hostDefaults still yields the last-resort \"balanced\" literal", () => {
-    stageVariant(home, "claude", "balanced", { "planner.md": "b" });
+    stageVariant(home, "claude", "balanced", { "judge.md": "b" });
     // No install-state, no hostDefaults passed at all.
 
     const inv = listProfiles({ targetHome: home });
@@ -168,7 +168,7 @@ describe("listProfiles", () => {
   });
 
   test("(i) a recorded modelProfile still wins over opts.hostDefaults", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "b" });
+    stageVariant(home, "claude", "work", { "judge.md": "b" });
     writeState(home, {
       version: 2,
       platforms: {
@@ -189,8 +189,8 @@ describe("listProfiles", () => {
 
 describe("switchProfile — happy path", () => {
   test("switches a file-route host, overwrites only massa-ai-owned files, records state only after copies", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     fs.writeFileSync(path.join(layoutFor(home, "claude").activeDir, "user-notes.md"), "keep me");
     writeState(home, {
       version: 2,
@@ -202,7 +202,7 @@ describe("switchProfile — happy path", () => {
     expect(report.restartRequired).toBe(true);
 
     const activeDir = layoutFor(home, "claude").activeDir;
-    expect(readBody(path.join(activeDir, "planner.md"))).toBe("opus");
+    expect(readBody(path.join(activeDir, "judge.md"))).toBe("opus");
     // Non-massa-ai file in the same directory is never touched.
     expect(readBody(path.join(activeDir, "user-notes.md"))).toBe("keep me");
 
@@ -212,10 +212,10 @@ describe("switchProfile — happy path", () => {
   });
 
   test("host filter switches only the requested host", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
-    stageVariant(home, "codex", "work", { "planner.toml": "opus" });
-    stageActive(home, "codex", { "planner.toml": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
+    stageVariant(home, "codex", "work", { "judge.toml": "opus" });
+    stageActive(home, "codex", { "judge.toml": "sonnet" });
     writeState(home, {
       version: 2,
       platforms: {
@@ -228,18 +228,18 @@ describe("switchProfile — happy path", () => {
     expect(report.hosts.map((h) => h.host)).toEqual(["claude"]);
 
     const codexActive = layoutFor(home, "codex").activeDir;
-    expect(readBody(path.join(codexActive, "planner.toml"))).toBe("sonnet"); // untouched
+    expect(readBody(path.join(codexActive, "judge.toml"))).toBe("sonnet"); // untouched
   });
 
   test("dry-run changes nothing on disk", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     const sp = writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
     });
     const before = fs.readFileSync(sp, "utf-8");
-    const activeFile = path.join(layoutFor(home, "claude").activeDir, "planner.md");
+    const activeFile = path.join(layoutFor(home, "claude").activeDir, "judge.md");
     const beforeContent = fs.readFileSync(activeFile, "utf-8");
 
     const report = switchProfile({ profile: "work", host: "claude", targetHome: home, dryRun: true });
@@ -250,8 +250,8 @@ describe("switchProfile — happy path", () => {
   });
 
   test("dry-run reports would-switch and never switched; a real run is the reverse (INV2)", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
@@ -267,8 +267,8 @@ describe("switchProfile — happy path", () => {
   });
 
   test("idempotent re-run: switching to the already-active profile is safe and repeatable", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
@@ -277,7 +277,7 @@ describe("switchProfile — happy path", () => {
     switchProfile({ profile: "work", host: "claude", targetHome: home });
     const second = switchProfile({ profile: "work", host: "claude", targetHome: home });
     expect(second.hosts[0]).toEqual({ host: "claude", status: "switched", filesChanged: 1 });
-    const activeFile = path.join(layoutFor(home, "claude").activeDir, "planner.md");
+    const activeFile = path.join(layoutFor(home, "claude").activeDir, "judge.md");
     expect(readBody(activeFile)).toBe("opus");
   });
 });
@@ -315,7 +315,7 @@ describe("agent-runtime-drift (INV3 + claude drift row)", () => {
     );
     fs.mkdirSync(path.join(cacheRoot, "agents"), { recursive: true });
     fs.writeFileSync(
-      path.join(cacheRoot, "agents", "investigator.md"),
+      path.join(cacheRoot, "agents", "code-explorer.md"),
       `---\nmodel: glm-5.2\neffort: max\n---\n${OWNED_MARKER_MD}\nbody`,
     );
     writeState(home, {
@@ -349,8 +349,8 @@ describe("agent-runtime-drift (INV3 + claude drift row)", () => {
 
 describe("switchProfile — Error Handling Strategy: unknown profile (MPS-09)", () => {
   test("unknown profile fails loud, lists available profiles, changes no files", () => {
-    stageVariant(home, "claude", "balanced", { "planner.md": "b" });
-    stageActive(home, "claude", { "planner.md": "b" });
+    stageVariant(home, "claude", "balanced", { "judge.md": "b" });
+    stageActive(home, "claude", { "judge.md": "b" });
     writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
@@ -363,17 +363,17 @@ describe("switchProfile — Error Handling Strategy: unknown profile (MPS-09)", 
       expect((err as Error).name).toBe("UnknownProfileError");
       expect((err as Error).message).toContain("balanced");
     }
-    const activeFile = path.join(layoutFor(home, "claude").activeDir, "planner.md");
+    const activeFile = path.join(layoutFor(home, "claude").activeDir, "judge.md");
     expect(readBody(activeFile)).toBe("b");
   });
 });
 
 describe("switchProfile — Error Handling Strategy: unsupported host (MPS-09)", () => {
   test("a profile absent for one host reports 'unsupported' there while another host still switches", () => {
-    stageVariant(home, "claude", "open_models", { "planner.md": "oss" });
-    stageActive(home, "claude", { "planner.md": "opus" });
-    stageVariant(home, "codex", "balanced", { "planner.toml": "b" }); // no open_models for codex
-    stageActive(home, "codex", { "planner.toml": "b" });
+    stageVariant(home, "claude", "open_models", { "judge.md": "oss" });
+    stageActive(home, "claude", { "judge.md": "opus" });
+    stageVariant(home, "codex", "balanced", { "judge.toml": "b" }); // no open_models for codex
+    stageActive(home, "codex", { "judge.toml": "b" });
     writeState(home, {
       version: 2,
       platforms: {
@@ -392,14 +392,14 @@ describe("switchProfile — Error Handling Strategy: unsupported host (MPS-09)",
   });
 
   test("a host whose bundle predates variants (no agent-profiles dir at all) reports the upgrade-plugin reason", () => {
-    stageActive(home, "codex", { "planner.toml": "b" }); // active dir exists, no variants dir ever created
+    stageActive(home, "codex", { "judge.toml": "b" }); // active dir exists, no variants dir ever created
     writeState(home, {
       version: 2,
       platforms: { codex: { root: "/y", skills: [], skillsOwner: "plugin", installRoute: "file" } },
     });
     // Give the profile a home elsewhere so it's not globally unknown.
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "s" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "s" });
     writeState(home, {
       version: 2,
       platforms: {
@@ -424,14 +424,14 @@ describe("switchProfile — Cursor is always skipped with an explicit reason", (
 
 describe("switchProfile — Error Handling Strategy: marketplace-route refusal (F1)", () => {
   test("installRoute absent refuses loud (never guesses from file absence)", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     writeState(home, { version: 2, platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin" } } });
 
     const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
     expect(report.hosts[0].status).toBe("failed");
     expect(report.hosts[0].reason?.toLowerCase()).toContain("install route");
-    const activeFile = path.join(layoutFor(home, "claude").activeDir, "planner.md");
+    const activeFile = path.join(layoutFor(home, "claude").activeDir, "judge.md");
     expect(readBody(activeFile)).toBe("sonnet"); // untouched
   });
 
@@ -441,8 +441,8 @@ describe("switchProfile — Error Handling Strategy: marketplace-route refusal (
   // genuinely unresolvable and the failure below is CPP-06's "unresolved
   // path" reason, not the pre-T18 blanket marketplace refusal.
   test('installRoute "marketplace" with no resolvable install root fails, naming the unresolved registry path', () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
@@ -453,8 +453,8 @@ describe("switchProfile — Error Handling Strategy: marketplace-route refusal (
     expect(report.hosts[0].reason).toMatch(/marketplace/i);
     expect(report.hosts[0].reason).toContain(path.join(home, ".claude", "plugins", "installed_plugins.json"));
     // Never falls back to the $HOME-derived file-route path (CPP-06) — the
-    // staged ~/.claude/agents/planner.md is untouched.
-    const activeFile = path.join(layoutFor(home, "claude").activeDir, "planner.md");
+    // staged ~/.claude/agents/judge.md is untouched.
+    const activeFile = path.join(layoutFor(home, "claude").activeDir, "judge.md");
     expect(readBody(activeFile)).toBe("sonnet");
   });
 });
@@ -463,7 +463,7 @@ describe("Claude marketplace parity (T18, CPP-03..06)", () => {
   test("(CPP-03) listProfiles reports installed:true + variants from the resolved marketplace root", () => {
     const cacheRoot = path.join(home, ".claude", "plugins", "cache", "massa-ai", "massa-ai", "1.0.0");
     fs.mkdirSync(path.join(cacheRoot, "agent-profiles", "balanced"), { recursive: true });
-    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "balanced", "planner.md"), owned("planner.md", "b"));
+    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "balanced", "judge.md"), owned("judge.md", "b"));
     fs.mkdirSync(path.join(cacheRoot, "agents"), { recursive: true });
     stageMarketplaceRegistry(home, cacheRoot);
     writeState(home, {
@@ -493,9 +493,9 @@ describe("Claude marketplace parity (T18, CPP-03..06)", () => {
   test("(CPP-04) switchProfile on a resolved marketplace root copies into <root>/agents and records modelProfile only after the copy", () => {
     const cacheRoot = path.join(home, ".claude", "plugins", "cache", "massa-ai", "massa-ai", "2.0.0");
     fs.mkdirSync(path.join(cacheRoot, "agent-profiles", "work"), { recursive: true });
-    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "work", "planner.md"), owned("planner.md", "opus"));
+    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "work", "judge.md"), owned("judge.md", "opus"));
     fs.mkdirSync(path.join(cacheRoot, "agents"), { recursive: true });
-    fs.writeFileSync(path.join(cacheRoot, "agents", "planner.md"), owned("planner.md", "sonnet"));
+    fs.writeFileSync(path.join(cacheRoot, "agents", "judge.md"), owned("judge.md", "sonnet"));
     stageMarketplaceRegistry(home, cacheRoot);
     writeState(home, {
       version: 2,
@@ -505,7 +505,7 @@ describe("Claude marketplace parity (T18, CPP-03..06)", () => {
     const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
     expect(report.hosts[0].status).toBe("switched");
     expect(report.hosts[0].filesChanged).toBe(1);
-    expect(readBody(path.join(cacheRoot, "agents", "planner.md"))).toBe("opus");
+    expect(readBody(path.join(cacheRoot, "agents", "judge.md"))).toBe("opus");
 
     const stateAfter = JSON.parse(fs.readFileSync(statePath(home), "utf-8"));
     expect(stateAfter.platforms.claude.modelProfile.profile).toBe("work");
@@ -516,7 +516,7 @@ describe("Claude marketplace parity (T18, CPP-03..06)", () => {
   test("(CPP-05) re-switching to the already-active marketplace profile still reports switched with a file count, never an error", () => {
     const cacheRoot = path.join(home, ".claude", "plugins", "cache", "massa-ai", "massa-ai", "3.0.0");
     fs.mkdirSync(path.join(cacheRoot, "agent-profiles", "cheap"), { recursive: true });
-    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "cheap", "planner.md"), owned("planner.md", "haiku"));
+    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "cheap", "judge.md"), owned("judge.md", "haiku"));
     fs.mkdirSync(path.join(cacheRoot, "agents"), { recursive: true });
     stageMarketplaceRegistry(home, cacheRoot);
     writeState(home, {
@@ -531,8 +531,8 @@ describe("Claude marketplace parity (T18, CPP-03..06)", () => {
   });
 
   test("codex marketplace-route switch now proceeds (T2/MDS-02: the stale refusal is retired) and switches codex's file-route layout", () => {
-    stageVariant(home, "codex", "work", { "planner.toml": "opus" });
-    stageActive(home, "codex", { "planner.toml": "sonnet" });
+    stageVariant(home, "codex", "work", { "judge.toml": "opus" });
+    stageActive(home, "codex", { "judge.toml": "sonnet" });
     writeState(home, {
       version: 2,
       platforms: { codex: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
@@ -542,7 +542,7 @@ describe("Claude marketplace parity (T18, CPP-03..06)", () => {
     expect(report.hosts[0].status).toBe("switched");
     expect(report.hosts[0].filesChanged).toBe(1);
     const codexActive = layoutFor(home, "codex").activeDir;
-    expect(readBody(path.join(codexActive, "planner.toml"))).toBe("opus");
+    expect(readBody(path.join(codexActive, "judge.toml"))).toBe("opus");
   });
 });
 
@@ -562,8 +562,8 @@ describe("switchProfile — T2b: runtime tracked-path guard (AC-02.4)", () => {
   }
 
   test("a deliberately git add-ed destination file is refused, naming the offending path", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
@@ -571,7 +571,7 @@ describe("switchProfile — T2b: runtime tracked-path guard (AC-02.4)", () => {
 
     gitInit(home);
     const activeDir = layoutFor(home, "claude").activeDir;
-    const destFile = path.join(activeDir, "planner.md");
+    const destFile = path.join(activeDir, "judge.md");
     gitAdd(home, path.relative(home, destFile));
 
     const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
@@ -582,8 +582,8 @@ describe("switchProfile — T2b: runtime tracked-path guard (AC-02.4)", () => {
   });
 
   test("an ignored (untracked) destination path proceeds normally", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
@@ -596,12 +596,12 @@ describe("switchProfile — T2b: runtime tracked-path guard (AC-02.4)", () => {
     const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
     expect(report.hosts[0].status).toBe("switched");
     const activeDir = layoutFor(home, "claude").activeDir;
-    expect(readBody(path.join(activeDir, "planner.md"))).toBe("opus");
+    expect(readBody(path.join(activeDir, "judge.md"))).toBe("opus");
   });
 
   test("a non-repo target (no git anywhere above it) proceeds normally — nothing there could be tracked", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
@@ -616,8 +616,8 @@ describe("switchProfile — T2b: runtime tracked-path guard (AC-02.4)", () => {
 
 describe("switchProfile — Error Handling Strategy: corrupt/unwritable state (F4)", () => {
   test("corrupt state fails globally before any copy", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     const sp = statePath(home);
     fs.mkdirSync(path.dirname(sp), { recursive: true });
     fs.writeFileSync(sp, "{ not json ");
@@ -628,13 +628,13 @@ describe("switchProfile — Error Handling Strategy: corrupt/unwritable state (F
     } catch (err) {
       expect((err as Error).name).toBe("CorruptInstallStateError");
     }
-    const activeFile = path.join(layoutFor(home, "claude").activeDir, "planner.md");
+    const activeFile = path.join(layoutFor(home, "claude").activeDir, "judge.md");
     expect(readBody(activeFile)).toBe("sonnet"); // no copy happened
   });
 
   test("unwritable state directory fails globally before any copy", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
 
     // .config exists (and reads fine — install-state.json is legitimately
     // missing, so readInstallState returns the default) but is read-only,
@@ -652,15 +652,15 @@ describe("switchProfile — Error Handling Strategy: corrupt/unwritable state (F
     } finally {
       fs.chmodSync(configDir, 0o755); // let afterEach's rmSync clean up
     }
-    const activeFile = path.join(layoutFor(home, "claude").activeDir, "planner.md");
+    const activeFile = path.join(layoutFor(home, "claude").activeDir, "judge.md");
     expect(readBody(activeFile)).toBe("sonnet");
   });
 });
 
 describe("switchProfile — Error Handling Strategy: concurrent switch (A10)", () => {
   test("a held lock fails the whole switch loud, with no files copied", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
     const sp = writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "file" } },
@@ -675,16 +675,16 @@ describe("switchProfile — Error Handling Strategy: concurrent switch (A10)", (
     } finally {
       held.release();
     }
-    const activeFile = path.join(layoutFor(home, "claude").activeDir, "planner.md");
+    const activeFile = path.join(layoutFor(home, "claude").activeDir, "judge.md");
     expect(readBody(activeFile)).toBe("sonnet");
   });
 });
 
 describe("switchProfile — Error Handling Strategy: partial multi-host failure", () => {
   test("one host's copy failure does not roll back another host's completed switch", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
-    stageActive(home, "claude", { "planner.md": "sonnet" });
-    stageVariant(home, "codex", "work", { "planner.toml": "opus" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
+    stageActive(home, "claude", { "judge.md": "sonnet" });
+    stageVariant(home, "codex", "work", { "judge.toml": "opus" });
     // Sabotage codex's active dir: put a file where a directory must go, so
     // mkdir(activeDir, {recursive:true}) fails.
     const codexLayout = layoutFor(home, "codex");
@@ -730,12 +730,12 @@ describe("switchProfile — Edge case: no hosts detected", () => {
 
 describe("switchProfile — F3: OpenCode symlink repoint", () => {
   test("the active OpenCode agent stays a symlink post-switch, repointed at the new profile's variant file", () => {
-    stageVariant(home, "opencode", "balanced", { "planner.md": "b" });
-    stageVariant(home, "opencode", "work", { "planner.md": "w" });
+    stageVariant(home, "opencode", "balanced", { "judge.md": "b" });
+    stageVariant(home, "opencode", "work", { "judge.md": "w" });
 
     const layout = layoutFor(home, "opencode");
     fs.mkdirSync(layout.activeDir, { recursive: true });
-    fs.symlinkSync(layout.variantDir("balanced") + "/planner.md", path.join(layout.activeDir, "planner.md"));
+    fs.symlinkSync(layout.variantDir("balanced") + "/judge.md", path.join(layout.activeDir, "judge.md"));
 
     writeState(home, {
       version: 2,
@@ -745,18 +745,18 @@ describe("switchProfile — F3: OpenCode symlink repoint", () => {
     const report = switchProfile({ profile: "work", host: "opencode", targetHome: home });
     expect(report.hosts[0].status).toBe("switched");
 
-    const dest = path.join(layout.activeDir, "planner.md");
+    const dest = path.join(layout.activeDir, "judge.md");
     expect(fs.lstatSync(dest).isSymbolicLink()).toBe(true);
     expect(readBody(dest)).toBe("w");
-    expect(path.basename(fs.readlinkSync(dest))).toBe("planner.md");
+    expect(path.basename(fs.readlinkSync(dest))).toBe("judge.md");
     expect(fs.readlinkSync(dest)).toContain(path.join("agent-profiles", "work"));
   });
 
   test("F3: a regular (non-symlink) file at the active path is never clobbered, mirroring install.sh's pre-flight", () => {
-    stageVariant(home, "opencode", "work", { "planner.md": "w" });
+    stageVariant(home, "opencode", "work", { "judge.md": "w" });
     const layout = layoutFor(home, "opencode");
     fs.mkdirSync(layout.activeDir, { recursive: true });
-    fs.writeFileSync(path.join(layout.activeDir, "planner.md"), owned("planner.md", "user hand-edited this"));
+    fs.writeFileSync(path.join(layout.activeDir, "judge.md"), owned("judge.md", "user hand-edited this"));
 
     writeState(home, {
       version: 2,
@@ -765,7 +765,7 @@ describe("switchProfile — F3: OpenCode symlink repoint", () => {
 
     switchProfile({ profile: "work", host: "opencode", targetHome: home });
 
-    const dest = path.join(layout.activeDir, "planner.md");
+    const dest = path.join(layout.activeDir, "judge.md");
     expect(fs.lstatSync(dest).isSymbolicLink()).toBe(false);
     expect(readBody(dest)).toBe("user hand-edited this");
   });
@@ -780,54 +780,54 @@ describe("switchProfile — marker ownership (NAM AC-6, AC-11)", () => {
   }
 
   test("claude: an unmarked same-named file in the active dir is left byte-identical", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus" });
     const activeDir = layoutFor(home, "claude").activeDir;
     fs.mkdirSync(activeDir, { recursive: true });
-    const foreign = "---\nname: planner\n---\nmy own planner\n";
-    fs.writeFileSync(path.join(activeDir, "planner.md"), foreign);
+    const foreign = "---\nname: judge\n---\nmy own judge\n";
+    fs.writeFileSync(path.join(activeDir, "judge.md"), foreign);
     fileRouteState("claude");
 
     const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
     expect(report.hosts).toEqual([{ host: "claude", status: "switched", filesChanged: 0 }]);
-    expect(fs.readFileSync(path.join(activeDir, "planner.md"), "utf-8")).toBe(foreign);
+    expect(fs.readFileSync(path.join(activeDir, "judge.md"), "utf-8")).toBe(foreign);
   });
 
   test("codex: an unmarked same-named TOML in the active dir is left byte-identical", () => {
-    stageVariant(home, "codex", "work", { "planner.toml": "opus" });
+    stageVariant(home, "codex", "work", { "judge.toml": "opus" });
     const activeDir = layoutFor(home, "codex").activeDir;
     fs.mkdirSync(activeDir, { recursive: true });
-    fs.writeFileSync(path.join(activeDir, "planner.toml"), 'name = "planner"\n');
+    fs.writeFileSync(path.join(activeDir, "judge.toml"), 'name = "judge"\n');
     fileRouteState("codex");
 
     const report = switchProfile({ profile: "work", host: "codex", targetHome: home });
     expect(report.hosts).toEqual([{ host: "codex", status: "switched", filesChanged: 0 }]);
-    expect(fs.readFileSync(path.join(activeDir, "planner.toml"), "utf-8")).toBe('name = "planner"\n');
+    expect(fs.readFileSync(path.join(activeDir, "judge.toml"), "utf-8")).toBe('name = "judge"\n');
   });
 
   test("claude: legacy-named and unmarked variant entries are never copied", () => {
-    stageVariant(home, "claude", "work", { "planner.md": "opus", "massa-ai-planner.md": "stale legacy" });
+    stageVariant(home, "claude", "work", { "judge.md": "opus", "massa-ai-planner.md": "stale legacy" });
     fs.writeFileSync(path.join(layoutFor(home, "claude").variantDir("work"), "stray.md"), "unmarked");
     fs.mkdirSync(layoutFor(home, "claude").activeDir, { recursive: true });
     fileRouteState("claude");
 
     const report = switchProfile({ profile: "work", host: "claude", targetHome: home });
     expect(report.hosts).toEqual([{ host: "claude", status: "switched", filesChanged: 1 }]);
-    expect(fs.readdirSync(layoutFor(home, "claude").activeDir)).toEqual(["planner.md"]);
+    expect(fs.readdirSync(layoutFor(home, "claude").activeDir)).toEqual(["judge.md"]);
   });
 
   test("opencode: a user symlink to an unmarked file elsewhere keeps its target; legacy variant entries are not linked", () => {
-    stageVariant(home, "opencode", "work", { "planner.md": "w", "massa-ai-planner.md": "stale legacy" });
+    stageVariant(home, "opencode", "work", { "judge.md": "w", "massa-ai-planner.md": "stale legacy" });
     const layout = layoutFor(home, "opencode");
     fs.mkdirSync(layout.activeDir, { recursive: true });
-    const dotfile = path.join(home, "dotfiles", "opencode", "agents", "planner.md");
+    const dotfile = path.join(home, "dotfiles", "opencode", "agents", "judge.md");
     fs.mkdirSync(path.dirname(dotfile), { recursive: true });
-    fs.writeFileSync(dotfile, "---\ndescription: mine\n---\nmy planner\n");
-    fs.symlinkSync(dotfile, path.join(layout.activeDir, "planner.md"));
+    fs.writeFileSync(dotfile, "---\ndescription: mine\n---\nmy judge\n");
+    fs.symlinkSync(dotfile, path.join(layout.activeDir, "judge.md"));
     fileRouteState("opencode");
 
     const report = switchProfile({ profile: "work", host: "opencode", targetHome: home });
     expect(report.hosts).toEqual([{ host: "opencode", status: "switched", filesChanged: 0 }]);
-    expect(fs.readlinkSync(path.join(layout.activeDir, "planner.md"))).toBe(dotfile);
-    expect(fs.readdirSync(layout.activeDir)).toEqual(["planner.md"]);
+    expect(fs.readlinkSync(path.join(layout.activeDir, "judge.md"))).toBe(dotfile);
+    expect(fs.readdirSync(layout.activeDir)).toEqual(["judge.md"]);
   });
 });

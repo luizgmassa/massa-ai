@@ -221,26 +221,26 @@ seed_state() { # seed_state HOME — writes stdin as the install state
 # per-class wipes that pin each member.
 # Agents are seeded marker-owned under unprefixed names: installer ownership
 # is the content marker, never the name (NAM AC-4).
-OWNED_AGENT_MD=$'---\nname: navigator\n---\n<!-- massa-ai-owned: true -->\nbody\n'
+OWNED_AGENT_MD=$'---\nname: code-explorer\n---\n<!-- massa-ai-owned: true -->\nbody\n'
 seed_installed_artifacts() {
   local h="$1" host="$2"
   case "$host" in
     claude)
       mkdir -p "$h/.claude/agents" "$h/.claude/commands"
-      printf '%s' "$OWNED_AGENT_MD" > "$h/.claude/agents/navigator.md"
+      printf '%s' "$OWNED_AGENT_MD" > "$h/.claude/agents/code-explorer.md"
       touch "$h/.claude/commands/massa-ai-spec-driven.md"
       printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"massa-ai-hook"}]}]}}' > "$h/.claude/settings.json"
       ;;
     codex)
       mkdir -p "$h/.codex/plugins/massa-ai/skills" "$h/.codex/agents"
       touch "$h/.codex/plugins/massa-ai/skills/spec-driven.md"
-      printf '# massa-ai-owned\nname = "navigator"\n' > "$h/.codex/agents/navigator.toml"
+      printf '# massa-ai-owned\nname = "code-explorer"\n' > "$h/.codex/agents/code-explorer.toml"
       printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"massa-ai-hook"}]}]}}' > "$h/.codex/hooks.json"
       ;;
     cursor)
       mkdir -p "$h/.cursor/plugins/local/massa-ai/skills/spec-driven" "$h/.cursor/agents"
       touch "$h/.cursor/plugins/local/massa-ai/skills/spec-driven/SKILL.md"
-      printf '%s' "$OWNED_AGENT_MD" > "$h/.cursor/agents/navigator.md"
+      printf '%s' "$OWNED_AGENT_MD" > "$h/.cursor/agents/code-explorer.md"
       printf '{"version":1,"hooks":{"beforeSubmitPrompt":[{"command":"massa-ai-hook"}]}}' > "$h/.cursor/hooks.json"
       ;;
     opencode)
@@ -250,8 +250,8 @@ seed_installed_artifacts() {
             "$h/.config/opencode/command/massa-ai-spec-driven.md"
       # OpenCode agents are symlinks into the bundle.
       mkdir -p "$h/bundle/apps/opencode-plugin/agents"
-      printf '%s' "$OWNED_AGENT_MD" > "$h/bundle/apps/opencode-plugin/agents/navigator.md"
-      ln -s "$h/bundle/apps/opencode-plugin/agents/navigator.md" "$h/.config/opencode/agents/navigator.md"
+      printf '%s' "$OWNED_AGENT_MD" > "$h/bundle/apps/opencode-plugin/agents/code-explorer.md"
+      ln -s "$h/bundle/apps/opencode-plugin/agents/code-explorer.md" "$h/.config/opencode/agents/code-explorer.md"
       ;;
   esac
 }

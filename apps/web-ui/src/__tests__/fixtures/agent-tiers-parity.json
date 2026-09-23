@@ -9,27 +9,27 @@
     "",
     "Cases covered, one per agent key:",
     "  builder  — inherit one host (claude), override another (opencode: standard -> deep)",
-    "  navigator — whole-agent null tombstone: removed entirely from the merged result",
-    "  reviewer — host-level null tombstone: its only host key is removed, agent entry",
+    "  code-explorer — whole-agent null tombstone: removed entirely from the merged result",
+    "  code-reviewer — host-level null tombstone: its only host key is removed, agent entry",
     "             survives as an empty object (deletion is scoped to the host key, not the",
     "             agent — mirrors mergeFlatMap's per-key tombstone semantics one level up)",
-    "  planner  — a genuinely new agent the builtin never named, added wholesale by the",
+    "  product-manager — a genuinely new agent the builtin never named, added wholesale by the",
     "             overlay (no agent list in the registry principle — this is opt-in data)"
   ],
   "builtinAgentTiers": {
     "builder": { "claude": "standard", "opencode": "standard" },
-    "navigator": { "claude": "light" },
-    "reviewer": { "claude": "light" }
+    "code-explorer": { "claude": "light" },
+    "code-reviewer": { "claude": "light" }
   },
   "overlayAgentTiers": {
     "builder": { "opencode": "deep" },
-    "navigator": null,
-    "reviewer": { "claude": null },
-    "planner": { "cursor": "deep" }
+    "code-explorer": null,
+    "code-reviewer": { "claude": null },
+    "product-manager": { "cursor": "deep" }
   },
   "expectedMergedAgentTiers": {
     "builder": { "claude": "standard", "opencode": "deep" },
-    "reviewer": {},
-    "planner": { "cursor": "deep" }
+    "code-reviewer": {},
+    "product-manager": { "cursor": "deep" }
   }
 }

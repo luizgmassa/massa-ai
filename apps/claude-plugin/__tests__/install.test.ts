@@ -99,7 +99,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
 
     // Generated subagents copied
     expect(
-      await pathExists(path.join(tmp, ".claude/agents/navigator.md")),
+      await pathExists(path.join(tmp, ".claude/agents/code-explorer.md")),
     ).toBe(true);
 
     // Hooks merged into settings.json with all 5 events
@@ -210,7 +210,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     }
     // Generated subagents removed on uninstall (massa-ai- prefix is the marker)
     expect(
-      await pathExists(path.join(tmp, ".claude/agents/navigator.md")),
+      await pathExists(path.join(tmp, ".claude/agents/code-explorer.md")),
     ).toBe(false);
   });
 
@@ -228,41 +228,30 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     expect(afterSecond).toBe(afterFirst);
   });
 
-  // ── T3: 18 subagent specialists (CLA-01, CLA-02, CLA-05, CLA-06, DOC-01) ──
+  // ── T3: subagent specialists (CLA-01, CLA-02, CLA-05, CLA-06, DOC-01) ──
   const SPECIALIST_NAMES = [
-    "investigator",
-    "planner",
     "builder",
-    "reviewer",
-    "context-curator",
-    "verification-agent",
-    "requirements-analyst",
-    "architecture-specialist",
-    "test-engineer",
-    "documentation-agent",
-    "audit-specialist",
-    "mobile-specialist",
-    "plan-critic",
-    "furps-analyst",
-    "navigator",
-    "meta-judge",
-    "judge",
+    "code-explorer",
+    "code-reviewer",
     "designer",
+    "judge",
+    "product-manager",
+    "test-engineer",
   ];
 
-  test("CLA-01/DOC-01: user-scope install copies 18 subagent specialists + prints summary line", async () => {
+  test("CLA-01/DOC-01: user-scope install copies every subagent specialist + prints summary line", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    // 18 specialist agent files at ~/.claude/agents/massa-ai-<name>.md
+    // One agent file per specialist at ~/.claude/agents/<name>.md
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/${name}.md`)),
       ).toBe(true);
     }
 
-    // Install output mentions the 18 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("18 subagent specialists");
+    // Install output reports the specialist count (DOC-01)
+    expect(res.stdout).toContain(`${SPECIALIST_NAMES.length} subagent specialists`);
   });
 
   // STI-01/STI-02: the installed bundle's tool gating, asserted end-to-end against
@@ -274,14 +263,11 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
   // key, `toolsLine` became "" for every read-only agent and the check passed
   // vacuously, while the write-agent branch failed outright. Both halves below assert
   // the PRESENCE of the expected gating key, so neither can pass on an empty line.
-  test("CLA-02: read-only agents deny writes via disallowedTools; write agents inherit; navigator keeps its allowlist", async () => {
+  test("CLA-02: read-only agents deny writes via disallowedTools; write agents inherit; no agent carries an allowlist", async () => {
     runInstall(["--user"], { HOME: tmp });
-    const writeAgents = ["builder", "test-engineer", "documentation-agent", "judge", "designer"];
-    // The sole AGENT_TOOLS_OVERRIDE member: index-first, so it keeps an explicit
-    // allowlist and does NOT inherit the session's MCP servers (a deliberate exception).
-    const allowlistAgents = ["navigator"];
+    const writeAgents = ["builder", "designer", "judge", "test-engineer"];
     const denylistAgents = SPECIALIST_NAMES.filter(
-      (n) => !writeAgents.includes(n) && !allowlistAgents.includes(n),
+      (n) => !writeAgents.includes(n),
     );
 
     const gatingLines = async (name: string) => {
@@ -307,16 +293,11 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
       expect(tools).toBeNull();
       expect(disallowed).toBeNull();
     }
-    for (const name of allowlistAgents) {
-      const { tools, disallowed } = await gatingLines(name);
-      expect(tools).toBe('tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]');
-      expect(disallowed).toBeNull();
-    }
   });
 
   test("CLA-05: uninstall removes every massa-ai-owned specialist, preserves user agents", async () => {
     runInstall(["--user"], { HOME: tmp });
-    // Sanity: all 18 specialists present before uninstall
+    // Sanity: every specialist present before uninstall
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/${name}.md`)),
@@ -329,7 +310,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     const res = runInstall(["--uninstall"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
-    // Every generated specialist removed — navigator included, it is generated too
+    // Every generated specialist removed
     for (const name of SPECIALIST_NAMES) {
       expect(
         await pathExists(path.join(tmp, `.claude/agents/${name}.md`)),
@@ -526,7 +507,7 @@ describe("claude-plugin generated-bundle contract (T5, UGB-05..08)", () => {
       });
       expect(res.status).toBe(0);
       expect(
-        await pathExists(path.join(tmp, ".claude/agents/navigator.md")),
+        await pathExists(path.join(tmp, ".claude/agents/code-explorer.md")),
       ).toBe(true);
     } finally {
       await fs.rm(pkgRoot, { recursive: true, force: true });

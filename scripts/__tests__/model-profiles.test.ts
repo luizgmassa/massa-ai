@@ -123,7 +123,7 @@ describe("model-profiles: the shipped registry", () => {
     expect(raw.agentTiers).toEqual({});
     const asText = JSON.stringify(raw.profiles) + JSON.stringify(raw.hostDefaults);
     // No specialist name should appear as a key in the model policy itself.
-    for (const name of ["investigator", "planner", "builder", "navigator", "plan-critic"]) {
+    for (const name of ["builder", "code-explorer", "code-reviewer", "judge", "product-manager"]) {
       expect(asText).not.toContain(`"${name}"`);
     }
   });
@@ -981,7 +981,7 @@ describe("model-profiles: agentTiers — merge (mergeOverlay, APUX-01 AC2, P1-A 
       workflowTiers: {},
       agentTiers: {
         builder: { claude: "standard", opencode: "standard" },
-        navigator: { claude: "light" },
+        "code-explorer": { claude: "light" },
       },
       profiles: {
         A: {
@@ -1000,14 +1000,14 @@ describe("model-profiles: agentTiers — merge (mergeOverlay, APUX-01 AC2, P1-A 
     const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
     expect(merged.agentTiers.builder).toEqual({ claude: "standard", opencode: "deep" });
     // An agent the overlay never mentions is retained verbatim.
-    expect(merged.agentTiers.navigator).toEqual(builtin.agentTiers.navigator);
+    expect(merged.agentTiers["code-explorer"]).toEqual(builtin.agentTiers["code-explorer"]);
   });
 
   test("agent-level null tombstones the whole agent entry", () => {
     const builtin = syntheticBuiltinWithAgentTiers();
-    const overlay: OverlayData = { agentTiers: { navigator: null } };
+    const overlay: OverlayData = { agentTiers: { "code-explorer": null } };
     const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
-    expect("navigator" in merged.agentTiers).toBe(false);
+    expect("code-explorer" in merged.agentTiers).toBe(false);
     // The untouched agent survives.
     expect(merged.agentTiers.builder).toEqual(builtin.agentTiers.builder);
   });
@@ -1021,9 +1021,9 @@ describe("model-profiles: agentTiers — merge (mergeOverlay, APUX-01 AC2, P1-A 
 
   test("a genuinely new agent the builtin never named passes through wholesale", () => {
     const builtin = syntheticBuiltinWithAgentTiers();
-    const overlay: OverlayData = { agentTiers: { planner: { cursor: "deep" } } };
+    const overlay: OverlayData = { agentTiers: { "product-manager": { cursor: "deep" } } };
     const merged = mergeOverlay(builtin, overlay) as unknown as Registry;
-    expect(merged.agentTiers.planner).toEqual({ cursor: "deep" });
+    expect(merged.agentTiers["product-manager"]).toEqual({ cursor: "deep" });
   });
 
   test("shared cross-boundary parity fixture: mergeOverlay reproduces the fixture's expected merged agentTiers (Worker 2 asserts the identical fixture through the client's mergeRegistryForDisplay)", () => {
@@ -1113,7 +1113,7 @@ describe("model-profiles: agentTiers — normalize + count (APUX-01 AC3, P1-A AC
     writeOverlay(overlayPath, {
       agentTiers: {
         builder: { opencode: "deep" }, // survives: 1 leaf
-        navigator: { emacs_is_not_a_host: null }, // no-op tombstone on an invalid host — the
+        "code-explorer": { emacs_is_not_a_host: null }, // no-op tombstone on an invalid host — the
         // merge validates hosts elsewhere; here it is simply an absent-in-builtin key, so
         // normalization drops it as a no-op, count 0 for this agent.
         ghost: null, // no-op whole-agent tombstone — agent never existed, count 0

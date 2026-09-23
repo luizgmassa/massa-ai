@@ -104,7 +104,7 @@ for host in claude cursor codex; do
   assert_no_file "$host: legacy massa-ai-reviewer.$ext is pruned" "$AD/massa-ai-reviewer.$ext"
   check "$host: unmarked massa-ai-mine.$ext survives install" "$(cmp -s "$AD/massa-ai-mine.$ext" "$ROOT/mine-$host.orig" && echo 0 || echo 1)"
   assert_no_file "$host: marked retired-specialist.$ext is pruned" "$AD/retired-specialist.$ext"
-  assert_file "$host: shipped reviewer.$ext installed" "$AD/reviewer.$ext"
+  assert_file "$host: shipped code-reviewer.$ext installed" "$AD/code-reviewer.$ext"
 
   BEFORE="$(tree_fingerprint "$AD")"
   run_installer "$host" "$STAGE" "$H" >/dev/null; RC=$?
@@ -116,7 +116,7 @@ for host in claude cursor codex; do
   check "$host: foreign builder.$ext is byte-identical after uninstall" "$(cmp -s "$AD/builder.$ext" "$ROOT/builder-$host.orig" && echo 0 || echo 1)"
   assert_symlink_to "$host: user symlink survives uninstall" "$AD/judge.$ext" "$H/dotfiles/judge.$ext"
   check "$host: unmarked massa-ai-mine.$ext survives uninstall" "$(cmp -s "$AD/massa-ai-mine.$ext" "$ROOT/mine-$host.orig" && echo 0 || echo 1)"
-  assert_no_file "$host: owned reviewer.$ext removed by uninstall" "$AD/reviewer.$ext"
+  assert_no_file "$host: owned code-reviewer.$ext removed by uninstall" "$AD/code-reviewer.$ext"
   assert_eq "$host: only the three user entries remain" "$(ls "$AD" | LC_ALL=C sort | tr '\n' ' ')" "builder.$ext judge.$ext massa-ai-mine.$ext "
 done
 
@@ -142,14 +142,14 @@ assert_symlink_to "opencode: user symlink judge.md keeps its dotfiles target" "$
 assert_contains "opencode: install warns naming the foreign symlink" "$OUT" "$AD/judge.md exists and is not massa-ai-owned — skipped"
 assert_no_file "opencode: legacy (dangling) massa-ai-reviewer.md link is pruned" "$AD/massa-ai-reviewer.md"
 assert_file "opencode: unmarked massa-ai-mine.md survives" "$AD/massa-ai-mine.md"
-assert_symlink_to "opencode: reviewer.md links into copy A" "$AD/reviewer.md" "$STAGE_A/apps/opencode-plugin/agents/reviewer.md"
+assert_symlink_to "opencode: code-reviewer.md links into copy A" "$AD/code-reviewer.md" "$STAGE_A/apps/opencode-plugin/agents/code-reviewer.md"
 
 OUT="$(run_installer opencode "$STAGE_B" "$H")"; RC=$?
 assert_eq "opencode install (copy B) exits 0" "$RC" "0"
-assert_symlink_to "opencode: reviewer.md relinked into copy B" "$AD/reviewer.md" "$STAGE_B/apps/opencode-plugin/agents/reviewer.md"
+assert_symlink_to "opencode: code-reviewer.md relinked into copy B" "$AD/code-reviewer.md" "$STAGE_B/apps/opencode-plugin/agents/code-reviewer.md"
 assert_eq "opencode: after copy B no owned link points into copy A" \
   "$(for l in "$AD"/*.md; do [[ -L "$l" ]] && readlink "$l"; done | grep -c "$STAGE_A/")" "0"
-assert_not_contains "opencode: copy B reinstall does not warn about its own links" "$OUT" "reviewer.md exists and is not massa-ai-owned"
+assert_not_contains "opencode: copy B reinstall does not warn about its own links" "$OUT" "code-reviewer.md exists and is not massa-ai-owned"
 
 # Profile switch (simulated exactly as the engine's repoint does), then reinstall.
 STATE="$H/.config/massa-ai/install-state.json"
@@ -158,11 +158,11 @@ STATE="$H/.config/massa-ai/install-state.json"
   const s = JSON.parse(fs.readFileSync(f, "utf8"));
   s.platforms.opencode.modelProfile = { profile: "work", switchedAt: "2026-01-01T00:00:00Z" };
   fs.writeFileSync(f, JSON.stringify(s, null, 2));' "$STATE"
-WORK_TARGET="$H/.config/opencode/plugins/massa-ai/agent-profiles/work/reviewer.md"
-ln -sfn "$WORK_TARGET" "$AD/reviewer.md"
+WORK_TARGET="$H/.config/opencode/plugins/massa-ai/agent-profiles/work/code-reviewer.md"
+ln -sfn "$WORK_TARGET" "$AD/code-reviewer.md"
 run_installer opencode "$STAGE_B" "$H" >/dev/null; RC=$?
 assert_eq "opencode reinstall after a switch exits 0" "$RC" "0"
-assert_symlink_to "opencode: reviewer.md still follows the recorded profile" "$AD/reviewer.md" "$WORK_TARGET"
+assert_symlink_to "opencode: code-reviewer.md still follows the recorded profile" "$AD/code-reviewer.md" "$WORK_TARGET"
 
 # Delete copy A entirely and point one link back into it (dangling), then reinstall.
 ln -sfn "$STAGE_A/apps/opencode-plugin/agents/designer.md" "$AD/designer.md"

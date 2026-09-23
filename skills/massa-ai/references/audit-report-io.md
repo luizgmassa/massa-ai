@@ -363,7 +363,7 @@ Model Requested: <slot pin: deepseek-v4-pro | minimax-m3 | GLM-5.2>
 Model Note: <fallback state or n/a>
 
 ## Evaluation Specification
-<meta-judge YAML, embedded verbatim once>
+<spec-author YAML, embedded verbatim once>
 
 ## Criterion Scores
 ### <criterion id> — <score>/<scale.max> (weight <w>)

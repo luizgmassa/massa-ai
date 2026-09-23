@@ -1847,7 +1847,7 @@ const NOMENCLATURE_SAMPLE_REGISTRY = {
   overlayOverrideCount: 2,
   agents: [
     { name: "builder", charterTier: "standard" },
-    { name: "reviewer", charterTier: "light" },
+    { name: "code-reviewer", charterTier: "light" },
   ],
 };
 

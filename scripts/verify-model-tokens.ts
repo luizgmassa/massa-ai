@@ -204,10 +204,9 @@ export function collectTargets(root = REPO_ROOT): readonly Target[] {
   // written against the four surfaces MPR-R1 enumerated, and `skills/AGENTS.md`
   // was not among them — so while every charter was policed, the registry that
   // documents those charters carried a hand-authored "Model hint" column naming
-  // a model per agent, for an unstated host. It was already wrong for `planner`
-  // and `requirements-analyst`, two of the three roles whose tiers MPR
-  // normalized, and named models for `judge`/`meta-judge` that no profile
-  // resolves. Every gate stayed green throughout.
+  // a model per agent, for an unstated host. It was already wrong for two of
+  // the three roles whose tiers MPR normalized, and named models for the two
+  // debate-panel roles that no profile resolves. Every gate stayed green throughout.
   //
   // The lesson is about the surface list, not the matcher: the matcher would
   // have caught all four the moment it was pointed at the file.

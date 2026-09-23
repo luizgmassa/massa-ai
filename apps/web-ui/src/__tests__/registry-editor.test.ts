@@ -48,7 +48,7 @@ const SAMPLE_REGISTRY = {
   },
   agents: [
     { name: "builder", charterTier: "standard" },
-    { name: "reviewer", charterTier: "light" },
+    { name: "code-reviewer", charterTier: "light" },
   ],
 };
 
@@ -246,8 +246,8 @@ describe("renderModelRegistry — non-profile overlay markers (WUT-17 AC3)", () 
     const claudeEnd = html.indexOf("</td>", claudeIdx);
     expect(html.slice(claudeIdx, claudeEnd)).not.toContain("overlay-badge");
 
-    // reviewer has no overlay.agentTiers entry at all — no cell in its row carries the badge.
-    const reviewerRowIdx = html.indexOf('data-agent="reviewer" data-host="claude"');
+    // code-reviewer has no overlay.agentTiers entry at all — no cell in its row carries the badge.
+    const reviewerRowIdx = html.indexOf('data-agent="code-reviewer" data-host="claude"');
     const reviewerRowEnd = html.indexOf("</tr>", reviewerRowIdx);
     expect(html.slice(reviewerRowIdx, reviewerRowEnd)).not.toContain("overlay-badge");
   });
@@ -390,7 +390,7 @@ describe("renderModelRegistry — Per-Agent Tier Overrides table (T6, APUX-04, P
   it("renders one row per agent with one dropdown per tool", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain('data-agent="builder"');
-    expect(html).toContain('data-agent="reviewer"');
+    expect(html).toContain('data-agent="code-reviewer"');
     const builderSelects = (html.match(/data-agent="builder"/g) || []).length;
     expect(builderSelects).toBe(4); // one select per REGISTRY_HOSTS entry
   });
@@ -398,7 +398,7 @@ describe("renderModelRegistry — Per-Agent Tier Overrides table (T6, APUX-04, P
   it("labels the default option with the raw charterTier and declared tiers with capitalized labels + raw values", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("(default: standard)"); // builder's charterTier, unmodified
-    expect(html).toContain("(default: light)"); // reviewer's charterTier, unmodified
+    expect(html).toContain("(default: light)"); // code-reviewer's charterTier, unmodified
     expect(html).toContain('<option value="light">Light</option>');
     expect(html).toContain('<option value="standard">Standard</option>');
     expect(html).toContain('<option value="deep">Deep</option>');
@@ -417,7 +417,7 @@ describe("renderModelRegistry — Per-Agent Tier Overrides table (T6, APUX-04, P
 
   it("leaves a non-overridden cell unmarked with no option selected", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const selectStart = html.indexOf('data-agent="reviewer" data-host="claude"');
+    const selectStart = html.indexOf('data-agent="code-reviewer" data-host="claude"');
     const cellStart = html.lastIndexOf("<td", selectStart);
     const cellEnd = html.indexOf("</td>", selectStart);
     const cellHtml = html.slice(cellStart, cellEnd);

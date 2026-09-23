@@ -67,7 +67,7 @@
     "overlayOverrideCount": 1,
     "agents": [
       { "name": "builder", "charterTier": "standard" },
-      { "name": "investigator", "charterTier": "deep" }
+      { "name": "code-explorer", "charterTier": "deep" }
     ]
   }
 }

@@ -752,7 +752,7 @@ fi
 # Flat agents and harness skills are written in BOTH branches (PAU-08/09):
 # Cursor discovers subagents only from the flat directory regardless of which
 # plugin-load path is active, and MCP/harness-skills ownership is independent
-# of it too. All of them, navigator included, are generated from
+# of it too. All of them are generated from
 # skills/agents/*/SKILL.md and carry the body ownership marker — a
 # user-authored agent is untouched, and a same-named one is skipped.
 #

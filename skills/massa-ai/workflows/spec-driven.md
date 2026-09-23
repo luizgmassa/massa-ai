@@ -36,7 +36,7 @@ Holds for every task, even if reference files are not opened:
 1. Tests derive from the spec's acceptance criteria and assert spec-defined outcomes — they never mirror the implementation.
 2. The gate must pass (tests pass) before a task is done — the test runner decides, not self-assessment.
 3. One atomic commit per task. Never batch tasks; never weaken, skip, or delete tests to make them pass.
-4. After the last task, a fresh verification-agent always runs automatically (author ≠ verifier) — spec-anchored outcome check plus discrimination sensor. Never optional, never prompted.
+4. After the last task, a fresh `code-reviewer` verifier (`verify` mode) always runs automatically (author ≠ verifier) — spec-anchored outcome check plus discrimination sensor. Never optional, never prompted.
 5. **Blast radius (approval ≠ remote authority):** Approving Execute for this feature authorizes local implementation and local commits, and covers one delivery through PR creation — branch push and `gh pr create` — under one explicit go-ahead given at Execute start. Force-push, deploy, production database changes, merges, and any other remote/externally-visible/destructive operation always require a separate explicit go-ahead, even after that authorization.
 
 ## Auto-Sizing
@@ -114,26 +114,25 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Use per-task commits when the environment and user permissions allow commits; otherwise record the skipped reason.
    - Keep validation assets protected.
    - Update logical feature artifacts in `.specs/features/<slug>/` and `.specs/project/STATE.md` after meaningful progress.
-    - Finish Execute by running `references/spec-driven/validate.md`. Dispatch `verification-agent` (author ≠ verifier) per `references/agent-orchestration.md`; the verification-agent always runs automatically and writes `.specs/features/<slug>/validation.md`. Without subagents, run the standalone fresh-eyes fallback in `validate.md`.
+    - Finish Execute by running `references/spec-driven/validate.md`. Dispatch `code-reviewer` in `verify` mode (author ≠ verifier) per `references/agent-orchestration.md`; the `code-reviewer` verifier always runs automatically and writes `.specs/features/<slug>/validation.md`. Without subagents, run the standalone fresh-eyes fallback in `validate.md`.
 
 **Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
-> **Dispatch: `designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
+> **Dispatch: `designer`** (role: `designer`, mode: `implement`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
 
-> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the task's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: spec-driven Execute final gate; author ≠ verifier independence required
 > - scope: the feature's git diff surface, test files, and spec ACs
 > - inputs: `spec.md` (ACs = source of truth), `references/spec-driven/validate.md` as operating checklist, commit range, test files in scope
@@ -142,7 +141,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 > - firewall: raw diffs/logs/test output summarized; mutations run in scratch state only
 > - memory: suggest-only; main agent persists validation outcomes
 
-    - The verification-agent re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
+    - The `code-reviewer` verifier re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
    - The fix → re-verify loop is bounded by the Bounded Fix→Re-verify Loop rule in `references/verification-ladder.md` (cap reached → `Blocked`).
    - Distill lesson signals through `references/lessons.md` when validation produces grounded reusable failures.
 7. Before the delivery chain's Propose stage (PR creation), write and commit `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` on the branch — not merely "after meaningful progress" during Execute, but committed before `gh pr create`. **Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` — a non-zero exit blocks Propose (see `references/implementation-delivery.md` stage 3.5 and GATE-02). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved). Record decisions, blockers, handoff, and completion evidence per `references/spec-driven/memory.md`'s write triggers.
@@ -169,7 +168,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 - Requirement cannot close: keep Specify open and ask the user, or record an explicit accepted assumption before execution.
 - Design or Tasks was skipped incorrectly: stop, create the missing artifact, and resume from the updated contract.
 - Validation command unavailable: record the missing command/tool in `validation.md` and mark `Blocked`.
-- Discrimination sensor cannot be made safely reversible: mark `Blocked` unless the verification-agent can prove equivalent discrimination with an existing deterministic mutation fixture.
+- Discrimination sensor cannot be made safely reversible: mark `Blocked` unless the `code-reviewer` verifier can prove equivalent discrimination with an existing deterministic mutation fixture.
 - Validation conflict: stop for user resolution when a validation asset conflicts with an approved specification.
 - Fix loop reaches the `references/verification-ladder.md` cap: stop with `Blocked`, preserve evidence, and ask for direction.
 

@@ -107,23 +107,15 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     expect(block).not.toContain("UAS_");
   });
 
-  test("sub-agent registry preserved (18 agents)", async () => {
+  test("sub-agent registry preserved (7 agents)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "AGENTS.md"));
-    expect(content).toContain("investigator");
-    expect(content).toContain("planner");
-    expect(content).toContain("builder");
-    expect(content).toContain("reviewer");
-    expect(content).toContain("context-curator");
-    expect(content).toContain("verification-agent");
-    expect(content).toContain("requirements-analyst");
-    expect(content).toContain("architecture-specialist");
-    expect(content).toContain("test-engineer");
-    expect(content).toContain("documentation-agent");
-    expect(content).toContain("audit-specialist");
-    expect(content).toContain("mobile-specialist");
-    expect(content).toContain("plan-critic");
-    expect(content).toContain("furps-analyst");
-    expect(content).toContain("navigator");
+    for (const agent of [
+      "builder", "code-explorer", "code-reviewer", "designer",
+      "judge", "product-manager", "test-engineer",
+    ]) {
+      expect(content).toContain(`| ${agent} |`);
+      expect(content).toContain(`skills/agents/${agent}/SKILL.md`);
+    }
   });
 });
 
@@ -719,21 +711,17 @@ describe("context slices", () => {
 });
 
 // ── Agents harness routing (ported from legacy) ──────────────────────────
-// Legacy asserted agents harness routing is enforced. The 16-agent registry
+// Legacy asserted agents harness routing is enforced. The 7-agent registry
 // lives in skills/AGENTS.md and each agent has a charter under skills/agents/.
 
 describe("agents harness routing", () => {
   const AGENTS_SUBDIR = path.join(SKILLS_DIR, "agents");
   const EXPECTED_AGENTS = [
-    "investigator", "planner", "builder", "reviewer",
-    "context-curator", "verification-agent", "requirements-analyst",
-    "architecture-specialist", "test-engineer", "documentation-agent",
-    "audit-specialist", "mobile-specialist",
-    "plan-critic", "furps-analyst", "navigator",
-    "meta-judge", "judge", "designer",
+    "builder", "code-explorer", "code-reviewer", "designer",
+    "judge", "product-manager", "test-engineer",
   ];
 
-  test("skills/agents/ exists with one subdir per agent (18)", async () => {
+  test("skills/agents/ exists with one subdir per agent (7)", async () => {
     expect(await fileExists(AGENTS_SUBDIR)).toBe(true);
     const entries = await fs.readdir(AGENTS_SUBDIR, { withFileTypes: true });
     const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
@@ -1073,7 +1061,7 @@ describe("spec-driven phase gates", () => {
 
   test("spec-driven workflow requires independent validation (author ≠ verifier)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "spec-driven.md"));
-    expect(content).toMatch(/independent validation|author.*verifier|verification-agent.*author.*verifier/i);
+    expect(content).toMatch(/independent validation|author.*verifier|code-reviewer.*author.*verifier/i);
   });
 
   test("spec-driven workflow writes validation.md as the Execute gate output", async () => {
@@ -1162,10 +1150,10 @@ describe("synapse policy and tool matrix references", () => {
 
 describe("canonical tool naming (no th0th_-prefixed tool names)", () => {
   const CHARTER_FILES = [
-    "agents/investigator/SKILL.md",
-    "agents/context-curator/SKILL.md",
-    "agents/navigator/SKILL.md",
-    "agents/plan-critic/SKILL.md",
+    "agents/code-explorer/SKILL.md",
+    "agents/code-reviewer/SKILL.md",
+    "agents/judge/SKILL.md",
+    "agents/product-manager/SKILL.md",
     "persona-router/SKILL.md",
     "massa-ai/SKILL.md",
     "massa-ai/references/mcp-tools.md",

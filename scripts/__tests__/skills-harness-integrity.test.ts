@@ -233,7 +233,7 @@ describe("no phantom roles: every orchestration role has a real charter", () => 
   test("the roster guard enumerated a real charter list", async () => {
     // Guard the guard: an empty charter list makes every coverage check here
     // vacuous, including the AGENTS.md one below.
-    expect((await charterNames()).length).toBeGreaterThanOrEqual(17);
+    expect((await charterNames()).length).toBe(7);
   });
 
   test("every charter is registered in skills/AGENTS.md and in the generator", async () => {
@@ -430,7 +430,7 @@ describe("charter permission matches the shipped artifact", () => {
    * three-way policy STI-01 introduced (.specs/features/
    * subagent-tool-inheritance/design.md Component 1/2): `disallowedTools:`
    * (denylist) blocks write when it names Write/Edit; a narrow `tools:`
-   * allowlist (only `navigator` today) grants write only if it names
+   * allowlist (no charter uses one today) grants write only if it names
    * Write/Edit; and neither key present means the charter inherits the full
    * pool, Write/Edit included. The prior version of this check read only the
    * `tools:` line, which is why it read every write charter as read-only the
@@ -513,7 +513,7 @@ describe("charter permission matches the shipped artifact", () => {
 
   test("no charter contains a spawn prohibition of any shape (S5)", async () => {
     const names = await charterNames();
-    expect(names.length).toBeGreaterThanOrEqual(17); // guard the guard
+    expect(names.length).toBe(7); // guard the guard
     // STI-04.5 requires the failure to name the file AND the line, so the offender
     // is reported as `skills/agents/<name>/SKILL.md:<line>: <the matching line>`
     // rather than the bare charter name — a charter is long enough that the name
@@ -533,9 +533,9 @@ describe("charter permission matches the shipped artifact", () => {
     expect(offenders).toEqual([]);
   });
 
-  test("all 18 charters retain the router/persona self-routing clause (S5)", async () => {
+  test("all 7 charters retain the router/persona self-routing clause (S5)", async () => {
     const names = await charterNames();
-    expect(names.length).toBe(18);
+    expect(names.length).toBe(7);
     const withClause = new Set<string>();
     for (const name of names) {
       const charter = await read(
@@ -543,7 +543,7 @@ describe("charter permission matches the shipped artifact", () => {
       );
       if (charter.includes(ROUTER_PERSONA_CLAUSE)) withClause.add(name);
     }
-    expect(withClause.size).toBe(18);
+    expect(withClause.size).toBe(7);
   });
 });
 
@@ -834,13 +834,14 @@ describe("dispatch role defaults: shared field values live in exactly one place"
 
   /**
    * Field values `agent-orchestration.md` fixes for a role. Keyed by the agent
-   * the default belongs to; `*` is every agent. A block restating any of these
-   * has forked the contract.
+   * the default belongs to, or by `agent/mode` for a default that holds for one
+   * mode only; `*` is every agent. A block restating any of these has forked the
+   * contract.
    */
   const DEFAULTED_FIELDS: Record<string, string[]> = {
     "*": ["persona"],
-    "reviewer": ["fallback"],
-    "verification-agent": ["permissions"],
+    "code-reviewer": ["permissions"],
+    "code-reviewer/review": ["fallback"],
     "designer": ["trigger", "sensors", "inputs", "firewall", "memory"],
   };
 
@@ -881,7 +882,12 @@ describe("dispatch role defaults: shared field values live in exactly one place"
       total += blocks.length;
       for (const block of blocks) {
         const agent = /\*\*Dispatch: `([^`]+)`\*\*/.exec(block)?.[1] ?? "unknown";
-        const fields = [...DEFAULTED_FIELDS["*"]!, ...(DEFAULTED_FIELDS[agent] ?? [])];
+        const mode = /\(role: `[^`]+`, mode: `([^`]+)`\)/.exec(block)?.[1];
+        const fields = [
+          ...DEFAULTED_FIELDS["*"]!,
+          ...(DEFAULTED_FIELDS[agent] ?? []),
+          ...(mode ? (DEFAULTED_FIELDS[`${agent}/${mode}`] ?? []) : []),
+        ];
         for (const field of fields) {
           if (new RegExp(`^> - ${field}:`, "m").test(block)) {
             offenders.push(`${path.relative(REPO_ROOT, file)} -> ${agent}: restates ${field}`);
@@ -1001,7 +1007,7 @@ describe("charter reference base: a charter states where its references live", (
     }
     expect(offenders).toEqual([]);
     // Guard the guard: a regex that stops matching makes every charter vacuously
-    // compliant. Class 9 was found across all 18 charters, so the citing set is
+    // compliant. Class 9 was found across every charter, so the citing set is
     // the whole roster.
     expect(citing).toBe(names.length);
   });

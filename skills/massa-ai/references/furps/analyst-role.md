@@ -1,4 +1,4 @@
-# Role: furps-analyst
+# Role: product-manager (`furps` mode)
 
 Reusable sub-agent role for `workflows/refinement/furps-refinement.md`. Charter follows `references/subagent-design.md`. Registered in `references/agent-orchestration.md`.
 
@@ -6,7 +6,7 @@ Purpose: analyze exactly one FURPS+ dimension (F, U, R, P, S, or X) of a PRD/ADR
 
 Trigger description:
 - Use when the `furps-refinement` workflow fans out per-dimension analysis and needs isolated context plus independent verification per dimension.
-- Do not use when the work is a one-off local check, needs full conversation history, requires writes, or overlaps another role (use `plan-critic` for The Fool, `investigator`/`verifier` for code claims).
+- Do not use when the work is a one-off local check, needs full conversation history, requires writes, or overlaps another role (use `judge` in `plan-critique` mode for The Fool, `code-explorer`/`code-reviewer` for code claims).
 
 Permissions:
 - Default: read-only.
@@ -15,7 +15,7 @@ Permissions:
 Context inputs:
 - exact `projectId`
 - exact parent `workflowSessionId` and a child session tag; an ephemeral Synapse session only if the role performs >=2 `search` calls
-- workflow name (`furps-refinement`) and role name (`furps-analyst`)
+- workflow name (`furps-refinement`) and role name (`product-manager`, `mode: furps`)
 - assigned dimension letter and its `references/furps/checklist.md` section
 - bounded document packet (sections/summaries, DoR, recalled facts, Fool summary)
 - exclusions: other dimensions (flag, do not expand), sibling-workflow targets

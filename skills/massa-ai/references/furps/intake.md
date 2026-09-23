@@ -68,9 +68,9 @@ The main agent builds one packet reused across sub-agents:
 
 ## Sub-agent packet contracts
 
-### plan-critic (The Fool) — evidence_audit
+### judge `plan-critique` (The Fool) — evidence_audit
 
-- role: `plan-critic`; mode: `evidence_audit`
+- role: `judge`; mode: `plan-critique`; depth: `full`; The Fool mode: `evidence_audit`
 - purpose: grade whether the PRD/ADR claims are source-backed, complete, falsifiable
 - scope: the document as the challenged thesis
 - permissions: read-only
@@ -80,9 +80,9 @@ The main agent builds one packet reused across sub-agents:
 - firewall: summarize the document; no raw dumps
 - memory: suggest only
 
-### plan-critic (The Fool) — pre_mortem
+### judge `plan-critique` (The Fool) — pre_mortem
 
-- role: `plan-critic`; mode: `pre_mortem`
+- role: `judge`; mode: `plan-critique`; depth: `full`; The Fool mode: `pre_mortem`
 - purpose: anticipate execution-phase failures of the proposed solution
 - inputs: document packet, DoR, recalled facts, AND the evidence_audit summary
 - output: Fool critique contract, focused on failure narratives
@@ -90,9 +90,9 @@ The main agent builds one packet reused across sub-agents:
 
 Dispatch `pre_mortem` after `evidence_audit` returns, so it can build on identified gaps.
 
-### furps-analyst — one per dimension (F, U, R, P, S, X)
+### product-manager `furps` — one per dimension (F, U, R, P, S, X)
 
-- role: `furps-analyst`; dimension: `<letter>`
+- role: `product-manager`; mode: `furps`; dimension: `<letter>`
 - purpose: analyze one FURPS+ dimension against its checklist section
 - scope: the assigned dimension's check items only
 - permissions: read-only

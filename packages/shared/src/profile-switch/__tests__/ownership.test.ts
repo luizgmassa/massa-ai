@@ -99,7 +99,7 @@ describe("isOwnedAgentLink", () => {
 
   test("a link to a marked file elsewhere is owned; to an unmarked one is not", () => {
     expect(isOwnedAgentLink(link("builder.md", write("dotfiles/builder.md", MARKED)))).toBe(true);
-    expect(isOwnedAgentLink(link("planner.md", write("dotfiles/planner.md", UNMARKED)))).toBe(false);
+    expect(isOwnedAgentLink(link("judge.md", write("dotfiles/judge.md", UNMARKED)))).toBe(false);
     expect(isOwnedAgentLink(link("ghost.md", path.join(dir, "missing.md")))).toBe(false);
   });
 

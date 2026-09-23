@@ -81,18 +81,13 @@ async function isSymlink(p: string): Promise<boolean> {
 }
 
 const SPECIALIST_NAMES = [
-  "investigator",
-  "planner",
   "builder",
-  "reviewer",
-  "context-curator",
-  "verification-agent",
-  "requirements-analyst",
-  "architecture-specialist",
+  "code-explorer",
+  "code-reviewer",
+  "designer",
+  "judge",
+  "product-manager",
   "test-engineer",
-  "documentation-agent",
-  "audit-specialist",
-  "mobile-specialist",
 ];
 
 describe("opencode-plugin install.sh", () => {
@@ -289,7 +284,7 @@ describe("opencode-plugin install.sh", () => {
   test("agent regular file at symlink target is skipped with warning", async () => {
     const agentPath = path.join(
       tmp,
-      ".config/opencode/agents/investigator.md",
+      ".config/opencode/agents/code-explorer.md",
     );
     await fs.mkdir(path.dirname(agentPath), { recursive: true });
 
@@ -885,7 +880,7 @@ describe("opencode-plugin generated-bundle contract (T8, UGB-05..08)", () => {
       expect(res.status).toBe(0);
       expect(
         await pathExists(
-          path.join(tmp, ".config/opencode/agents/navigator.md"),
+          path.join(tmp, ".config/opencode/agents/code-explorer.md"),
         ),
       ).toBe(true);
     } finally {

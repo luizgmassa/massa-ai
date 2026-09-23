@@ -176,8 +176,9 @@ data loss, migrations, irreversible actions, auth/privacy, cross-service
 contracts; or when the plan touches more than 5 files, classes, or modules. If
 The Fool or the selected Fool reference is already loaded, reuse it.
 
-For low-risk plans, run this inline auto-lite checklist without loading The Fool
-references:
+Both gates dispatch the `judge` agent in `plan-critique` mode (`depth: lite` or
+`depth: full`); it writes nothing in that mode. For low-risk plans, the lite packet
+carries this auto-lite checklist without loading The Fool references:
 
 - What assumption would most likely make this plan fail?
 - What evidence or deterministic check would falsify success?
@@ -306,7 +307,7 @@ of `skills/massa-ai/references/code-annotation.md`.
 
 # Sub-Agent Registry
 
-Single registry for the 18 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
+Single registry for the 7 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are specialists any workflow can invoke via the host's task/subagent tool. A charter that owns several output contracts selects one per dispatch through the capability packet's `mode` field.
 
 **Dispatch names are the bare role.** A charter at `skills/agents/<role>/SKILL.md` is registered by every host as `<role>`; on the Claude plugin route dispatch the plugin-namespaced `massa-ai:<role>`. See `skills/massa-ai/references/agent-orchestration.md` -> Name Resolution for the convention and for the fallback when a named agent is unavailable.
 
@@ -332,68 +333,52 @@ charter's `metadata.model_tier` plus the host and the selected profile in
 or an effort level for any host. Read the tier from the charter; a second copy here
 would drift, and did.
 
-| Name | Purpose | Permission | Trigger | Charter |
+| Name | Purpose | Permission | Modes | Charter |
 |---|---|---|---|---|
-| investigator | Read and understand the codebase | read-only | Locate implementations, trace flow, estimate impact | `skills/agents/investigator/SKILL.md` |
-| planner | Transform requests into implementation plans | read-only | Break work into steps, identify risks, order execution | `skills/agents/planner/SKILL.md` |
-| builder | Implement approved plans | write | Modify source code with a disjoint write set | `skills/agents/builder/SKILL.md` |
-| reviewer | Review implementation quality | read-only | Analyze diffs for bugs, regressions, smells | `skills/agents/reviewer/SKILL.md` |
-| context-curator | Prepare the minimum high-quality Context Packet | read-only | Decide files to open, retrieve memories, apply firewall | `skills/agents/context-curator/SKILL.md` |
-| verification-agent | Centralize Verification Ladder logic | read-only | Validate outputs, choose verification level | `skills/agents/verification-agent/SKILL.md` |
-| requirements-analyst | Analyze requirements before implementation | read-only | Detect ambiguity, gaps, contradictions, implicit needs | `skills/agents/requirements-analyst/SKILL.md` |
-| architecture-specialist | Provide architectural guidance | read-only | Evaluate architecture, suggest boundaries, trade-offs | `skills/agents/architecture-specialist/SKILL.md` |
-| test-engineer | Generate testing strategy | read-only (test-write when scoped) | Unit, integration, edge cases, acceptance coverage | `skills/agents/test-engineer/SKILL.md` |
-| documentation-agent | Generate engineering documentation | read-only (doc-write when scoped) | README, ADR, RFC, changelog, KDoc | `skills/agents/documentation-agent/SKILL.md` |
-| audit-specialist | Execute specialized audits through configurable lenses | read-only | One of: bugs, architecture, security, requirements, code-quality, performance | `skills/agents/audit-specialist/SKILL.md` |
-| mobile-specialist | Provide mobile-specific expertise (conditional) | read-only | Mobile-related project detected (Android/iOS/KMP) | `skills/agents/mobile-specialist/SKILL.md` |
-| plan-critic | Challenge a constructed plan (lite or full Plan Challenge gate) | read-only | A concrete plan exists; standing policy exception to the dispatch triggers | `skills/agents/plan-critic/SKILL.md` |
-| furps-analyst | Analyze one FURPS+ dimension of a PRD/ADR | read-only | `furps-refinement` fans out per-dimension analysis | `skills/agents/furps-analyst/SKILL.md` |
-| navigator | Navigate an indexed codebase index-first | read-only | "where is X", "who calls Y" against a fresh massa-ai index | `skills/agents/navigator/SKILL.md` |
-| meta-judge | Author the evaluation specification YAML a debate panel scores against (once per evaluation) | read-only | `judge-with-debate` opens an evaluation | `skills/agents/meta-judge/SKILL.md` |
-| judge | Score an artifact against the evaluation specification with quoted evidence; debate to consensus | read-only (report-write, own file only) | `judge-with-debate` dispatches the 3-judge panel or a debate round | `skills/agents/judge/SKILL.md` |
-| designer | Verify and implement user-facing screens against their design source | read-only (UI-layer write when scoped) | A task creates or modifies a screen — standing exception to the dispatch triggers | `skills/agents/designer/SKILL.md` |
+| builder | Implement approved plans | write | — (one contract) | `skills/agents/builder/SKILL.md` |
+| code-explorer | Understand an existing codebase, index-first | read-only | `lookup` (index-first answer), `trace` (flow, dependencies, impact) | `skills/agents/code-explorer/SKILL.md` |
+| code-reviewer | Review, verify, audit, and guide existing or changed code | read-only | `review` (diff), `verify` (Verification Ladder + discrimination sensor), `audit` (lenses bugs, architecture, security, code-quality, performance), `guide` (architecture, mobile platform) | `skills/agents/code-reviewer/SKILL.md` |
+| designer | Read and write user-facing screens from Figma, screenshots, or other design direction | read-only (UI-layer write when scoped) | `audit` (conformance), `implement` (UI layer) | `skills/agents/designer/SKILL.md` |
+| judge | Evaluate artifacts and challenge plans with quoted evidence | write (own judge-N report, `scorer` mode only) | `spec-author` (evaluation specification), `scorer` (debate panel), `plan-critique` (lite or full Plan Challenge gate) | `skills/agents/judge/SKILL.md` |
+| product-manager | Hold requirements to a clear, complete, consistent standard | read-only | `furps` (one FURPS+ dimension), `requirements` (ambiguity, gaps, contradictions, implicit needs), `audit` (requirements lens) | `skills/agents/product-manager/SKILL.md` |
+| test-engineer | Plan, audit, and fix tests | read-only (test-write when scoped) | `plan` (strategy), `audit` (tests lens), `fix` (tests-fix implementation) | `skills/agents/test-engineer/SKILL.md` |
 
-## Mapping — New Agents ↔ Existing Roles
+## Mapping — Retired Agents → Current Agents
 
-The massa-ai skill defines the roles in `skills/massa-ai/references/agent-orchestration.md`. This registry maps the agent skills to those roles:
+The single old→new table for the charters retired by the roster consolidation. Workflows dispatch only the current agent; this table is traceability, never a dispatch target. Older role vocabulary (`implementer`, `verifier`, `domain-mapper`, ...) is mapped in `skills/massa-ai/references/agent-orchestration.md` §Roles.
 
-| New agent skill | Existing role | Relationship |
+| Retired agent | Current agent | Mode / lens |
 |---|---|---|
-| investigator | `investigator` | Identical capability; new skill is the product-repo packaging. |
-| builder | `implementer` | Identical capability; renamed to match the request vocabulary. |
-| verification-agent | `verifier` | Identical capability; new skill also centralizes Verification Ladder selection. |
-| architecture-specialist | `domain-mapper` + `coupling-auditor` + `deepening-architect` | Three roles folded into one specialist. |
-| planner | — | New capability. |
-| reviewer | — | New capability. |
-| context-curator | — | New capability. |
-| requirements-analyst | — | New capability. |
-| test-engineer | — | New capability. |
-| documentation-agent | — | New capability. |
-| audit-specialist | — | New capability (configurable 6-lens). |
-| mobile-specialist | — | New capability (conditional). |
-| plan-critic | `plan-critic` | Identical capability; the former charter-less role now has a charter. |
-| furps-analyst | `furps-analyst` | Identical capability; charter sourced from `references/furps/analyst-role.md`. |
-| navigator | — | Pre-existing Claude/Cursor index-first agent, now charter-governed and shipped to all four hosts. |
-| meta-judge | — | New capability (evaluation-specification author for debate panels). |
-| judge | — | New capability (debate-panel evaluator; quoted-evidence scoring, append-only debate rounds). |
-| designer | — | New capability (screen implementation and design-source conformance; UI-layer scoped writer). |
+| investigator | code-explorer | `trace` |
+| navigator | code-explorer | `lookup` |
+| reviewer | code-reviewer | `review` |
+| verification-agent | code-reviewer | `verify` |
+| audit-specialist | code-reviewer | `audit` (the `requirements` lens moved to product-manager `audit`, the `tests` lens to test-engineer `audit`) |
+| architecture-specialist | code-reviewer | `guide` |
+| mobile-specialist | code-reviewer | `guide` (mobile detection gate kept) |
+| meta-judge | judge | `spec-author` |
+| plan-critic | judge | `plan-critique` |
+| furps-analyst | product-manager | `furps` |
+| requirements-analyst | product-manager | `requirements` |
+| planner | — | Retired; the dispatching workflow's main agent plans |
+| context-curator | — | Retired; the main agent curates context under the Context Firewall |
+| documentation-agent | — | Retired; the `create-*` workflows produce their documents |
 
 ## How to Add an Agent
 
-1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_tier` (a tier declared in `skills/model-profiles.json`, never a model name) and `metadata.permission`. Its `## Restrictions` section must carry both persona-boundary lines verbatim — the self-routing ban (`never load the massa-ai or persona-router routers, and never open a personas/ prompt file`) and the precedence line (`a persona supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing either line fails the gate.
+1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_tier` (a tier declared in `skills/model-profiles.json`, never a model name) and `metadata.permission`. A charter with more than one output contract declares one `### Mode: `<name>`` section per contract. Its `## Restrictions` section must carry both persona-boundary lines verbatim — the self-routing ban (`never load the massa-ai or persona-router routers, and never open a personas/ prompt file`) and the precedence line (`a persona supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing either line fails the gate.
 2. Add one row to the Agent Table above.
-3. Add one row to the Mapping table if it maps to an existing role.
-4. Add `<name>` to `SPECIALIST_NAMES` in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts. There are no model tables to edit — the generator resolves the model from the charter's `metadata.model_tier` through `skills/model-profiles.json`.
-5. Add `<name>` to the roster in `scripts/__tests__/subagent-parity.test.ts` and run `bun run test:scripts`.
+3. Add `<name>` to `SPECIALIST_NAMES` in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts. There are no model tables to edit — the generator resolves the model from the charter's `metadata.model_tier` through `skills/model-profiles.json`.
+4. Add `<name>` to the roster in `scripts/__tests__/subagent-parity.test.ts` and run `bun run test:scripts`.
 
-Steps 4-5 are enforced: the parity test fails on generator drift and `scripts/__tests__/skills-harness-integrity.test.ts` fails if a workflow dispatches an agent with no shipped artifact.
+Steps 3-4 are enforced: the parity test fails on generator drift and `scripts/__tests__/skills-harness-integrity.test.ts` fails if a workflow dispatches an agent with no shipped artifact.
 
 ## massa-ai Concepts
 
 All agents integrate these concepts (documented per-agent in each charter):
 
 - **Massa-ai Memory**: agents suggest durable memories only when useful; the main agent persists.
-- **Synapse**: repeated-search agents (investigator, navigator, context-curator, furps-analyst) receive their own ephemeral Synapse session.
+- **Synapse**: repeated-search agents (code-explorer, code-reviewer in `audit` or `guide` mode, product-manager) receive their own ephemeral Synapse session.
 - **Context Firewall**: agents summarize verbose output and never return raw dumps.
 - **Verification Ladder**: agents declare the deterministic sensors they run.
 - **References**: agents point to the relevant massa-ai reference files by name.

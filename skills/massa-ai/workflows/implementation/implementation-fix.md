@@ -32,7 +32,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
    - `references/discrimination-sensor.md` before closing any finding at the tiers the verification-ladder's Independent Verification Mandate names.
    - `references/knowledge-verification-chain.md` when a finding's fix depends on external library/API behavior not already verified this session.
    - `references/brownfield-mapping.md` (Minimum Bar only) for Standard+ findings when recall returns no hit for the target and no gate command is derivable from the report's evidence.
-   - `references/agent-orchestration.md` for high-risk findings or disjoint implementation slices; the mandated verification-agent dispatch below is carved out of this trigger by agent-orchestration's Independent Verification Exception and always attempts dispatch at its own tier gate.
+   - `references/agent-orchestration.md` for high-risk findings or disjoint implementation slices; the mandated `code-reviewer` `verify` dispatch below is carved out of this trigger by agent-orchestration's Independent Verification Exception and always attempts dispatch at its own tier gate.
 3. `recall` -> load prior implementation audit decisions, known regressions, architecture/security boundaries, accepted exceptions, testing conventions, and reusable verification recipes for the target.
 4. Select the report with an explicit execution focus:
    - Establish report selector, target focus, and optional source-qualified finding IDs before selecting a report.
@@ -64,7 +64,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 
 **Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
-> **Dispatch: `designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
+> **Dispatch: `designer`** (role: `designer`, mode: `implement`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
@@ -81,17 +81,16 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 
     Never run parallel writers against shared files or contracts.
 
-> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: an `Area/PREFIX-N` finding's closure meets the verification-ladder's Independent Verification Mandate tier gate — Standard+/Spec-driven size or any high/critical-severity finding
 > - scope: the closed `Area/PREFIX-N` finding's fix diff, its source-lens claim, and the validation assets the fix touches
 > - inputs: the source-qualified finding ID, the applied fix diff, the report's Verification Suggestion, and the pending closure-matrix row

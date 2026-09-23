@@ -41,7 +41,7 @@
       "brownfield Minimum Bar gate",
       "references/knowledge-verification-chain.md",
       "prove the coverage discriminates",
-      "Dispatch: `verification-agent",
+      "Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`)",
       "Independent Verification Exception",
       "Bounded Fix→Re-verify Loop",
       ".specs/debug/<slug>/REPORT.md",
@@ -57,7 +57,7 @@
       "graceful degradation preserved"
     ],
     "notes": [
-      "verification-agent dispatch block",
+      "code-reviewer verify-mode dispatch block",
       "Independent Verification Mandate (Standard tier and above)",
       "Bounded Fix→Re-verify Loop cap (3 iterations)",
       "validate_state.ts <slug> deterministic backing",
@@ -114,7 +114,7 @@
       "knowledge-verification-chain.md"
     ],
     "notes": [
-      "verification-agent dispatch block",
+      "code-reviewer verify-mode dispatch block",
       "discrimination sensor mutate the moved code",
       "characterization tests must kill it",
       "P0 payment/auth/data-integrity/public-contract",

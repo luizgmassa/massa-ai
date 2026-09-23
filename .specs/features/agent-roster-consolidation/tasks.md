@@ -217,11 +217,11 @@ T12 → T13
 
 **Done when**:
 
-- [ ] `ls skills/agents` = exactly the 7 names; bundles hold 7 per host and per profile
-- [ ] T7 contract test green against the absorbing charters
-- [ ] New content test: per-family expected agent set (Dispatch AC-1..8), each asserting its agents and the absence of retired ones
-- [ ] Old-name sweep with PCRE `(?<![-\w])(planner|context-curator|...|reviewer)(?![-\w])` restricted to agent-name contexts returns only the mapping table (outside `.specs/`, `.ua/`, CHANGELOG)
-- [ ] Phase 3 full gate green
+- [x] `ls skills/agents` = exactly the 7 names; bundles hold 7 per host and per profile
+- [x] T7 contract test green against the absorbing charters
+- [x] New content test: per-family expected agent set (Dispatch AC-1..8), each asserting its agents and the absence of retired ones
+- [ ] Old-name sweep with PCRE `(?<![-\w])(planner|context-curator|...|reviewer)(?![-\w])` restricted to agent-name contexts returns only the mapping table (outside `.specs/`, `.ua/`, CHANGELOG) — skills/, scripts/, apps/ and packages/ are clean apart from the legacy-prune lists (A17) and non-agent or historical uses; the doc hits (README, FEATURES prose, CLAUDE.md, root AGENTS.md, docs/CHEATSHEET.md, plugin READMEs) are handed to T12
+- [x] Phase 3 full gate green
 
 **Tests**: content + parity + unit
 **Gate**: full

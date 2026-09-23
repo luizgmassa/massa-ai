@@ -59,7 +59,7 @@ describe("managed subtrees stay gitignored (UGB-01)", () => {
     // entries are separate lines in .gitignore, so a shared host would let one
     // line's deletion hide behind the other's.
     "apps/claude-plugin/skills/bootstrap/SKILL.md",
-    "apps/opencode-plugin/skills/agents/investigator/SKILL.md",
+    "apps/opencode-plugin/skills/agents/code-explorer/SKILL.md",
     "apps/claude-plugin/agents/builder.md",
     "apps/opencode-plugin/agent-profiles/work/builder.md",
     "apps/codex-plugin/hooks/massa-ai-hook",

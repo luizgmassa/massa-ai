@@ -3,11 +3,11 @@
  *
  * Verifies the `massa-ai-config agents` subcommand against spec ACs
  * (OPC-01,02,05,06,07 + DOC-01):
- * - `agents install --user` writes 18 .md files to ~/.config/opencode/agents/
+ * - `agents install --user` writes one .md file per specialist to ~/.config/opencode/agents/
  * - each file has mode: all + metadata: { massa-ai-owned: true }
  * - `agents uninstall` removes only massa-ai-owned files (R3: user agents preserved)
  * - idempotent re-run overwrites with identical content
- * - install prints "+ 18 subagent specialists"
+ * - install prints "+ <count> subagent specialists"
  *
  * Uses spawnSync to run the source CLI with overridden HOME + XDG_CONFIG_HOME.
  */
@@ -68,28 +68,17 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 const SPECIALIST_NAMES = [
-  "investigator",
-  "planner",
   "builder",
-  "reviewer",
-  "context-curator",
-  "verification-agent",
-  "requirements-analyst",
-  "architecture-specialist",
-  "test-engineer",
-  "documentation-agent",
-  "audit-specialist",
-  "mobile-specialist",
-  "plan-critic",
-  "furps-analyst",
-  "navigator",
-  "meta-judge",
-  "judge",
+  "code-explorer",
+  "code-reviewer",
   "designer",
+  "judge",
+  "product-manager",
+  "test-engineer",
 ];
 
 describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 + DOC-01)", () => {
-  test("OPC-01/DOC-01: agents install --user writes 18 .md to ~/.config/opencode/agents/ + prints summary", async () => {
+  test("OPC-01/DOC-01: agents install --user writes every specialist .md to ~/.config/opencode/agents/ + prints summary", async () => {
     const res = runCli(["agents", "install", "--user"], {
       HOME: tmp,
       XDG_CONFIG_HOME: xdgConfig,
@@ -103,8 +92,8 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
       ).toBe(true);
     }
 
-    // Install output mentions the 18 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("18 subagent specialists");
+    // Install output reports the specialist count (DOC-01)
+    expect(res.stdout).toContain(`${SPECIALIST_NAMES.length} subagent specialists`);
   });
 
   test("OPC-07: each installed agent has mode: all + the ownership marker", async () => {
@@ -196,10 +185,9 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     const agentsDir = path.join(xdgConfig, "opencode/agents");
     const writeAgents = new Set([
       "builder",
-      "test-engineer",
-      "documentation-agent",
-      "judge",
       "designer",
+      "judge",
+      "test-engineer",
     ]);
 
     for (const name of SPECIALIST_NAMES) {
@@ -256,12 +244,12 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     expect(res.exitCode).toBe(0);
     expect(res.stderr).toContain(`${foreign} exists and is not massa-ai-owned — skipped`);
     expect(await fs.readFile(foreign, "utf8")).toBe(userBody);
-    expect(await pathExists(path.join(agentsDir, "reviewer.md"))).toBe(true);
+    expect(await pathExists(path.join(agentsDir, "code-reviewer.md"))).toBe(true);
 
     const un = runCli(["agents", "uninstall", "--user"], { HOME: tmp, XDG_CONFIG_HOME: xdgConfig });
     expect(un.exitCode).toBe(0);
     expect(await fs.readFile(foreign, "utf8")).toBe(userBody);
-    expect(await pathExists(path.join(agentsDir, "reviewer.md"))).toBe(false);
+    expect(await pathExists(path.join(agentsDir, "code-reviewer.md"))).toBe(false);
   });
 
   test("NAM AC-4/AC-7: installer-style symlinks are owned — uninstall removes them, install replaces them without writing through", async () => {

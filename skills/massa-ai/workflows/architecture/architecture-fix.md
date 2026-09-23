@@ -83,17 +83,16 @@ Not for findings-only architecture review — route to `workflows/architecture/a
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable architecture patterns
 
-> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation of the architecture finding complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, ARCH acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become architecture fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists review outcomes for the architecture fix
 
-> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven-sized findings or high/critical severity, per the Independent Verification Mandate in `references/verification-ladder.md`'s Mandatory Verification Fix Gate; Quick-tier findings take the fallback below instead
 > - scope: the fixed finding's dependency direction, seam/adapter shape, tests, imports, and report claim closure
 > - inputs: the finding, the applied fix, the verification suggestion, dependency-direction/import-cycle evidence, and validation assets
@@ -107,7 +106,7 @@ Not for findings-only architecture review — route to `workflows/architecture/a
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
    - Apply the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check for each selected finding or coherent group.
-   - Run the sensors at the mandate's own tier gate: dispatch the verification-agent block above at Standard+/Spec-driven size or high/critical severity; a Quick-tier finding runs its fallback fresh-eyes self-check instead — the hop is skippable, the check never is.
+   - Run the sensors at the mandate's own tier gate: dispatch the `code-reviewer` `verify` block above at Standard+/Spec-driven size or high/critical severity; a Quick-tier finding runs its fallback fresh-eyes self-check instead — the hop is skippable, the check never is.
    - A surviving mutant on the discrimination sensor marks the finding's Closure Matrix row `blocked` and records a `surviving_mutant` signal via `references/lessons.md`.
    - The fix→re-verify loop is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; exhausting it also marks the row `blocked`.
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.

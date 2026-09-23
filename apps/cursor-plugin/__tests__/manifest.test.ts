@@ -8,7 +8,7 @@
  * - `skills/` holds exactly those 6 marker-free hand-authored stem dirs plus
  *   one marker-bearing generated stem dir per live workflow (widened,
  *   workflow-commands T6, WFC-11)
- * - agents/navigator.md exists
+ * - agents/code-explorer.md exists
  * - mcp.json declares the massa-ai MCP server (npx @massa-ai/mcp-client)
  * - .cursor-plugin/plugin.json has name and version
  * - hooks/massa-ai-hook symlink resolves to the claude-plugin binary
@@ -124,12 +124,12 @@ describe("cursor-plugin manifest (T10 / CRS-01,03,04,05,06,08)", () => {
     expect(generatedStems.sort()).toEqual(liveEntries.map((e) => e.stem).sort());
   });
 
-  test("agents/navigator.md exists", async () => {
-    const p = path.join(PLUGIN_ROOT, "agents/navigator.md");
+  test("agents/code-explorer.md exists", async () => {
+    const p = path.join(PLUGIN_ROOT, "agents/code-explorer.md");
     const stat = await fs.stat(p);
     expect(stat.isFile()).toBe(true);
     const content = await fs.readFile(p, "utf8");
-    expect(content).toContain("navigator");
+    expect(content).toContain("code-explorer");
   });
 
   test("no plugin-local mcp.json ships — MCP has a single writer", async () => {
@@ -191,7 +191,7 @@ describe("cursor-plugin manifest (T10 / CRS-01,03,04,05,06,08)", () => {
       "skills/graph/SKILL.md",
       "skills/status/SKILL.md",
       "hooks/hooks.json",
-      "agents/navigator.md",
+      "agents/code-explorer.md",
     ];
     for (const rel of required) {
       const p = path.join(PLUGIN_ROOT, rel);

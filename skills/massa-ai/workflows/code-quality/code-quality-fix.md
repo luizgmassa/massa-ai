@@ -60,7 +60,7 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
    - Run or identify characterization tests before changing behavior-adjacent code.
    - Do not weaken tests, fixtures, snapshots, types, or public contracts to make cleanup pass.
    - Prefer small reversible edits; verify after each finding or coherent group.
-10. Use agent orchestration only when it improves signal — except the verification-agent dispatch below, which `references/agent-orchestration.md`'s Independent Verification Exception mandates at the tiers named in its trigger regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
+10. Use agent orchestration only when it improves signal — except the `code-reviewer` `verify` dispatch below, which `references/agent-orchestration.md`'s Independent Verification Exception mandates at the tiers named in its trigger regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
 
 > **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
@@ -72,17 +72,16 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable code-quality patterns
 
-> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation of the CQ finding complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, CQ acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become CQ fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists review outcomes for the code-quality fix
 
-> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: mandatory per the verification-ladder's Independent Verification Mandate at Standard+/Spec-driven finding size or high/critical severity; at Quick size the subagent hop is skipped and the standalone fresh-eyes check below runs instead
 > - scope: the fixed finding's behavior-preservation claim over the moved/transformed code, its call sites/imports, and report claim closure
 > - inputs: the finding, the applied fix, the verification suggestion, and validation assets
