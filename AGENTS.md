@@ -37,7 +37,7 @@ to current ones.
 - `designer/` — reads and writes user-facing screens from Figma, screenshots, or other design direction (UI-layer writes when scoped)
 - `judge/` — evaluation-spec authoring, debate-panel scoring, and the lite and full Plan Challenge critique
 - `product-manager/` — read-only requirements work: FURPS+ dimensions, ambiguity and gap analysis, requirements audit lens
-- `test-engineer/` — test strategy, tests audit lens, and tests-fix implementation (test-file writes when scoped)
+- `test-engineer/` — tests audit lens and tests-fix implementation (test-file writes when scoped)
 
 ### Spec Artifacts
 
