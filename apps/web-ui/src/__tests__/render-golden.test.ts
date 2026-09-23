@@ -87,6 +87,20 @@
  *    added/dropped exactly as described above; every other case (Projects, Memory,
  *    Search, Handoffs, Proposals, Checkpoints, Logs, Config, markdownToHtml,
  *    escapeHtml, buildConfigSectionBody, ...) is byte-untouched.
+ *
+ * 6. model-catalog-revamp fix round (findings 11, V1, V3, V4) — `renderModelRegistry`
+ *    gained `aria-label`s on every profile-grid and per-agent model/effort control
+ *    (e.g. `"balanced · Claude model"`, `"builder · Codex effort"`); the profile grid is
+ *    now wrapped in its own `.registry-profile-grid` card (heading "Profiles" + a
+ *    rows/columns help line) instead of a bare `.grid-scroll` div; the Add/Duplicate/
+ *    Delete Profile buttons and their inline forms moved from after Per-Agent Model
+ *    Overrides into that new card, next to the grid they manage; and a per-agent row
+ *    with no override now shows its inherited effort as disabled text
+ *    (`"<effort> (profile)"`) instead of an editable `<select>` defaulting to the host
+ *    enum's first option. Diffed before regenerating: exactly the 18 cases prefixed
+ *    `renderModelRegistry` or ending `renderProfilesView/.../registry` changed, no case
+ *    was added or dropped, and every diffed byte falls into one of the four changes
+ *    above; every other case is byte-untouched.
  */
 
 import { describe, it, expect } from "bun:test";

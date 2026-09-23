@@ -414,6 +414,85 @@ describe("renderModelRegistry — help section", () => {
   });
 });
 
+// ── Fix round: findings 6, 11, V1, V3, V4 ────────────────────────────────────
+
+describe("renderModelRegistry — accessible names on grid and per-agent selects (finding 11)", () => {
+  it("labels the profile-grid model and effort selects with profile · tool", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('data-action="registry-model-select" data-profile="balanced" data-host="claude" aria-label="balanced · Claude model"');
+    expect(html).toContain('data-action="registry-effort" data-profile="balanced" data-host="claude" aria-label="balanced · Claude effort"');
+  });
+
+  it("labels the per-agent model select with agent · tool", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, agentOverridesProfile: "balanced" });
+    expect(html).toContain(
+      'data-action="registry-agent-model-select" data-profile="balanced" data-agent="builder" data-host="opencode" aria-label="builder · OpenCode model"',
+    );
+  });
+});
+
+describe("renderModelRegistry — Per-Agent effort control hidden until an override exists (V1)", () => {
+  it("shows the inherited profile effort as disabled text, not an editable select, when no override exists", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, agentOverridesProfile: "balanced" });
+    const start = html.indexOf('data-action="registry-agent-model-select" data-profile="balanced" data-agent="reviewer" data-host="claude"');
+    const cellEnd = html.indexOf("</td>", start);
+    const cellHtml = html.slice(start, cellEnd);
+    expect(cellHtml).not.toContain('data-action="registry-agent-effort"');
+    expect(cellHtml).toContain("medium (profile)");
+  });
+
+  it("still renders an editable effort select once an override exists", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, agentOverridesProfile: "balanced" });
+    const start = html.indexOf('data-action="registry-agent-model-select" data-profile="balanced" data-agent="builder" data-host="opencode"');
+    const cellEnd = html.indexOf("</td>", start);
+    const cellHtml = html.slice(start, cellEnd);
+    expect(cellHtml).toContain('data-action="registry-agent-effort"');
+  });
+});
+
+describe("renderModelRegistry — Profiles card (V3)", () => {
+  it("wraps the grid in a card with an h3 heading and short help text", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('<div class="registry-profile-grid"><h3>Profiles</h3>');
+    expect(html).toContain("Rows are tools, columns are profiles.");
+  });
+});
+
+describe("renderModelRegistry — profile management moved into the Profiles card, next to the grid (V4)", () => {
+  it("Add/Duplicate/Delete Profile buttons render inside .registry-profile-grid, before its grid-scroll table", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const cardStart = html.indexOf('<div class="registry-profile-grid">');
+    const addProfileIdx = html.indexOf('data-action="registry-add-profile"', cardStart);
+    const gridScrollIdx = html.indexOf('<div class="grid-scroll">', cardStart);
+    expect(cardStart).toBeGreaterThanOrEqual(0);
+    expect(addProfileIdx).toBeGreaterThan(cardStart);
+    expect(addProfileIdx).toBeLessThan(gridScrollIdx);
+  });
+
+  it("no longer renders the profile-management buttons after Per-Agent Model Overrides", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const perAgentIdx = html.indexOf("<h3>Per-Agent Model Overrides</h3>");
+    const addProfileIdx = html.indexOf('data-action="registry-add-profile"');
+    expect(addProfileIdx).toBeGreaterThanOrEqual(0);
+    expect(addProfileIdx).toBeLessThan(perAgentIdx);
+  });
+});
+
+describe("renderModelRegistry — v1BackupPath warning banner (finding 6)", () => {
+  it("shows an escaped warning banner naming the backup path", () => {
+    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, v1BackupPath: '/tmp/<danger>&"overlay".json' }, { writeMode: true });
+    expect(html).toContain('class="warning"');
+    expect(html).toContain("backed up to");
+    expect(html).toContain("&lt;danger&gt;");
+    expect(html).not.toContain("<danger>");
+  });
+
+  it("renders nothing extra when v1BackupPath is absent", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).not.toContain('class="warning"');
+  });
+});
+
 // ── Structural no-prompt sensor: the Model Catalog tab never uses prompt()/alert() ──
 // Scans only the source SPANS of handleRegistry*/handleModel*/renderModelRegistry/
 // renderProfilesView — never a whole-file scan, so the (out-of-scope) Memory tab

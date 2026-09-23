@@ -257,6 +257,7 @@ export interface RegistryPayload {
   overlayOverrideBreakdown?: RegistryOverlayOverrideBreakdown;
   agents?: RegistryAgent[];
   agentsError?: string;
+  v1BackupPath?: string;
 }
 
 interface RegistryRenderOpts {
@@ -268,15 +269,16 @@ interface RegistryRenderOpts {
 
 /** Extracted so both the profile grid and the Per-Agent Model Overrides table
  *  render the same {model, effort} pair the same way (model-catalog-revamp T3). */
-function renderEffortControl(host: RegistryHost, effort: string, writeMode: boolean, action: string, attrs: string): string {
+function renderEffortControl(host: RegistryHost, effort: string, writeMode: boolean, action: string, attrs: string, ariaLabel: string): string {
   const effortOptions = UI_HOST_EFFORT_ENUM[host];
+  const ariaAttr = ' aria-label="' + escapeHtml(ariaLabel) + '"';
   if (effortOptions && effortOptions.length > 0) {
     const opts = effortOptions
       .map((e) => '<option value="' + escapeHtml(e) + '"' + (e === effort ? " selected" : "") + ">" + escapeHtml(e) + "</option>")
       .join("");
-    return '<select data-action="' + action + '"' + attrs + ' data-type="enum"' + (writeMode ? "" : " disabled") + ">" + opts + "</select>";
+    return '<select data-action="' + action + '"' + attrs + ariaAttr + ' data-type="enum"' + (writeMode ? "" : " disabled") + ">" + opts + "</select>";
   } else if (effortOptions === null) {
-    return '<input type="text" data-action="' + action + '"' + attrs + ' value="' + escapeHtml(effort) + '" data-type="text"' + (writeMode ? "" : " disabled") + " />";
+    return '<input type="text" data-action="' + action + '"' + attrs + ariaAttr + ' value="' + escapeHtml(effort) + '" data-type="text"' + (writeMode ? "" : " disabled") + " />";
   }
   return '<span class="muted">n/a</span>';
 }
@@ -337,13 +339,18 @@ function renderModelsSection(models: Record<string, RegistryModel>, writeMode: b
   return '<div class="registry-models"><h3>Models</h3>' + table + addBtn + form + "</div>";
 }
 
-/** Profile grid (AC5): rows = tools, columns = profiles, cell = model select + effort. */
+/** Profiles card (AC5, V3/V4): rows = tools, columns = profiles, cell = model select +
+ *  effort. Carries a heading and short help text like the Models and Per-Agent Model
+ *  Overrides cards, and hosts `actionsHtml` (the Add/Duplicate/Delete Profile buttons + their
+ *  inline forms) so profile management sits next to the grid it manages, instead of after
+ *  the unrelated Per-Agent section further down the page. */
 function renderProfileGrid(
   profiles: Record<string, RegistryProfile>,
   profileNames: string[],
   models: Record<string, RegistryModel>,
   overlayProfiles: Record<string, unknown>,
   writeMode: boolean,
+  actionsHtml: string,
 ): string {
   const headerCells = profileNames
     .map((p) => {
@@ -362,17 +369,25 @@ function renderProfileGrid(
         const isOverlay = Object.prototype.hasOwnProperty.call(overlayProfiles, profileName);
         const overlayClass = isOverlay ? " overlay-sourced" : "";
         const attrs = ' data-profile="' + escapeHtml(profileName) + '" data-host="' + escapeHtml(host) + '"';
+        const hostLabel = REGISTRY_HOST_LABELS[host];
         const modelSelect = writeMode
-          ? '<select data-action="registry-model-select"' + attrs + ">" + renderModelSelectOptions(models, host, model, "Inherit") + "</select>"
+          ? '<select data-action="registry-model-select"' + attrs + ' aria-label="' + escapeHtml(profileName + " · " + hostLabel + " model") + '">' +
+            renderModelSelectOptions(models, host, model, "Inherit") + "</select>"
           : "<span>" + escapeHtml(model || "—") + "</span>";
-        const effortControl = renderEffortControl(host, effort, writeMode, "registry-effort", attrs);
+        const effortControl = renderEffortControl(host, effort, writeMode, "registry-effort", attrs, profileName + " · " + hostLabel + " effort");
         return '<td class="registry-cell' + overlayClass + '">' + modelSelect + effortControl + "</td>";
       })
       .join("");
     return '<tr><th class="tool-cell">' + escapeHtml(REGISTRY_HOST_LABELS[host]) + "</th>" + cells + "</tr>";
   }).join("");
 
-  return '<div class="grid-scroll"><table class="registry-grid"><thead><tr><th>Tool</th>' + headerCells + "</tr></thead><tbody>" + bodyRows + "</tbody></table></div>";
+  return (
+    '<div class="registry-profile-grid"><h3>Profiles</h3>' +
+    '<p class="muted">Rows are tools, columns are profiles.</p>' +
+    actionsHtml +
+    '<div class="grid-scroll"><table class="registry-grid"><thead><tr><th>Tool</th>' + headerCells + "</tr></thead><tbody>" + bodyRows + "</tbody></table></div>" +
+    "</div>"
+  );
 }
 
 /** Per-Agent Model Overrides (AC6): a profile selector, rows = the agents the
@@ -409,6 +424,7 @@ function renderAgentOverridesSection(
   }
 
   const profile = profiles[selectedProfile];
+  const profileHosts = (profile && profile.hosts) || {};
   const headerCells = REGISTRY_HOSTS.map((h) => "<th>" + escapeHtml(REGISTRY_HOST_LABELS[h]) + "</th>").join("");
   const bodyRows = agents
     .map((agent) => {
@@ -416,13 +432,27 @@ function renderAgentOverridesSection(
       const cells = REGISTRY_HOSTS.map((host) => {
         const cell = perHost[host] || {};
         const model = cell.model || "";
+        const hasOverride = !!model;
         const effort = cell.effort || "";
         const attrs = ' data-profile="' + escapeHtml(selectedProfile) + '" data-agent="' + escapeHtml(agent.name) + '" data-host="' + escapeHtml(host) + '"';
-        const overriddenClass = model ? ' class="overridden"' : "";
+        const overriddenClass = hasOverride ? ' class="overridden"' : "";
+        const hostLabel = REGISTRY_HOST_LABELS[host];
         const modelSelect = writeMode
-          ? '<select data-action="registry-agent-model-select"' + attrs + ">" + renderModelSelectOptions(models, host, model, "Profile default") + "</select>"
+          ? '<select data-action="registry-agent-model-select"' + attrs + ' aria-label="' + escapeHtml(agent.name + " · " + hostLabel + " model") + '">' +
+            renderModelSelectOptions(models, host, model, "Profile default") + "</select>"
           : "<span>" + escapeHtml(model || "—") + "</span>";
-        const effortControl = renderEffortControl(host, effort, writeMode, "registry-agent-effort", attrs);
+        // V1: an agent row with no override has no effort of its own to edit — rendering an
+        // editable effort select there (defaulting to the host enum's first option, e.g.
+        // "low"/"minimal") misrepresented the row as pinned to that value while the effective
+        // effort was actually the profile's own. Show the inherited value as disabled text
+        // instead, and only render the real control once an override exists.
+        let effortControl: string;
+        if (hasOverride) {
+          effortControl = renderEffortControl(host, effort, writeMode, "registry-agent-effort", attrs, agent.name + " · " + hostLabel + " effort");
+        } else {
+          const inherited = (profileHosts[host] && profileHosts[host].effort) || "";
+          effortControl = inherited ? '<span class="muted" title="Inherited from the profile default">' + escapeHtml(inherited) + " (profile)</span>" : "";
+        }
         return "<td" + overriddenClass + ">" + modelSelect + effortControl + "</td>";
       }).join("");
       return "<tr><th>" + escapeHtml(agent.name) + "</th>" + cells + "</tr>";
@@ -470,6 +500,11 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
     ? '<div class="error">Saved changes could not be loaded: ' + escapeHtml(overlayError) + " (showing builtin)</div>"
     : "";
 
+  const v1BackupPath = payload.v1BackupPath;
+  const v1BackupBanner = v1BackupPath
+    ? '<div class="warning">The previous tier-based overlay was backed up to <code>' + escapeHtml(v1BackupPath) + "</code> and ignored — re-enter your custom models.</div>"
+    : "";
+
   const overlayOverrideCount = typeof payload.overlayOverrideCount === "number" ? payload.overlayOverrideCount : 0;
   const overlayBreakdown = payload.overlayOverrideBreakdown;
   const overlayCategoryParts = overlayBreakdown
@@ -482,19 +517,10 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
     : "";
 
   const modelsSection = renderModelsSection(models, writeMode, registryFormState);
-  const grid = renderProfileGrid(profiles, profileNames, models, overlayProfiles, writeMode);
 
-  const agents = payload.agents || [];
-  const agentsError = payload.agentsError;
-  const selectedProfile =
-    opts && opts.agentOverridesProfile && profileNames.includes(opts.agentOverridesProfile)
-      ? opts.agentOverridesProfile
-      : profileNames.includes("balanced")
-        ? "balanced"
-        : profileNames[0] || "";
-  const agentOverridesSection = renderAgentOverridesSection(agents, agentsError, profiles, profileNames, models, selectedProfile, writeMode);
-
-  // Profile management: add / duplicate / delete / restore (unchanged, AC5).
+  // Profile management: add / duplicate / delete / restore (unchanged, AC5) — rendered
+  // INSIDE the Profiles card (V4), next to the grid it manages, instead of after the
+  // unrelated Per-Agent Model Overrides section further down the page.
   const profileActions = writeMode
     ? '<div class="registry-actions">' +
       '<button type="button" class="btn btn-secondary" data-action="registry-add-profile">Add Profile</button>' +
@@ -505,6 +531,18 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
       (registryFormState && registryFormState.kind === "duplicate-profile" ? renderDuplicateProfileForm(registryFormState, profileNames) : "") +
       (registryFormState && registryFormState.kind === "delete-profile" ? renderDeleteProfileForm(registryFormState, profileNames) : "")
     : "";
+
+  const grid = renderProfileGrid(profiles, profileNames, models, overlayProfiles, writeMode, profileActions);
+
+  const agents = payload.agents || [];
+  const agentsError = payload.agentsError;
+  const selectedProfile =
+    opts && opts.agentOverridesProfile && profileNames.includes(opts.agentOverridesProfile)
+      ? opts.agentOverridesProfile
+      : profileNames.includes("balanced")
+        ? "balanced"
+        : profileNames[0] || "";
+  const agentOverridesSection = renderAgentOverridesSection(agents, agentsError, profiles, profileNames, models, selectedProfile, writeMode);
 
   const tombstonedList = tombstoned.length
     ? '<div class="tombstoned"><h4>Removed Profiles (restorable)</h4>' +
@@ -553,11 +591,11 @@ export function renderModelRegistry(data: RegistryPayload | null | undefined, op
     '<section class="view"><h2>Model Catalog</h2>' + unsaved +
     registryError +
     overlayBanner +
+    v1BackupBanner +
     overlayOverrideLine +
     modelsSection +
     grid +
     agentOverridesSection +
-    profileActions +
     tombstonedList +
     actionButtons +
     helpSection +

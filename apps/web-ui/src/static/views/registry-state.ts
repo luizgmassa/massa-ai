@@ -1,24 +1,12 @@
 /**
  * Model Catalog — the in-memory overlay, its CRUD (models + profiles), and the
- * Save & Apply stream.
- *
- * Split from `registry.js` because that file reached 948 lines: the renderer and
- * this overlay state machine are two subjects, and the repo's coding guidelines
- * flag anything over ~600 lines for splitting. The renderer is pure
- * data-in/HTML-out; everything here mutates `ctx.state.registryOverlay` or talks
- * to the network.
+ * Save & Apply stream. Split from `registry.js` (renderer) at 948 lines.
  *
  * The overlay is a DELTA against the builtin registry (absent key = inherit,
- * null = tombstone), never a full copy — seeding it from the effective registry
- * writes the whole builtin back on every save and freezes that operator against
- * every future builtin addition.
- *
- * Merge semantics mirror `mergeOverlay`/`mergeFlatMap`/`mergeAgents`
- * (scripts/lib/model-profiles.ts): `models.<id>` is replaced whole (`null`
- * tombstones it); a profile's `hosts.<host>` and `agents.<agent>.<host>` are
- * each a LEAF — an edit always writes the whole `{model, effort}` cell, never
- * a bare field, or a field-only write would silently blank its sibling on the
- * next merge.
+ * null = tombstone), never a full copy. Merge semantics mirror
+ * `mergeOverlay`/`mergeFlatMap`/`mergeAgents` (scripts/lib/model-profiles.ts):
+ * `models.<id>` is replaced whole; a profile's `hosts.<host>` and
+ * `agents.<agent>.<host>` are each a LEAF — always a whole-cell write.
  */
 
 import { showBanner } from "../lib/banner.js";
@@ -59,14 +47,9 @@ interface RegistryServerData {
   agentsError?: string | null;
 }
 
-/** Server-computed fields that `mergeRegistryForDisplay`'s rebuild branch (below) must carry
- *  through from `serverData` unchanged — every key of `RegistryServerData` except `registry`,
- *  which is the one field the branch legitimately rebuilds via merge. This is the class-level
- *  guard the docblock's prose warning failed to be: the population here is typed against
- *  `RegistryServerData` itself rather than re-typed by hand — `_PassthroughKeysComplete` below
- *  fails `bun run type-check` if a field is ever added to the interface and not added to this
- *  list, and the reverse (a stray key not on the interface) is caught by the
- *  `readonly PassthroughKey[]` annotation on the export itself. */
+/** Fields `mergeRegistryForDisplay`'s rebuild branch must carry through from `serverData`
+ *  unchanged (every `RegistryServerData` key except `registry`). Typed against the interface
+ *  itself so a new field forces `tsc` to fail here until this list is updated too. */
 type PassthroughKey = Exclude<keyof RegistryServerData, "registry">;
 const PASSTHROUGH_KEYS_LITERAL = ["source", "overlayOverrideCount", "overlayOverrideBreakdown", "agents", "agentsError"] as const;
 type _PassthroughKeysComplete = PassthroughKey extends (typeof PASSTHROUGH_KEYS_LITERAL)[number] ? true : false;
@@ -114,9 +97,7 @@ function ensureOverlay(ctx: RegistryStateCtx): RegistryOverlay {
   return ctx.state.registryOverlay;
 }
 
-/** Merge a flat `{key: value}` overlay delta over the server's map, per key —
- *  never a truthiness fallback (an empty-but-present overlay object must not
- *  blank the server's map). A `null` overlay value tombstones the key. */
+/** Merge a flat `{key: value}` overlay delta over the server's map. A `null` value tombstones. */
 function mergeFlatMapForDisplay<T>(serverMap: Record<string, T> | undefined, overlayMap: Record<string, T | null> | undefined): Record<string, T> {
   const merged = { ...serverMap } as Record<string, T>;
   for (const [key, value] of Object.entries(overlayMap || {})) {
@@ -126,11 +107,8 @@ function mergeFlatMapForDisplay<T>(serverMap: Record<string, T> | undefined, ove
   return merged;
 }
 
-/** Per-agent, per-host merge of a profile's `agents` overlay — client twin of
- *  `mergeAgents` in scripts/lib/model-profiles.ts. `overlay[agent] === null` deletes the
- *  whole agent entry; otherwise the agent's host map is merged against the base via
- *  `mergeFlatMapForDisplay` itself, so a host-level `null` tombstones just that key and an
- *  absent host key inherits. */
+/** Per-agent, per-host merge of a profile's `agents` overlay — client twin of `mergeAgents`
+ *  (scripts/lib/model-profiles.ts). `overlay[agent] === null` deletes the whole entry. */
 function mergeAgentsForDisplay<T>(
   base: Record<string, Record<string, T>> | undefined,
   overlay: Record<string, Record<string, T | null> | null> | undefined,
@@ -149,10 +127,8 @@ function mergeAgentsForDisplay<T>(
   return result;
 }
 
-/** Merge one overlay profile over its server-side counterpart, per host leaf and per
- *  agent/host leaf — mirrors `mergeProfile` in scripts/lib/model-profiles.ts. A host or
- *  agent the overlay does not mention is retained from the server's profile; a profile the
- *  server does not have passes through as a genuinely new one. */
+/** Merge one overlay profile over its server counterpart, per host/agent leaf — mirrors
+ *  `mergeProfile` (scripts/lib/model-profiles.ts). */
 function mergeProfileForDisplay(baseProfile: RegistryProfile | null | undefined, overlayProfile: RegistryOverlayProfile): RegistryProfile {
   const { _delete: _unusedDelete, ...rest } = overlayProfile;
   void _unusedDelete;
@@ -167,9 +143,8 @@ function mergeProfileForDisplay(baseProfile: RegistryProfile | null | undefined,
   return result;
 }
 
-/** Build the display registry = server registry merged with in-memory overlay.
- *  This makes add/duplicate/delete/restore/edit visible immediately (before save),
- *  instead of requiring a save+reload cycle. The renderer reads from this. */
+/** Display registry = server registry merged with the in-memory overlay, so
+ *  add/duplicate/delete/restore/edit are visible before save. The renderer reads from this. */
 export function mergeRegistryForDisplay(serverData: RegistryServerData | null | undefined, overlay: RegistryOverlay | null | undefined): RegistryServerData {
   const base = (serverData && serverData.registry) || {};
   if (!overlay || (!overlay.profiles && !overlay.models)) return serverData || { registry: {}, source: {} };
@@ -183,13 +158,7 @@ export function mergeRegistryForDisplay(serverData: RegistryServerData | null | 
       merged.profiles[key] = mergeProfileForDisplay(merged.profiles[key], val);
     }
   }
-  // overlayOverrideCount/overlayOverrideBreakdown are server-computed from the saved
-  // overlay, not the in-memory display merge — carry both through unchanged so the count
-  // and its named categories stay visible while add/duplicate/delete/edit are shown
-  // pre-save. `agents`/`agentsError` are likewise server-computed (directory-scan derived)
-  // and must survive this rebuild branch, or the Per-Agent Model Overrides table loses its
-  // row source the instant any other field is edited in the same session. This must-survive
-  // list is exactly `SERVER_COMPUTED_PASSTHROUGH_KEYS` above.
+  // Server-computed fields (SERVER_COMPUTED_PASSTHROUGH_KEYS) survive this rebuild unchanged.
   return {
     registry: merged,
     source: (serverData && serverData.source) || {},
@@ -200,9 +169,8 @@ export function mergeRegistryForDisplay(serverData: RegistryServerData | null | 
   };
 }
 
-/** Reads the current DISPLAY cell (server + overlay) at `profile`/`host`, or a blank cell
- *  when nothing is set yet — the base an edit's untouched field is read from, since a host
- *  leaf is whole-cell replace (never a bare field write). */
+/** Reads the current DISPLAY cell (server + overlay), or a blank cell — the base an edit's
+ *  untouched field is read from (a host leaf is whole-cell replace). */
 function currentHostCell(ctx: RegistryStateCtx, profile: string, host: string): RegistryCell {
   const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
   const p = display.registry && display.registry.profiles && display.registry.profiles[profile];
@@ -216,10 +184,18 @@ function currentAgentCell(ctx: RegistryStateCtx, profile: string, agent: string,
   return (agentMap && agentMap[host]) || { model: null, effort: null };
 }
 
-/** Writes a whole cell into `overlay.profiles[profile].hosts[host]`, preserving whatever
- *  sibling field the caller did not touch (read from the current display value). Does not
- *  call `ctx.render()` — callers that mutate several cells in one pass (an Edit Model
- *  rewrite) render once at the end. */
+function isBuiltinProfile(ctx: RegistryStateCtx, profile: string): boolean {
+  const builtinProfiles =
+    ctx.state.registryServerData &&
+    ctx.state.registryServerData.source &&
+    ctx.state.registryServerData.source.builtin &&
+    ctx.state.registryServerData.source.builtin.profiles;
+  if (!builtinProfiles) return true;
+  return Object.prototype.hasOwnProperty.call(builtinProfiles, profile);
+}
+
+/** Writes a whole cell into `overlay.profiles[profile].hosts[host]`, preserving the sibling
+ *  field. Does not call `ctx.render()` — multi-cell callers render once at the end. */
 function writeHostCell(ctx: RegistryStateCtx, profile: string, host: string, field: "model" | "effort", value: string | null): void {
   const overlay = ensureOverlay(ctx);
   if (!overlay.profiles![profile]) overlay.profiles![profile] = {};
@@ -231,10 +207,10 @@ function writeHostCell(ctx: RegistryStateCtx, profile: string, host: string, fie
 }
 
 /** Writes a whole cell into `overlay.profiles[profile].agents[agent][host]`. `field ===
- *  "model"` with `value === ""` (the "Profile default" option) writes an explicit `null`
- *  tombstone for that host leaf — NOT a deleted key — because a built-in profile can already
- *  carry a real override for this agent (D1); an absent overlay key would just inherit that
- *  built-in override rather than resetting to the profile default. */
+ *  "model"` with `value === ""` writes `null` for a builtin profile (D1); a non-builtin
+ *  profile has no built-in override to reset past, so the key is deleted instead. A new
+ *  override seeds `effort` from the profile's own host cell; an `effort`-only edit with no
+ *  existing override is a no-op (the control is UI-hidden in that state). */
 function writeAgentCell(ctx: RegistryStateCtx, profile: string, agent: string, host: string, field: "model" | "effort", value: string | null): void {
   const overlay = ensureOverlay(ctx);
   if (!overlay.profiles![profile]) overlay.profiles![profile] = {};
@@ -242,13 +218,27 @@ function writeAgentCell(ctx: RegistryStateCtx, profile: string, agent: string, h
   if (!p.agents) p.agents = {};
   if (!p.agents[agent] || p.agents[agent] === null) p.agents[agent] = {};
   const agentMap = p.agents[agent] as OverlayCellMap;
+  const base = currentAgentCell(ctx, profile, agent, host);
+  const hadOverride = !!base.model;
+
   if (field === "model" && !value) {
-    agentMap[host] = null;
+    if (isBuiltinProfile(ctx, profile)) {
+      agentMap[host] = null;
+    } else {
+      delete agentMap[host];
+      if (Object.keys(agentMap).length === 0) delete p.agents[agent];
+    }
     ctx.state.registryDirty = true;
     return;
   }
-  const base = currentAgentCell(ctx, profile, agent, host);
-  agentMap[host] = { ...base, [field]: value || null };
+
+  if (field === "effort" && !hadOverride) return;
+
+  if (field === "model") {
+    agentMap[host] = { model: value, effort: hadOverride ? base.effort ?? null : currentHostCell(ctx, profile, host).effort ?? null };
+  } else {
+    agentMap[host] = { ...base, effort: value || null };
+  }
   ctx.state.registryDirty = true;
 }
 
@@ -308,10 +298,8 @@ export function handleModelFormHostChange(ctx: RegistryStateCtx, host: string): 
   ctx.render();
 }
 
-/** Rewrites every profile-grid cell and per-agent override, for `host`, whose stored model
- *  string equals `oldResolved`, to `newResolved` — the D4 edit semantics (AC4). Reads a
- *  fresh display snapshot once (not per-cell) since none of the individual writes below
- *  render or otherwise change what "current" means mid-pass. */
+/** Rewrites every profile-grid cell and per-agent override, for `host`, matching
+ *  `oldResolved` to `newResolved` (D4, AC4). Reads one display snapshot up front. */
 function rewriteMatchingModelCells(ctx: RegistryStateCtx, host: string, oldResolved: string, newResolved: string): void {
   const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
   const profiles = (display.registry && display.registry.profiles) || {};
@@ -330,10 +318,8 @@ function rewriteMatchingModelCells(ctx: RegistryStateCtx, host: string, oldResol
   }
 }
 
-/** Submits the Add/Edit Model form (AC4). `data` is read live from the DOM by the wiring
- *  site via `collectFormData(ctx.root, "model-form")`. Edit rewrites every cell/override
- *  whose stored string equalled the model's OLD resolved string, for the model's (old) host
- *  — D4. */
+/** Submits the Add/Edit Model form (AC4). Edit rewrites every cell/override that held the
+ *  model's OLD resolved string, for the model's (old) host — D4. */
 export function handleModelFormSubmit(ctx: RegistryStateCtx, data: { name?: unknown; host?: unknown; provider?: unknown; model?: unknown; context1m?: unknown }): void {
   const form = ctx.state.registryForm;
   if (!form || (form.kind !== "model-add" && form.kind !== "model-edit")) return;
@@ -363,7 +349,8 @@ export function handleModelFormSubmit(ctx: RegistryStateCtx, data: { name?: unkn
     if (oldEntry) {
       const oldResolved = resolvedModelString(oldEntry);
       const newResolved = resolvedModelString(newEntry);
-      if (oldResolved !== newResolved) {
+      // A host change means the old cells never belonged to the new host's model space.
+      if (oldResolved !== newResolved && oldEntry.host === host) {
         rewriteMatchingModelCells(ctx, oldEntry.host, oldResolved, newResolved);
       }
     }
@@ -373,11 +360,9 @@ export function handleModelFormSubmit(ctx: RegistryStateCtx, data: { name?: unkn
   ctx.render();
 }
 
-/** Deletes a model (AC4): a built-in model is tombstoned (`null`) so it stays gone across a
- *  future builtin update; an operator-added model (absent from the source's builtin catalog)
- *  is dropped outright, since there is nothing to tombstone. Cells that still hold its
- *  resolved string are left untouched — they render as `custom: <string>` (D4). No confirm()
- *  here; the destructive confirm lives at the wiring site. */
+/** Deletes a model (AC4): builtin is tombstoned (`null`); operator-added is dropped outright.
+ *  Cells still holding its resolved string render as `custom: <string>` (D4). No confirm()
+ *  here — that's the wiring site's job. */
 export function handleModelDelete(ctx: RegistryStateCtx, id: string): void {
   const overlay = ensureOverlay(ctx);
   const builtinModels = (ctx.state.registryServerData && ctx.state.registryServerData.source && ctx.state.registryServerData.source.builtin && ctx.state.registryServerData.source.builtin.models) || {};
@@ -385,6 +370,9 @@ export function handleModelDelete(ctx: RegistryStateCtx, id: string): void {
     overlay.models![id] = null;
   } else {
     delete overlay.models![id];
+  }
+  if (ctx.state.registryForm && ctx.state.registryForm.kind === "model-edit" && ctx.state.registryForm.editId === id) {
+    ctx.state.registryForm = null;
   }
   ctx.state.registryDirty = true;
   ctx.render();
@@ -411,7 +399,9 @@ export function handleRegistryAddProfile(ctx: RegistryStateCtx, name: string, de
   if (!name || !name.trim()) return;
   const trimmed = name.trim();
   const overlay = ensureOverlay(ctx);
-  if (overlay.profiles![trimmed]) {
+  const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
+  const available = (display && display.registry && display.registry.profiles) || {};
+  if (Object.prototype.hasOwnProperty.call(available, trimmed)) {
     ctx.state.registryForm = { kind: "add-profile", error: 'Profile "' + trimmed + '" already exists.' };
     ctx.render();
     return;
@@ -425,12 +415,9 @@ export function handleRegistryAddProfile(ctx: RegistryStateCtx, name: string, de
   ctx.render();
 }
 
-// Both Duplicate and Delete build their "Available: ..." list from the DISPLAY registry
-// (server registry merged with the in-memory overlay), not the raw overlay — the overlay-only
-// seed leaves ctx.state.registryOverlay.profiles empty for an operator who has not edited
-// anything this session, so reading the raw overlay made both pickers report "no profiles
-// available" even though every builtin profile is selectable. mergeRegistryForDisplay already
-// drops `_delete`-tombstoned profiles from its result, so no separate filter is needed here.
+// Duplicate/Delete build their "Available: ..." list from the DISPLAY registry (server +
+// overlay), not the raw (overlay-only-seeded) overlay, or every builtin profile would read
+// as unavailable to an operator who has not edited anything yet.
 export function handleRegistryDuplicateProfile(ctx: RegistryStateCtx, sourceName: string, newName: string): void {
   const overlay = ensureOverlay(ctx);
   const display = mergeRegistryForDisplay(ctx.state.registryServerData, ctx.state.registryOverlay);
@@ -468,9 +455,7 @@ export function handleRegistryDeleteProfile(ctx: RegistryStateCtx, name: string)
     ctx.render();
     return;
   }
-  // The tombstone must land on the OVERLAY (the thing that gets saved), not the computed
-  // display copy - create a minimal overlay entry when deleting a profile the overlay has
-  // never touched (e.g. a builtin-only profile). `_delete: true` alone is a valid tombstone.
+  // Tombstone lands on the OVERLAY (what gets saved) — create a minimal entry if untouched.
   if (!overlay.profiles![trimmed]) {
     overlay.profiles![trimmed] = { _delete: true };
   } else {
@@ -508,14 +493,8 @@ export async function handleRegistryClearOverlay(ctx: RegistryApiCtx): Promise<v
 }
 
 // ── Registry regenerate streaming handler ───────────────────────────────────
-// runRegenerateStream is the SSE fetch + classification logic, called ONLY from
-// handleRegistrySaveAndApply below. Returns `{ ok, reason }`: `ok` is true only
-// for a full, unqualified success (every host installed, no variant-sync
-// failures); on any other outcome `reason` is the exact diagnostic text this
-// function would otherwise have shown on its own — stream-closed sentence,
-// exit-code line, per-host failed/unsupported detail, or the spawn/network
-// error — so the caller can fold the specific reason into its own banner
-// instead of discarding it.
+// SSE fetch + classification, called only from handleRegistrySaveAndApply. `ok` is true only
+// for a full success; otherwise `reason` is the diagnostic text so the caller can fold it in.
 
 const RESTART_SENTENCE = "Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) to pick up the changes.";
 
@@ -567,25 +546,18 @@ export async function runRegenerateStream(ctx: RegistryApiCtx): Promise<{ ok: bo
           // append to log panel — in a real browser this updates the DOM.
           // For the handler contract, we just consume the line.
         } else if (event.type === "install") {
-          // Classify by the server-derived status, not merely by the event's presence — a
-          // failed/unsupported host must never land in the success bucket. "unsupported" is
-          // its own class, never folded into "skipped".
+          // Classify by server-derived status — failed/unsupported must never read as success.
           if (event.status === "switched") installResults.switched.push(event.host + " → " + event.profile);
           else if (event.status === "skipped") installResults.skipped.push(event.host as string);
           else if (event.status === "unsupported") installResults.unsupported.push((event.unsupported || event.host) as string);
           else if (event.status === "failed") installResults.failed.push(event.host + ": " + (event.error || event.failed || "unknown"));
         } else if (event.type === "variant-sync") {
-          // Bridge-step frames, emitted before the "install" frames — one per host, copying
-          // the freshly regenerated agent-profiles trees into that host's installed variant
-          // root. "skipped" is the routine case (no source checkout, Cursor, or no variant
-          // tree installed yet) and stays silent, matching how a "skipped" install host needs
-          // no banner line on its own.
+          // One per host, before the "install" frames. "skipped" is routine and stays silent.
           if (event.status === "synced") variantSyncResults.synced.push(event.host as string);
           else if (event.status === "failed") variantSyncResults.failed.push(event.host + ": " + (event.error || "unknown"));
         } else if (event.type === "done") {
           gotDone = true;
-          // The generator can exit 0 while at least one host's install failed or was
-          // unsupported — that is not a success.
+          // exit 0 with a failed/unsupported host is still not a success.
           var hadInstallProblems = installResults.failed.length > 0 || installResults.unsupported.length > 0 || variantSyncResults.failed.length > 0;
           if (event.exitCode === 0 && !hadInstallProblems) {
             ok = true;
@@ -637,9 +609,8 @@ interface RegistrySaveResponse {
   error?: string;
 }
 
-/** Unified Save & Apply. One confirm covering both steps: PUT the in-memory overlay, and —
- *  only on a successful save — run the existing regenerate-and-install stream (no second
- *  confirm). */
+/** Unified Save & Apply: one confirm, PUT the overlay, then (on success) run the
+ *  regenerate-and-install stream with no second confirm. */
 export async function handleRegistrySaveAndApply(ctx: RegistryApiCtx): Promise<void> {
   if (!confirm("Save changes and apply them to your installed agents? This overwrites installed variant directories, and you will need to restart your CLI sessions afterward.")) return;
   try {
@@ -653,16 +624,12 @@ export async function handleRegistrySaveAndApply(ctx: RegistryApiCtx): Promise<v
     showBanner(ctx.root, "error", "Save failed: " + String((e && (e as { message?: unknown }).message) || e));
     return;
   }
-  // Reset the loaded/dirty guards so the next render re-inits from the newly saved
-  // source.overlay (mirrors the old Save Overlay success path).
+  // Reset guards so the next render re-inits from the newly saved source.overlay.
   ctx.state.registryDirty = false;
   ctx.state.registryLoaded = false;
   const { ok: applied, reason } = await runRegenerateStream(ctx);
   if (!applied) {
-    // Overrides runRegenerateStream's own (more detailed) failure banner — showBanner clears
-    // the prior banner, so this is what the operator sees last. The leading sentence stays
-    // literal (safe-to-retry contract); the specific reason (stream-closed, per-host failure,
-    // exit-code line, spawn error) is folded in rather than discarded.
+    // Overrides runRegenerateStream's own failure banner; the specific reason is folded in.
     const detail = reason ? " Details: " + reason : "";
     showBanner(ctx.root, "error", "Changes saved, but applying them failed — press Save & Apply again to retry." + detail);
   }

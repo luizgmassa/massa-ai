@@ -14,6 +14,8 @@
   --accent-tint: rgba(37, 99, 235, 0.08);
   --success-fg: #166534;
   --success-bg: #f0fdf4;
+  --warn-bg: #fffbeb;
+  --warn-fg: #92400e;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
 }
@@ -32,6 +34,8 @@
   --accent-tint: rgba(96, 165, 250, 0.12);
   --success-fg: #4ade80;
   --success-bg: #0a2818;
+  --warn-bg: #2a2114;
+  --warn-fg: #fbbf24;
 }
 
 * {
@@ -260,6 +264,14 @@ body {
   background: var(--error-bg);
   color: var(--error-fg);
   border-color: var(--error-fg);
+}
+.warning {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  border: 1px solid var(--warn-fg);
+  margin-bottom: 0.5rem;
 }
 
 /* markdown content rendered inside cells/cards/results */
@@ -499,9 +511,13 @@ pre code {
   overflow-x: auto;
 }
 
-/* DS-03: Model Catalog view */
+/* DS-03: Model Catalog view. `min-width: 100%` (not `width: 100%`) lets the table grow
+ * PAST its scroll container when the profile columns need more room than the viewport —
+ * a fixed `width: 100%` instead forced every column to shrink to fit, which is what cut
+ * off the trailing profile column at narrower widths despite `.grid-scroll` already being
+ * present (V2). */
 .registry-grid {
-  width: 100%;
+  min-width: 100%;
   border-collapse: collapse;
 }
 .registry-grid .tool-cell {
@@ -604,9 +620,11 @@ pre code {
   gap: 0.4rem;
 }
 
-/* model-catalog-revamp AC4/AC6: Models CRUD table + Per-Agent Model Overrides table. */
+/* model-catalog-revamp AC4/AC6: Models CRUD table + Per-Agent Model Overrides table +
+ * Profiles grid (V3) — all three share the same card treatment. */
 .registry-models,
-.registry-agent-overrides {
+.registry-agent-overrides,
+.registry-profile-grid {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 6px;

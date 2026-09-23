@@ -1091,6 +1091,72 @@ describe("handleRegistryAgentCellEdit — per-agent override edit (AC6)", () => 
     handleRegistryAgentCellEdit(ctx, "balanced", "builder", "opencode", "effort", "max");
     expect(ctx.state.registryOverlay.profiles.balanced.agents.builder.opencode).toEqual({ model: "sonnet", effort: "max" });
   });
+
+  // ── Fix round: findings 1 and 2 ───────────────────────────────────────────
+
+  it('"Profile default" on a profile absent from builtin deletes the host key instead of tombstoning it, and drops the emptied agent map (finding 1)', () => {
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: { custom: { agents: { builder: { opencode: { model: "opencode-go/glm-5.2", effort: "max" } } } } }, models: {} },
+        registryDirty: false,
+        registryLoaded: true,
+        registryServerData: {
+          registry: { profiles: { custom: { hosts: {}, agents: { builder: { opencode: { model: "opencode-go/glm-5.2", effort: "max" } } } } }, models: {} },
+          // "custom" is NOT one of the builtin profiles — nothing to reset past.
+          source: { builtin: { profiles: { balanced: { hosts: {} } } } },
+        },
+      },
+    });
+    handleRegistryAgentCellEdit(ctx, "custom", "builder", "opencode", "model", "");
+    expect(ctx.state.registryOverlay.profiles.custom.agents.builder).toBeUndefined();
+    expect(ctx.state.registryDirty).toBe(true);
+  });
+
+  it("still writes an explicit null tombstone for a builtin profile (finding 1 does not regress D1)", () => {
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: { balanced: { agents: { builder: { opencode: { model: "opencode-go/glm-5.2", effort: "max" } } } } }, models: {} },
+        registryDirty: false,
+        registryLoaded: true,
+        registryServerData: {
+          registry: { profiles: { balanced: { hosts: {}, agents: { builder: { opencode: { model: "opencode-go/glm-5.2", effort: "max" } } } } }, models: {} },
+          source: { builtin: { profiles: { balanced: { hosts: {} } } } },
+        },
+      },
+    });
+    handleRegistryAgentCellEdit(ctx, "balanced", "builder", "opencode", "model", "");
+    expect(ctx.state.registryOverlay.profiles.balanced.agents.builder.opencode).toBeNull();
+  });
+
+  it("an effort-only edit on a row with no override is a no-op, never creating a {model:null, effort} phantom (finding 2)", () => {
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: {}, models: {} },
+        registryDirty: false,
+        registryLoaded: true,
+        registryServerData: { registry: { profiles: { balanced: { hosts: {}, agents: {} } }, models: {} }, source: {} },
+      },
+    });
+    handleRegistryAgentCellEdit(ctx, "balanced", "reviewer", "claude", "effort", "high");
+    expect(ctx.state.registryOverlay.profiles.balanced?.agents?.reviewer?.claude).toBeUndefined();
+    expect(ctx.state.registryDirty).toBe(false);
+  });
+
+  it("picking a model for a fresh override seeds effort from the profile's own host cell, not null (finding 2)", () => {
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: {}, models: {} },
+        registryDirty: false,
+        registryLoaded: true,
+        registryServerData: {
+          registry: { profiles: { balanced: { hosts: { opencode: { model: "opencode-go/glm-5.2", effort: "high" } }, agents: {} } }, models: {} },
+          source: {},
+        },
+      },
+    });
+    handleRegistryAgentCellEdit(ctx, "balanced", "reviewer", "opencode", "model", "opencode-go/glm-5.2");
+    expect(ctx.state.registryOverlay.profiles.balanced.agents.reviewer.opencode).toEqual({ model: "opencode-go/glm-5.2", effort: "high" });
+  });
 });
 
 describe("handleAgentOverridesProfileChange — selects the profile shown in the Per-Agent table", () => {
@@ -1279,6 +1345,17 @@ describe("handleModelFormSubmit — Edit Model rewrites matching cells (D4, AC4)
     expect(ctx.state.registryOverlay.models["claude-sonnet-5"].name).toBe("Sonnet 5 (renamed)");
     expect(ctx.state.registryOverlay.profiles.balanced?.hosts?.claude).toBeUndefined();
   });
+
+  it("skips the rewrite entirely when the Tool (host) changes — old-host cells are left alone to fall back to a custom: display (finding 8)", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenEdit(ctx, "claude-sonnet-5");
+    handleModelFormSubmit(ctx, { name: "Sonnet 5", host: "codex", provider: "", model: "gpt-5-sonnet-clone", context1m: false });
+    expect(ctx.state.registryOverlay.models["claude-sonnet-5"]).toEqual({ name: "Sonnet 5", host: "codex", provider: "", model: "gpt-5-sonnet-clone", context1m: false });
+    // balanced/claude, work/claude, and balanced/builder/claude all held the old (claude)
+    // resolved string — none may be rewritten with a codex-shaped string.
+    expect(ctx.state.registryOverlay.profiles.balanced).toBeUndefined();
+    expect(ctx.state.registryOverlay.profiles.work).toBeUndefined();
+  });
 });
 
 describe("handleModelDelete — tombstone builtin, drop user-added, leave cells as custom (D4, AC4)", () => {
@@ -1302,6 +1379,22 @@ describe("handleModelDelete — tombstone builtin, drop user-added, leave cells 
     // The profile-grid cell keeps its literal string; the renderer (registry-editor.test.ts)
     // is what turns an unmatched catalog string into "custom: <string>" for display.
     expect(ctx.state.registryOverlay.profiles.balanced).toBeUndefined();
+  });
+
+  it("closes a stale Edit Model form open for the deleted id, so Submit cannot re-create it (finding 9)", () => {
+    const ctx = makeModelsCtx();
+    handleModelFormOpenEdit(ctx, "claude-sonnet-5");
+    expect(ctx.state.registryForm?.editId).toBe("claude-sonnet-5");
+    handleModelDelete(ctx, "claude-sonnet-5");
+    expect(ctx.state.registryForm).toBeNull();
+  });
+
+  it("leaves an Edit Model form open for a DIFFERENT id untouched", () => {
+    const ctx = makeModelsCtx();
+    ctx.state.registryOverlay.models["my-custom-model"] = { name: "Mine", host: "claude", provider: "", model: "mine" };
+    handleModelFormOpenEdit(ctx, "claude-sonnet-5");
+    handleModelDelete(ctx, "my-custom-model");
+    expect(ctx.state.registryForm?.editId).toBe("claude-sonnet-5");
   });
 });
 
@@ -1372,6 +1465,22 @@ describe("handleRegistryAddProfile — inline form submit (T7, REGWIRE-03, APUX-
     });
     handleRegistryAddProfile(ctx, "", "");
     expect(Object.keys(ctx.state.registryOverlay.profiles)).toHaveLength(0);
+    expect(ctx.state.registryDirty).toBe(false);
+  });
+
+  it("also rejects a name already taken by a BUILTIN (merged) profile the overlay has never touched (finding 10)", () => {
+    const ctx = makeRegistryCtx({
+      state: {
+        registryOverlay: { profiles: {}, models: {} },
+        registryDirty: false,
+        registryLoaded: true,
+        registryForm: { kind: "add-profile", error: null },
+        registryServerData: { registry: { profiles: { balanced: { hosts: {} } }, models: {} }, source: { builtin: { profiles: { balanced: { hosts: {} } } } } },
+      },
+    });
+    handleRegistryAddProfile(ctx, "balanced", "");
+    expect(ctx.state.registryForm?.error).toContain("balanced");
+    expect(ctx.state.registryOverlay.profiles.balanced).toBeUndefined();
     expect(ctx.state.registryDirty).toBe(false);
   });
 });
