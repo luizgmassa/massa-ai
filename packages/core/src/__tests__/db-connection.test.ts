@@ -30,19 +30,22 @@ describe("db-connection", () => {
     process.env.DB_POOL_SIZE = original;
   });
 
-  test("getDbConfig defaults connectionTimeoutMs to 15000", () => {
+  // The next two test resolveConnectionTimeoutMs() directly rather than
+  // through getDbConfig() — resolveConnectionTimeoutMs is deliberately
+  // independent of requirePostgresDatabaseUrl (see db-connection.ts), so
+  // these stay DATABASE_URL-independent instead of inheriting getDbConfig's
+  // dependency on it.
+  test("resolveConnectionTimeoutMs defaults to 15000", () => {
     const original = process.env.DB_CONNECTION_TIMEOUT_MS;
     delete process.env.DB_CONNECTION_TIMEOUT_MS;
-    const config = getDbConfig();
-    expect(config.connectionTimeoutMs).toBe(15_000);
+    expect(resolveConnectionTimeoutMs()).toBe(15_000);
     if (original !== undefined) process.env.DB_CONNECTION_TIMEOUT_MS = original;
   });
 
-  test("getDbConfig reads DB_CONNECTION_TIMEOUT_MS env", () => {
+  test("resolveConnectionTimeoutMs reads DB_CONNECTION_TIMEOUT_MS env", () => {
     const original = process.env.DB_CONNECTION_TIMEOUT_MS;
     process.env.DB_CONNECTION_TIMEOUT_MS = "30000";
-    const config = getDbConfig();
-    expect(config.connectionTimeoutMs).toBe(30_000);
+    expect(resolveConnectionTimeoutMs()).toBe(30_000);
     if (original === undefined) delete process.env.DB_CONNECTION_TIMEOUT_MS;
     else process.env.DB_CONNECTION_TIMEOUT_MS = original;
   });

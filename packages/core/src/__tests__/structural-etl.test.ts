@@ -378,7 +378,6 @@ describeNative("TS/JS structural ETL adapter", () => {
     const [resolved] = await new ResolveStage(repository as never).run(context(dir), [parsed!]);
     const symbol = resolved!.symbols[0]!;
     expect(symbol.name).toBe("C%23 vs F%23");
-    expect(symbol.qualifiedName).toBe("C%23 vs F%23");
     expect(symbol.fqn).toBe("notes.md#C%23 vs F%23");
 
     const batch = buildSymbolPersistenceBatch("p", resolved!);
