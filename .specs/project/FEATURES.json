@@ -1510,7 +1510,43 @@
       "validation": ".specs/features/per-provider-default-models/validation.md",
       "notes": "COMPLETE 2026-09-21 after 21 Tasks across 8 Phases, two fix passes (F1-F9 + F2b, then G1-G6) and three independent verification rounds: FAIL, FAIL, then PASS at 25/25 ACs with 0 spec-precision gaps. THE NUMBER THAT MATTERS is the discrimination sensor, not the suites. Round 1: 16 injected, 12 killed, 4 SURVIVED. Round 2: 16 injected, 15 killed, 1 survived. Round 3: 14 injected, 11 killed, 3 survived -- all three survivors documentation prose whose values are currently correct, recorded as a residual with the mutation evidence so the judgement can be overturned on it. THE DEFECT CLASS THAT DOMINATED THIS FEATURE -- a requirement names a set, and the thing meant to implement it covers a subset. FIVE instances, and not one was caught by a gate. (1) PDM-12 AC-2 named five config fields; four got a reader (T06b). (2) PDM-02 AC-2 said \"that provider's three model ids\"; the writers shipped two (T07b). (3) PDM-03 AC-1 named the ollama embedding default; T03 derived only .llm (T03b). (4) The `use ollama` CLI branch assigned NONE of the three llm.* fields while the lmstudio branch below assigned all three, so init --lmstudio then use ollama left the LLM on the old provider (F1) -- found only because round 1 was explicitly told to hunt for a fourth. (5) `_resolveEmbedContextWindow` resolved config over env, inverting the documented precedence, with a docblock stating the inversion and a test asserting it as the contract (G1) -- found only because round 2 was told to hunt for a fifth. TWO OF THE FIVE WERE THE ORCHESTRATOR'S ERROR, WRITTEN INTO A TASK TEXT AND FOLLOWED LITERALLY. T06b and F2 both specified `config ?? env ?? default` against CLAUDE.md:321's env > config.json > literal defaults. F2b caught one; G1 caught the other. A third orchestrator error produced N4: F1's text said \"mirror the lmstudio branch\", which is safe only because lmstudio's two base URLs are byte-identical -- ollama's differ by /v1, so `use ollama --base-url` wrote an LLM URL missing it (G2, fixed in the seam via deriveInferenceBaseUrls so neither CLI carries a copy). IMPLEMENTERS FOLLOWING A TASK TEXT LITERALLY IS CORRECT BEHAVIOUR; the task text is what has to be checked against the requirement. THE GATE COROLLARY IS THE MOST TRANSFERABLE FINDING. The parity gate could not see instance (4) because its DERIVED_SURFACES table carried (use lmstudio, instruct/coding) rows and no (use ollama, ...) counterparts -- the population was enumerated from the implementation's subset, so it MIRRORED the bug instead of catching it. F4 re-derived the population from PDM-02 AC-2's own text (provider x branch x role x CLI), narrowed a blanket process.env exclusion to admit `process.env.X || \"literal\"` -- which is both a read AND a default declaration, exactly the shape the /api/v1/system/ollama defect lived in -- and added an instruct/coding completeness scan that had never existed outside the Markdown tier. Acceptance was never a green gate: the original defects were reproduced and killed by name. THE SAME SHAPE IN THE TESTS. Three mutations in the production llm.* reader survived 945 PASSING TESTS, because config.get(\"llm\") always returns a populated defaultConfig.llm, making _resolveLlmConfig's `cfg?.X ??` fallbacks dead code in production -- while the tests that looked like coverage exercised loadConfig(), a different function on a different type (F5). Separately apps/tools-api's system.test.ts PINNED the retired qwen3-embedding:4b as the contract, keeping `bun run test` green over a wrong answer (F2). FOUR GATES WERE REPAIRED RATHER THAN TRUSTED. embedding-defaults-parity.test.ts used to ABORT the whole file (0 pass / 0 fail / 1 error -- referencePair() ran in the describe body, and an aborted file reads as \"no failures\" to anything counting only fail), and before that silently slid its regex into an adjacent branch and reported mistral-embed/1024 as though it were a pass; a silent wrong match is indistinguishable from a pass. It now runs 21/0 with 41 assertions. test:scripts short-circuited on && and skipped all 37 shell suites while printing the bun half's counts (T15b), then still aborted at suite 16 of 39 (F6; scripts/run-shell-suites.sh now reports every failing suite together). The gate's printed population also overstated by 2, because two rows sat inside a flatMap without depending on it (G3, now self-checked against the distinct-label count). And PDM-10 AC-3's per-role `lms load -c` values had NO sensor at all -- the single survivor of round 2 (G5, now 6 sites x 3 roles asserted against INFERENCE_ROLE_DEFAULTS). BREAKING: the ollama embedding default moves from qwen3-embedding:4b/2560 to qwen3-embedding:0.6b/1024, invalidating every workspace's embedding_fingerprint and flipping the vector store from binary-quantization to direct HNSW cosine. Fingerprint read and write gates fail closed with an actionable message. NO migration is built; a full reindex is required. ACCEPTED, NOT CLOSED: retrieval quality at 1024 dimensions is UNMEASURED, by the user's explicit choice, and the needles floors are knowingly nulled. Stated plainly in spec.md:94, CHANGELOG.md:21-23, README.md:742-744 and 14.needles.test.ts:79-110 -- round 3 re-checked all four for hedging and found none. SKIPPED SENSOR, NEVER A PASS: 14.needles.test.ts is unobservable in this environment -- :3333 unreachable while :11434 and :1234 both answer 200 -- so 0 pass / 2 skip / 0 fail across all three rounds. PDM-03/04 AC-4's live LM Studio sensor WAS observable and observed: 2 pass / 0 fail, \"Provider ready (model: text-embedding-qwen3-embedding-0.6b, dimensions: 1024)\". RESIDUALS: (1) the parity gate's Markdown tier is membership-only and never value-checks the 7 docs, and .env.example has 1 gated instruct site against 5 carrying the literal -- mutations M10/M11 survived both parity and the 2064-test bun half; judged at parity with the embedding half per PDM-05's own comparator, recorded with the evidence so it can be overturned. (2) 3 host-specific shell suites fail (install-skills-cli, plugin-auto-install, plugin-registry-registration) -- a real ~/.claude leaking into host detection plus a missing CLI; deliberately not skipped or excluded. (3) `bun skills/massa-ai/scripts/lessons.ts list` DESTROYS .specs/lessons.json -- measured on a scratch copy, 25 entries before and 6 after -- and the primary checkout still carries that damage.",
       "completed": "2026-09-21"
+    },
+    {
+      "id": "api-log-clarity",
+      "slug": "api-log-clarity",
+      "title": "API log clarity: labelled LLM failures with streaks, repeat counts, full error fields, warn/error sweep, MASSA_AI_LOG_LEVEL",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": false,
+        "execute": true
+      },
+      "branch": "feat/model-catalog-revamp",
+      "created": "2026-09-22",
+      "depends_on": [],
+      "spec": ".specs/features/api-log-clarity/spec.md",
+      "validation": ".specs/features/api-log-clarity/validation.md"
+    },
+    {
+      "id": "model-catalog-revamp",
+      "slug": "model-catalog-revamp",
+      "title": "Model Catalog revamp: typed models catalog, per-profile default model + per-agent overrides, tiers removed",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": false,
+        "execute": true
+      },
+      "branch": "feat/model-catalog-revamp",
+      "created": "2026-09-22",
+      "depends_on": [],
+      "spec": ".specs/features/model-catalog-revamp/spec.md",
+      "validation": ".specs/features/model-catalog-revamp/validation.md"
     }
   ],
-  "active_feature": "per-provider-default-models"
+  "active_feature": "model-catalog-revamp"
 }

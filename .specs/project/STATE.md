@@ -1,4 +1,14 @@
-## Current — Per-provider default models (**COMPLETE 2026-09-21** — 21 Tasks across 8 Phases, two fix passes (F1-F9 + F2b, then G1-G6), three independent verification rounds: **FAIL, FAIL, then PASS at 25/25 ACs**; unpushed, push/PR is the user's call)
+## Current — Model Catalog revamp + API log clarity (**VALIDATED PASS 2026-09-23** — 12/12 logging ACs, 9/9 catalog ACs, drift follow-ups T1/T1b/T2; independent verifier iteration 1 blocked on 5 surviving mutants, iteration 2 killed all; branch `feat/model-catalog-revamp`)
+
+Specs: `.specs/features/api-log-clarity/`, `.specs/features/model-catalog-revamp/`; validation reports beside them.
+Delivered as one PR, per the user on 2026-09-22.
+
+**Lessons worth carrying:**
+- A reviewer found that AI SDK error `cause` messages embed the full model output. Serializing `cause` needs a cap.
+- A builder's "pre-existing" failure was bisected to this branch: `origin/main` 86/0, `a075e1bb` 86/0, tip 82/6. The real cause was a test-isolation hole: an installer test regenerated the checkout's real bundles, and the last host's profile won. At `a075e1bb` it stayed hidden because a missing opencode `dist/` skipped that host's case.
+- Source-order tests (`indexOf(a) < indexOf(b)`) do not detect a dropped argument. The verifier's M14 survived until a behavioral child-process test replaced it.
+
+## Previous — Per-provider default models (merged, PR #122) (**COMPLETE 2026-09-21** — 21 Tasks across 8 Phases, two fix passes (F1-F9 + F2b, then G1-G6), three independent verification rounds: **FAIL, FAIL, then PASS at 25/25 ACs**; unpushed, push/PR is the user's call)
 
 **Sensor across the three rounds — this is the number, not the suite counts:** 16 injected / 12
 killed / **4 survived** → 16 / 15 / 1 → 14 / 11 / 3, the last three all documentation prose whose
