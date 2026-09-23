@@ -192,7 +192,7 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 | **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 18 subagent specialists | No |
 | **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | MCP into `opencode.json`/`opencode.jsonc` (59 tools) + lifecycle handlers + 18 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
-Each plugin also ships generated slash commands — one per massa-ai workflow (40 today)
+Each plugin also ships generated slash commands — one per massa-ai workflow (36 today)
 (`/massa-ai:debug`, `$debug`, etc., naming varies by host) — alongside the 6
 quick commands in the table above; see
 [Workflow Commands](./FEATURES.md#workflow-commands-generated-slash-commands)
@@ -339,7 +339,7 @@ The repo ships a set of repo-local skills plus a unified installer that copies t
 
 | Skill | Location | Purpose |
 |-------|----------|---------|
-| `massa-ai` | `skills/massa-ai/` | Workflow router (40 workflows: spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
+| `massa-ai` | `skills/massa-ai/` | Workflow router (36 workflows: spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
 | `persona-router` | `skills/persona-router/` | Automatic persona selection from catalog (`skills/massa-ai/personas/`) |
 | `profile` | `skills/profile/` | Switch the installed agents to a registry model profile, or report the active one |
 | `bootstrap` | `skills/bootstrap/` | Inspect or toggle the nine startup-contract rules delivered by `MASSA-AI.md` |

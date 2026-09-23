@@ -93,17 +93,17 @@ export function joinModelId(provider: string | null | undefined, model: string |
 
 /** Frontend copy of the live workflow inventory (basenames from
  *  skills/massa-ai/workflows/ - all .md files). Kept in sync manually; the
- *  frontend cannot import from scripts/lib. Used by the Workflow Tiers picker. */
-const WORKFLOW_STEMS = [
-  "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
-  "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
-  "discovery", "exploration", "feature", "furps-refinement", "general",
-  "implementation-audit", "implementation-fix", "judge-with-debate",
-  "long-session", "maestro", "maestro-audit", "maestro-fix",
-  "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
-  "refactor", "requirements-audit", "requirements-fix", "rfc",
-  "security-audit", "security-fix", "skill-architect", "spec-driven",
-  "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
+ *  frontend cannot import from scripts/lib. Used by the Workflow Tiers picker.
+ *  Exported only so `registry-workflow-stems.test.ts` can pin it to the live tree. */
+export const WORKFLOW_STEMS = [
+  "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
+  "code-quality-audit", "code-quality-fix", "commit", "create-adr", "create-prd",
+  "create-rfc", "create-tdd", "create-ticket", "debug", "design", "exploration",
+  "feature", "furps-refinement", "implementation-audit", "implementation-fix",
+  "judge-with-debate", "long-session", "mobile-figma-audit", "mobile-figma-fix",
+  "onboarding", "pr-review", "product-discovery", "refactor",
+  "requirements-audit", "requirements-fix", "security-audit", "security-fix",
+  "skill-architect", "spec-driven", "tests-audit", "tests-fix", "the-fool",
 ];
 
 // ── Registry inline forms (design D-4.4, APUX-12, P2-D AC2-AC6) ────────────

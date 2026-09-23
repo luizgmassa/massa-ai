@@ -338,7 +338,7 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 ## Workflow Commands (Generated Slash Commands)
 
-**What:** massa-ai generates one host-native slash command per workflow skill under `skills/massa-ai/workflows/**/*.md` (40 at last count, scan-derived — never hardcoded). Every workflow the massa-ai router can dispatch becomes directly invocable, skipping the router's own classification step for the explicit case.
+**What:** massa-ai generates one host-native slash command per workflow skill under `skills/massa-ai/workflows/**/*.md` (36 at last count, scan-derived — never hardcoded). Every workflow the massa-ai router can dispatch becomes directly invocable, skipping the router's own classification step for the explicit case.
 
 **Why:** Without a dedicated command, invoking a specific workflow (e.g. `debug`, `create-tdd`, `security-audit`) means describing intent in prose and trusting the router's classifier. A generated command makes the choice explicit and one keystroke away, on every host, for every workflow — not just the 6 hand-authored "quick" commands (`map`/`index`/`find`/`def`/`graph`/`status`).
 
@@ -1367,7 +1367,7 @@ The sub-agent registry is not written — it is consumed by workflows that dispa
 
 | Skill | Location | Description |
 |-------|----------|-------------|
-| `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 40 workflow files under `workflows/` and 43 top-level references under `references/` (evidence gate, context firewall, verification ladder, agent orchestration, etc.), plus 57 more in per-workflow reference subdirectories (`furps/`, `maestro/`, `spec-driven/`, `tdd/`, `the-fool/`, `ticket/`, `rfc/`, `skill-architect/`, `mobile-figma-matcher/`) — 100 reference files in all. Counted 2026-09-16. |
+| `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 36 workflow files under `workflows/` and 43 top-level references under `references/` (evidence gate, context firewall, verification ladder, agent orchestration, etc.), plus 57 more in per-workflow reference subdirectories (`furps/`, `maestro/`, `spec-driven/`, `tdd/`, `the-fool/`, `ticket/`, `rfc/`, `skill-architect/`, `mobile-figma-matcher/`) — 100 reference files in all. Counted 2026-09-16. |
 | `persona-router` | `skills/persona-router/` | Automatic persona selection from catalog. Reads `skills/massa-ai/personas/catalog.json`, routes based on primary deliverable ownership, supports explicit selection, ambiguity policy, and mid-conversation rerouting. |
 | `profile` | `skills/profile/` | Switch the installed agents to a registry model profile, or report the active one per host. Drives the shared switch engine — never a second switch path. |
 | `bootstrap` | `skills/bootstrap/` | Inspect or toggle the nine startup-contract rules delivered by `MASSA-AI.md`. Drives `massa-ai-config bootstrap`, never a hand-edited file. |

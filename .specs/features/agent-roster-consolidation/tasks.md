@@ -125,8 +125,8 @@ T12 → T13
 
 **Done when**:
 
-- [ ] A test asserts `WORKFLOW_STEMS` equals the stems derived from `skills/massa-ai/workflows/**` (not a hand list)
-- [ ] web-ui tests green; Phase 1 full gate green
+- [x] A test asserts `WORKFLOW_STEMS` equals the stems derived from `skills/massa-ai/workflows/**` (not a hand list)
+- [x] web-ui tests green; Phase 1 full gate green
 
 **Tests**: unit + golden
 **Gate**: full

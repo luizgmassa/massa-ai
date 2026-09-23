@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import fs from "fs";
 import path from "path";
+import { WORKFLOW_STEMS } from "../static/views/registry.js";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
@@ -617,17 +618,7 @@ describe("renderModelRegistry — inline dropdown forms replace prompt() (T7, AP
 
   it("add-workflow: renders a muted notice instead of the form when every stem is taken", () => {
     const allTaken: Record<string, string> = {};
-    for (const stem of [
-      "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
-      "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
-      "discovery", "exploration", "feature", "furps-refinement", "general",
-      "implementation-audit", "implementation-fix", "judge-with-debate",
-      "long-session", "maestro", "maestro-audit", "maestro-fix",
-      "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
-      "refactor", "requirements-audit", "requirements-fix", "rfc",
-      "security-audit", "security-fix", "skill-architect", "spec-driven",
-      "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
-    ]) {
+    for (const stem of WORKFLOW_STEMS) {
       allTaken[stem] = "standard";
     }
     const registryAllTaken = {
@@ -709,17 +700,7 @@ describe("renderModelRegistry — inline dropdown forms replace prompt() (T7, AP
 const EMPTY_PROFILES_REGISTRY = { registry: { profiles: {}, tiers: ["light"] }, source: {}, _error: "unrelated" };
 
 const ALL_WORKFLOW_STEMS_TAKEN: Record<string, string> = {};
-for (const stem of [
-  "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
-  "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
-  "discovery", "exploration", "feature", "furps-refinement", "general",
-  "implementation-audit", "implementation-fix", "judge-with-debate",
-  "long-session", "maestro", "maestro-audit", "maestro-fix",
-  "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
-  "refactor", "requirements-audit", "requirements-fix", "rfc",
-  "security-audit", "security-fix", "skill-architect", "spec-driven",
-  "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
-]) {
+for (const stem of WORKFLOW_STEMS) {
   ALL_WORKFLOW_STEMS_TAKEN[stem] = "standard";
 }
 const REGISTRY_ALL_WORKFLOW_STEMS_TAKEN = {
@@ -944,5 +925,26 @@ describe("renderModelRegistry — Nomenclature Scheme A per-row assertions (T9, 
     expect(html).toContain('data-action="registry-save-apply"');
     expect(html).toContain('class="registry-hostDefaults"');
     expect(html).toContain('class="registry-workflowTiers"');
+  });
+});
+// agent-roster-consolidation WFL-03 (Inventory AC-7): the picker's hand-kept
+// stem list must equal the live workflow tree, derived here by an independent
+// walk rather than a second hand list.
+describe("WORKFLOW_STEMS matches skills/massa-ai/workflows/", () => {
+  function liveStems(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) out.push(...liveStems(full));
+      else if (entry.isFile() && entry.name.endsWith(".md")) out.push(entry.name.slice(0, -".md".length));
+    }
+    return out;
+  }
+
+  it("equals the stems of every workflow file, and nothing else", () => {
+    const workflowsDir = path.resolve(import.meta.dir, "../../../../skills/massa-ai/workflows");
+    const live = liveStems(workflowsDir).sort();
+    expect(live.length).toBeGreaterThan(0);
+    expect([...WORKFLOW_STEMS].sort()).toEqual(live);
   });
 });

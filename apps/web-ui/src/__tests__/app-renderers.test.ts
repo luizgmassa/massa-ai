@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import fs from "fs";
 import path from "path";
+import { WORKFLOW_STEMS } from "../static/views/registry.js";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
@@ -1727,24 +1728,13 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
         const buttons = extractButtonTags(html);
         for (const tag of buttons) expect(tag).toContain("class=");
       }
-      // Mirrors app.js's WORKFLOW_STEMS exactly — every stem must already have
+      // Uses the picker's own WORKFLOW_STEMS — every stem must already have
       // an override for the add-workflow form to hit its empty-state branch.
-      const ALL_WORKFLOW_STEMS = [
-        "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
-        "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
-        "discovery", "exploration", "feature", "furps-refinement", "general",
-        "implementation-audit", "implementation-fix", "judge-with-debate",
-        "long-session", "maestro", "maestro-audit", "maestro-fix",
-        "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
-        "refactor", "requirements-audit", "requirements-fix", "rfc",
-        "security-audit", "security-fix", "skill-architect", "spec-driven",
-        "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
-      ];
       const noWorkflowRoom = {
         ...registryData,
         registry: {
           ...registryData.registry,
-          workflowTiers: Object.fromEntries(ALL_WORKFLOW_STEMS.map((s) => [s, "light"])),
+          workflowTiers: Object.fromEntries(WORKFLOW_STEMS.map((s) => [s, "light"])),
         },
       };
       const htmlFull = renderModelRegistry(noWorkflowRoom, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });

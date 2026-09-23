@@ -73,6 +73,17 @@
  *    between them (HTML-escaped by the renderer: `'` to `&#39;`, backticks to
  *    `<code>`, matching the existing treatment of every other guide string).
  *    Every other case and every byte outside that one span is untouched.
+ *
+ * 5. T3 (agent-roster-consolidation, WFL-03) — `renderModelRegistry/write/form:add-workflow`
+ *    moved because `WORKFLOW_STEMS` follows the workflow inventory: `general` and
+ *    the three `maestro` stems were removed and six stems renamed (`adr`,
+ *    `discovery`, `rfc`, `tdd`, `ticket`, `to-prd` → `create-adr`,
+ *    `product-discovery`, `create-rfc`, `create-tdd`, `create-ticket`,
+ *    `create-prd`). Diffed before regenerating: exactly that 1 case changed, no
+ *    case was added or dropped (88 before and after), and with every
+ *    `<option value="…">…</option>` element stripped the old and new strings are
+ *    byte-identical — the delta is the option list alone (10 stems removed,
+ *    6 added).
  */
 
 import { describe, it, expect } from "bun:test";
