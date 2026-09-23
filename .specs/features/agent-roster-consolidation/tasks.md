@@ -274,8 +274,9 @@ T12 → T13
 
 **Done when**:
 
-- [ ] Test asserts `/persona x` is not classified `role`; `act as` still is
-- [ ] Phase 4 full gate green
+- [x] Test asserts `/persona x` is not classified `role`; `act as` still is
+- [x] Phase 4 full gate green
+  - `bun run test` replaced by per-file runs of the touched core/app suites plus `packages/shared` (known Bun napi SIGTRAP at exit in core and mcp-client, red at base)
 
 **Tests**: unit
 **Gate**: full

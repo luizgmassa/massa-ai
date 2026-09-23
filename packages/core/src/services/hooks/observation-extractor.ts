@@ -202,9 +202,8 @@ const classifyUserPrompt: Classifier = (source, payload) => {
   ) {
     return "blocked-on";
   }
-  // Role / persona
+  // Role
   if (
-    lowerPrompt.startsWith("/persona") ||
     lowerPrompt.startsWith("act as") ||
     lowerPrompt.startsWith("you are a")
   ) {
