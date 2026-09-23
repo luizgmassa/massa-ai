@@ -128,13 +128,13 @@ export class ObservationConsolidationJob {
       void this.runOnce(projectId).catch((e) => {
         logger.warn("observation consolidation: runOnce failed (silent)", {
           projectId,
-          error: (e as Error).message,
+          error: e as Error,
         });
       });
     } catch (e) {
       logger.warn("observation consolidation: maybeRun swallowed", {
         projectId,
-        error: (e as Error).message,
+        error: e as Error,
       });
     }
   }
@@ -168,7 +168,7 @@ export class ObservationConsolidationJob {
     } catch (e) {
       logger.warn("observation consolidation: listRecent failed", {
         projectId,
-        error: (e as Error).message,
+        error: e as Error,
       });
       return noop;
     }
@@ -203,7 +203,7 @@ export class ObservationConsolidationJob {
     } catch (e) {
       logger.warn("observation consolidation: llm.object threw (silent)", {
         projectId,
-        error: (e as Error).message,
+        error: e as Error,
       });
       return noop;
     }
@@ -238,7 +238,7 @@ export class ObservationConsolidationJob {
     } catch (e) {
       logger.warn("observation consolidation: summary insert failed", {
         batchId: batch.id,
-        error: (e as Error).message,
+        error: e as Error,
       });
       return noop;
     }

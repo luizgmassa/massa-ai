@@ -114,7 +114,7 @@ export class SearchCacheWarmup {
         totalDuration,
       };
     } catch (error) {
-      logger.error("Global cache warmup failed", error as Error);
+      logger.error("Global cache warmup failed", error as Error, { topN });
       return {
         projects: 0,
         totalQueries: 0,

@@ -312,7 +312,7 @@ export class Scheduler {
     this.timer = setInterval(() => {
       void this.tick().catch((e) => {
         logger.warn("Scheduler tick failed (swallowed)", {
-          error: (e as Error).message,
+          error: e as Error,
         });
       });
     }, this.tickIntervalMs);
@@ -480,7 +480,7 @@ export class Scheduler {
         logger.warn("Scheduler: job handler threw (caught)", {
           id: job.id,
           jobKind: job.jobKind,
-          error: errMsg,
+          error: e as Error,
         });
       } finally {
         // Wave 5 FR-13: success/failure split. last_success_at updates ONLY
@@ -506,7 +506,7 @@ export class Scheduler {
         } catch (e) {
           logger.warn("Scheduler: persist after fire failed", {
             id: job.id,
-            error: (e as Error).message,
+            error: e as Error,
           });
         }
         this.running.delete(job.jobKind);

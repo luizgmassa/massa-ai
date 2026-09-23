@@ -522,7 +522,7 @@ export class EtlPipeline {
         logger.warn("EtlPipeline: search-admission marker write failed", {
           projectId,
           jobId,
-          error: (markerError as Error).message.slice(0, 160),
+          error: markerError as Error,
         });
       }
 
@@ -555,7 +555,7 @@ export class EtlPipeline {
             logger.warn("EtlPipeline: embedding fingerprint stamp failed", {
               projectId,
               jobId,
-              error: (stampError as Error).message.slice(0, 160),
+              error: stampError as Error,
             });
           }
         }

@@ -127,7 +127,7 @@ export class PgScheduledJobStore implements ScheduledJobStore {
         logger.info("PgScheduledJobStore hydrated", { rows: this.mirror.size });
       } catch (e) {
         logger.warn("PgScheduledJobStore hydrate failed (best-effort)", {
-          error: (e as Error).message,
+          error: e as Error,
         });
       } finally {
         this.hydrating = null;
@@ -146,9 +146,10 @@ export class PgScheduledJobStore implements ScheduledJobStore {
       try {
         await action();
       } catch (e) {
-        logger.warn(`PgScheduledJobStore.${operation} failed (best-effort)`, {
+        logger.warn("PgScheduledJobStore mutation failed (best-effort)", {
           id,
-          error: (e as Error).message,
+          operation,
+          error: e as Error,
         });
       }
     };

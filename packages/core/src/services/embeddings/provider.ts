@@ -151,8 +151,14 @@ async function withRetry<T>(
       if (attempt < config.maxRetries) {
         const delay = getRetryDelay(attempt, config);
         logger.warn(
-          `[EmbeddingProvider] ${context} failed (attempt ${attempt + 1}/${config.maxRetries + 1}), retrying in ${delay}ms`,
-          { error: lastError.message },
+          "EmbeddingProvider: operation failed, retrying",
+          {
+            context,
+            attempt: attempt + 1,
+            maxAttempts: config.maxRetries + 1,
+            delayMs: delay,
+            error: lastError,
+          },
         );
         await sleep(delay);
       }
@@ -657,7 +663,8 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
         );
       } catch (error) {
         logger.warn(
-          `[${this.id}] Ollama batch endpoint unavailable, falling back to sequential embeds: ${(error as Error).message}`,
+          "EmbeddingProvider: Ollama batch endpoint unavailable, falling back to sequential embeds",
+          { providerId: this.id, textCount: texts.length, error: error as Error },
         );
         const embeddings: number[][] = [];
         let consecutiveFailures = 0;
@@ -727,15 +734,17 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
           clearTimeout(timeoutId);
           if (!response.ok) {
             logger.error(
-              `[${this.id}] Ollama API returned ${response.status}`,
+              "EmbeddingProvider: Ollama API returned non-OK status",
+              undefined,
+              { providerId: this.id, status: response.status },
             );
             return false;
           }
         } catch {
           logger.error(
-            `[${this.id}] Ollama service unreachable`,
+            "EmbeddingProvider: Ollama service unreachable",
             undefined,
-            { baseURL: this.baseURL, timeoutMs: 2000 },
+            { providerId: this.id, baseURL: this.baseURL, timeoutMs: 2000 },
           );
           return false;
         }
@@ -759,24 +768,29 @@ export class AISDKEmbeddingProvider implements EmbeddingProvider {
           );
         }
         logger.error(
-          `[${this.id}] Invalid embedding dimensions`,
+          "EmbeddingProvider: invalid embedding dimensions",
           undefined,
-          { expected: this.dimensions, got: embedding.length },
+          { providerId: this.id, expected: this.dimensions, got: embedding.length },
         );
         return false;
       }
 
       // Validate embedding values (should be numbers)
       if (!embedding.every((v) => typeof v === "number" && !isNaN(v))) {
-        logger.error(`[${this.id}] Invalid embedding values (not numbers)`);
+        logger.error(
+          "EmbeddingProvider: invalid embedding values (not numbers)",
+          undefined,
+          { providerId: this.id },
+        );
         return false;
       }
 
       return true;
     } catch (error) {
       logger.error(
-        `[${this.id}] Provider unavailable`,
+        "EmbeddingProvider: provider unavailable",
         error as Error,
+        { providerId: this.id },
       );
       return false;
     }

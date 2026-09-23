@@ -51,7 +51,7 @@ describe("MetricsCollector.getModelPricing (async)", () => {
   test("returns gpt-4 pricing as default for unknown model (warns)", async () => {
     const p = await MetricsCollector.getModelPricing("totally-unknown-model");
     expect(p).toEqual({ input: 30, output: 60 });
-    expect(warnCalls.some(([m]) => m.includes("Unknown model"))).toBe(true);
+    expect(warnCalls.some(([m]) => m.includes("unknown model"))).toBe(true);
   });
 });
 

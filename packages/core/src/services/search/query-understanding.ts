@@ -146,7 +146,7 @@ export async function hyde(
   } catch (e) {
     // Embeddings provider unavailable (e.g. Ollama down) → skip HyDE.
     logger.warn("hyde embed failed — skipping HyDE stream", {
-      error: (e as Error).message,
+      error: e as Error,
     });
     return null;
   }

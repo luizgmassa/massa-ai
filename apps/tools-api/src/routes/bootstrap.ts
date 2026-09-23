@@ -53,7 +53,7 @@ export const bootstrapRoutes = new Elysia({ prefix: "/api/v1/bootstrap" }).post(
       return { success: true, data: result };
     } catch (e) {
       const err = e as Error;
-      logger.error("bootstrap failed", err);
+      logger.error("bootstrap failed", err, { projectId, projectPath });
       set.status = 500;
       return { success: false, error: `bootstrap failed: ${err.message}` };
     }

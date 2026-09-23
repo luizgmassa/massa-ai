@@ -96,7 +96,7 @@ export class LLMJudgeReranker {
     } catch (e) {
       logger.warn("LLMJudgeReranker threw — degrading to input order", {
         query,
-        error: (e as Error).message,
+        error: e as Error,
       });
       return results;
     }

@@ -176,7 +176,10 @@ export class CodeCompressor implements ICompressor {
       return compressedContent;
 
     } catch (error) {
-      logger.error('Code compression failed', error as Error);
+      logger.error('Code compression failed', error as Error, {
+        strategy: useStrategy,
+        originalLength: content.length,
+      });
       return CompressedContentModel.identity(content);
     }
   }

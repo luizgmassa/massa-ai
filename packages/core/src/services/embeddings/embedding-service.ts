@@ -55,8 +55,8 @@ export class EmbeddingService {
         dimensions: this.provider.dimensions,
       });
     } catch (error) {
-      logger.error('Failed to initialize embedding service', error as Error);
-      logger.warn('Embedding service will use fallback mode');
+      logger.error('Failed to initialize embedding service', error as Error, { stage: 'initialize' });
+      logger.warn('Embedding service will use fallback mode', { stage: 'initialize' });
       // Don't throw - allow system to function with degraded capability
     }
   }

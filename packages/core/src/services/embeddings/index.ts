@@ -157,10 +157,9 @@ function refuseOnDimensionMismatch(
   mismatch: DimensionMismatchError,
 ): never {
   logger.error(
-    `[${providerId}] Configured embedding provider failed with a dimension mismatch — refusing to ` +
-      `fall through to another provider (that would silently degrade retrieval quality). ` +
-      `configured dimensions ${mismatch.expected} ≠ model output ${mismatch.got} — fix ` +
-      "`embedding.dimensions` in config.json or OLLAMA_EMBEDDING_DIMENSIONS to match the model actually pulled.",
+    "EmbeddingProvider: configured provider failed with a dimension mismatch, refusing to fall through",
+    mismatch,
+    { providerId, configuredDimensions: mismatch.expected, modelDimensions: mismatch.got },
   );
   throw mismatch;
 }

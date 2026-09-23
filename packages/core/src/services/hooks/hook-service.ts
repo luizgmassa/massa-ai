@@ -275,9 +275,11 @@ export class HookService {
       } catch (e) {
         // Fire-and-forget: a persist failure after admission is logged, not
         // retried, and does NOT poison the queue (spec §11 / design §5).
-        logger.warn("observation persist failed", {
+        logger.warn("HookService: observation persist failed", {
           id: obs.id,
-          error: (e as Error).message,
+          projectId: obs.projectId,
+          sessionId: obs.sessionId,
+          error: e as Error,
         });
       }
     });

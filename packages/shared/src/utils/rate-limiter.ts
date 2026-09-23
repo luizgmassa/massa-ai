@@ -116,7 +116,9 @@ export class SmartRateLimiter {
     const hasTokenCapacity = this.tokenLimiter.tryConsume(estimatedTokens);
 
     if (!hasRequestCapacity) {
-      logger.warn('Request rate limit exceeded');
+      logger.warn('Request rate limit exceeded', {
+        availableTokens: this.requestLimiter.getAvailableTokens(),
+      });
       return false;
     }
 

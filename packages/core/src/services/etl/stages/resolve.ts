@@ -472,7 +472,7 @@ export class ResolveStage {
       if (skippedStructural) throw new Error("structural_repository_seed_failed", { cause: err });
       logger.warn("buildSymbolIndex: repo seed failed, in-batch only", {
         projectId,
-        error: (err as Error)?.message,
+        error: err as Error,
       });
     }
 

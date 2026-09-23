@@ -261,19 +261,23 @@ export class LocalTransformersEmbeddingProvider implements EmbeddingProvider {
       const vec = Array.from(out.data);
       if (!Array.isArray(vec) || vec.length !== this.dimensions) {
         logger.error(
-          `[${this.id}] Invalid embedding dimensions`,
+          "LocalTransformersProvider: invalid embedding dimensions",
           undefined,
-          { expected: this.dimensions, got: vec.length },
+          { providerId: this.id, expected: this.dimensions, got: vec.length },
         );
         return false;
       }
       if (vec.some((v) => typeof v !== "number" || isNaN(v))) {
-        logger.error(`[${this.id}] Invalid embedding values (not numbers)`);
+        logger.error(
+          "LocalTransformersProvider: invalid embedding values (not numbers)",
+          undefined,
+          { providerId: this.id },
+        );
         return false;
       }
       return true;
     } catch (error) {
-      logger.error(`[${this.id}] Local provider unavailable`, error as Error);
+      logger.error("LocalTransformersProvider: provider unavailable", error as Error, { providerId: this.id });
       return false;
     }
   }

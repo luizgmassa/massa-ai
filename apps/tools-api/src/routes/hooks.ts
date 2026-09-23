@@ -65,7 +65,10 @@ export const hookRoutes = new Elysia({ prefix: "/api/v1/hook" })
           return { status: e.code, error: e.message };
         }
         const err = e as Error;
-        logger.error("hook ingestion failed", err);
+        logger.error("hook ingestion failed", err, {
+          projectId: (body as { projectId?: string }).projectId,
+          event: (body as { event?: string }).event,
+        });
         set.status = 500;
         return { status: 500, error: `hook service unavailable: ${err.message}` };
       }
@@ -110,7 +113,9 @@ export const hookRoutes = new Elysia({ prefix: "/api/v1/hook" })
           return { status: e.code, error: e.message };
         }
         const err = e as Error;
-        logger.error("hook batch ingestion failed", err);
+        logger.error("hook batch ingestion failed", err, {
+          count: ((body as { events?: unknown[] }).events ?? []).length,
+        });
         set.status = 500;
         return { status: 500, error: `hook service unavailable: ${err.message}` };
       }

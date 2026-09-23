@@ -235,7 +235,7 @@ export class BootstrapService {
       } catch (e) {
         logger.warn("bootstrap: marker check threw (continuing)", {
           projectId,
-          error: (e as Error).message,
+          error: e as Error,
         });
       }
     } else if (!cfg.refreshEnabled) {
@@ -297,7 +297,7 @@ export class BootstrapService {
     } catch (e) {
       logger.warn("bootstrap: storeSeeds failed (silent)", {
         projectId,
-        error: (e as Error).message,
+        error: e as Error,
       });
       return { ...noopResult("insert-failed"), signalCount, source };
     }

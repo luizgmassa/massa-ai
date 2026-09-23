@@ -108,9 +108,10 @@ export class SearchSessionHook {
       });
     } catch (err) {
       logger.warn("SearchSessionHook: store failed (best-effort)", {
-        error: (err as Error).message,
         projectId,
+        sessionId,
         query: query.slice(0, 60),
+        error: err as Error,
       });
     }
   }

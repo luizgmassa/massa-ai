@@ -82,7 +82,7 @@ export class SalienceJudge {
     } catch (e) {
       logger.warn("SalienceJudge threw — degrading to neutral default", {
         type,
-        error: (e as Error).message,
+        error: e as Error,
       });
       return { salience: NEUTRAL_SALIENCE, source: "default" };
     }

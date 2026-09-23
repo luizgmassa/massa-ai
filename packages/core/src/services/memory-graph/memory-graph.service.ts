@@ -87,7 +87,7 @@ export class MemoryGraphService {
       // Graph operations are best-effort; never fail the store
       logger.warn("Graph update failed after memory store", {
         memoryId,
-        error: (error as Error).message,
+        error: error as Error,
       });
     }
   }
@@ -108,7 +108,7 @@ export class MemoryGraphService {
     } catch (error) {
       logger.warn("Graph cleanup failed after memory delete", {
         memoryId,
-        error: (error as Error).message,
+        error: error as Error,
       });
     }
   }

@@ -183,7 +183,8 @@ export class PostgresVectorStore extends BaseVectorStore {
       );
 
       if (rows.length === 0) {
-        logger.warn(`Table ${this.tableName} not found. Creating fallback table.`, {
+        logger.warn('PostgresVectorStore: table not found, creating fallback table', {
+          tableName: this.tableName,
           note: 'Run "prisma migrate deploy" to create tables via migrations',
         });
         await this.createFallbackTable(client, providerDimensions);
@@ -246,12 +247,13 @@ export class PostgresVectorStore extends BaseVectorStore {
 
         const otherDim = tablename.match(/_([0-9]+)d$/)?.[1];
         logger.warn(
-          `[vector] Orphaned chunks detected: ${tablename} has data for projects not in ${this.tableName}. ` +
-            `Embedding model likely changed from ${otherDim}d → ${currentDim}d. Reindex required.`,
+          'PostgresVectorStore: orphaned chunks detected, embedding model likely changed, reindex required',
           {
             currentTable: this.tableName,
             currentCount,
+            currentDim,
             orphanedTable: tablename,
+            orphanedDim: otherDim,
             affectedProjects: projects.map((p: any) => ({ projectId: p.project_id, chunks: p.n })),
           },
         );
@@ -465,7 +467,7 @@ export class PostgresVectorStore extends BaseVectorStore {
         logger.warn('[postgres] Sub-batch embedding failed, falling back per-document', {
           subBatchIndex: Math.floor(i / EMBED_SUB_BATCH_SIZE),
           count: subBatch.length,
-          error: (error as Error).message,
+          error: error as Error,
         });
       }
 
@@ -478,7 +480,7 @@ export class PostgresVectorStore extends BaseVectorStore {
           logger.warn('[postgres] Sub-batch insert failed, falling back per-document', {
             subBatchIndex: Math.floor(i / EMBED_SUB_BATCH_SIZE),
             count: subBatch.length,
-            error: (error as Error).message,
+            error: error as Error,
           });
         }
       }
@@ -493,7 +495,7 @@ export class PostgresVectorStore extends BaseVectorStore {
           totalFailed++;
           logger.warn('[postgres] Skipping document due to embedding/insert error', {
             id: doc.id,
-            error: (singleError as Error).message,
+            error: singleError as Error,
           });
         }
       }

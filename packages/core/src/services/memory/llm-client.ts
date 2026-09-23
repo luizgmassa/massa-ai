@@ -115,7 +115,7 @@ export async function _checkJsonSchemaSupport(): Promise<boolean> {
   } catch (e) {
     _jsonSchemaSupported = false;
     logger.warn("json_schema: version check error — falling back to json_object", {
-      error: (e as Error).message,
+      error: e as Error,
     });
     return false;
   }
