@@ -79,14 +79,16 @@ export function which(bin: string): boolean {
   return r.status === 0 && (r.stdout ?? "").trim() !== "";
 }
 
-/** Every distinct non-null model id the registry pins for a host. */
+/** Every distinct non-null model id the registry pins for a host, walking both a profile's
+ *  host default cell and every per-agent override cell (registry v2 shape). */
 export function idsForHost(registry: Registry, host: Host): string[] {
   const ids = new Set<string>();
   for (const profile of Object.values(registry.profiles)) {
-    const hostMap = profile.hosts[host];
-    if (!hostMap) continue;
-    for (const entry of Object.values(hostMap)) {
-      if (entry.model !== null) ids.add(entry.model);
+    const cell = profile.hosts[host];
+    if (cell?.model) ids.add(cell.model);
+    for (const hostMap of Object.values(profile.agents ?? {})) {
+      const override = hostMap[host];
+      if (override?.model) ids.add(override.model);
     }
   }
   return [...ids].sort();

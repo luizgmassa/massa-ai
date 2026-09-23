@@ -11,15 +11,13 @@ import { node } from "@elysiajs/node";
 // lazy profilesLib() pattern and GENERATE_SCRIPT resolution.
 
 const builtinRegistry = {
-  version: 1,
-  tiers: ["light", "standard", "deep"],
-  hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
-  workflowTiers: {},
+  version: 2,
+  models: {},
   profiles: {
     balanced: {
       description: "builtin balanced",
       hosts: {
-        claude: { light: { model: "m-light", effort: "high" }, standard: { model: "m-std", effort: "high" }, deep: { model: "m-deep", effort: "high" } },
+        claude: { model: "m-std", effort: "high" },
       },
     },
   },
@@ -513,14 +511,13 @@ describe("POST /api/v1/model-registry/regenerate-and-install-stream — variant-
     expect(arg.sourceRoot).toBe(realDeploymentRoot);
   });
 
-  test("hostDefaults reaches listProfiles via getRegistryHostDefaults()", async () => {
+  test("spec AC8: listProfiles is called with no options — the registry's hostDefaults key is gone in v2", async () => {
     spawnMock.mockImplementationOnce(() => makeFakeChild({ stdoutLines: [], exitCode: 0 }));
     await postStream("/api/v1/model-registry/regenerate-and-install-stream");
 
     expect(listProfilesMock).toHaveBeenCalledTimes(1);
-    const arg = (listProfilesMock.mock.calls[0] as any[])[0] as { hostDefaults?: Record<string, string> };
-    // builtinRegistry (this file's fixture) declares hostDefaults for every host.
-    expect(arg.hostDefaults).toMatchObject({ claude: "balanced", opencode: "balanced" });
+    const arg = (listProfilesMock.mock.calls[0] as any[])[0];
+    expect(arg).toBeUndefined();
   });
 
   test("a variant-sync failure does not block the install loop", async () => {

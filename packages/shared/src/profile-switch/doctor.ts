@@ -29,6 +29,7 @@ import {
 } from "./claude-marketplace.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { readInstallState, type InstallState } from "./state.js";
+import type { Host } from "./hosts.js";
 
 /** Host env vars that override per-agent models at runtime. Extend here, not
  *  at call sites — the doctor reports the first present, non-blank one. */
@@ -51,7 +52,7 @@ export interface AgentRoleRuntime {
 }
 
 export interface AgentRuntimeReport {
-  readonly host: "claude";
+  readonly host: Host;
   readonly route: "directory-source" | "registry-cache" | "unresolved";
   readonly liveRoot: string | null;
   /** Version declared by the live root's own plugin.json (the tree the host loads). */
@@ -78,6 +79,7 @@ export interface RuntimeDriftOptions {
   env?: Readonly<Record<string, string | undefined>>;
   /** Inject when the caller already holds the state (avoids a second read). */
   state?: InstallState;
+  host?: Host;
 }
 
 function readTextFile(filePath: string): string | null {
@@ -163,6 +165,7 @@ function readRoles(
 
 export function runtimeDriftReport(opts: RuntimeDriftOptions = {}): AgentRuntimeReport {
   const targetHome = opts.targetHome ?? os.homedir();
+  const host: Host = opts.host ?? "claude";
   const stateFilePath =
     opts.stateFilePath ?? path.join(targetHome, ".config", "massa-ai", "install-state.json");
 
@@ -174,9 +177,25 @@ export function runtimeDriftReport(opts: RuntimeDriftOptions = {}): AgentRuntime
       state = null; // absent/unwritable/corrupt — degraded, never thrown
     }
   }
-  const platform = state?.platforms?.claude;
+  const platform = state?.platforms?.[host];
   const stateVersion = typeof platform?.plugin?.version === "string" ? platform.plugin.version : null;
   const activeProfile = platform?.modelProfile?.profile ?? null;
+
+  if (host !== "claude") {
+    return {
+      host,
+      route: "unresolved",
+      liveRoot: null,
+      sourceVersion: null,
+      stateVersion,
+      pinnedVersion: null,
+      activeProfile,
+      roles: [],
+      envOverride: detectEnvOverride(opts.env ?? process.env),
+      versionDrift: false,
+      profileMaterialized: false,
+    };
+  }
 
   const install = resolveClaudeMarketplaceInstall({ targetHome, pluginKey: opts.pluginKey });
   const liveRoot = install?.root ?? null;

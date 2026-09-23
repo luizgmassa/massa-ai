@@ -97,6 +97,14 @@ for host in claude codex; do
   assert_eq "$host never writes modelProfile on a fresh install" \
     "$(state_field "$STATE" "$STATE_HOST" modelProfile.profile)" ""
 
+  # The shipped-default reference for sections 2-3, frozen right after this
+  # fresh (no recorded profile) install — regeneration at the top of every
+  # install.sh run targets the SAME checkout path, so re-reading that live
+  # path after a later section's non-default install would compare the
+  # default against itself.
+  DEFAULT_ACTIVE="$ROOT/default-active-$host.$ext"
+  cp "$PROJECT_ROOT/apps/${host}-plugin/agents/massa-ai-builder.$ext" "$DEFAULT_ACTIVE"
+
   # ── Section 2: recorded profile honored ───────────────────────────────────
   echo ""
   echo "2.$host recorded profile honored — active set comes from agent-profiles/work/"
@@ -111,7 +119,6 @@ JSON
   assert_contains "$host re-apply log line names the profile" "$OUT" "re-applying recorded model profile 'work'"
   INSTALLED="$H/$cfg_dir/agents/massa-ai-builder.$ext"
   WORK_VARIANT="$BUNDLE_AGENT_PROFILES/work/massa-ai-builder.$ext"
-  DEFAULT_ACTIVE="$PROJECT_ROOT/apps/${host}-plugin/agents/massa-ai-builder.$ext"
   assert_file "$host installed active file exists" "$INSTALLED"
   if cmp -s "$INSTALLED" "$WORK_VARIANT"; then
     ok "$host installed content == work variant content"

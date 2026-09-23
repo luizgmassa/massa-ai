@@ -43,7 +43,7 @@
 
 import { readFileSync, readdirSync, existsSync, statSync } from "fs";
 import path from "path";
-import { loadRegistry } from "./lib/model-profiles.ts";
+import { loadRegistry, resolvedModelString } from "./lib/model-profiles.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "..");
 const FIXTURE = ".specs/features/model-profile-registry/fixtures/baseline-main.json";
@@ -66,10 +66,16 @@ export function modelTokens(root = REPO_ROOT): readonly string[] {
   };
 
   const registry = loadRegistry(path.join(root, "skills/model-profiles.json"));
+  for (const entry of Object.values(registry.models)) {
+    add(resolvedModelString(entry));
+  }
   for (const profile of Object.values(registry.profiles)) {
-    for (const tiers of Object.values(profile.hosts)) {
-      for (const resolved of Object.values(tiers)) {
-        if (resolved.model !== null) add(resolved.model);
+    for (const cell of Object.values(profile.hosts)) {
+      if (cell.model !== null) add(cell.model);
+    }
+    for (const hostMap of Object.values(profile.agents ?? {})) {
+      for (const cell of Object.values(hostMap)) {
+        if (cell.model !== null) add(cell.model);
       }
     }
   }

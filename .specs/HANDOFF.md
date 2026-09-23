@@ -1,4 +1,33 @@
-# Handoff — per-provider-default-models (COMPLETE 2026-09-21 — 21 Tasks across 8 Phases via 8 batch workers, two fix passes via 5 more, three independent verification rounds: FAIL, FAIL, then PASS at 25/25 ACs; unpushed, push/PR is the user's call)
+# Handoff — model-catalog-revamp + api-log-clarity (EXECUTE COMPLETE 2026-09-23 — one PR per the user, carrying the agent-runtime-drift follow-ups; independent verification PASS on iteration 2; delivery: push + PR, merge is the user's call)
+
+## What shipped on `feat/model-catalog-revamp`
+
+- **Logging** (`.specs/features/api-log-clarity/`):
+  - repeat counts (`occurrences`/`firstSeenAgo`, keyed by message + label);
+  - error `code`/`cause`, capped at 300 chars;
+  - every LLM call labelled (compiler-enforced), with failure lines carrying model, provider, timeout, elapsed time, `timedOut` and a per-label streak, plus one `recovered` line;
+  - decode lines moved to DEBUG;
+  - a sweep of every warn/error site, guarded by `scripts/__tests__/log-call-hygiene.test.ts`;
+  - `LOG_LEVEL` → `MASSA_AI_LOG_LEVEL` (breaking, AD-010);
+  - dashboard scheduler health made real.
+- **Model Catalog v2** (`.specs/features/model-catalog-revamp/`):
+  - typed `models` catalog;
+  - per-profile default model per tool, plus seeded per-agent overrides;
+  - removed: tiers, `hostDefaults`, `workflowTiers`, `agentTiers`, charter `model_tier`;
+  - v1 overlay is backed up and ignored;
+  - Web UI Models CRUD with dropdowns.
+
+  Generated agents stay byte-identical, except for the judge Model Hint.
+- **Drift follow-ups** (`a075e1bb`, from the main checkout's uncommitted work): `massa-ai-config doctor`, and a recorded-profile rank. Fixed on this branch: a stale recorded profile degrades instead of crashing, `--check` threads state, and `doctor --fix` is host-scoped.
+
+## Open items / traps for the next session
+
+- **The main checkout still has the original uncommitted agent-runtime-drift edits.** They are now committed here as `a075e1bb`. Discard them in `/Users/luizmassa/Projects/massa-ai` once this PR merges; nothing else owns them.
+- **Local full `bun run test` cannot finish on this macOS.** A Bun 1.3.14 SIGTRAP panic at isolated-child exit, also present on `main`, stops the runner. CI on Linux is the gate.
+- **The `web-ui` bundle is compiled.** `/ui` serves `apps/web-ui/dist/static`, so a stale `dist` shows the old UI after a source change. Rebuild (`cd apps/web-ui && bun run build`).
+- **Two generator tests rewrite the real gitignored `apps/claude-plugin/agents/`** and restore it in `finally` (no output-dir seam exists). An output-dir seam would remove that hazard.
+
+## Previous handoff — per-provider-default-models (MERGED — PR #122; COMPLETE 2026-09-21 — 21 Tasks across 8 Phases via 8 batch workers, two fix passes via 5 more, three independent verification rounds: FAIL, FAIL, then PASS at 25/25 ACs; unpushed, push/PR is the user's call)
 
 ## Final verdict — round 3, PASS
 

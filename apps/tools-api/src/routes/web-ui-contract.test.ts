@@ -187,10 +187,15 @@ describe("model-registry GET shape matches the Web UI golden fixture", () => {
     expect(Array.isArray(fixture.data.source.tombstoned)).toBe(true);
   });
 
-  test("fixture registry has version, tiers, profiles", () => {
+  test("fixture registry is v2: version, models, profiles, and no tier keys", () => {
     const fixture = JSON.parse(fs.readFileSync(REGISTRY_FIXTURE_PATH, "utf8")) as any;
-    expect(fixture.data.registry.version).toBe(1);
-    expect(Array.isArray(fixture.data.registry.tiers)).toBe(true);
-    expect(fixture.data.registry.profiles).toBeDefined();
+    expect(fixture.data.registry.version).toBe(2);
+    expect(Object.keys(fixture.data.registry.models).length).toBeGreaterThan(0);
+    expect(fixture.data.registry.profiles.balanced.hosts).toBeDefined();
+    for (const key of ["tiers", "hostDefaults", "workflowTiers", "agentTiers"]) {
+      expect(key in fixture.data.registry).toBe(false);
+    }
+    expect(fixture.data.overlayOverrideBreakdown).toEqual({ models: 0, profiles: 0 });
+    expect(fixture.data.agents.every((a: any) => Object.keys(a).join() === "name")).toBe(true);
   });
 });

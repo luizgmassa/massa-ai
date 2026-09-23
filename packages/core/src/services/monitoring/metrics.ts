@@ -441,7 +441,7 @@ export class MetricsCollector {
         JSON.stringify(this.currentMetrics, null, 2),
       );
     } catch (error) {
-      logger.error("[Metrics] Failed to save:", error as Error);
+      logger.error("Metrics: failed to save", error as Error, { path: this.metricsPath });
     }
   }
 

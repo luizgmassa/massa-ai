@@ -382,7 +382,7 @@ async function polishSummary(
   input: BeginHandoffInput,
 ): Promise<string | null> {
   const prompt = buildPolishPrompt(input);
-  const res = await surface.object(prompt, HandoffSummarySchema);
+  const res = await surface.object(prompt, HandoffSummarySchema, { label: "handoff-summary" });
   if (!res.ok || !res.value || !res.value.summary) return null;
   return res.value.summary;
 }

@@ -21,7 +21,7 @@ export function getPrismaClient(): PrismaClient {
     const pg = _adapters.loadPg();
     const { PrismaPg } = _adapters.loadPrismaPg();
     const pool = new pg.Pool({ connectionString: databaseUrl, max: 10, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000 });
-    pool.on("error", (error) => logger.error("Unexpected PG pool error", error as Error));
+    pool.on("error", (error) => logger.error("prisma-client: unexpected PG pool error", error as Error, { poolMax: 10 }));
     prismaPool = pool;
     prismaInstance = new PrismaClient({ adapter: new PrismaPg(pool as any) as any });
     logger.info("Prisma Client initialized with PostgreSQL");

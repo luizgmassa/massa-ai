@@ -145,7 +145,7 @@ export class TaskEnvelopeService {
         errors.push("prime");
         logger.warn("synapse_task_begin: prime sub-step failed", {
           sessionId,
-          error: err instanceof Error ? err.message : String(err),
+          error: err,
         });
       }
     }
@@ -171,7 +171,7 @@ export class TaskEnvelopeService {
       errors.push("search");
       logger.warn("synapse_task_begin: search sub-step failed", {
         sessionId,
-        error: err instanceof Error ? err.message : String(err),
+        error: err,
       });
     }
 
@@ -200,7 +200,7 @@ export class TaskEnvelopeService {
         errors.push("prefetch");
         logger.warn("synapse_task_begin: prefetch sub-step failed", {
           sessionId,
-          error: err instanceof Error ? err.message : String(err),
+          error: err,
         });
       }
     }
@@ -213,7 +213,7 @@ export class TaskEnvelopeService {
         errors.push("access");
         logger.warn("synapse_task_begin: access sub-step failed", {
           sessionId,
-          error: err instanceof Error ? err.message : String(err),
+          error: err,
         });
       }
     }

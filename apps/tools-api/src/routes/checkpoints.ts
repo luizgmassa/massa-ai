@@ -59,7 +59,10 @@ export const checkpointRoutes = new Elysia({ prefix: "/api/v1/checkpoints" })
       try {
         return await getListCheckpointsTool().handle(body);
       } catch (error) {
-        logger.error("Failed to list checkpoints", error as Error);
+        logger.error("Failed to list checkpoints", error as Error, {
+          taskId: (body as { taskId?: string }).taskId,
+          projectId: (body as { projectId?: string }).projectId,
+        });
         return {
           success: false,
           error: `Checkpoint service unavailable: ${(error as Error).message}`,
@@ -93,7 +96,10 @@ export const checkpointRoutes = new Elysia({ prefix: "/api/v1/checkpoints" })
       try {
         return await getCreateCheckpointTool().handle(body);
       } catch (error) {
-        logger.error("Failed to create checkpoint", error as Error);
+        logger.error("Failed to create checkpoint", error as Error, {
+          taskId: (body as { taskId?: string }).taskId,
+          projectId: (body as { projectId?: string }).projectId,
+        });
         return {
           success: false,
           error: `Checkpoint service unavailable: ${(error as Error).message}`,
@@ -149,7 +155,10 @@ export const checkpointRoutes = new Elysia({ prefix: "/api/v1/checkpoints" })
       try {
         return await getRestoreCheckpointTool().handle(body);
       } catch (error) {
-        logger.error("Failed to restore checkpoint", error as Error);
+        logger.error("Failed to restore checkpoint", error as Error, {
+          checkpointId: (body as { checkpointId?: string }).checkpointId,
+          taskId: (body as { taskId?: string }).taskId,
+        });
         return {
           success: false,
           error: `Checkpoint service unavailable: ${(error as Error).message}`,
@@ -190,8 +199,10 @@ export const checkpointRoutes = new Elysia({ prefix: "/api/v1/checkpoints" })
      * re-show the row (accepted V1 limitation, Plan Challenge F4).
      */
     ({ body, set }) => {
+      let checkpointId: string | undefined;
       try {
         const { id } = body as { id: string };
+        checkpointId = id;
         const existed = getCheckpointManager().deleteCheckpoint(id);
         if (!existed) {
           set.status = 404;
@@ -200,7 +211,7 @@ export const checkpointRoutes = new Elysia({ prefix: "/api/v1/checkpoints" })
         set.status = 200;
         return { success: true as const, data: { ok: true } };
       } catch (error) {
-        logger.error("Failed to delete checkpoint", error as Error);
+        logger.error("Failed to delete checkpoint", error as Error, { checkpointId });
         set.status = 500;
         return {
           success: false as const,

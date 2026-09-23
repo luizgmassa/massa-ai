@@ -119,6 +119,7 @@ interface ProfilesViewOpts {
   writeMode?: boolean;
   unsaved?: unknown;
   registryForm?: unknown;
+  agentOverridesProfile?: string;
 }
 
 export function renderProfilesView(
@@ -138,7 +139,7 @@ export function renderProfilesView(
 
   let body: string;
   if (tab === "registry") {
-    body = renderModelRegistry(registryData, { writeMode, unsaved: opts.unsaved, registryForm: opts.registryForm });
+    body = renderModelRegistry(registryData, { writeMode, unsaved: opts.unsaved, registryForm: opts.registryForm, agentOverridesProfile: opts.agentOverridesProfile });
   } else {
     body = renderProfiles(profilesData, { writeMode });
   }

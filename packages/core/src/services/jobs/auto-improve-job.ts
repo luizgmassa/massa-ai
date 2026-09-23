@@ -101,9 +101,9 @@ export class AutoImproveJob {
       if (this.newSinceRun < this.minObservations && (this.lastRunAt === 0 || now - this.lastRunAt < this.minIntervalMs)) return;
       this.newSinceRun = 0;
       this.lastRunAt = now;
-      void this.runOnce(projectId).catch((e) => logger.warn("auto-improve: runOnce failed (silent)", { projectId, error: (e as Error).message }));
+      void this.runOnce(projectId).catch((e) => logger.warn("auto-improve: runOnce failed (silent)", { projectId, error: e as Error }));
     } catch (e) {
-      logger.warn("auto-improve: maybeRun swallowed", { projectId, error: (e as Error).message });
+      logger.warn("auto-improve: maybeRun swallowed", { projectId, error: e as Error });
     }
   }
 

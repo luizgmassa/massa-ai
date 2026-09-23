@@ -166,7 +166,7 @@ export class PgObservationStore implements ObservationStore {
         // the mirror stays as-is and the op proceeds against it.
         this.hydrateFailedAt = Date.now();
         logger.warn("PgObservationStore hydrate failed (best-effort)", {
-          error: (e as Error).message,
+          error: e as Error,
         });
       } finally {
         this.hydrating = null;
@@ -266,7 +266,7 @@ export class PgObservationStore implements ObservationStore {
     const next = prev.then(fn).catch((e) => {
       logger.warn("PgObservationStore.insert failed (best-effort)", {
         id: key,
-        error: (e as Error).message,
+        error: e as Error,
       });
     });
     this.inflight.set(key, next);

@@ -41,12 +41,12 @@ export type QueryRewrite = z.infer<typeof QueryRewriteSchema>;
 export interface QueryLlmSurface {
   complete(
     prompt: string,
-    opts?: { system?: string; timeoutMs?: number; modelRole?: "instruct" | "code" },
+    opts: { label: string; system?: string; timeoutMs?: number; modelRole?: "instruct" | "code" },
   ): Promise<{ ok: boolean; value?: string; error?: string }>;
   object<T>(
     prompt: string,
     schema: z.ZodSchema<T>,
-    opts?: { system?: string; timeoutMs?: number; modelRole?: "instruct" | "code" },
+    opts: { label: string; system?: string; timeoutMs?: number; modelRole?: "instruct" | "code" },
   ): Promise<{ ok: boolean; value?: T; error?: string }>;
   isEnabled(): boolean;
 }
@@ -100,6 +100,7 @@ export async function rewriteQuery(
   opts: { timeoutMs?: number } = {},
 ): Promise<QueryRewrite | null> {
   const res = await surface.object(rewritePrompt(query), QueryRewriteSchema, {
+    label: "query-rewrite",
     system: REWRITE_SYSTEM,
     timeoutMs: opts.timeoutMs,
   });
@@ -130,6 +131,7 @@ export async function hyde(
   opts: { timeoutMs?: number } = {},
 ): Promise<number[] | null> {
   const text = await surface.complete(hydePrompt(query), {
+    label: "hyde",
     system: HYDE_SYSTEM,
     timeoutMs: opts.timeoutMs,
   });
@@ -144,7 +146,7 @@ export async function hyde(
   } catch (e) {
     // Embeddings provider unavailable (e.g. Ollama down) → skip HyDE.
     logger.warn("hyde embed failed — skipping HyDE stream", {
-      error: (e as Error).message,
+      error: e as Error,
     });
     return null;
   }

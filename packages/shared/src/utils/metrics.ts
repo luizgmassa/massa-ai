@@ -57,8 +57,9 @@ export class MetricsCollector {
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.warn(`Failed to fetch pricing for ${modelId}`, {
-        error: { name: err.name, message: err.message },
+      logger.warn("MetricsCollector: failed to fetch pricing", {
+        modelId,
+        error: err,
       });
     }
 
@@ -70,7 +71,7 @@ export class MetricsCollector {
     }
 
     // Default to gpt-4 pricing if unknown model
-    logger.warn(`Unknown model ${modelId}, using gpt-4 pricing as default`);
+    logger.warn("MetricsCollector: unknown model, using gpt-4 pricing as default", { modelId });
     return FALLBACK_PRICING["gpt-4"];
   }
 

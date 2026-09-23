@@ -123,7 +123,7 @@ export const proposalRoutes = new Elysia({ prefix: "/api/v1/proposal" })
       } catch (e) {
         if (e instanceof SearchServiceError) throw e;
         const err = e as Error;
-        logger.error("proposal list failed", err);
+        logger.error("proposal list failed", err, { projectId: b.projectId });
         set.status = 500;
         return { success: false, error: `proposal list failed: ${err.message}` };
       }
@@ -159,7 +159,7 @@ export const proposalRoutes = new Elysia({ prefix: "/api/v1/proposal" })
       } catch (e) {
         if (e instanceof SearchServiceError) throw e;
         const err = e as Error;
-        logger.error("proposal approve failed", err);
+        logger.error("proposal approve failed", err, { id: b.id, projectId: b.projectId });
         set.status = 500;
         return { success: false, error: `proposal approve failed: ${err.message}` };
       }
@@ -197,7 +197,7 @@ export const proposalRoutes = new Elysia({ prefix: "/api/v1/proposal" })
       } catch (e) {
         if (e instanceof SearchServiceError) throw e;
         const err = e as Error;
-        logger.error("proposal reject failed", err);
+        logger.error("proposal reject failed", err, { id: b.id, projectId: b.projectId });
         set.status = 500;
         return { success: false, error: `proposal reject failed: ${err.message}` };
       }
@@ -274,7 +274,7 @@ export const proposalRoutes = new Elysia({ prefix: "/api/v1/proposal" })
           return { status: validationStatus, error: (e as Error).message };
         }
         const err = e as Error;
-        logger.error("proposal create failed", err);
+        logger.error("proposal create failed", err, { projectId, kind });
         set.status = 500;
         return { success: false, error: `proposal create failed: ${err.message}` };
       }
@@ -364,7 +364,7 @@ export const proposalRoutes = new Elysia({ prefix: "/api/v1/proposal" })
           return { status: validationStatus, error: (e as Error).message };
         }
         const err = e as Error;
-        logger.error("proposal update failed", err);
+        logger.error("proposal update failed", err, { id: params.id, projectId: query.projectId });
         set.status = 500;
         return { success: false, error: `proposal update failed: ${err.message}` };
       }
@@ -424,7 +424,7 @@ export const proposalRoutes = new Elysia({ prefix: "/api/v1/proposal" })
       } catch (e) {
         if (e instanceof SearchServiceError) throw e;
         const err = e as Error;
-        logger.error("proposal delete failed", err);
+        logger.error("proposal delete failed", err, { id: params.id, projectId: query.projectId });
         set.status = 500;
         return { success: false, error: `proposal delete failed: ${err.message}` };
       }

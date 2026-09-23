@@ -84,7 +84,8 @@ export class EmbeddingRateLimiter {
 
       // Check RPD limit
       if (this.config.requestsPerDay && this.dailyRequestsWindow.length >= this.config.requestsPerDay) {
-        logger.warn(`[${this.providerId}] RPD limit reached, waiting 60s`, {
+        logger.warn("EmbeddingRateLimiter: RPD limit reached, waiting 60s", {
+          providerId: this.providerId,
           rpd: this.config.requestsPerDay,
           current: this.dailyRequestsWindow.length,
         });

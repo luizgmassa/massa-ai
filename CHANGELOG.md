@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`massa-ai-config doctor [--fix] [--host <h>] [--target <dir>]`** in both
+  the mcp-client and opencode-plugin CLIs (agent-drift followup T2). Prints
+  the profile-switch doctor's drift report — live-tree vs recorded vs pinned
+  versions, per-role models, variant staleness, and the host env override —
+  and `--fix` is the sanctioned mutation surface the session-start hook
+  deliberately is not: it re-runs the profile switch for the RECORDED active
+  profile (never a flag), then re-reports. Version drift and env overrides
+  stay report-only; their remedies live outside this CLI's write scope.
+- **Web UI Model Catalog: a Models section.** It adds, edits and deletes
+  typed models (name, tool, provider, model, and a 1M-context checkbox for
+  Claude Code). The profile grid and per-agent overrides pick from those models
+  through dropdowns. Edits persist in the user overlay, so they survive restart
+  and upgrade. The Tiers, Default Profile per Tool and Per-Workflow Tier
+  Overrides sections are removed.
+
+### Changed
+
+- **BREAKING: model registry v2 — tiers replaced by profiles and a typed
+  models catalog.** Removed from `skills/model-profiles.json`:
+  `tiers`, `hostDefaults`, `workflowTiers`, `agentTiers` (keys);
+  `metadata.model_tier` (charter field); `resolveTier()` and `workflowTier()`
+  (functions). Each profile now defines per-tool default models and optional
+  per-agent overrides. Adding a specialist = one charter directory (discovered
+  by `skills/agents/*/SKILL.md` directory scan, no SPECIALIST_NAMES list).
+  Built-in profiles ship overrides that preserve today's model spread:
+  14 agents use the profile default, 3 override to standard, 1 to light.
+  Read-only agents carry no override by convention and resolve to the profile
+  default (the strongest model). **User migration:** v1 overlays are detected,
+  backed up to `~/.config/massa-ai/model-profiles.v1.json`, and ignored with
+  one warning; re-enter custom models in the Web UI Model Catalog.
+- **BREAKING: `LOG_LEVEL` renamed to `MASSA_AI_LOG_LEVEL` (AD-010, no dual-read).**
+  Updated in config readers, `.env.example`, `install.sh`, Synapse documentation,
+  and `turbo.json` passThroughEnv.
+- **Logging improvements:** (1) LLM failure lines include `label`, `role`,
+  `model`, `provider`, `timeoutMs`, `elapsedMs`, `timedOut`, and
+  `consecutiveFailures` (per-label streak, resets on success);
+  (2) first success after N ≥ 1 failures logs one INFO `LLM call recovered`
+  with `afterFailures: N`; (3) repeated WARN/ERROR within 15 min get
+  `occurrences` and `firstSeenAgo` added to meta; (4) successful structured
+  calls move to DEBUG and carry `label` and `model`; (5) every production
+  warn/error site was reviewed, and the offenders were fixed to pass the Error object itself (not `.message`), use
+  constant component+operation messages, carry scope identifiers in meta,
+  and follow H1-H4 rules (error serialization preserves `name`, `code`,
+  `cause`; one-level deep only, never spread).
+
+### Fixed
+
+- **Regeneration no longer silently resets the active profile
+  (agent-drift followup T1).** `selectProfile`'s precedence gains rank 3:
+  `--profile` > `MASSA_AI_MODEL_PROFILE` > **install-state's recorded
+  `modelProfile`** > `"balanced"`. Measured 2026-09-21: after an operator
+  switched to `work`, the next `generate:artifacts` re-emitted the claude
+  actives from the registry default models while the state still said `work`
+  — the session-start drift hook caught the divergence its own generator had
+  caused. `main()` now threads the recorded profile through `emitAll`
+  (`stateProfilesFromInstallState`), so a regeneration re-emits the actives
+  for the profile the operator actually switched to; fresh checkouts and CI
+  (no state) keep the old behavior. A stale recorded name (removed, renamed,
+  or no longer supporting the host) now degrades to the `"balanced"`
+  fallback instead of throwing — a historical switch this run did not
+  request should not crash regeneration; `--profile`/`MASSA_AI_MODEL_PROFILE`
+  still throw on an unknown name.
+- **Dashboard scheduler status now reports real `consecutiveFailures` and
+  `lastSuccessAt`.** `GET /api/v1/scheduler/status` stopped hardcoding
+  these fields to 0 and null, and now reflects the job's actual persistence.
+
 ## [1.60.1] - 2026-09-21
 
 ### Fixed

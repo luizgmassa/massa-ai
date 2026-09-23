@@ -45,10 +45,14 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
  * edit that needs a reason in the commit message — that friction is the point.
  */
 // 331 since ALLWF-03 (tlc-330-harness-update): pinning the 8 remaining
-// read-only charters to `model_tier: deep` (14/18 now deep) made their
-// frontmatter runs identical across files — +18 excess of mandated
+// read-only charters to a (since-removed by model-catalog-revamp)
+// `model_tier: deep` frontmatter field (14/18 charters then "deep") made
+// their frontmatter runs identical across files — +18 excess of mandated
 // uniformity, not prose drift. Measured differentially: main 313 → branch
 // 331, every new block is charter frontmatter around the shared tier line.
+// The `model_tier` field itself no longer exists in any charter — this note
+// is a historical record of the baseline delta it produced, not a
+// description of current frontmatter.
 //
 // 471 since WMH-01/02 (workflow-metadata-headers): prepending Agent Skills
 // YAML frontmatter to all 36 skills/massa-ai/workflows/**/*.md files gave

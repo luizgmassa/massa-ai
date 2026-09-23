@@ -79,7 +79,10 @@ export const memoryRoutes = new Elysia({ prefix: "/api/v1/memory" })
       try {
         return await getStoreMemoryTool().handle(body);
       } catch (error) {
-        logger.error("Failed to initialize StoreMemoryTool", error as Error);
+        logger.error("Failed to initialize StoreMemoryTool", error as Error, {
+          projectId: (body as { projectId?: string }).projectId,
+          sessionId: (body as { sessionId?: string }).sessionId,
+        });
         return {
           success: false,
           error: `Memory service unavailable: ${(error as Error).message}`,
@@ -129,7 +132,10 @@ export const memoryRoutes = new Elysia({ prefix: "/api/v1/memory" })
       try {
         return await getSearchMemoriesTool().handle(body);
       } catch (error) {
-        logger.error("Failed to initialize SearchMemoriesTool", error as Error);
+        logger.error("Failed to initialize SearchMemoriesTool", error as Error, {
+          projectId: (body as { projectId?: string }).projectId,
+          sessionId: (body as { sessionId?: string }).sessionId,
+        });
         return {
           success: false,
           error: `Memory service unavailable: ${(error as Error).message}`,
@@ -178,7 +184,9 @@ export const memoryRoutes = new Elysia({ prefix: "/api/v1/memory" })
       try {
         return await getUpdateMemoryTool().handle(body);
       } catch (error) {
-        logger.error("Failed to initialize UpdateMemoryTool", error as Error);
+        logger.error("Failed to initialize UpdateMemoryTool", error as Error, {
+          id: (body as { id?: string }).id,
+        });
         return {
           success: false,
           error: `Memory service unavailable: ${(error as Error).message}`,
@@ -218,7 +226,9 @@ export const memoryRoutes = new Elysia({ prefix: "/api/v1/memory" })
       try {
         return await getDeleteMemoryTool().handle(body);
       } catch (error) {
-        logger.error("Failed to initialize DeleteMemoryTool", error as Error);
+        logger.error("Failed to initialize DeleteMemoryTool", error as Error, {
+          id: (body as { id?: string }).id,
+        });
         return {
           success: false,
           error: `Memory service unavailable: ${(error as Error).message}`,
@@ -272,7 +282,10 @@ export const memoryRoutes = new Elysia({ prefix: "/api/v1/memory" })
           data: { memories: rows.map(formatRow), total, limit, offset },
         };
       } catch (error) {
-        logger.error("Failed to list memories", error as Error);
+        logger.error("Failed to list memories", error as Error, {
+          projectId: body.projectId,
+          sessionId: body.sessionId,
+        });
         return {
           success: false,
           error: `Failed to list memories: ${(error as Error).message}`,

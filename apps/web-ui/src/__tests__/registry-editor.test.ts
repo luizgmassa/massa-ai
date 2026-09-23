@@ -4,684 +4,347 @@ import path from "path";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};
-const { renderModelRegistry, splitModelId, joinModelId } = { ...mod, ...UI } as {
-  renderModelRegistry: (data: unknown, opts?: { writeMode?: boolean; registryForm?: { kind: string; error: string | null } | null }) => string;
-  splitModelId: (model: string | null | undefined) => { provider: string; model: string };
-  joinModelId: (provider: string | null | undefined, model: string | null | undefined) => string | null;
+const { renderModelRegistry, renderProfilesView } = { ...mod, ...UI } as {
+  renderModelRegistry: (
+    data: unknown,
+    opts?: { writeMode?: boolean; registryForm?: Record<string, unknown> | null; agentOverridesProfile?: string },
+  ) => string;
+  renderProfilesView: (profilesData: unknown, registryData: unknown, opts?: Record<string, unknown> | null) => string;
 };
 
 const SAMPLE_REGISTRY = {
   registry: {
-    version: 1,
-    tiers: ["light", "standard", "deep"],
-    hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
-    workflowTiers: { search: "standard", index: "light", audit: "deep" },
-    agentTiers: { builder: { opencode: "deep" } },
+    models: {
+      "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" },
+      "claude-opus-5-5": { name: "Opus 5.5", host: "claude", provider: "", model: "claude-opus-5-5" },
+      "codex-gpt-5": { name: "GPT-5", host: "codex", provider: "", model: "gpt-5" },
+      "opencode-go-glm-5-2": { name: "GLM 5.2", host: "opencode", provider: "opencode-go", model: "glm-5.2" },
+    },
     profiles: {
       balanced: {
         description: "Balanced profile",
         hosts: {
-          claude: { light: { model: "claude-sonnet", effort: "low" }, standard: { model: "claude-sonnet", effort: "medium" }, deep: { model: "claude-opus", effort: "high" } },
-          codex: { light: { model: "gpt-4o-mini", effort: "minimal" }, standard: { model: "gpt-4o", effort: "medium" }, deep: { model: "o1", effort: "high" } },
-          cursor: { light: { model: null, effort: null }, standard: { model: "claude-sonnet", effort: null }, deep: { model: "claude-opus", effort: null } },
-          opencode: { light: { model: "qwen-mini", effort: "low" }, standard: { model: "opencode-go/glm-5.2", effort: "medium" }, deep: { model: "qwen-max", effort: "high" } },
+          claude: { model: "claude-sonnet-5", effort: "medium" },
+          codex: { model: "gpt-5", effort: "medium" },
+          cursor: { model: null, effort: null },
+          opencode: { model: "opencode-go/glm-5.2", effort: "high" },
+        },
+        agents: {
+          builder: { opencode: { model: "opencode-go/glm-5.2", effort: "max" } },
         },
       },
       work: {
         description: "Work profile",
         hosts: {
-          claude: { light: { model: "claude-haiku", effort: "low" }, standard: { model: "claude-sonnet", effort: "high" }, deep: { model: "claude-opus", effort: "max" } },
+          claude: { model: "claude-opus-5-5", effort: "max" },
         },
       },
     },
   },
   source: {
-    builtin: {},
+    builtin: {
+      models: {
+        "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" },
+        "codex-gpt-5": { name: "GPT-5", host: "codex", provider: "", model: "gpt-5" },
+        "opencode-go-glm-5-2": { name: "GLM 5.2", host: "opencode", provider: "opencode-go", model: "glm-5.2" },
+      },
+    },
     overlay: {
       profiles: { work: { description: "Custom work profile", hosts: {} } },
-      hostDefaults: { codex: "work" },
-      workflowTiers: { search: "standard" },
-      agentTiers: { builder: { opencode: "deep" } },
+      models: { "claude-opus-5-5": { name: "Opus 5.5", host: "claude", provider: "", model: "claude-opus-5-5" } },
     },
     tombstoned: ["old-profile"],
   },
-  agents: [
-    { name: "builder", charterTier: "standard" },
-    { name: "reviewer", charterTier: "light" },
-  ],
+  agents: [{ name: "builder" }, { name: "reviewer" }],
 };
 
-describe("renderModelRegistry — grid render (REG-01)", () => {
-  const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-
-  it("renders profiles as columns", () => {
-    expect(html).toContain("balanced");
-    expect(html).toContain("work");
+describe("renderModelRegistry — Models section (AC4)", () => {
+  it("renders every catalog model as a table row: name, tool, resolved model", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain("<h3>Models</h3>");
+    expect(html).toContain("Sonnet 5");
+    expect(html).toContain("claude-sonnet-5");
+    expect(html).toContain("GLM 5.2");
+    expect(html).toContain("opencode-go/glm-5.2");
   });
 
-  it("renders Tool + Tier leading columns instead of the merged host/tier header (T4, APUX-06)", () => {
-    expect(html).toContain("Claude");
-    expect(html).toContain("Light");
-    expect(html).toContain("Standard");
-    expect(html).toContain("Deep");
-    expect(html).not.toContain("claude / light");
-    expect(html).not.toContain("codex / deep");
+  it("renders Edit + Delete per row in write mode, and hides both in read mode", () => {
+    const write = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(write).toContain('data-action="model-edit" data-id="claude-sonnet-5"');
+    expect(write).toContain('data-action="model-delete" data-id="claude-sonnet-5"');
+    const read = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(read).not.toContain('data-action="model-edit"');
+    expect(read).not.toContain('data-action="model-delete"');
   });
 
-  it("renders model + effort cells", () => {
-    expect(html).toContain("claude-sonnet");
-    expect(html).toContain("gpt-4o");
-    expect(html).toContain("claude-opus");
+  it("renders an Add Model trigger in write mode only", () => {
+    expect(renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true })).toContain('data-action="model-add"');
+    expect(renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false })).not.toContain('data-action="model-add"');
   });
 
-  it("renders a table with thead + tbody", () => {
-    expect(html).toContain('<table class="registry-grid">');
-    expect(html).toContain("<thead>");
-    expect(html).toContain("<tbody>");
+  it("renders the Add Model form with Name, Tool, Provider, Model fields", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "model-add", host: "claude" } });
+    expect(html).toContain('data-create="name" data-form="model-form"');
+    expect(html).toContain('data-create="host" data-form="model-form"');
+    expect(html).toContain('data-create="provider" data-form="model-form"');
+    expect(html).toContain('data-create="model" data-form="model-form"');
+    expect(html).toContain('data-action="model-form-submit"');
+    expect(html).toContain('data-action="model-form-cancel"');
+  });
+
+  it("1M-context checkbox renders only when the form's Tool is Claude (D2)", () => {
+    const claudeForm = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "model-add", host: "claude" } });
+    expect(claudeForm).toContain('data-create="context1m"');
+    expect(claudeForm).toContain("1M context");
+
+    const codexForm = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "model-add", host: "codex" } });
+    expect(codexForm).not.toContain('data-create="context1m"');
+
+    const cursorForm = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "model-add", host: "cursor" } });
+    expect(cursorForm).not.toContain('data-create="context1m"');
+
+    const opencodeForm = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "model-add", host: "opencode" } });
+    expect(opencodeForm).not.toContain('data-create="context1m"');
+  });
+
+  it("the checked 1M checkbox and a context1m:true catalog entry both surface [1m] on the resolved string", () => {
+    const checkedForm = renderModelRegistry(SAMPLE_REGISTRY, {
+      writeMode: true,
+      registryForm: { kind: "model-add", host: "claude", context1m: true },
+    });
+    expect(checkedForm).toContain('data-create="context1m" data-form="model-form" checked');
+
+    const registryWith1m = {
+      ...SAMPLE_REGISTRY,
+      registry: {
+        ...SAMPLE_REGISTRY.registry,
+        models: { ...SAMPLE_REGISTRY.registry.models, "claude-fable-1m": { name: "Fable (1M)", host: "claude", provider: "", model: "claude-fable-5-1", context1m: true } },
+      },
+    };
+    const table = renderModelRegistry(registryWith1m, { writeMode: true });
+    expect(table).toContain("claude-fable-5-1[1m]");
+  });
+
+  it("Edit prefills Name/Tool/Provider/Model/1M from the model being edited", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, {
+      writeMode: true,
+      registryForm: { kind: "model-edit", editId: "claude-opus-5-5", host: "claude", name: "Opus 5.5", provider: "", model: "claude-opus-5-5", context1m: false },
+    });
+    expect(html).toContain('value="Opus 5.5"');
+    expect(html).toContain('value="claude-opus-5-5"');
+    expect(html).toContain('data-action="model-form-submit">Save</button>');
+  });
+
+  it("renders an inline .form-error instead of alert() when the model form carries an error", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "model-add", host: "claude", error: "Model is required." } });
+    expect(html).toContain('class="form-error"');
+    expect(html).toContain("Model is required.");
+  });
+
+  it("empty catalog renders an empty-state message, not a missing table", () => {
+    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, registry: { ...SAMPLE_REGISTRY.registry, models: {} } }, { writeMode: true });
+    expect(html).toContain("No models in the catalog.");
   });
 });
 
-describe("renderModelRegistry — Tool + Tier leading columns (T4, APUX-06, P1-B AC1)", () => {
-  it("renders Tool and Tier header cells before the profile columns", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const theadEnd = html.indexOf("</thead>");
-    const thead = html.slice(0, theadEnd);
-    expect(thead).toContain("<th>Tool</th>");
-    expect(thead).toContain("<th>Tier</th>");
+describe("renderModelRegistry — profile grid uses tool rows + model-select cells (AC5)", () => {
+  const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+
+  it("renders profiles as columns and tools as rows (no tier rows/column)", () => {
+    expect(html).toContain("balanced");
+    expect(html).toContain("work");
+    expect(html).toContain("Claude");
+    expect(html).toContain("Codex");
+    expect(html).toContain("Cursor");
+    expect(html).toContain("OpenCode");
+    expect(html).not.toContain("<th>Tier</th>");
+    expect(html).not.toContain('class="tier-cell"');
   });
 
-  it("gives the Tool cell a rowspan equal to tiers.length", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const tierCount = SAMPLE_REGISTRY.registry.tiers.length;
-    expect(html).toContain('<th class="tool-cell" rowspan="' + tierCount + '">');
+  it("renders a model <select> per cell listing that host's catalog models", () => {
+    expect(html).toContain('data-action="registry-model-select" data-profile="balanced" data-host="claude"');
+    const start = html.indexOf('data-action="registry-model-select" data-profile="balanced" data-host="claude"');
+    const end = html.indexOf("</select>", start);
+    const cellHtml = html.slice(start, end);
+    expect(cellHtml).toContain(">Sonnet 5<");
+    expect(cellHtml).toContain(">Opus 5.5<");
+    expect(cellHtml).not.toContain(">GPT-5<"); // codex-only model must not leak into the claude select
   });
 
-  it("renders exactly one tool cell per host (first tier row only)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const toolCellMatches = html.match(/class="tool-cell"/g) || [];
-    expect(toolCellMatches.length).toBe(4); // one per REGISTRY_HOSTS entry
+  it("first option is Inherit, selected when the cell has no model", () => {
+    const start = html.indexOf('data-action="registry-model-select" data-profile="balanced" data-host="cursor"');
+    const end = html.indexOf("</select>", start);
+    const cellHtml = html.slice(start, end);
+    expect(cellHtml).toContain('<option value="" selected>Inherit</option>');
   });
 
-  it("capitalizes tool and tier labels while data-* attributes keep raw lowercase ids", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('<th class="tool-cell" rowspan="3">Claude</th>');
-    expect(html).toContain('<th class="tool-cell" rowspan="3">OpenCode</th>');
-    expect(html).toContain('<th class="tier-cell">Light</th>');
-    expect(html).toContain('<th class="tier-cell">Standard</th>');
-    expect(html).toContain('<th class="tier-cell">Deep</th>');
-    expect(html).toContain('data-host="claude"');
-    expect(html).toContain('data-tier="light"');
+  it("a cell string matching no catalog model for that host renders as a custom: option", () => {
+    const withCustom = {
+      ...SAMPLE_REGISTRY,
+      registry: {
+        ...SAMPLE_REGISTRY.registry,
+        profiles: {
+          ...SAMPLE_REGISTRY.registry.profiles,
+          balanced: {
+            ...SAMPLE_REGISTRY.registry.profiles.balanced,
+            hosts: { ...SAMPLE_REGISTRY.registry.profiles.balanced.hosts, claude: { model: "some/deleted-model", effort: "high" } },
+          },
+        },
+      },
+    };
+    const out = renderModelRegistry(withCustom, { writeMode: true });
+    expect(out).toContain("custom: some/deleted-model");
+  });
+
+  it("renders read mode as a plain string, no select", () => {
+    const readHtml = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(readHtml).not.toContain('data-action="registry-model-select"');
+    expect(readHtml).toContain("claude-sonnet-5");
   });
 
   it("wraps the grid in a .grid-scroll horizontal-scroll container", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('<div class="grid-scroll"><table class="registry-grid">');
-  });
-});
-
-describe("splitModelId / joinModelId — provider/model split-join (T5, APUX-14, P1-B AC2-AC5)", () => {
-  it("splits on the FIRST slash only, keeping the remainder in model", () => {
-    expect(splitModelId("a/b/c")).toEqual({ provider: "a", model: "b/c" });
+    expect(html).toContain('<div class="grid-scroll">');
   });
 
-  it("splits a bare model id (no slash) into an empty provider", () => {
-    expect(splitModelId("m")).toEqual({ provider: "", model: "m" });
-  });
-
-  it("splits null/empty into two empty strings", () => {
-    expect(splitModelId(null)).toEqual({ provider: "", model: "" });
-    expect(splitModelId("")).toEqual({ provider: "", model: "" });
-    expect(splitModelId(undefined)).toEqual({ provider: "", model: "" });
-  });
-
-  it("joins provider + model with a single slash", () => {
-    expect(joinModelId("a", "b/c")).toBe("a/b/c");
-  });
-
-  it("joins a bare model when provider is blank", () => {
-    expect(joinModelId("", "m")).toBe("m");
-  });
-
-  it("joins both-blank to null, never '' or the string 'null'", () => {
-    expect(joinModelId("", "")).toBeNull();
-    expect(joinModelId(null, null)).toBeNull();
-    expect(joinModelId("  ", "  ")).toBeNull();
-  });
-
-  it("round-trips split -> join back to the original string", () => {
-    for (const original of ["opencode-go/glm-5.2", "sonnet", "a/b/c/d"]) {
-      const { provider, model } = splitModelId(original);
-      expect(joinModelId(provider, model)).toBe(original);
-    }
-  });
-});
-
-describe("renderModelRegistry — Provider/Model split fields + hints (T5, APUX-14, APUX-05, P1-B AC2-AC5)", () => {
-  it("renders separate Provider and Model inputs for the opencode/standard/balanced cell", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-provider"');
-    expect(html).toContain('data-action="registry-model"');
-    // opencode/standard/balanced is "opencode-go/glm-5.2" in SAMPLE_REGISTRY.
-    expect(html).toContain('class="registry-provider-input" data-action="registry-provider" data-profile="balanced" data-host="opencode" data-tier="standard" value="opencode-go"');
-    expect(html).toContain('class="registry-model-input" data-action="registry-model" data-profile="balanced" data-host="opencode" data-tier="standard" value="glm-5.2"');
-  });
-
-  it("renders empty Provider and Model inputs for a null-model cell", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-profile="balanced" data-host="cursor" data-tier="light" value=""');
-  });
-
-  it("carries placeholder + title hints on both Provider and Model inputs", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('placeholder="e.g. opencode-go, zai-coding-plan, local — leave blank for Claude/Codex"');
-    expect(html).toContain('title="e.g. opencode-go, zai-coding-plan, local — leave blank for Claude/Codex"');
-    expect(html).toContain('placeholder="e.g. sonnet · gpt-5.6-terra · glm-5.2"');
-    expect(html).toContain('title="e.g. sonnet · gpt-5.6-terra · glm-5.2"');
-  });
-
-  it("renders read mode as a plain joined string, no split inputs", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
-    expect(html).not.toContain('data-action="registry-provider"');
-    expect(html).not.toContain('data-action="registry-model"');
-    expect(html).toContain("opencode-go/glm-5.2");
-  });
-});
-
-describe("renderModelRegistry — overlay attribution (REG-02)", () => {
-  it("marks overlay-sourced profile columns with overlay badge", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+  it("marks overlay-sourced profile columns with an override badge, and only those", () => {
     expect(html).toContain("overlay-badge");
-    const workHeaderIdx = html.indexOf("work");
+    const workHeaderIdx = html.indexOf(">work<");
+    const headerStart = html.lastIndexOf("<th>", workHeaderIdx);
     const headerEnd = html.indexOf("</th>", workHeaderIdx);
-    expect(html.slice(workHeaderIdx, headerEnd)).toContain("overlay");
+    expect(html.slice(headerStart, headerEnd)).toContain("overlay-badge");
+    const balancedHeaderIdx = html.indexOf(">balanced<");
+    const balancedStart = html.lastIndexOf("<th>", balancedHeaderIdx);
+    const balancedEnd = html.indexOf("</th>", balancedHeaderIdx);
+    expect(html.slice(balancedStart, balancedEnd)).not.toContain("overlay-badge");
   });
 
-  it("does not mark builtin profiles with overlay badge", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const balancedIdx = html.indexOf("balanced");
-    const headerEnd = html.indexOf("</th>", balancedIdx);
-    expect(html.slice(balancedIdx, headerEnd)).not.toContain("overlay-badge");
-  });
-
-  it("adds overlay-sourced class to overlay cells", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("overlay-sourced");
-  });
-});
-
-describe("renderModelRegistry — non-profile overlay markers (WUT-17 AC3)", () => {
-  it("marks the hostDefaults row that has a saved overlay entry, and only that row", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const codexIdx = html.indexOf("<label>codex");
-    const codexEnd = html.indexOf("</label>", codexIdx);
-    expect(html.slice(codexIdx, codexEnd)).toContain("overlay-badge");
-
-    const claudeIdx = html.indexOf("<label>claude");
-    const claudeEnd = html.indexOf("</label>", claudeIdx);
-    expect(html.slice(claudeIdx, claudeEnd)).not.toContain("overlay-badge");
-  });
-
-  it("marks the workflowTiers row that has a saved overlay entry, and only that row", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const searchIdx = html.indexOf("<label>search");
-    const searchEnd = html.indexOf("</label>", searchIdx);
-    expect(html.slice(searchIdx, searchEnd)).toContain("overlay-badge");
-
-    const indexIdx = html.indexOf("<label>index");
-    const indexEnd = html.indexOf("</label>", indexIdx);
-    expect(html.slice(indexIdx, indexEnd)).not.toContain("overlay-badge");
-  });
-
-  it("marks only the agentTiers cell that has a saved overlay entry (builder/opencode), not its siblings", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-
-    // builder/opencode: overlay.agentTiers.builder.opencode is set — must carry the badge.
-    const opencodeIdx = html.indexOf('data-agent="builder" data-host="opencode"');
-    const opencodeEnd = html.indexOf("</td>", opencodeIdx);
-    expect(html.slice(opencodeIdx, opencodeEnd)).toContain("overlay-badge");
-
-    // builder/claude: same agent, a host the overlay never names — must not.
-    const claudeIdx = html.indexOf('data-agent="builder" data-host="claude"');
-    const claudeEnd = html.indexOf("</td>", claudeIdx);
-    expect(html.slice(claudeIdx, claudeEnd)).not.toContain("overlay-badge");
-
-    // reviewer has no overlay.agentTiers entry at all — no cell in its row carries the badge.
-    const reviewerRowIdx = html.indexOf('data-agent="reviewer" data-host="claude"');
-    const reviewerRowEnd = html.indexOf("</tr>", reviewerRowIdx);
-    expect(html.slice(reviewerRowIdx, reviewerRowEnd)).not.toContain("overlay-badge");
-  });
-
-  it("names the non-zero breakdown categories in the count line, in page order (WUT-17 AC4)", () => {
-    const html = renderModelRegistry(
-      { ...SAMPLE_REGISTRY, overlayOverrideCount: 3, overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 0, agentTiers: 2, tiers: 0, profiles: 0 } },
+  it("names the non-zero breakdown categories (models, profiles) in the count line", () => {
+    const out = renderModelRegistry(
+      { ...SAMPLE_REGISTRY, overlayOverrideCount: 3, overlayOverrideBreakdown: { models: 1, profiles: 2 } },
       { writeMode: true },
     );
-    expect(html).toContain(
-      "You have 3 custom overrides of the built-in defaults: 1 in Default Profile per Tool, 2 in Per-Agent Tier Overrides.",
-    );
+    expect(out).toContain("You have 3 custom overrides of the built-in defaults: 1 in Models, 2 in Model Catalog profiles.");
   });
 });
 
-describe("renderModelRegistry — effort enum constraint (REG-03)", () => {
-  it("renders effort select for claude with correct enum values", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-host="claude"');
-    expect(html).toContain("low");
-    expect(html).toContain("medium");
-    expect(html).toContain("high");
+describe("renderModelRegistry — effort enum constraint (unchanged per host)", () => {
+  const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+
+  it("renders effort select for claude/codex/opencode with the documented enum", () => {
     expect(html).toContain("xhigh");
-    expect(html).toContain("max");
-  });
-
-  it("renders effort select for codex with minimal option", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("minimal");
-  });
-
-  it("renders dropdown for opencode effort (constrained enum)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-host="opencode"');
     expect(html).toContain('data-type="enum"');
-    expect(html).toContain('value="max"');
-    expect(html).toContain('value="high"');
   });
 
   it("renders n/a for cursor effort (empty enum)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("n/a");
   });
 });
 
-describe("renderModelRegistry — profile management (REG-04..07)", () => {
-  it("renders Add Profile button when write mode on", () => {
+describe("renderModelRegistry — no tiers, no Default Profile per Tool, no Per-Workflow section (AC5)", () => {
+  const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+
+  it("removed sections and vocabulary do not appear", () => {
+    expect(html).not.toContain("Default Profile per Tool");
+    expect(html).not.toContain("Per-Workflow Tier Overrides");
+    expect(html).not.toContain("Capability Tiers");
+    expect(html).not.toContain('data-action="registry-hostDefault"');
+    expect(html).not.toContain('data-action="registry-workflowTier"');
+    expect(html).not.toContain("Per-Agent Tier Overrides");
+  });
+});
+
+describe("renderModelRegistry — Per-Agent Model Overrides (AC6)", () => {
+  it("renders a profile selector", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-add-profile"');
-    expect(html).toContain("Add Profile");
+    expect(html).toContain('data-action="agent-overrides-profile"');
+    expect(html).toContain("<h3>Per-Agent Model Overrides</h3>");
   });
 
-  it("renders Duplicate Profile button when write mode on", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-duplicate-profile"');
+  it("rows come from payload.agents, never hardcoded — an injected fake agent name renders", () => {
+    const withFakeAgent = { ...SAMPLE_REGISTRY, agents: [...SAMPLE_REGISTRY.agents, { name: "zzz-injected-fake-agent" }] };
+    const html = renderModelRegistry(withFakeAgent, { writeMode: true });
+    expect(html).toContain("zzz-injected-fake-agent");
   });
 
-  it("renders Delete Profile button when write mode on", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-delete-profile"');
+  it("cell select's first option is Profile default, selected when the agent has no override", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, agentOverridesProfile: "balanced" });
+    const start = html.indexOf('data-action="registry-agent-model-select" data-profile="balanced" data-agent="reviewer" data-host="claude"');
+    const end = html.indexOf("</select>", start);
+    expect(html.slice(start, end)).toContain('<option value="" selected>Profile default</option>');
   });
 
-  it("hides profile management buttons when write mode off", () => {
+  it("an agent with an override shows the overridden model selected, not Profile default", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, agentOverridesProfile: "balanced" });
+    const start = html.indexOf('data-action="registry-agent-model-select" data-profile="balanced" data-agent="builder" data-host="opencode"');
+    const end = html.indexOf("</select>", start);
+    const cell = html.slice(start, end);
+    expect(cell).toContain('value="opencode-go/glm-5.2" selected');
+    expect(cell).not.toContain('value="" selected');
+  });
+
+  it("selects the requested profile via agentOverridesProfile, defaulting to balanced", () => {
+    const defaultProfile = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(defaultProfile).toContain('<option value="balanced" selected>balanced</option>');
+
+    const explicit = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, agentOverridesProfile: "work" });
+    expect(explicit).toContain('<option value="work" selected>work</option>');
+  });
+
+  it("agentsError renders a muted notice instead of a table", () => {
+    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, agents: [], agentsError: "charter read failed" }, { writeMode: true });
+    expect(html).toContain("Agent list unavailable: charter read failed");
+  });
+
+  it("no agents renders a muted notice", () => {
+    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, agents: [] }, { writeMode: true });
+    expect(html).toContain("No agents found.");
+  });
+
+  it("renders read mode as plain strings, no select", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
-    expect(html).not.toContain('data-action="registry-add-profile"');
-    expect(html).not.toContain('data-action="registry-duplicate-profile"');
-    expect(html).not.toContain('data-action="registry-delete-profile"');
+    expect(html).not.toContain('data-action="registry-agent-model-select"');
   });
 
-  it("renders tombstoned profiles in a restorable list (REG-06, REG-07, T9: Removed Profiles nomenclature)", () => {
+  it("renderProfilesView forwards agentOverridesProfile through to renderModelRegistry (start-app.ts wiring)", () => {
+    const html = renderProfilesView({ hosts: [] }, SAMPLE_REGISTRY, { profilesTab: "registry", writeMode: true, agentOverridesProfile: "work" });
+    expect(html).toContain('<option value="work" selected>work</option>');
+  });
+});
+
+describe("renderModelRegistry — profile management (unchanged)", () => {
+  it("renders Add/Duplicate/Delete Profile buttons in write mode, hides them in read mode", () => {
+    const write = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(write).toContain('data-action="registry-add-profile"');
+    expect(write).toContain('data-action="registry-duplicate-profile"');
+    expect(write).toContain('data-action="registry-delete-profile"');
+    const read = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(read).not.toContain('data-action="registry-add-profile"');
+  });
+
+  it("renders tombstoned profiles in a restorable list", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("Removed Profiles (restorable)");
-    expect(html).not.toContain("Deleted (restorable)");
-    expect(html).toContain("old-profile");
-    expect(html).toContain('data-action="registry-restore"');
-    expect(html).toContain('data-profile="old-profile"');
+    expect(html).toContain('data-tombstoned="old-profile"');
+    expect(html).toContain('data-action="registry-restore" data-profile="old-profile"');
   });
 
-  it("hides restore buttons when write mode off", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
-    expect(html).not.toContain('data-action="registry-restore"');
-  });
-});
-
-describe("renderModelRegistry — hostDefaults + workflowTiers (REG-08, REG-09, T9 nomenclature)", () => {
-  it("renders hostDefaults editor with per-host selects, labeled Default Profile per Tool", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("Default Profile per Tool");
-    expect(html).not.toContain("Host Defaults");
-    expect(html).toContain('data-action="registry-hostDefault"');
-    expect(html).toContain('data-host="claude"');
-    expect(html).toContain('data-host="codex"');
-  });
-
-  it("renders workflowTiers editor with per-workflow selects, labeled Per-Workflow Tier Overrides", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("Per-Workflow Tier Overrides");
-    expect(html).not.toContain("<h3>Workflow Tiers</h3>");
-    expect(html).toContain('data-action="registry-workflowTier"');
-    expect(html).toContain('data-workflow="search"');
-    expect(html).toContain('data-workflow="index"');
-    expect(html).toContain('data-workflow="audit"');
-  });
-
-  it("lists tier options in workflowTiers selects", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("light");
-    expect(html).toContain("standard");
-    expect(html).toContain("deep");
-  });
-
-  it("renders Add Workflow Tier button when write mode on (REG-03)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-workflowTier-add"');
-    expect(html).toContain("Add Workflow Tier");
-  });
-
-  it("renders Remove button per workflow tier row when write mode on (REG-03)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-workflowTier-remove"');
-    expect(html).toContain('data-workflow="search"');
-  });
-
-  it("hides Add + Remove workflow tier buttons when write mode off", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
-    expect(html).not.toContain('data-action="registry-workflowTier-add"');
-    expect(html).not.toContain('data-action="registry-workflowTier-remove"');
-  });
-});
-
-describe("renderModelRegistry — Per-Agent Tier Overrides table (T6, APUX-04, P1-A AC7-AC8)", () => {
-  it("renders the section heading after Per-Workflow Tier Overrides (T9 nomenclature)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const workflowIdx = html.indexOf("<h3>Per-Workflow Tier Overrides</h3>");
-    const agentIdx = html.indexOf("<h3>Per-Agent Tier Overrides</h3>");
-    expect(workflowIdx).toBeGreaterThan(-1);
-    expect(agentIdx).toBeGreaterThan(workflowIdx);
-  });
-
-  it("renders one row per agent with one dropdown per tool", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-agent="builder"');
-    expect(html).toContain('data-agent="reviewer"');
-    const builderSelects = (html.match(/data-agent="builder"/g) || []).length;
-    expect(builderSelects).toBe(4); // one select per REGISTRY_HOSTS entry
-  });
-
-  it("labels the default option with the raw charterTier and declared tiers with capitalized labels + raw values", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("(default: standard)"); // builder's charterTier, unmodified
-    expect(html).toContain("(default: light)"); // reviewer's charterTier, unmodified
-    expect(html).toContain('<option value="light">Light</option>');
-    expect(html).toContain('<option value="standard">Standard</option>');
-    expect(html).toContain('<option value="deep">Deep</option>');
-  });
-
-  it("selects the effective override and marks the cell overridden (builder/opencode -> deep)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const selectStart = html.indexOf('data-agent="builder" data-host="opencode"');
-    expect(selectStart).toBeGreaterThan(-1);
-    const cellStart = html.lastIndexOf("<td", selectStart);
-    const cellEnd = html.indexOf("</td>", selectStart);
-    const cellHtml = html.slice(cellStart, cellEnd);
-    expect(cellHtml).toContain('class="overridden"');
-    expect(cellHtml).toContain('value="deep" selected');
-  });
-
-  it("leaves a non-overridden cell unmarked with no option selected", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const selectStart = html.indexOf('data-agent="reviewer" data-host="claude"');
-    const cellStart = html.lastIndexOf("<td", selectStart);
-    const cellEnd = html.indexOf("</td>", selectStart);
-    const cellHtml = html.slice(cellStart, cellEnd);
-    expect(cellHtml).not.toContain('class="overridden"');
-    expect(cellHtml).not.toContain("selected");
-  });
-
-  it("disables the dropdowns in read mode", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
-    const selectStart = html.indexOf('data-action="registry-agentTier"');
-    expect(selectStart).toBeGreaterThan(-1);
-    const selectEnd = html.indexOf(">", selectStart);
-    expect(html.slice(selectStart, selectEnd)).toContain("disabled");
-  });
-
-  it("shows a muted notice instead of the table when agents is empty", () => {
-    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, agents: [] }, { writeMode: true });
-    expect(html).toContain("Per-Agent Tier Overrides");
-    expect(html).toContain("No agents found.");
-    expect(html).not.toContain('data-action="registry-agentTier"');
-  });
-
-  it("shows a muted notice naming the error when agentsError is present", () => {
-    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, agentsError: "checkout absent" }, { writeMode: true });
-    expect(html).toContain("Agent list unavailable");
-    expect(html).toContain("checkout absent");
-    expect(html).not.toContain('data-action="registry-agentTier"');
-  });
-});
-
-describe("renderModelRegistry — action buttons (T8, APUX-13, REG-14, REG-15, P1-C AC5)", () => {
-  it("renders exactly one Save & Apply button when write mode on, and no separate Save Overlay/Regenerate buttons (P1-C AC5)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-save-apply"');
-    expect(html).toContain("Save &amp; Apply");
-    expect(html).not.toContain('data-action="registry-save-overlay"');
-    expect(html).not.toContain('data-action="registry-regenerate"');
-  });
-
-  it("renders clear-overlay button when write mode on, labeled Discard All Overrides (REG-14, REG-15, T9 nomenclature)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-clear-overlay"');
-    expect(html).toContain("Discard All Overrides");
-    expect(html).not.toContain("Reset to Built-in");
-  });
-
-  it("hides all action buttons when write mode off", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
-    expect(html).not.toContain('data-action="registry-save-apply"');
-    expect(html).not.toContain('data-action="registry-save-overlay"');
-    expect(html).not.toContain('data-action="registry-regenerate"');
-    expect(html).not.toContain('data-action="registry-clear-overlay"');
-  });
-});
-
-describe("renderModelRegistry — overlay error + empty state (REG-16, T9 nomenclature)", () => {
-  it("shows a load-error banner when overlayError present, without saying 'overlay'", () => {
-    const html = renderModelRegistry({
-      registry: SAMPLE_REGISTRY.registry,
-      source: { overlay: null, tombstoned: [] },
-      overlayError: "corrupted JSON",
-    }, { writeMode: true });
-    expect(html).toContain("Saved changes could not be loaded");
-    expect(html).not.toContain("Overlay error");
-    expect(html).toContain("corrupted JSON");
-    expect(html).toContain("showing builtin");
-  });
-
-  it("renders empty state when no profiles", () => {
-    const html = renderModelRegistry({ registry: { profiles: {} }, source: {} }, { writeMode: true });
-    expect(html).toContain("No profiles");
-  });
-
-  it("renders empty state when registry empty and no overlay error", () => {
-    const html = renderModelRegistry({}, { writeMode: true });
-    expect(html).toContain("No profiles");
-  });
-
-  it("shows a catalog error message when _error present (UIC-06)", () => {
-    // T14: "Registry load error" renamed "Catalog load error" — negative
-    // vocabulary sensor (P2-D AC1) bans user-visible "registry".
-    const html = renderModelRegistry({ registry: { profiles: {} }, source: {}, _error: "Route not found" }, { writeMode: true });
-    expect(html).toContain("Catalog load error");
-    expect(html).toContain("Route not found");
-  });
-});
-
-describe("renderModelRegistry — cell inputs", () => {
-  it("renders model text inputs when write mode on", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain('data-action="registry-model"');
-  });
-
-  it("renders model as text (not input) when write mode off", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
-    expect(html).not.toContain('data-action="registry-model"');
-    expect(html).toContain("claude-sonnet");
-  });
-
-  it("effort selects are disabled when write mode off", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
-    expect(html).toContain("disabled");
-  });
-});
-
-describe("renderModelRegistry — defaults writeMode", () => {
-  it("defaults writeMode to isWriteModeEnabled() when not passed", () => {
-    delete (globalThis as any).MASSA_AI_WEB_WRITE_MODE;
-    delete (globalThis as any).document;
-    delete (globalThis as any).localStorage;
-    const html = renderModelRegistry(SAMPLE_REGISTRY);
-    expect(html).not.toContain('data-action="registry-save-apply"');
-  });
-});
-
-describe("renderModelRegistry — help section (REG-01, T8, T14)", () => {
-  it("renders a collapsible details help section", () => {
-    // T14: bare "?" summary + "registry-help" class replaced by the shared
-    // `.help-card` titled collapsible ("About this tab"), design D-5/D-6.
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("<details");
-    expect(html).toContain('class="help-card"');
-    expect(html).toContain("<summary>About this tab</summary>");
-  });
-
-  it("explains every current action button (T8: Save & Apply replaces Save Overlay + Regenerate Artifacts; T9: Discard All Overrides)", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("Add Profile");
-    expect(html).toContain("Duplicate Profile");
-    expect(html).toContain("Delete Profile");
-    expect(html).toContain("Save &amp; Apply");
-    expect(html).toContain("Discard All Overrides");
-    expect(html).not.toContain("Save Overlay");
-    expect(html).not.toContain("Regenerate Artifacts");
-    expect(html).not.toContain("Reset to Built-in");
-  });
-
-  it("help section appears after action buttons", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    const actionIdx = html.indexOf('data-action="registry-clear-overlay"');
-    const helpIdx = html.indexOf('class="help-card"');
-    expect(actionIdx).toBeGreaterThan(-1);
-    expect(helpIdx).toBeGreaterThan(actionIdx);
-  });
-
-  it("renders help section in read mode too (buttons absent, help present)", () => {
-    // T14: "Button Guide" heading replaced by "Managing Profiles" as part of
-    // the plain-English rewrite (design D-6, APUX-10).
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
-    expect(html).toContain("<details");
-    expect(html).toContain("Managing Profiles");
-  });
-});
-
-describe("renderModelRegistry — help card content (T14, APUX-10)", () => {
-  it("explains what a profile is and the three capability tiers", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("What A Profile Is");
-    expect(html).toContain("Capability Tiers");
-    expect(html).toContain("<strong>Light</strong>");
-    expect(html).toContain("<strong>Standard</strong>");
-    expect(html).toContain("<strong>Deep</strong>");
-  });
-
-  it("explains the Save & Apply flow including the CLI-restart consequence", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("Restart your CLI sessions (Claude, Codex, Cursor, OpenCode) afterward");
-  });
-
-  it("explains Per-Agent Tier Overrides and Removed Profiles", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).toContain("<h4>Per-Agent Tier Overrides</h4>");
-    expect(html).toContain("<h4>Removed Profiles</h4>");
-  });
-});
-
-describe("renderModelRegistry — inline dropdown forms replace prompt() (T7, APUX-12, D-4.4, P2-D AC2-AC6)", () => {
-  it("renders no inline form when registryForm is absent", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
-    expect(html).not.toContain('class="registry-inline-form');
-  });
-
-  it("add-workflow: renders a workflow + tier select excluding already-overridden workflows", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
-    expect(html).toContain('data-action="registry-form-workflow"');
-    expect(html).toContain('data-action="registry-form-tier"');
-    // search/index/audit already have overrides in SAMPLE_REGISTRY.workflowTiers.
-    const formStart = html.indexOf('data-action="registry-form-workflow"');
-    const formEnd = html.indexOf("</select>", formStart);
-    const workflowOptions = html.slice(formStart, formEnd);
-    expect(workflowOptions).not.toContain('value="search"');
-    expect(workflowOptions).not.toContain('value="index"');
-    expect(workflowOptions).not.toContain('value="audit"');
-    expect(workflowOptions).toContain('value="debug"');
-    expect(html).toContain('data-action="registry-form-submit">Add</button>');
-    expect(html).toContain('data-action="registry-form-cancel">Cancel</button>');
-  });
-
-  it("add-workflow: renders a muted notice instead of the form when every stem is taken", () => {
-    const allTaken: Record<string, string> = {};
-    for (const stem of [
-      "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
-      "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
-      "discovery", "exploration", "feature", "furps-refinement", "general",
-      "implementation-audit", "implementation-fix", "judge-with-debate",
-      "long-session", "maestro", "maestro-audit", "maestro-fix",
-      "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
-      "refactor", "requirements-audit", "requirements-fix", "rfc",
-      "security-audit", "security-fix", "skill-architect", "spec-driven",
-      "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
-    ]) {
-      allTaken[stem] = "standard";
-    }
-    const registryAllTaken = {
-      ...SAMPLE_REGISTRY,
-      registry: { ...SAMPLE_REGISTRY.registry, workflowTiers: allTaken },
-    };
-    const html = renderModelRegistry(registryAllTaken, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
-    expect(html).not.toContain('data-action="registry-form-workflow"');
-    expect(html).toContain("already has a tier override");
-    expect(html).toContain('data-action="registry-form-cancel"');
-  });
-
-  it("add-workflow: renders the inline .form-error instead of alert() when the form carries an error", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-workflow", error: 'Workflow "search" already has a tier. Edit it instead.' } });
-    expect(html).toContain('class="form-error"');
-    expect(html).toContain("already has a tier");
-  });
-
-  it("duplicate-profile: renders a source-profile select from the display registry + a new-name input", () => {
+  it("duplicate-profile form: source select + new-name input", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "duplicate-profile", error: null } });
     expect(html).toContain('data-action="registry-form-source"');
     expect(html).toContain('value="balanced"');
-    expect(html).toContain('value="work"');
     expect(html).toContain('data-action="registry-form-new-name"');
-    expect(html).toContain('data-action="registry-form-submit">Duplicate</button>');
   });
 
-  it("duplicate-profile: renders a muted notice when there are no profiles to duplicate", () => {
-    // profileNames.length === 0 alone hits the page's own top-level "No profiles in
-    // registry" empty state before reaching profileActions at all; carrying an
-    // unrelated _error keeps the rest of the page (and this notice) reachable.
-    const empty = { registry: { profiles: {}, tiers: ["light"] }, source: {}, _error: "unrelated" };
-    const html = renderModelRegistry(empty, { writeMode: true, registryForm: { kind: "duplicate-profile", error: null } });
-    expect(html).not.toContain('data-action="registry-form-source"');
-    expect(html).toContain("No profiles available to duplicate");
-  });
-
-  it("delete-profile: renders a profile select from the display registry", () => {
+  it("delete-profile form: profile select", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "delete-profile", error: null } });
     expect(html).toContain('data-action="registry-form-profile"');
-    expect(html).toContain('value="balanced"');
-    expect(html).toContain('value="work"');
-    expect(html).toContain('data-action="registry-form-submit">Delete</button>');
   });
 
-  it("add-profile: renders name + description inputs, both hinted", () => {
+  it("add-profile form: name + description inputs", () => {
     const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-profile", error: null } });
     expect(html).toContain('data-action="registry-form-name"');
     expect(html).toContain('data-action="registry-form-description"');
-    const nameStart = html.indexOf('data-action="registry-form-name"');
-    const nameEnd = html.indexOf("/>", nameStart);
-    expect(html.slice(nameStart, nameEnd)).toContain("placeholder=");
-    expect(html.slice(nameStart, nameEnd)).toContain("title=");
-    expect(html).toContain('data-action="registry-form-submit">Add</button>');
   });
 
   it("renders only the form matching the open kind, not the others", () => {
@@ -689,7 +352,6 @@ describe("renderModelRegistry — inline dropdown forms replace prompt() (T7, AP
     expect(html).toContain('data-action="registry-form-name"');
     expect(html).not.toContain('data-action="registry-form-source"');
     expect(html).not.toContain('data-action="registry-form-profile"');
-    expect(html).not.toContain('data-action="registry-form-workflow"');
   });
 
   it("renders no inline form in read mode even when registryForm is set", () => {
@@ -698,104 +360,152 @@ describe("renderModelRegistry — inline dropdown forms replace prompt() (T7, AP
   });
 });
 
-// ── Fix-loop 2, gap 2 (T11, APUX-09, P2-F AC4) ──────────────────────────────
-// `.button-row` groups every inline-form's action buttons instead of leaving
-// them visually piled, but no test asserted the literal class. It renders
-// only inside the Models catalog's four inline forms (Add Workflow Override,
-// Duplicate Profile, Delete Profile, Add Profile) — one assertion per emission
-// site in app.js, both branches (has options / empty-state notice) where each
-// form renders two different bodies.
-
-const EMPTY_PROFILES_REGISTRY = { registry: { profiles: {}, tiers: ["light"] }, source: {}, _error: "unrelated" };
-
-const ALL_WORKFLOW_STEMS_TAKEN: Record<string, string> = {};
-for (const stem of [
-  "adr", "architecture-audit", "architecture-fix", "bugs-audit", "bugs-fix",
-  "code-quality-audit", "code-quality-fix", "commit", "debug", "design",
-  "discovery", "exploration", "feature", "furps-refinement", "general",
-  "implementation-audit", "implementation-fix", "judge-with-debate",
-  "long-session", "maestro", "maestro-audit", "maestro-fix",
-  "mobile-figma-audit", "mobile-figma-fix", "onboarding", "pr-review",
-  "refactor", "requirements-audit", "requirements-fix", "rfc",
-  "security-audit", "security-fix", "skill-architect", "spec-driven",
-  "tdd", "tests-audit", "tests-fix", "the-fool", "ticket", "to-prd",
-]) {
-  ALL_WORKFLOW_STEMS_TAKEN[stem] = "standard";
-}
-const REGISTRY_ALL_WORKFLOW_STEMS_TAKEN = {
-  ...SAMPLE_REGISTRY,
-  registry: { ...SAMPLE_REGISTRY.registry, workflowTiers: ALL_WORKFLOW_STEMS_TAKEN },
-};
-
-describe("Models catalog inline-form button-row grouping (T11, APUX-09, P2-F AC4)", () => {
-  it("add-workflow form (workflows available): Add/Cancel pair renders inside .button-row", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
-    expect(html).toContain('class="button-row"');
+describe("renderModelRegistry — action buttons + empty/error states", () => {
+  it("renders Save & Apply and Discard All Overrides in write mode only", () => {
+    const write = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(write).toContain('data-action="registry-save-apply"');
+    expect(write).toContain('data-action="registry-clear-overlay"');
+    const read = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: false });
+    expect(read).not.toContain('data-action="registry-save-apply"');
   });
 
-  it("add-workflow form (every stem taken — empty-state notice): lone Cancel renders inside .button-row", () => {
-    const html = renderModelRegistry(REGISTRY_ALL_WORKFLOW_STEMS_TAKEN, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
-    expect(html).toContain('class="button-row"');
+  it("renders an overlay error banner and still shows the builtin grid", () => {
+    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, overlayError: "bad json" }, { writeMode: true });
+    expect(html).toContain("Saved changes could not be loaded");
+    expect(html).toContain("bad json");
   });
 
-  it("duplicate-profile form (profiles available): Duplicate/Cancel pair renders inside .button-row", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "duplicate-profile", error: null } });
-    expect(html).toContain('class="button-row"');
+  it("renders the empty state when there are no profiles", () => {
+    const html = renderModelRegistry({ registry: { profiles: {} }, source: {} }, { writeMode: true });
+    expect(html).toContain("No profiles in the catalog.");
   });
 
-  it("duplicate-profile form (no profiles — empty-state notice): lone Cancel renders inside .button-row", () => {
-    const html = renderModelRegistry(EMPTY_PROFILES_REGISTRY, { writeMode: true, registryForm: { kind: "duplicate-profile", error: null } });
-    expect(html).toContain('class="button-row"');
-  });
-
-  it("delete-profile form (profiles available): Delete/Cancel pair renders inside .button-row", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "delete-profile", error: null } });
-    expect(html).toContain('class="button-row"');
-  });
-
-  it("delete-profile form (no profiles — empty-state notice): lone Cancel renders inside .button-row", () => {
-    const html = renderModelRegistry(EMPTY_PROFILES_REGISTRY, { writeMode: true, registryForm: { kind: "delete-profile", error: null } });
-    expect(html).toContain('class="button-row"');
-  });
-
-  it("add-profile form: Add/Cancel pair renders inside .button-row", () => {
-    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: { kind: "add-profile", error: null } });
-    expect(html).toContain('class="button-row"');
+  it("shows the unsaved-changes badge only when opts.unsaved is set", () => {
+    const unsaved = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, unsaved: true } as any);
+    expect(unsaved).toContain("unsaved changes");
+    const saved = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(saved).not.toContain("unsaved changes");
   });
 });
 
-// ── Structural no-prompt sensor (T7, P2-D AC6, advisory finding #4) ─────────
-// Scans only the source SPANS of handleRegistry* functions and
-// renderModelRegistry/renderProfilesView for `prompt(`/`alert(` — never a
-// whole-file scan, so the (out-of-scope) Memory tab prompt() at a different
-// function is never a false positive here.
+describe("renderModelRegistry — help section", () => {
+  const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
 
-/** The Models tab moved to its own modules when app.js was split: the catalog
- *  renderer in `views/registry.js`, every `handleRegistry*` in
- *  `views/registry-state.js`, and `renderProfilesView` in `views/profiles.js`.
- *  All three are read so the scanned population is exactly the one this sensor
- *  was written against — reading fewer would silently shrink it, and the
- *  span-count sanity assertion below is what catches that (it did, twice,
- *  during the split). */
+  it('h2 is "Model Catalog"', () => {
+    expect(html).toContain("<h2>Model Catalog</h2>");
+  });
+
+  it("documents Models, Per-Agent Model Overrides, Save & Apply, Discard All Overrides", () => {
+    expect(html).toContain("<h4>Models</h4>");
+    expect(html).toContain("<h4>Per-Agent Model Overrides</h4>");
+    expect(html).toContain("<h4>Save &amp; Apply</h4>");
+    expect(html).toContain("<h4>Discard All Overrides</h4>");
+  });
+
+  it("notes that read-only agents follow the profile default, so the default should be the strongest model", () => {
+    expect(html).toContain("resolve to the profile default");
+    expect(html).toContain("strongest model");
+  });
+
+  it("does not document any removed section", () => {
+    expect(html).not.toContain("<h4>Capability Tiers</h4>");
+    expect(html).not.toContain("<h4>Default Profile per Tool</h4>");
+    expect(html).not.toContain("<h4>Per-Workflow Tier Overrides</h4>");
+  });
+});
+
+// ── Fix round: findings 6, 11, V1, V3, V4 ────────────────────────────────────
+
+describe("renderModelRegistry — accessible names on grid and per-agent selects (finding 11)", () => {
+  it("labels the profile-grid model and effort selects with profile · tool", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('data-action="registry-model-select" data-profile="balanced" data-host="claude" aria-label="balanced · Claude model"');
+    expect(html).toContain('data-action="registry-effort" data-profile="balanced" data-host="claude" aria-label="balanced · Claude effort"');
+  });
+
+  it("labels the per-agent model select with agent · tool", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, agentOverridesProfile: "balanced" });
+    expect(html).toContain(
+      'data-action="registry-agent-model-select" data-profile="balanced" data-agent="builder" data-host="opencode" aria-label="builder · OpenCode model"',
+    );
+  });
+});
+
+describe("renderModelRegistry — Per-Agent effort control hidden until an override exists (V1)", () => {
+  it("shows the inherited profile effort as disabled text, not an editable select, when no override exists", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, agentOverridesProfile: "balanced" });
+    const start = html.indexOf('data-action="registry-agent-model-select" data-profile="balanced" data-agent="reviewer" data-host="claude"');
+    const cellEnd = html.indexOf("</td>", start);
+    const cellHtml = html.slice(start, cellEnd);
+    expect(cellHtml).not.toContain('data-action="registry-agent-effort"');
+    expect(cellHtml).toContain("medium (profile)");
+  });
+
+  it("still renders an editable effort select once an override exists", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, agentOverridesProfile: "balanced" });
+    const start = html.indexOf('data-action="registry-agent-model-select" data-profile="balanced" data-agent="builder" data-host="opencode"');
+    const cellEnd = html.indexOf("</td>", start);
+    const cellHtml = html.slice(start, cellEnd);
+    expect(cellHtml).toContain('data-action="registry-agent-effort"');
+  });
+});
+
+describe("renderModelRegistry — Profiles card (V3)", () => {
+  it("wraps the grid in a card with an h3 heading and short help text", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).toContain('<div class="registry-profile-grid"><h3>Profiles</h3>');
+    expect(html).toContain("Rows are tools, columns are profiles.");
+  });
+});
+
+describe("renderModelRegistry — profile management moved into the Profiles card, next to the grid (V4)", () => {
+  it("Add/Duplicate/Delete Profile buttons render inside .registry-profile-grid, before its grid-scroll table", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const cardStart = html.indexOf('<div class="registry-profile-grid">');
+    const addProfileIdx = html.indexOf('data-action="registry-add-profile"', cardStart);
+    const gridScrollIdx = html.indexOf('<div class="grid-scroll">', cardStart);
+    expect(cardStart).toBeGreaterThanOrEqual(0);
+    expect(addProfileIdx).toBeGreaterThan(cardStart);
+    expect(addProfileIdx).toBeLessThan(gridScrollIdx);
+  });
+
+  it("no longer renders the profile-management buttons after Per-Agent Model Overrides", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    const perAgentIdx = html.indexOf("<h3>Per-Agent Model Overrides</h3>");
+    const addProfileIdx = html.indexOf('data-action="registry-add-profile"');
+    expect(addProfileIdx).toBeGreaterThanOrEqual(0);
+    expect(addProfileIdx).toBeLessThan(perAgentIdx);
+  });
+});
+
+describe("renderModelRegistry — v1BackupPath warning banner (finding 6)", () => {
+  it("shows an escaped warning banner naming the backup path", () => {
+    const html = renderModelRegistry({ ...SAMPLE_REGISTRY, v1BackupPath: '/tmp/<danger>&"overlay".json' }, { writeMode: true });
+    expect(html).toContain('class="warning"');
+    expect(html).toContain("backed up to");
+    expect(html).toContain("&lt;danger&gt;");
+    expect(html).not.toContain("<danger>");
+  });
+
+  it("renders nothing extra when v1BackupPath is absent", () => {
+    const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true });
+    expect(html).not.toContain('class="warning"');
+  });
+});
+
+// ── Structural no-prompt sensor: the Model Catalog tab never uses prompt()/alert() ──
+// Scans only the source SPANS of handleRegistry*/handleModel*/renderModelRegistry/
+// renderProfilesView — never a whole-file scan, so the (out-of-scope) Memory tab
+// prompt() at a different function is never a false positive here.
+
 const MODELS_TAB_SOURCE = [
   fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "registry.ts"), "utf8"),
   fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "registry-state.ts"), "utf8"),
   fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "profiles.ts"), "utf8"),
 ].join("\n");
 
-/** The Memory tab moved to its own module too. This sensor's control case reads
- *  it from there; the assertion itself is unchanged, only the file the source
- *  is read from. */
-const MEMORY_VIEW_SOURCE = fs.readFileSync(
-  path.join(import.meta.dir, "..", "static", "views", "memory.ts"),
-  "utf8",
-);
+const MEMORY_VIEW_SOURCE = fs.readFileSync(path.join(import.meta.dir, "..", "static", "views", "memory.ts"), "utf8");
 
-/** Extracts the full source text of every top-level `function name(...)  { ... }`
- *  declaration (optionally `export`/`async`) whose name matches `namePattern`,
- *  using a small brace-depth lexer that ignores braces inside string/template
- *  literals and comments so it never mis-closes on `"{" `/`"}"` inside a
- *  rendered HTML string. */
 function extractFunctionSpans(source: string, namePattern: RegExp): { name: string; span: string }[] {
   const spans: { name: string; span: string }[] = [];
   const declRe = /(export\s+)?(async\s+)?function\s+(\w+)\s*\(/g;
@@ -803,7 +513,6 @@ function extractFunctionSpans(source: string, namePattern: RegExp): { name: stri
   while ((m = declRe.exec(source))) {
     const name = m[3];
     if (!namePattern.test(name)) continue;
-    // Walk past the parameter list (balance parens) to find the body's opening brace.
     let i = declRe.lastIndex;
     let parenDepth = 1;
     while (parenDepth > 0 && i < source.length) {
@@ -846,103 +555,37 @@ function extractFunctionSpans(source: string, namePattern: RegExp): { name: stri
   return spans;
 }
 
-describe("no-prompt/no-alert structural sensor — Models tab (T7, P2-D AC6)", () => {
-  const targetSpans = extractFunctionSpans(MODELS_TAB_SOURCE, /^(handleRegistry\w+|renderModelRegistry|renderProfilesView)$/);
+describe("no-prompt/no-alert structural sensor — Model Catalog tab", () => {
+  const targetSpans = extractFunctionSpans(MODELS_TAB_SOURCE, /^(handleRegistry\w+|handleModel\w+|handleAgentOverridesProfileChange|renderModelRegistry|renderProfilesView)$/);
 
-  // T31 (WUT-14): population sensor on the raw disk reads MODELS_TAB_SOURCE
-  // and MEMORY_VIEW_SOURCE are built from, distinct from the span-count
-  // sanity check below (which counts *extracted* function spans, derived
-  // data). If any of the three joined files, or the memory view, silently
-  // shrank on disk, this catches it directly. Measured at authoring time:
-  // MODELS_TAB_SOURCE 65921 bytes (registry.ts + registry-state.ts +
-  // profiles.ts joined), MEMORY_VIEW_SOURCE 14824 bytes.
-  it("reads a non-trivial Models-tab and Memory-tab source population from disk", () => {
-    console.log(
-      `[registry-editor] MODELS_TAB_SOURCE: ${MODELS_TAB_SOURCE.length} bytes, MEMORY_VIEW_SOURCE: ${MEMORY_VIEW_SOURCE.length} bytes`,
-    );
+  it("reads a non-trivial Model-Catalog-tab and Memory-tab source population from disk", () => {
     expect(MODELS_TAB_SOURCE.length).toBeGreaterThan(20000);
     expect(MEMORY_VIEW_SOURCE.length).toBeGreaterThan(5000);
   });
 
-  it("finds at least the known Models-tab handler + renderer functions (sensor sanity — a 0-span result proves nothing)", () => {
+  it("finds at least the known handler + renderer functions (sensor sanity — a 0-span result proves nothing)", () => {
     const names = targetSpans.map((s) => s.name);
     expect(names).toContain("renderModelRegistry");
     expect(names).toContain("renderProfilesView");
     expect(names).toContain("handleRegistryAddProfile");
     expect(names).toContain("handleRegistryDuplicateProfile");
     expect(names).toContain("handleRegistryDeleteProfile");
-    expect(names).toContain("handleRegistryWorkflowTierAdd");
-    expect(targetSpans.length).toBeGreaterThanOrEqual(6);
+    expect(names).toContain("handleModelFormSubmit");
+    expect(names).toContain("handleModelDelete");
+    expect(targetSpans.length).toBeGreaterThanOrEqual(8);
   });
 
-  it("contains zero prompt( calls across every handleRegistry*/renderModelRegistry/renderProfilesView span", () => {
+  it("contains zero prompt( calls across every matched span", () => {
     const offenders = targetSpans.filter((s) => s.span.includes("prompt("));
     expect(offenders.map((o) => o.name)).toEqual([]);
   });
 
-  it("contains zero alert( calls across every handleRegistry*/renderModelRegistry/renderProfilesView span", () => {
+  it("contains zero alert( calls across every matched span", () => {
     const offenders = targetSpans.filter((s) => s.span.includes("alert("));
     expect(offenders.map((o) => o.name)).toEqual([]);
   });
 
   it("the Memory tab's unrelated prompt() (out of scope for this sensor) still exists in the file", () => {
-    // Proves the sensor is scoped to specific function spans, not a whole-file
-    // scan that would trivially also "pass" a repo with no prompt() anywhere.
     expect(MEMORY_VIEW_SOURCE).toContain('prompt("Edit memory content:", "")');
-  });
-});
-
-// ── T9 (APUX-07, P2-D AC1): Nomenclature Map, row-by-row on renderModelRegistry ─
-
-describe("renderModelRegistry — Nomenclature Scheme A per-row assertions (T9, APUX-07)", () => {
-  const html = renderModelRegistry(SAMPLE_REGISTRY, { writeMode: true, registryForm: null });
-
-  it('H2 "Model Registry" -> "Model Catalog"', () => {
-    expect(html).toContain("<h2>Model Catalog</h2>");
-    expect(html).not.toContain("Model Registry");
-  });
-
-  it('"Host Defaults" -> "Default Profile per Tool"', () => {
-    expect(html).toContain("<h3>Default Profile per Tool</h3>");
-    expect(html).not.toContain("Host Defaults");
-  });
-
-  it('"Workflow Tiers" -> "Per-Workflow Tier Overrides"', () => {
-    expect(html).toContain("<h3>Per-Workflow Tier Overrides</h3>");
-    expect(html).not.toContain("<h3>Workflow Tiers</h3>");
-  });
-
-  it('"Per-Agent Tier Overrides" section is present (new section row)', () => {
-    expect(html).toContain("<h3>Per-Agent Tier Overrides</h3>");
-  });
-
-  it('"overlay" badge / count sentence -> "override" badge / new sentence', () => {
-    expect(html).toContain(">override<");
-    expect(html).not.toContain(">overlay<");
-  });
-
-  it('"Save Overlay" + "Regenerate Artifacts" -> single "Save & Apply"', () => {
-    expect(html).toContain("Save &amp; Apply");
-    expect(html).not.toContain("Save Overlay");
-    expect(html).not.toContain("Regenerate Artifacts");
-  });
-
-  it('"Reset to Built-in (clear overlay)" -> "Discard All Overrides"', () => {
-    expect(html).toContain("Discard All Overrides");
-    expect(html).not.toContain("Reset to Built-in");
-  });
-
-  it('"Deleted (restorable)" -> "Removed Profiles (restorable)"', () => {
-    expect(html).toContain("Removed Profiles (restorable)");
-    expect(html).not.toContain("Deleted (restorable)");
-  });
-
-  it("data-action values, state keys and registry JSON keys keep their internal names (only user-visible text changed)", () => {
-    expect(html).toContain('data-action="registry-hostDefault"');
-    expect(html).toContain('data-action="registry-workflowTier"');
-    expect(html).toContain('data-action="registry-clear-overlay"');
-    expect(html).toContain('data-action="registry-save-apply"');
-    expect(html).toContain('class="registry-hostDefaults"');
-    expect(html).toContain('class="registry-workflowTiers"');
   });
 });

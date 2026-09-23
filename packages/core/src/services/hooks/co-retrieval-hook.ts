@@ -118,8 +118,10 @@ export class CoRetrievalHook {
       peers = await this.findPeers(memoryId, projectId, sessionId);
     } catch (err) {
       logger.warn("CoRetrievalHook: peer lookup failed", {
-        error: (err as Error).message,
+        projectId,
+        sessionId,
         memoryId,
+        error: err as Error,
       });
       return;
     }

@@ -112,9 +112,7 @@ function warnSandboxUnavailable(): void {
 
   const missingTool = process.platform === "darwin" ? "sandbox-exec" : "docker";
   logger.warn(
-    `sandbox: MASSA_AI_EXECUTOR_SANDBOX=auto found no '${missingTool}' on this platform, ` +
-      `so code is executing with best-effort containment and no OS-level isolation. ` +
-      `Install '${missingTool}', or set MASSA_AI_EXECUTOR_SANDBOX=on to fail loudly instead of falling back.`,
+    "Sandbox: no sandbox tool found for auto mode, falling back to best-effort containment",
     { missingTool, platform: process.platform, effectiveMode: "none" },
   );
 }
