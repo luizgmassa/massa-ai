@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.61.0] - 2026-09-23
+
 ### Added
 
 - **`massa-ai-config doctor [--fix] [--host <h>] [--target <dir>]`** in both
