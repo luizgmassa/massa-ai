@@ -102,17 +102,13 @@ necessary but not sufficient. A real host addition also touches:
   design.md C5's "Not moved" list: per-host string rendering stays
   host-specific code, because byte-identity to a real host's documented
   schema is the whole point).
-- **`skills/model-profiles.json`'s `hostDefaults`** — every host needs an
-  entry naming which model profile it resolves against by default (all
-  four existing hosts currently default to `"balanced"`). `scripts/lib/
-  model-profiles.ts`'s `validateRegistry()` fails the build if a host
-  known to `HOSTS` (`scripts/lib/model-profiles.ts`, re-exported from
-  `host-capabilities.ts`) has no `hostDefaults` entry naming a profile
-  that actually supports it — so a new host is registered here in the
-  SAME array (`HOSTS` in `model-profiles.ts`) that `host-capabilities.ts`
-  re-exports, not a second one. That module also owns the new host's
-  effort-string enum (`HOST_EFFORT_ENUM`) — see its own docblock for
-  the "no fourth rank, no silent default" precedent to follow.
+- **`HOSTS` and `HOST_EFFORT_ENUM` in `scripts/lib/model-profiles.ts`** —
+  register the new host in that one `HOSTS` array (`host-capabilities.ts`
+  re-exports it; do not add a second list) and give it an effort enum.
+  Then give `skills/model-profiles.json` catalog `models` entries for the
+  host and a `hosts.<host>` cell in every profile that should support it.
+  A profile may omit a host; selecting that profile for it throws
+  `MissingHostError` rather than falling back silently.
 - **`apps/<host>-plugin/`** — the actual plugin package (its own
   `install.sh`, `package.json`, `.{host}-plugin/plugin.json` manifest,
   and any host-specific MCP registration shape in

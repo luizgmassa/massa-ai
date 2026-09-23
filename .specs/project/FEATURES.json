@@ -1512,6 +1512,42 @@
       "completed": "2026-09-21"
     },
     {
+      "id": "api-log-clarity",
+      "slug": "api-log-clarity",
+      "title": "API log clarity: labelled LLM failures with streaks, repeat counts, full error fields, warn/error sweep, MASSA_AI_LOG_LEVEL",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": false,
+        "execute": true
+      },
+      "branch": "feat/model-catalog-revamp",
+      "created": "2026-09-22",
+      "depends_on": [],
+      "spec": ".specs/features/api-log-clarity/spec.md",
+      "validation": ".specs/features/api-log-clarity/validation.md"
+    },
+    {
+      "id": "model-catalog-revamp",
+      "slug": "model-catalog-revamp",
+      "title": "Model Catalog revamp: typed models catalog, per-profile default model + per-agent overrides, tiers removed",
+      "status": "complete",
+      "priority": "P1",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": false,
+        "execute": true
+      },
+      "branch": "feat/model-catalog-revamp",
+      "created": "2026-09-22",
+      "depends_on": [],
+      "spec": ".specs/features/model-catalog-revamp/spec.md",
+      "validation": ".specs/features/model-catalog-revamp/validation.md"
+    },
+    {
       "id": "agent-roster-consolidation",
       "slug": "agent-roster-consolidation",
       "title": "Agent roster consolidation: remove personas, 18 sub-agents to 7 unprefixed agents with content-marker ownership, drop general/maestro workflows and rename six to create-*/product-*",

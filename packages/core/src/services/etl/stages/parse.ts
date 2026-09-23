@@ -254,8 +254,9 @@ export class ParseStage {
         timestamp: Date.now(),
       });
       logger.warn("ParseStage: failed to parse file", {
+        projectId: ctx.projectId,
         filePath: file.relativePath,
-        error: (err as Error).message,
+        error: err as Error,
       });
       // Native, query, ABI, and structural infrastructure failures invalidate
       // the whole build. Never convert them into an empty successful file.

@@ -10,10 +10,10 @@ import { logger } from "@massa-ai/shared";
 
 export const errorHandler = new Elysia({ name: "error-handler" }).onError(
   ({ code, error, set, path, request }) => {
-    // No raw Error object passed to the logger: logger.error() would embed its
-    // unscrubbed `error.message` verbatim. safeErrorSummary() is the only
-    // source of the message field here, so credential-shaped substrings never
-    // reach the log sink.
+    // No raw Error object passed to the logger: the error-level log call
+    // would embed its unscrubbed `error.message` verbatim. safeErrorSummary()
+    // is the only source of the message field here, so credential-shaped
+    // substrings never reach the log sink.
     logger.error("[massa-ai-api] Request failed", undefined, {
       ...safeErrorSummary(error),
       code,

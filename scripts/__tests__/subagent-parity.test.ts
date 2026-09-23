@@ -23,7 +23,7 @@ import toml from "toml";
 import {
   HOST_EFFORT_ENUM,
   loadRegistry,
-  resolveTier,
+  resolveAgent,
   selectProfile,
   type Host as RegistryHost,
 } from "../lib/model-profiles.ts";
@@ -123,18 +123,11 @@ const BASELINE = JSON.parse(
   agents: Record<string, Record<string, { model: string | null; effort: string | null; keys: string[] }>>;
 };
 
-/** Charter tier, read from the charter that owns it. */
-function tierOf(name: SpecialistName): string {
-  const raw = readFileSync(path.join(REPO_ROOT, "skills/agents", name, "SKILL.md"), "utf8");
-  const m = /^  model_tier: *([A-Za-z0-9_-]+)/m.exec(raw);
-  if (!m) throw new Error(`charter ${name} has no metadata.model_tier`);
-  return m[1]!;
-}
-
-/** What the registry says this (host, agent) pair should be, under the host default profile. */
+/** What the registry says this (host, agent) pair should be, under the host default profile
+ *  — override-first resolution (registry v2, D1). */
 function expected(host: RegistryHost, name: SpecialistName) {
   const profile = selectProfile(REGISTRY, host, { env: {} });
-  return resolveTier(REGISTRY, host, profile, tierOf(name));
+  return resolveAgent(REGISTRY, host, profile, name);
 }
 
 // ── Documented frontmatter schemas, per host (MPR-R9) ───────────────────────
@@ -315,10 +308,10 @@ describe("subagent parity — variant bundles: exact 7 per (host, supported prof
     }
   });
 
-  test("active agents/ byte-equals agent-profiles/<hostDefaults[host]>/ for every host (MPS-01 AC5)", async () => {
+  test("active agents/ byte-equals agent-profiles/<default profile>/ for every host (MPS-01 AC5)", async () => {
     for (const host of HOSTS_LIST) {
       const activeDir = path.join(REPO_ROOT, `apps/${host}-plugin/agents`);
-      const defaultProfile = REGISTRY.hostDefaults[host]!;
+      const defaultProfile = selectProfile(REGISTRY, host, { env: {} });
       const variantDirPath = path.join(
         REPO_ROOT,
         `apps/${host}-plugin/agent-profiles/${defaultProfile}`,
@@ -719,27 +712,13 @@ describe("subagent parity — FEATURES.md doc-drift (MPR-R11)", () => {
   const FEATURES = readFileSync(path.join(REPO_ROOT, "FEATURES.md"), "utf8");
   const TABLES = markdownTables(FEATURES);
 
-  test("the role -> tier table matches the charters exactly", () => {
-    const roleTier = TABLES.filter(
-      (t) => t.header[0] === "Agent" && t.header[1] === "Tier",
-    );
-    expect(roleTier.length).toBe(1);
-
-    const documented = new Map(roleTier[0]!.rows.map((r) => [r[0]!, r[1]!]));
-    const charters = new Map(SPECIALIST_NAMES.map((n) => [n as string, tierOf(n)]));
-    // Compared as maps: a row order change is not drift, a wrong tier is.
-    expect([...documented.entries()].sort()).toEqual([...charters.entries()].sort());
-  });
-
-  test("it is the ONLY role-keyed table in the file", () => {
-    // Kills the design.md section 6 mutation "reintroduce a per-host rationale column":
-    // any second table keyed by agent name — with a model column, a rationale column, or
-    // anything else — fails here regardless of what its other columns hold.
+  test("no table in the file is keyed by agent name", () => {
+    // Per-agent model choices live only in skills/model-profiles.json (profile defaults +
+    // agents overrides). Any agent-keyed doc table would restate them and drift.
     const roleKeyed = TABLES.filter(
       (t) => t.rows.filter((r) => (SPECIALIST_NAMES as readonly string[]).includes(r[0]!)).length >= 5,
     );
-    expect(roleKeyed.length).toBe(1);
-    expect(roleKeyed[0]!.header).toEqual(["Agent", "Tier"]);
+    expect(roleKeyed.map((t) => t.header)).toEqual([]);
   });
 
   test("no per-host rationale column survives anywhere in the file", () => {
@@ -756,9 +735,12 @@ describe("subagent parity — FEATURES.md doc-drift (MPR-R11)", () => {
     // restate a model value are exactly how the four tables drifted apart.
     const ids = new Set<string>();
     for (const profile of Object.values(REGISTRY.profiles)) {
-      for (const tiers of Object.values(profile.hosts)) {
-        for (const resolved of Object.values(tiers)) {
-          if (resolved.model !== null) ids.add(resolved.model);
+      for (const cell of Object.values(profile.hosts)) {
+        if (cell.model !== null) ids.add(cell.model);
+      }
+      for (const hostMap of Object.values(profile.agents ?? {})) {
+        for (const cell of Object.values(hostMap)) {
+          if (cell.model !== null) ids.add(cell.model);
         }
       }
     }
@@ -1040,5 +1022,37 @@ describe("subagent parity — frozen baseline diff (MPR-R8)", () => {
     );
     expect(BASELINE.agents["reviewer"]!.claude!.model).toBe("sonnet");
     expect(claudeReviewer.model).toBe("opus");
+  });
+});
+
+// ── ALLWF-03: read-only agents run the strongest model (registry v2 convention) ──
+
+describe("ALLWF-03: read-only agents carry no override in any built-in profile", () => {
+  // The rule (registry v2, D1/spec ALLWF-03): a built-in profile's `agents` map holds
+  // overrides ONLY for the write-capable charters (builder/designer/test-engineer resolve
+  // the "standard" spread, documentation-agent the "light" spread). Every read-only charter
+  // must carry no override anywhere, so it resolves to the profile's own host default —
+  // which, by convention, the profile author picks as the strongest model. A read-only
+  // agent gaining an override would silently opt it out of that convention.
+  test("no built-in profile's agents map names a charter outside WRITE_AGENTS", () => {
+    const registry = loadRegistry();
+    const offenders: string[] = [];
+    for (const [pName, profile] of Object.entries(registry.profiles)) {
+      for (const agentName of Object.keys(profile.agents ?? {})) {
+        if (!WRITE_AGENTS.has(agentName as SpecialistName)) {
+          offenders.push(`${pName}.agents.${agentName}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("a read-only charter (investigator) resolves identically whether or not it is asked for by name — there is no override to bypass", () => {
+    const registry = loadRegistry();
+    for (const [pName, profile] of Object.entries(registry.profiles)) {
+      for (const host of Object.keys(profile.hosts) as RegistryHost[]) {
+        expect(resolveAgent(registry, host, pName, "investigator")).toEqual(profile.hosts[host]);
+      }
+    }
   });
 });

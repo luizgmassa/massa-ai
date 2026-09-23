@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: Luiz Massa
   version: "2.0.0"
-  model_tier: deep
   permission: write
 ---
 
@@ -137,9 +136,10 @@ Output for `depth: full`:
 - References (paths relative to the `massa-ai` skill directory): `references/agent-orchestration.md`, `references/audit-report-io.md` (Judge With Debate Report Contracts), `references/the-fool/`, `references/verification-ladder.md`.
 
 ## Model Hint
-See `references/agent-orchestration.md` (Model Diversity Fallback): `metadata.model_tier`
-(`deep`) is the per-slot fallback; `workflows/judge-with-debate.md` owns the live slot
-assignments for the `spec-author` and `scorer` dispatches.
+See `references/agent-orchestration.md` (Model Diversity Fallback): `judge` carries no
+per-agent override in `skills/model-profiles.json`, so the active profile's host default is
+the per-slot fallback; `workflows/judge-with-debate.md` owns the live slot assignments for the
+`spec-author` and `scorer` dispatches.
 
 ## Validation Sensors
 - `spec-author`: output parses as YAML; weights sum to 1.0 (±0.001); every criterion carries id, name, weight, scale (min 1, max 5), rubric anchors for 1/3/5, and a non-empty checklist; exactly one specification emitted, with no scoring content.

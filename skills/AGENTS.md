@@ -257,11 +257,11 @@ Exact next step — lives in `skills/massa-ai/references/agent-orchestration.md`
 
 ## Agent Table
 
-This table names no model. Each agent's model is resolved at build time from its
-charter's `metadata.model_tier` plus the host and the selected profile in
-`skills/model-profiles.json`, which is the only hand-authored place that names a model
-or an effort level for any host. Read the tier from the charter; a second copy here
-would drift, and did.
+This table names no model. Each agent's model is resolved at build time from the active
+profile in `skills/model-profiles.json`, which is the only hand-authored place that names
+a model or an effort level for any host. Most agents use the profile's default per-tool
+model; some carry optional per-agent overrides in the profile. A second copy here would
+drift, and did.
 
 | Name | Purpose | Permission | Modes | Charter |
 |---|---|---|---|---|
@@ -296,10 +296,11 @@ The single old→new table for the charters retired by the roster consolidation.
 
 ## How to Add an Agent
 
-1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_tier` (a tier declared in `skills/model-profiles.json`, never a model name) and `metadata.permission`. A charter with more than one output contract declares one `### Mode: `<name>`` section per contract. Its `## Restrictions` section must carry the self-routing ban verbatim (`Never load the massa-ai router skill; the dispatching workflow owns routing.`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing that line fails the gate.
+1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.permission`.
 2. Add one row to the Agent Table above.
-3. Add `<name>` to `SPECIALIST_NAMES` in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts. There are no model tables to edit — the generator resolves the model from the charter's `metadata.model_tier` through `skills/model-profiles.json`.
-4. Add `<name>` to the roster in `scripts/__tests__/subagent-parity.test.ts` and run `bun run test:scripts`.
+3. Add one row to the Mapping table if it maps to an existing role.
+4. Run `bun run generate:artifacts` to regenerate the host artifacts — the generator discovers agents by scanning `skills/agents/*/SKILL.md` directories. Add per-agent overrides to `skills/model-profiles.json` if the agent's model should differ from the profile default (optional; most agents use the default).
+5. Add `<name>` to the roster in `scripts/__tests__/subagent-parity.test.ts` and run `bun run test:scripts`.
 
 Steps 3-4 are enforced: the parity test fails on generator drift and `scripts/__tests__/skills-harness-integrity.test.ts` fails if a workflow dispatches an agent with no shipped artifact.
 

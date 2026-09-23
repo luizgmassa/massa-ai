@@ -154,8 +154,9 @@ export class ModelsDevClient {
         path: cachePath,
       });
     } catch (error) {
-      logger.warn("Failed to save local pricing cache", {
-        error: (error as Error).message,
+      logger.warn("ModelsDevClient: failed to save local pricing cache", {
+        path: cachePath,
+        error: error as Error,
       });
     }
   }
@@ -463,7 +464,7 @@ export class ModelsDevClient {
       }
     }
 
-    logger.warn(`Model pricing not found: ${modelId}`);
+    logger.warn("ModelsDevClient: model pricing not found", { modelId });
     return null;
   }
 
@@ -644,8 +645,9 @@ export class ModelsDevClient {
         logger.debug("Local pricing cache file deleted");
       }
     } catch (error) {
-      logger.warn("Failed to delete local pricing cache", {
-        error: (error as Error).message,
+      logger.warn("ModelsDevClient: failed to delete local pricing cache", {
+        path: cachePath,
+        error: error as Error,
       });
     }
   }

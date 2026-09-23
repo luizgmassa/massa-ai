@@ -90,7 +90,7 @@ describe("disableThink gates json_schema on LM Studio (PDM-13)", () => {
     llm._setJsonSchemaSupportedForTesting(true);
     lastCall = null;
 
-    const res = await llm.llmObject("prompt", schemaOf());
+    const res = await llm.llmObject("prompt", schemaOf(), { label: "test" });
 
     expect(res.ok).toBe(true);
     // The fallback's signature: `output: "no-schema"` and no schemaName. With

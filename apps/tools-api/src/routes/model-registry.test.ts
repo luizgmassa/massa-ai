@@ -4,35 +4,19 @@ import { Elysia } from "elysia";
 import { node } from "@elysiajs/node";
 
 const builtinRegistry = {
-  version: 1,
-  tiers: ["light", "standard", "deep"],
-  hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
-  workflowTiers: {},
-  agentTiers: {},
+  version: 2,
+  models: {
+    "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" },
+    "claude-alias-opus": { name: "Opus (latest)", host: "claude", provider: "", model: "opus" },
+  },
   profiles: {
     balanced: {
       description: "builtin balanced",
       hosts: {
-        claude: {
-          light: { model: "m-light", effort: "high" },
-          standard: { model: "m-std", effort: "high" },
-          deep: { model: "m-deep", effort: "high" },
-        },
-        codex: {
-          light: { model: "m-light", effort: "high" },
-          standard: { model: "m-std", effort: "high" },
-          deep: { model: "m-deep", effort: "high" },
-        },
-        cursor: {
-          light: { model: null, effort: null },
-          standard: { model: null, effort: null },
-          deep: { model: null, effort: null },
-        },
-        opencode: {
-          light: { model: "m-light", effort: "high" },
-          standard: { model: "m-std", effort: "high" },
-          deep: { model: "m-deep", effort: "high" },
-        },
+        claude: { model: "opus", effort: "high" },
+        codex: { model: "gpt-5.6-sol", effort: "high" },
+        cursor: { model: null, effort: null },
+        opencode: { model: "opencode-go/minimax-m3", effort: "max" },
       },
     },
   },
@@ -73,17 +57,15 @@ mock.module("../../../../scripts/lib/model-profiles.ts", () => ({
   DEFAULT_REGISTRY_PATH: "/dev/null",
 }));
 
-// design D-3 (APUX-03): agents inventory — mirrors the profilesLib() mock above exactly,
-// including the non-literal require path pattern the route itself uses.
-const DEFAULT_MOCK_CHARTERS = [
-  { name: "builder", modelTier: "standard" },
-  { name: "code-explorer", modelTier: "deep" },
-];
-const loadAllCharters = mock((..._args: unknown[]): unknown => DEFAULT_MOCK_CHARTERS);
+// spec AC6: agents inventory — mirrors the profilesLib() mock above exactly, including the
+// non-literal require path pattern the route itself uses. scanCharterNames() is a plain
+// directory scan (string[]), not a full charter parse.
+const DEFAULT_MOCK_CHARTER_NAMES = ["builder", "investigator"];
+const scanCharterNames = mock((..._args: unknown[]): unknown => DEFAULT_MOCK_CHARTER_NAMES);
 const actualGeneratorLib = require("../../../../scripts/generate-subagent-artifacts.ts");
 mock.module("../../../../scripts/generate-subagent-artifacts.ts", () => ({
   ...actualGeneratorLib,
-  loadAllCharters: (...args: unknown[]) => loadAllCharters(...args),
+  scanCharterNames: (...args: unknown[]) => scanCharterNames(...args),
 }));
 
 const configDir = mock((..._args: unknown[]): string => "/tmp/massa-ai-test-overlay");
@@ -122,7 +104,7 @@ beforeEach(() => {
   mergeOverlay.mockClear();
   configDir.mockClear();
   getDeploymentRoot.mockClear();
-  loadAllCharters.mockClear();
+  scanCharterNames.mockClear();
 });
 
 async function get(path: string) {
@@ -166,14 +148,14 @@ describe("GET /api/v1/model-registry", () => {
     const res = await get("/api/v1/model-registry");
     expect(res.status).toBe(200);
     expect(res.json.success).toBe(true);
-    expect(res.json.data.registry.version).toBe(1);
+    expect(res.json.data.registry.version).toBe(2);
     expect(res.json.data.source.overlay).not.toBeNull();
-    // APCR-01.10: the count of overlay entries surviving normalization is surfaced to the
-    // operator through the read path, not just computed internally.
+    // Count of overlay entries surviving normalization is surfaced to the operator through
+    // the read path, not just computed internally.
     expect(res.json.data.overlayOverrideCount).toBe(3);
   });
 
-  test("200 with no overlay reports overlayOverrideCount:0 (APCR-01.10)", async () => {
+  test("200 with no overlay reports overlayOverrideCount:0", async () => {
     loadEffectiveRegistry.mockImplementationOnce(() => ({
       registry: builtinRegistry,
       source: { builtin: builtinRegistry, overlay: null, tombstoned: [] },
@@ -185,28 +167,22 @@ describe("GET /api/v1/model-registry", () => {
     expect(res.json.data.overlayOverrideCount).toBe(0);
   });
 
-  // WUT-17: the GET response carries the per-category breakdown alongside the count.
-  test("200 carries overlayOverrideBreakdown from the library result", async () => {
+  // The GET response carries the per-category breakdown alongside the count.
+  test("200 carries overlayOverrideBreakdown {models, profiles} from the library result", async () => {
     loadEffectiveRegistry.mockImplementationOnce(() => ({
       registry: builtinRegistry,
       source: {
         builtin: builtinRegistry,
-        overlay: { agentTiers: { builder: { opencode: "deep" } }, profiles: { balanced: { description: "x" } } },
+        overlay: { models: { "user-model": null }, profiles: { balanced: { description: "x" } } },
         tombstoned: [],
       },
       overlayOverrideCount: 2,
-      overlayOverrideBreakdown: { hostDefaults: 0, workflowTiers: 0, agentTiers: 1, tiers: 0, profiles: 1 },
+      overlayOverrideBreakdown: { models: 1, profiles: 1 },
     }));
 
     const res = await get("/api/v1/model-registry");
     expect(res.status).toBe(200);
-    expect(res.json.data.overlayOverrideBreakdown).toEqual({
-      hostDefaults: 0,
-      workflowTiers: 0,
-      agentTiers: 1,
-      tiers: 0,
-      profiles: 1,
-    });
+    expect(res.json.data.overlayOverrideBreakdown).toEqual({ models: 1, profiles: 1 });
   });
 
   test("200 with a library result missing overlayOverrideBreakdown falls back to an all-zero shape (defensive, mirrors the existing overlayOverrideCount ?? 0 pattern)", async () => {
@@ -218,13 +194,35 @@ describe("GET /api/v1/model-registry", () => {
 
     const res = await get("/api/v1/model-registry");
     expect(res.status).toBe(200);
-    expect(res.json.data.overlayOverrideBreakdown).toEqual({
-      hostDefaults: 0,
-      workflowTiers: 0,
-      agentTiers: 0,
-      tiers: 0,
-      profiles: 0,
-    });
+    expect(res.json.data.overlayOverrideBreakdown).toEqual({ models: 0, profiles: 0 });
+  });
+
+  // Finding 6: loadEffectiveRegistry already exposes v1BackupPath (D5/D7) when a v1 overlay
+  // was renamed away on this load — the GET route must forward it so the UI can render a
+  // notice from that exact field name.
+  test("200 forwards v1BackupPath when the library reports a v1 overlay was just backed up", async () => {
+    loadEffectiveRegistry.mockImplementationOnce(() => ({
+      registry: builtinRegistry,
+      source: { builtin: builtinRegistry, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
+      v1BackupPath: "/tmp/massa-ai-test-overlay/model-profiles.v1.json",
+    }));
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect(res.json.data.v1BackupPath).toBe("/tmp/massa-ai-test-overlay/model-profiles.v1.json");
+  });
+
+  test("200 omits v1BackupPath when the library does not report one", async () => {
+    loadEffectiveRegistry.mockImplementationOnce(() => ({
+      registry: builtinRegistry,
+      source: { builtin: builtinRegistry, overlay: null, tombstoned: [] },
+      overlayOverrideCount: 0,
+    }));
+
+    const res = await get("/api/v1/model-registry");
+    expect(res.status).toBe(200);
+    expect("v1BackupPath" in res.json.data).toBe(false);
   });
 
   test("200 on overlay corruption with overlayError surfaced", async () => {
@@ -242,39 +240,33 @@ describe("GET /api/v1/model-registry", () => {
   });
 });
 
-// ── design D-3 / APUX-03: agents inventory ───────────────────────────────────
+// ── spec AC6: agents inventory ───────────────────────────────────────────────
 
-describe("GET /api/v1/model-registry — agents inventory (design D-3, APUX-03, P1-A AC6)", () => {
-  test("200 + agents array shaped {name, charterTier} derived from loadAllCharters()", async () => {
-    loadAllCharters.mockImplementationOnce(() => [
-      { name: "builder", modelTier: "standard" },
-      { name: "code-explorer", modelTier: "deep" },
-    ]);
+describe("GET /api/v1/model-registry — agents inventory (spec AC6)", () => {
+  test("200 + agents array shaped {name} derived from scanCharterNames() (directory scan, no charterTier)", async () => {
+    scanCharterNames.mockImplementationOnce(() => ["builder", "investigator"]);
 
     const res = await get("/api/v1/model-registry");
     expect(res.status).toBe(200);
     expect(res.json.success).toBe(true);
-    expect(res.json.data.agents).toEqual([
-      { name: "builder", charterTier: "standard" },
-      { name: "code-explorer", charterTier: "deep" },
-    ]);
+    expect(res.json.data.agents).toEqual([{ name: "builder" }, { name: "investigator" }]);
     expect(res.json.data.agentsError).toBeUndefined();
   });
 
-  test("a loadAllCharters() throw degrades to agents:[] + agentsError, GET stays 200 (best-effort)", async () => {
-    loadAllCharters.mockImplementationOnce(() => {
-      throw new Error("charter parse failure: skills/agents/ghost/SKILL.md missing description");
+  test("a scanCharterNames() throw degrades to agents:[] + agentsError, GET stays 200 (best-effort)", async () => {
+    scanCharterNames.mockImplementationOnce(() => {
+      throw new Error("ENOENT skills/agents");
     });
 
     const res = await get("/api/v1/model-registry");
     expect(res.status).toBe(200);
     expect(res.json.success).toBe(true);
     expect(res.json.data.agents).toEqual([]);
-    expect(res.json.data.agentsError).toContain("charter parse failure");
+    expect(res.json.data.agentsError).toContain("ENOENT");
   });
 
-  test("a rejected loadAllCharters() promise degrades the same way — the async path is caught too", async () => {
-    loadAllCharters.mockImplementationOnce(() => Promise.reject(new Error("ENOENT skills/agents")));
+  test("a rejected scanCharterNames() promise degrades the same way — the async path is caught too", async () => {
+    scanCharterNames.mockImplementationOnce(() => Promise.reject(new Error("ENOENT skills/agents")));
 
     const res = await get("/api/v1/model-registry");
     expect(res.status).toBe(200);
@@ -288,8 +280,8 @@ describe("GET /api/v1/model-registry — agents inventory (design D-3, APUX-03, 
     expect(res.status).toBe(501);
     expect(res.json.success).toBe(false);
     expect(res.json.error).toContain("model-registry is unavailable in this deployment");
-    // The 501 gate returns before loadAllCharters() is ever reached.
-    expect(loadAllCharters).not.toHaveBeenCalled();
+    // The 501 gate returns before scanCharterNames() is ever reached.
+    expect(scanCharterNames).not.toHaveBeenCalled();
   });
 });
 
@@ -310,34 +302,25 @@ describe("PUT /api/v1/model-registry", () => {
     expect(res.status).toBe(200);
     expect(res.json.success).toBe(true);
     expect(res.json.data.registry).toBeDefined();
-    // APCR-01.10: the write path's response also reports the post-save override count, not
-    // just the read path — the operator sees it immediately after Save Overlay.
+    // The write path's response also reports the post-save override count, not just the
+    // subsequent GET — the operator sees it immediately after Save Overlay.
     expect(res.json.data.overlayOverrideCount).toBe(1);
   });
 
-  // WUT-17: this is the field the T41 task calls out as "missed the first time" on a past
-  // occurrence of overlayOverrideCount (admin-portal-correctness-repair/validation.md) — the
-  // PUT response must carry it too, not just GET.
   test("200 carries overlayOverrideBreakdown from the post-save library result", async () => {
     validateRegistry.mockImplementationOnce(() => builtinRegistry);
     loadEffectiveRegistry.mockImplementationOnce(() => ({
       registry: builtinRegistry,
       source: { builtin: builtinRegistry, overlay: { profiles: {} }, tombstoned: [] },
       overlayOverrideCount: 1,
-      overlayOverrideBreakdown: { hostDefaults: 0, workflowTiers: 0, agentTiers: 0, tiers: 0, profiles: 1 },
+      overlayOverrideBreakdown: { models: 0, profiles: 1 },
     }));
 
     const res = await put("/api/v1/model-registry", {
       profiles: { balanced: { description: "overlay modified" } },
     });
     expect(res.status).toBe(200);
-    expect(res.json.data.overlayOverrideBreakdown).toEqual({
-      hostDefaults: 0,
-      workflowTiers: 0,
-      agentTiers: 0,
-      tiers: 0,
-      profiles: 1,
-    });
+    expect(res.json.data.overlayOverrideBreakdown).toEqual({ models: 0, profiles: 1 });
   });
 
   test("uses the shared library merge, not a hand-copied twin (APCR-01.7)", async () => {
@@ -359,8 +342,8 @@ describe("PUT /api/v1/model-registry", () => {
   test("400 with all violations on validation failure", async () => {
     validateRegistry.mockImplementationOnce(() => {
       throw new RegistryValidationError([
-        "profiles.foo is missing tier 'standard'",
-        "hostDefaults.bar names unknown profile",
+        "profiles.foo.description is required and must be a non-empty string",
+        "models.bar.host is not a known host",
       ]);
     });
 
@@ -370,8 +353,77 @@ describe("PUT /api/v1/model-registry", () => {
     expect(res.status).toBe(400);
     expect(res.json.success).toBe(false);
     expect(res.json.error).toBe("validation failed");
-    expect(res.json.details).toContain("profiles.foo is missing tier 'standard'");
-    expect(res.json.details).toContain("hostDefaults.bar names unknown profile");
+    expect(res.json.details).toContain("profiles.foo.description is required and must be a non-empty string");
+    expect(res.json.details).toContain("models.bar.host is not a known host");
+  });
+
+  // spec T2 / AC1 / AC9: a v1-shaped overlay (any of the four removed registry keys) is
+  // rejected outright, before ever reaching mergeOverlay/validateRegistry — those keys are
+  // simply not read by mergeOverlay, so silently accepting the body would drop the operator's
+  // edit without telling them.
+  describe("400 on a v1-shaped overlay (unknown top-level key)", () => {
+    for (const key of ["tiers", "hostDefaults", "workflowTiers", "agentTiers"]) {
+      test(`rejects top-level "${key}"`, async () => {
+        const res = await put("/api/v1/model-registry", { [key]: {} });
+        expect(res.status).toBe(400);
+        expect(res.json.success).toBe(false);
+        expect(res.json.error).toBe("validation failed");
+        expect(res.json.details.some((d: string) => d.includes(`"${key}"`))).toBe(true);
+        expect(mergeOverlay).not.toHaveBeenCalled();
+        expect(validateRegistry).not.toHaveBeenCalled();
+      });
+    }
+
+    test("rejects an arbitrary unknown top-level key too", async () => {
+      const res = await put("/api/v1/model-registry", { bogus: {} });
+      expect(res.status).toBe(400);
+      expect(res.json.details.some((d: string) => d.includes('"bogus"'))).toBe(true);
+    });
+
+    // Finding 7: mergeOverlay's isOverlayProfile guard silently `continue`s past a non-object
+    // profile entry, so without this check it never reaches validateRegistry — the PUT would
+    // succeed (200) and persist dead cruft to the overlay file.
+    test("rejects a non-object profile entry (profiles.x = \"junk\")", async () => {
+      const res = await put("/api/v1/model-registry", { profiles: { x: "junk" } });
+      expect(res.status).toBe(400);
+      expect(res.json.success).toBe(false);
+      expect(res.json.details.some((d: string) => d.includes("overlay.profiles.x"))).toBe(true);
+      expect(mergeOverlay).not.toHaveBeenCalled();
+    });
+
+    // A models entry may legitimately be `null` (tombstone) — only a non-object, non-null
+    // value is rejected here.
+    test("rejects a non-object, non-null models entry (models.x = \"junk\")", async () => {
+      const res = await put("/api/v1/model-registry", { models: { x: "junk" } });
+      expect(res.status).toBe(400);
+      expect(res.json.success).toBe(false);
+      expect(res.json.details.some((d: string) => d.includes("overlay.models.x"))).toBe(true);
+      expect(mergeOverlay).not.toHaveBeenCalled();
+    });
+
+    test("a null models entry (tombstone) is not rejected by the shape check", async () => {
+      validateRegistry.mockImplementationOnce(() => builtinRegistry);
+      loadEffectiveRegistry.mockImplementationOnce(() => ({
+        registry: builtinRegistry,
+        source: { builtin: builtinRegistry, overlay: { models: {} }, tombstoned: [] },
+        overlayOverrideCount: 0,
+      }));
+
+      const res = await put("/api/v1/model-registry", { models: { "claude-alias-opus": null } });
+      expect(res.status).toBe(200);
+    });
+
+    test("does not reject a valid {models, profiles}-only overlay", async () => {
+      validateRegistry.mockImplementationOnce(() => builtinRegistry);
+      loadEffectiveRegistry.mockImplementationOnce(() => ({
+        registry: builtinRegistry,
+        source: { builtin: builtinRegistry, overlay: { profiles: {} }, tombstoned: [] },
+        overlayOverrideCount: 0,
+      }));
+
+      const res = await put("/api/v1/model-registry", { models: {}, profiles: {} });
+      expect(res.status).toBe(200);
+    });
   });
 });
 
@@ -394,7 +446,7 @@ describe("DELETE /api/v1/model-registry/overlay", () => {
     const res = await del("/api/v1/model-registry/overlay");
     expect(res.status).toBe(200);
     expect(res.json.success).toBe(true);
-    expect(res.json.data.registry.version).toBe(1);
+    expect(res.json.data.registry.version).toBe(2);
     expect(res.json.data.source.overlay).toBeNull();
   });
 });

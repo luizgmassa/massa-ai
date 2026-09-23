@@ -93,7 +93,7 @@ export class ProjectIdentityAliasResolver {
       // the next writer retries the lookup instead of riding a transient.
       logger.warn(
         "[project-identity] alias resolution failed; using original id",
-        safeErrorSummary(error),
+        { projectId, ...safeErrorSummary(error) },
       );
       return projectId;
     }

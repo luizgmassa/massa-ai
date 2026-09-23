@@ -111,7 +111,7 @@ export class MemoryConsolidationJob {
       // guard ensures a job-cycle failure never crashes the host process.
       logger.warn("Memory consolidation skipped", {
         trigger,
-        error: (error as Error).message,
+        error: error as Error,
       });
     } finally {
       this.running = false;
@@ -162,7 +162,7 @@ export class MemoryConsolidationJob {
       );
     } catch (e) {
       logger.warn("consolidation: candidate list failed (decay)", {
-        error: (e as Error).message,
+        error: e as Error,
       });
       return 0;
     }
@@ -188,7 +188,7 @@ export class MemoryConsolidationJob {
       } catch (e) {
         logger.warn("consolidation: decay write failed", {
           id: row.id,
-          error: (e as Error).message,
+          error: e as Error,
         });
       }
     }
@@ -229,14 +229,14 @@ export class MemoryConsolidationJob {
           } catch (e) {
             logger.warn("consolidation: soft-delete failed", {
               id: row.id,
-              error: (e as Error).message,
+              error: e as Error,
             });
           }
         }
       }
     } catch (e) {
       logger.warn("consolidation: prune scan failed", {
-        error: (e as Error).message,
+        error: e as Error,
       });
     }
     return pruned;
@@ -259,7 +259,7 @@ export class MemoryConsolidationJob {
       );
     } catch (e) {
       logger.warn("consolidation: candidate list failed (merge)", {
-        error: (e as Error).message,
+        error: e as Error,
       });
       return { merged: 0, batchesCreated: 0 };
     }
@@ -295,7 +295,7 @@ export class MemoryConsolidationJob {
     } catch (e) {
       logger.warn("consolidation: merge insert failed", {
         batchId: batch.id,
-        error: (e as Error).message,
+        error: e as Error,
       });
       return { merged: 0, batchesCreated: 0 };
     }
@@ -310,7 +310,7 @@ export class MemoryConsolidationJob {
         logger.warn("consolidation: addSupercedesEdge failed", {
           newId,
           sourceId,
-          error: (e as Error).message,
+          error: e as Error,
         });
       }
     }
@@ -361,7 +361,7 @@ export class MemoryConsolidationJob {
       return result as unknown as number;
     } catch (e) {
       logger.warn("consolidation: promote (PG) failed", {
-        error: (e as Error).message,
+        error: e as Error,
       });
       return 0;
     }

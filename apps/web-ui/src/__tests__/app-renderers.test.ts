@@ -1689,57 +1689,49 @@ describe("create/delete forms (T13 — MEM-02, HAND-02, CHKP-02, PROJ-02/04)", (
     it("every <button> in the write-mode Models (Model Catalog) view carries a class, including inline-form and empty-state buttons", () => {
       const registryData = {
         registry: {
-          version: 1,
-          tiers: ["light", "standard", "deep"],
-          hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
-          workflowTiers: { search: "standard" },
-          agentTiers: { builder: { opencode: "deep" } },
+          models: {
+            "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" },
+            "opencode-go-glm-5-2": { name: "GLM 5.2", host: "opencode", provider: "opencode-go", model: "glm-5.2" },
+          },
           profiles: {
             balanced: {
               description: "Balanced profile",
               hosts: {
-                claude: { light: { model: "claude-sonnet", effort: "low" }, standard: { model: "claude-sonnet", effort: "medium" }, deep: { model: "claude-opus", effort: "high" } },
-                opencode: { light: { model: "qwen-mini", effort: "low" }, standard: { model: "opencode-go/glm-5.2", effort: "medium" }, deep: { model: "qwen-max", effort: "high" } },
+                claude: { model: "claude-sonnet-5", effort: "medium" },
+                opencode: { model: "opencode-go/glm-5.2", effort: "medium" },
               },
+              agents: { builder: { opencode: { model: "opencode-go/glm-5.2", effort: "max" } } },
             },
           },
         },
         source: { builtin: {}, overlay: {}, tombstoned: ["old-profile"] },
-        agents: [{ name: "builder", charterTier: "standard" }],
+        agents: [{ name: "builder" }],
       };
-      const scanFormState = (registryForm: { kind: string; error: string | null } | null) => {
+      const scanFormState = (registryForm: Record<string, unknown> | null) => {
         const html = renderModelRegistry(registryData, { writeMode: true, registryForm });
         const buttons = extractButtonTags(html);
         expect(buttons.length).toBeGreaterThan(0);
         for (const tag of buttons) expect(tag).toContain("class=");
       };
       scanFormState(null);
-      scanFormState({ kind: "add-workflow", error: null });
+      scanFormState({ kind: "model-add", host: "claude", error: null });
+      scanFormState({ kind: "model-edit", editId: "claude-sonnet-5", host: "claude", error: null });
       scanFormState({ kind: "add-profile", error: null });
       scanFormState({ kind: "duplicate-profile", error: null });
       scanFormState({ kind: "delete-profile", error: null });
 
-      // Empty-state inline-form branches (no workflows left / no profiles to
-      // duplicate or delete) render a bare-looking form with only a Cancel
-      // button — exercise those too.
+      // Empty-state inline-form branches (no profiles to duplicate or delete, no models in
+      // the catalog) render a bare-looking form/table with only a Cancel button or an
+      // empty-state message — exercise those too.
       const noProfiles = { ...registryData, registry: { ...registryData.registry, profiles: {} } };
       for (const kind of ["duplicate-profile", "delete-profile"]) {
         const html = renderModelRegistry(noProfiles, { writeMode: true, registryForm: { kind, error: null } });
         const buttons = extractButtonTags(html);
         for (const tag of buttons) expect(tag).toContain("class=");
       }
-      // Uses the picker's own WORKFLOW_STEMS — every stem must already have
-      // an override for the add-workflow form to hit its empty-state branch.
-      const noWorkflowRoom = {
-        ...registryData,
-        registry: {
-          ...registryData.registry,
-          workflowTiers: Object.fromEntries(WORKFLOW_STEMS.map((s) => [s, "light"])),
-        },
-      };
-      const htmlFull = renderModelRegistry(noWorkflowRoom, { writeMode: true, registryForm: { kind: "add-workflow", error: null } });
-      expect(extractButtonTags(htmlFull).length).toBeGreaterThan(0);
-      for (const tag of extractButtonTags(htmlFull)) expect(tag).toContain("class=");
+      const noModels = { ...registryData, registry: { ...registryData.registry, models: {} } };
+      const noModelsHtml = renderModelRegistry(noModels, { writeMode: true });
+      for (const tag of extractButtonTags(noModelsHtml)) expect(tag).toContain("class=");
     });
 
     it(".form-grid is present on the Projects index form and Checkpoints create form", () => {
@@ -1818,37 +1810,35 @@ function extractVisibleText(html: string): string {
 
 const NOMENCLATURE_SAMPLE_REGISTRY = {
   registry: {
-    version: 1,
-    tiers: ["light", "standard", "deep"],
-    hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
-    workflowTiers: { search: "standard" },
-    agentTiers: { builder: { opencode: "deep" } },
+    models: {
+      "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" },
+      "codex-gpt-5": { name: "GPT-5", host: "codex", provider: "", model: "gpt-5" },
+      "opencode-go-glm-5-2": { name: "GLM 5.2", host: "opencode", provider: "opencode-go", model: "glm-5.2" },
+    },
     profiles: {
       balanced: {
         description: "Balanced profile",
         hosts: {
-          claude: { light: { model: "claude-sonnet", effort: "low" }, standard: { model: "claude-sonnet", effort: "medium" }, deep: { model: "claude-opus", effort: "high" } },
-          codex: { light: { model: "gpt-4o-mini", effort: "minimal" }, standard: { model: "gpt-4o", effort: "medium" }, deep: { model: "o1", effort: "high" } },
-          cursor: { light: { model: null, effort: null }, standard: { model: "claude-sonnet", effort: null }, deep: { model: "claude-opus", effort: null } },
-          opencode: { light: { model: "qwen-mini", effort: "low" }, standard: { model: "opencode-go/glm-5.2", effort: "medium" }, deep: { model: "qwen-max", effort: "high" } },
+          claude: { model: "claude-sonnet-5", effort: "medium" },
+          codex: { model: "gpt-5", effort: "medium" },
+          cursor: { model: null, effort: null },
+          opencode: { model: "opencode-go/glm-5.2", effort: "medium" },
         },
+        agents: { builder: { opencode: { model: "opencode-go/glm-5.2", effort: "max" } } },
       },
       work: {
         description: "Work profile",
-        hosts: { claude: { light: { model: "claude-haiku", effort: "low" } } },
+        hosts: { claude: { model: "claude-sonnet-5", effort: "low" } },
       },
     },
   },
   source: {
     builtin: {},
-    overlay: { profiles: { work: { description: "Custom work profile", hosts: {} } }, hostDefaults: { codex: "work" } },
+    overlay: { profiles: { work: { description: "Custom work profile", hosts: {} } } },
     tombstoned: ["old-profile"],
   },
   overlayOverrideCount: 2,
-  agents: [
-    { name: "builder", charterTier: "standard" },
-    { name: "code-reviewer", charterTier: "light" },
-  ],
+  agents: [{ name: "builder" }, { name: "reviewer" }],
 };
 
 const NOMENCLATURE_SAMPLE_PROFILES = {
@@ -1875,15 +1865,13 @@ describe("Models tab nomenclature Scheme A (T9, APUX-07, P2-D AC1)", () => {
     expect(catalogTabHtml).not.toContain("Model Registry");
   });
 
-  it('"Default Profile per Tool" replaces "Host Defaults" (Nomenclature Map)', () => {
-    expect(catalogTabHtml).toContain("Default Profile per Tool");
+  it('the Models section and Per-Agent Model Overrides section are present, with no tier/hostDefault/workflowTier vocabulary (model-catalog-revamp AC4/AC5/AC6)', () => {
+    expect(catalogTabHtml).toContain("<h3>Models</h3>");
+    expect(catalogTabHtml).toContain("<h3>Per-Agent Model Overrides</h3>");
+    expect(catalogTabHtml).not.toContain("Default Profile per Tool");
+    expect(catalogTabHtml).not.toContain("Per-Workflow Tier Overrides");
     expect(catalogTabHtml).not.toContain("Host Defaults");
-  });
-
-  it('"Per-Workflow Tier Overrides" replaces "Workflow Tiers" (Nomenclature Map)', () => {
-    expect(catalogTabHtml).toContain("Per-Workflow Tier Overrides");
-    expect(catalogTabHtml).not.toContain("<h3>Workflow Tiers</h3>");
-    expect(catalogTabHtml).not.toContain("<h4>Workflow Tiers</h4>");
+    expect(catalogTabHtml).not.toContain("Per-Agent Tier Overrides");
   });
 
   it('the "override" badge and override-count sentence replace "overlay" wording (Nomenclature Map)', () => {
@@ -1910,8 +1898,8 @@ describe("Models tab nomenclature Scheme A (T9, APUX-07, P2-D AC1)", () => {
   it('renderModelRegistry alone matches the same Scheme A labels', () => {
     const html = renderModelRegistry(NOMENCLATURE_SAMPLE_REGISTRY, { writeMode: true });
     expect(html).toContain("<h2>Model Catalog</h2>");
-    expect(html).toContain("Default Profile per Tool");
-    expect(html).toContain("Per-Workflow Tier Overrides");
+    expect(html).toContain("<h3>Models</h3>");
+    expect(html).toContain("<h3>Per-Agent Model Overrides</h3>");
     expect(html).toContain("Discard All Overrides");
     expect(html).toContain("Removed Profiles (restorable)");
   });

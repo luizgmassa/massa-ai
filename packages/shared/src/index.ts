@@ -121,6 +121,14 @@ export {
 } from "./profile-switch/ownership.js";
 export { syncGeneratedVariants, type VariantSyncHostResult, type VariantSyncOptions } from "./profile-switch/variant-sync.js";
 export { findRepoRootWithMarker } from "./profile-switch/repo-root.js";
+export {
+  runtimeDriftReport,
+  ENV_OVERRIDE_VARS,
+  type AgentRoleRuntime,
+  type AgentRuntimeReport,
+  type EnvOverride,
+  type RuntimeDriftOptions,
+} from "./profile-switch/doctor.js";
 
 // Bootstrap rule toggles. Root re-export, no new `exports` subpath — the same
 // shape profile-switch uses above. `ConfigParseError` is deliberately absent:

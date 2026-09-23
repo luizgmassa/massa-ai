@@ -150,7 +150,7 @@ export class PgSynapseSessionStore implements SessionStore {
       } catch (e) {
         this.hydrateFailedAt = Date.now();
         logger.warn("PgSynapseSessionStore hydrate failed (best-effort)", {
-          error: (e as Error).message,
+          error: e as Error,
         });
       } finally {
         this.hydrating = null;
@@ -346,7 +346,7 @@ export class PgSynapseSessionStore implements SessionStore {
     const next = prev.then(fn).catch((e) => {
       logger.warn("PgSynapseSessionStore write failed (best-effort)", {
         key,
-        error: (e as Error).message,
+        error: e as Error,
       });
     });
     this.inflight.set(key, next);

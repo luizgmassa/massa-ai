@@ -841,7 +841,10 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
       const rows = filtered.slice(offset, offset + limit);
       return { success: true, data: { memories: rows, total, limit, offset } };
     } catch (error) {
-      logger.error("Failed to list memories (embedded)", error as Error);
+      logger.error("Failed to list memories (embedded)", error as Error, {
+        projectId: body.projectId as string | undefined,
+        sessionId: body.sessionId as string | undefined,
+      });
       return { success: false, error: `Failed to list memories: ${(error as Error).message}` };
     }
   }

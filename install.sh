@@ -425,7 +425,7 @@ OLLAMA_EMBEDDING_DIMENSIONS=1024
 #MISTRAL_API_KEY=your_key_here
 
 # ── Logging ──────────────────────────────────────────────────
-LOG_LEVEL=info
+MASSA_AI_LOG_LEVEL=info
 ENABLE_METRICS=true
 
 # ── Local-first LLM (Ollama); default OFF, silent degrade ──

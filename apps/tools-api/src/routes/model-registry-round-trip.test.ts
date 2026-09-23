@@ -1,6 +1,6 @@
 /**
- * Unmocked agentTiers PUT->GET round trip (design D-3, admin-portal-ux-overhaul,
- * plan-critic blocking finding #1).
+ * Unmocked overlay PUT->GET round trip (design D-3, admin-portal-ux-overhaul,
+ * plan-critic blocking finding #1; extended for spec AC4's catalog persistence case).
  *
  * model-registry.test.ts registers mock.module("../../../../scripts/lib/model-profiles.ts",
  * ...) for every other route test — necessary there, but it also means Bun's mock.module
@@ -59,20 +59,39 @@ async function get(requestPath: string) {
   return { status: res.status, json: (await res.json()) as any };
 }
 
-describe("PUT then GET — unmocked agentTiers round trip (design D-3, plan-critic blocking finding #1)", () => {
-  test("PUT {agentTiers:{builder:{opencode:deep}}} survives the REAL mergeOverlay + validateRegistry + loadEffectiveRegistry, and GET reads it back", async () => {
+describe("PUT then GET — unmocked v2 overlay round trip (design D-3, plan-critic blocking finding #1)", () => {
+  test("PUT {profiles.balanced.hosts.claude} survives the REAL mergeOverlay + validateRegistry + loadEffectiveRegistry, and GET reads it back", async () => {
     const putRes = await put("/api/v1/model-registry", {
-      agentTiers: { builder: { opencode: "deep" } },
+      profiles: { balanced: { hosts: { claude: { model: "claude-round-trip-model", effort: "high" } } } },
     });
     expect(putRes.status).toBe(200);
     expect(putRes.json.success).toBe(true);
     // The PUT response itself already reflects the real merge (loadEffectiveRegistry re-read
     // right after the atomic write), not just the subsequent GET.
-    expect(putRes.json.data.registry.agentTiers.builder.opencode).toBe("deep");
+    expect(putRes.json.data.registry.profiles.balanced.hosts.claude.model).toBe("claude-round-trip-model");
 
     const getRes = await get("/api/v1/model-registry");
     expect(getRes.status).toBe(200);
     expect(getRes.json.success).toBe(true);
-    expect(getRes.json.data.registry.agentTiers.builder.opencode).toBe("deep");
+    expect(getRes.json.data.registry.profiles.balanced.hosts.claude.model).toBe("claude-round-trip-model");
+  });
+
+  // Finding 1: a brand-new profile's overlay carrying a null leaf (no builtin counterpart to
+  // tombstone) must not 400 through the REAL mergeOverlay + validateRegistry chain.
+  test("PUT a brand-new profile with a null host leaf survives the REAL mergeOverlay + validateRegistry", async () => {
+    const putRes = await put("/api/v1/model-registry", {
+      profiles: {
+        "round-trip-new-profile": {
+          description: "round trip",
+          hosts: { claude: { model: "claude-round-trip-model", effort: "high" }, codex: null },
+        },
+      },
+    });
+    expect(putRes.status).toBe(200);
+    expect(putRes.json.success).toBe(true);
+    expect(putRes.json.data.registry.profiles["round-trip-new-profile"].hosts.claude.model).toBe(
+      "claude-round-trip-model",
+    );
+    expect("codex" in putRes.json.data.registry.profiles["round-trip-new-profile"].hosts).toBe(false);
   });
 });

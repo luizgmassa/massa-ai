@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: Luiz Massa
   version: "2.0.0"
-  model_tier: deep
   permission: read-only
 ---
 

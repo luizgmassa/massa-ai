@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 26,
+  "next_id": 28,
   "lessons": [
     {
       "id": "L-001",
@@ -24,7 +24,7 @@
       ],
       "created": "2026-07-22T21:39:38Z",
       "last_seen": "2026-08-03T23:36:28Z",
-      "confidence": 1.0,
+      "confidence": 1,
       "project": "massa-ai",
       "session": "spec-da-inventory-closure",
       "workflow": "spec-driven",
@@ -547,6 +547,44 @@
       ],
       "created": "2026-08-11T02:40:44Z",
       "last_seen": "2026-08-11T02:40:44Z",
+      "confidence": 0.53
+    },
+    {
+      "id": "L-026",
+      "key": "surviving_mutant::a source order test indexof a indexof b cannot sense a dropped argument prove state threading with a behavioral run in a child process when homedir is involved because bun ignores in process home reassignment",
+      "text": "A source-order test (indexOf(a) < indexOf(b)) cannot sense a dropped argument; prove state threading with a behavioral run, in a child process when homedir() is involved, because Bun ignores in-process HOME reassignment.",
+      "signal": "surviving_mutant",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "model-catalog-revamp"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "scripts/__tests__/generate-subagent-artifacts.test.ts:643 (M14/M14b killed only after the behavioral rewrite)"
+      ],
+      "created": "2026-09-23T06:20:49Z",
+      "last_seen": "2026-09-23T06:20:49Z",
+      "confidence": 0.53
+    },
+    {
+      "id": "L-027",
+      "key": "gate_fail::serializing error cause is not free the ai sdk noobjectgeneratederror cause embeds the full model output so cap message cause length at the logger never per call site",
+      "text": "Serializing Error.cause is not free: the AI SDK NoObjectGeneratedError.cause embeds the full model output, so cap message/cause length at the logger, never per call site.",
+      "signal": "gate_fail",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "api-log-clarity"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "packages/shared/src/utils/logger.ts pickErrorFields cap (review finding 1)"
+      ],
+      "created": "2026-09-23T06:20:49Z",
+      "last_seen": "2026-09-23T06:20:49Z",
       "confidence": 0.53
     }
   ],

@@ -178,8 +178,11 @@ export const SELECTABLE_PROVIDERS = new Set<string>([
 ]);
 if (!SELECTABLE_PROVIDERS.has(selectedProvider)) {
   logger.warn(
-    `[EmbeddingConfig] selected provider "${selectedProvider}" has no runtime entry — falling back to priority order`,
-    { source: process.env.EMBEDDING_PROVIDER ? "EMBEDDING_PROVIDER env" : "config.json embedding.provider" },
+    "EmbeddingConfig: selected provider has no runtime entry, falling back to priority order",
+    {
+      selectedProvider,
+      source: process.env.EMBEDDING_PROVIDER ? "EMBEDDING_PROVIDER env" : "config.json embedding.provider",
+    },
   );
 }
 
@@ -264,9 +267,13 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
     const resolvedDimensions = resolveEmbeddingDimensions(model, file?.dimensions, envDimensions);
     if (resolvedDimensions.correctedFrom !== undefined) {
       logger.warn(
-        `[ollama] config.json records embedding.dimensions ${resolvedDimensions.correctedFrom} for model ` +
-          `"${model}", which emits ${resolvedDimensions.dimensions}. Using ${resolvedDimensions.dimensions}. ` +
-          "Update embedding.dimensions in config.json (or set OLLAMA_EMBEDDING_DIMENSIONS) to silence this.",
+        "EmbeddingConfig: ollama config.json dimensions mismatch corrected",
+        {
+          provider: "ollama",
+          model,
+          configuredDimensions: resolvedDimensions.correctedFrom,
+          correctedDimensions: resolvedDimensions.dimensions,
+        },
       );
     }
     return {

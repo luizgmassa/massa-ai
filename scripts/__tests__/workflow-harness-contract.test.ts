@@ -949,7 +949,10 @@ describe("dispatch announcement contract: single canonical shape (S8)", () => {
    * Substrings that together identify "a rule telling the orchestrator how
    * to announce a sub-agent's model/effort" -- specific enough not to
    * collide with unrelated mentions of "model" or "effort" elsewhere in the
-   * harness (Model Diversity Fallback, model_tier resolution, etc).
+   * harness (Model Diversity Fallback, per-profile model resolution, etc).
+   * (`model_tier` resolution was the pre-model-catalog-revamp mechanism this
+   * example used to name; that field no longer exists — see
+   * .specs/features/model-catalog-revamp/spec.md AC1.)
    */
   const ANNOUNCEMENT_MARKERS = ["effort: inherit", "model: inherit"] as const;
 

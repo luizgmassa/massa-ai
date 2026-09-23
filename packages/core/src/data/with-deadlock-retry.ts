@@ -74,7 +74,7 @@ export async function withDeadlockRetry<T>(
         attempt,
         maxAttempts,
         delayMs,
-        error: (error as Error)?.message?.slice(0, 120),
+        error: error as Error,
       });
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }

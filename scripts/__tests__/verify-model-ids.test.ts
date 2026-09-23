@@ -14,27 +14,21 @@ import { describe, test, expect } from "bun:test";
 import { exitCodeFor, idsForHost, verifyHost, which, type HostResult } from "../verify-model-ids.ts";
 import { loadRegistry, validateRegistry, type Registry } from "../lib/model-profiles.ts";
 
-function registryWith(hostBlocks: Record<string, Record<string, { model: string | null; effort: string | null }>>): Registry {
+function registryWith(hostBlocks: Record<string, { model: string | null; effort: string | null }>): Registry {
   return validateRegistry({
-    version: 1,
-    tiers: ["light", "standard", "deep"],
-    hostDefaults: { claude: "p", codex: "p", cursor: "p", opencode: "p" },
-    workflowTiers: {},
-    profiles: { p: { description: "t", hosts: hostBlocks } },
+    version: 2,
+    models: {},
+    profiles: { balanced: { description: "t", hosts: hostBlocks } },
   });
 }
 
-const triple = (model: string | null, effort: string | null) => ({
-  light: { model, effort },
-  standard: { model, effort },
-  deep: { model, effort },
-});
+const cell = (model: string | null, effort: string | null) => ({ model, effort });
 
 const ALL_HOSTS = () => ({
-  claude: triple("haiku", "high"),
-  codex: triple("gpt-5.4-mini", "high"),
-  cursor: triple(null, null),
-  opencode: triple("opencode-go/glm-5.2", "max"),
+  claude: cell("haiku", "high"),
+  codex: cell("gpt-5.4-mini", "high"),
+  cursor: cell(null, null),
+  opencode: cell("opencode-go/glm-5.2", "max"),
 });
 
 describe("idsForHost", () => {
@@ -58,14 +52,14 @@ describe("claude alias checking (no CLI exists to probe)", () => {
 
   test("documented aliases pass", () => {
     for (const alias of ["haiku", "sonnet", "opus", "fable"]) {
-      const r = verifyHost(registryWith({ ...ALL_HOSTS(), claude: triple(alias, "high") }), probe);
+      const r = verifyHost(registryWith({ ...ALL_HOSTS(), claude: cell(alias, "high") }), probe);
       expect(r.verdict).toBe("ok");
     }
   });
 
   test("a non-alias is UNKNOWN, not OK — a full model id cannot be checked offline", () => {
     const r = verifyHost(
-      registryWith({ ...ALL_HOSTS(), claude: triple("claude-opus-4-8", "high") }),
+      registryWith({ ...ALL_HOSTS(), claude: cell("claude-opus-4-8", "high") }),
       probe,
     );
     expect(r.verdict).toBe("unverifiable");
@@ -73,7 +67,7 @@ describe("claude alias checking (no CLI exists to probe)", () => {
   });
 
   test("a typo'd alias is UNKNOWN rather than silently accepted", () => {
-    const r = verifyHost(registryWith({ ...ALL_HOSTS(), claude: triple("haiky", "high") }), probe);
+    const r = verifyHost(registryWith({ ...ALL_HOSTS(), claude: cell("haiky", "high") }), probe);
     expect(r.verdict).not.toBe("ok");
   });
 });
@@ -125,7 +119,7 @@ describe("probing a real listing command", () => {
 
   test("every pinned id present in the listing -> ok", () => {
     const r = verifyHost(
-      registryWith({ ...ALL_HOSTS(), opencode: triple("opencode-go/glm-5.2", "max") }),
+      registryWith({ ...ALL_HOSTS(), opencode: cell("opencode-go/glm-5.2", "max") }),
       listing(["opencode-go/glm-5.2", "opencode-go/other"]),
     );
     expect(r.verdict).toBe("ok");
@@ -134,7 +128,7 @@ describe("probing a real listing command", () => {
 
   test("a pinned id ABSENT from the listing -> missing (the discriminating case)", () => {
     const r = verifyHost(
-      registryWith({ ...ALL_HOSTS(), opencode: triple("opencode-go/ghost-model", "max") }),
+      registryWith({ ...ALL_HOSTS(), opencode: cell("opencode-go/ghost-model", "max") }),
       listing(["opencode-go/glm-5.2"]),
     );
     expect(r.verdict).toBe("missing");
@@ -143,7 +137,7 @@ describe("probing a real listing command", () => {
 
   test("matching is exact, not substring — a prefix must not satisfy a longer id", () => {
     const r = verifyHost(
-      registryWith({ ...ALL_HOSTS(), opencode: triple("opencode-go/glm-5.2-turbo", "max") }),
+      registryWith({ ...ALL_HOSTS(), opencode: cell("opencode-go/glm-5.2-turbo", "max") }),
       listing(["opencode-go/glm-5.2"]),
     );
     expect(r.verdict).toBe("missing");

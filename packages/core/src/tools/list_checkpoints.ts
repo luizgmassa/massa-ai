@@ -130,7 +130,7 @@ export class ListCheckpointsTool implements IToolHandler {
 
       return serializeToolResponse(responseData, { format, fields });
     } catch (error) {
-      logger.error("Failed to list checkpoints", error as Error);
+      logger.error("Failed to list checkpoints", error as Error, { taskId, projectId });
       return {
         success: false,
         error: `Failed to list checkpoints: ${(error as Error).message}`,

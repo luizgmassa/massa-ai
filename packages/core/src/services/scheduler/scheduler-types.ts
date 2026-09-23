@@ -81,6 +81,8 @@ export interface SchedulerStatus {
     enabled: boolean;
     nextRunAt: number;
     lastRunAt: number;
+    lastSuccessAt: number | null;
+    consecutiveFailures: number;
     due: boolean;
     currentlyRunning: boolean;
   }>;

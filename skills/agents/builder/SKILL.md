@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: Luiz Massa
   version: "1.1.0"
-  model_tier: standard
   permission: write
 ---
 

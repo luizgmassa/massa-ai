@@ -161,9 +161,9 @@ export class TokenMetrics {
 
       throw new Error("Model not found in models.dev");
     } catch (error) {
-      logger.warn("Failed to fetch pricing from models.dev, using fallback", {
+      logger.warn("TokenMetrics: failed to fetch pricing from models.dev, using fallback", {
         modelId,
-        error: error instanceof Error ? error.message : String(error),
+        error,
       });
 
       // Use fallback pricing

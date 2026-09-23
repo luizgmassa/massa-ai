@@ -226,8 +226,9 @@ export class DiscoverStage {
       };
     } catch (err) {
       logger.warn("DiscoverStage: failed to stat/read file", {
+        projectId: ctx.projectId,
         relativePath,
-        error: (err as Error).message,
+        error: err as Error,
       });
       throw new Error(`required_file_unreadable:${relativePath}:${(err as Error).message}`);
     }

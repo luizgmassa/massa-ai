@@ -242,15 +242,19 @@ describe("no phantom roles: every orchestration role has a real charter", () => 
     expect((await charterNames()).length).toBe(7);
   });
 
-  test("every charter is registered in skills/AGENTS.md and in the generator", async () => {
+  test("every charter is registered in skills/AGENTS.md and discovered by the generator", async () => {
+    // The generator no longer names agents literally (model-catalog-revamp): it scans
+    // skills/agents/*/SKILL.md at runtime (`scanCharterNames`) instead of carrying a
+    // hand-maintained SPECIALIST_NAMES list. So "registered in the generator" is now a
+    // behavioural check — does the scan actually find this charter — not a literal-string
+    // search over the generator's source.
+    const { scanCharterNames } = await import("../generate-subagent-artifacts.ts");
     const names = await charterNames();
     const registry = await read(path.join(SKILLS_DIR, "AGENTS.md"));
-    const generator = await read(
-      path.join(REPO_ROOT, "scripts/generate-subagent-artifacts.ts"),
-    );
+    const scanned = new Set(await scanCharterNames());
     for (const name of names) {
       expect(registry).toContain(`skills/agents/${name}/SKILL.md`);
-      expect(generator).toContain(`"${name}"`);
+      expect(scanned.has(name)).toBe(true);
     }
   });
 });

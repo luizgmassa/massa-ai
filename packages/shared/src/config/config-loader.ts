@@ -506,7 +506,7 @@ export function getConfigForEnv(): Record<string, string> {
     );
   }
 
-  env.LOG_LEVEL = config.logging.level;
+  env.MASSA_AI_LOG_LEVEL = config.logging.level;
   env.ENABLE_METRICS = String(config.logging.enableMetrics);
 
   return env;

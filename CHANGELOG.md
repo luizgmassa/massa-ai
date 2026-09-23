@@ -7,41 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed
+### Added
 
-- **Breaking: the persona feature is gone.** `skills/persona-router/`, the persona catalog
-  (`skills/massa-ai/personas/`), the `persona_router:` policy block, the `persona_pin`
-  project contract, and the `persona` capability-packet field no longer exist. Role routing
-  lives in one place: workflows plus the seven sub-agents. Generated plugin bundles no longer
-  carry `skills/persona-router/`, and `bun run generate:artifacts` deletes a stale copy left
-  in a checkout.
-- **Breaking: the `persona-router` bootstrap rule is retired — 9 rules become 8.** The
-  contract now renders `caveman`, `massa-ai-router`, `dedupe-guardrails`, `plan-challenge`,
-  `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`. A persisted
-  `bootstrap.rules["persona-router"]` in `config.json` is silently ignored (no warning, the
-  key is left in place); `massa-ai-config bootstrap enable|disable persona-router` now exits
-  with `bootstrap rule "persona-router" was retired and can no longer be toggled`.
-- **Breaking: 14 sub-agents are retired; the roster is 7.** `planner`, `context-curator`,
-  `documentation-agent`, `investigator`, `navigator`, `meta-judge`, `plan-critic`,
-  `furps-analyst`, `requirements-analyst`, `verification-agent`, `mobile-specialist`,
-  `architecture-specialist`, `audit-specialist`, and `reviewer` are folded into `builder`,
-  `code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, and
-  `test-engineer`, which select a former output contract through the capability packet's
-  `mode` field. The single retired → current mapping table is in `skills/AGENTS.md`
-  (`planner`, `context-curator`, and `documentation-agent` have no successor: the main agent
-  plans and curates context, and the `create-*` workflows write documents). The index-first
-  allowlist exception (`AGENT_TOOLS_OVERRIDE`) and its `pwd`-only OpenCode bash override are
-  gone; every read-only agent uses the ordinary denylist.
-- **Breaking: the `general`, `maestro`, `maestro-audit`, and `maestro-fix` workflows are
-  removed — 40 workflows become 36.** With them go `references/maestro.md`,
-  `references/maestro/`, `docs/massa-ai-maestro.md`, the `maestro` audit-report family and its
-  `MST` prefix. When no route matches, the router now proceeds without loading any workflow
-  file, under its Core Contract; there is no fallback workflow.
-- **The `/persona` prompt prefix is no longer an observation-extractor role signal.** `act as`
-  and `you are a` still are.
+- **`massa-ai-config doctor [--fix] [--host <h>] [--target <dir>]`** in both
+  the mcp-client and opencode-plugin CLIs (agent-drift followup T2). Prints
+  the profile-switch doctor's drift report — live-tree vs recorded vs pinned
+  versions, per-role models, variant staleness, and the host env override —
+  and `--fix` is the sanctioned mutation surface the session-start hook
+  deliberately is not: it re-runs the profile switch for the RECORDED active
+  profile (never a flag), then re-reports. Version drift and env overrides
+  stay report-only; their remedies live outside this CLI's write scope.
+- **Web UI Model Catalog: a Models section.** It adds, edits and deletes
+  typed models (name, tool, provider, model, and a 1M-context checkbox for
+  Claude Code). The profile grid and per-agent overrides pick from those models
+  through dropdowns. Edits persist in the user overlay, so they survive restart
+  and upgrade. The Tiers, Default Profile per Tool and Per-Workflow Tier
+  Overrides sections are removed.
 
 ### Changed
 
+- **BREAKING: model registry v2 — tiers replaced by profiles and a typed
+  models catalog.** Removed from `skills/model-profiles.json`:
+  `tiers`, `hostDefaults`, `workflowTiers`, `agentTiers` (keys);
+  `metadata.model_tier` (charter field); `resolveTier()` and `workflowTier()`
+  (functions). Each profile now defines per-tool default models and optional
+  per-agent overrides. Adding a specialist = one charter directory (discovered
+  by `skills/agents/*/SKILL.md` directory scan, no SPECIALIST_NAMES list).
+  Built-in profiles ship overrides that preserve today's model spread:
+  14 agents use the profile default, 3 override to standard, 1 to light.
+  Read-only agents carry no override by convention and resolve to the profile
+  default (the strongest model). **User migration:** v1 overlays are detected,
+  backed up to `~/.config/massa-ai/model-profiles.v1.json`, and ignored with
+  one warning; re-enter custom models in the Web UI Model Catalog.
+- **BREAKING: `LOG_LEVEL` renamed to `MASSA_AI_LOG_LEVEL` (AD-010, no dual-read).**
+  Updated in config readers, `.env.example`, `install.sh`, Synapse documentation,
+  and `turbo.json` passThroughEnv.
+- **Logging improvements:** (1) LLM failure lines include `label`, `role`,
+  `model`, `provider`, `timeoutMs`, `elapsedMs`, `timedOut`, and
+  `consecutiveFailures` (per-label streak, resets on success);
+  (2) first success after N ≥ 1 failures logs one INFO `LLM call recovered`
+  with `afterFailures: N`; (3) repeated WARN/ERROR within 15 min get
+  `occurrences` and `firstSeenAgo` added to meta; (4) successful structured
+  calls move to DEBUG and carry `label` and `model`; (5) every production
+  warn/error site was reviewed, and the offenders were fixed to pass the Error object itself (not `.message`), use
+  constant component+operation messages, carry scope identifiers in meta,
+  and follow H1-H4 rules (error serialization preserves `name`, `code`,
+  `cause`; one-level deep only, never spread).
 - **Breaking: six workflows are renamed, with no aliases.** `discovery` → `product-discovery`,
   `adr` → `create-adr`, `to-prd` → `create-prd`, `rfc` → `create-rfc`, `tdd` → `create-tdd`,
   `ticket` → `create-ticket` — the files, frontmatter names, session-id prefixes, `workflow:`
@@ -84,6 +95,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the old nine-rule text with the persona router until you run `bash
   scripts/install-harness.sh` or `bash scripts/install-skills.sh --apply`, or any
   `massa-ai-config bootstrap enable|disable`.
+
+### Removed
+
+- **Breaking: the persona feature is gone.** `skills/persona-router/`, the persona catalog
+  (`skills/massa-ai/personas/`), the `persona_router:` policy block, the `persona_pin`
+  project contract, and the `persona` capability-packet field no longer exist. Role routing
+  lives in one place: workflows plus the seven sub-agents. Generated plugin bundles no longer
+  carry `skills/persona-router/`, and `bun run generate:artifacts` deletes a stale copy left
+  in a checkout.
+- **Breaking: the `persona-router` bootstrap rule is retired — 9 rules become 8.** The
+  contract now renders `caveman`, `massa-ai-router`, `dedupe-guardrails`, `plan-challenge`,
+  `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`. A persisted
+  `bootstrap.rules["persona-router"]` in `config.json` is silently ignored (no warning, the
+  key is left in place); `massa-ai-config bootstrap enable|disable persona-router` now exits
+  with `bootstrap rule "persona-router" was retired and can no longer be toggled`.
+- **Breaking: 14 sub-agents are retired; the roster is 7.** `planner`, `context-curator`,
+  `documentation-agent`, `investigator`, `navigator`, `meta-judge`, `plan-critic`,
+  `furps-analyst`, `requirements-analyst`, `verification-agent`, `mobile-specialist`,
+  `architecture-specialist`, `audit-specialist`, and `reviewer` are folded into `builder`,
+  `code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, and
+  `test-engineer`, which select a former output contract through the capability packet's
+  `mode` field. The single retired → current mapping table is in `skills/AGENTS.md`
+  (`planner`, `context-curator`, and `documentation-agent` have no successor: the main agent
+  plans and curates context, and the `create-*` workflows write documents). The index-first
+  allowlist exception (`AGENT_TOOLS_OVERRIDE`) and its `pwd`-only OpenCode bash override are
+  gone; every read-only agent uses the ordinary denylist. With `documentation-agent` gone, its
+  light-model per-agent override leaves every built-in profile: the profiles override exactly
+  `builder`, `designer`, and `test-engineer`; `code-explorer`, `code-reviewer`, `judge`, and
+  `product-manager` resolve to the profile default.
+- **Breaking: the `general`, `maestro`, `maestro-audit`, and `maestro-fix` workflows are
+  removed — 40 workflows become 36.** With them go `references/maestro.md`,
+  `references/maestro/`, `docs/massa-ai-maestro.md`, the `maestro` audit-report family and its
+  `MST` prefix. When no route matches, the router now proceeds without loading any workflow
+  file, under its Core Contract; there is no fallback workflow.
+- **The `/persona` prompt prefix is no longer an observation-extractor role signal.** `act as`
+  and `you are a` still are.
+
+### Fixed
+
+- **Regeneration no longer silently resets the active profile
+  (agent-drift followup T1).** `selectProfile`'s precedence gains rank 3:
+  `--profile` > `MASSA_AI_MODEL_PROFILE` > **install-state's recorded
+  `modelProfile`** > `"balanced"`. Measured 2026-09-21: after an operator
+  switched to `work`, the next `generate:artifacts` re-emitted the claude
+  actives from the registry default models while the state still said `work`
+  — the session-start drift hook caught the divergence its own generator had
+  caused. `main()` now threads the recorded profile through `emitAll`
+  (`stateProfilesFromInstallState`), so a regeneration re-emits the actives
+  for the profile the operator actually switched to; fresh checkouts and CI
+  (no state) keep the old behavior. A stale recorded name (removed, renamed,
+  or no longer supporting the host) now degrades to the `"balanced"`
+  fallback instead of throwing — a historical switch this run did not
+  request should not crash regeneration; `--profile`/`MASSA_AI_MODEL_PROFILE`
+  still throw on an unknown name.
+- **Dashboard scheduler status now reports real `consecutiveFailures` and
+  `lastSuccessAt`.** `GET /api/v1/scheduler/status` stopped hardcoding
+  these fields to 0 and null, and now reflects the job's actual persistence.
 
 ## [1.60.1] - 2026-09-21
 

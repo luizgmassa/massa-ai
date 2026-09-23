@@ -134,7 +134,7 @@ export class OperationLogRepositoryPg implements OperationLogRepository {
         op: input.op,
         projectId,
         result: input.result,
-        error: (err as Error).message,
+        error: err as Error,
       });
     }
   }

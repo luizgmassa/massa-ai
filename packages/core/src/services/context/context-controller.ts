@@ -146,7 +146,7 @@ export class ContextController {
         }
       } catch (err) {
         // Graph errors are non-fatal — fall through to semantic search only
-        logger.warn("Graph prefilter failed", { query, error: (err as Error).message });
+        logger.warn("ContextController: graph prefilter failed", { projectId, query, error: err as Error });
       }
     }
 
@@ -380,9 +380,11 @@ export class ContextController {
 
       return result.memories;
     } catch (error) {
-      logger.warn("Memory search failed, continuing without memories", {
-        error: (error as Error).message,
+      logger.warn("ContextController: memory search failed, continuing without memories", {
+        projectId: opts.projectId,
+        sessionId: opts.sessionId,
         query: query.slice(0, 30),
+        error: error as Error,
       });
       return [];
     }

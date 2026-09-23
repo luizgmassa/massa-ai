@@ -167,7 +167,7 @@ export class PgCheckpointStore implements ICheckpointStore {
       } catch (e) {
         this.hydrateFailedAt = Date.now();
         logger.warn("PgCheckpointStore hydrate failed (best-effort)", {
-          error: (e as Error).message,
+          error: e as Error,
         });
       } finally {
         this.hydrating = null;
@@ -429,8 +429,9 @@ export class PgCheckpointStore implements ICheckpointStore {
       // Query failed (memories table missing, connection error, ...) —
       // best-effort: assume all referenced memories exist so a restore is never
       // blocked by an unrelated query error. Mirrors the PostgreSQL store's catch.
-      logger.warn("countExistingMemoryIds failed (best-effort: assuming all exist)", {
-        error: (e as Error).message,
+      logger.warn("PgCheckpointStore: countExistingMemoryIds failed (best-effort, assuming all exist)", {
+        memoryIdCount: memoryIds.length,
+        error: e as Error,
       });
       return memoryIds;
     }
@@ -529,7 +530,7 @@ export class PgCheckpointStore implements ICheckpointStore {
     const next = prev.then(fn).catch((e) => {
       logger.warn("PgCheckpointStore write failed (best-effort)", {
         key,
-        error: (e as Error).message,
+        error: e as Error,
       });
     });
     this.inflight.set(key, next);

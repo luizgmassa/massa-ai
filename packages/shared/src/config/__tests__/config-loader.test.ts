@@ -458,11 +458,11 @@ describe("getConfigForEnv", () => {
     expect(env.OPENAI_API_KEY).toBe("");
   });
 
-  test("always sets LOG_LEVEL and ENABLE_METRICS", () => {
+  test("always sets MASSA_AI_LOG_LEVEL and ENABLE_METRICS", () => {
     const cfg = { ...defaultMassaAiConfig, logging: { level: "warn", enableMetrics: true } };
     saveConfig(cfg);
     const env = getConfigForEnv();
-    expect(env.LOG_LEVEL).toBe("warn");
+    expect(env.MASSA_AI_LOG_LEVEL).toBe("warn");
     expect(env.ENABLE_METRICS).toBe("true");
   });
 
@@ -498,7 +498,7 @@ describe("getConfigForEnv", () => {
     try {
       const env = getConfigForEnv();
       // No embedding-specific env var at all — only the two unconditional ones.
-      expect(Object.keys(env).sort()).toEqual(["ENABLE_METRICS", "LOG_LEVEL"]);
+      expect(Object.keys(env).sort()).toEqual(["ENABLE_METRICS", "MASSA_AI_LOG_LEVEL"]);
       expect(errorSpy).toHaveBeenCalledTimes(1);
       expect(String(errorSpy.mock.calls[0]![0])).toContain('"cohere"');
     } finally {

@@ -149,26 +149,17 @@ describe("listProfiles", () => {
     expect(claude.bundleVersion).toBe("1.23.0");
   });
 
-  test("(i) honours opts.hostDefaults as the fallback for an unrecorded host", () => {
-    stageVariant(home, "claude", "local_models", { "judge.md": "b" });
+  test("(i) an unrecorded host falls back to the literal \"balanced\" (spec AC8 — no registry hostDefaults anymore)", () => {
+    stageVariant(home, "claude", "balanced", { "massa-ai-planner.md": "b" });
     // No install-state written -> claude has no recorded modelProfile.
-
-    const inv = listProfiles({ targetHome: home, hostDefaults: { claude: "local_models" } });
-    const claude = inv.hosts.find((h) => h.host === "claude")!;
-    expect(claude.activeProfile).toBe("local_models");
-  });
-
-  test("(i) omitting opts.hostDefaults still yields the last-resort \"balanced\" literal", () => {
-    stageVariant(home, "claude", "balanced", { "judge.md": "b" });
-    // No install-state, no hostDefaults passed at all.
 
     const inv = listProfiles({ targetHome: home });
     const claude = inv.hosts.find((h) => h.host === "claude")!;
     expect(claude.activeProfile).toBe("balanced");
   });
 
-  test("(i) a recorded modelProfile still wins over opts.hostDefaults", () => {
-    stageVariant(home, "claude", "work", { "judge.md": "b" });
+  test("(i) a recorded modelProfile wins over the \"balanced\" fallback", () => {
+    stageVariant(home, "claude", "work", { "massa-ai-planner.md": "b" });
     writeState(home, {
       version: 2,
       platforms: {
@@ -181,7 +172,7 @@ describe("listProfiles", () => {
       },
     });
 
-    const inv = listProfiles({ targetHome: home, hostDefaults: { claude: "local_models" } });
+    const inv = listProfiles({ targetHome: home });
     const claude = inv.hosts.find((h) => h.host === "claude")!;
     expect(claude.activeProfile).toBe("work");
   });

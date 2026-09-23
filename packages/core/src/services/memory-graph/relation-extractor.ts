@@ -188,7 +188,7 @@ export class RelationExtractor {
     } catch (error) {
       logger.warn("RelationExtractor: extraction failed", {
         memoryId,
-        error: (error as Error).message,
+        error: error as Error,
       });
     }
 

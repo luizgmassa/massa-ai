@@ -104,30 +104,21 @@ export interface ListProfilesOptions extends CommonOpts {
   hosts?: readonly Host[];
   /** Injectable env for the claude drift row (tests); defaults to process.env. */
   env?: Readonly<Record<string, string | undefined>>;
-  /** Per-host declared default profile (registry `hostDefaults`, rank 3 of
-   *  profile resolution — `scripts/lib/model-profiles.ts:356`). Used only
-   *  when a host has no recorded `modelProfile` in install-state: that
-   *  value drives what `installActiveProfiles` *writes* on the next
-   *  regenerate (not merely what the UI shows), so a caller that can reach
-   *  the registry should pass this rather than accept the last-resort
-   *  literal below. Omit when the registry is unreachable (e.g. the two
-   *  published config-CLIs, which cannot depend on `scripts/lib`) — the
-   *  literal is the correct degrade, not a bug to work around. */
-  hostDefaults?: Readonly<Record<string, string>>;
 }
 
 /**
  * Enumerates installed variant dirs per detected host + reads recorded
  * state. Never touches the registry — every profile name comes from
- * on-disk directories (MPS-02 offline requirement); `opts.hostDefaults` is
- * the one exception, an optional caller-supplied map read only as the
- * fallback for a host with no recorded `modelProfile`.
+ * on-disk directories (MPS-02 offline requirement). A host with no recorded
+ * `modelProfile` in install-state falls back to the literal `"balanced"`
+ * (spec AC8 — the registry's `hostDefaults` key is gone in v2, so this is
+ * the only fallback left).
  *
  * ACCEPTED RISK (plan-critic F3, not fixed here): a host with no recorded
- * `modelProfile` is still auto-installed on the next regenerate — this
- * change only makes that auto-install target the registry's declared
- * default instead of a hardcoded literal. Refusing to auto-install an
- * unswitched host at all would be a separate, unrequested behaviour change.
+ * `modelProfile` is still auto-installed on the next regenerate, targeting
+ * `"balanced"` instead of a registry-declared default. Refusing to
+ * auto-install an unswitched host at all would be a separate, unrequested
+ * behaviour change.
  */
 export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
   const { targetHome, stateFilePath } = resolveCommon(opts);
@@ -165,7 +156,7 @@ export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
         installed: false,
         skipped: false,
         skipReason: null,
-        activeProfile: platform.modelProfile?.profile ?? opts.hostDefaults?.[host] ?? "balanced",
+        activeProfile: platform.modelProfile?.profile ?? "balanced",
         bundleVersion: platform.plugin?.version ?? null,
         availableProfiles: [],
         ...claudeDriftFields(host),
@@ -192,7 +183,7 @@ export function listProfiles(opts: ListProfilesOptions = {}): ProfileInventory {
       installed,
       skipped: false,
       skipReason: null,
-      activeProfile: platform?.modelProfile?.profile ?? opts.hostDefaults?.[host] ?? "balanced",
+      activeProfile: platform?.modelProfile?.profile ?? "balanced",
       bundleVersion: platform?.plugin?.version ?? null,
       availableProfiles,
       ...claudeDriftFields(host),
