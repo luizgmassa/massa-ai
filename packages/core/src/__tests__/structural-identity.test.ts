@@ -185,6 +185,24 @@ describe("versioned structural FQN codec goldens", () => {
     expect(identity.legacyFqn).toBe("src/example.ts#topic~method~draft");
   });
 
+  test("escapes a mid-string # instead of throwing (e.g. a markdown heading naming an issue)", () => {
+    const identity = createStructuralIdentity({
+      ...METHOD,
+      name: "Fixes issue #456",
+      qualifiedName: "Fixes issue #456",
+      kind: "heading",
+      scope: "top_level",
+      overload: "unique",
+    });
+    expect(identity.name).toBe("Fixes issue %23456");
+    expect(identity.qualifiedName).toBe("Fixes issue %23456");
+    expect(identity.fqn).toBe("src/example.ts#Fixes issue %23456");
+    expect(parseStructuralFqn(identity.fqn)).toMatchObject({
+      format: "simple",
+      name: "Fixes issue %23456",
+    });
+  });
+
   test("canonical serialization is position-free, NFC, whitespace-normalized, and modifier-sorted", () => {
     const first = canonicalizeStructuralSignature(METHOD);
     const second = canonicalizeStructuralSignature({
