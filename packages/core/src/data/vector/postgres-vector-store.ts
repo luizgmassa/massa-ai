@@ -31,6 +31,7 @@ import {
   type InferenceProviderId,
 } from '@massa-ai/shared/inference-providers';
 import { installGuardOnTable } from '../../kernel/identity-guard-installer.js';
+import { resolveConnectionTimeoutMs } from '../../kernel/db-connection.js';
 import type { Pool, PoolConfig } from 'pg';
 
 export interface PostgresConfig {
@@ -147,11 +148,16 @@ export class PostgresVectorStore extends BaseVectorStore {
     const pg = await import('pg');
     const PgPool = (pg.default as any)?.Pool ?? (pg as any).Pool;
 
+    // connectionTimeoutMs shares db-connection.ts's DB_CONNECTION_TIMEOUT_MS
+    // knob — a hardcoded 5s here was observed timing out sibling pools'
+    // connections during normal concurrent-reindex load (this pool handles
+    // the vector upserts in the same load stage; see db-connection.ts for
+    // the incident this fixes).
     const poolConfig: PoolConfig = {
       connectionString: this.config.connectionString,
       max: this.config.poolSize,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: resolveConnectionTimeoutMs(),
     };
 
     return new PgPool(poolConfig) as Pool;
