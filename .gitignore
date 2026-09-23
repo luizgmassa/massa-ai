@@ -77,7 +77,6 @@ benchmarks/datasets/
 
 # Generated plugin bundles (regenerate via `bun run generate:artifacts`)
 apps/*-plugin/skills/massa-ai/
-apps/*-plugin/skills/persona-router/
 apps/*-plugin/skills/profile/
 apps/*-plugin/skills/bootstrap/
 apps/*-plugin/skills/agents/

@@ -169,7 +169,7 @@ fi
 # ── Skills bundling (PDO-08, 09 / D3 two-writer ownership) ──────────────────
 # scripts/install-skills.sh remains the single writer once it has already
 # claimed this platform (skillsOwner: "repo" in the shared install-state.json).
-# This plugin installs its bundled massa-ai/persona-router skills into the
+# This plugin installs its bundled massa-ai/profile/bootstrap skills into the
 # SAME harness skills directory ($TARGET/skills) only when that has not
 # happened, mirroring the MCP single-writer precedent
 # (test-mcp-single-writer.sh). A repo checkout's own --apply always takes
@@ -210,12 +210,12 @@ install_bundled_skills() {
   local installed=0 name src dest
   # IPT-05/AC-05.1/D6: the authoritative set of harness skills is the
   # generator's own constant (`collectSkillEntries`'s bundle list in
-  # generate-skill-artifacts.ts) — massa-ai, persona-router, profile,
-  # bootstrap. Do NOT derive this by scanning the bundle's skills/ directory;
-  # that installs 49 skills on cursor (AC-05.2). Keeping this loop equal to
+  # generate-skill-artifacts.ts) — massa-ai, profile, bootstrap. Do NOT
+  # derive this by scanning the bundle's skills/ directory; that installs 49
+  # skills on cursor (AC-05.2). Keeping this loop equal to
   # that constant is enforced by scripts/__tests__/installer-removal-derivation.test.ts
   # (AC-05.2a), which reads the generator rather than a copy of the list.
-  for name in massa-ai persona-router profile bootstrap; do
+  for name in massa-ai profile bootstrap; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -230,7 +230,8 @@ install_bundled_skills() {
   done
   vecho "  + ${installed} harness skills installed to $HARNESS_SKILLS_DIR (plugin-owned)"
 
-  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$TARGET" <<'NODE'
+  local state_retired_skills
+  state_retired_skills="$("$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$TARGET" <<'NODE'
 const fs = require("fs");
 const path = require("path");
 const [, , file, host, root] = process.argv;
@@ -244,7 +245,8 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile", "bootstrap"] };
+const current = ["massa-ai", "profile", "bootstrap"];
+data.platforms[host] = { root, skillsOwner: "plugin", skills: current };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. modelProfile (T10, MPS-03 round-trip
 // obligation) is engine-owned; installRoute is installer-owned but written by
@@ -264,7 +266,19 @@ if (prev && typeof prev === "object" && !Array.isArray(prev)) {
 }
 fs.mkdirSync(path.dirname(file), { recursive: true });
 fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+// C4: a harness skill this plugin recorded as installed and no longer ships is
+// printed for the caller to remove — the recorded list is the ownership proof,
+// so an unrecorded directory of the same name is never touched.
+const retired = prev && prev.skillsOwner === "plugin" && Array.isArray(prev.skills)
+  ? prev.skills.filter((s) => typeof s === "string" && /^[a-z0-9][a-z0-9-]*$/.test(s) && !current.includes(s))
+  : [];
+process.stdout.write(retired.join("\n"));
 NODE
+  )"
+  for name in $state_retired_skills; do
+    rm -rf "$HARNESS_SKILLS_DIR/$name"
+    vecho "  - removed retired harness skill $HARNESS_SKILLS_DIR/$name"
+  done
 }
 
 uninstall_bundled_skills() {
@@ -274,22 +288,33 @@ uninstall_bundled_skills() {
   else return 0
   fi
 
-  local raw_owner
-  raw_owner="$("$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+  # Line 1 is the raw owner; any further lines are the C4 retired skills this
+  # plugin recorded and no longer ships.
+  local raw_owner state_retired_skills
+  state_retired_skills="$("$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
 const fs = require("fs");
 const [, , file, host] = process.argv;
 try {
   const data = JSON.parse(fs.readFileSync(file, "utf8"));
   const rec = data && data.platforms && data.platforms[host];
-  process.stdout.write(rec ? String(rec.skillsOwner) : "none");
+  const current = ["massa-ai", "profile", "bootstrap"];
+  const retired = rec && rec.skillsOwner === "plugin" && Array.isArray(rec.skills)
+    ? rec.skills.filter((s) => typeof s === "string" && /^[a-z0-9][a-z0-9-]*$/.test(s) && !current.includes(s))
+    : [];
+  process.stdout.write([rec ? String(rec.skillsOwner) : "none", ...retired].join("\n"));
 } catch {
   process.stdout.write("none");
 }
 NODE
   )"
+  raw_owner="${state_retired_skills%%$'\n'*}"
+  state_retired_skills="${state_retired_skills#"$raw_owner"}"
   [[ "$raw_owner" == "plugin" ]] && {
     local name
-    for name in massa-ai persona-router profile bootstrap; do
+    for name in massa-ai profile bootstrap; do
+      rm -rf "$HARNESS_SKILLS_DIR/$name"
+    done
+    for name in $state_retired_skills; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
     rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
@@ -718,7 +743,7 @@ if [[ "$commands_pruned" -gt 0 ]]; then
 fi
 vecho ""
 
-# Skills bundling (PDO-08, 09): install massa-ai/persona-router into the
+# Skills bundling (PDO-08, 09): install massa-ai/profile/bootstrap into the
 # shared harness skills directory, unless scripts/install-skills.sh already
 # owns it for this platform.
 install_bundled_skills

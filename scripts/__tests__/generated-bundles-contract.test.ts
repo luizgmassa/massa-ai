@@ -52,7 +52,6 @@ describe("managed subtrees stay gitignored (UGB-01)", () => {
   // regardless of how the .gitignore is formatted.
   const ignoredRepresentatives = [
     "apps/claude-plugin/skills/massa-ai/SKILL.md",
-    "apps/codex-plugin/skills/persona-router/SKILL.md",
     "apps/cursor-plugin/skills/profile/SKILL.md",
     // T21: the bootstrap bundle's own root-precise entry. One representative
     // per pattern, and a different host from profile's on purpose — the two
@@ -108,7 +107,6 @@ describe("managed subtrees stay gitignored (UGB-01)", () => {
       [
         "ls-files",
         "apps/claude-plugin/skills/massa-ai",
-        "apps/codex-plugin/skills/persona-router",
         "apps/cursor-plugin/skills/profile",
         "apps/claude-plugin/skills/bootstrap",
         "apps/opencode-plugin/skills/agents",

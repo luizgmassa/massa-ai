@@ -178,7 +178,7 @@ echo "Scenario 6 (CPP-07): after a marketplace update, a recorded model profile 
 NAME6=cpp7-reapply
 SCEN_PRE6="$ROOT/$NAME6"
 mkdir -p "$SCEN_PRE6/.config/massa-ai"
-printf '{"version":2,"platforms":{"claude":{"root":"/irrelevant","skillsOwner":"plugin","skills":["massa-ai","persona-router"],"modelProfile":{"profile":"cheap","switchedAt":"2026-01-01T00:00:00.000Z"}}}}\n' \
+printf '{"version":2,"platforms":{"claude":{"root":"/irrelevant","skillsOwner":"plugin","skills":["massa-ai","profile"],"modelProfile":{"profile":"cheap","switchedAt":"2026-01-01T00:00:00.000Z"}}}}\n' \
   > "$SCEN_PRE6/.config/massa-ai/install-state.json"
 
 # The marketplace install root the mock CLI records (CPP-01/06 topology). It

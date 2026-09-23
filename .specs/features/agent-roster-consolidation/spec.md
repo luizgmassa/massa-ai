@@ -183,7 +183,7 @@ installer ever touching my own agent files.
 | --- | --- | --- | --- | --- |
 | PER-01 | Delete persona router skill + catalog (PER AC-1, AC-7) | Personas removed | Execute (T9) | Done |
 | PER-02 | Bootstrap registry 9→8, AGENTS.md spans, retired-id silence (AC-2, AC-6) | Personas removed | Execute (T9) | Done |
-| PER-03 | Generator + installers drop persona-router, prune installed copy (AC-3, AC-4, AC-5) | Personas removed | Design | Pending |
+| PER-03 | Generator + installers drop persona-router, prune installed copy (AC-3, AC-4, AC-5) | Personas removed | Execute (T10) | Done |
 | PER-04 | Observation-extractor `/persona` trigger removed (AC-8) | Personas removed | Design | Pending |
 | ROS-01 | Seven charters authored from merged sources + contract-preservation fixture test (ROS AC-1..6, AC-9) | Seven-agent roster | Design | Pending |
 | ROS-02 | Old agent names purged; single mapping table (AC-7) | Seven-agent roster | Design | Pending |

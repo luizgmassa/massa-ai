@@ -288,12 +288,12 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
 });
 
 describe("codex-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
-  test("install copies massa-ai + persona-router + profile + bootstrap into ~/.codex/skills (not the plugin cache) as plugin-owned", async () => {
+  test("install copies massa-ai + profile + bootstrap into ~/.codex/skills (not the plugin cache) as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("harness skills installed");
 
-    for (const name of ["massa-ai", "persona-router", "profile", "bootstrap"]) {
+    for (const name of ["massa-ai", "profile", "bootstrap"]) {
       const skillMd = path.join(tmp, `.codex/skills/${name}/SKILL.md`);
       expect(await pathExists(skillMd)).toBe(true);
       const lst = await fs.lstat(skillMd);
@@ -306,24 +306,24 @@ describe("codex-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
   });
 
   // AC-05.3: a behavioural guard — run the real install.sh against a scratch
-  // HOME and assert it lands EXACTLY the four harness skill directories the
+  // HOME and assert it lands EXACTLY the three harness skill directories the
   // generator's own constant names (generate-skill-artifacts.ts:138). Not a
   // static parse of the `for name in ...` literal — that shortcut is exactly
   // what AC-03.4 rejects for the sibling requirement.
-  test("AC-05.3: a scratch-HOME install lands exactly the four harness skill directories", async () => {
+  test("AC-05.3: a scratch-HOME install lands exactly the three harness skill directories", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
     const harnessSkillsDir = path.join(tmp, ".codex/skills");
     const entries = await fs.readdir(harnessSkillsDir);
-    expect(entries.sort()).toEqual(["massa-ai", "persona-router", "profile", "bootstrap"].sort());
+    expect(entries.sort()).toEqual(["massa-ai", "profile", "bootstrap"].sort());
   });
 
-  test("the existing 6 host-command skills copy is unaffected — no massa-ai/persona-router leak into the plugin cache", async () => {
+  test("the existing 6 host-command skills copy is unaffected — no harness skill leaks into the plugin cache", async () => {
     runInstall(["--user"], { HOME: tmp });
     const pluginDir = path.join(tmp, ".codex/plugins/massa-ai");
     expect(await pathExists(path.join(pluginDir, "skills/massa-ai"))).toBe(false);
-    expect(await pathExists(path.join(pluginDir, "skills/persona-router"))).toBe(false);
+    expect(await pathExists(path.join(pluginDir, "skills/bootstrap"))).toBe(false);
     for (const name of ["def", "find", "graph", "index", "map", "status"]) {
       expect(await pathExists(path.join(pluginDir, `skills/${name}.md`))).toBe(true);
     }
@@ -338,7 +338,7 @@ describe("codex-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
         {
           version: 2,
           platforms: {
-            codex: { root: path.join(tmp, ".codex"), skillsOwner: "repo", skills: ["massa-ai", "persona-router"] },
+            codex: { root: path.join(tmp, ".codex"), skillsOwner: "repo", skills: ["massa-ai", "profile"] },
           },
         },
         null,
@@ -465,12 +465,12 @@ describe("codex-plugin generated workflow-command delivery (T8, WFC-08)", () => 
     expect(await pathExists(installedSkillsDir)).toBe(true);
 
     // Sanity: generated commands never leaked into the harness skills dir —
-    // only massa-ai/persona-router/profile/bootstrap (the four names
+    // only massa-ai/profile/bootstrap (the three names
     // install_bundled_skills copies) live there, never a workflow-command stem.
     const harnessSkillsDir = path.join(tmp, ".codex/skills");
     if (await pathExists(harnessSkillsDir)) {
       const harnessEntries = await fs.readdir(harnessSkillsDir);
-      expect(harnessEntries.sort()).toEqual(["massa-ai", "persona-router", "profile", "bootstrap"].sort());
+      expect(harnessEntries.sort()).toEqual(["massa-ai", "profile", "bootstrap"].sort());
     }
 
     const res = runInstall(["--uninstall"], { HOME: tmp });
@@ -551,5 +551,66 @@ describe("codex-plugin generated-bundle contract (T6, UGB-05..08)", () => {
     expect(res.status).toBe(3);
     expect(res.stderr).toContain("bun required");
     expect(await pathExists(path.join(tmp, ".codex"))).toBe(false);
+  });
+});
+
+// PER AC-5 / design C4: a harness skill this plugin recorded in
+// install-state.json and no longer ships is removed on install and on
+// uninstall; an unrecorded directory of the same name is never touched.
+describe("codex-plugin retired harness-skill prune (PER AC-5)", () => {
+  const stateFile = () => path.join(tmp, ".config/massa-ai/install-state.json");
+  const retiredDir = () => path.join(tmp, ".codex/skills/persona-router");
+
+  async function plantRetired(): Promise<void> {
+    await fs.mkdir(retiredDir(), { recursive: true });
+    await fs.writeFile(path.join(retiredDir(), "SKILL.md"), "---\nname: persona-router\n---\n");
+  }
+
+  async function recordPluginSkills(skills: string[]): Promise<void> {
+    let data: Record<string, any> = { version: 2, platforms: {} };
+    if (await pathExists(stateFile())) data = await readJson(stateFile());
+    data.platforms.codex = {
+      ...data.platforms.codex,
+      root: path.join(tmp, ".codex"),
+      skillsOwner: "plugin",
+      skills,
+    };
+    await fs.mkdir(path.dirname(stateFile()), { recursive: true });
+    await fs.writeFile(stateFile(), JSON.stringify(data, null, 2));
+  }
+
+  test("install removes a recorded persona-router skill and records only the current three", async () => {
+    await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
+    await plantRetired();
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(await pathExists(retiredDir())).toBe(false);
+    const state = await readJson(stateFile());
+    const platforms = state.platforms as Record<string, { skills: string[] }>;
+    expect(platforms.codex.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+  });
+
+  test("uninstall removes a recorded persona-router skill", async () => {
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
+    await plantRetired();
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(await pathExists(retiredDir())).toBe(false);
+  });
+
+  test("an unrecorded persona-router directory survives install and uninstall byte-identical", async () => {
+    await plantRetired();
+    const before = await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8");
+
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
+
+    expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
+    expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
   });
 });

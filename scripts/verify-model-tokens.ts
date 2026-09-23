@@ -194,7 +194,7 @@ export function collectTargets(root = REPO_ROOT): readonly Target[] {
   // 5. the sub-agent registry.
   //
   // No mirrored copies: `generate-skill-artifacts.ts` bundles
-  // `skills/{massa-ai,persona-router,agents}/` into each host, but NOT
+  // `skills/{massa-ai,profile,bootstrap,agents}/` into each host, but NOT
   // `skills/AGENTS.md` — that file is the source of the bootstrap block
   // `install-skills.sh` writes to `<host>/AGENTS.md` at install time. Adding
   // `apps/*/skills/AGENTS.md` here would be four silently-inert paths, which is

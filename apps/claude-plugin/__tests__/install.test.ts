@@ -341,12 +341,12 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
 });
 
 describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
-  test("install copies massa-ai + persona-router + profile + bootstrap into ~/.claude/skills as plugin-owned", async () => {
+  test("install copies massa-ai + profile + bootstrap into ~/.claude/skills as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("harness skills installed");
 
-    for (const name of ["massa-ai", "persona-router", "profile", "bootstrap"]) {
+    for (const name of ["massa-ai", "profile", "bootstrap"]) {
       const skillMd = path.join(tmp, `.claude/skills/${name}/SKILL.md`);
       expect(await pathExists(skillMd)).toBe(true);
       const lst = await fs.lstat(skillMd);
@@ -361,7 +361,7 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
   // AC-05.3: a behavioural guard, not a static parse of the installer's
   // `for name in …` literal (that shortcut is what let profile silently ship
   // through the repo route while every plugin route omitted it — IPT-05).
-  test("install lands exactly the four harness skill directories (AC-05.3)", async () => {
+  test("install lands exactly the three harness skill directories (AC-05.3)", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
@@ -370,14 +370,13 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
       .sort();
-    expect(dirs).toEqual(["bootstrap", "massa-ai", "persona-router", "profile"]);
+    expect(dirs).toEqual(["bootstrap", "massa-ai", "profile"]);
 
     const state = await readJson(path.join(tmp, ".config/massa-ai/install-state.json"));
     const platforms = state.platforms as Record<string, { skills: string[] }>;
     expect([...platforms.claude.skills].sort()).toEqual([
       "bootstrap",
       "massa-ai",
-      "persona-router",
       "profile",
     ]);
   });
@@ -391,7 +390,7 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
         {
           version: 2,
           platforms: {
-            claude: { root: path.join(tmp, ".claude"), skillsOwner: "repo", skills: ["massa-ai", "persona-router"] },
+            claude: { root: path.join(tmp, ".claude"), skillsOwner: "repo", skills: ["massa-ai", "profile"] },
           },
         },
         null,
@@ -411,8 +410,8 @@ describe("claude-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
     const res = runInstall(["--uninstall"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(await pathExists(path.join(tmp, ".claude/skills/massa-ai"))).toBe(false);
-    expect(await pathExists(path.join(tmp, ".claude/skills/persona-router"))).toBe(false);
     expect(await pathExists(path.join(tmp, ".claude/skills/profile"))).toBe(false);
+    expect(await pathExists(path.join(tmp, ".claude/skills/bootstrap"))).toBe(false);
 
     const stateFile = path.join(tmp, ".config/massa-ai/install-state.json");
     if (await pathExists(stateFile)) {
@@ -653,5 +652,66 @@ describe("claude-plugin generated-bundle contract (T5, UGB-05..08)", () => {
     // Nothing under the temp HOME was ever created — the check runs before
     // SCOPE/TARGET resolution and every subsequent host-config mutation.
     expect(await pathExists(path.join(tmp, ".claude"))).toBe(false);
+  });
+});
+
+// PER AC-5 / design C4: a harness skill this plugin recorded in
+// install-state.json and no longer ships is removed on install and on
+// uninstall; an unrecorded directory of the same name is never touched.
+describe("claude-plugin retired harness-skill prune (PER AC-5)", () => {
+  const stateFile = () => path.join(tmp, ".config/massa-ai/install-state.json");
+  const retiredDir = () => path.join(tmp, ".claude/skills/persona-router");
+
+  async function plantRetired(): Promise<void> {
+    await fs.mkdir(retiredDir(), { recursive: true });
+    await fs.writeFile(path.join(retiredDir(), "SKILL.md"), "---\nname: persona-router\n---\n");
+  }
+
+  async function recordPluginSkills(skills: string[]): Promise<void> {
+    let data: Record<string, any> = { version: 2, platforms: {} };
+    if (await pathExists(stateFile())) data = await readJson(stateFile());
+    data.platforms.claude = {
+      ...data.platforms.claude,
+      root: path.join(tmp, ".claude"),
+      skillsOwner: "plugin",
+      skills,
+    };
+    await fs.mkdir(path.dirname(stateFile()), { recursive: true });
+    await fs.writeFile(stateFile(), JSON.stringify(data, null, 2));
+  }
+
+  test("install removes a recorded persona-router skill and records only the current three", async () => {
+    await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
+    await plantRetired();
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(await pathExists(retiredDir())).toBe(false);
+    const state = await readJson(stateFile());
+    const platforms = state.platforms as Record<string, { skills: string[] }>;
+    expect(platforms.claude.skills).toEqual(["massa-ai", "profile", "bootstrap"]);
+  });
+
+  test("uninstall removes a recorded persona-router skill", async () => {
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
+    await plantRetired();
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(await pathExists(retiredDir())).toBe(false);
+  });
+
+  test("an unrecorded persona-router directory survives install and uninstall byte-identical", async () => {
+    await plantRetired();
+    const before = await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8");
+
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
+
+    expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
+    expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
   });
 });

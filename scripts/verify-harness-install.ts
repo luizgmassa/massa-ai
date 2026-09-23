@@ -65,7 +65,7 @@ function readJson(path: string): any | null {
 }
 
 /** The three harness skills the generator ships (generate-skill-artifacts.ts). */
-const HARNESS_SKILLS = ["massa-ai", "persona-router", "profile"];
+const HARNESS_SKILLS = ["massa-ai", "profile", "bootstrap"];
 
 function checkSkills(host: string, skillsDir: string) {
   if (!existsSync(skillsDir)) {

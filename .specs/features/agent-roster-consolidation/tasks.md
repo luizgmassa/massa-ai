@@ -256,9 +256,9 @@ T12 → T13
 
 **Done when**:
 
-- [ ] Per host: prior state `skills` incl. `persona-router` + planted dir → removed by install and by uninstall; unrecorded `persona-router` dir → untouched
-- [ ] `generate:artifacts` removes a planted `apps/cursor-plugin/skills/persona-router/`
-- [ ] Gate: plugins + scripts green
+- [x] Per host: prior state `skills` incl. `persona-router` + planted dir → removed by install and by uninstall; unrecorded `persona-router` dir → untouched
+- [x] `generate:artifacts` removes a planted `apps/cursor-plugin/skills/persona-router/`
+- [x] Gate: plugins + scripts green
 
 **Tests**: integration
 **Gate**: plugins, scripts

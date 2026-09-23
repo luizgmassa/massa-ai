@@ -65,12 +65,28 @@ describe("generate-skill-artifacts emitAll — prune-before-emit (T1, UGB-04)", 
     await expect(fs.access(staleFile)).rejects.toThrow();
   });
 
+  test("a retired bundle root (skills/persona-router/) left in a checkout vanishes after emit (PER AC-3)", async () => {
+    const tmp = await makeTmpRoot();
+    const targetRoots: Record<string, string> = { cursor: path.join(tmp, "cursor") };
+
+    const retiredRoot = path.join(targetRoots.cursor!, "skills", "persona-router");
+    await fs.mkdir(path.join(retiredRoot, "references"), { recursive: true });
+    await fs.writeFile(path.join(retiredRoot, "SKILL.md"), "stale retired bundle");
+    await fs.writeFile(path.join(retiredRoot, "references", "routing-details.md"), "stale");
+
+    await emitAll(targetRoots, ["cursor"]);
+
+    await expect(fs.access(retiredRoot)).rejects.toThrow();
+    // The sweep is scoped to the retired root: a current bundle is still emitted.
+    await expect(fs.access(path.join(targetRoots.cursor!, "skills", "bootstrap", "SKILL.md"))).resolves.toBeNull();
+  });
+
   test("a hand-authored quick-skill file beside the managed roots (apps/codex-plugin/skills/def.md class) survives emit", async () => {
     const tmp = await makeTmpRoot();
     const targetRoots: Record<string, string> = { codex: path.join(tmp, "codex") };
 
     // Lives directly under skills/, a sibling of the managed
-    // skills/{massa-ai,persona-router,profile,agents} roots — never inside one.
+    // skills/{massa-ai,profile,bootstrap,agents} roots — never inside one.
     const quickSkill = path.join(targetRoots.codex!, "skills", "def.md");
     await fs.mkdir(path.dirname(quickSkill), { recursive: true });
     await fs.writeFile(quickSkill, "# quick skill\nhand-authored, not generated");
