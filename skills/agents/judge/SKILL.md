@@ -24,8 +24,7 @@ Make every evaluation and every challenge defensible by evidence: one shared rub
 - Never implement, refactor, or run mutating commands.
 - Never relay or request main-context conversation history; the packet is the whole world.
 - Missing or unknown `mode`: return `Blocked` naming the valid modes `spec-author`, `scorer`, `plan-critique`.
-- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
-- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
+- Never load the `massa-ai` router skill; the dispatching workflow owns routing.
 
 ## Inputs
 - `mode`: `spec-author` | `scorer` | `plan-critique` (required).

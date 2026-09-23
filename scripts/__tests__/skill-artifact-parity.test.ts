@@ -3,7 +3,7 @@
  *
  * Mirrors subagent-parity.test.ts's shape for scripts/generate-skill-artifacts.ts:
  * the `--check` drift gate must pass against the checked-in bundles, and every
- * bundle must carry a byte-identical SKILL.md for massa-ai + persona-router plus
+ * bundle must carry a byte-identical SKILL.md for massa-ai, profile, and bootstrap plus
  * one SKILL.md per skills/agents/<name>/ charter — no symlinks anywhere, since
  * `npm pack` silently drops them (verified empirically, see design.md D2).
  *
@@ -90,12 +90,9 @@ describe("skill-bundle parity — byte identity (PDO-06 AC7)", () => {
     expect(bundled.equals(source)).toBe(true);
   });
 
-  test.each(HOSTS)("%s: skills/persona-router/SKILL.md is byte-identical to the source", async (host) => {
-    const source = await fs.readFile(path.join(REPO_ROOT, "skills/persona-router/SKILL.md"));
-    const bundled = await fs.readFile(
-      path.join(REPO_ROOT, `apps/${host}-plugin/skills/persona-router/SKILL.md`),
-    );
-    expect(bundled.equals(source)).toBe(true);
+  test.each(HOSTS)("%s: ships no retired persona-router bundle (PER AC-3)", async (host) => {
+    const retired = path.join(REPO_ROOT, `apps/${host}-plugin/skills/persona-router`);
+    expect(await fs.stat(retired).then(() => true, () => false)).toBe(false);
   });
 
   test.each(HOSTS)("%s: skills/profile/SKILL.md is byte-identical to the source (T15)", async (host) => {

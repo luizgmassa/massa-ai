@@ -25,8 +25,7 @@ Hold requirements to a clear, complete, and consistent standard before and after
 - Never return raw document dumps.
 - In `furps` mode, never analyze a dimension other than the assigned one; flag cross-dimension gaps instead of expanding into them.
 - Do not use this role for plan critique (use `judge` in `plan-critique` mode) or for code-correctness claims (use `code-explorer` or `code-reviewer`).
-- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
-- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
+- Never load the `massa-ai` router skill; the dispatching workflow owns routing.
 
 ## Inputs
 - `mode`: `furps` | `requirements` | `audit` (required).

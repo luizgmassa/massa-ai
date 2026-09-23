@@ -401,7 +401,7 @@ describe("pointer template (BST-04 AC-6, AC-7)", () => {
 
   test("carries no policy text: no rule's own lines appear in it", () => {
     // Derived from the artifact rather than from a hand-picked banned-phrase
-    // list, so a policy paragraph pasted in from any of the nine spans is
+    // list, so a policy paragraph pasted in from any of the eight spans is
     // caught, not just the ones someone thought to name.
     const pointer = render(ALL_ON, "cursor").pointer;
     for (const [id, lines] of RULE_SIGNATURES) {
@@ -476,7 +476,7 @@ describe("pointer template (BST-04 AC-6, AC-7)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-6 — all nine rules switchable both ways (BST-10 AC-4, BST-09 AC-3)
+// AC-6 — all eight rules switchable both ways (BST-10 AC-4, BST-09 AC-3)
 // ---------------------------------------------------------------------------
 
 describe("every rule is individually switchable in both directions (BST-10 AC-4)", () => {
@@ -682,11 +682,11 @@ describe("output shape", () => {
   }
 
   test("fenced block contents are passed through byte-for-byte", () => {
-    // The source's four fences carry policy data (three yaml, one path list);
+    // The source's policy fences (two yaml, one path list) carry contract data;
     // a layout normalizer that reformatted them would be editing the contract.
     const fence = REAL_SOURCE.slice(
-      REAL_SOURCE.indexOf("```yaml\npersona_router:"),
-      REAL_SOURCE.indexOf("```", REAL_SOURCE.indexOf("```yaml\npersona_router:") + 8) + 3,
+      REAL_SOURCE.indexOf("```yaml\nplan_challenge:"),
+      REAL_SOURCE.indexOf("```", REAL_SOURCE.indexOf("```yaml\nplan_challenge:") + 8) + 3,
     );
     expect(fence.length).toBeGreaterThan(20);
     expect(render(ALL_ON).contract).toContain(fence);

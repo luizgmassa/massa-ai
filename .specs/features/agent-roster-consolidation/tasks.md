@@ -237,9 +237,10 @@ T12 → T13
 
 **Done when**:
 
-- [ ] Test: persisted `{"persona-router": false}` renders 8 rules and emits no "Ignored persisted rule state" line
-- [ ] `git grep -i -l -wE 'persona(s|-router|_pin)?'` outside `.specs/`, `.ua/`, CHANGELOG returns only files on this task's explicit allowlist (the files T10–T12 still own, plus `references/the-fool/`), and after T12 only `docs/removed-features.md` + `references/the-fool/`
-- [ ] Gate: shared + scripts green
+- [x] Test: persisted `{"persona-router": false}` renders 8 rules and emits no "Ignored persisted rule state" line
+- [x] `git grep -i -l -wE 'persona(s|-router|_pin)?'` outside `.specs/`, `.ua/`, CHANGELOG returns only files on this task's explicit allowlist (the files T10–T12 still own, plus `references/the-fool/`), and after T12 only `docs/removed-features.md` + `references/the-fool/`
+  - T9 allowlist beyond T10–T12 files: the retired-id literal (`packages/shared/src/bootstrap/rules.ts`) and the sensors that must name what they prove absent (shared `engine`/`rules`/`state` tests, `profile-switch` `state.test.ts` legacy install-state fixture, `skills-harness-integrity`, `validate-repository`, `skill-artifact-parity`); history comments in `agent-era-guidance-content` and `skills-duplication-metric` tests
+- [x] Gate: shared + scripts green
 
 **Tests**: unit + content
 **Gate**: shared, scripts

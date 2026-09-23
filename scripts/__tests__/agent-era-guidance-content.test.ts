@@ -399,15 +399,15 @@ describe("references/spec-driven/validate.md: post-validation metric snapshot re
 const REVIEWER_DISPATCH_HEADER =
   "> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`";
 /**
- * The code-reviewer's `fallback` and the universal `persona` bullet used to be
- * asserted here, per file, because each block carried them verbatim. Both are
- * now Role Defaults in `references/agent-orchestration.md` — stated once,
- * applying to every dispatch — so asserting them per block would assert their
- * absence-by-design as a failure.
+ * The code-reviewer's `fallback` bullet used to be asserted here, per file,
+ * because each block carried it verbatim. It is now a Role Default in
+ * `references/agent-orchestration.md` — stated once, applying to every review
+ * dispatch — so asserting it per block would assert its absence-by-design as a
+ * failure.
  *
- * They are not unguarded: `skills-harness-integrity.test.ts`'s role-defaults
- * group asserts that the reference states each default, that the section claims
- * universality, and that NO block restates one. What stays here is what is
+ * It is not unguarded: `skills-harness-integrity.test.ts`'s role-defaults
+ * group asserts that the reference states each default and that NO block
+ * restates one. What stays here is what is
  * genuinely per-file — the header and the file's own `scope` sentence — plus
  * the requirement that the defaults have actually moved rather than vanished.
  */
@@ -447,7 +447,7 @@ describe("code-reviewer dispatch block: 4 implementing workflows (T15, AEH-06)",
   });
 
   for (const target of IMPLEMENTING_WORKFLOW_TARGETS) {
-    test(`${target.file} carries the code-reviewer dispatch block with fallback and persona bullets`, () => {
+    test(`${target.file} carries the code-reviewer dispatch block`, () => {
       expectReviewerDispatchBlock(target);
     });
   }
@@ -483,7 +483,7 @@ const FIX_WORKFLOW_BATCH_1_TARGETS: ReviewerDispatchTarget[] = [
 
 describe("code-reviewer dispatch block: fix workflows batch 1 (T16, AEH-06)", () => {
   for (const target of FIX_WORKFLOW_BATCH_1_TARGETS) {
-    test(`${target.file} carries the code-reviewer dispatch block with fallback and persona bullets`, () => {
+    test(`${target.file} carries the code-reviewer dispatch block`, () => {
       expectReviewerDispatchBlock(target);
     });
   }
@@ -497,7 +497,7 @@ const FIX_WORKFLOW_BATCH_2_TARGETS: ReviewerDispatchTarget[] = [
 
 describe("code-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)", () => {
   for (const target of FIX_WORKFLOW_BATCH_2_TARGETS) {
-    test(`${target.file} carries the code-reviewer dispatch block with fallback and persona bullets`, () => {
+    test(`${target.file} carries the code-reviewer dispatch block`, () => {
       expectReviewerDispatchBlock(target);
     });
   }

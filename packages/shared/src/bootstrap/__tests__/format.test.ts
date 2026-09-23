@@ -30,7 +30,7 @@ function row(host: Host, status: BootstrapRenderResult["status"], reason?: strin
 }
 
 describe("formatBootstrapInventory — BST-11 AC-3", () => {
-  test("names every one of the nine rule ids", () => {
+  test("names every one of the eight rule ids", () => {
     const lines = formatBootstrapInventory(state()).split("\n");
     for (const id of BOOTSTRAP_RULE_IDS) {
       expect(lines.some((line) => line.startsWith(`  ${id}: `))).toBe(true);

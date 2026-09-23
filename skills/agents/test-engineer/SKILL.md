@@ -25,8 +25,7 @@ Make a test suite catch the five distinct error classes it must cover — busine
 - No production code changes outside test files.
 - Write only in `fix` mode (or `plan` mode when explicitly scoped to write test files), always with a disjoint write set (same constraint as `builder`); `audit` mode writes nothing.
 - Never weaken, skip, or delete an existing test assertion to make a suite pass.
-- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
-- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
+- Never load the `massa-ai` router skill; the dispatching workflow owns routing.
 
 ## Inputs
 - `mode`: `plan` | `audit` | `fix` (defaults to `plan`).

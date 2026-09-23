@@ -37,7 +37,8 @@ async function readFile(p: string): Promise<string> {
 describe("skill file structure validation", () => {
   const expectedSkills = [
     "massa-ai",
-    "persona-router",
+    "profile",
+    "bootstrap",
   ];
 
   for (const skill of expectedSkills) {
@@ -83,16 +84,17 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     expect(block).toContain("caveman full");
     expect(block).toContain("coding-guidelines");
     expect(block).toContain("massa-ai");
-    expect(block).toContain("persona-router");
+    expect(block).not.toContain("persona-router");
   });
 
-  test("bootstrap contains persona router policy", async () => {
+  test("bootstrap contains the agent policies and no retired persona policy (PER AC-2)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "AGENTS.md"));
     const block = content.slice(
       content.indexOf(BOOTSTRAP_START),
       content.indexOf(BOOTSTRAP_END) + BOOTSTRAP_END.length
     );
-    expect(block).toContain("persona_router");
+    expect(block).not.toContain("persona_router");
+    expect(block).not.toContain("persona_pin");
     expect(block).toContain("plan_challenge");
     expect(block).toContain("conversation_feedback");
   });
@@ -301,72 +303,12 @@ describe("docs migration", () => {
   }
 });
 
-// ── Persona catalog ────────────────────────────────────────────────────────
+// ── Persona feature removed (PER AC-1) ─────────────────────────────────────
 
-describe("persona catalog", () => {
-  const catalogPath = path.join(SKILLS_DIR, "massa-ai", "personas", "catalog.json");
-
-  test("catalog.json exists and parses", async () => {
-    expect(await fileExists(catalogPath)).toBe(true);
-    const content = await readFile(catalogPath);
-    expect(() => JSON.parse(content)).not.toThrow();
-  });
-
-  test("schema_version is 2", async () => {
-    const content = await readFile(catalogPath);
-    const catalog = JSON.parse(content);
-    expect(catalog.schema_version).toBe(2);
-  });
-
-  test("all prompt_path values resolve to existing files", async () => {
-    const content = await readFile(catalogPath);
-    const catalog = JSON.parse(content);
-    const personasDir = path.dirname(catalogPath);
-    for (const persona of catalog.personas) {
-      const promptPath = path.join(personasDir, persona.prompt_path);
-      expect(await fileExists(promptPath)).toBe(true);
-    }
-  });
-
-  test("expected persona IDs present", async () => {
-    const content = await readFile(catalogPath);
-    const catalog = JSON.parse(content);
-    const ids = catalog.personas.map((p: { id: string }) => p.id);
-    expect(ids).toContain("senior-mobile-engineer");
-    expect(ids).toContain("senior-mobile-qa-automation-engineer");
-    expect(ids).toContain("context-skill-harness-engineer-architect");
-    expect(ids).toContain("product-manager");
-    expect(ids).toContain("ai-native-nodejs-cli-architect");
-  });
-
-  test("persona prompt files exist", async () => {
-    const personaFiles = [
-      "ai-native-nodejs-cli-architect.md",
-      "context-skill-harness-engineer-architect.md",
-      "product-manager.md",
-      "senior-mobile-engineer.md",
-      "senior-mobile-qa-automation-engineer.md",
-    ];
-    for (const file of personaFiles) {
-      expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "personas", file))).toBe(true);
-    }
-  });
-});
-
-// ── Persona router SKILL.md ────────────────────────────────────────────────
-
-describe("persona-router skill", () => {
-  test("SKILL.md exists with frontmatter", async () => {
-    const skillMd = path.join(SKILLS_DIR, "persona-router", "SKILL.md");
-    expect(await fileExists(skillMd)).toBe(true);
-    const content = await readFile(skillMd);
-    expect(content.startsWith("---")).toBe(true);
-    expect(content).toContain("name: persona-router");
-  });
-
-  test("references catalog location at new path", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "persona-router", "SKILL.md"));
-    expect(content).toContain("massa-ai/personas/catalog.json");
+describe("persona feature removed", () => {
+  test("no persona-router skill and no persona catalog directory remain", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "persona-router"))).toBe(false);
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "personas"))).toBe(false);
   });
 });
 
@@ -378,124 +320,9 @@ describe("removed features documented", () => {
   });
 });
 
-// ── Persona catalog deep validation (ported from legacy test_validate_repository.py) ──
-// The legacy suite had 12 persona-catalog tests; the TS port had 5 shallow ones.
-// These add: malformed/missing/legacy/schema-version/required-fields/duplicate/
-// prompt-missing/path-escape/uncataloged-prompt/invalid-shape/mirror-drift.
-
-describe("persona catalog deep validation", () => {
-  const catalogPath = path.join(SKILLS_DIR, "massa-ai", "personas", "catalog.json");
-  const personasDir = path.dirname(catalogPath);
-
-  test("catalog is valid JSON (malformed catalog detected)", async () => {
-    const content = await readFile(catalogPath);
-    expect(() => JSON.parse(content)).not.toThrow();
-  });
-
-  test("catalog schema_version is present and 2", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    expect(catalog.schema_version).toBe(2);
-  });
-
-  test("catalog has required top-level shape (personas array)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    expect(Array.isArray(catalog.personas)).toBe(true);
-    expect(catalog.personas.length).toBeGreaterThanOrEqual(1);
-  });
-
-  test("every persona entry has required v2 fields (id, display_name, prompt_path, signals_path, summary, aliases) and no inline signal arrays", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    const requiredFields = ["id", "display_name", "prompt_path", "signals_path", "summary", "aliases"];
-    for (const persona of catalog.personas) {
-      for (const field of requiredFields) {
-        expect(persona[field]).toBeDefined();
-      }
-      expect(typeof persona.id).toBe("string");
-      expect(typeof persona.display_name).toBe("string");
-      expect(typeof persona.prompt_path).toBe("string");
-      expect(typeof persona.signals_path).toBe("string");
-      expect(typeof persona.summary).toBe("string");
-      expect(Array.isArray(persona.aliases)).toBe(true);
-      // v2 moved the signal arrays out of the index — an inline array is drift back to v1.
-      expect(persona.primary_signals).toBeUndefined();
-      expect(persona.negative_signals).toBeUndefined();
-      expect(persona.secondary_lens_signals).toBeUndefined();
-    }
-  });
-
-  test("every signals_path is signals/<id>.json, resolves, and carries the three signal arrays (v2 split — every v1 assertion kept, repointed)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    for (const persona of catalog.personas) {
-      expect(persona.signals_path).toBe(`signals/${persona.id}.json`);
-      expect(persona.signals_path).not.toMatch(/^\//);
-      expect(persona.signals_path).not.toContain("..");
-      const signalsFile = path.join(personasDir, persona.signals_path);
-      expect(await fileExists(signalsFile)).toBe(true);
-      const signals = JSON.parse(await readFile(signalsFile));
-      expect(Array.isArray(signals.primary_signals)).toBe(true);
-      expect(Array.isArray(signals.negative_signals)).toBe(true);
-      expect(Array.isArray(signals.secondary_lens_signals)).toBe(true);
-      expect(signals.primary_signals.length).toBeGreaterThan(0);
-    }
-  });
-
-  test("persona IDs are unique (no duplicate entries)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    const ids = catalog.personas.map((p: { id: string }) => p.id);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  test("persona prompt_paths are unique (no duplicate paths)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    const paths = catalog.personas.map((p: { prompt_path: string }) => p.prompt_path);
-    expect(new Set(paths).size).toBe(paths.length);
-  });
-
-  test("prompt_path values are filename-only (no path traversal / absolute paths)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    for (const persona of catalog.personas) {
-      const pp: string = persona.prompt_path;
-      expect(pp).not.toMatch(/^\//);          // not absolute
-      expect(pp).not.toMatch(/\.\.\//);       // no parent-dir traversal
-      expect(pp).not.toMatch(/\\\/\\/);       // no backslash separators
-      expect(pp).not.toContain("/");          // filename-only — no subdirs
-    }
-  });
-
-  test("every prompt_path resolves to an existing file", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    for (const persona of catalog.personas) {
-      const promptPath = path.join(personasDir, persona.prompt_path);
-      expect(await fileExists(promptPath)).toBe(true);
-    }
-  });
-
-  test("every cataloged persona prompt file is non-empty markdown", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    for (const persona of catalog.personas) {
-      const promptPath = path.join(personasDir, persona.prompt_path);
-      const content = await readFile(promptPath);
-      expect(content.length).toBeGreaterThan(100);
-      // Persona prompt files are markdown (start with a heading), not YAML frontmatter.
-      expect(content.startsWith("#")).toBe(true);
-    }
-  });
-
-  test("no uncataloged persona prompt files exist in personas/ (mirror drift)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    const cataloged = new Set(catalog.personas.map((p: { prompt_path: string }) => p.prompt_path));
-    const entries = await fs.readdir(personasDir, { withFileTypes: true });
-    // Only consider persona prompt files: .md files other than README.md.
-    const onDisk = entries
-      .filter((e) => e.isFile() && e.name.endsWith(".md") && e.name !== "README.md")
-      .map((e) => e.name);
-    for (const file of onDisk) {
-      expect(cataloged.has(file)).toBe(true);
-    }
-  });
-
+describe("legacy persona catalog", () => {
   test("legacy top-level persona catalog is NOT present (migration complete)", async () => {
-    // The legacy repo had a top-level personas/ dir; the new path is under skills/massa-ai/personas/.
+    // The legacy repo had a top-level personas/ dir; the feature is now removed entirely.
     expect(await fileExists(path.join(REPO_ROOT, "personas", "catalog.json"))).toBe(false);
   });
 });
@@ -1154,7 +981,6 @@ describe("canonical tool naming (no th0th_-prefixed tool names)", () => {
     "agents/code-reviewer/SKILL.md",
     "agents/judge/SKILL.md",
     "agents/product-manager/SKILL.md",
-    "persona-router/SKILL.md",
     "massa-ai/SKILL.md",
     "massa-ai/references/mcp-tools.md",
     "massa-ai/references/synapse-policy.md",

@@ -464,7 +464,7 @@ describe("export surface (PC-B1)", () => {
     expect(typeof bootstrapBarrel.resolveBootstrapState).toBe("function");
     expect(typeof bootstrapBarrel.applyBootstrapState).toBe("function");
     expect(typeof bootstrapBarrel.setBootstrapRuleEnabled).toBe("function");
-    expect(bootstrapBarrel.BOOTSTRAP_RULE_IDS.length).toBe(9);
+    expect(bootstrapBarrel.BOOTSTRAP_RULE_IDS.length).toBe(8);
   });
 
   test("the package root barrel re-exports them, the way profile-switch is exported", () => {

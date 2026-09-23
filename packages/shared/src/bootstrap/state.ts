@@ -33,6 +33,7 @@ import {
   assertKnownRuleId,
   bootstrapRuleDefaults,
   isBootstrapRuleId,
+  isRetiredRuleId,
 } from "./rules";
 
 /** Resolved state: every registry id present, defaults filled in. */
@@ -113,6 +114,7 @@ export function resolveBootstrapState(doc?: Record<string, unknown>): ResolvedBo
   }
 
   for (const [key, value] of Object.entries(rules)) {
+    if (isRetiredRuleId(key)) continue;
     if (!isBootstrapRuleId(key) || typeof value !== "boolean") {
       ignored.push(key);
       continue;
@@ -149,7 +151,7 @@ export interface SetBootstrapRuleResult {
  *
  * The id is validated **before** any read or write, so an unknown id can never
  * be the reason a file was touched: `assertKnownRuleId` throws
- * `UnknownRuleError` naming the bad id and listing all nine valid ones
+ * `UnknownRuleError` naming the bad id and listing all eight valid ones
  * (BST-09 AC-8).
  *
  * The bytes read here are handed to {@link writeRawConfig} as its

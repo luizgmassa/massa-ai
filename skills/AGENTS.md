@@ -37,8 +37,6 @@ user-editable policies, and global indexing/context exclusions.
 Runtime workflow routing, project/session handling, retrieval, persistence,
 graceful degradation, and completion behavior are canonical in
 `skills/massa-ai/SKILL.md`. Do not copy those contracts into this file.
-Persona selection, evidence gathering, route persistence, and persona failure
-handling are canonical in `skills/persona-router/SKILL.md`.
 
 ## Runtime Contract Pointer
 
@@ -46,70 +44,6 @@ After activation, follow `skills/massa-ai/SKILL.md` for all runtime behavior.
 Its selected workflows and references define exact tool contracts, memory
 tags, failure handling, and completion evidence.
 <!-- massa-ai:rule:massa-ai-router:end -->
-<!-- massa-ai:rule:persona-router:start -->
-### `persona-router`
-
-After massa-ai finishes its initial memory setup, load and run
-`persona-router` against the first user prompt before substantive work,
-selecting one cataloged specialist perspective using progressive disclosure
-and at most one secondary review lens.
-
-For generic non-coding conversations, preserve massa-ai's exclusion: do not
-load `massa-ai` solely for persona selection. Run `persona-router` directly
-against the configured policy, persona catalog, workspace documentation, and
-the first user prompt.
-
-## Persona Router Policy
-
-This user-editable policy controls automatic persona selection. SessionStart
-transports this policy before the first user prompt; the agent performs the
-actual selection only after that prompt is available.
-
-```yaml
-persona_router:
-  enabled: auto
-  ambiguity: ask
-  no_match: no_persona
-  mid_conversation: task_change
-```
-
-Supported values:
-
-- `enabled`: `auto` runs automatic inference for every conversation; `off`
-  disables inference but still honors explicit persona or no-persona requests.
-- `ambiguity`: `ask` asks the user to choose among plausible personas or no
-  persona; `best_match` applies the strongest supported route; `no_persona`
-  continues without a persona.
-- `no_match`: `no_persona` continues silently when no catalog entry fits;
-  `ask` asks whether to use a weakly supported candidate or no persona.
-- `mid_conversation`: `task_change` re-evaluates when the primary deliverable
-  changes ownership or a new task begins; `explicit_only` changes the route
-  only when the user requests it.
-
-A project `AGENTS.md` may additionally declare a persona pin as a single data
-line (not a policy block):
-
-```text
-persona_pin: <catalog-id> | no_persona
-```
-
-A valid pin is a routing fast path: the router reads only the pinned persona's
-prompt — no memory recall, no workspace-doc inspection, no signals loading, no
-classification. `no_persona` completes routing silently. A pin naming an id
-absent from the catalog is reported in one line and routing continues normally.
-Precedence: explicit prompt-level choice > pin > automatic inference. With no
-pin, a `persona-route:<projectId>` pattern memory from a prior successful
-inferred route may skip doc inspection and classification the same way.
-
-Prompt-level explicit persona or no-persona instructions override this policy
-for the current task. Applicable system, developer, and project instructions
-remain higher priority than persona behavior.
-
-Automatic routing must use progressive disclosure: inspect catalog metadata
-first, reuse relevant massa-ai evidence when available, read only targeted
-workspace documentation when needed, and load only the selected persona prompt.
-Ask the user only when the configured edge-case policy requires it.
-<!-- massa-ai:rule:persona-router:end -->
 
 <!-- massa-ai:rule:dedupe-guardrails:start -->
 ### Dedupe And Lazy-Load Guardrails
@@ -126,10 +60,6 @@ Before reading any massa-ai workflow or reference:
   references.
 - Load only the missing minimum context required for the current request.
 - Never load all workflows or all references "just in case."
-
-Load `persona-router` once per conversation after the coding bootstrap, or
-directly for non-coding conversations. Reuse its selected route across turns;
-do not reload the router or persona prompt unless its rerouting rules apply.
 
 The first load is mandatory in each new coding conversation and must load
 `massa-ai`. Dedupe applies only after that load and must never skip initial
@@ -315,9 +245,9 @@ Single registry for the 7 reusable sub-agent skills in this repo. Workflows rema
 
 The canonical field list and dispatch gates live in
 `skills/massa-ai/references/agent-orchestration.md` §Capability Packet. An
-agent inherits nothing from the parent session — no skills, no personas, no
-loaded references, no conversation history; everything it needs is named in
-the packet. Persona-boundary rules live in `skills/persona-router/SKILL.md`.
+agent inherits nothing from the parent session — no skills, no loaded
+references, no conversation history; everything it needs is named in the
+packet.
 
 ## Output Contract (shared by all agents)
 
@@ -366,7 +296,7 @@ The single old→new table for the charters retired by the roster consolidation.
 
 ## How to Add an Agent
 
-1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_tier` (a tier declared in `skills/model-profiles.json`, never a model name) and `metadata.permission`. A charter with more than one output contract declares one `### Mode: `<name>`` section per contract. Its `## Restrictions` section must carry both persona-boundary lines verbatim — the self-routing ban (`never load the massa-ai or persona-router routers, and never open a personas/ prompt file`) and the precedence line (`a persona supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing either line fails the gate.
+1. Create `skills/agents/<name>/SKILL.md` from the charter template (see any existing agent skill), including `metadata.model_tier` (a tier declared in `skills/model-profiles.json`, never a model name) and `metadata.permission`. A charter with more than one output contract declares one `### Mode: `<name>`` section per contract. Its `## Restrictions` section must carry the self-routing ban verbatim (`Never load the massa-ai router skill; the dispatching workflow owns routing.`). `scripts/__tests__/skills-harness-integrity.test.ts` enumerates charters from disk and is section-scoped, so a new charter missing that line fails the gate.
 2. Add one row to the Agent Table above.
 3. Add `<name>` to `SPECIALIST_NAMES` in `scripts/generate-subagent-artifacts.ts`, then run it to regenerate the host artifacts. There are no model tables to edit — the generator resolves the model from the charter's `metadata.model_tier` through `skills/model-profiles.json`.
 4. Add `<name>` to the roster in `scripts/__tests__/subagent-parity.test.ts` and run `bun run test:scripts`.

@@ -50,7 +50,7 @@ export interface HostCapabilities {
    * handlers).
    */
   hookBinaryDelivery: "source" | "real-copy" | "none";
-  /** Extra directories (beyond skills/{massa-ai,persona-router,agents}) this
+  /** Extra directories (beyond skills/{massa-ai,profile,bootstrap,agents}) this
    *  host's skill bundle manages, relative to the plugin root. */
   extraManagedRoots: readonly string[];
   /**
@@ -63,10 +63,9 @@ export interface HostCapabilities {
    */
   sessionStartStdoutDelivered: boolean | null;
   /**
-   * Which hook event actually carries the persona-router / AGENTS.md startup
-   * contract into the model's context for this host, per
-   * skills/massa-ai/personas/README.md's "Automatic Routing" section. `null`
-   * means neither — the contract is delivered through a managed instruction
+   * Which hook event actually carries the AGENTS.md / MASSA-AI.md startup
+   * contract into the model's context for this host (per-host citations
+   * below). `null` means neither — the contract is delivered through a managed instruction
    * file installed once, not through a session-lifecycle hook at all.
    */
   handoffInjectionPoint: "session-start" | "user-prompt-submit" | null;
@@ -113,8 +112,9 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // a managed instruction file, not a SessionStart hook (see
     // handoffInjectionPoint), so the behavior was never forced to be measured.
     sessionStartStdoutDelivered: null,
-    // skills/massa-ai/personas/README.md "Automatic Routing": "Claude Code and
-    // OpenCode receive it through their managed instruction files."
+    // scripts/install-skills.sh "Bootstrap contract delivery": Claude loads
+    // ~/.claude/MASSA-AI.md through an @MASSA-AI.md managed block in
+    // ~/.claude/CLAUDE.md — a managed instruction file, not a hook.
     handoffInjectionPoint: null,
     // Claude docs, `tools` field: "Inherits every tool available to subagents
     // if omitted." Allowlist example: "The subagent can't edit files, write
@@ -134,9 +134,10 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // HOOK_BINARY_HOSTS in generate-skill-artifacts.ts: real chmod'd copy.
     hookBinaryDelivery: "real-copy",
     extraManagedRoots: [],
-    // skills/massa-ai/personas/README.md: "Codex and Cursor receive this
-    // contract through SessionStart context" — proven working, unlike the
-    // Kimi/Grok discard case the ai-memory evidence documents.
+    // docs/adding-a-host.md "The two quirk classes": "Codex and Cursor
+    // both resolve to "session-start" today, but that is a measured fact
+    // about those two hosts" — proven working, unlike the Kimi/Grok discard
+    // case the ai-memory evidence documents.
     sessionStartStdoutDelivered: true,
     handoffInjectionPoint: "session-start",
     // Codex docs (per spec.md § Evidence): "session settings, such as
@@ -155,7 +156,7 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     forwardsUnknownFrontmatter: false,
     hookBinaryDelivery: "real-copy",
     extraManagedRoots: [],
-    // Same README citation as codex.
+    // Same docs/adding-a-host.md citation as codex.
     sessionStartStdoutDelivered: true,
     handoffInjectionPoint: "session-start",
     // Cursor docs, "Can I use MCP tools in subagents?": "Yes. Subagents
@@ -185,7 +186,9 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // the marker-scoped mechanism the three shared-directory hosts need.
     extraManagedRoots: ["lib", "command"],
     sessionStartStdoutDelivered: null,
-    // Same README citation as claude.
+    // scripts/install-skills.sh "Bootstrap contract delivery": OpenCode loads
+    // MASSA-AI.md through the absolute path in its config's `instructions`
+    // array — a managed instruction file, not a hook.
     handoffInjectionPoint: null,
     // OpenCode docs (per spec.md § Evidence): `tools` is deprecated in favour
     // of the `permission` map; patterns are "matched as wildcard patterns

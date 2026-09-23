@@ -174,7 +174,7 @@ is traceability only, never a dispatch target.
 
 **This section is the sole canonical Capability Packet definition.** `references/subagent-design.md` mirrors this list and the root `skills/AGENTS.md` registry points here without restating it. Bespoke packets (judge panel, FURPS analyst, phase-batch worker) are declared specializations that map onto these fields in their own workflow files.
 
-**A subagent inherits nothing from the parent session** — no skills, no personas, no loaded references, no conversation history. Everything the subagent needs is named explicitly in the packet, including the exact reference file paths it must read itself.
+**A subagent inherits nothing from the parent session** — no skills, no loaded references, no conversation history. Everything the subagent needs is named explicitly in the packet, including the exact reference file paths it must read itself.
 
 When dispatching a subagent, send a compact capability packet rather than a loose instruction. Include:
 
@@ -188,7 +188,6 @@ When dispatching a subagent, send a compact capability packet rather than a loos
 - `output`: the exact output contract
 - `firewall`: raw logs, diffs, snapshots, reports, or research that must be summarized
 - `memory`: whether the subagent may suggest memories and who persists them
-- `persona`: optional. The active route's cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt. Omit the field when no persona is routed.
 - `next_use`: what the main agent will do with the result
 - `mode`: conditional — for a charter that declares modes (`code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, `test-engineer`), the `Mode:` section of the charter this dispatch runs.
 - `lens`: conditional — `code-reviewer` `audit` dispatches only. One of `bugs | architecture | security | code-quality | performance`; the requirements lens is `product-manager` `audit` mode and the tests lens is `test-engineer` `audit` mode.
@@ -206,11 +205,6 @@ twice is the same field free to disagree.
 Reading a workflow's dispatch block therefore means reading this section beside
 it. That is the trade: the block stops being self-contained in exchange for
 having exactly one place a shared value can be wrong.
-
-**Every role, every dispatch**
-
-- `persona` — as defined in the Capability Packet list above. It is never written
-  in a dispatch block; it applies to all of them.
 
 **`code-reviewer`** (every mode)
 

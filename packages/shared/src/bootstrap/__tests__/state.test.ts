@@ -130,7 +130,7 @@ describe("resolveBootstrapState — defaults and merge", () => {
     }
   });
 
-  test("every one of the nine ids is overridable in both directions", () => {
+  test("every one of the eight ids is overridable in both directions", () => {
     // BST-09 AC-3: no protected subset. Each id is driven to the opposite of
     // its own default and asserted, so a rule that silently ignored its
     // persisted value would redden here rather than hide behind a default that
@@ -152,6 +152,15 @@ describe("resolveBootstrapState — defaults and merge", () => {
 });
 
 describe("resolveBootstrapState — ignored entries (BST-10 AC-12)", () => {
+  test("a retired id is skipped silently, not reported as ignored (PER AC-6)", () => {
+    const { state, ignoredStateKeys } = resolveBootstrapState({
+      bootstrap: { rules: { "persona-router": false } },
+    });
+    expect(ignoredStateKeys).toEqual([]);
+    expect(state).toEqual(bootstrapRuleDefaults());
+    expect(Object.keys(state)).toHaveLength(8);
+  });
+
   test("an id absent from the registry is ignored, reported once, and not fatal", () => {
     const { state, ignoredStateKeys } = resolveBootstrapState({
       bootstrap: { rules: { "no-such-rule": false, caveman: false } },
@@ -303,7 +312,7 @@ describe("setBootstrapRuleEnabled — refusals happen before any write", () => {
     }
     expect(thrown?.name).toBe("UnknownRuleError");
     expect(String(thrown?.message)).toContain("not-a-rule");
-    // Lists all nine valid ids (BST-09 AC-8).
+    // Lists all eight valid ids (BST-09 AC-8).
     for (const id of BOOTSTRAP_RULE_IDS) expect(String(thrown?.message)).toContain(id);
     // Byte-identical: the file was never opened for writing.
     expect(vfs.get(CONFIG_PATH)).toBe(before);
@@ -328,7 +337,7 @@ describe("setBootstrapRuleEnabled — refusals happen before any write", () => {
 });
 
 describe("every registry id is individually persistable (BST-09 AC-3)", () => {
-  test("each of the nine ids writes and reads back, in both directions", () => {
+  test("each of the eight ids writes and reads back, in both directions", () => {
     for (const id of BOOTSTRAP_RULE_IDS as readonly BootstrapRuleId[]) {
       vfs = new Map();
       existing = new Set();

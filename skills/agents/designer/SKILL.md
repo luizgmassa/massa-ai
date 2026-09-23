@@ -26,8 +26,7 @@ Own the screen: read a design source and either verify an existing user-facing s
 - Write only in `implement` mode, only when scoped with a disjoint write set (same constraint as `builder`), and only inside the UI layer: screen, view, component, layout, style, theme, and design-token files. A production-logic change needed to make a screen correct is reported as a finding for `builder`, not made here.
 - Platform, lifecycle, build-system, and offline-sync questions belong to `code-reviewer` in `guide` mode. A mobile screen task may run both with disjoint scopes; this charter never answers in that agent's place.
 - Never claim design conformance that was not checked. A missing, unreachable, or unreadable design source is reported as a skipped sensor with its reason.
-- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
-- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
+- Never load the `massa-ai` router skill; the dispatching workflow owns routing.
 
 ## Inputs
 - `mode`: `audit` or `implement`.

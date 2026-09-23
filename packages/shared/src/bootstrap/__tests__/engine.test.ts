@@ -38,6 +38,7 @@ import {
   ruleMarker,
   wrapBootstrapBlock,
 } from "../render";
+import { formatBootstrapReport } from "../format";
 import { bootstrapReportSucceeded, type BootstrapRenderResult } from "../report";
 import { BOOTSTRAP_RULES, type BootstrapRuleId } from "../rules";
 import { resolveBootstrapState } from "../state";
@@ -623,6 +624,25 @@ describe("rule state", () => {
     expect(report.ignoredStateKeys).toEqual(["no-such-rule"]);
     expect(statusByHost(report.rows)).toEqual({ codex: "written" });
     expect(bootstrapReportSucceeded(report)).toBe(true);
+  });
+
+  test("a persisted retired persona-router id renders the 8-rule contract with no ignored-state line (PER AC-6)", () => {
+    seedInstallState(["codex"]);
+    seedAllWiring();
+    seedRuleStateRaw(
+      `${JSON.stringify({ bootstrap: { rules: { "persona-router": false } } }, null, 2)}\n`,
+    );
+
+    const report = apply();
+
+    expect(report.ignoredStateKeys).toEqual([]);
+    expect(formatBootstrapReport(report)).not.toContain("Ignored persisted rule state");
+    expect(BOOTSTRAP_RULES).toHaveLength(8);
+    const contract = fs.readFileSync(bootstrapContractPath("codex", home), "utf-8");
+    for (const rule of BOOTSTRAP_RULES.filter((r) => r.defaultEnabled)) {
+      expect(contract).toContain(ruleToken(rule.id));
+    }
+    expect(statusByHost(report.rows)).toEqual({ codex: "written" });
   });
 
   test("a re-apply over an identical contract is skipped, not written", () => {

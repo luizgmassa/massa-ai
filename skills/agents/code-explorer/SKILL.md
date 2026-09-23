@@ -32,8 +32,7 @@ The user's codebase is usually **already indexed** by massa-ai. The first move o
 - Never scan directories exhaustively or read whole trees to answer a narrow question.
 - Never paste long code; summarize and cite.
 - Never call `reset_project`, `index`, or `reindex`; report the needed reindex to the parent agent instead.
-- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
-- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
+- Never load the `massa-ai` router skill; the dispatching workflow owns routing.
 
 ## Inputs
 - `mode`: `lookup` or `trace` (defaults to `lookup` for a single "where/who/how" question, `trace` for flow, dependency, or impact work).

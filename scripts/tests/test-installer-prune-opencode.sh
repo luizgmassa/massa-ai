@@ -28,8 +28,8 @@
 #   stated precondition never holds, and the test would be green for the
 #   wrong reason.
 #
-#   IPT-05/AC-05.1: install_bundled_skills now installs three harness skills
-#   (massa-ai, persona-router, profile), not two.
+#   IPT-05/AC-05.1 + PER AC-4: install_bundled_skills installs exactly the
+#   harness skills massa-ai, profile, and bootstrap.
 #
 # Runs the real install.sh against scratch HOMEs. MASSA_AI_SKIP_ARTIFACT_GENERATION=1
 # is set for every ordinary invocation because this checkout's
@@ -220,14 +220,15 @@ done
 
 echo ""
 
-# ── IPT-05/AC-05.1: three harness skills, not two ────────────────────────────
-echo "Scenario: install_bundled_skills installs massa-ai, persona-router, AND profile"
+# ── IPT-05/AC-05.1 + PER AC-4: the three harness skills ────────────────────────────
+echo "Scenario: install_bundled_skills installs massa-ai, profile, AND bootstrap (PER AC-4)"
 H5="$ROOT/h5"; mkdir -p "$H5"
 OUT5="$(run_install "$H5")"; RC5=$?
 assert_eq "install exits 0" "$RC5" "0"
 SKILLS_DIR5="$H5/.config/opencode/skills"
 assert_file "massa-ai skill installed" "$SKILLS_DIR5/massa-ai/SKILL.md"
-assert_file "persona-router skill installed" "$SKILLS_DIR5/persona-router/SKILL.md"
 assert_file "profile skill installed" "$SKILLS_DIR5/profile/SKILL.md"
+assert_file "bootstrap skill installed" "$SKILLS_DIR5/bootstrap/SKILL.md"
+assert_no_file "retired persona-router skill is not installed" "$SKILLS_DIR5/persona-router"
 
 summary "installer prune (opencode)"

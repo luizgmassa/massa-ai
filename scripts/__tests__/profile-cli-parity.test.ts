@@ -220,7 +220,7 @@ describe("bootstrap subcommand — cross-CLI parity (T19, BST-11/BST-12)", () =>
   });
 
   test("every registry id persists identically through both CLIs", async () => {
-    expect(RULE_IDS.length).toBe(9);
+    expect(RULE_IDS.length).toBe(8);
     for (const id of RULE_IDS) {
       const { mcp, oc } = await bothFootprints(["bootstrap", "enable", id]);
       expect(mcp.persistCalls).toEqual([[id, true]]);

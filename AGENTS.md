@@ -18,7 +18,6 @@ Check `.specs/project/STATE.md` for the current active feature and `.specs/proje
 
 - `massa-ai/` — workflow router; MCP tool contracts and Synapse lifecycle live in
   its `references/mcp-tools.md` and `references/synapse-policy.md`
-- `persona-router/` — persona selection
 - `AGENTS.md` (under `skills/`) — sub-agent registry: 18 reusable specialist
   agents, plus the canonical policy bootstrap block
 
@@ -100,7 +99,7 @@ Thumbs.db
 
 ## Agent Policies (single source elsewhere)
 
-The Persona Router, Plan Challenge, and Conversation Feedback policies are
+The Plan Challenge and Conversation Feedback policies are
 defined **once**, in the `<!-- massa-ai:bootstrap -->` block of
 [`skills/AGENTS.md`](./skills/AGENTS.md). `scripts/install-skills.sh` copies that
 block to `<host>/AGENTS.md` (for example `~/.claude/AGENTS.md`), which is the
@@ -110,12 +109,8 @@ Edit the policies in `skills/AGENTS.md`. Do not restate them here or in a host
 copy — a second copy is how the repo previously ended up shipping two
 contradicting Plan Challenge gates.
 `scripts/__tests__/skills-harness-integrity.test.ts` fails if a
-`plan_challenge:` / `conversation_feedback:` / `persona_router:` block reappears
+`plan_challenge:` / `conversation_feedback:` block reappears
 in this file.
-
-## Persona Pin
-
-persona_pin: context-skill-harness-engineer-architect
 
 ## Runtime Contract
 

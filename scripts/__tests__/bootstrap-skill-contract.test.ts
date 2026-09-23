@@ -24,7 +24,7 @@
  *    Both directions are asserted: the positive claims must be present too, so
  *    the ban cannot be passed by a file that says nothing at all.
  *
- * 2. **The documented id list is the registry's nine (BST-12 AC-4).** Parsed
+ * 2. **The documented id list is the registry's eight (BST-12 AC-4).** Parsed
  *    out of the skill's own `## The Rule Ids` section and compared against
  *    `BOOTSTRAP_RULE_IDS` in order, plus each id's documented default against
  *    `BOOTSTRAP_RULES`. Adding or removing a registry id without updating the
@@ -113,7 +113,7 @@ describe("skills/bootstrap/SKILL.md — the CLI is the only front (BST-11 AC-4/B
 });
 
 describe("skills/bootstrap/SKILL.md — documented ids match the registry (BST-12 AC-4)", () => {
-  test("the documented id list is exactly the registry's nine, in registry order", () => {
+  test("the documented id list is exactly the registry's eight, in registry order", () => {
     const documented = documentedRuleIds();
     const registry = [...BOOTSTRAP_RULE_IDS];
 
@@ -124,7 +124,7 @@ describe("skills/bootstrap/SKILL.md — documented ids match the registry (BST-1
     expect({ missing, extra }).toEqual({ missing: [], extra: [] });
 
     expect(documented).toEqual(registry);
-    expect(documented.length).toBe(9);
+    expect(documented.length).toBe(8);
   });
 
   test("each documented default matches the registry default", () => {

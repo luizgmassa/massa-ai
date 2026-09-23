@@ -26,8 +26,7 @@ Judge existing or changed code with source-backed evidence: review a diff, verif
 - Missing or unknown `mode` (or, in `audit` mode, a missing or unknown `lens`): return `Blocked` naming the valid modes `review`, `verify`, `audit`, `guide` (and lenses `bugs`, `architecture`, `security`, `code-quality`, `performance`).
 - One mode per dispatch; in `audit` mode, one lens per dispatch — do not mix lenses in one run.
 - Never skip a verification level without recording a concrete reason.
-- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
-- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
+- Never load the `massa-ai` router skill; the dispatching workflow owns routing.
 
 ## Inputs
 - `mode`: `review` | `verify` | `audit` | `guide` (required).
