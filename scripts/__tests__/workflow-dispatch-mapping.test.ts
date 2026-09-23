@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
@@ -227,6 +227,24 @@ function charterOf(agent: string): string {
   return read(path.join(SKILLS, "agents", agent, "SKILL.md"));
 }
 
+/**
+ * Charter text plus the content of every lazy mode-contract file it stubs
+ * (agent-roster-revision LZY-02), so a per-mode declaration such as `lens`
+ * that a lazy charter moved out of the shared body is still visible to a
+ * check that only reads the charter itself.
+ */
+function charterWithModeContracts(agent: string): string {
+  const charter = charterOf(agent);
+  const citations = [
+    ...charter.matchAll(/`references\/agent-modes\/([a-z-]+\/[a-z0-9.-]+\.md)`/g),
+  ].map((m) => m[1]!);
+  const modeFiles = citations.map((rel) => {
+    const file = path.join(SKILLS, "massa-ai", "references", "agent-modes", rel);
+    return existsSync(file) ? read(file) : "";
+  });
+  return [charter, ...modeFiles].join("\n");
+}
+
 describe("every dispatch packet names a real charter mode and lens (repo-wide)", () => {
   const blocks = ALL_SKILL_MD.flatMap((rel) =>
     dispatchBlocks(read(path.join(REPO_ROOT, rel))).map((b) => ({ rel, ...b })),
@@ -256,7 +274,7 @@ describe("every dispatch packet names a real charter mode and lens (repo-wide)",
     const bad: string[] = [];
     for (const b of blocks) {
       if (b.lenses.length === 0) continue;
-      const decl = charterOf(b.agent).match(/^- `lens`: [^\n]*?one of `([^`]+)`/m);
+      const decl = charterWithModeContracts(b.agent).match(/^- `lens`: [^\n]*?one of `([^`]+)`/m);
       const allowed = decl ? decl[1]!.split(/\s*\|\s*/) : [];
       for (const lens of b.lenses) {
         if (!allowed.includes(lens)) bad.push(`${b.rel}: ${b.agent} lens=${lens} (charter lenses: ${allowed.join(", ") || "none"})`);

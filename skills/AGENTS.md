@@ -271,7 +271,7 @@ drift, and did.
 | designer | Read and write user-facing screens from Figma, screenshots, or other design direction | read-only (UI-layer write when scoped) | `audit` (conformance), `implement` (UI layer) | `skills/agents/designer/SKILL.md` |
 | judge | Evaluate artifacts and challenge plans with quoted evidence | write (own judge-N report, `scorer` mode only) | `spec-author` (evaluation specification), `scorer` (debate panel), `plan-critique` (lite or full Plan Challenge gate) | `skills/agents/judge/SKILL.md` |
 | product-manager | Hold requirements to a clear, complete, consistent standard | read-only | `furps` (one FURPS+ dimension), `audit` (requirements lens: ambiguity, gaps, contradictions, implicit needs, uncovered scenarios, or implementation drift) | `skills/agents/product-manager/SKILL.md` |
-| test-engineer | Plan, audit, and fix tests | read-only (test-write when scoped) | `plan` (strategy), `audit` (tests lens), `fix` (tests-fix implementation) | `skills/agents/test-engineer/SKILL.md` |
+| test-engineer | Audit and fix tests | read-only (test-write when scoped) | `audit` (tests lens), `fix` (tests-fix implementation) | `skills/agents/test-engineer/SKILL.md` |
 
 ## Mapping — Retired Agents → Current Agents
 

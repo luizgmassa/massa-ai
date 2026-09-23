@@ -10,10 +10,11 @@
  * requirement — no broad substring that would pass on unrelated prose.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
+const AGENT_MODES_DIR = resolve(REPO_ROOT, "skills", "massa-ai", "references", "agent-modes");
 
 function readSkill(relPath: string): string {
   return readFileSync(resolve(REPO_ROOT, "skills", "massa-ai", relPath), "utf-8");
@@ -21,6 +22,35 @@ function readSkill(relPath: string): string {
 
 function readAgentCharter(agentName: string): string {
   return readFileSync(resolve(REPO_ROOT, "skills", "agents", agentName, "SKILL.md"), "utf-8");
+}
+
+/**
+ * Extracts `references/agent-modes/<agent>/<mode>.md` citations from a
+ * mode-stub section body (mirrors charter-contract-preservation.test.ts's
+ * `stubCitations`, agent-roster-revision LZY-02).
+ */
+function stubCitations(sectionBody: string): string[] {
+  return [...sectionBody.matchAll(/`references\/agent-modes\/([a-z-]+\/[a-z0-9.-]+\.md)`/g)].map(
+    (m) => m[1]!,
+  );
+}
+
+/**
+ * Resolves a `Mode:` section to its real contract prose: follows a lazy
+ * stub's citation(s) to their file(s) when present, otherwise returns the
+ * section body itself unchanged (mirrors charter-contract-preservation.test.ts's
+ * `resolveStubContent`). A dangling citation resolves to "", failing the
+ * caller's containment check rather than silently passing.
+ */
+function resolveModeContract(sectionBody: string): string {
+  const citations = stubCitations(sectionBody);
+  if (citations.length === 0) return sectionBody;
+  return citations
+    .map((rel) => {
+      const file = resolve(AGENT_MODES_DIR, rel);
+      return existsSync(file) ? readFileSync(file, "utf-8") : "";
+    })
+    .join("\n");
 }
 
 /** Collapses whitespace runs (including line wraps) to a single space, for phrases that may span a hard-wrapped source line. */
@@ -278,8 +308,11 @@ describe("test-engineer/SKILL.md: tests lens lives in the audit mode (AEH-08)", 
     const start = content.indexOf("### Mode: `audit`");
     expect(start).toBeGreaterThan(-1);
     const section = content.slice(start, content.indexOf("### Mode: `fix`"));
-    expect(section).toContain("coverage, regression protection, assertion quality, fixture reliability, variation");
-    expect(section).toContain("per-lens reference `workflows/tests/tests-audit.md`");
+    // agent-roster-revision LZY-02: the section is a lazy stub, not the
+    // inline contract; resolve through it to the real contract file.
+    const resolved = resolveModeContract(section);
+    expect(resolved).toContain("coverage, regression protection, assertion quality, fixture reliability, variation");
+    expect(resolved).toContain("per-lens reference `workflows/tests/tests-audit.md`");
   });
 });
 
