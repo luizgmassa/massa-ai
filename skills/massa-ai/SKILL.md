@@ -28,6 +28,10 @@ copies that block out. Edit the policies there, never in a host copy.
   `code-reviewer`, ...). On the Claude plugin route, dispatch the
   plugin-namespaced `massa-ai:<name>` so a same-named agent cannot
   intercept the dispatch.
+- Lazy charters (`designer`, `judge`, `test-engineer`) read
+  `references/agent-modes/<agent>/<mode>.md` before dispatch and inline it as
+  `mode_contract` (`judge` `plan-critique`: lite/full by `depth`); missing it
+  on a lazy mode returns `Blocked`.
 - Start with `recall` (prior decisions/patterns), budgeted: `limit <= 3`,
   `minImportance >= 0.7`, `types=["critical","decision","pattern"]`, unless
   the workflow needs a broader query. Never use it as an artifact loader --
@@ -38,15 +42,12 @@ copies that block out. Edit the policies there, never in a host copy.
 - The full 59-tool surface is contracted in `references/mcp-tools.md`. Graph tools (`trace_path`, `impact_analysis`, `get_architecture`) count as evidence only when fresh for the current repository path and commit/worktree state.
 - Persist only durable, useful knowledge; do not fabricate memories. Use
   `memory_update`/`memory_delete` to correct/remove.
-- Expand abbreviations on first use (e.g. "PR (Pull Request)"); one
-  vocabulary for batches: **Task** (atomic unit), **Phase** (ordered group)
-  -- `1 Phase = X Tasks`, never batch/wave/stage/chunk. Emit concise status
-  updates at workflow boundaries when Conversation Feedback is active.
+- Expand abbreviations on first use; one vocabulary for batches: **Task**,
+  **Phase** (`1 Phase = X Tasks`, never batch/wave/stage/chunk). Emit concise
+  status updates at workflow boundaries when Conversation Feedback is active.
 - Verify, don't assume: claims driving a decision are verified against
-  current codebase/command evidence or the user; docs (README, `.specs/`
-  prose, comments) are leads, never truth by themselves. Genuine doubt
-  (meaning, scope, irreversible choices, contradictory evidence) goes to
-  the user, not a silent choice.
+  current codebase/command evidence or the user; docs are leads, not truth.
+  Genuine doubt goes to the user, not a silent choice.
 - Before implementation edits, load `references/coding-guidelines.md` if
   not already loaded. Complete Evidence Gate before claiming done.
 
@@ -72,8 +73,8 @@ entity, generate a stable id `<workflow>-<entity>` (e.g.
 
 Resolve `projectId`:
 
-1. Call `recall` with query `"projectId for this workspace"` using the
-   default recall budget above.
+1. Call `recall` with query `"projectId for this workspace"` (default budget
+   above).
 2. If found, reuse exactly.
 3. If absent, derive from workspace root.
 4. If ambiguous, ask the user.
@@ -149,34 +150,33 @@ Apply the installed Plan Challenge Policy from `skills/AGENTS.md` (canonical
 source); prompt-level instructions override it for the current turn.
 
 - **Lite** (default, low-risk `feature`/`refactor`): dispatch `judge` in `plan-critique` mode
-  with a bounded checklist packet (failing assumption, falsifying check,
-  risk/size check, `escalate_to_full: true|false` + reason); skip The Fool
-  references unless it escalates.
+  (`judge/plan-critique-lite.md`) with a bounded checklist packet (failing
+  assumption, falsifying check, risk/size check, `escalate_to_full:
+  true|false` + reason); skip The Fool references unless it escalates.
 - **Full** (`spec-driven`, `design`, `create-adr`/`rfc`/`tdd`, explicit
   challenge, high-risk domain, >5 files/modules, or lite escalation): load
-  `workflows/the-fool.md`, select the mode, dispatch `judge` in `plan-critique` mode
-  with `fool_mode` in the packet.
+  `workflows/the-fool.md`, select the mode, dispatch `judge` in `plan-critique`
+  mode (`judge/plan-critique-full.md`) with `fool_mode` in the packet.
 - If `judge` is unavailable, run a local fresh-eyes critique and report the
   skipped reason; never retry under a different agent name.
 
 ## Retrieval And Synapse
 
-Follow the shared order in `references/codebase-investigation.md` (schemas
-in `references/mcp-tools.md`). Index output is a lead until confirmed
-against current source; current repository source and approved `.specs/`
-artifacts stay authoritative. Load `references/synapse-policy.md` before 2+
-related `search` calls.
+Follow the shared order in `references/codebase-investigation.md` (schemas in
+`references/mcp-tools.md`). Index output is a lead until confirmed against
+current source; source and approved `.specs/` artifacts stay authoritative.
+Load `references/synapse-policy.md` before 2+ related `search` calls.
 
 ## Persistence
 
-Required tags and supported memory types are in
-`references/memory-policy.md`; load it before writing memory.
+Required tags and memory types are in `references/memory-policy.md`; load it
+before writing memory.
 
 ## Graceful Degradation
 
 On any tool/index/MCP failure (server unavailable, index incomplete, Synapse
-unavailable, or a specific tool unavailable), load and follow
-`references/graceful-degradation.md` instead of blocking.
+unavailable), load and follow `references/graceful-degradation.md` instead
+of blocking.
 
 ## Completion
 
