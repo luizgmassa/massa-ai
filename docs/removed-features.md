@@ -47,3 +47,55 @@ The following docs were deleted (~6000 lines total):
 - `docs/path-recovery.md` — Project path recovery (`--recover` flag, Wave 6 N42)
 - `docs/adr/0001-remove-d5-cypher-subset.md` — ADR closing D5 Cypher deferral (Wave 7)
 - `docs/removed-features.md` — This document
+## Agent roster consolidation — personas, 14 sub-agents, 4 workflows
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-consolidation/`
+**Rationale**: The harness had three overlapping layers of role routing — a persona
+catalog with its own router skill and bootstrap rule, 18 sub-agent charters whose
+responsibilities overlapped (three judges, two explorers, five read-only reviewers, two
+requirement analysts), and 40 workflows, some niche (`maestro*`), one a catch-all
+(`general`). Routing now lives in one place: workflows dispatch a roster of 7 agents,
+each merged charter keeping every former output contract behind a capability-packet
+`mode`.
+
+### Removed personas
+
+| Removed | Replacement |
+|---|---|
+| `skills/persona-router/` (router skill) | None — workflows plus sub-agents own role routing |
+| `skills/massa-ai/personas/` (catalog + 5 persona prompts) | None |
+| `persona-router` bootstrap rule (9 → 8 rules) | None; a persisted `bootstrap.rules["persona-router"]` is silently ignored |
+| `persona_router:` policy block, `persona_pin` project contract, `persona` capability-packet field | None |
+| `/persona` prompt prefix as an observation-extractor role signal | `act as` / `you are a` still classify as role |
+
+The red-team "adversary personas" in `skills/massa-ai/references/the-fool/` are a critique
+technique, not this feature, and stay.
+
+### Removed sub-agents
+
+| Retired agent | Now |
+|---|---|
+| `investigator`, `navigator` | `code-explorer` (`trace`, `lookup`) |
+| `reviewer`, `verification-agent`, `audit-specialist`, `architecture-specialist`, `mobile-specialist` | `code-reviewer` (`review`, `verify`, `audit`, `guide`) |
+| `meta-judge`, `plan-critic` | `judge` (`spec-author`, `plan-critique`; `scorer` was `judge`) |
+| `furps-analyst`, `requirements-analyst` | `product-manager` (`furps`, `requirements`; plus the `audit` requirements lens) |
+| `planner` | None — the dispatching workflow's main agent plans |
+| `context-curator` | None — the main agent curates context under the Context Firewall |
+| `documentation-agent` | None — the `create-*` workflows produce their documents |
+
+The `massa-ai-` agent-name prefix went with them: agents ship unprefixed, and ownership
+moved to the `massa-ai-owned` content marker. Installers prune the legacy
+`massa-ai-<name>` files for the 18 pre-consolidation names on upgrade. The mapping table
+in `skills/AGENTS.md` is the single current-tense record of this change.
+
+### Removed workflows
+
+| Removed | Reason |
+|---|---|
+| `general` | A catch-all duplicated the router's Core Contract; with no match the router now proceeds without a workflow file |
+| `maestro`, `maestro-audit`, `maestro-fix` (+ `references/maestro.md`, `references/maestro/`, `docs/massa-ai-maestro.md`, the `MST` audit family) | Niche mobile E2E workflows; removed to shrink the workflow surface to what is used |
+
+Six workflows were renamed, not removed, with no aliases: `discovery` →
+`product-discovery`, `adr` → `create-adr`, `to-prd` → `create-prd`, `rfc` → `create-rfc`,
+`tdd` → `create-tdd`, `ticket` → `create-ticket`.

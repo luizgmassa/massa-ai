@@ -9,7 +9,7 @@
 # host that kept its subagents but lost its hooks, commands or plugin directory
 # read as fully installed and was skipped forever.
 #
-# Observed live 2026-08-17: Cursor had ~/.cursor/agents/massa-ai-*.md and
+# Observed live 2026-08-17: Cursor had ~/.cursor/agents/*.md and
 # neither plugins/local/massa-ai nor a single massa-ai hook entry. Re-running
 # scripts/setup-local-first.sh repaired nothing, because the sentinel was
 # satisfied by the agents alone.
@@ -72,27 +72,40 @@ NODE
 classes_for() {
   case "$1" in
     claude)
-      echo 'subagents|rm -f "$H/.claude/agents/"massa-ai-*.md'
+      echo 'subagents|rm -f "$H/.claude/agents/"*.md'
       echo 'commands|rm -f "$H/.claude/commands/"massa-ai-*.md'
       echo 'hooks|drop_hooks "$H/.claude/settings.json"'
       ;;
     codex)
-      echo 'subagents|rm -f "$H/.codex/agents/"massa-ai-*.toml'
+      echo 'subagents|rm -f "$H/.codex/agents/"*.toml'
       echo 'commands|rm -rf "$H/.codex/plugins/massa-ai/skills"'
       echo 'plugin|rm -rf "$H/.codex/plugins/massa-ai"'
       echo 'hooks|drop_hooks "$H/.codex/hooks.json"'
       ;;
     cursor)
-      echo 'subagents|rm -f "$H/.cursor/agents/"massa-ai-*.md'
+      echo 'subagents|rm -f "$H/.cursor/agents/"*.md'
       echo 'commands|rm -rf "$H/.cursor/plugins/local/massa-ai/skills"'
       echo 'plugin|rm -rf "$H/.cursor/plugins/local/massa-ai"'
       echo 'hooks|drop_hooks "$H/.cursor/hooks.json"'
       ;;
     opencode)
-      echo 'subagents|rm -f "$H/.config/opencode/agents/"massa-ai-*.md'
+      echo 'subagents|rm -f "$H/.config/opencode/agents/"*.md'
       echo 'commands|rm -f "$H/.config/opencode/command/"massa-ai-*.md'
       echo 'plugin|rm -f "$H/.config/opencode/plugins/massa-ai/index.js"'
       ;;
+  esac
+}
+
+# plant_user_agent <host> <home> — replace the owned subagents with one
+# user-authored agent of the same name that carries no massa-ai marker (for
+# opencode: a regular file, not a bundle symlink).
+plant_user_agent() {
+  local d
+  case "$1" in
+    claude) d="$2/.claude/agents"; rm -f "$d/"*.md; printf -- '---\nname: builder\n---\nmine\n' > "$d/builder.md" ;;
+    codex) d="$2/.codex/agents"; rm -f "$d/"*.toml; printf 'name = "builder"\n' > "$d/builder.toml" ;;
+    cursor) d="$2/.cursor/agents"; rm -f "$d/"*.md; printf -- '---\nname: builder\n---\nmine\n' > "$d/builder.md" ;;
+    opencode) d="$2/.config/opencode/agents"; rm -f "$d/"*.md; printf -- '---\nname: builder\n---\nmine\n' > "$d/builder.md" ;;
   esac
 }
 
@@ -113,6 +126,12 @@ for host in claude codex cursor opencode; do
     eval "$wipe"
     assert_eq "${host} ${cls} wiped → sentinel absent (reinstall)" "$(sentinel "$host" "$H")" "1"
   done < <(classes_for "$host")
+
+  # NAM AC-7: detection is by ownership, not presence — a user's unmarked
+  # agent must not stand in for the owned subagents.
+  rm -rf "$H"; cp -a "$PRISTINE" "$H"
+  plant_user_agent "$host" "$H"
+  assert_eq "${host} only an unmarked user agent → sentinel absent (reinstall)" "$(sentinel "$host" "$H")" "1"
 done
 
 # ── Route case 1: Cursor's bridge route legitimately has no local hooks ──────
@@ -139,7 +158,7 @@ rm -rf "$HB/.cursor/plugins/local/massa-ai"
 assert_eq "bridge route + plugin wiped → sentinel absent" "$(sentinel cursor "$HB")" "1"
 
 # ── Route case 2: Claude's marketplace route serves from the bundle ──────────
-# The installer deletes ~/.claude/{agents,commands}/massa-ai-* on this route and
+# The installer deletes the owned ~/.claude/agents and commands/massa-ai-* on this route and
 # skips the settings.json hook merge, so file-route expectations would loop
 # forever. Fixture-built: registering for real needs the claude CLI.
 echo ""
@@ -151,13 +170,19 @@ printf '{"version":2,"plugins":{"massa-ai@massa-ai":[{"scope":"user","installPat
   "$CACHE" > "$HM/.claude/plugins/installed_plugins.json"
 printf '{"version":2,"repository":"/x","platforms":{"claude":{"installRoute":"marketplace"}}}' \
   > "$HM/.config/massa-ai/install-state.json"
-touch "$CACHE/agents/massa-ai-builder.md" "$CACHE/commands/spec-driven.md"
+printf -- '---\nname: builder\n---\n<!-- massa-ai-owned: true -->\nbody\n' > "$CACHE/agents/builder.md"
+touch "$CACHE/commands/spec-driven.md"
 assert_eq "marketplace bundle intact → sentinel present" "$(sentinel claude "$HM")" "0"
 assert_eq "marketplace route ignores absent ~/.claude/agents" "$(sentinel claude "$HM")" "0"
+mv "$CACHE/agents/builder.md" "$ROOT/builder.marked"
+printf -- '---\nname: builder\n---\nmine\n' > "$CACHE/agents/builder.md"
+assert_eq "marketplace bundle with only an unmarked agent → sentinel absent" "$(sentinel claude "$HM")" "1"
+mv "$ROOT/builder.marked" "$CACHE/agents/builder.md"
+assert_eq "marketplace bundle marked agent restored → sentinel present" "$(sentinel claude "$HM")" "0"
 rm -f "$CACHE/commands/spec-driven.md"
 assert_eq "marketplace bundle lost its commands → sentinel absent" "$(sentinel claude "$HM")" "1"
 touch "$CACHE/commands/spec-driven.md"
-rm -f "$CACHE/agents/massa-ai-builder.md"
+rm -f "$CACHE/agents/builder.md"
 assert_eq "marketplace bundle lost its subagents → sentinel absent" "$(sentinel claude "$HM")" "1"
 rm -rf "$CACHE"
 assert_eq "marketplace installPath gone entirely → sentinel absent" "$(sentinel claude "$HM")" "1"

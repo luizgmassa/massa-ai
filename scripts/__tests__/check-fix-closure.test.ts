@@ -114,9 +114,9 @@ function closureBody(rows: string[]): string {
 }
 
 const ROW_SEC1_FIXED =
-  "| SEC-1 | fixed | src/a.ts | `bun test src/a.test.ts` | 4 pass, 0 fail | none | 2/2 killed | PASS (massa-ai-verification-agent) | 3 | tests | none | - |";
+  "| SEC-1 | fixed | src/a.ts | `bun test src/a.test.ts` | 4 pass, 0 fail | none | 2/2 killed | PASS (code-reviewer verify) | 3 | tests | none | - |";
 const ROW_SEC2_FIXED =
-  "| SEC-2 | fixed | src/b.ts | `bun test src/b.test.ts` | 6 pass, 0 fail | none | 1/1 killed | PASS (massa-ai-verification-agent) | 3 | tests | none | - |";
+  "| SEC-2 | fixed | src/b.ts | `bun test src/b.test.ts` | 6 pass, 0 fail | none | 1/1 killed | PASS (code-reviewer verify) | 3 | tests | none | - |";
 
 describe("check_fix_closure.ts", () => {
   test("complete committed closure exits 0 and prints the selected population", () => {

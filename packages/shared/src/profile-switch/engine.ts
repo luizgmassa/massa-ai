@@ -27,6 +27,7 @@ import { HOSTS, type Host, resolveHostLayout, detectRoute, type HostFileLayout }
 import { readInstallState, updatePlatform, UnwritableInstallStateError, type InstallState } from "./state.js";
 import { acquireLock, type AcquireLockOptions } from "./lock.js";
 import { resolveClaudeMarketplaceRoot } from "./claude-marketplace.js";
+import { isLegacyAgentName, isOwnedAgentFile, isOwnedAgentLink } from "./ownership.js";
 import { runtimeDriftReport } from "./doctor.js";
 import type { HostProfileState, ProfileInventory, HostSwitchResult, HostSwitchStatus, SwitchReport } from "./report.js";
 
@@ -212,25 +213,33 @@ export interface SwitchProfileOptions extends CommonOpts {
   lock?: Pick<AcquireLockOptions, "clock" | "identity" | "staleAfterMs">;
 }
 
-function matchesGlob(filename: string, glob: string): boolean {
-  const starIdx = glob.indexOf("*");
-  if (starIdx === -1) return filename === glob;
-  const prefix = glob.slice(0, starIdx);
-  const suffix = glob.slice(starIdx + 1);
-  return (
-    filename.length >= prefix.length + suffix.length && filename.startsWith(prefix) && filename.endsWith(suffix)
-  );
-}
-
-/** The massa-ai-owned filenames a switch of this host would write into
- * `dir` — shared by both copy strategies below and by the tracked-path
- * guard, so the guard checks exactly what is about to be written, no more
- * and no less. */
-function matchingFileNames(dir: string, glob: string): string[] {
+/** The variant entries a switch of this host may write: regular files of
+ * the host's extension that carry the ownership marker and are not
+ * legacy-named. `variant-sync` never deletes, so a variant dir materialized
+ * by an older version can still hold `massa-ai-<name>` files — never copy
+ * them back into the active dir. Shared by both copy strategies below and by
+ * the tracked-path guard, so the guard checks exactly what is about to be
+ * written, no more and no less. */
+function matchingFileNames(dir: string, ext: string): string[] {
   return fs
     .readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isFile() && matchesGlob(e.name, glob))
+    .filter(
+      (e) =>
+        e.isFile() &&
+        e.name.endsWith(ext) &&
+        !isLegacyAgentName(e.name) &&
+        isOwnedAgentFile(path.join(dir, e.name)),
+    )
     .map((e) => e.name);
+}
+
+function destIsAbsent(dest: string): boolean {
+  try {
+    fs.lstatSync(dest);
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 // ── T2b / AC-02.4: runtime tracked-path guard ───────────────────────────
@@ -336,40 +345,33 @@ function assertStateWritable(stateFilePath: string): void {
   }
 }
 
-/** claude/codex: overwrite only massa-ai-owned files present in the
- * variant; never delete a file (massa-ai-owned or not) missing from it. */
+/** claude/codex: write each owned variant file whose destination is absent
+ * or massa-ai-owned; a foreign same-named file is left untouched. Never
+ * delete a file (massa-ai-owned or not) missing from the variant. */
 function copyFileRouteVariant(layout: HostFileLayout, variantDir: string): number {
   fs.mkdirSync(layout.activeDir, { recursive: true });
   let changed = 0;
-  for (const entry of fs.readdirSync(variantDir, { withFileTypes: true })) {
-    if (!entry.isFile() || !matchesGlob(entry.name, layout.activeGlob)) continue;
-    fs.copyFileSync(path.join(variantDir, entry.name), path.join(layout.activeDir, entry.name));
+  for (const name of matchingFileNames(variantDir, layout.activeExt)) {
+    const dest = path.join(layout.activeDir, name);
+    if (!destIsAbsent(dest) && !isOwnedAgentFile(dest)) continue;
+    fs.copyFileSync(path.join(variantDir, name), dest);
     changed++;
   }
   return changed;
 }
 
 /** opencode (F3): actives stay symlinks — repoint each massa-ai-owned
- * symlink at the new profile's variant file. A regular file where a
- * symlink is expected is user content and is left untouched forever,
+ * symlink at the new profile's variant file. A regular file, or a symlink
+ * massa-ai does not own, is user content and is left untouched forever,
  * mirroring `apps/opencode-plugin/install.sh`'s pre-flight; normalizing to
  * a copy would freeze that agent on every future upgrade. */
 function repointOpencodeVariant(layout: HostFileLayout, variantDir: string): number {
   fs.mkdirSync(layout.activeDir, { recursive: true });
   let changed = 0;
-  for (const entry of fs.readdirSync(variantDir, { withFileTypes: true })) {
-    if (!entry.isFile() || !matchesGlob(entry.name, layout.activeGlob)) continue;
-    const dest = path.join(layout.activeDir, entry.name);
-    const target = path.resolve(path.join(variantDir, entry.name));
-
-    let destExists = true;
-    let destIsSymlink = false;
-    try {
-      destIsSymlink = fs.lstatSync(dest).isSymbolicLink();
-    } catch {
-      destExists = false;
-    }
-    if (destExists && !destIsSymlink) continue; // pre-flight: never clobber a regular file
+  for (const name of matchingFileNames(variantDir, layout.activeExt)) {
+    const dest = path.join(layout.activeDir, name);
+    const target = path.resolve(path.join(variantDir, name));
+    if (!destIsAbsent(dest) && !isOwnedAgentLink(dest)) continue; // pre-flight: never clobber user content
 
     const tmp = `${dest}.massa-ai-switch.${crypto.randomUUID()}`;
     fs.symlinkSync(target, tmp);
@@ -492,7 +494,7 @@ export function switchProfile(opts: SwitchProfileOptions): SwitchReport {
       // T2b / AC-02.4: the runtime replacement for the refusal D2 retired —
       // right before this host's files are overwritten, refuse a write that
       // would dirty a git-tracked path in the destination checkout.
-      const candidateNames = matchingFileNames(h.variantDir, h.layout.activeGlob);
+      const candidateNames = matchingFileNames(h.variantDir, h.layout.activeExt);
       const guard = checkTrackedPathGuard(h.layout.activeDir, candidateNames);
       if (guard.blocked) {
         rows.push({

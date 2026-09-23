@@ -137,7 +137,7 @@ describe("bootstrap list / bootstrap show (BST-11 AC-2, AC-3)", () => {
 
 describe("unknown rule id (BST-09 AC-8)", () => {
   test.each(["enable", "disable"])(
-    "bootstrap %s <unknown> exits non-zero, names the id, lists the nine valid ids and changes no state",
+    "bootstrap %s <unknown> exits non-zero, names the id, lists the eight valid ids and changes no state",
     async (verb) => {
       const r = await captureConsole(() => runCli(["bootstrap", verb, "not-a-rule"]));
       expect(r.code).not.toBe(0);
@@ -153,11 +153,22 @@ describe("unknown rule id (BST-09 AC-8)", () => {
     },
   );
 
-  test("the listed ids are exactly the nine in the registry", async () => {
+  test.each(["enable", "disable"])(
+    "bootstrap %s persona-router says the rule is retired and changes no state",
+    async (verb) => {
+      const r = await captureConsole(() => runCli(["bootstrap", verb, "persona-router"]));
+      expect(r.code).not.toBe(0);
+      expect(r.err).toContain('bootstrap rule "persona-router" was retired');
+      expect(setBootstrapRuleEnabled.mock.calls.length).toBe(0);
+      expect(applyBootstrapState.mock.calls.length).toBe(0);
+    },
+  );
+
+  test("the listed ids are exactly the eight in the registry", async () => {
     const r = await captureConsole(() => runCli(["bootstrap", "enable", "nope"]));
     const listed = (r.err.split("valid ids: ")[1] ?? "").trim().split(", ");
     expect(listed).toEqual([...RULE_IDS]);
-    expect(listed.length).toBe(9);
+    expect(listed.length).toBe(8);
   });
 });
 

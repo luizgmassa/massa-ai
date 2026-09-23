@@ -229,7 +229,7 @@ describe("pr-review.md: coverage dimension uses the dedicated tests lens (AEH-08
   const content = readSkill("workflows/pr-review.md");
 
   test("coverage dimension dispatches lens: tests, not coverage-under-performance", () => {
-    expect(content).toContain("| 5 | Test coverage | `massa-ai-audit-specialist` | `lens: tests`");
+    expect(content).toContain("| 5 | Test coverage | `test-engineer` | `mode: audit` (dedicated tests lens:");
     expect(content).not.toContain("the charter's lens set has no `tests` lens");
   });
 });
@@ -267,16 +267,19 @@ describe("test-engineer/SKILL.md: five error classes and variation test design (
 });
 
 // ---------------------------------------------------------------------------
-// AEH-08: audit-specialist/SKILL.md tests lens (T10)
+// AEH-08: the tests lens (T10). agent-roster-consolidation moved it from the
+// retired audit-specialist lens table into test-engineer's `audit` mode.
 // ---------------------------------------------------------------------------
 
-describe("audit-specialist/SKILL.md: tests lens row (AEH-08)", () => {
-  const content = readAgentCharter("audit-specialist");
+describe("test-engineer/SKILL.md: tests lens lives in the audit mode (AEH-08)", () => {
+  const content = readAgentCharter("test-engineer");
 
-  test("lens table gains a tests row routing to tests-audit.md", () => {
-    expect(content).toContain(
-      "| `tests` | Coverage, regression protection, assertion quality, variation | `workflows/tests/tests-audit.md` |",
-    );
+  test("the audit mode covers the tests lens and routes to tests-audit.md", () => {
+    const start = content.indexOf("### Mode: `audit`");
+    expect(start).toBeGreaterThan(-1);
+    const section = content.slice(start, content.indexOf("### Mode: `fix`"));
+    expect(section).toContain("coverage, regression protection, assertion quality, fixture reliability, variation");
+    expect(section).toContain("per-lens reference `workflows/tests/tests-audit.md`");
   });
 });
 
@@ -388,23 +391,23 @@ describe("references/spec-driven/validate.md: post-validation metric snapshot re
 });
 
 // ---------------------------------------------------------------------------
-// AEH-06: massa-ai-reviewer dispatch block wired into the 14 implementing/fix
-// workflows (T15-T17). Shared constants and target lists below are reused
+// AEH-06: code-reviewer dispatch block wired into the implementing/fix
+// workflows (T15-T17; 12 since agent-roster-consolidation removed `general` and `maestro-fix`). Shared constants and target lists below are reused
 // across the T15/T16/T17 describe blocks as each batch lands.
 // ---------------------------------------------------------------------------
 
 const REVIEWER_DISPATCH_HEADER =
-  "> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`";
+  "> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`";
 /**
- * The reviewer's `fallback` and the universal `persona` bullet used to be
- * asserted here, per file, because each block carried them verbatim. Both are
- * now Role Defaults in `references/agent-orchestration.md` — stated once,
- * applying to every dispatch — so asserting them per block would assert their
- * absence-by-design as a failure.
+ * The code-reviewer's `fallback` bullet used to be asserted here, per file,
+ * because each block carried it verbatim. It is now a Role Default in
+ * `references/agent-orchestration.md` — stated once, applying to every review
+ * dispatch — so asserting it per block would assert its absence-by-design as a
+ * failure.
  *
- * They are not unguarded: `skills-harness-integrity.test.ts`'s role-defaults
- * group asserts that the reference states each default, that the section claims
- * universality, and that NO block restates one. What stays here is what is
+ * It is not unguarded: `skills-harness-integrity.test.ts`'s role-defaults
+ * group asserts that the reference states each default and that NO block
+ * restates one. What stays here is what is
  * genuinely per-file — the header and the file's own `scope` sentence — plus
  * the requirement that the defaults have actually moved rather than vanished.
  */
@@ -416,14 +419,14 @@ interface ReviewerDispatchTarget {
   scope: string;
 }
 
-/** Asserts one file carries its own half of the reviewer dispatch block: header and scope. */
+/** Asserts one file carries its own half of the code-reviewer dispatch block: header and scope. */
 function expectReviewerDispatchBlock({ file, scope }: ReviewerDispatchTarget): void {
   const content = readSkill(file);
   expect(content).toContain(REVIEWER_DISPATCH_HEADER);
   expect(content).toContain(`> - scope: ${scope}`);
 }
 
-/** The reviewer's fallback survived the move into the shared defaults. */
+/** The code-reviewer's fallback survived the move into the shared defaults. */
 function expectReviewerFallbackDefault(): void {
   const body = readSkill("references/agent-orchestration.md");
   const start = body.indexOf("### Role Defaults");
@@ -433,38 +436,37 @@ function expectReviewerFallbackDefault(): void {
 
 const IMPLEMENTING_WORKFLOW_TARGETS: ReviewerDispatchTarget[] = [
   { file: "workflows/feature.md", scope: "the feature's diff surface and its task/AC context" },
-  { file: "workflows/general.md", scope: "the change's diff surface and its task/AC context" },
   { file: "workflows/debug.md", scope: "the fix's diff surface and its task/AC context" },
   { file: "workflows/refactor.md", scope: "the change's diff surface and its task/AC context" },
   { file: "workflows/spec-driven.md", scope: "the task's diff surface and its task/AC context" },
 ];
 
-describe("massa-ai-reviewer dispatch block: 5 implementing workflows (T15, AEH-06)", () => {
-  test("the reviewer's fallback clause survived the move into the shared role defaults", () => {
+describe("code-reviewer dispatch block: 4 implementing workflows (T15, AEH-06)", () => {
+  test("the code-reviewer's fallback clause survived the move into the shared role defaults", () => {
     expectReviewerFallbackDefault();
   });
 
   for (const target of IMPLEMENTING_WORKFLOW_TARGETS) {
-    test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
+    test(`${target.file} carries the code-reviewer dispatch block`, () => {
       expectReviewerDispatchBlock(target);
     });
   }
 
-  test("spec-driven.md's existing verification-agent dispatch block stays intact", () => {
+  test("spec-driven.md's existing verify-mode dispatch block stays intact", () => {
     const content = readSkill("workflows/spec-driven.md");
     expect(content).toContain(
-      "> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`",
+      "> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`",
     );
     expect(content).toContain("> - scope: the feature's git diff surface, test files, and spec ACs");
     expect(content).toContain(
-      "the verification-agent always runs automatically and writes `.specs/features/<slug>/validation.md`",
+      "the `code-reviewer` verifier always runs automatically and writes `.specs/features/<slug>/validation.md`",
     );
   });
 
-  test("the reviewer dispatch block precedes the verification-agent dispatch block in spec-driven.md", () => {
+  test("the review-mode dispatch block precedes the verify-mode dispatch block in spec-driven.md", () => {
     const content = readSkill("workflows/spec-driven.md");
     const reviewerIdx = content.indexOf(REVIEWER_DISPATCH_HEADER);
-    const verificationIdx = content.indexOf("> **Dispatch: `massa-ai-verification-agent`**");
+    const verificationIdx = content.indexOf("> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`)");
     expect(reviewerIdx).toBeGreaterThan(-1);
     expect(verificationIdx).toBeGreaterThan(-1);
     expect(reviewerIdx).toBeLessThan(verificationIdx);
@@ -479,9 +481,9 @@ const FIX_WORKFLOW_BATCH_1_TARGETS: ReviewerDispatchTarget[] = [
   "workflows/requirements/requirements-fix.md",
 ].map((file) => ({ file, scope: "the fix's diff surface and its task/AC context" }));
 
-describe("massa-ai-reviewer dispatch block: fix workflows batch 1 (T16, AEH-06)", () => {
+describe("code-reviewer dispatch block: fix workflows batch 1 (T16, AEH-06)", () => {
   for (const target of FIX_WORKFLOW_BATCH_1_TARGETS) {
-    test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
+    test(`${target.file} carries the code-reviewer dispatch block`, () => {
       expectReviewerDispatchBlock(target);
     });
   }
@@ -490,37 +492,36 @@ describe("massa-ai-reviewer dispatch block: fix workflows batch 1 (T16, AEH-06)"
 const FIX_WORKFLOW_BATCH_2_TARGETS: ReviewerDispatchTarget[] = [
   "workflows/tests/tests-fix.md",
   "workflows/implementation/implementation-fix.md",
-  "workflows/maestro/maestro-fix.md",
   "workflows/mobile-figma/mobile-figma-fix.md",
 ].map((file) => ({ file, scope: "the fix's diff surface and its task/AC context" }));
 
-describe("massa-ai-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)", () => {
+describe("code-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)", () => {
   for (const target of FIX_WORKFLOW_BATCH_2_TARGETS) {
-    test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
+    test(`${target.file} carries the code-reviewer dispatch block`, () => {
       expectReviewerDispatchBlock(target);
     });
   }
 
-  test("all 14 wired workflows carry the reviewer dispatch block (count sensor)", () => {
+  test("all 12 wired workflows carry the code-reviewer dispatch block (count sensor)", () => {
     const allTargets = [
       ...IMPLEMENTING_WORKFLOW_TARGETS,
       ...FIX_WORKFLOW_BATCH_1_TARGETS,
       ...FIX_WORKFLOW_BATCH_2_TARGETS,
     ];
-    expect(allTargets.length).toBe(14);
+    expect(allTargets.length).toBe(12);
     const withBlock = allTargets.filter(({ file }) => readSkill(file).includes(REVIEWER_DISPATCH_HEADER));
-    expect(withBlock.length).toBe(14);
+    expect(withBlock.length).toBe(12);
   });
 });
 
 // ---------------------------------------------------------------------------
-// The reviewer's trigger line, both directions.
+// The code-reviewer's trigger line, both directions.
 //
 // Written after a Plan Challenge pre-mortem found this line ungated in BOTH
-// directions: AEH-06 pinned the reviewer block's header, scope, fallback and
+// directions: AEH-06 pinned the code-reviewer block's header, scope, fallback and
 // persona bullets verbatim in all 14 files and never touched `trigger:`, which
 // is the bullet that states the dispatch is mandatory. A proposal to tier the
-// reviewer by Verification Ladder size would therefore have landed silently in
+// code-reviewer by Verification Ladder size would therefore have landed silently in
 // 14 source workflows and 48 generated bundle copies with every gate green.
 //
 // The proposal was dropped — it removes no line from any workflow (the
@@ -528,7 +529,7 @@ describe("massa-ai-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)"
 // widens entry into a path that already exists), and at Quick size it would
 // leave zero dispatched independent readers, since
 // `references/verification-ladder.md`'s Independent Verification Mandate
-// already lets the VERIFIER skip its subagent hop there. The reviewer dispatch
+// already lets the VERIFIER skip its subagent hop there. The code-reviewer dispatch
 // is what keeps "author ≠ verifier" true at Quick.
 //
 // The gap it exposed is real either way, so this is the sensor. Shaped after
@@ -540,14 +541,14 @@ describe("massa-ai-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)"
 // worth a gate.
 // ---------------------------------------------------------------------------
 
-describe("reviewer dispatch trigger: mandatory in all 14, and not by accident", () => {
+describe("code-reviewer dispatch trigger: mandatory in all 12, and not by accident", () => {
   const ALL_REVIEWER_TARGETS = [
     ...IMPLEMENTING_WORKFLOW_TARGETS,
     ...FIX_WORKFLOW_BATCH_1_TARGETS,
     ...FIX_WORKFLOW_BATCH_2_TARGETS,
   ];
 
-  /** The generic lead-in, shared byte-identically by 12 of the 14. */
+  /** The generic lead-in, shared byte-identically by 10 of the 12. */
   const GENERIC_TRIGGER =
     "> - trigger: implementation complete, before the verification gate — never optional";
 
@@ -565,13 +566,13 @@ describe("reviewer dispatch trigger: mandatory in all 14, and not by accident", 
       "> - trigger: implementation of the CQ finding complete, before the verification gate — never optional",
   };
 
-  /** The reviewer block's own `trigger:` line in a file, or undefined. */
+  /** The code-reviewer block's own `trigger:` line in a file, or undefined. */
   function reviewerTrigger(file: string): string | undefined {
     const lines = readSkill(file).split(/\r?\n/);
     const headerIdx = lines.findIndex((l) => l.startsWith(REVIEWER_DISPATCH_HEADER));
     if (headerIdx === -1) return undefined;
     // Scan only this block: stop at the first non-blockquote line, so a later
-    // dispatch block's trigger can never be mistaken for the reviewer's.
+    // dispatch block's trigger can never be mistaken for the code-reviewer's.
     for (let i = headerIdx + 1; i < lines.length && lines[i]!.startsWith(">"); i++) {
       if (lines[i]!.startsWith("> - trigger:")) return lines[i];
     }
@@ -579,27 +580,27 @@ describe("reviewer dispatch trigger: mandatory in all 14, and not by accident", 
   }
 
   for (const { file } of ALL_REVIEWER_TARGETS) {
-    test(`${file}'s reviewer trigger states the dispatch is never optional`, () => {
+    test(`${file}'s code-reviewer trigger states the dispatch is never optional`, () => {
       const trigger = reviewerTrigger(file);
-      expect(trigger, `${file} has no reviewer trigger line`).toBeDefined();
+      expect(trigger, `${file} has no code-reviewer trigger line`).toBeDefined();
       expect(trigger).toContain("— never optional");
       // And it is one of the two sanctioned wordings, not a third.
       expect(trigger).toBe(FINDING_SCOPED_TRIGGERS[file] ?? GENERIC_TRIGGER);
     });
   }
 
-  test("the 12 generic triggers are byte-identical to each other", () => {
+  test("the 10 generic triggers are byte-identical to each other", () => {
     const generic = ALL_REVIEWER_TARGETS
       .map(({ file }) => file)
       .filter((file) => !(file in FINDING_SCOPED_TRIGGERS))
       .map((file) => reviewerTrigger(file));
-    expect(generic.length).toBe(12); // guard the guard: the split must stay 12/2
+    expect(generic.length).toBe(10); // guard the guard: the split must stay 10/2
     expect(new Set(generic).size).toBe(1);
   });
 
-  test("pr-review.md's reviewer dispatch is deliberately NOT this trigger", () => {
+  test("pr-review.md's code-reviewer dispatch is deliberately NOT this trigger", () => {
     // Negative control. Without it, a mutation that pasted the mandatory trigger
-    // into every reviewer block on disk would pass every assertion above, and
+    // into every code-reviewer block on disk would pass every assertion above, and
     // the group would be measuring nothing.
     const trigger = reviewerTrigger("workflows/pr-review.md");
     expect(trigger).toBeDefined();
@@ -607,7 +608,7 @@ describe("reviewer dispatch trigger: mandatory in all 14, and not by accident", 
     expect(trigger).toContain("pr-review Step 2, dimension row 6");
   });
 
-  test("no workflow outside the 14 claims a never-optional reviewer dispatch", () => {
+  test("no workflow outside the 12 claims a never-optional code-reviewer dispatch", () => {
     const sanctioned = new Set(ALL_REVIEWER_TARGETS.map(({ file }) => file));
     const offenders: string[] = [];
     for (const rel of listWorkflowFiles()) {

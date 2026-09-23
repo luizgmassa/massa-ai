@@ -149,17 +149,6 @@ describe("validate_audit_report.ts — valid fixture per family", () => {
     { family: "requirements", title: "Requirements Audit", workflow: "requirements-audit", findings: [{ id: "REQ-1", title: "Missing edge case" }] },
     { family: "tests", title: "Tests Audit", workflow: "tests-audit", findings: [{ id: "TST-1", title: "No coverage for error path" }] },
     {
-      family: "maestro",
-      title: "Maestro Audit",
-      workflow: "maestro-audit",
-      findings: [{ id: "MST-1", title: "Flaky checkout flow" }],
-      extraMeta: {
-        "Scenario Source": "local file",
-        "Maestro CLI": "1.39.0",
-        "Device/Emulator Readiness": "emulator-5554 ready",
-      },
-    },
-    {
       family: "mobile-figma",
       title: "Mobile Figma Audit",
       workflow: "mobile-figma-audit",
@@ -262,6 +251,22 @@ ${CHECKLIST}`;
     const r = run(path); // no --family
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("family=bugs");
+  });
+
+  // agent-roster-consolidation WFL-02 (Inventory AC-3): the maestro family and
+  // its MST prefix are gone, so a report that was valid before is now rejected.
+  test("retired maestro family is rejected, by --family and by Workflow: auto-detect", () => {
+    const root = makeTempRoot("audit-report-maestro-retired");
+    const content = singleLensFixture("Maestro Audit", "maestro-audit", [{ id: "MST-1", title: "Flaky checkout flow" }], {
+      "Scenario Source": "local file",
+      "Maestro CLI": "1.39.0",
+      "Device/Emulator Readiness": "emulator-5554 ready",
+    });
+    const path = writeReport(root, "report.md", content);
+    for (const r of [run(path, ["--family", "maestro"]), run(path)]) {
+      expect(r.exitCode).not.toBe(0);
+      expect(r.stdout + r.stderr).toContain("could not determine report family");
+    }
   });
 });
 

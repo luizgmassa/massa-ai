@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: six workflows are renamed, with no aliases.** `discovery` → `product-discovery`,
+  `adr` → `create-adr`, `to-prd` → `create-prd`, `rfc` → `create-rfc`, `tdd` → `create-tdd`,
+  `ticket` → `create-ticket` — the files, frontmatter names, session-id prefixes, `workflow:`
+  tags, and the generated slash commands (`/massa-ai-create-adr`, `/massa-ai:create-adr`, …).
+  The old commands are gone. The owned references and guides follow:
+  `references/{tdd,rfc,ticket}/` → `references/create-{tdd,rfc,ticket}/`,
+  `references/adr-authoring.md` → `references/create-adr.md`, and
+  `docs/massa-ai-{rfc,tdd,ticket}.md` → `docs/massa-ai-create-{rfc,tdd,ticket}.md`. The Plan
+  Challenge policy names `create-adr`, `create-rfc`, `create-tdd`.
+- **Breaking: sub-agents drop the `massa-ai-` name prefix on every host.** Agents are
+  generated and dispatched as `builder`, `code-reviewer`, …; on the Claude plugin route
+  dispatch the plugin-namespaced `massa-ai:<name>`. Slash commands and the `massa-ai-hook`
+  binary keep their prefix.
+- **Agent-file ownership is a content marker, not a filename.** Every generated `.md` agent
+  (Claude, Cursor, OpenCode) carries `<!-- massa-ai-owned: true -->` as its first body line;
+  Codex `.toml` keeps its `# massa-ai-owned` first line. The four plugin installers,
+  `installer-shared.sh`, `verify-harness-install.ts`, `massa-ai-config agents
+  install|uninstall`, and the profile-switch engine and `doctor` select owned files through
+  that marker (`isOwnedAgentFile` in `packages/shared/src/profile-switch/ownership.ts`, inlined
+  by each bash installer). A same-named agent file you own — regular file or symlink — is
+  skipped with a `⚠ … is not massa-ai-owned — skipped` warning and left byte-identical, and a
+  profile switch never overwrites one.
+- **Upgrades prune the old agents and the retired skill.** Installers remove legacy
+  `massa-ai-<name>` agent files for exactly the 18 pre-consolidation names (never an open
+  `massa-ai-*` glob, so a user's own `massa-ai-mine.md` survives). Plugin installers delete a
+  host's installed `persona-router` skill on install and uninstall when `install-state.json`
+  records it among that host's plugin-installed skills, and `install-skills.sh --apply` does
+  the same on a plugin → repo handover; harness skills are now exactly `massa-ai`, `profile`,
+  `bootstrap`.
+- **Workflow dispatch follows the new roster.** The five audits dispatch `code-reviewer` with
+  the matching lens (`implementation-audit` also sends its Requirements lens to
+  `product-manager` and its Tests lens to `test-engineer`); fix workflows dispatch `builder`
+  plus `code-reviewer` for review and verification; `tests-audit`/`tests-fix` dispatch
+  `test-engineer`; `furps-refinement` and `requirements-audit` dispatch `product-manager`;
+  `design` and `mobile-figma-*` dispatch `designer` unconditionally; Plan Challenge and
+  `judge-with-debate` dispatch `judge`. The Claude hook's profile drift check reads
+  `code-reviewer.md`.
+- **Upgrade note: re-render your startup contract.** A plugin-only update
+  (`claude plugin update` and friends) does not rewrite the installed `MASSA-AI.md`, so it keeps
+  the old nine-rule text with the persona router until you run `bash
+  scripts/install-harness.sh` or `bash scripts/install-skills.sh --apply`, or any
+  `massa-ai-config bootstrap enable|disable`.
+
+### Removed
+
+- **Breaking: the persona feature is gone.** `skills/persona-router/`, the persona catalog
+  (`skills/massa-ai/personas/`), the `persona_router:` policy block, the `persona_pin`
+  project contract, and the `persona` capability-packet field no longer exist. Role routing
+  lives in one place: workflows plus the seven sub-agents. Generated plugin bundles no longer
+  carry `skills/persona-router/`, and `bun run generate:artifacts` deletes a stale copy left
+  in a checkout.
+- **Breaking: the `persona-router` bootstrap rule is retired — 9 rules become 8.** The
+  contract now renders `caveman`, `massa-ai-router`, `dedupe-guardrails`, `plan-challenge`,
+  `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`. A persisted
+  `bootstrap.rules["persona-router"]` in `config.json` is silently ignored (no warning, the
+  key is left in place); `massa-ai-config bootstrap enable|disable persona-router` now exits
+  with `bootstrap rule "persona-router" was retired and can no longer be toggled`.
+- **Breaking: 14 sub-agents are retired; the roster is 7.** `planner`, `context-curator`,
+  `documentation-agent`, `investigator`, `navigator`, `meta-judge`, `plan-critic`,
+  `furps-analyst`, `requirements-analyst`, `verification-agent`, `mobile-specialist`,
+  `architecture-specialist`, `audit-specialist`, and `reviewer` are folded into `builder`,
+  `code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, and
+  `test-engineer`, which select a former output contract through the capability packet's
+  `mode` field. The single retired → current mapping table is in `skills/AGENTS.md`
+  (`planner`, `context-curator`, and `documentation-agent` have no successor: the main agent
+  plans and curates context, and the `create-*` workflows write documents). The index-first
+  allowlist exception (`AGENT_TOOLS_OVERRIDE`) and its `pwd`-only OpenCode bash override are
+  gone; every read-only agent uses the ordinary denylist. With `documentation-agent` gone, its
+  light-model per-agent override leaves every built-in profile: the profiles override exactly
+  `builder`, `designer`, and `test-engineer`; `code-explorer`, `code-reviewer`, `judge`, and
+  `product-manager` resolve to the profile default.
+- **Breaking: the `general`, `maestro`, `maestro-audit`, and `maestro-fix` workflows are
+  removed — 40 workflows become 36.** With them go `references/maestro.md`,
+  `references/maestro/`, `docs/massa-ai-maestro.md`, the `maestro` audit-report family and its
+  `MST` prefix. When no route matches, the router now proceeds without loading any workflow
+  file, under its Core Contract; there is no fallback workflow.
+- **The `/persona` prompt prefix is no longer an observation-extractor role signal.** `act as`
+  and `you are a` still are.
+
 ## [1.61.0] - 2026-09-23
 
 ### Added

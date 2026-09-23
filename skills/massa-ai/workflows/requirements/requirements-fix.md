@@ -64,9 +64,9 @@ Not for findings-only requirements review — route to `workflows/requirements/r
    - Preserve non-goals and explicit constraints.
    - `references/knowledge-verification-chain.md`'s Step 5 settles technical facts only (library/API behavior), never product intent; a product decision gap still stops here regardless of how the chain resolved.
    - If a finding exposes a product decision gap, stop and ask rather than inventing policy.
-10. Use agent orchestration only when it improves signal, with one carve-out: the verification-agent dispatch below is mandatory at its tier gate rather than discretionary, per `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
+10. Use agent orchestration only when it improves signal, with one carve-out: the `code-reviewer` `verify` dispatch below is mandatory at its tier gate rather than discretionary, per `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated requirements finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -76,17 +76,16 @@ Not for findings-only requirements review — route to `workflows/requirements/r
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable requirements patterns
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven REQ-fix size or high/critical requirement severity, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`'s Mandatory Verification Fix Gate; a Quick-tier REQ finding takes the fallback below instead
 > - scope: the closed REQ row's Requirement Source alignment, acceptance evidence, and report claim closure
 > - inputs: the finding, its Requirement Source and Requirement ID or Quote, the applied fix, the verification suggestion, and validation assets
@@ -101,7 +100,7 @@ Not for findings-only requirements review — route to `workflows/requirements/r
    - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
    - Apply the Mandatory Verification Fix Gate from `references/verification-ladder.md`: run the report's Verification Suggestion or an equivalent deterministic command/artifact check for each selected finding or coherent group.
-   - Dispatch the verification-agent block above once a REQ finding reaches Standard+/Spec-driven size or high/critical severity; a Quick-tier finding instead runs the listed fallback self-check — the tier gate decides the hop, never the check itself.
+   - Dispatch the `code-reviewer` `verify` block above once a REQ finding reaches Standard+/Spec-driven size or high/critical severity; a Quick-tier finding instead runs the listed fallback self-check — the tier gate decides the hop, never the check itself.
    - A surviving mutant on the discrimination sensor blocks the row: mark the finding's Closure Matrix status `blocked` and log a `surviving_mutant` signal through `references/lessons.md`.
    - `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop caps re-verify cycles per REQ finding at 3; exhausting it also lands `blocked`.
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.

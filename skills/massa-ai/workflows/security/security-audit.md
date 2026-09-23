@@ -29,12 +29,11 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - Apply the Memory Freshness Gate from `references/audit-scope.md`; recalled exceptions are leads, not proof.
 4. Establish the investigation scope: select the scope type and build the shared scope packet per `references/audit-scope.md`, which owns the supported scope types, the ask-when-vague rule, and the packet fields. Carry the packet into the report.
 5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Security row of Per-Lens Scope Deltas).
-6. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
+6. Investigation pass. Dispatch `code-reviewer` (`audit` mode) per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
 
-> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
 > - scope: the security audit target — files, trust boundaries, auth paths, validators
-> - permissions: read-only
 > - inputs: shared scope packet; `lens: security`; recalled security decisions, auth boundaries, validation rules, accepted exceptions
 > - sensors: trace untrusted input -> validation -> authorization -> transformation -> persistence; authn/authz, object ownership, tenant isolation, input validation, secret handling, injection risks
 > - output: findings with security boundary, asset, trigger/exploit path, severity, confidence, evidence, simplest fix direction, verification suggestion

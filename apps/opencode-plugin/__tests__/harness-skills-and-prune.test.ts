@@ -33,7 +33,7 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 describe("opencode-plugin harness skills (IPT-05, AC-05.1/AC-05.3)", () => {
-  test("a scratch-HOME install lands exactly the four harness skill directories", async () => {
+  test("a scratch-HOME install lands exactly the three harness skill directories", async () => {
     const tmp = await fs.mkdtemp(
       path.join(os.tmpdir(), "mt-opencode-harness-skills-"),
     );
@@ -53,8 +53,8 @@ describe("opencode-plugin harness skills (IPT-05, AC-05.1/AC-05.3)", () => {
         .sort();
       // Not a scan-and-count of what happened to be present under the
       // bundle's skills/ dir (AC-05.2 rejects deriving the list that way) —
-      // an exact-equality assertion against the four named directories.
-      expect(entries).toEqual(["bootstrap", "massa-ai", "persona-router", "profile"]);
+      // an exact-equality assertion against the three named directories.
+      expect(entries).toEqual(["bootstrap", "massa-ai", "profile"]);
 
       for (const name of entries) {
         expect(
@@ -75,7 +75,7 @@ describe("opencode-plugin agent prune ownership (IPT-02 site 4, AC-02.3/AC-02.5)
     try {
       const agentsDir = path.join(tmp, ".config/opencode/agents");
       await fs.mkdir(agentsDir, { recursive: true });
-      const regularFile = path.join(agentsDir, "massa-ai-fake-specialist.md");
+      const regularFile = path.join(agentsDir, "fake-specialist.md");
       const content = "a regular file the prune must never delete";
       await fs.writeFile(regularFile, content);
 

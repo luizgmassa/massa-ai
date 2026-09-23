@@ -1,6 +1,58 @@
-# Handoff — model-catalog-revamp + api-log-clarity (EXECUTE COMPLETE 2026-09-23 — one PR per the user, carrying the agent-runtime-drift follow-ups; independent verification PASS on iteration 2; delivery: push + PR, merge is the user's call)
+# Handoff — agent-roster-consolidation (COMPLETE 2026-09-23 — T1–T13 across 5 Phases; independent validation PASS at 49/49 ACs, 9/9 mutations killed)
 
-## What shipped on `feat/model-catalog-revamp`
+- **Feature**: `.specs/features/agent-roster-consolidation/` (spec, design, tasks, `fixtures/`)
+- **Phase / Task**: Phase 5 / T13 done — Execute and validation complete
+- **Validation**: Independent validation: round 1 at `bde889aa` FAIL (23 mutations, 18 killed, 5 survived — all test gaps, no live defect); test-only fix `40299644` + spec amendments `6a78d0c0`; round 2 at `6a78d0c0` FAIL (49 ACs, 48 matched; 15/15 killed; ROS AC-7 prose spellings the sweep missed); fix `738010a8`; round 3 at `738010a8` **PASS — 49/49 ACs, 0 spec-precision gaps, 9/9 mutations killed**. Post-PASS test-only hardening `e057feb5` (massa-ai-prefixed + underscore retired-name sweep, observed red 59/1, 58/2, 59/1).
+- **Completed**: T1–T13 (commits in `.specs/project/STATE.md` → Current)
+- **In-progress**: none
+- **Next step**: push the branch, open the PR, watch CI; merge is the user's call
+- **Blockers**: none
+- **Uncommitted files**: none
+- **Branch**: `feat/agent-roster-consolidation` @ `~/Projects/massa-ai-wt-roster`, off `origin/main@f582b602`
+
+**Post-validation merge (2026-09-23).** `origin/main` (model catalog v2 — tiers removed, per-agent overrides; logging) merged in `ec21d05e`; adaptation commit drops `documentation-agent` overrides from every built-in profile and repoints main's new generator tests to the 7-agent roster. Spec: Inventory AC-7 superseded (no `WORKFLOW_STEMS` upstream), A21 added. Post-merge gates, foreground: build, type-check, lint, generate --check, stale pointers green; scripts 2181/0, shell suites all pass, plugins 183/0, shared 1015/0, web-ui 751/0, opencode src 155/0, mcp-client config-cli 87/0, tools-api model-registry 36/0 + web-ui-contract 8/0.
+
+## Deferred advisories (recorded, not fixed — true and unflattering)
+
+- **Phase 2 review F3** — the profile-switch tracked-path guard refuses a switch when a user's
+  git-tracked file shares an agent's name. It fails safe (no write), but the skipped file is not
+  listed in the row's reason, so the refusal reads as unexplained.
+- **Phase 2 review F4** — a `massa-ai-handoff-writer.md` installed by ≤v1.3 is not pruned on
+  Claude/Cursor: it is not one of the 18 legacy names. Accepted under A17 (exact names only).
+- **Phase 2 review F5** — (the `doctor` unmarked-`.md` fixture was added in `40299644`); the engine suite lacks a
+  symlink-destination case; the `_copy_agents_unprefixed` test helper is a no-op; the ownership
+  shell suite exits 0 reporting "0 passed" when the generated bundles are missing.
+- **Phase 3 review A8** — the frozen `retired-charter-outputs.json` fixture freezes too little of
+  some retired contracts, so `charter-contract-preservation.test.ts` passing does not prove every
+  former output contract survived the merge intact.
+- **Phase 3 review A10** — reviewer and verifier are now one agent and one model
+  (`code-reviewer`, deep tier), so "author ≠ verifier" is a fresh-context guarantee, not a
+  different-model one.
+- **Fix-3 deviation (`d9326551`)** — `install-skills.sh` prunes only `RETIRED_SKILL_NAMES` on a
+  plugin → repo handover, not every plugin-recorded skill, to keep the version-skew
+  `ghost-plugin` guard (a newer plugin may record a skill this checkout does not know).
+  `RETIRED_SKILL_NAMES` must equal `generate-skill-artifacts.ts` `RETIRED_BUNDLE_ROOTS`
+  (asserted in `generate-skill-artifacts-prune.test.ts` since T12).
+- **Host noise, not code** — gate runs detached or in the background fake installer reds;
+  run them in the foreground. `packages/core` and `apps/mcp-client` hit a Bun napi SIGTRAP at
+  process exit (red at base too), so `bun run test` (turbo) was replaced by per-suite runs.
+
+## T12/T13 notes
+
+- The T12 `ROSTER = 7` scan now skips `.ua/` (a generated historical snapshot, out of scope per
+  the spec) — its `knowledge-graph.json` still says 18.
+- Sweep residuals left on purpose: persona hits are only absence/prune sensors, the retired-id
+  literals (`RETIRED_RULE_IDS`, `RETIRED_BUNDLE_ROOTS`, `RETIRED_SKILL_NAMES`), the `.gitignore`
+  `apps/*-plugin/skills/persona-router/` ignore, `docs/removed-features.md`, and
+  `references/the-fool/`; old-name hits are the `skills/AGENTS.md` mapping table, the A17
+  legacy-name lists, legacy-prune fixtures, review-finding ids (`plan-critic C3`), and ordinary
+  English (`reviewer`, `planner`, `navigator state`).
+- CHANGELOG `[Unreleased]` carries `### Removed` + `### Changed` (minor bump) with the A16
+  upgrade note.
+
+## Previous handoff — model-catalog-revamp + api-log-clarity (EXECUTE COMPLETE 2026-09-23 — one PR per the user, carrying the agent-runtime-drift follow-ups; independent verification PASS on iteration 2; delivery: push + PR, merge is the user's call)
+
+### What shipped on `feat/model-catalog-revamp`
 
 - **Logging** (`.specs/features/api-log-clarity/`):
   - repeat counts (`occurrences`/`firstSeenAgo`, keyed by message + label);
@@ -20,7 +72,7 @@
   Generated agents stay byte-identical, except for the judge Model Hint.
 - **Drift follow-ups** (`a075e1bb`, from the main checkout's uncommitted work): `massa-ai-config doctor`, and a recorded-profile rank. Fixed on this branch: a stale recorded profile degrades instead of crashing, `--check` threads state, and `doctor --fix` is host-scoped.
 
-## Open items / traps for the next session
+### Open items / traps for the next session
 
 - **The main checkout still has the original uncommitted agent-runtime-drift edits.** They are now committed here as `a075e1bb`. Discard them in `/Users/luizmassa/Projects/massa-ai` once this PR merges; nothing else owns them.
 - **Local full `bun run test` cannot finish on this macOS.** A Bun 1.3.14 SIGTRAP panic at isolated-child exit, also present on `main`, stops the runner. CI on Linux is the gate.

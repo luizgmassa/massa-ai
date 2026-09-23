@@ -270,10 +270,10 @@ if [ "$DO_PLUGINS" = "1" ]; then
   # one path here would send a reader looking at the wrong absence.
   plugin_sentinel_hint() {
     case "$1" in
-      claude)   echo "~/.claude/{agents,commands}/massa-ai-* + settings.json hooks (or the marketplace bundle's agents/ + commands/)" ;;
-      codex)    echo "~/.codex/plugins/massa-ai/skills + agents/massa-ai-*.toml + hooks.json" ;;
-      cursor)   echo "~/.cursor/plugins/local/massa-ai/skills + agents/massa-ai-*.md + hooks.json (hooks not expected on the bridge route)" ;;
-      opencode) echo "~/.config/opencode/{plugins/massa-ai/index.js,agents/massa-ai-*.md,command/massa-ai-*.md}" ;;
+      claude)   echo "~/.claude/agents (massa-ai-owned) + commands/massa-ai-* + settings.json hooks (or the marketplace bundle's agents/ + commands/)" ;;
+      codex)    echo "~/.codex/plugins/massa-ai/skills + massa-ai-owned agents/*.toml + hooks.json" ;;
+      cursor)   echo "~/.cursor/plugins/local/massa-ai/skills + massa-ai-owned agents/*.md + hooks.json (hooks not expected on the bridge route)" ;;
+      opencode) echo "~/.config/opencode/{plugins/massa-ai/index.js,command/massa-ai-*.md} + massa-ai-owned agents/*.md links" ;;
       *) echo "" ;;
     esac
   }

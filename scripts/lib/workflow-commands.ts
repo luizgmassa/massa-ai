@@ -42,7 +42,6 @@ export const QUICK_COMMAND_NAMES = ["def", "find", "graph", "index", "map", "sta
  *  cache before it was added here. */
 export const RESERVED_BUNDLE_ROOTS = [
   "massa-ai",
-  "persona-router",
   "profile",
   "bootstrap",
   "agents",

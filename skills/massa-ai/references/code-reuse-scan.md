@@ -30,7 +30,7 @@ The scan covers existing:
 Run the scan in one or more separate read-only subagents before new
 implementation code is planned or written:
 
-> **Dispatch: `massa-ai-investigator`** (role: `investigator`) — charter `skills/agents/investigator/SKILL.md`
+> **Dispatch: `code-explorer`** (role: `code-explorer`, mode: `trace`) — charter `skills/agents/code-explorer/SKILL.md`
 > - trigger: planning or writing new implementation code in any of the 16 implementation workflows — mandatory, not optional
 > - scope: the target feature/module area — candidate existing components, helpers, classes, use cases, repositories, and business logic that could satisfy or overlap the new work
 > - permissions: read-only

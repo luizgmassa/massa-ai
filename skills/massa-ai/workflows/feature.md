@@ -54,25 +54,24 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - When every group has a confirmed Jira key, follow the optional stacked branch flow in `references/pr-task-fix.md` (Jira-Key Stacked Branches).
    - All PR groups decomposed under this feature share one feature-level delivery go-ahead: no individual group seeks or receives its own Stage 3 sign-off — see `references/implementation-delivery.md` Stage 3.
 
-**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
+**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
-> **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
+> **Dispatch: `designer`** (role: `designer`, mode: `implement`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the feature's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
-> - trigger: Standard tier or above per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once every implemented PR group has cleared reviewer fix items; Quick tier substitutes the fallback below
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
+> - trigger: Standard tier or above per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once every implemented PR group has cleared `code-reviewer` review fix items; Quick tier substitutes the fallback below
 > - scope: the new code landed across this feature's PR groups from step 12, plus the tests and validation assets those groups touch
 > - inputs: the 1-5 acceptance criteria captured in step 11 (or the referenced spec artifact) as the outcome source, the feature's diff surface across all PR groups, and its test suite
 > - sensors: check the diff and tests against each acceptance criterion; discrimination sensor per `references/discrimination-sensor.md` (mutate the feature's new code, one PR group at a time — covering tests must kill each mutant or that group is not verified)

@@ -17,7 +17,7 @@ Every feature in massa-ai, what it does, why it exists, and how to use it.
 - [Passive Capture (Hooks)](#passive-capture-hooks)
 - [Plugins (4-Tool Parity)](#plugins-4-tool-parity)
 - [Workflow Commands (Generated Slash Commands)](#workflow-commands-generated-slash-commands)
-- [Subagent Skills (18 Specialists)](#subagent-skills-18-specialists)
+- [Subagent Skills (7 Specialists)](#subagent-skills-7-specialists)
 - [Model Profile Switching](#model-profile-switching)
 - [Workflow Tools (59-Tool Adoption)](#workflow-tools-59-tool-adoption)
 - [Bootstrap](#bootstrap)
@@ -206,7 +206,7 @@ memory_delete { id: "<id>" }
 
 ### Claude Code plugin (`apps/claude-plugin/`)
 
-**What it bundles:** 6 slash commands (`/massa-ai-map`, `/massa-ai-index`, `/massa-ai-find`, `/massa-ai-def`, `/massa-ai-graph`, `/massa-ai-status`), the `massa-ai-navigator` subagent, and 5 hook events auto-written into `~/.claude/settings.json`.
+**What it bundles:** 6 slash commands (`/massa-ai-map`, `/massa-ai-index`, `/massa-ai-find`, `/massa-ai-def`, `/massa-ai-graph`, `/massa-ai-status`), the 7 subagent specialists, and 5 hook events auto-written into `~/.claude/settings.json`.
 
 **Hook events (5):** `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PreCompact`, `Stop`.
 
@@ -260,7 +260,7 @@ Unlike Claude Code, the two Codex routes are **complementary, not exclusive**. A
 
 ### Cursor plugin (`apps/cursor-plugin/`)
 
-**What it bundles:** 6 skills, 7 hook events, and the `massa-ai-navigator` agent. MCP registration is delegated to `scripts/install-agents.sh --agent cursor`, which the installer calls for you.
+**What it bundles:** 6 skills, 7 hook events, and the 7 subagent specialists. MCP registration is delegated to `scripts/install-agents.sh --agent cursor`, which the installer calls for you.
 
 **Hook events (7):** `sessionStart`, `sessionEnd`, `beforeSubmitPrompt`, `preToolUse`, `postToolUse`, `preCompact`, `stop`. This closes the historical gap where Cursor was documented as having only 3 events — Cursor now supports 18+ events including `sessionStart` and `preCompact`.
 
@@ -276,7 +276,7 @@ bash apps/cursor-plugin/install.sh --uninstall
 
 ### OpenCode plugin (`apps/opencode-plugin/`)
 
-**What it bundles:** hooks only (AD-017: plugins deliver, MCP serves tools, hooks observe) — 6 in-process lifecycle handlers and 18 subagent specialists. It registers zero in-process tools; the massa-ai MCP server (59 tools) is registered alongside it via `scripts/install-agents.sh --agent opencode`, same as every other host. It is published as `@massa-ai/opencode-plugin`. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai`, `persona-router`, `profile` and `bootstrap` skill bundles plus the 18 agent charters, so a registry install needs no repository checkout.
+**What it bundles:** hooks only (AD-017: plugins deliver, MCP serves tools, hooks observe) — 6 in-process lifecycle handlers and 7 subagent specialists. It registers zero in-process tools; the massa-ai MCP server (59 tools) is registered alongside it via `scripts/install-agents.sh --agent opencode`, same as every other host. It is published as `@massa-ai/opencode-plugin`. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai`, `profile` and `bootstrap` skill bundles plus the 7 agent charters, so a registry install needs no repository checkout.
 
 **Hook events (in-process, 6 lifecycle handlers):** `session.created`, `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`, `dispose` — all registered in-process by the plugin. No external hooks file needed.
 
@@ -338,9 +338,9 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 ## Workflow Commands (Generated Slash Commands)
 
-**What:** massa-ai generates one host-native slash command per workflow skill under `skills/massa-ai/workflows/**/*.md` (40 at last count, scan-derived — never hardcoded). Every workflow the massa-ai router can dispatch becomes directly invocable, skipping the router's own classification step for the explicit case.
+**What:** massa-ai generates one host-native slash command per workflow skill under `skills/massa-ai/workflows/**/*.md` (36 at last count, scan-derived — never hardcoded). Every workflow the massa-ai router can dispatch becomes directly invocable, skipping the router's own classification step for the explicit case.
 
-**Why:** Without a dedicated command, invoking a specific workflow (e.g. `debug`, `tdd`, `security-audit`) means describing intent in prose and trusting the router's classifier. A generated command makes the choice explicit and one keystroke away, on every host, for every workflow — not just the 6 hand-authored "quick" commands (`map`/`index`/`find`/`def`/`graph`/`status`).
+**Why:** Without a dedicated command, invoking a specific workflow (e.g. `debug`, `create-tdd`, `security-audit`) means describing intent in prose and trusting the router's classifier. A generated command makes the choice explicit and one keystroke away, on every host, for every workflow — not just the 6 hand-authored "quick" commands (`map`/`index`/`find`/`def`/`graph`/`status`).
 
 **Command body:** every generated command loads the massa-ai router skill (dedupe-guarded), then routes to its named workflow under routing precedence 1 (explicit route) — it never re-classifies — and passes the invocation's arguments verbatim as the task description; the workflow's own intake gathers detail when the arguments are empty.
 
@@ -354,7 +354,7 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 | Cursor | `~/.cursor/plugins/local/massa-ai/skills/<stem>/SKILL.md` | auto-loaded skill, invoked via Cursor's skill picker |
 | OpenCode | `~/.config/opencode/command/massa-ai-<stem>.md` | `/massa-ai-<stem>` |
 
-**Generation:** part of the same `bun run generate:artifacts` entrypoint that emits skills/agents/hooks — scanned from `skills/massa-ai/workflows/**/*.md`, validated fail-loud (unique stem, no collision with the 6 quick-command names or the reserved bundle roots `massa-ai`/`persona-router`/`profile`/`bootstrap`/`agents`, charset `^[a-z0-9][a-z0-9-]*$`), and rendered per host: one byte-identical template for Claude/Codex/Cursor, a minimal-frontmatter variant for OpenCode (unknown frontmatter keys are forwarded to the model provider there, so only `description:` ships).
+**Generation:** part of the same `bun run generate:artifacts` entrypoint that emits skills/agents/hooks — scanned from `skills/massa-ai/workflows/**/*.md`, validated fail-loud (unique stem, no collision with the 6 quick-command names or the reserved bundle roots `massa-ai`/`profile`/`bootstrap`/`agents`, charset `^[a-z0-9][a-z0-9-]*$`), and rendered per host: one byte-identical template for Claude/Codex/Cursor, a minimal-frontmatter variant for OpenCode (unknown frontmatter keys are forwarded to the model provider there, so only `description:` ships).
 
 **Ownership + drift:** generated files carry a body marker (`<!-- massa-ai:generated workflow-command -->`) and are gitignored build output (AD-016) — regenerate with `bun run generate:artifacts` after a `git pull` in a checkout, same as the rest of the plugin bundles (see "Generation prerequisite" in the [README](./README.md#plugin-bundles-4-tool-parity)). The marker is what lets prune and `--check` share Claude's `commands/` and Codex/Cursor's `skills/` directories safely with the hand-authored quick commands, which never carry it; `bun scripts/generate-skill-artifacts.ts --check` flags any drift (stale, missing, or modified) same as it does for every other generated surface.
 
@@ -364,13 +364,13 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 ---
 
-## Subagent Skills (18 Specialists)
+## Subagent Skills (7 Specialists)
 
-**What:** massa-ai defines 18 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
+**What:** massa-ai defines 7 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
 
-**The 18 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, designer, plan-critic, furps-analyst, navigator, meta-judge, judge.
+**The 7 specialists:** builder, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer. A charter that owns several output contracts selects one per dispatch through the capability packet's `mode` field (for example `code-reviewer` in `review`, `verify`, `audit`, or `guide` mode); the modes per agent and the retired-agent → current-agent mapping live in `skills/AGENTS.md`.
 
-Workflows dispatch these agents under their **host-registered** names, prefixed `massa-ai-` (for example `massa-ai-investigator`). The bare charter name is the registry key, not the dispatch name.
+Workflows dispatch these agents by their bare charter name (for example `code-explorer`) — no `massa-ai-` prefix on any host. On the Claude plugin route the host namespaces them as `massa-ai:<name>`, which is the name to dispatch there. Installers identify massa-ai's agent files by the `massa-ai-owned` content marker, never by name: a same-named agent the user owns is skipped with a warning and never overwritten or deleted, and the pre-consolidation `massa-ai-<name>` files are pruned on upgrade.
 
 **Single source of truth:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` and emits per-host agent files into `apps/{claude,codex,cursor,opencode}-plugin/agents/` (plus the pre-rendered per-profile variants under `agent-profiles/`). Outputs are **generated-on-demand, gitignored build output — not checked in** (AD-016); `bun run generate:artifacts` is the single entrypoint and runs ahead of every consumer via Bun pre-scripts. A parity test (`scripts/__tests__/subagent-parity.test.ts`) re-runs the generator in `--check` mode and asserts byte-identity — drift fails CI.
 
@@ -378,10 +378,10 @@ Workflows dispatch these agents under their **host-registered** names, prefixed 
 
 | Host | Location | Format | Ownership marker |
 | --- | --- | --- | --- |
-| Claude Code | `apps/claude-plugin/agents/massa-ai-*.md` → installed to `~/.claude/agents/` | `.md` (YAML frontmatter: `name`, `description`, `model`, `effort`, plus **either** `disallowedTools` for ordinary read-only charters **or** `tools` for the one allowlist exception — see Permission mapping) | Name prefix `massa-ai-` (uninstall excludes `massa-ai-navigator.md` by name — R1) |
-| Codex | `apps/codex-plugin/agents/massa-ai-*.toml` → installed to `~/.codex/agents/` (OUTSIDE plugin dir) | `.toml` (`name`, `description`, `model`, `model_reasoning_effort`, `sandbox_mode`, `developer_instructions`) | `# massa-ai-owned` top comment |
-| Cursor | `apps/cursor-plugin/agents/massa-ai-*.md` → bundled in plugin `agents/` dir | `.md` (YAML frontmatter: `name`, `description`, `model`, `readonly` — Cursor's entire documented schema; **no** `tools`, **no** `reasoningEffort`) | Name prefix `massa-ai-` (removed with plugin dir) |
-| OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (shipped IN the npm package, installed outside the plugin dir) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission` — **no** `name`, **no** `metadata`) | `<!-- massa-ai-owned: true -->` as the first body line |
+| Claude Code | `apps/claude-plugin/agents/*.md` → installed to `~/.claude/agents/` | `.md` (YAML frontmatter: `name`, `description`, `model`, `effort`, plus `disallowedTools` for read-only charters — see Permission mapping) | `<!-- massa-ai-owned: true -->` as the first body line |
+| Codex | `apps/codex-plugin/agents/*.toml` → installed to `~/.codex/agents/` (OUTSIDE plugin dir) | `.toml` (`name`, `description`, `model`, `model_reasoning_effort`, `sandbox_mode`, `developer_instructions`) | `# massa-ai-owned` top comment |
+| Cursor | `apps/cursor-plugin/agents/*.md` → bundled in plugin `agents/` dir | `.md` (YAML frontmatter: `name`, `description`, `model`, `readonly` — Cursor's entire documented schema; **no** `tools`, **no** `reasoningEffort`) | `<!-- massa-ai-owned: true -->` as the first body line |
+| OpenCode | `apps/opencode-plugin/agents/*.md` → installed to `~/.config/opencode/agents/` (shipped IN the npm package, installed outside the plugin dir) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission` — **no** `name`, **no** `metadata`) | `<!-- massa-ai-owned: true -->` as the first body line |
 
 > Codex and OpenCode agents are *installed* outside the plugin dir because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. They are still **shipped inside** their npm package — OpenCode's `files` declares `agents/*.md`, and until the package-contents gate landed those 18 charters were silently missing from every published tarball, because the publish job has no `actions/checkout` and the build artifact never uploaded `agents/`. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
 
@@ -432,11 +432,8 @@ this document names none of them and points at the registry instead. Read
 The built-in profiles define per-tool defaults (the strongest model for each profile) and
 agent-specific overrides to achieve a mix of reasoning depth and latency:
 
-- **14 agents** (investigator, planner, reviewer, context-curator, verification-agent,
-  requirements-analyst, architecture-specialist, audit-specialist, mobile-specialist,
-  plan-critic, furps-analyst, navigator, meta-judge, judge) use the profile default.
+- **4 agents** (code-explorer, code-reviewer, judge, product-manager) use the profile default.
 - **3 agents** (builder, designer, test-engineer) override to a standard-tier model per profile.
-- **1 agent** (documentation-agent) overrides to a light-tier model per profile.
 
 Read-only agents carry no override by convention and resolve to the profile default, ensuring
 the strongest model runs on every read-only pass (see ALLWF-03 in `skills/massa-ai/references/spec-driven/sub-agents.md`).
@@ -467,8 +464,11 @@ Two hosts reject more than they ignore. Cursor's schema is exactly `name`, `desc
 there is no `tools` allowlist. OpenCode forwards **unrecognized frontmatter keys to the model
 provider as model options**, which is why `name` and `metadata` had to leave OpenCode's
 frontmatter. The ownership marker inside `metadata` was not deleted, it **moved** to a body
-comment: `massa-ai-config agents uninstall` scopes by that literal substring, so removing it
-would have matched zero files and orphaned 18 installed agents.
+comment, which every `.md` host now carries as its first body line: installers,
+`massa-ai-config agents install|uninstall`, and the profile-switch engine select owned files
+through one content-marker predicate (`isOwnedAgentFile` in
+`packages/shared/src/profile-switch/ownership.ts`, mirrored inline by each bash installer),
+so removing the marker would orphan every installed agent.
 
 Every OpenCode agent also sets `mode: all`, which is not a model decision but is easy to
 mistake for one. OpenCode's Tab switcher lists `primary` and `all` agents only, so the earlier
@@ -510,25 +510,25 @@ always or pass vacuously.
 
 ### Permission mapping (read-only vs write)
 
-Write-permitted agents: `builder`, `test-engineer`, `documentation-agent`, `judge`, `designer` (all but `builder` are scoped writers — test files / doc files / the agent's own judge-N report / UI-layer files only, each with a disjoint write set). All others are read-only. Each charter's `metadata.permission` must agree with the shipped artifact; `scripts/__tests__/skills-harness-integrity.test.ts` enforces that.
+Write-permitted agents: `builder`, `test-engineer`, `judge`, `designer` (all but `builder` are scoped writers — test files / the agent's own judge-N report / UI-layer files only, each with a disjoint write set). All others are read-only. Each charter's `metadata.permission` must agree with the shipped artifact; `scripts/__tests__/skills-harness-integrity.test.ts` enforces that.
 
 | Host | Read-only | Write |
 | --- | --- | --- |
 | Claude Code | `disallowedTools: Write, Edit, NotebookEdit` — a **denylist**, so the rest of the parent session's pool stays reachable | neither key emitted |
 | Codex | `sandbox_mode = "read-only"` | `sandbox_mode = "workspace-write"` |
 | Cursor | `readonly: true` | `readonly` omitted (`false` is the documented default) |
-| OpenCode | `permission: { edit: deny, bash: deny }` (strict), `{ edit: deny, bash: { "*": "ask" } }` (planner — inspection-capable), or `{ edit: deny, bash: { "pwd": "allow", "*": "deny" } }` (navigator — index-first) | `permission: { edit: allow, bash: allow }` |
+| OpenCode | `permission: { edit: deny, bash: deny }` | `permission: { edit: allow, bash: allow }` |
 
-**Claude's `tools:` is an allowlist, which is why ordinary charters no longer carry one.** Claude's own docs state an allowlisted subagent "can't edit files, write files, or use any MCP tools" — so a generated agent shipping `tools: ["Read","Grep","Glob","Bash"]` could reach no massa-ai MCP tool at all. `emitClaude` therefore gates read-only charters with `disallowedTools` instead, which Claude documents as leaving the rest of the pool (MCP included) intact.
+**Claude's `tools:` is an allowlist, which is why no charter carries one.** Claude's own docs state an allowlisted subagent "can't edit files, write files, or use any MCP tools" — so a generated agent shipping `tools: ["Read","Grep","Glob","Bash"]` could reach no massa-ai MCP tool at all. `emitClaude` therefore gates read-only charters with `disallowedTools` instead, which Claude documents as leaving the rest of the pool (MCP included) intact.
 
-`navigator` is the deliberate allowlist exception: `tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]`, declared in the generator's `AGENT_TOOLS_OVERRIDE`, so it stays index-first instead of widening to every MCP server on the machine. It reaches Claude only — Cursor has no `tools` key, so its read-only agents carry `readonly: true` instead, Codex gates via `sandbox_mode`, and OpenCode expresses the same intent through `permission`.
+There is no allowlist exception any more: the former index-first allowlist and its `pwd`-only OpenCode bash override retired with the roster consolidation, and `code-explorer`'s index-first behavior is charter prose. Cursor has no `tools` key, so its read-only agents carry `readonly: true`, Codex gates via `sandbox_mode`, and OpenCode through `permission`.
 
 ### Generator + parity contract
 
-- **Generator:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` (18 charters) plus `skills/model-profiles.json`, and emits 72 files (18 × 4 hosts) into `apps/*/agents/`, plus the pre-rendered per-profile variants under `apps/*/agent-profiles/<profile>/` (396 variant files at last generation). Run via `bun run generate:artifacts`, or directly with `bun run scripts/generate-subagent-artifacts.ts`, optionally `--profile=<name>`. Outputs are gitignored build output, not checked in (AD-016).
+- **Generator:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` (7 charters) plus `skills/model-profiles.json`, and emits 28 files (7 × 4 hosts) into `apps/*/agents/`, plus the pre-rendered per-profile variants under `apps/*/agent-profiles/<profile>/` (154 variant files at last generation). Run via `bun run generate:artifacts`, or directly with `bun run scripts/generate-subagent-artifacts.ts`, optionally `--profile=<name>`. Outputs are gitignored build output, not checked in (AD-016).
 - **Resolver:** `scripts/lib/model-profiles.ts` loads and validates the registry, selects the profile, and resolves `tier → {model, effort}`. It reports **every** registry violation in one throw, and has no dependency outside `node:fs`/`node:path` so it runs in the deterministic gate. Covered by `scripts/__tests__/model-profiles.test.ts`.
 - **Drift gate:** `bun run scripts/generate-subagent-artifacts.ts --check` emits to a temp dir and diffs full directory inventories against the generated bundle, so a stale file left behind by a source deletion is caught too. Exit non-zero on drift.
-- **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts registry-derived model/effort/permission pinning, name-collision-free, exact 18 per host, per-host allowed-key conformance with the defining doc URL cited, Codex TOML round-trip + owned marker, the OpenCode body marker, and a frozen-baseline diff against `origin/main`'s artifacts that must contain exactly the pin changes the spec authorises. It also carries the doc-drift test for this file's role→tier table.
+- **Parity test:** `scripts/__tests__/subagent-parity.test.ts` runs the drift gate + asserts registry-derived model/effort/permission pinning, name-collision-free, exact 7 per host, per-host allowed-key conformance with the defining doc URL cited, Codex TOML round-trip + owned marker, the OpenCode body marker, and a frozen-baseline diff against `origin/main`'s artifacts that must contain exactly the pin changes the spec authorises. It also carries the doc-drift test for this file's role→tier table.
 - **Harness integrity:** `scripts/__tests__/skills-harness-integrity.test.ts` asserts every workflow `Dispatch:` block names an agent that exists in all four host dirs, every role in `references/agent-orchestration.md` has a real charter, and charter permission matches the shipped artifact.
 
 **Spec:** `.specs/features/subagent-skills-plugin-parity/` (the specialists and the four host
@@ -599,11 +599,11 @@ switching" non-goal in `.specs/features/model-profile-registry/spec.md` in place
 | `trace_path` | `debug` | Root-cause call/data-flow path tracing |
 | `impact_analysis` | `architecture-audit`, `refactor` | Git-diff centrality-ranked blast radius |
 | `get_architecture` | `architecture-audit` | Architecture-specific deep map (packages, routes, hotspots, communities, cycles) |
-| `execute_file` / `execute` / `batch_execute` | `debug`, `general` | Run analysis code over files instead of loading into context |
+| `execute_file` / `execute` / `batch_execute` | `debug` | Run analysis code over files instead of loading into context |
 | `synapse_task_begin` / `synapse_task_end` / `synapse_prefetch` | `spec-driven`, `feature`, `debug` | Task envelopes + buffer warming for multi-search investigations |
-| `read_file` / `symbol_snippet` | `general` (and all workflows that read files) | File reads with symbol metadata; raw code snippets by line range |
-| `memory_update` / `memory_delete` | `general`, `debug`, `long-session` | Correct stale memories; remove obsolete ones |
-| `analytics` | `general`, `long-session` | Usage/cache insights |
+| `read_file` / `symbol_snippet` | all workflows that read files | File reads with symbol metadata; raw code snippets by line range |
+| `memory_update` / `memory_delete` | `debug`, `long-session` | Correct stale memories; remove obsolete ones |
+| `analytics` | `long-session` | Usage/cache insights |
 | `fetch_and_index` | `exploration` | Pull web docs/API refs into searchable index |
 
 **Graph-tool freshness gate:** `trace_path`, `impact_analysis`, and `get_architecture` only count as evidence when the index is fresh for the current repository path and commit/worktree state. When the index is stale, incomplete, or missing, workflows fall back to `search`/`get_references` and record reduced retrieval confidence.
@@ -1303,7 +1303,7 @@ process environment at boot, so they do not appear in `~/.config/massa-ai/config
 | `set <key> <val>` | | Set one value |
 | `use <provider>` | `--api-key <key>`, `--model <name>`, `--base-url <url>` | Switch embedding provider (`ollama`, `lmstudio`, `mistral`, `openai`, `google`, `cohere`) |
 | `recover <projectId>` | `--path <newPath>` | Re-associate an index with a moved directory (`mcp-client` bin only) |
-| `agents install\|uninstall` | `--user`, `--project` | Write/remove the 18 agent files (`opencode-plugin` bin only) |
+| `agents install\|uninstall` | `--user`, `--project` | Write/remove the 7 agent files (`opencode-plugin` bin only) |
 | `profile list\|show` | | Shipped profiles + per-host active profile |
 | `profile set <name>` | `--host <h>`, `--dry-run` | Switch installed agents to a profile |
 | `bootstrap list\|show` | | Every startup-contract rule: state, default, description |
@@ -1333,9 +1333,9 @@ The repo ships repo-local skills plus a unified bash installer that copies them 
 
 `skills/AGENTS.md` contains two sections:
 
-1. **Bootstrap contract** (top, between `<!-- massa-ai:bootstrap:start -->` and `<!-- massa-ai:bootstrap:end -->` markers): the coding session startup contract that activates the skill stack. Nine individually-toggleable rules — `caveman`, `massa-ai-router`, `persona-router`, `dedupe-guardrails`, `plan-challenge`, `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`.
+1. **Bootstrap contract** (top, between `<!-- massa-ai:bootstrap:start -->` and `<!-- massa-ai:bootstrap:end -->` markers): the coding session startup contract that activates the skill stack. Eight individually-toggleable rules — `caveman`, `massa-ai-router`, `dedupe-guardrails`, `plan-challenge`, `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`.
 
-2. **Sub-agent registry** (bottom): the 18 reusable sub-agent specialist registry (investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, designer, plan-critic, furps-analyst, navigator, meta-judge, judge) with capability packet and output contract definitions.
+2. **Sub-agent registry** (bottom): the 7 reusable sub-agent specialist registry (builder, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer) plus the single retired-agent → current-agent mapping table, with capability packet and output contract definitions.
 
 **The contract body is delivered as a file, not inlined into `AGENTS.md`.** It is rendered to a first-class per-host `MASSA-AI.md` at that host's config root, and each host is then wired to load it through its own real mechanism:
 
@@ -1352,13 +1352,12 @@ The sub-agent registry is not written — it is consumed by workflows that dispa
 
 | Skill | Location | Description |
 |-------|----------|-------------|
-| `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 40 workflow files under `workflows/` and 43 top-level references under `references/` (evidence gate, context firewall, verification ladder, agent orchestration, etc.), plus 57 more in per-workflow reference subdirectories (`furps/`, `maestro/`, `spec-driven/`, `tdd/`, `the-fool/`, `ticket/`, `rfc/`, `skill-architect/`, `mobile-figma-matcher/`) — 100 reference files in all. Counted 2026-09-16. |
-| `persona-router` | `skills/persona-router/` | Automatic persona selection from catalog. Reads `skills/massa-ai/personas/catalog.json`, routes based on primary deliverable ownership, supports explicit selection, ambiguity policy, and mid-conversation rerouting. |
+| `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 36 workflow files under `workflows/` and 43 top-level references under `references/` (evidence gate, context firewall, verification ladder, agent orchestration, etc.), plus 47 more in per-workflow reference subdirectories (`furps/`, `spec-driven/`, `create-tdd/`, `the-fool/`, `create-ticket/`, `create-rfc/`, `skill-architect/`, `mobile-figma-matcher/`) — 90 reference files in all. Counted 2026-09-23. |
 | `profile` | `skills/profile/` | Switch the installed agents to a registry model profile, or report the active one per host. Drives the shared switch engine — never a second switch path. |
-| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the nine startup-contract rules delivered by `MASSA-AI.md`. Drives `massa-ai-config bootstrap`, never a hand-edited file. |
-| `agents/<n>` | `skills/agents/` | The 18 sub-agent specialist charters, emitted per host by `generate-subagent-artifacts.ts`. |
+| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the eight startup-contract rules delivered by `MASSA-AI.md`. Drives `massa-ai-config bootstrap`, never a hand-edited file. |
+| `agents/<n>` | `skills/agents/` | The 7 sub-agent specialist charters, emitted per host by `generate-subagent-artifacts.ts`. |
 
-All five roots are bundled per host by `scripts/generate-skill-artifacts.ts` into `apps/<host>-plugin/skills/`, as gitignored build output (AD-016).
+All four roots are bundled per host by `scripts/generate-skill-artifacts.ts` into `apps/<host>-plugin/skills/`, as gitignored build output (AD-016).
 
 ### Unified Skills Installer (`scripts/install-skills.sh`)
 
@@ -1466,24 +1465,6 @@ The plugin phase is host-detected and version-gated: it installs a host's bundle
 }
 ```
 
-### Persona Router & Catalog
-
-Personas are cataloged prompt artifacts for shaping conversation perspective. The router selects one persona based on the primary deliverable, with optional secondary review lens.
-
-**Catalog:** `skills/massa-ai/personas/catalog.json` (schema_version 1, 5 personas). Each entry has `id`, `display_name`, `prompt_path` (filename-only, relative to the catalog directory), `summary`, `aliases`, `primary_signals`, `negative_signals`, and `secondary_lens_signals`.
-
-**Persona prompt files:** `skills/massa-ai/personas/`
-
-| Persona | File | Use |
-|---------|------|-----|
-| AI Engineer | `context-skill-harness-engineer-architect.md` | Agent context architecture, skill/persona design, harness startup contracts |
-| Node CLI Engineer | `ai-native-nodejs-cli-architect.md` | Node.js/TypeScript CLI architecture, command UX, MCP/LLM boundaries |
-| Product Manager | `product-manager.md` | PRDs, product briefs, user stories, MVP scope |
-| Senior Mobile Engineer | `senior-mobile-engineer.md` | Cross-platform mobile architecture, delivery, testing, release |
-| Senior Mobile QA Automation Engineer | `senior-mobile-qa-automation-engineer.md` | Mobile QA automation, E2E reliability, flake reduction, CI signal |
-
-**Router policy** (in `skills/AGENTS.md`): `enabled: auto`, `ambiguity: ask`, `no_match: no_persona`, `mid_conversation: task_change`. Explicit persona or no-persona requests override automatic inference.
-
 ### Workflow Guides
 
 Documentation for massa-ai workflows lives in `docs/`:
@@ -1491,11 +1472,10 @@ Documentation for massa-ai workflows lives in `docs/`:
 | Guide | File | Covers |
 |-------|------|--------|
 | Spec-Driven | `docs/massa-ai-spec-driven.md` | TLC v3 Specify → (Design) → (Tasks) → Execute flow |
-| TDD | `docs/massa-ai-tdd.md` | Technical design / implementation plan workflow |
-| RFC | `docs/massa-ai-rfc.md` | Propose a significant change |
+| TDD | `docs/massa-ai-create-tdd.md` | Technical design / implementation plan workflow |
+| RFC | `docs/massa-ai-create-rfc.md` | Propose a significant change |
 | Commit | `docs/massa-ai-commit.md` | Safe Conventional Commits with Jira branch prefixes |
-| Ticket | `docs/massa-ai-ticket.md` | Draft and create Jira Epics/issues through Atlassian MCP |
-| Maestro | `docs/massa-ai-maestro.md` | Mobile E2E flow implementation |
+| Ticket | `docs/massa-ai-create-ticket.md` | Draft and create Jira Epics/issues through Atlassian MCP |
 | Mobile Figma | `docs/massa-ai-mobile-figma.md` | Compare mobile UI implementation with Figma design |
 | Context Slices | `docs/context-slices.md` | Context slicing patterns |
 
@@ -1505,7 +1485,7 @@ Ported from the old repo's Python test suite to TypeScript/bun test:
 
 | Test file | Scenarios | Covers |
 |-----------|-----------|--------|
-| `scripts/__tests__/validate-repository.test.ts` | 183 | Skill structure, workflow/reference existence, bootstrap contract, persona catalog (deep: schema/fields/duplicates/path-escape/mirror-drift), hooks enforcement contract, lessons dual-write contract, harness state path migration, gitignore, context slices, agents harness routing, RFC/TDD/ticket/commit workflow contracts, deterministic router precedence, verification ladder, spec-driven phase gates, audit-report-IO, evidence gate, context firewall, synapse policy, mcp-tools matrix, canonical tool naming (no `th0th_*` prefixes), docs guides |
+| `scripts/__tests__/validate-repository.test.ts` | 163 | Skill structure, workflow/reference existence, bootstrap contract, hooks enforcement contract, lessons dual-write contract, harness state path migration, gitignore, context slices, agents harness routing, RFC/TDD/ticket/commit workflow contracts, deterministic router precedence, verification ladder, spec-driven phase gates, audit-report-IO, evidence gate, context firewall, synapse policy, mcp-tools matrix, canonical tool naming (no `th0th_*` prefixes), docs guides |
 | `scripts/tests/test-install-skills-apply.sh` | 22 | Skill copy-in, idempotent re-run, contract insert/replace, foreign conflict aborts before any mutation |
 | `scripts/tests/test-install-skills-state.sh` | 21 | State v1→v2 migration, malformed JSON, path-traversal skill names, dedupe, unsupported version |
 | `scripts/tests/test-install-skills-check.sh` | 19 | Drift detection (missing / stale / unowned target), `--json` shape, and proof that `--check` and `--dry-run` write nothing |

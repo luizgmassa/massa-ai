@@ -1,7 +1,7 @@
 /**
  * generate-subagent-artifacts.ts — unit tests for the emitter + parser layer.
  *
- * The generator is the single source of truth for the 18 specialist agent files
+ * The generator is the single source of truth for the 7 agent files
  * across 4 hosts. We test the pure emitters + YAML/TOML helpers directly, drive
  * the real charter loader against the repo charters, and exercise the drift-gate
  * (runCheck) + diffHost edge cases in-process so the CLI shell isn't the only
@@ -32,7 +32,7 @@ import {
   stateProfilesFromInstallState,
   readStateProfiles,
   warnStaleAgentOverrides,
-  OPENCODE_OWNED_MARKER,
+  OWNED_MARKER_MD,
   type Charter,
   type Host,
 } from "../generate-subagent-artifacts";
@@ -64,11 +64,11 @@ describe("parseSimpleYaml", () => {
     const y = parseSimpleYaml([
       "# a comment",
       "",
-      "name: massa-ai-builder",
+      "name: builder",
       'description: "Builds things"',
       "mode: subagent",
     ].join("\n"));
-    expect(y.name).toBe("massa-ai-builder");
+    expect(y.name).toBe("builder");
     expect(y.description).toBe("Builds things");
     expect(y.mode).toBe("subagent");
   });
@@ -117,21 +117,23 @@ function resolved(model: string | null, effort: string | null): Resolved {
 // per class. Mutation-proved against "flip the WRITE_AGENTS branch to return denylist" —
 // see the T1 commit message for the observed-RED record.
 describe("claudeToolPolicyFor (STI-01/STI-02)", () => {
-  test("an AGENT_TOOLS_OVERRIDE member (navigator) returns an allowlist carrying its override tools", () => {
-    expect(claudeToolPolicyFor("navigator")).toEqual({
-      kind: "allowlist",
-      tools: ["mcp__massa-ai__*", "Read", "Grep", "Glob", "Bash(pwd)"],
+  // agent-roster-consolidation A9 retired the navigator allowlist: code-explorer, which
+  // absorbed navigator, is read-only through the same denylist as every other reader.
+  test("code-explorer (the former allowlisted navigator role) returns the read-only denylist", () => {
+    expect(claudeToolPolicyFor("code-explorer")).toEqual({
+      kind: "denylist",
+      disallowed: ["Write", "Edit", "NotebookEdit"],
     });
   });
 
-  test("every WRITE_AGENTS member with no override returns inherit", () => {
-    for (const name of ["builder", "test-engineer", "documentation-agent", "judge", "designer"] as const) {
+  test("every WRITE_AGENTS member returns inherit", () => {
+    for (const name of ["builder", "designer", "judge", "test-engineer"] as const) {
       expect(claudeToolPolicyFor(name)).toEqual({ kind: "inherit" });
     }
   });
 
-  test("a charter with neither an override nor WRITE_AGENTS membership (investigator) returns the read-only denylist", () => {
-    expect(claudeToolPolicyFor("investigator")).toEqual({
+  test("a charter outside WRITE_AGENTS (code-reviewer) returns the read-only denylist", () => {
+    expect(claudeToolPolicyFor("code-reviewer")).toEqual({
       kind: "denylist",
       disallowed: ["Write", "Edit", "NotebookEdit"],
     });
@@ -149,14 +151,14 @@ describe("claudeToolPolicyFor (STI-01/STI-02)", () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-charter-"));
     try {
       const raw = await fs.readFile(
-        path.join(REPO_ROOT, "skills/agents/investigator/SKILL.md"),
+        path.join(REPO_ROOT, "skills/agents/code-explorer/SKILL.md"),
         "utf8"
       );
       const mutated = raw.replace(/^ {2}permission:.*$/m, "  permission: some-unrecognized-value");
       expect(mutated).not.toBe(raw); // the harness itself must actually mutate the fixture
-      await fs.mkdir(path.join(tmp, "investigator"), { recursive: true });
-      await fs.writeFile(path.join(tmp, "investigator", "SKILL.md"), mutated);
-      const c = await loadCharter("investigator", tmp);
+      await fs.mkdir(path.join(tmp, "code-explorer"), { recursive: true });
+      await fs.writeFile(path.join(tmp, "code-explorer", "SKILL.md"), mutated);
+      const c = await loadCharter("code-explorer", tmp);
       expect(c.permission).toBe("read-only"); // loadCharter's existing fail-safe coercion
       expect(claudeToolPolicyFor(c.name)).toEqual({
         kind: "denylist",
@@ -181,9 +183,9 @@ describe("emitClaude", () => {
       .filter((k): k is string => Boolean(k));
   }
 
-  test("read-only agent (investigator, no override) gets the denylist, never an allowlist", () => {
-    const out = emitClaude(charter({ name: "investigator" }), resolved("haiku", "high"));
-    expect(out).toContain("name: massa-ai-investigator");
+  test("read-only agent (code-explorer, no override) gets the denylist, never an allowlist", () => {
+    const out = emitClaude(charter({ name: "code-explorer" }), resolved("haiku", "high"));
+    expect(out).toContain("name: code-explorer");
     expect(out).toContain("disallowedTools: Write, Edit, NotebookEdit");
     expect(out).not.toContain("tools:");
     expect(out).toContain("model: haiku");
@@ -198,34 +200,38 @@ describe("emitClaude", () => {
     expect(out).toContain("model: sonnet");
   });
 
-  test("an AGENT_TOOLS_OVERRIDE member (navigator) keeps its allowlist and emits no disallowedTools", () => {
-    const out = emitClaude(charter({ name: "navigator" }), resolved("opus", "high"));
-    expect(out).toContain('tools: ["mcp__massa-ai__*","Read","Grep","Glob","Bash(pwd)"]');
-    expect(out).not.toContain("disallowedTools:");
+  test("no agent emits a tools: allowlist — the navigator exception is retired (A9)", () => {
+    for (const name of ["builder", "code-explorer", "code-reviewer", "designer", "judge", "product-manager", "test-engineer"] as const) {
+      expect(emitClaude(charter({ name }), resolved("opus", "high"))).not.toMatch(/^tools:/m);
+    }
   });
 
-  test("key order is name, description, <gate>, model, effort for all three classes", () => {
-    expect(keyOrder(emitClaude(charter({ name: "investigator" }), resolved("haiku", "high")))).toEqual([
+  test("key order is name, description, <gate>, model, effort for both classes", () => {
+    expect(keyOrder(emitClaude(charter({ name: "code-explorer" }), resolved("haiku", "high")))).toEqual([
       "name", "description", "disallowedTools", "model", "effort",
     ]);
     expect(keyOrder(emitClaude(charter({ name: "builder" }), resolved("sonnet", "high")))).toEqual([
       "name", "description", "model", "effort",
     ]);
-    expect(keyOrder(emitClaude(charter({ name: "navigator" }), resolved("opus", "high")))).toEqual([
-      "name", "description", "tools", "model", "effort",
-    ]);
   });
 
   test("the emitter renders whatever the resolver returns — it holds no model table", () => {
-    const out = emitClaude(charter({ name: "investigator" }), resolved("fable", "xhigh"));
+    const out = emitClaude(charter({ name: "code-explorer" }), resolved("fable", "xhigh"));
     expect(out).toContain("model: fable");
     expect(out).toContain("effort: xhigh");
   });
 
   test("null model becomes the documented `inherit`; null effort omits the key", () => {
-    const out = emitClaude(charter({ name: "investigator" }), resolved(null, null));
+    const out = emitClaude(charter({ name: "code-explorer" }), resolved(null, null));
     expect(out).toContain("model: inherit");
     expect(out).not.toContain("effort:");
+  });
+
+  test("the ownership marker is the FIRST body line, outside the frontmatter", () => {
+    const out = emitClaude(charter({ name: "code-explorer" }), resolved("haiku", "high"));
+    const [, fm, body] = out.split("---\n");
+    expect(fm).not.toContain("massa-ai-owned");
+    expect(body!.split("\n")[0]).toBe(OWNED_MARKER_MD);
   });
 });
 
@@ -233,15 +239,15 @@ describe("emitCursor", () => {
   // Cursor's documented frontmatter is exactly name/description/model/readonly/is_background.
   // https://cursor.com/docs/subagents.md
   test("emits ONLY documented keys — no tools, no reasoningEffort", () => {
-    const out = emitCursor(charter({ name: "investigator" }), resolved(null, null));
-    expect(out).toContain("name: massa-ai-investigator");
+    const out = emitCursor(charter({ name: "code-explorer" }), resolved(null, null));
+    expect(out).toContain("name: code-explorer");
     expect(out).toContain("model: inherit");
     expect(out).not.toContain("tools:");
     expect(out).not.toContain("reasoningEffort");
   });
 
   test("read-only charter gets readonly: true — Cursor's only permission mechanism", () => {
-    const out = emitCursor(charter({ name: "investigator" }), resolved(null, null));
+    const out = emitCursor(charter({ name: "code-explorer" }), resolved(null, null));
     expect(out).toContain("readonly: true");
   });
 
@@ -251,15 +257,22 @@ describe("emitCursor", () => {
   });
 
   test("a pinned id carries effort as a bracket parameter, not a separate key", () => {
-    const out = emitCursor(charter({ name: "investigator" }), resolved("claude-opus-5", "high"));
+    const out = emitCursor(charter({ name: "code-explorer" }), resolved("claude-opus-5", "high"));
     expect(out).toContain("model: claude-opus-5[effort=high]");
     expect(out).not.toContain("reasoningEffort");
   });
 
   test("a pinned id with no effort emits the bare id", () => {
-    const out = emitCursor(charter({ name: "investigator" }), resolved("composer-2", null));
+    const out = emitCursor(charter({ name: "code-explorer" }), resolved("composer-2", null));
     expect(out).toContain("model: composer-2");
     expect(out).not.toContain("[effort");
+  });
+
+  test("the ownership marker is the FIRST body line, never a frontmatter key", () => {
+    const out = emitCursor(charter({ name: "code-explorer" }), resolved(null, null));
+    const [, fm, body] = out.split("---\n");
+    expect(fm).not.toContain("massa-ai-owned");
+    expect(body!.split("\n")[0]).toBe(OWNED_MARKER_MD);
   });
 });
 
@@ -273,14 +286,15 @@ describe("emitOpenCode", () => {
     expect(out).toMatch(/^model: [a-z0-9-]+\/[a-z0-9.:-]+$/m);
   });
 
-  test("planner (inspection-capable) -> edit: deny, bash ask", () => {
-    const out = emitOpenCode(charter({ name: "planner" }), resolved("opencode-go/minimax-m3", "max"));
-    expect(out).toContain("edit: deny");
-    expect(out).toContain('bash: { "*": "ask" }');
+  test("no read-only agent gets a bash override — the planner/navigator overrides are retired (A9)", () => {
+    for (const name of ["code-explorer", "code-reviewer", "product-manager"] as const) {
+      const out = emitOpenCode(charter({ name }), resolved("opencode-go/minimax-m3", "max"));
+      expect(out).toContain("permission: { edit: deny, bash: deny }");
+    }
   });
 
   test("strict read-only agent -> edit: deny, bash: deny", () => {
-    const out = emitOpenCode(charter({ name: "investigator" }), resolved("opencode-go/deepseek-v4-pro", "max"));
+    const out = emitOpenCode(charter({ name: "code-explorer" }), resolved("opencode-go/deepseek-v4-pro", "max"));
     expect(out).toContain("edit: deny");
     expect(out).toContain("bash: deny");
   });
@@ -289,28 +303,28 @@ describe("emitOpenCode", () => {
   // options, so `name` and `metadata` were being sent as bogus options on every call.
   // https://opencode.ai/docs/agents/
   test("emits NO name key — the agent name is the filename", () => {
-    const out = emitOpenCode(charter({ name: "investigator" }), resolved("p/m", "max"));
+    const out = emitOpenCode(charter({ name: "code-explorer" }), resolved("p/m", "max"));
     const fm = /^---\n([\s\S]*?)\n---/.exec(out)![1]!;
     expect(fm).not.toMatch(/^name:/m);
   });
 
   test("emits NO metadata key in frontmatter, but keeps the ownership marker in the body", () => {
-    const out = emitOpenCode(charter({ name: "investigator" }), resolved("p/m", "max"));
+    const out = emitOpenCode(charter({ name: "code-explorer" }), resolved("p/m", "max"));
     const fm = /^---\n([\s\S]*?)\n---/.exec(out)![1]!;
     expect(fm).not.toMatch(/^metadata:/m);
     // config-cli.ts scopes `agents uninstall` on this literal substring.
     expect(out).toContain("massa-ai-owned: true");
-    expect(out).toContain(OPENCODE_OWNED_MARKER);
+    expect(out).toContain(OWNED_MARKER_MD);
   });
 
   test("the ownership marker is the FIRST body line, so uninstall scoping survives", () => {
-    const out = emitOpenCode(charter({ name: "investigator" }), resolved("p/m", "max"));
+    const out = emitOpenCode(charter({ name: "code-explorer" }), resolved("p/m", "max"));
     const body = out.split("---\n")[2] ?? "";
-    expect(body.split("\n")[0]).toBe(OPENCODE_OWNED_MARKER);
+    expect(body.split("\n")[0]).toBe(OWNED_MARKER_MD);
   });
 
   test("null model/effort omit both keys — OpenCode inherits from the invoking agent", () => {
-    const out = emitOpenCode(charter({ name: "investigator" }), resolved(null, null));
+    const out = emitOpenCode(charter({ name: "code-explorer" }), resolved(null, null));
     const fm = /^---\n([\s\S]*?)\n---/.exec(out)![1]!;
     expect(fm).not.toMatch(/^model:/m);
     expect(fm).not.toMatch(/^reasoningEffort:/m);
@@ -330,16 +344,16 @@ describe("emitCodex + TOML helpers", () => {
   });
 
   test("read-only codex agent -> sandbox read-only + massa-ai-owned header", () => {
-    const out = emitCodex(charter({ name: "investigator" }), resolved("gpt-5.4-mini", "high"));
+    const out = emitCodex(charter({ name: "code-explorer" }), resolved("gpt-5.4-mini", "high"));
     expect(out.split("\n")[0]).toBe("# massa-ai-owned");
-    expect(out).toContain('name = "massa-ai-investigator"');
+    expect(out).toContain('name = "code-explorer"');
     expect(out).toContain('sandbox_mode = "read-only"');
     expect(out).toContain('model = "gpt-5.4-mini"');
     expect(out).toContain('model_reasoning_effort = "high"');
     expect(out).toContain('developer_instructions = """');
     // round-trips through a real TOML parser
     const parsed = toml.parse(out) as Record<string, unknown>;
-    expect(parsed.name).toBe("massa-ai-investigator");
+    expect(parsed.name).toBe("code-explorer");
   });
 
   test("write codex agent (builder) -> sandbox workspace-write", () => {
@@ -350,14 +364,14 @@ describe("emitCodex + TOML helpers", () => {
 
   test("body containing a triple-quote is escaped so the TOML still parses", () => {
     const out = emitCodex(
-      charter({ name: "investigator", body: 'code """ here' }),
+      charter({ name: "code-explorer", body: 'code """ here' }),
       resolved("gpt-5.4-mini", "high")
     );
     expect(() => toml.parse(out)).not.toThrow();
   });
 
   test("null model/effort omit both keys — Codex inherits from the parent session", () => {
-    const out = emitCodex(charter({ name: "investigator" }), resolved(null, null));
+    const out = emitCodex(charter({ name: "code-explorer" }), resolved(null, null));
     expect(out).not.toContain("model =");
     expect(out).not.toContain("model_reasoning_effort");
     // still a valid agent TOML
@@ -369,9 +383,9 @@ describe("emitCodex + TOML helpers", () => {
 // ── Real charter loading ────────────────────────────────────────────────────
 
 describe("loadCharter / loadAllCharters (repo charters)", () => {
-  test("loadCharter reads investigator with description + read-only permission", async () => {
-    const c = await loadCharter("investigator");
-    expect(c.name).toBe("investigator");
+  test("loadCharter reads code-explorer with description + read-only permission", async () => {
+    const c = await loadCharter("code-explorer");
+    expect(c.name).toBe("code-explorer");
     expect(c.description.length).toBeGreaterThan(0);
     expect(c.permission).toBe("read-only");
   });
@@ -389,12 +403,12 @@ describe("loadCharter / loadAllCharters (repo charters)", () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-charter-"));
     try {
       const raw = await fs.readFile(
-        path.join(REPO_ROOT, "skills/agents/investigator/SKILL.md"),
+        path.join(REPO_ROOT, "skills/agents/code-explorer/SKILL.md"),
         "utf8"
       );
-      await fs.mkdir(path.join(tmp, "investigator"), { recursive: true });
-      await fs.writeFile(path.join(tmp, "investigator", "SKILL.md"), transform(raw));
-      return await loadCharter("investigator", tmp);
+      await fs.mkdir(path.join(tmp, "code-explorer"), { recursive: true });
+      await fs.writeFile(path.join(tmp, "code-explorer", "SKILL.md"), transform(raw));
+      return await loadCharter("code-explorer", tmp);
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -404,7 +418,7 @@ describe("loadCharter / loadAllCharters (repo charters)", () => {
     // Without this, a broken harness would make every throw-assertion below pass for the
     // wrong reason — a thrown ENOENT is still a thrown error.
     const c = await loadFromTemp((raw) => raw);
-    expect(c.name).toBe("investigator");
+    expect(c.name).toBe("code-explorer");
     expect(c.description.length).toBeGreaterThan(0);
   });
 
@@ -422,17 +436,17 @@ describe("loadCharter / loadAllCharters (repo charters)", () => {
     ).rejects.toThrow(/missing description/);
   });
 
-  test("loadAllCharters loads exactly the 18 specialists", async () => {
+  test("loadAllCharters loads exactly the 7 charters", async () => {
     const all = await loadAllCharters();
-    expect(all.length).toBe(18);
-    expect(new Set(all.map((c) => c.name)).size).toBe(18);
+    expect(all.length).toBe(7);
+    expect(new Set(all.map((c) => c.name)).size).toBe(7);
   });
 });
 
 // ── emitAll + drift gate ────────────────────────────────────────────────────
 
 describe("emitAll + diffHost", () => {
-  test("emitAll writes 18 files per host (72 total) into a temp tree", async () => {
+  test("emitAll writes 7 files per host (28 total) into a temp tree", async () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
     try {
       const dirs: Record<Host, string> = {
@@ -445,7 +459,7 @@ describe("emitAll + diffHost", () => {
       for (const host of ["claude", "codex", "cursor", "opencode"] as Host[]) {
         const ext = host === "codex" ? "toml" : "md";
         const files = (await fs.readdir(dirs[host])).filter((f) => f.endsWith(`.${ext}`));
-        expect(files.length).toBe(18);
+        expect(files.length).toBe(7);
       }
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
@@ -477,9 +491,9 @@ describe("emitAll + diffHost", () => {
       for (const f of await fs.readdir(generated)) {
         await fs.copyFile(path.join(generated, f), path.join(checkedIn, f));
       }
-      await fs.writeFile(path.join(generated, "massa-ai-investigator.md"), "mutated\n");
+      await fs.writeFile(path.join(generated, "code-explorer.md"), "mutated\n");
       const diffs = await diffHost(generated, checkedIn, "claude");
-      expect(diffs).toContain("M massa-ai-investigator.md");
+      expect(diffs).toContain("M code-explorer.md");
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -496,12 +510,12 @@ describe("emitAll + diffHost", () => {
         await fs.copyFile(path.join(generated, f), path.join(checkedIn, f));
       }
       // remove from generated -> "+ <rel> (missing in generated)"
-      await fs.rm(path.join(generated, "massa-ai-builder.md"));
+      await fs.rm(path.join(generated, "builder.md"));
       // remove from checked-in (different file) -> "- <rel> (missing in checked-in)"
-      await fs.rm(path.join(checkedIn, "massa-ai-planner.md"));
+      await fs.rm(path.join(checkedIn, "judge.md"));
       const diffs = await diffHost(generated, checkedIn, "claude");
-      expect(diffs).toContain("+ massa-ai-builder.md (missing in generated)");
-      expect(diffs).toContain("- massa-ai-planner.md (missing in checked-in)");
+      expect(diffs).toContain("+ builder.md (missing in generated)");
+      expect(diffs).toContain("- judge.md (missing in checked-in)");
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -622,7 +636,7 @@ describe("main()/runCheck thread the recorded install-state profile end-to-end (
       const code = runGeneratorInSubprocess([], homeDir);
       expect(code).toBe(0);
 
-      const out = await fs.readFile(path.join(CLAUDE_AGENTS_DIR, "massa-ai-documentation-agent.md"), "utf8");
+      const out = await fs.readFile(path.join(CLAUDE_AGENTS_DIR, "builder.md"), "utf8");
       // Compare against an independent "cheap" emission (the same production
       // resolver, a throwaway target dir) instead of a hardcoded model literal.
       const tmpOut = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
@@ -631,10 +645,10 @@ describe("main()/runCheck thread the recorded install-state profile end-to-end (
         { profileFlag: "cheap", env: {} },
         ["claude"],
       );
-      const expected = await fs.readFile(path.join(tmpOut, "massa-ai-documentation-agent.md"), "utf8");
+      const expected = await fs.readFile(path.join(tmpOut, "builder.md"), "utf8");
       expect(out).toBe(expected);
       // And it must actually have moved off the checked-in ("balanced") baseline.
-      expect(out).not.toBe(backup.get("massa-ai-documentation-agent.md")!.toString("utf8"));
+      expect(out).not.toBe(backup.get("builder.md")!.toString("utf8"));
     } finally {
       await restoreDir(CLAUDE_AGENTS_DIR, backup);
     }
@@ -756,18 +770,17 @@ describe("generator profile selection", () => {
       });
       await emitAll(dirsFor("a"), { env: {} });
       await emitAll(dirsFor("b"), { profileFlag: "heavy", env: {} });
-      // documentation-agent is the remaining light-tier charter; the bumped
-      // read-only roles (ALLWF-03) resolve identically across these profiles.
+      // builder is a standard-tier charter: balanced pins sonnet, heavy pins opus.
       const a = await fs.readFile(
-        path.join(dirsFor("a").claude, "massa-ai-documentation-agent.md"),
+        path.join(dirsFor("a").claude, "builder.md"),
         "utf8"
       );
       const b = await fs.readFile(
-        path.join(dirsFor("b").claude, "massa-ai-documentation-agent.md"),
+        path.join(dirsFor("b").claude, "builder.md"),
         "utf8"
       );
-      expect(a).toContain("model: haiku"); // balanced, light tier
-      expect(b).toContain("model: sonnet"); // heavy, light tier
+      expect(a).toContain("model: sonnet"); // balanced, standard tier
+      expect(b).toContain("model: opus"); // heavy, standard tier
       expect(a).not.toBe(b);
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
@@ -799,10 +812,10 @@ function withAgentOverride(
 describe("per-agent override resolution (registry v2, D1)", () => {
   test("profile.agents[agent][host] wins over the profile's host default for that host only — an unmentioned host still resolves the host default", async () => {
     const builtin = loadRegistry();
-    // investigator carries no override in the shipped registry, so it resolves the
+    // code-explorer carries no override in the shipped registry, so it resolves the
     // profile's own host default (ALLWF-03: read-only specialists run the strongest
     // model). Override claude to "haiku"; codex is never mentioned and must stay default.
-    const registry = withAgentOverride(builtin, "investigator", {
+    const registry = withAgentOverride(builtin, "code-explorer", {
       claude: { model: "haiku", effort: "high" },
     });
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
@@ -814,8 +827,8 @@ describe("per-agent override resolution (registry v2, D1)", () => {
         opencode: path.join(tmp, "opencode"),
       };
       await emitAll(dirs, { registry, env: {} });
-      const claudeOut = await fs.readFile(path.join(dirs.claude, "massa-ai-investigator.md"), "utf8");
-      const codexOut = await fs.readFile(path.join(dirs.codex, "massa-ai-investigator.toml"), "utf8");
+      const claudeOut = await fs.readFile(path.join(dirs.claude, "code-explorer.md"), "utf8");
+      const codexOut = await fs.readFile(path.join(dirs.codex, "code-explorer.toml"), "utf8");
       expect(claudeOut).toContain("model: haiku"); // overridden
       expect(codexOut).toContain('model = "gpt-5.6-sol"'); // balanced host default, unaffected
     } finally {
@@ -825,7 +838,7 @@ describe("per-agent override resolution (registry v2, D1)", () => {
 
   test("an override changes only that agent's emitted file, not its siblings", async () => {
     const builtin = loadRegistry();
-    const registry = withAgentOverride(builtin, "investigator", {
+    const registry = withAgentOverride(builtin, "code-explorer", {
       claude: { model: "haiku", effort: "high" },
     });
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
@@ -837,10 +850,10 @@ describe("per-agent override resolution (registry v2, D1)", () => {
         opencode: path.join(tmp, "opencode"),
       };
       await emitAll(dirs, { registry, env: {} });
-      const investigatorOut = await fs.readFile(path.join(dirs.claude, "massa-ai-investigator.md"), "utf8");
-      const plannerOut = await fs.readFile(path.join(dirs.claude, "massa-ai-planner.md"), "utf8");
-      expect(investigatorOut).toContain("model: haiku");
-      expect(plannerOut).toContain("model: opus"); // balanced host default, untouched
+      const explorerOut = await fs.readFile(path.join(dirs.claude, "code-explorer.md"), "utf8");
+      const reviewerOut = await fs.readFile(path.join(dirs.claude, "code-reviewer.md"), "utf8");
+      expect(explorerOut).toContain("model: haiku");
+      expect(reviewerOut).toContain("model: opus"); // balanced host default, untouched
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -879,7 +892,7 @@ describe("stale agent-override warn (registry v2)", () => {
       expect(staleWarnCalls.length).toBe(1);
       // The emission itself still succeeded — a stale override must not brick the build.
       const claudeOut = await fs.readdir(dirs.claude);
-      expect(claudeOut.length).toBe(18);
+      expect(claudeOut.length).toBe(7);
     } finally {
       warnSpy.mockRestore();
       await fs.rm(tmp, { recursive: true, force: true });
@@ -912,7 +925,7 @@ describe("stale agent-override warn (registry v2)", () => {
     });
     const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     try {
-      const charters: Charter[] = [charter({ name: "investigator" })];
+      const charters: Charter[] = [charter({ name: "code-explorer" })];
       const shared = new Set<string>();
       warnStaleAgentOverrides(registry, charters, shared);
       warnStaleAgentOverrides(registry, charters, shared);
@@ -949,13 +962,13 @@ describe("stale agent-override warn (registry v2)", () => {
 
   test("an override naming a real charter never warns", async () => {
     const builtin = loadRegistry();
-    const registry = withAgentOverride(builtin, "investigator", {
+    const registry = withAgentOverride(builtin, "code-explorer", {
       claude: { model: "haiku", effort: "high" },
     });
     const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     try {
       // The FULL real charter set — every override the shipped registry already carries
-      // (builder, designer, test-engineer, documentation-agent) names a real charter too,
+      // (builder, designer, test-engineer) names a real charter too,
       // so only a singleton fake charter list would make those look stale.
       const charters = await loadAllCharters();
       warnStaleAgentOverrides(registry, charters, new Set());

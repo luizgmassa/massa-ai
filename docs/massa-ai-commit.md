@@ -35,7 +35,7 @@ Commit everything except audit reports.
 
 - The workflow can draft messages without committing.
 - It commits only when the user explicitly asks for a commit.
-- Jira ticket creation remains owned by the ticket workflow.
+- Jira ticket creation remains owned by the `create-ticket` workflow.
 - Release notes, changelogs, and PR descriptions are separate documentation tasks.
 
 ## Troubleshooting

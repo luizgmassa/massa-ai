@@ -9,7 +9,7 @@
  *
  * Why this exists: install-harness.sh skips a host whose recorded plugin
  * version equals the bundle version. Its self-heal check used to consult ONE
- * sentinel per host (for cursor, `~/.cursor/agents/massa-ai-*.md`), so a host
+ * sentinel per host (for cursor, an owned `~/.cursor/agents/*.md`), so a host
  * that had agents but had lost its hooks looked fully installed and was
  * skipped forever — measured live on Cursor, 2026-08-17. That probe now checks
  * every class (installer_plugin_sentinel_present in scripts/lib/installer-shared.sh),
@@ -28,6 +28,7 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { isOwnedAgentFile, isOwnedAgentLink } from "../packages/shared/src/profile-switch/ownership.ts";
 
 const args = process.argv.slice(2);
 const HOME = args.includes("--home") ? args[args.indexOf("--home") + 1]! : process.env.HOME!;
@@ -40,7 +41,7 @@ const results: Check[] = [];
 const add = (host: string, artifact: string, status: Status, detail: string) =>
   results.push({ host, artifact, status, detail });
 
-/** Files matching `massa-ai-*.<ext>` directly inside dir. */
+/** Command files matching `massa-ai-*.<ext>` directly inside dir. */
 function ownedFiles(dir: string, ext: string): string[] {
   if (!existsSync(dir)) return [];
   try {
@@ -64,7 +65,7 @@ function readJson(path: string): any | null {
 }
 
 /** The three harness skills the generator ships (generate-skill-artifacts.ts). */
-const HARNESS_SKILLS = ["massa-ai", "persona-router", "profile"];
+const HARNESS_SKILLS = ["massa-ai", "profile", "bootstrap"];
 
 function checkSkills(host: string, skillsDir: string) {
   if (!existsSync(skillsDir)) {
@@ -81,8 +82,24 @@ function checkSkills(host: string, skillsDir: string) {
   );
 }
 
-function checkSubagents(host: string, dir: string, ext: string, expected: number) {
-  const files = ownedFiles(dir, ext);
+/** Agent files directly inside dir that massa-ai owns (content marker, not name). */
+function ownedAgents(dir: string, ext: string, isOwned: (p: string) => boolean = isOwnedAgentFile): string[] {
+  if (!existsSync(dir)) return [];
+  try {
+    return readdirSync(dir).filter((f) => f.endsWith(ext) && isOwned(join(dir, f)));
+  } catch {
+    return [];
+  }
+}
+
+function checkSubagents(
+  host: string,
+  dir: string,
+  ext: string,
+  expected: number,
+  isOwned: (p: string) => boolean = isOwnedAgentFile,
+) {
+  const files = ownedAgents(dir, ext, isOwned);
   add(
     host,
     "subagents",
@@ -92,7 +109,7 @@ function checkSubagents(host: string, dir: string, ext: string, expected: number
 }
 
 // How many specialist charters the repo currently ships, measured not assumed.
-let EXPECTED_AGENTS = 18;
+let EXPECTED_AGENTS = 7;
 try {
   const charters = readdirSync(join(import.meta.dir, "..", "skills", "agents"), {
     withFileTypes: true,
@@ -115,7 +132,7 @@ try {
   // Two legitimate routes: marketplace (served in place) or file route.
   const registry = readJson(join(dir, "plugins", "installed_plugins.json"));
   const viaMarketplace = registry ? JSON.stringify(registry).includes("massa-ai@") : false;
-  const fileRouteAgents = ownedFiles(join(dir, "agents"), ".md").length > 0;
+  const fileRouteAgents = ownedAgents(join(dir, "agents"), ".md").length > 0;
   add(
     h,
     "plugin",
@@ -178,7 +195,7 @@ try {
       ? readdirSync(join(installPath, "commands")).filter((f) => f.endsWith(".md")).length
       : 0;
     add(h, "commands", bundleCmds ? "ok" : "missing", `${bundleCmds} in the marketplace bundle`);
-    const bundleAgents = ownedFiles(join(installPath, "agents"), ".md").length;
+    const bundleAgents = ownedAgents(join(installPath, "agents"), ".md").length;
     add(
       h,
       "subagents",
@@ -307,7 +324,7 @@ try {
   const cmds = ownedFiles(join(dir, "command"), ".md").length;
   add(h, "commands", cmds ? "ok" : "missing", `${cmds} in ~/.config/opencode/command`);
 
-  checkSubagents(h, join(dir, "agents"), ".md", EXPECTED_AGENTS);
+  checkSubagents(h, join(dir, "agents"), ".md", EXPECTED_AGENTS, isOwnedAgentLink);
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────

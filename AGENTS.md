@@ -18,30 +18,27 @@ Check `.specs/project/STATE.md` for the current active feature and `.specs/proje
 
 - `massa-ai/` — workflow router; MCP tool contracts and Synapse lifecycle live in
   its `references/mcp-tools.md` and `references/synapse-policy.md`
-- `persona-router/` — persona selection
-- `AGENTS.md` (under `skills/`) — sub-agent registry: 18 reusable specialist
+- `AGENTS.md` (under `skills/`) — sub-agent registry: 7 reusable specialist
   agents, plus the canonical policy bootstrap block
+- `profile/` — switch the installed agents to a registry model profile
+- `bootstrap/` — inspect or toggle the startup-contract rules
 
 #### Sub-Agent Skills (invocable by any workflow)
 
-Dispatch under the host-registered name `massa-ai-<role>`, never the bare role
-name (see `skills/massa-ai/references/agent-orchestration.md` → Name Resolution).
+Dispatch under the bare role name; on the Claude plugin route use the
+plugin-namespaced `massa-ai:<role>` (see
+`skills/massa-ai/references/agent-orchestration.md` → Name Resolution). A charter
+with several output contracts selects one per dispatch through the capability
+packet's `mode` field; `skills/AGENTS.md` lists the modes and maps retired agents
+to current ones.
 
-- `investigator/` — read-only codebase investigation (locate, trace, impact)
-- `planner/` — read-only implementation planning (steps, deps, risks, order)
 - `builder/` — write-permitted implementation (disjoint write set)
-- `reviewer/` — read-only diff review (bugs, regressions, smells, edge cases)
-- `context-curator/` — read-only Context Packet preparation (firewall, Synapse)
-- `verification-agent/` — read-only Verification Ladder centralization (validate, report)
-- `requirements-analyst/` — read-only requirements analysis (ambiguity, gaps, implicit)
-- `architecture-specialist/` — read-only architecture guidance (boundaries, trade-offs)
-- `test-engineer/` — testing strategy (unit, integration, edge, acceptance coverage)
-- `documentation-agent/` — engineering documentation (README, ADR, RFC, changelog)
-- `audit-specialist/` — configurable 6-lens audit (bugs, architecture, security, requirements, code-quality, performance)
-- `mobile-specialist/` — conditional mobile expertise (Android, iOS, KMP; refuses non-mobile)
-- `plan-critic/` — read-only plan challenge for the lite and full Plan Challenge gates
-- `furps-analyst/` — read-only single-dimension FURPS+ analysis of a PRD or ADR
-- `navigator/` — read-only index-first codebase navigation (massa-ai MCP surface)
+- `code-explorer/` — read-only codebase exploration: index-first lookup, flow tracing, dependencies, impact
+- `code-reviewer/` — read-only diff review, independent verification, findings-only audits (bugs, architecture, security, code-quality, performance), architecture and mobile guidance
+- `designer/` — reads and writes user-facing screens from Figma, screenshots, or other design direction (UI-layer writes when scoped)
+- `judge/` — evaluation-spec authoring, debate-panel scoring, and the lite and full Plan Challenge critique
+- `product-manager/` — read-only requirements work: FURPS+ dimensions, ambiguity and gap analysis, requirements audit lens
+- `test-engineer/` — test strategy, tests audit lens, and tests-fix implementation (test-file writes when scoped)
 
 ### Spec Artifacts
 
@@ -100,7 +97,7 @@ Thumbs.db
 
 ## Agent Policies (single source elsewhere)
 
-The Persona Router, Plan Challenge, and Conversation Feedback policies are
+The Plan Challenge and Conversation Feedback policies are
 defined **once**, in the `<!-- massa-ai:bootstrap -->` block of
 [`skills/AGENTS.md`](./skills/AGENTS.md). `scripts/install-skills.sh` copies that
 block to `<host>/AGENTS.md` (for example `~/.claude/AGENTS.md`), which is the
@@ -110,12 +107,8 @@ Edit the policies in `skills/AGENTS.md`. Do not restate them here or in a host
 copy — a second copy is how the repo previously ended up shipping two
 contradicting Plan Challenge gates.
 `scripts/__tests__/skills-harness-integrity.test.ts` fails if a
-`plan_challenge:` / `conversation_feedback:` / `persona_router:` block reappears
+`plan_challenge:` / `conversation_feedback:` block reappears
 in this file.
-
-## Persona Pin
-
-persona_pin: context-skill-harness-engineer-architect
 
 ## Runtime Contract
 

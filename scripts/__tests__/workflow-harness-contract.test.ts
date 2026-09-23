@@ -38,8 +38,8 @@ const SKILL_DIR = path.join(REPO_ROOT, "skills", "massa-ai");
 const WORKFLOWS_DIR = path.join(SKILL_DIR, "workflows");
 const REFERENCES_DIR = path.join(SKILL_DIR, "references");
 
-/** Total workflow files expected after the overhaul removed three routes. */
-const EXPECTED_WORKFLOW_COUNT = 40;
+/** Total workflow files expected after agent-roster-consolidation removed `general` and the three `maestro` routes (WFL-02). */
+const EXPECTED_WORKFLOW_COUNT = 36;
 
 /**
  * The workflows that mutate the repository. These, and only these, carry the
@@ -53,10 +53,7 @@ const IMPLEMENTATION_WORKFLOWS = [
   "debug.md",
   "design.md",
   "feature.md",
-  "general.md",
   "implementation/implementation-fix.md",
-  "maestro/maestro-fix.md",
-  "maestro/maestro.md",
   "mobile-figma/mobile-figma-fix.md",
   "refactor.md",
   "requirements/requirements-fix.md",
@@ -295,9 +292,9 @@ describe("delivery scope: only mutating workflows carry the delivery contract", 
     expect(leaked).toEqual([]);
   });
 
-  test("the read-only complement is exactly 24 workflows", async () => {
+  test("the read-only complement is exactly 23 workflows", async () => {
     const all = await listWorkflows();
-    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(24);
+    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(23);
   });
 });
 
@@ -398,9 +395,9 @@ describe("invariants: the references still encode the decisions that were made",
 
 // ── 6. Roster count ───────────────────────────────────────────────────────
 
-describe("roster: nothing advertises a specialist count other than 18", () => {
+describe("roster: nothing advertises a specialist count other than 7", () => {
   /** The roster size every current-tense claim must agree with. */
-  const ROSTER = 18;
+  const ROSTER = 7;
 
   /**
    * A count-shaped claim, matched within one line OR across exactly one line
@@ -473,9 +470,13 @@ describe("roster: nothing advertises a specialist count other than 18", () => {
     const files = (await new Response(proc.stdout).text())
       .split("\n")
       .filter(Boolean)
-      // .specs/ is historical record and CHANGELOG.md documents each change;
+      // .specs/ is historical record, .ua/ is a generated knowledge-graph
+      // snapshot of past sources, and CHANGELOG.md documents each change;
       // this file carries the counts as assertion data.
-      .filter((f) => !f.startsWith(".specs/") && f !== "CHANGELOG.md" && f !== SELF);
+      .filter(
+        (f) =>
+          !f.startsWith(".specs/") && !f.startsWith(".ua/") && f !== "CHANGELOG.md" && f !== SELF,
+      );
 
     const offenders: string[] = [];
     for (const rel of files) {
@@ -532,6 +533,8 @@ describe("roster: nothing advertises a specialist count other than 18", () => {
       "15 specialists",
       "12 subagent specialists",
       "9 reusable sub-agent specialists",
+      // The pre-consolidation roster size is now a wrong count too.
+      "18 subagent specialists",
     ]) {
       const m = COUNT_CLAIM.exec(text);
       expect(m, `no match for ${text}`).not.toBeNull();
@@ -541,19 +544,19 @@ describe("roster: nothing advertises a specialist count other than 18", () => {
 
   test("a correct count in any spelling passes", () => {
     for (const text of [
-      "18 specialists",
-      "18 subagent specialists",
-      "18 sub-agent specialists",
-      "18 reusable sub-agent specialists",
+      "7 specialists",
+      "7 subagent specialists",
+      "7 sub-agent specialists",
+      "7 reusable sub-agent specialists",
     ]) {
       expect(COUNT_CLAIM.exec(text)![1]).toBe(String(ROSTER));
     }
   });
 
-  test("the shell installers advertise 18", async () => {
+  test("the shell installers advertise 7", async () => {
     for (const rel of ["install.sh", "scripts/install-agents.sh"]) {
       const body = await fs.readFile(path.join(REPO_ROOT, rel), "utf8");
-      expect(body).toContain("18 subagent specialists");
+      expect(body).toMatch(/(?<!\d)7 subagent specialists/);
     }
   });
 });
@@ -710,7 +713,7 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
 // .specs/features/designer-agent/ — ADRG-01, ADRG-02.
 //
 // `skills/AGENTS.md` names the workflows that take the full Plan Challenge
-// Gate. `workflows/adr.md` was named there and carried no gate step at all,
+// Gate. `workflows/create-adr.md` was named there and carried no gate step at all,
 // and `workflows/refactor.md` carried none either — the policy reached both
 // only if the orchestrator recalled the bootstrap list unaided. Every other
 // workflow-side contract in this repo is inline in its own file for exactly
@@ -746,8 +749,10 @@ describe("plan challenge: every full-gate workflow carries the gate step", () =>
     // parse would make every assertion below pass by matching nothing.
     const names = await fullGateWorkflows();
     expect(names.length).toBeGreaterThanOrEqual(6);
-    expect(names).toContain("adr");
     expect(names).toContain("refactor");
+    // agent-roster-consolidation WFL-03 (Inventory AC-5): the renamed stems.
+    for (const stem of ["create-adr", "create-rfc", "create-tdd"]) expect(names).toContain(stem);
+    for (const old of ["adr", "rfc", "tdd"]) expect(names).not.toContain(old);
   });
 
   test("every named workflow exists on disk", async () => {
@@ -773,7 +778,7 @@ describe("plan challenge: every full-gate workflow carries the gate step", () =>
 // .specs/features/designer-agent/ — DSG-05, DSG-06.
 //
 // Added after independent verification: two mutations survived every gate in
-// the suite. Removing the whole `massa-ai-designer` block from one of the seven
+// the suite. Removing the whole `designer` block from one of the seven
 // workflows was caught by NOTHING (the duplication ceiling shifted as a side
 // effect of the line-window moving, which is not a check), and rewording one
 // block's `trigger:` so the seven disagree was caught by nothing at all.
@@ -788,7 +793,7 @@ describe("plan challenge: every full-gate workflow carries the gate step", () =>
 // sentence is what states the dispatch is mandatory-on-condition, so one file
 // drifting to weaker wording silently makes it advisory there.
 
-describe("designer dispatch: exactly 7 workflows, one wording", () => {
+describe("designer dispatch: exactly 6 workflows, one wording", () => {
   /**
    * The screen-capable workflows (spec A1). Hardcoded deliberately, unlike
    * ADRG-02's parsed list: there is no policy sentence enumerating these, and
@@ -798,17 +803,16 @@ describe("designer dispatch: exactly 7 workflows, one wording", () => {
   const SCREEN_WORKFLOWS = [
     "design.md",
     "feature.md",
-    "general.md",
     "implementation/implementation-fix.md",
     "mobile-figma/mobile-figma-audit.md",
     "mobile-figma/mobile-figma-fix.md",
     "spec-driven.md",
   ] as const;
 
-  const DISPATCH_HEADER = "> **Dispatch: `massa-ai-designer`**";
+  const DISPATCH_HEADER = "> **Dispatch: `designer`**";
   const TRIGGER_PREFIX = "> - trigger: the task creates or modifies a user-facing screen";
 
-  test("each of the 7 carries the designer dispatch block", async () => {
+  test("each of the 6 carries the designer dispatch block", async () => {
     const without: string[] = [];
     for (const rel of SCREEN_WORKFLOWS) {
       const body = await readWorkflow(rel);
@@ -1016,8 +1020,8 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(relative).toBe("~/.claude/agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain(relative);
-    expect(body).toContain(layout.activeGlob);
-    expect(layout.activeGlob).toBe("massa-ai-*.md");
+    expect(layout.activeExt).toBe(".md");
+    expect(body).toContain("| `*.md` whose first body line is `<!-- massa-ai-owned: true -->` |");
   });
 
   test("claude marketplace route: the doc's <marketplaceRoot>/agents pattern equals the resolver's suffix", async () => {
@@ -1084,8 +1088,8 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(relative).toBe("~/.codex/agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain(relative);
-    expect(layout.activeGlob).toBe("massa-ai-*.toml");
-    expect(body).toContain(layout.activeGlob);
+    expect(layout.activeExt).toBe(".toml");
+    expect(body).toContain("| `*.toml` whose first line is `# massa-ai-owned` |");
   });
 
   test("opencode: the doc's ~/.config/opencode/agents literal equals the resolver's home-relative path", async () => {
@@ -1096,8 +1100,8 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(relative).toBe("~/.config/opencode/agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain(relative);
-    expect(layout.activeGlob).toBe("massa-ai-*.md");
-    expect(body).toContain(layout.activeGlob);
+    expect(layout.activeExt).toBe(".md");
+    expect(body).toContain("| `*.md` symlinks into the massa-ai bundle |");
   });
 
   test("cursor: resolveHostLayout returns route skip, and the doc names no cursor installed-agent path", async () => {

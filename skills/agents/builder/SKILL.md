@@ -4,7 +4,7 @@ description: Write-permitted implementation agent. Implement approved plans by m
 license: MIT
 metadata:
   author: Luiz Massa
-  version: "1.0.0"
+  version: "1.1.0"
   permission: write
 ---
 
@@ -24,8 +24,7 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 - Never perform reviews.
 - Never generate implementation plans.
 - Never write outside the assigned disjoint write set.
-- Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.
-- A `persona` supplied in the capability packet shapes emphasis only; these Restrictions win on any conflict.
+- Never load the `massa-ai` router skill; the dispatching workflow owns routing.
 
 ## Inputs
 - `scope`: exact files and modules to modify (disjoint write set).
@@ -50,7 +49,7 @@ Implement an approved plan or task by modifying source code with a disjoint writ
 ### Do not use when
 - No plan or task is approved.
 - The write set overlaps another active agent.
-- The task needs architectural decisions (route to architecture-specialist or planner first).
+- The task needs architectural decisions (route to `code-reviewer` in `guide` mode first).
 
 ## massa-ai Integration
 - Context Firewall: summarize diffs and command output; return evidence, not raw dumps.

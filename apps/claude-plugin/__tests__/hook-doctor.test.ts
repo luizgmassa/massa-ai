@@ -52,9 +52,9 @@ describe("buildSessionStartDoctorLine", () => {
       version: 2,
       platforms: { claude: { plugin: { version: "1.57.0" }, modelProfile: { profile: "work" } } },
     });
-    const agent = "---\nname: massa-ai-investigator\nmodel: glm-5.3-flash\neffort: max\n---\nbody";
-    writeText(path.join(pluginRoot, "agents", "massa-ai-investigator.md"), agent);
-    writeText(path.join(pluginRoot, "agent-profiles", "work", "massa-ai-investigator.md"), agent);
+    const agent = "---\nname: code-reviewer\nmodel: glm-5.3-flash\neffort: max\n---\nbody";
+    writeText(path.join(pluginRoot, "agents", "code-reviewer.md"), agent);
+    writeText(path.join(pluginRoot, "agent-profiles", "work", "code-reviewer.md"), agent);
 
     expect(buildSessionStartDoctorLine(pluginRoot, ENV())).toBeNull();
   });
@@ -72,14 +72,14 @@ describe("buildSessionStartDoctorLine", () => {
     expect(line).toContain("1.56.0");
   });
 
-  test("active investigator model ≠ recorded profile variant → agent drift line", () => {
+  test("active code-reviewer model ≠ recorded profile variant → agent drift line", () => {
     writeJson(path.join(pluginRoot, ".claude-plugin", "plugin.json"), { version: "1.57.0" });
     writeJson(getInstallStatePath(), {
       version: 2,
       platforms: { claude: { plugin: { version: "1.57.0" }, modelProfile: { profile: "work" } } },
     });
-    writeText(path.join(pluginRoot, "agents", "massa-ai-investigator.md"), "---\nmodel: glm-5.3-flash\n---\n");
-    writeText(path.join(pluginRoot, "agent-profiles", "work", "massa-ai-investigator.md"), "---\nmodel: glm-5.2\n---\n");
+    writeText(path.join(pluginRoot, "agents", "code-reviewer.md"), "---\nmodel: glm-5.3-flash\n---\n");
+    writeText(path.join(pluginRoot, "agent-profiles", "work", "code-reviewer.md"), "---\nmodel: glm-5.2\n---\n");
 
     const line = buildSessionStartDoctorLine(pluginRoot, ENV());
     expect(line).toContain("agent drift");
@@ -99,8 +99,8 @@ describe("buildSessionStartDoctorLine", () => {
       version: 2,
       platforms: { claude: { plugin: { version: "1.56.0" }, modelProfile: { profile: "work" } } },
     });
-    writeText(path.join(pluginRoot, "agents", "massa-ai-investigator.md"), "---\nmodel: glm-5.3-flash\n---\n");
-    writeText(path.join(pluginRoot, "agent-profiles", "work", "massa-ai-investigator.md"), "---\nmodel: glm-5.2\n---\n");
+    writeText(path.join(pluginRoot, "agents", "code-reviewer.md"), "---\nmodel: glm-5.3-flash\n---\n");
+    writeText(path.join(pluginRoot, "agent-profiles", "work", "code-reviewer.md"), "---\nmodel: glm-5.2\n---\n");
 
     const line = buildSessionStartDoctorLine(pluginRoot, ENV("minimax-m3"));
     expect(line).not.toBeNull();
@@ -114,12 +114,12 @@ describe("buildSessionStartDoctorLine", () => {
 
 describe("cross-side pin (INV B3): hook regex == shared parser for `model:`", () => {
   test("both readers extract the same model from a shipped-shaped agent file", () => {
-    const raw = "---\nname: massa-ai-investigator\nmodel: glm-5.3-flash-tencent-claude[1m]\neffort: max\n---\nbody";
+    const raw = "---\nname: code-reviewer\nmodel: glm-5.3-flash-tencent-claude[1m]\neffort: max\n---\nbody";
     const shared = parseFrontmatter(raw).frontmatter.model;
-    writeText(path.join(pluginRoot, "agents", "massa-ai-investigator.md"), raw);
+    writeText(path.join(pluginRoot, "agents", "code-reviewer.md"), raw);
     // Exercise the hook's pinned read through the builder: a work variant
     // carrying the SAME model must yield no agent-drift line.
-    writeText(path.join(pluginRoot, "agent-profiles", "work", "massa-ai-investigator.md"), raw);
+    writeText(path.join(pluginRoot, "agent-profiles", "work", "code-reviewer.md"), raw);
     writeJson(path.join(pluginRoot, ".claude-plugin", "plugin.json"), { version: "1.0.0" });
     writeJson(getInstallStatePath(), {
       version: 2,
@@ -133,14 +133,27 @@ describe("cross-side pin (INV B3): hook regex == shared parser for `model:`", ()
   test("a quoted model value reads identically through both readers", () => {
     const raw = "---\nmodel: \"glm-5.3-flash\"\n---\nbody";
     expect(parseFrontmatter(raw).frontmatter.model).toBe("glm-5.3-flash");
-    writeText(path.join(pluginRoot, "agents", "massa-ai-investigator.md"), raw);
+    writeText(path.join(pluginRoot, "agents", "code-reviewer.md"), raw);
     writeJson(path.join(pluginRoot, ".claude-plugin", "plugin.json"), { version: "1.0.0" });
     writeJson(getInstallStatePath(), {
       version: 2,
       platforms: { claude: { plugin: { version: "1.0.0" }, modelProfile: { profile: "work" } } },
     });
-    writeText(path.join(pluginRoot, "agent-profiles", "work", "massa-ai-investigator.md"), "---\nmodel: other\n---\n");
+    writeText(path.join(pluginRoot, "agent-profiles", "work", "code-reviewer.md"), "---\nmodel: other\n---\n");
     const line = buildSessionStartDoctorLine(pluginRoot, ENV());
     expect(line).toContain("glm-5.3-flash");
+  });
+});
+
+describe("drift sentinel names a shipped agent (NAM AC-8)", () => {
+  test("the agent file the hook reads exists in the generated Claude bundle and every variant", () => {
+    const pluginDir = path.resolve(import.meta.dir, "..");
+    const source = fs.readFileSync(path.join(pluginDir, "hooks", "massa-ai-hook.ts"), "utf8");
+    const sentinels = [...source.matchAll(/path\.join\(pluginRoot, "agents", "([^"]+)"\)/g)].map((m) => m[1]!);
+    expect(sentinels).toEqual(["code-reviewer.md"]);
+    expect(fs.existsSync(path.join(pluginDir, "agents", sentinels[0]!))).toBe(true);
+    for (const profile of fs.readdirSync(path.join(pluginDir, "agent-profiles"))) {
+      expect(fs.existsSync(path.join(pluginDir, "agent-profiles", profile, sentinels[0]!))).toBe(true);
+    }
   });
 });

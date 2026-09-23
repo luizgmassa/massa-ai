@@ -34,12 +34,12 @@ every property).
 |---|---|---|
 | `artifactExtension` | `"md" \| "toml"` | The file extension the host's own subagent-definition format uses. Read the host's official subagent documentation (Claude, Cursor, and OpenCode all use Markdown-with-frontmatter; Codex uses TOML). Mechanically consumed by `generate-subagent-artifacts.ts`'s `emitAll`/`diffHost` via `capabilitiesFor(host).artifactExtension`. |
 | `agentIdentity` | `"frontmatter-name" \| "filename"` | Whether the host reads the agent's display name from a `name`-shaped frontmatter field, or infers it from the file's own name. Determine by reading the host's subagent schema documentation; if it lists no `name` key, assume `"filename"` and confirm empirically (a name-bearing file and a name-less file with different filenames producing the same displayed name is the tell). Documentation-bearing today — not yet wired into a generator, since only OpenCode currently omits `name`. |
-| `ownershipMarker` | `"frontmatter" \| "body" \| "filename"` | Where the "this file is massa-ai-generated" signal lives, so the host's `agents uninstall` path can remove only owned files. Determine by reading the corresponding `install.sh`'s uninstall block for an existing host as a template, or — for a genuinely new host — by choosing the mechanism that survives `forwardsUnknownFrontmatter` (see below): if the host forwards unrecognized frontmatter keys to a model provider, the marker MUST NOT live in frontmatter (use `"body"`); if the host has no per-file name/marker mechanism at all, the marker is effectively the `massa-ai-` filename prefix (use `"filename"`, matching Claude and Cursor's actual measured behavior — see the SPEC_DEVIATION note in `host-capabilities.ts`'s module docblock for why this is a 3-value field, not the 2-value one first proposed in design.md). |
+| `ownershipMarker` | `"frontmatter" \| "body"` | Where the "this file is massa-ai-generated" signal lives, so the host's installer and uninstaller touch only owned files. Claude, Cursor, and OpenCode carry `<!-- massa-ai-owned: true -->` as the first body line; Codex carries a top-of-file `# massa-ai-owned` TOML comment (`"frontmatter"`). If the host forwards unrecognized frontmatter keys to a model provider, the marker MUST NOT live in frontmatter (use `"body"`). |
 | `forwardsUnknownFrontmatter` | `boolean` | Whether the host passes frontmatter keys it does not recognize through to the model provider as model options (a real, measured OpenCode behavior: `https://opencode.ai/docs/agents/`). Read the host's plugin/subagent documentation for this exact behavior before assuming `false` — assuming `false` incorrectly is how a stray marker key becomes a live, user-visible model option. |
 | `hookBinaryDelivery` | `"source" \| "real-copy" \| "none"` | How the shared hook binary (`apps/claude-plugin/hooks/massa-ai-hook.ts`, the canonical source) reaches this host's plugin bundle. `"source"` only applies to claude-plugin itself. `"real-copy"` means `generate-skill-artifacts.ts` must chmod+copy a real file (never a symlink: `npm pack` silently drops symlink entries — verified empirically when Codex/Cursor's `hooks/massa-ai-hook` were symlinks and neither the link nor its target directory reached the published tarball). `"none"` means the host has no shared hook binary at all (OpenCode's plugin entry is `src/index.ts`, in-process). Mechanically consumed via `hookBinaryHosts()` in `generate-skill-artifacts.ts`. |
-| `extraManagedRoots` | `readonly string[]` | Directories beyond `skills/{massa-ai,persona-router,agents}` that this host's skill bundle manages, relative to the plugin root (OpenCode: `["lib"]`, for its vendored `opencode-config.cjs` copy). Determine from what the new host's plugin package actually needs vendored at install time; empty for a host with no extra vendored assets. Mechanically consumed via `managedRootsFor()` in `generate-skill-artifacts.ts`. |
+| `extraManagedRoots` | `readonly string[]` | Directories beyond `skills/{massa-ai,profile,bootstrap,agents}` that this host's skill bundle manages, relative to the plugin root (OpenCode: `["lib", "command"]`, for its vendored `opencode-config.cjs` copy and its generated workflow commands). Determine from what the new host's plugin package actually needs vendored at install time; empty for a host with no extra vendored assets. Mechanically consumed via `managedRootsFor()` in `generate-skill-artifacts.ts`. |
 | `sessionStartStdoutDelivered` | `boolean \| null` | Whether a `SessionStart`-equivalent lifecycle hook's stdout is actually injected into the model's context on this host. **This is the first quirk class** — see below. `null` means unverified: don't guess here, and don't leave it `null` if this repo starts relying on the behavior for that host. |
-| `handoffInjectionPoint` | `"session-start" \| "user-prompt-submit" \| null` | Which lifecycle hook actually carries the persona-router / `AGENTS.md` startup contract into the model's context for this host. **This is the second quirk class** — see below. `null` means the contract is delivered through a managed instruction file installed once (Claude, OpenCode today), not through any session-lifecycle hook. |
+| `handoffInjectionPoint` | `"session-start" \| "user-prompt-submit" \| null` | Which lifecycle hook actually carries the `AGENTS.md` / `MASSA-AI.md` startup contract into the model's context for this host. **This is the second quirk class** — see below. `null` means the contract is delivered through a managed instruction file installed once (Claude, OpenCode today), not through any session-lifecycle hook. |
 
 ## The two quirk classes (from the ai-memory evidence)
 
@@ -64,9 +64,9 @@ hosts, and a new host must be measured, not assumed:
    delivery path at all, and needs a non-hook mechanism instead (Grok
    uses a native `--rules` flag; this repo's own Claude/OpenCode use a
    managed instruction file installed once, for the analogous reason —
-   see `skills/massa-ai/personas/README.md`'s "Automatic Routing"
-   section, cited above as the source for `handoffInjectionPoint`'s
-   real per-host values).
+   see `scripts/install-skills.sh`'s "Bootstrap contract delivery"
+   section, cited per host beside each `handoffInjectionPoint` value in
+   `scripts/lib/host-capabilities.ts`).
 
 A new host's `sessionStartStdoutDelivered` and `handoffInjectionPoint`
 values must be set from an actual verification against that host, not
@@ -133,7 +133,7 @@ and `bun run test:scripts` must stay green.
 - `.specs/features/cross-pollination-ports/design.md` component C5 — the
   original design for `HostCapabilities` and this document.
 - `scripts/lib/host-capabilities.ts` — the capability table itself; read
-  its module docblock for the `ownershipMarker` SPEC_DEVIATION and every
+  its module docblock for the `ownershipMarker` markers and every
   per-host value's inline citation.
 - `CLAUDE.md` §Agent-harness surface — the broader generator/installer
   architecture this document's surfaces sit inside.

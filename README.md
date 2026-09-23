@@ -105,7 +105,7 @@ the repo's `dist/index.js` (re-run the installer after `bun run build` to
 refresh it — a symlink here used to go dead whenever the gitignored `dist/`
 vanished, and OpenCode skips an unresolvable local plugin silently), adds
 `"./plugins/massa-ai/index.js"` to the `plugin` array of `opencode.json`, and
-symlinks the 18 specialist agents into `~/.config/opencode/agents/`. The plugin
+symlinks the 7 specialist agents into `~/.config/opencode/agents/`. The plugin
 is hooks-only (AD-017: plugins deliver, MCP serves tools, hooks observe) — it
 registers zero in-process tools, so the installer delegates MCP registration to
 `scripts/install-agents.sh --agent opencode`, giving you all 59 MCP tools
@@ -187,12 +187,12 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 
 | Tool | Install command | Events | Bundles | Trust step? |
 |------|----------------|--------|---------|-------------|
-| **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + 18 subagent specialists + hooks into `settings.json` | No |
-| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 18 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + MCP into `~/.codex/config.toml` | Yes — run `/hooks` in Codex |
-| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 18 subagent specialists | No |
-| **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | MCP into `opencode.json`/`opencode.jsonc` (59 tools) + lifecycle handlers + 18 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
+| **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + 7 subagent specialists + hooks into `settings.json` | No |
+| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 7 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + MCP into `~/.codex/config.toml` | Yes — run `/hooks` in Codex |
+| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 7 subagent specialists | No |
+| **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | MCP into `opencode.json`/`opencode.jsonc` (59 tools) + lifecycle handlers + 7 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
-Each plugin also ships generated slash commands — one per massa-ai workflow (40 today)
+Each plugin also ships generated slash commands — one per massa-ai workflow (36 today)
 (`/massa-ai:debug`, `$debug`, etc., naming varies by host) — alongside the 6
 quick commands in the table above; see
 [Workflow Commands](./FEATURES.md#workflow-commands-generated-slash-commands)
@@ -297,13 +297,14 @@ plugin does not remove the MCP entry — plugin lifecycle and MCP tool-surface
 lifecycle are independent; remove the entry with
 `bash scripts/install-agents.sh --agent opencode --uninstall` if wanted.
 
-**18 subagent specialists:** all four plugins ship the 18 massa-ai
-sub-agent specialists (investigator, planner, builder, reviewer,
-context-curator, verification-agent, requirements-analyst,
-architecture-specialist, test-engineer, documentation-agent,
-audit-specialist, mobile-specialist, designer, plan-critic, furps-analyst,
-navigator, meta-judge, judge) as host-native subagent definitions, registered
-under the prefixed names `massa-ai-<role>`.
+**7 subagent specialists:** all four plugins ship the 7 massa-ai
+sub-agent specialists (builder, code-explorer, code-reviewer, designer,
+judge, product-manager, test-engineer) as host-native subagent definitions,
+registered under their bare names (`builder`, not `massa-ai-builder`; on the
+Claude plugin route the host namespaces them as `massa-ai:<name>`). Installers
+tell their own agent files apart by a `massa-ai-owned` content marker, never by
+name: a same-named agent you own is skipped with a warning and left untouched,
+and the pre-consolidation `massa-ai-<name>` files are pruned on upgrade.
 
 Model + effort are pinned per host, resolved at build time from
 `skills/model-profiles.json` — the only hand-authored place that names a model
@@ -318,7 +319,7 @@ effort key at all. Seven profiles ship (`balanced`, `cheap`, `heavy`, `work`,
 `home`, plus OpenCode-only `open_models` and `local_models`) and an installed
 machine switches between them at runtime — see
 [FEATURES.md → Model Profile Switching](./FEATURES.md#model-profile-switching).
-See [FEATURES.md → Subagent Skills (18 Specialists)](./FEATURES.md#subagent-skills-18-specialists)
+See [FEATURES.md → Subagent Skills (7 Specialists)](./FEATURES.md#subagent-skills-7-specialists)
 for the full per-agent model/effort/permission tables, file locations, and
 the generator + parity-test contract.
 
@@ -339,11 +340,10 @@ The repo ships a set of repo-local skills plus a unified installer that copies t
 
 | Skill | Location | Purpose |
 |-------|----------|---------|
-| `massa-ai` | `skills/massa-ai/` | Workflow router (40 workflows: spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
-| `persona-router` | `skills/persona-router/` | Automatic persona selection from catalog (`skills/massa-ai/personas/`) |
+| `massa-ai` | `skills/massa-ai/` | Workflow router (36 workflows: spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
 | `profile` | `skills/profile/` | Switch the installed agents to a registry model profile, or report the active one |
-| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the nine startup-contract rules delivered by `MASSA-AI.md` |
-| `agents/<n>` | `skills/agents/` | The 18 sub-agent specialist charters |
+| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the eight startup-contract rules delivered by `MASSA-AI.md` |
+| `agents/<n>` | `skills/agents/` | The 7 sub-agent specialist charters |
 
 ### Unified skills installer
 
@@ -377,9 +377,9 @@ load it through its own real mechanism:
 | Cursor | `~/.cursor/skills/<name>` | `~/.cursor/MASSA-AI.md` | pointer block in `AGENTS.md` |
 | OpenCode | `~/.config/opencode/skills/<name>` | `~/.config/opencode/MASSA-AI.md` | absolute path in the config's `instructions` array |
 
-Nine contract rules ship (`caveman`, `massa-ai-router`, `persona-router`,
-`dedupe-guardrails`, `plan-challenge`, `conversation-feedback`,
-`indexing-hygiene`, `english-code`, `code-comments`), each individually
+Eight contract rules ship (`caveman`, `massa-ai-router`, `dedupe-guardrails`,
+`plan-challenge`, `conversation-feedback`, `indexing-hygiene`, `english-code`,
+`code-comments`), each individually
 toggleable at runtime — `massa-ai-config bootstrap list|enable|disable`.
 
 **State:** `~/.config/massa-ai/install-state.json` (v2 format; v1 auto-migrates).
@@ -469,11 +469,10 @@ Migrated documentation for massa-ai workflows lives in `docs/`:
 | Guide | File |
 |-------|------|
 | Spec-Driven | `docs/massa-ai-spec-driven.md` |
-| TDD | `docs/massa-ai-tdd.md` |
-| RFC | `docs/massa-ai-rfc.md` |
+| TDD | `docs/massa-ai-create-tdd.md` |
+| RFC | `docs/massa-ai-create-rfc.md` |
 | Commit | `docs/massa-ai-commit.md` |
-| Ticket | `docs/massa-ai-ticket.md` |
-| Maestro | `docs/massa-ai-maestro.md` |
+| Ticket | `docs/massa-ai-create-ticket.md` |
 | Mobile Figma | `docs/massa-ai-mobile-figma.md` |
 | Context Slices | `docs/context-slices.md` |
 | Cheatsheet (commands, flags, tools, skills, agents) | `docs/CHEATSHEET.md` |
@@ -1018,7 +1017,7 @@ massa-ai-config set embedding.dimensions 1024
 massa-ai-config recover my-project --path /new/path   # re-associate a moved index
 massa-ai-config profile list                      # shipped profiles + per-host active one
 massa-ai-config profile set work --dry-run
-massa-ai-config bootstrap list                    # the nine startup-contract rules
+massa-ai-config bootstrap list                    # the eight startup-contract rules
 massa-ai-config bootstrap disable caveman
 ```
 

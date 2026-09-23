@@ -12,20 +12,12 @@
  * one array-first, canonical enumeration (design.md C5) — never duplicated
  * here.
  *
- * SPEC_DEVIATION (accepted, T9): design.md's `HostCapabilities.ownershipMarker`
- * is typed `"frontmatter" | "body"`. Measured reality (apps/claude-plugin/
- * install.sh:489-494, apps/cursor-plugin/install.sh:433-436) is that Claude
- * and Cursor scope ownership by the `massa-ai-` FILENAME prefix — neither a
- * frontmatter field nor a body marker is written or read for that purpose.
- * Documenting them as "frontmatter" would be inaccurate at exactly the kind
- * of doc-vs-reality gap this feature (XP-08/09) exists to stop introducing.
- * The type below adds `"filename"` as a third value; Codex's top-of-file
- * `# massa-ai-owned` TOML comment (apps/codex-plugin/install.sh:483) is
- * classed `"frontmatter"` (it plays the frontmatter role structurally — a
- * fixed top-of-file position read before any other field) to preserve
- * design's intended two-way contrast against OpenCode's `"body"`, which is
- * forced there by `forwardsUnknownFrontmatter` (see below). No production
- * code depends on this field's exact enum; only docs and the fixture test do.
+ * `ownershipMarker`: Claude, Cursor, and OpenCode carry the generated
+ * `<!-- massa-ai-owned: true -->` line (`OWNED_MARKER_MD`) as the first body
+ * line; Codex carries a top-of-file `# massa-ai-owned` TOML comment, classed
+ * `"frontmatter"` (a fixed top-of-file position read before any other field).
+ * Installers and the profile-switch engine identify owned agent files by
+ * these markers, not by filename.
  */
 
 import { HOSTS, type Host } from "./model-profiles.ts";
@@ -41,9 +33,8 @@ export interface HostCapabilities {
    * Where the "this file is massa-ai-generated" ownership signal lives, so
    * `agents uninstall` (or the equivalent per-host script) can scope itself
    * to owned files without touching a user's own agents.
-   * See the SPEC_DEVIATION note above for `"filename"`.
    */
-  ownershipMarker: "frontmatter" | "body" | "filename";
+  ownershipMarker: "frontmatter" | "body";
   /**
    * WHY `ownershipMarker` is forced to `"body"` for a host: true means the
    * host forwards unrecognized frontmatter keys to the model provider as
@@ -59,7 +50,7 @@ export interface HostCapabilities {
    * handlers).
    */
   hookBinaryDelivery: "source" | "real-copy" | "none";
-  /** Extra directories (beyond skills/{massa-ai,persona-router,agents}) this
+  /** Extra directories (beyond skills/{massa-ai,profile,bootstrap,agents}) this
    *  host's skill bundle manages, relative to the plugin root. */
   extraManagedRoots: readonly string[];
   /**
@@ -72,10 +63,9 @@ export interface HostCapabilities {
    */
   sessionStartStdoutDelivered: boolean | null;
   /**
-   * Which hook event actually carries the persona-router / AGENTS.md startup
-   * contract into the model's context for this host, per
-   * skills/massa-ai/personas/README.md's "Automatic Routing" section. `null`
-   * means neither — the contract is delivered through a managed instruction
+   * Which hook event actually carries the AGENTS.md / MASSA-AI.md startup
+   * contract into the model's context for this host (per-host citations
+   * below). `null` means neither — the contract is delivered through a managed instruction
    * file installed once, not through a session-lifecycle hook at all.
    */
   handoffInjectionPoint: "session-start" | "user-prompt-submit" | null;
@@ -112,8 +102,8 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     artifactExtension: "md",
     // https://code.claude.com/docs/en/sub-agents.md — documented `name:` field.
     agentIdentity: "frontmatter-name",
-    // apps/claude-plugin/install.sh:489-494 — uninstall globs `agents/massa-ai-*.md`.
-    ownershipMarker: "filename",
+    // OWNED_MARKER_MD as the first body line (emitClaude).
+    ownershipMarker: "body",
     forwardsUnknownFrontmatter: false,
     // apps/claude-plugin/hooks/massa-ai-hook.ts IS the canonical source file.
     hookBinaryDelivery: "source",
@@ -122,8 +112,9 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // a managed instruction file, not a SessionStart hook (see
     // handoffInjectionPoint), so the behavior was never forced to be measured.
     sessionStartStdoutDelivered: null,
-    // skills/massa-ai/personas/README.md "Automatic Routing": "Claude Code and
-    // OpenCode receive it through their managed instruction files."
+    // scripts/install-skills.sh "Bootstrap contract delivery": Claude loads
+    // ~/.claude/MASSA-AI.md through an @MASSA-AI.md managed block in
+    // ~/.claude/CLAUDE.md — a managed instruction file, not a hook.
     handoffInjectionPoint: null,
     // Claude docs, `tools` field: "Inherits every tool available to subagents
     // if omitted." Allowlist example: "The subagent can't edit files, write
@@ -143,9 +134,10 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // HOOK_BINARY_HOSTS in generate-skill-artifacts.ts: real chmod'd copy.
     hookBinaryDelivery: "real-copy",
     extraManagedRoots: [],
-    // skills/massa-ai/personas/README.md: "Codex and Cursor receive this
-    // contract through SessionStart context" — proven working, unlike the
-    // Kimi/Grok discard case the ai-memory evidence documents.
+    // docs/adding-a-host.md "The two quirk classes": "Codex and Cursor
+    // both resolve to "session-start" today, but that is a measured fact
+    // about those two hosts" — proven working, unlike the Kimi/Grok discard
+    // case the ai-memory evidence documents.
     sessionStartStdoutDelivered: true,
     handoffInjectionPoint: "session-start",
     // Codex docs (per spec.md § Evidence): "session settings, such as
@@ -158,13 +150,13 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     artifactExtension: "md",
     // https://cursor.com/docs/subagents.md — documented `name:` field.
     agentIdentity: "frontmatter-name",
-    // apps/cursor-plugin/install.sh:433-436 — agents copied/removed by the
-    // massa-ai- filename prefix (CRS-04), same mechanism as Claude.
-    ownershipMarker: "filename",
+    // OWNED_MARKER_MD as the first body line (emitCursor); Cursor's
+    // frontmatter schema forbids an extra marker key.
+    ownershipMarker: "body",
     forwardsUnknownFrontmatter: false,
     hookBinaryDelivery: "real-copy",
     extraManagedRoots: [],
-    // Same README citation as codex.
+    // Same docs/adding-a-host.md citation as codex.
     sessionStartStdoutDelivered: true,
     handoffInjectionPoint: "session-start",
     // Cursor docs, "Can I use MCP tools in subagents?": "Yes. Subagents
@@ -178,7 +170,7 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // emitOpenCode's own docblock: "The markdown file name becomes the agent
     // name" — OpenCode has no `name` frontmatter key at all.
     agentIdentity: "filename",
-    // The marker MOVES to the first body line (OPENCODE_OWNED_MARKER) because
+    // The marker lives on the first body line (OWNED_MARKER_MD) because
     // frontmatter forwarding would leak it as a bogus provider model option.
     ownershipMarker: "body",
     // https://opencode.ai/docs/agents/: "Any other options you specify in
@@ -194,7 +186,9 @@ const RAW_CAPABILITIES: Record<Host, HostCapabilities> = {
     // the marker-scoped mechanism the three shared-directory hosts need.
     extraManagedRoots: ["lib", "command"],
     sessionStartStdoutDelivered: null,
-    // Same README citation as claude.
+    // scripts/install-skills.sh "Bootstrap contract delivery": OpenCode loads
+    // MASSA-AI.md through the absolute path in its config's `instructions`
+    // array — a managed instruction file, not a hook.
     handoffInjectionPoint: null,
     // OpenCode docs (per spec.md § Evidence): `tools` is deprecated in favour
     // of the `permission` map; patterns are "matched as wildcard patterns

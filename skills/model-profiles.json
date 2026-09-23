@@ -72,11 +72,6 @@
           "claude": { "model": "sonnet", "effort": "high" },
           "codex": { "model": "gpt-5.6-terra", "effort": "high" },
           "opencode": { "model": "opencode-go/glm-5.2", "effort": "max" }
-        },
-        "documentation-agent": {
-          "claude": { "model": "haiku", "effort": "high" },
-          "codex": { "model": "gpt-5.4-mini", "effort": "high" },
-          "opencode": { "model": "opencode-go/deepseek-v4-pro", "effort": "max" }
         }
       }
     },
@@ -104,11 +99,6 @@
           "claude": { "model": "haiku", "effort": "medium" },
           "codex": { "model": "gpt-5.4-mini", "effort": "medium" },
           "opencode": { "model": "opencode-go/glm-5.1", "effort": "high" }
-        },
-        "documentation-agent": {
-          "claude": { "model": "haiku", "effort": "low" },
-          "codex": { "model": "gpt-5.4-mini", "effort": "low" },
-          "opencode": { "model": "opencode-go/deepseek-v4-flash", "effort": "high" }
         }
       }
     },
@@ -133,11 +123,6 @@
         "test-engineer": {
           "claude": { "model": "opus", "effort": "high" },
           "codex": { "model": "gpt-5.6-sol", "effort": "high" }
-        },
-        "documentation-agent": {
-          "claude": { "model": "sonnet", "effort": "high" },
-          "codex": { "model": "gpt-5.6-terra", "effort": "high" },
-          "opencode": { "model": "opencode-go/glm-5.2", "effort": "max" }
         }
       }
     },
@@ -151,11 +136,6 @@
         "opencode": { "model": "zai-coding-plan/glm-5.2", "effort": "max" }
       },
       "agents": {
-        "documentation-agent": {
-          "claude": { "model": "sonnet", "effort": "high" },
-          "codex": { "model": "gpt-5.6-terra", "effort": "high" },
-          "opencode": { "model": "zai-coding-plan/glm-5.1", "effort": "max" }
-        }
       }
     },
 
@@ -182,11 +162,6 @@
           "claude": { "model": "sonnet", "effort": "high" },
           "codex": { "model": "gpt-5.6-terra", "effort": "high" },
           "opencode": { "model": "opencode-go/glm-5.2", "effort": "max" }
-        },
-        "documentation-agent": {
-          "claude": { "model": "haiku", "effort": "high" },
-          "codex": { "model": "gpt-5.4-mini", "effort": "high" },
-          "opencode": { "model": "opencode-go/deepseek-v4-pro", "effort": "max" }
         }
       }
     },
@@ -199,8 +174,7 @@
       "agents": {
         "builder": { "opencode": { "model": "opencode-go/glm-5.2", "effort": "max" } },
         "designer": { "opencode": { "model": "opencode-go/glm-5.2", "effort": "max" } },
-        "test-engineer": { "opencode": { "model": "opencode-go/glm-5.2", "effort": "max" } },
-        "documentation-agent": { "opencode": { "model": "opencode-go/deepseek-v4-pro", "effort": "max" } }
+        "test-engineer": { "opencode": { "model": "opencode-go/glm-5.2", "effort": "max" } }
       }
     },
 
@@ -212,8 +186,7 @@
       "agents": {
         "builder": { "opencode": { "model": "ollama-cloud/gpt-oss:120b", "effort": "max" } },
         "designer": { "opencode": { "model": "ollama-cloud/gpt-oss:120b", "effort": "max" } },
-        "test-engineer": { "opencode": { "model": "ollama-cloud/gpt-oss:120b", "effort": "max" } },
-        "documentation-agent": { "opencode": { "model": "ollama-cloud/gpt-oss:20b", "effort": "max" } }
+        "test-engineer": { "opencode": { "model": "ollama-cloud/gpt-oss:120b", "effort": "max" } }
       }
     }
   }

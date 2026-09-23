@@ -32,7 +32,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
    - `references/audit-scope.md` and `references/codebase-investigation.md` for freshness and current source.
    - `references/verification-ladder.md` before edits.
    - `references/context-firewall.md` before large design/runtime artifacts.
-   - `references/agent-orchestration.md` for the tier-gated builder/verification-agent dispatch in the fix loop below.
+   - `references/agent-orchestration.md` for the designer/builder dispatches and the tier-gated `code-reviewer` `verify` dispatch in the fix loop below.
    - `references/discrimination-sensor.md` before closing any finding under the Mandatory Verification Fix Gate — the mobile-Figma token/value instantiation lives in `references/mobile-figma-matcher/core.md`'s Discrimination Sensor for Visual Parity section.
    - `references/knowledge-verification-chain.md` when a selected finding's fix direction depends on platform-API or external-library technique rather than the Figma-defined value.
    - `references/brownfield-mapping.md` (Minimum Bar only — the gate-command packet, `TESTING.md`-equivalent) when recall returns no hit for the target surface/module and no gate command is derivable from the report's evidence, for Standard+ findings; the report's Verification/Test Fidelity Checklist already carries the risk surface, so `CONCERNS.md` is satisfied-by-citation from that checklist rather than derived fresh.
@@ -58,36 +58,35 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
    - Keep XML/Compose, UIKit/SwiftUI, and KMP/native interoperability explicit. Do not duplicate one visual rule across layers when an established shared source owns it.
    - Do not weaken screenshot tests, previews, fixtures, assertions, test tags, resource IDs, content descriptions, or Maestro selectors to hide a mismatch.
    - Modify tracked Maestro flows only when the selected finding explicitly identifies the flow as incorrect or missing and the user-approved scope includes that change.
-9. Dispatch per `references/agent-orchestration.md`; the verification-agent block below is tier-gated mandatory, not merely discretionary — carved out of ordinary delegation gating by that reference's Independent Verification Exception:
+9. Dispatch per `references/agent-orchestration.md`; the `code-reviewer` `verify` block below is tier-gated mandatory, not merely discretionary — carved out of ordinary delegation gating by that reference's Independent Verification Exception:
 
-**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
+**Screen work — unconditional in this workflow:** every task here fixes a user-facing screen, so the `designer` dispatch below always runs; it is not gated on a screen-work condition (Screen Implementation Exception in `references/agent-orchestration.md`). `designer` implements every UI-layer `MFM-*` fix; `builder` is dispatched only for an `MFM-*` finding whose fix needs non-UI-layer changes (navigation, data, resource or build wiring), with a write set disjoint from the designer's.
 
-> **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
+> **Dispatch: `designer`** (role: `designer`, mode: `implement`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
-> - trigger: a selected `MFM-*` finding spans a disjoint surface or shared-root slice, or an explicit subagent request
-> - scope: one `MFM-*` finding, or a coherent surface group sharing one KMP root cause, with a disjoint write set
-> - permissions: write (disjoint write set, per-surface or per-module ownership)
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> - trigger: a selected `MFM-*` finding whose fix needs non-UI-layer changes (navigation, data, resource or build wiring) — never for a UI-layer fix, which belongs to `designer`
+> - scope: the non-UI-layer part of one `MFM-*` finding, or of a coherent surface group sharing one KMP root cause, with a write set disjoint from the designer's
+> - permissions: write (disjoint write set, non-UI-layer files only)
 > - inputs: the finding's Surface ID, Figma value, resolved token/resource/asset chain, current implementation value, and simplest fix direction
 > - sensors: the remediation matrix's assigned runtime sensor and optional Maestro packet for the surface
 > - output: implementation summary, changed files, commands run, per-surface render evidence
 > - firewall: raw diffs and screenshots summarized
 > - memory: suggest-only; main agent persists reusable token/mapping patterns
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven size or high/critical severity per the Independent Verification Mandate in `references/verification-ladder.md`; a Quick-tier finding runs the fallback fresh-eyes self-check below instead
 > - scope: the fixed `MFM-*` finding's surface, resolved token/value, comparison-matrix row, and closure claim
 > - inputs: the finding, the applied fix, the comparison-matrix row, the render sensor used, and validation assets

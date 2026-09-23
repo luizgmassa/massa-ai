@@ -17,8 +17,8 @@
  *   `present` — a literal substring of the workflow as it stands. Asserted.
  *               Rewording the phrase in the workflow fails here, which is
  *               exactly what the original comment asked for and never got.
- *   `notes`   — a paraphrase, a structural description ("massa-ai-
- *               verification-agent dispatch block"), or a claim of ABSENCE
+ *   `notes`   — a paraphrase, a structural description ("code-reviewer
+ *               verify-mode dispatch block"), or a claim of ABSENCE
  *               ("no Isolation Gate"). Carried verbatim for the next editor,
  *               deliberately not asserted: a substring check cannot express
  *               any of them, and pretending otherwise would either go red on
@@ -58,8 +58,8 @@ async function listWorkflows(): Promise<string[]> {
 describe("validator anchors: the fixture describes real workflows", () => {
   test("the fixture is not empty and covers the files that carried anchors", () => {
     // Guard the guard: an empty fixture makes every assertion below vacuous.
-    expect(ENTRIES.length).toBe(16);
-    expect(ENTRIES.flatMap(([, e]) => e.present).length).toBeGreaterThanOrEqual(90);
+    expect(ENTRIES.length).toBe(14);
+    expect(ENTRIES.flatMap(([, e]) => e.present).length).toBeGreaterThanOrEqual(86);
   });
 
   test("every keyed path exists on disk", async () => {

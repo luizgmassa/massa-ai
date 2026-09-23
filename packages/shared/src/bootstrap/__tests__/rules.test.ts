@@ -2,7 +2,7 @@
  * Bootstrap rule registry unit tests (T4 / TASK-004, BST-08, BST-09).
  *
  * Every assertion here is deliberately set/id-shaped rather than
- * count-shaped: a count assertion (`expect(ids).toHaveLength(9)`) passes
+ * count-shaped: a count assertion (`expect(ids).toHaveLength(8)`) passes
  * unchanged if one id is swapped for another, which is exactly the class of
  * regression this registry exists to prevent (see the task's "Done when":
  * "asserted as a set, so adding or removing one reddens").
@@ -21,12 +21,12 @@ import {
   BootstrapRuleValidationError,
   assertKnownRuleId,
   validateRuleIds,
+  RETIRED_RULE_IDS,
 } from "../rules";
 
 const EXPECTED_IDS: readonly string[] = [
   "caveman",
   "massa-ai-router",
-  "persona-router",
   "dedupe-guardrails",
   "plan-challenge",
   "conversation-feedback",
@@ -36,7 +36,7 @@ const EXPECTED_IDS: readonly string[] = [
 ];
 
 describe("BOOTSTRAP_RULE_IDS — id set", () => {
-  test("is exactly the nine spec ids, as a set", () => {
+  test("is exactly the eight spec ids, as a set", () => {
     expect(new Set(BOOTSTRAP_RULE_IDS)).toEqual(new Set(EXPECTED_IDS));
   });
 
@@ -52,6 +52,14 @@ describe("BOOTSTRAP_RULE_IDS — id set", () => {
   test("renders in the fixed source order (BST-10 AC-7 depends on this)", () => {
     expect(BOOTSTRAP_RULE_IDS).toEqual(EXPECTED_IDS as readonly BootstrapRuleId[]);
     expect(BOOTSTRAP_RULES.map((r) => r.id)).toEqual(EXPECTED_IDS as readonly BootstrapRuleId[]);
+  });
+});
+
+describe("retired rule ids (PER AC-2)", () => {
+  test("persona-router is retired and is not a registry id", () => {
+    expect([...RETIRED_RULE_IDS]).toEqual(["persona-router"]);
+    expect(isBootstrapRuleId("persona-router")).toBe(false);
+    expect(() => assertKnownRuleId("persona-router")).toThrow(BootstrapRuleError);
   });
 });
 
@@ -77,13 +85,12 @@ describe("isBootstrapRuleId", () => {
 describe("defaults — every rule enabled except code-comments (BST-08 AC-2)", () => {
   const defaults = bootstrapRuleDefaults();
 
-  // Asserted per id, not by count: this table would still be 9 entries long
+  // Asserted per id, not by count: this table would still be 8 entries long
   // if `code-comments` accidentally defaulted true and some other rule
   // defaulted false instead.
   const expectedDefaults: Record<string, boolean> = {
     caveman: true,
     "massa-ai-router": true,
-    "persona-router": true,
     "dedupe-guardrails": true,
     "plan-challenge": true,
     "conversation-feedback": true,
@@ -121,13 +128,20 @@ describe("getBootstrapRuleDefinition", () => {
 });
 
 describe("UnknownRuleError / assertKnownRuleId (BST-09 AC-8)", () => {
-  test("UnknownRuleError names the bad id and lists all nine valid ids", () => {
+  test("UnknownRuleError names the bad id and lists all eight valid ids", () => {
     const err = UnknownRuleError("bogus-rule");
     expect(err.name).toBe("UnknownRuleError");
     expect(err.message).toContain("bogus-rule");
     for (const id of EXPECTED_IDS) {
       expect(err.message).toContain(id);
     }
+  });
+
+  test("UnknownRuleError names a retired id as retired, not unknown", () => {
+    const err = UnknownRuleError("persona-router");
+    expect(err.name).toBe("UnknownRuleError");
+    expect(err.message).toContain('bootstrap rule "persona-router" was retired');
+    expect(err.message).not.toContain("unknown bootstrap rule");
   });
 
   test("UnknownRuleError is a BootstrapRuleError", () => {
@@ -145,7 +159,7 @@ describe("UnknownRuleError / assertKnownRuleId (BST-09 AC-8)", () => {
     expect((caught as Error).name).toBe("UnknownRuleError");
   });
 
-  test("assertKnownRuleId does not throw for any of the nine real ids", () => {
+  test("assertKnownRuleId does not throw for any of the eight real ids", () => {
     for (const id of BOOTSTRAP_RULE_IDS) {
       expect(() => assertKnownRuleId(id)).not.toThrow();
     }
@@ -156,7 +170,7 @@ describe("both enable and disable accept every id — no protected id (BST-09 AC
   // There is no separate "enable" vs "disable" gate in this registry module;
   // both operations are expected to route through the same
   // assertKnownRuleId/isBootstrapRuleId checks, so proving those checks are
-  // symmetric across all nine ids is what BST-09 AC-3 requires at this layer.
+  // symmetric across all eight ids is what BST-09 AC-3 requires at this layer.
   for (const id of BOOTSTRAP_RULE_IDS) {
     test(`"${id}" is accepted identically regardless of intended direction`, () => {
       expect(isBootstrapRuleId(id)).toBe(true);

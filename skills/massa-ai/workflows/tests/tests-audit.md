@@ -41,9 +41,9 @@ Five gates, five distinct error classes. A green gate elsewhere never substitute
    - Apply the Memory Freshness Gate from `references/audit-scope.md`; recalled exceptions are leads, not proof.
 4. Establish the investigation scope: select the scope type and build the shared scope packet per `references/audit-scope.md`, which owns the supported scope types, the ask-when-vague rule, and the packet fields. Carry the packet into the report.
 5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Tests row of Per-Lens Scope Deltas).
-6. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
+6. Investigation pass. Dispatch `test-engineer` (`audit` mode) per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
 
-> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `test-engineer`** (role: `test-engineer`, mode: `audit`) — charter `skills/agents/test-engineer/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
 > - scope: the tests audit target — test files, fixtures, harnesses, coverage
 > - permissions: read-only

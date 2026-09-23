@@ -154,7 +154,7 @@ massa-ai-config <command> [options]
 | `set <key> <val>` | | Set one value, e.g. `set embedding.dimensions 1024` |
 | `use <provider>` | `--api-key <key>`, `--model <name>`, `--base-url <url>` | Switch embedding provider (`ollama`, `lmstudio`, `mistral`, `openai`, `google`, `cohere`) |
 | `recover <projectId>` | `--path <newPath>` | Re-associate an index with a moved directory (`mcp-client` bin only) |
-| `agents install\|uninstall` | `--user`, `--project` | Write/remove the 18 agent files (`opencode-plugin` bin only) |
+| `agents install\|uninstall` | `--user`, `--project` | Write/remove the 7 agent files (`opencode-plugin` bin only) |
 | `profile list` / `profile show` | | Shipped profiles + per-host active profile |
 | `profile set <name>` | `--host <h>`, `--dry-run` | Switch installed agents to a profile |
 | `bootstrap list` / `bootstrap show` | | Every startup-contract rule: state, default, description |
@@ -223,12 +223,11 @@ Toggle blocks of the startup contract rendered into each host's `MASSA-AI.md`:
 
 ```bash
 massa-ai-config bootstrap list
-massa-ai-config bootstrap disable persona-router --dry-run
+massa-ai-config bootstrap disable caveman --dry-run
 ```
 
-Rule ids: `caveman`, `massa-ai-router`, `persona-router`, `dedupe-guardrails`,
-`plan-challenge`, `conversation-feedback`, `indexing-hygiene`, `english-code`,
-`code-comments`.
+Rule ids: `caveman`, `massa-ai-router`, `dedupe-guardrails`, `plan-challenge`,
+`conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`.
 
 The contract body lives in a per-host `MASSA-AI.md` at that host's config root
 (`~/.claude/MASSA-AI.md`, `$CODEX_HOME/MASSA-AI.md`, `~/.cursor/MASSA-AI.md`,
@@ -309,12 +308,11 @@ Repo-local skills live in `skills/`; generated per-host bundles land in
 | Skill | Purpose |
 |---|---|
 | `massa-ai` | Default memory-backed workflow router — load once per coding session |
-| `persona-router` | Select and apply a conversation persona |
 | `profile` | Switch installed agents to a model profile / report the active one |
-| `bootstrap` | Inspect or toggle the nine startup-contract rules |
-| `agents/<name>` | The 18 sub-agent charters |
+| `bootstrap` | Inspect or toggle the eight startup-contract rules |
+| `agents/<name>` | The 7 sub-agent charters |
 
-Registry and policies (Persona Router, Plan Challenge, Conversation Feedback):
+Registry and policies (Plan Challenge, Conversation Feedback):
 `skills/AGENTS.md`.
 
 Regenerate bundles after touching anything under `skills/`:
@@ -336,7 +334,6 @@ The `massa-ai` skill routes to exactly one workflow per task. Files under
 | `onboarding` | First session / missing `projectId` |
 | `feature` | New capability |
 | `debug` | Broken behavior, errors, crashes |
-| `general` | Coding work with no more specific workflow |
 | `exploration` | Read-only codebase/flow understanding |
 
 Audit/fix pairs — the `-audit` half is findings-only, the `-fix` half consumes a saved
@@ -351,7 +348,6 @@ audit report:
 | `tests-audit` / `-fix` | Coverage, regression, assertions, flakiness |
 | `bugs-audit` / `-fix` | Bug discovery |
 | `implementation-audit` / `-fix` | Multi-lens audit of a concrete implementation target |
-| `maestro-audit` / `-fix` | Maestro mobile E2E flows (plus `maestro` to author new ones) |
 | `mobile-figma-audit` / `-fix` | Android/iOS/KMP UI versus a Figma design |
 
 Documents and process:
@@ -359,14 +355,14 @@ Documents and process:
 | Workflow | Use for |
 |---|---|
 | `spec-driven` | TLC v3: Specify → Design → Tasks → Execute with independent validation |
-| `adr` / `rfc` / `tdd` | Record a decision / propose a change / technical design |
-| `discovery` / `to-prd` | Product brainstorming / turn the conversation into a PRD |
+| `create-adr` / `create-rfc` / `create-tdd` | Record a decision / propose a change / technical design |
+| `product-discovery` / `create-prd` | Product brainstorming / turn the conversation into a PRD |
 | `furps-refinement` | FURPS+ refinement of a PRD or ADR before implementation |
 | `refactor` | Behavior-preserving structural cleanup |
 | `design` | Implement mobile UI from Figma evidence |
 | `commit` | Conventional Commits with Jira branch prefixes |
 | `pr-review` | Review a GitHub PR / GitLab MR, post findings via `gh`/`glab` |
-| `ticket` | Jira Epics, issues, sub-tasks through Atlassian MCP |
+| `create-ticket` | Jira Epics, issues, sub-tasks through Atlassian MCP |
 | `the-fool` | Direct challenge, red-team, pre-mortem, evidence audit |
 | `judge-with-debate` | Multi-judge debate evaluation of a supplied artifact |
 | `skill-architect` | Design and build a new skill |
@@ -376,35 +372,32 @@ Explicitly requested workflows win; otherwise the most specific match.
 
 ---
 
-## 10. Sub-agents (18)
+## 10. Sub-agents (7)
 
 Charters in `skills/agents/<name>/SKILL.md`, shipped to all four hosts by
-`scripts/generate-subagent-artifacts.ts`.
+`scripts/generate-subagent-artifacts.ts` under their bare names (on the Claude plugin
+route dispatch `massa-ai:<name>`). A charter with several output contracts selects one
+per dispatch through the capability packet's `mode` field.
 
-| Agent | Purpose | Permission |
-|---|---|---|
-| `investigator` | Read and understand the codebase | read-only |
-| `navigator` | Navigate an indexed codebase index-first | read-only |
-| `context-curator` | Prepare the minimum high-quality Context Packet | read-only |
-| `planner` | Turn requests into implementation plans | read-only |
-| `plan-critic` | Challenge a constructed plan (Plan Challenge gate) | read-only |
-| `builder` | Implement approved plans | write |
-| `reviewer` | Review implementation quality, analyze diffs | read-only |
-| `verification-agent` | Verification Ladder logic | read-only |
-| `test-engineer` | Testing strategy | read-only (test-write when scoped) |
-| `requirements-analyst` | Analyze requirements before implementation | read-only |
-| `architecture-specialist` | Architectural guidance | read-only |
-| `audit-specialist` | Specialized audits through configurable lenses | read-only |
-| `documentation-agent` | Engineering documentation | read-only (doc-write) |
-| `furps-analyst` | One FURPS+ dimension of a PRD/ADR | read-only |
-| `mobile-specialist` | Mobile-specific expertise | read-only |
-| `designer` | Verify/implement screens against their design source | read-only (UI-layer write when scoped) |
-| `meta-judge` | Author the evaluation spec a debate panel scores against | read-only |
-| `judge` | Score an artifact against that spec with quoted evidence | read-only (report-write, own file only) |
+| Agent | Purpose | Modes | Permission |
+|---|---|---|---|
+| `builder` | Implement approved plans | — | write |
+| `code-explorer` | Understand an existing codebase, index-first | `lookup`, `trace` | read-only |
+| `code-reviewer` | Review, verify, audit, and guide existing or changed code | `review`, `verify`, `audit`, `guide` | read-only |
+| `designer` | Read and write screens from Figma, screenshots, or other design direction | `audit`, `implement` | read-only (UI-layer write when scoped) |
+| `judge` | Evaluate artifacts and challenge plans with quoted evidence | `spec-author`, `scorer`, `plan-critique` | write (own judge-N report, `scorer` only) |
+| `product-manager` | Hold requirements to a clear, complete, consistent standard | `furps`, `requirements`, `audit` | read-only |
+| `test-engineer` | Plan, audit, and fix tests | `plan`, `audit`, `fix` | read-only (test-write when scoped) |
 
-Tool gating differs per host — only Claude needed a fix. Ordinary Claude charters get
+Retired agents and where their work went: the mapping table in `skills/AGENTS.md`.
+
+Tool gating differs per host — only Claude needed a fix. Read-only Claude charters get
 `disallowedTools: Write, Edit, NotebookEdit` (a denylist that keeps MCP tools reachable);
-`navigator` is the deliberate allowlist exception so it stays index-first.
+no charter carries a `tools:` allowlist.
+
+Installers identify their own agent files by the `massa-ai-owned` content marker, never by
+name: a same-named agent you own is skipped with a warning, and pre-consolidation
+`massa-ai-<name>` files are pruned on upgrade.
 
 ---
 

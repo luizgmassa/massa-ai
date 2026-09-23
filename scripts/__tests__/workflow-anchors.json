@@ -41,7 +41,7 @@
       "brownfield Minimum Bar gate",
       "references/knowledge-verification-chain.md",
       "prove the coverage discriminates",
-      "Dispatch: `massa-ai-verification-agent",
+      "Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`)",
       "Independent Verification Exception",
       "Bounded Fix→Re-verify Loop",
       ".specs/debug/<slug>/REPORT.md",
@@ -57,28 +57,13 @@
       "graceful degradation preserved"
     ],
     "notes": [
-      "massa-ai-verification-agent dispatch block",
+      "code-reviewer verify-mode dispatch block",
       "Independent Verification Mandate (Standard tier and above)",
       "Bounded Fix→Re-verify Loop cap (3 iterations)",
       "validate_state.ts <slug> deterministic backing",
       ".specs/quick/NNN-slug/TASK.md and SUMMARY.md",
       ".specs/features/<slug>/spec.md and validation.md",
       "one feature-level delivery go-ahead across PR groups"
-    ]
-  },
-  "general.md": {
-    "present": [
-      "Independent Verification Mandate",
-      "risk-domain set named in step 3",
-      ".specs/quick/NNN-slug/SUMMARY.md",
-      "Minimum Bar sweep",
-      ".specs/project/onboarding/",
-      "Bounded Fix→Re-verify Loop"
-    ],
-    "notes": [
-      "massa-ai-verification-agent dispatch block",
-      "check_specs_delivered.ts --kind quick",
-      "Stage 3 delivery authorization"
     ]
   },
   "implementation/implementation-fix.md": {
@@ -93,23 +78,6 @@
       "brownfield-mapping.md` (Minimum Bar only)"
     ],
     "notes": []
-  },
-  "maestro/maestro-fix.md": {
-    "present": [
-      "references/discrimination-sensor.md",
-      "Discrimination Sensor (Flow Mutation)",
-      "first fix touching an unmapped Maestro workspace",
-      "Independent Verification Mandate",
-      "Bounded Fix→Re-verify Loop",
-      "Fix Closure Report Contract",
-      "audits/maestro/<YYYY-MM-DD maestro-fix-closure>.md",
-      "graceful degradation preserved"
-    ],
-    "notes": [
-      "references/brownfield-mapping.md (Minimum Bar only)",
-      "surviving_mutant lessons signal",
-      "check_fix_closure.ts --family maestro"
-    ]
   },
   "mobile-figma/mobile-figma-fix.md": {
     "present": [
@@ -146,7 +114,7 @@
       "knowledge-verification-chain.md"
     ],
     "notes": [
-      "massa-ai-verification-agent dispatch block",
+      "code-reviewer verify-mode dispatch block",
       "discrimination sensor mutate the moved code",
       "characterization tests must kill it",
       "P0 payment/auth/data-integrity/public-contract",
@@ -210,7 +178,7 @@
       "surviving_mutant lessons signal"
     ]
   },
-  "to-prd.md": {
+  "create-prd.md": {
     "present": [
       "references/project-context.md"
     ],

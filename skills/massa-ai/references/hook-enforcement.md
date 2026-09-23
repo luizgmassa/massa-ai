@@ -64,7 +64,6 @@ absent, it falls back to the flat evidence matrix (graceful degradation).
 | `bugs-fix` | verification-fix gate |
 | `code-quality-fix` | verification-fix gate |
 | `implementation-fix` | verification-fix gate |
-| `maestro-fix` | verification-fix gate |
 | `mobile-figma-fix` | verification-fix gate |
 | `requirements-fix` | verification-fix gate |
 | `security-fix` | verification-fix gate |
@@ -78,23 +77,20 @@ absent, it falls back to the flat evidence matrix (graceful degradation).
 | `bugs-audit` | flat evidence matrix |
 | `code-quality-audit` | flat evidence matrix |
 | `implementation-audit` | flat evidence matrix |
-| `maestro-audit` | flat evidence matrix |
 | `mobile-figma-audit` | flat evidence matrix |
 | `requirements-audit` | flat evidence matrix |
 | `security-audit` | flat evidence matrix |
 | `tests-audit` | flat evidence matrix |
 | `furps-refinement` | flat evidence matrix (findings-only; report written + DoR coverage gaps listed) |
-| `adr` | flat evidence matrix |
+| `create-adr` | flat evidence matrix |
 | `commit` | flat evidence matrix |
 | `design` | flat evidence matrix |
-| `general` | flat evidence matrix |
 | `long-session` | flat evidence matrix |
-| `maestro` | flat evidence matrix |
 | `onboarding` | flat evidence matrix |
-| `rfc` | flat evidence matrix |
-| `tdd` | flat evidence matrix |
+| `create-rfc` | flat evidence matrix |
+| `create-tdd` | flat evidence matrix |
 | `the-fool` | flat evidence matrix |
-| `ticket` | flat evidence matrix |
+| `create-ticket` | flat evidence matrix |
 
 ## massa-ai Dual-Write / Tag Contract
 

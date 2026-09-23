@@ -297,7 +297,7 @@ describe("opencode config-cli runCli", () => {
     expect(r.code).toBe(0);
     // Agents written to XDG_CONFIG_HOME/opencode/agents/
     const agentsDir = path.join(tmpHome, "opencode", "agents");
-    const files = readdirSync(agentsDir).filter((f) => f.startsWith("massa-ai-"));
+    const files = readdirSync(agentsDir).filter((f) => f.endsWith(".md"));
     expect(files.length).toBeGreaterThan(0);
   });
 
@@ -309,7 +309,7 @@ describe("opencode config-cli runCli", () => {
       const r = await captureConsole(() => runCli(["agents", "install", "--project"]));
       expect(r.code).toBe(0);
       const agentsDir = path.join(projectTmp, ".opencode", "agents");
-      const files = readdirSync(agentsDir).filter((f) => f.startsWith("massa-ai-"));
+      const files = readdirSync(agentsDir).filter((f) => f.endsWith(".md"));
       expect(files.length).toBeGreaterThan(0);
     } finally {
       process.chdir(prevCwd);

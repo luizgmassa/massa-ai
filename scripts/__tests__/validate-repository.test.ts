@@ -37,7 +37,8 @@ async function readFile(p: string): Promise<string> {
 describe("skill file structure validation", () => {
   const expectedSkills = [
     "massa-ai",
-    "persona-router",
+    "profile",
+    "bootstrap",
   ];
 
   for (const skill of expectedSkills) {
@@ -83,16 +84,17 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     expect(block).toContain("caveman full");
     expect(block).toContain("coding-guidelines");
     expect(block).toContain("massa-ai");
-    expect(block).toContain("persona-router");
+    expect(block).not.toContain("persona-router");
   });
 
-  test("bootstrap contains persona router policy", async () => {
+  test("bootstrap contains the agent policies and no retired persona policy (PER AC-2)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "AGENTS.md"));
     const block = content.slice(
       content.indexOf(BOOTSTRAP_START),
       content.indexOf(BOOTSTRAP_END) + BOOTSTRAP_END.length
     );
-    expect(block).toContain("persona_router");
+    expect(block).not.toContain("persona_router");
+    expect(block).not.toContain("persona_pin");
     expect(block).toContain("plan_challenge");
     expect(block).toContain("conversation_feedback");
   });
@@ -107,23 +109,15 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     expect(block).not.toContain("UAS_");
   });
 
-  test("sub-agent registry preserved (18 agents)", async () => {
+  test("sub-agent registry preserved (7 agents)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "AGENTS.md"));
-    expect(content).toContain("investigator");
-    expect(content).toContain("planner");
-    expect(content).toContain("builder");
-    expect(content).toContain("reviewer");
-    expect(content).toContain("context-curator");
-    expect(content).toContain("verification-agent");
-    expect(content).toContain("requirements-analyst");
-    expect(content).toContain("architecture-specialist");
-    expect(content).toContain("test-engineer");
-    expect(content).toContain("documentation-agent");
-    expect(content).toContain("audit-specialist");
-    expect(content).toContain("mobile-specialist");
-    expect(content).toContain("plan-critic");
-    expect(content).toContain("furps-analyst");
-    expect(content).toContain("navigator");
+    for (const agent of [
+      "builder", "code-explorer", "code-reviewer", "designer",
+      "judge", "product-manager", "test-engineer",
+    ]) {
+      expect(content).toContain(`| ${agent} |`);
+      expect(content).toContain(`skills/agents/${agent}/SKILL.md`);
+    }
   });
 });
 
@@ -134,17 +128,16 @@ describe("workflow files referenced in SKILL.md exist", () => {
     "workflows/spec-driven.md",
     "workflows/feature.md",
     "workflows/debug.md",
-    "workflows/general.md",
     "workflows/refactor.md",
     "workflows/the-fool.md",
-    "workflows/adr.md",
-    "workflows/rfc.md",
-    "workflows/tdd.md",
+    "workflows/create-adr.md",
+    "workflows/create-rfc.md",
+    "workflows/create-tdd.md",
     "workflows/exploration.md",
     "workflows/onboarding.md",
     "workflows/long-session.md",
     "workflows/commit.md",
-    "workflows/ticket.md",
+    "workflows/create-ticket.md",
     "workflows/design.md",
   ];
 
@@ -296,12 +289,11 @@ describe("docs migration", () => {
   const migratedDocs = [
     "context-slices.md",
     "massa-ai-commit.md",
-    "massa-ai-maestro.md",
     "massa-ai-mobile-figma.md",
-    "massa-ai-rfc.md",
+    "massa-ai-create-rfc.md",
     "massa-ai-spec-driven.md",
-    "massa-ai-tdd.md",
-    "massa-ai-ticket.md",
+    "massa-ai-create-tdd.md",
+    "massa-ai-create-ticket.md",
   ];
 
   for (const doc of migratedDocs) {
@@ -311,72 +303,12 @@ describe("docs migration", () => {
   }
 });
 
-// ── Persona catalog ────────────────────────────────────────────────────────
+// ── Persona feature removed (PER AC-1) ─────────────────────────────────────
 
-describe("persona catalog", () => {
-  const catalogPath = path.join(SKILLS_DIR, "massa-ai", "personas", "catalog.json");
-
-  test("catalog.json exists and parses", async () => {
-    expect(await fileExists(catalogPath)).toBe(true);
-    const content = await readFile(catalogPath);
-    expect(() => JSON.parse(content)).not.toThrow();
-  });
-
-  test("schema_version is 2", async () => {
-    const content = await readFile(catalogPath);
-    const catalog = JSON.parse(content);
-    expect(catalog.schema_version).toBe(2);
-  });
-
-  test("all prompt_path values resolve to existing files", async () => {
-    const content = await readFile(catalogPath);
-    const catalog = JSON.parse(content);
-    const personasDir = path.dirname(catalogPath);
-    for (const persona of catalog.personas) {
-      const promptPath = path.join(personasDir, persona.prompt_path);
-      expect(await fileExists(promptPath)).toBe(true);
-    }
-  });
-
-  test("expected persona IDs present", async () => {
-    const content = await readFile(catalogPath);
-    const catalog = JSON.parse(content);
-    const ids = catalog.personas.map((p: { id: string }) => p.id);
-    expect(ids).toContain("senior-mobile-engineer");
-    expect(ids).toContain("senior-mobile-qa-automation-engineer");
-    expect(ids).toContain("context-skill-harness-engineer-architect");
-    expect(ids).toContain("product-manager");
-    expect(ids).toContain("ai-native-nodejs-cli-architect");
-  });
-
-  test("persona prompt files exist", async () => {
-    const personaFiles = [
-      "ai-native-nodejs-cli-architect.md",
-      "context-skill-harness-engineer-architect.md",
-      "product-manager.md",
-      "senior-mobile-engineer.md",
-      "senior-mobile-qa-automation-engineer.md",
-    ];
-    for (const file of personaFiles) {
-      expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "personas", file))).toBe(true);
-    }
-  });
-});
-
-// ── Persona router SKILL.md ────────────────────────────────────────────────
-
-describe("persona-router skill", () => {
-  test("SKILL.md exists with frontmatter", async () => {
-    const skillMd = path.join(SKILLS_DIR, "persona-router", "SKILL.md");
-    expect(await fileExists(skillMd)).toBe(true);
-    const content = await readFile(skillMd);
-    expect(content.startsWith("---")).toBe(true);
-    expect(content).toContain("name: persona-router");
-  });
-
-  test("references catalog location at new path", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "persona-router", "SKILL.md"));
-    expect(content).toContain("massa-ai/personas/catalog.json");
+describe("persona feature removed", () => {
+  test("no persona-router skill and no persona catalog directory remain", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "persona-router"))).toBe(false);
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "personas"))).toBe(false);
   });
 });
 
@@ -388,124 +320,9 @@ describe("removed features documented", () => {
   });
 });
 
-// ── Persona catalog deep validation (ported from legacy test_validate_repository.py) ──
-// The legacy suite had 12 persona-catalog tests; the TS port had 5 shallow ones.
-// These add: malformed/missing/legacy/schema-version/required-fields/duplicate/
-// prompt-missing/path-escape/uncataloged-prompt/invalid-shape/mirror-drift.
-
-describe("persona catalog deep validation", () => {
-  const catalogPath = path.join(SKILLS_DIR, "massa-ai", "personas", "catalog.json");
-  const personasDir = path.dirname(catalogPath);
-
-  test("catalog is valid JSON (malformed catalog detected)", async () => {
-    const content = await readFile(catalogPath);
-    expect(() => JSON.parse(content)).not.toThrow();
-  });
-
-  test("catalog schema_version is present and 2", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    expect(catalog.schema_version).toBe(2);
-  });
-
-  test("catalog has required top-level shape (personas array)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    expect(Array.isArray(catalog.personas)).toBe(true);
-    expect(catalog.personas.length).toBeGreaterThanOrEqual(1);
-  });
-
-  test("every persona entry has required v2 fields (id, display_name, prompt_path, signals_path, summary, aliases) and no inline signal arrays", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    const requiredFields = ["id", "display_name", "prompt_path", "signals_path", "summary", "aliases"];
-    for (const persona of catalog.personas) {
-      for (const field of requiredFields) {
-        expect(persona[field]).toBeDefined();
-      }
-      expect(typeof persona.id).toBe("string");
-      expect(typeof persona.display_name).toBe("string");
-      expect(typeof persona.prompt_path).toBe("string");
-      expect(typeof persona.signals_path).toBe("string");
-      expect(typeof persona.summary).toBe("string");
-      expect(Array.isArray(persona.aliases)).toBe(true);
-      // v2 moved the signal arrays out of the index — an inline array is drift back to v1.
-      expect(persona.primary_signals).toBeUndefined();
-      expect(persona.negative_signals).toBeUndefined();
-      expect(persona.secondary_lens_signals).toBeUndefined();
-    }
-  });
-
-  test("every signals_path is signals/<id>.json, resolves, and carries the three signal arrays (v2 split — every v1 assertion kept, repointed)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    for (const persona of catalog.personas) {
-      expect(persona.signals_path).toBe(`signals/${persona.id}.json`);
-      expect(persona.signals_path).not.toMatch(/^\//);
-      expect(persona.signals_path).not.toContain("..");
-      const signalsFile = path.join(personasDir, persona.signals_path);
-      expect(await fileExists(signalsFile)).toBe(true);
-      const signals = JSON.parse(await readFile(signalsFile));
-      expect(Array.isArray(signals.primary_signals)).toBe(true);
-      expect(Array.isArray(signals.negative_signals)).toBe(true);
-      expect(Array.isArray(signals.secondary_lens_signals)).toBe(true);
-      expect(signals.primary_signals.length).toBeGreaterThan(0);
-    }
-  });
-
-  test("persona IDs are unique (no duplicate entries)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    const ids = catalog.personas.map((p: { id: string }) => p.id);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  test("persona prompt_paths are unique (no duplicate paths)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    const paths = catalog.personas.map((p: { prompt_path: string }) => p.prompt_path);
-    expect(new Set(paths).size).toBe(paths.length);
-  });
-
-  test("prompt_path values are filename-only (no path traversal / absolute paths)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    for (const persona of catalog.personas) {
-      const pp: string = persona.prompt_path;
-      expect(pp).not.toMatch(/^\//);          // not absolute
-      expect(pp).not.toMatch(/\.\.\//);       // no parent-dir traversal
-      expect(pp).not.toMatch(/\\\/\\/);       // no backslash separators
-      expect(pp).not.toContain("/");          // filename-only — no subdirs
-    }
-  });
-
-  test("every prompt_path resolves to an existing file", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    for (const persona of catalog.personas) {
-      const promptPath = path.join(personasDir, persona.prompt_path);
-      expect(await fileExists(promptPath)).toBe(true);
-    }
-  });
-
-  test("every cataloged persona prompt file is non-empty markdown", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    for (const persona of catalog.personas) {
-      const promptPath = path.join(personasDir, persona.prompt_path);
-      const content = await readFile(promptPath);
-      expect(content.length).toBeGreaterThan(100);
-      // Persona prompt files are markdown (start with a heading), not YAML frontmatter.
-      expect(content.startsWith("#")).toBe(true);
-    }
-  });
-
-  test("no uncataloged persona prompt files exist in personas/ (mirror drift)", async () => {
-    const catalog = JSON.parse(await readFile(catalogPath));
-    const cataloged = new Set(catalog.personas.map((p: { prompt_path: string }) => p.prompt_path));
-    const entries = await fs.readdir(personasDir, { withFileTypes: true });
-    // Only consider persona prompt files: .md files other than README.md.
-    const onDisk = entries
-      .filter((e) => e.isFile() && e.name.endsWith(".md") && e.name !== "README.md")
-      .map((e) => e.name);
-    for (const file of onDisk) {
-      expect(cataloged.has(file)).toBe(true);
-    }
-  });
-
+describe("legacy persona catalog", () => {
   test("legacy top-level persona catalog is NOT present (migration complete)", async () => {
-    // The legacy repo had a top-level personas/ dir; the new path is under skills/massa-ai/personas/.
+    // The legacy repo had a top-level personas/ dir; the feature is now removed entirely.
     expect(await fileExists(path.join(REPO_ROOT, "personas", "catalog.json"))).toBe(false);
   });
 });
@@ -721,21 +538,17 @@ describe("context slices", () => {
 });
 
 // ── Agents harness routing (ported from legacy) ──────────────────────────
-// Legacy asserted agents harness routing is enforced. The 16-agent registry
+// Legacy asserted agents harness routing is enforced. The 7-agent registry
 // lives in skills/AGENTS.md and each agent has a charter under skills/agents/.
 
 describe("agents harness routing", () => {
   const AGENTS_SUBDIR = path.join(SKILLS_DIR, "agents");
   const EXPECTED_AGENTS = [
-    "investigator", "planner", "builder", "reviewer",
-    "context-curator", "verification-agent", "requirements-analyst",
-    "architecture-specialist", "test-engineer", "documentation-agent",
-    "audit-specialist", "mobile-specialist",
-    "plan-critic", "furps-analyst", "navigator",
-    "meta-judge", "judge", "designer",
+    "builder", "code-explorer", "code-reviewer", "designer",
+    "judge", "product-manager", "test-engineer",
   ];
 
-  test("skills/agents/ exists with one subdir per agent (18)", async () => {
+  test("skills/agents/ exists with one subdir per agent (7)", async () => {
     expect(await fileExists(AGENTS_SUBDIR)).toBe(true);
     const entries = await fs.readdir(AGENTS_SUBDIR, { withFileTypes: true });
     const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
@@ -748,12 +561,12 @@ describe("agents harness routing", () => {
     }
   });
 
-  test("every agent charter has YAML frontmatter with name", async () => {
+  test("every agent charter has YAML frontmatter with name equal to its directory (ROS AC-1)", async () => {
     for (const agent of EXPECTED_AGENTS) {
       const content = await readFile(path.join(AGENTS_SUBDIR, agent, "SKILL.md"));
       expect(content.startsWith("---")).toBe(true);
       const fm = content.slice(0, content.indexOf("---", 3));
-      expect(fm).toContain("name:");
+      expect(fm.match(/^name:\s*(.+?)\s*$/m)?.[1]).toBe(agent);
     }
   });
 });
@@ -761,19 +574,19 @@ describe("agents harness routing", () => {
 // ── RFC workflow (ported from legacy rfc tests) ──────────────────────────
 // Legacy asserted: removed rfc identifiers/artifacts detected, missing merged
 // rfc reference detected, merged rfc behavior/attribution drift detected.
-// The repo migrated RFC refs from workflows/rfc.md → references/rfc/ subdir.
+// The repo migrated RFC refs from workflows/create-rfc.md → references/create-rfc/ subdir.
 
 describe("rfc workflow and references", () => {
-  test("workflows/rfc.md exists", async () => {
-    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"))).toBe(true);
+  test("workflows/create-rfc.md exists", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"))).toBe(true);
   });
 
-  test("references/rfc/ subdir exists (migrated from inline)", async () => {
-    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "references", "rfc"))).toBe(true);
+  test("references/create-rfc/ subdir exists (migrated from inline)", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "references", "create-rfc"))).toBe(true);
   });
 
-  test("references/rfc/ contains the expected sub-references", async () => {
-    const rfcDir = path.join(SKILLS_DIR, "massa-ai", "references", "rfc");
+  test("references/create-rfc/ contains the expected sub-references", async () => {
+    const rfcDir = path.join(SKILLS_DIR, "massa-ai", "references", "create-rfc");
     const entries = await fs.readdir(rfcDir, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile()).map((e) => e.name);
     expect(files).toContain("discovery-and-sizing.md");
@@ -781,25 +594,25 @@ describe("rfc workflow and references", () => {
     expect(files).toContain("quality-and-lifecycle.md");
   });
 
-  test("rfc workflow loads references/rfc/discovery-and-sizing.md", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"));
-    expect(content).toContain("references/rfc/discovery-and-sizing.md");
+  test("rfc workflow loads references/create-rfc/discovery-and-sizing.md", async () => {
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"));
+    expect(content).toContain("references/create-rfc/discovery-and-sizing.md");
   });
 
   test("rfc workflow requires impact label HIGH/MEDIUM/LOW", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"));
     expect(content).toMatch(/HIGH.*MEDIUM.*LOW|impact label/i);
   });
 
   test("rfc workflow requires at least two options (no one-sided proposal)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"));
     expect(content).toMatch(/at least two options|one-sided|only one credible option/i);
   });
 
   test("rfc workflow routes finalized decisions to adr and settled design to tdd", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "rfc.md"));
-    expect(content).toContain("workflows/adr.md");
-    expect(content).toContain("workflows/tdd.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-rfc.md"));
+    expect(content).toContain("workflows/create-adr.md");
+    expect(content).toContain("workflows/create-tdd.md");
   });
 });
 
@@ -810,12 +623,12 @@ describe("rfc workflow and references", () => {
 // project type taxonomy, mandatory trigger mapping, document litmus.
 
 describe("tdd workflow and references", () => {
-  test("workflows/tdd.md exists", async () => {
-    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"))).toBe(true);
+  test("workflows/create-tdd.md exists", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"))).toBe(true);
   });
 
-  test("references/tdd/ subdir exists with expected sub-references", async () => {
-    const tddDir = path.join(SKILLS_DIR, "massa-ai", "references", "tdd");
+  test("references/create-tdd/ subdir exists with expected sub-references", async () => {
+    const tddDir = path.join(SKILLS_DIR, "massa-ai", "references", "create-tdd");
     expect(await fileExists(tddDir)).toBe(true);
     const entries = await fs.readdir(tddDir, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile()).map((e) => e.name);
@@ -826,22 +639,22 @@ describe("tdd workflow and references", () => {
   });
 
   test("tdd workflow references discovery-and-sizing.md (sizing rules)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
-    expect(content).toContain("references/tdd/discovery-and-sizing.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
+    expect(content).toContain("references/create-tdd/discovery-and-sizing.md");
   });
 
   test("tdd workflow references document-contract.md (the document shape)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
-    expect(content).toContain("references/tdd/document-contract.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
+    expect(content).toContain("references/create-tdd/document-contract.md");
   });
 
   test("tdd workflow references calibrated-examples.md (calibrated examples anchor)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
-    expect(content).toContain("references/tdd/calibrated-examples.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
+    expect(content).toContain("references/create-tdd/calibrated-examples.md");
   });
 
   test("tdd workflow documents project_type taxonomy (integration/feature/refactor/infrastructure/payment/auth/data)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toContain("project_type");
     expect(content).toContain("integration");
     expect(content).toContain("feature");
@@ -853,51 +666,51 @@ describe("tdd workflow and references", () => {
   });
 
   test("tdd workflow documents mandatory trigger mapping (payment/auth → security; rollout → monitoring/rollback; integration → dependencies+security)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/payment.*auth.*Security.*mandatory/i);
     expect(content).toMatch(/rollout.*Monitoring.*Rollback.*mandatory/i);
     expect(content).toMatch(/integration.*Dependencies.*Security.*mandatory/i);
   });
 
   test("tdd workflow requires small PRs (PR size contract)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/Small PR|Medium PR|Large PR|PR group/i);
   });
 
   test("tdd workflow documents layer order (Data first, then Domain, then Presentation/Navigation)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/Data first.*Domain.*Presentation|layer when applicable/i);
   });
 
   test("tdd workflow requires the full Plan Challenge Gate", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/full.*Plan Challenge Gate|full gate/i);
   });
 
   test("tdd workflow delegates Jira creation to ticket workflow (not inline)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
-    expect(content).toContain("workflows/ticket.md");
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
+    expect(content).toContain("workflows/create-ticket.md");
     expect(content).toMatch(/Jira creation.*owned.*ticket|delegates|solely by the ticket/i);
   });
 
   test("tdd workflow never marks document Approved without human decision", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/Never mark.*Approved|without.*human decision|Never.*Approved/i);
   });
 
   test("tdd workflow includes Pre-Merge TDD Fidelity Check section", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toContain("Pre-Merge TDD Fidelity Check");
   });
 
   test("tdd workflow includes Strings Audit for mapper stringResource branches", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toContain("Strings Audit");
     expect(content).toContain("stringResource");
   });
 
   test("tdd workflow includes parallel rendering surfaces checklist for UI/UX changes", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "tdd.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-tdd.md"));
     expect(content).toMatch(/parallel rendering surface/i);
   });
 });
@@ -909,12 +722,12 @@ describe("tdd workflow and references", () => {
 // failure resume, forbidden cross-skill call, review artifact external.
 
 describe("ticket workflow and references", () => {
-  test("workflows/ticket.md exists", async () => {
-    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"))).toBe(true);
+  test("workflows/create-ticket.md exists", async () => {
+    expect(await fileExists(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"))).toBe(true);
   });
 
-  test("references/ticket/ subdir exists with expected sub-references", async () => {
-    const ticketDir = path.join(SKILLS_DIR, "massa-ai", "references", "ticket");
+  test("references/create-ticket/ subdir exists with expected sub-references", async () => {
+    const ticketDir = path.join(SKILLS_DIR, "massa-ai", "references", "create-ticket");
     expect(await fileExists(ticketDir)).toBe(true);
     const entries = await fs.readdir(ticketDir, { withFileTypes: true });
     const files = entries.filter((e) => e.isFile()).map((e) => e.name);
@@ -924,47 +737,47 @@ describe("ticket workflow and references", () => {
   });
 
   test("ticket workflow names Atlassian MCP as the only tracker (no CLI/tracker fallback)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/Atlassian MCP.*only tracker|never substitute.*CLI.*tracker/i);
   });
 
   test("ticket workflow requires explicit user approval before any Jira mutation", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/explicit user approval|approval.*before.*mutation|approval of an older revision.*invalid/i);
   });
 
   test("ticket workflow: content/field revision increments Draft Revision and resets Approval Status", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/Draft Revision|increments.*Draft Revision|resets.*Approval Status/i);
   });
 
   test("ticket workflow requires duplicate detection before creation", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/duplicate|Search.*Jira project.*potential duplicates/i);
   });
 
   test("ticket workflow: review artifact must be OUTSIDE the repository", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/outside the repository|external.*plans directory|never write.*draft.*repository/i);
   });
 
   test("ticket workflow: partial failure stops immediately, no auto-compensation", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/partial failure.*stop|stop immediately|do not.*transition.*comment.*compensate/i);
   });
 
   test("ticket workflow does not persist raw ticket bodies or customer data to memory", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/Do not persist raw ticket|customer data|one-run creation/i);
   });
 
   test("ticket workflow forbids searching Git history/commits for ticket examples", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toMatch(/Never search Git history|repository ticket references|do not.*search.*Git/i);
   });
 
   test("ticket workflow delegates code grounding to exploration.md (child pass)", async () => {
-    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "ticket.md"));
+    const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "create-ticket.md"));
     expect(content).toContain("workflows/exploration.md");
   });
 });
@@ -1009,7 +822,7 @@ describe("commit workflow", () => {
 
   test("commit workflow routes Jira ticket creation to ticket.md (not inline)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "commit.md"));
-    expect(content).toContain("workflows/ticket.md");
+    expect(content).toContain("workflows/create-ticket.md");
   });
 });
 
@@ -1022,7 +835,7 @@ describe("deterministic router contract (deep)", () => {
   test("SKILL.md documents deterministic routing precedence (first match wins, 6 tiers)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "SKILL.md"));
     expect(content).toMatch(/first match wins|Deterministic routing precedence/i);
-    expect(content).toMatch(/Explicit route|Requested artifact|Target type|Primary verb|Risk domain escalation|General fallback/i);
+    expect(content).toMatch(/Explicit route|Requested artifact|Target type|Primary verb|Risk domain escalation|No match/i);
   });
 
   test("SKILL.md routes exploration as read-only (no mutation)", async () => {
@@ -1030,9 +843,13 @@ describe("deterministic router contract (deep)", () => {
     expect(content).toMatch(/exploration.*read-only|explicitly read-only|exploration.*no.*mutation/i);
   });
 
-  test("SKILL.md requires general fallback preflight (one-line naming the rejected workflow)", async () => {
+  test("SKILL.md no-match fallback loads no workflow file and names no `general` workflow (WFL-02, Inventory AC-4)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "SKILL.md"));
-    expect(content).toMatch(/General fallback preflight|one-line.*fallback.*preflight|names the specialized workflow considered/i);
+    const rule6 = content.split(/\r?\n/).find((l) => l.startsWith("6. "));
+    expect(rule6).toBeDefined();
+    expect(rule6).toContain("**No match:** proceed without loading a workflow file");
+    expect(rule6).toContain("Core Contract");
+    expect(content).not.toMatch(/`general`|workflows\/general\.md|General fallback/);
   });
 
   test("SKILL.md documents graph-tool freshness gate (trace_path/impact_analysis/get_architecture require fresh index)", async () => {
@@ -1071,7 +888,7 @@ describe("spec-driven phase gates", () => {
 
   test("spec-driven workflow requires independent validation (author ≠ verifier)", async () => {
     const content = await readFile(path.join(SKILLS_DIR, "massa-ai", "workflows", "spec-driven.md"));
-    expect(content).toMatch(/independent validation|author.*verifier|verification-agent.*author.*verifier/i);
+    expect(content).toMatch(/independent validation|author.*verifier|code-reviewer.*author.*verifier/i);
   });
 
   test("spec-driven workflow writes validation.md as the Execute gate output", async () => {
@@ -1160,11 +977,10 @@ describe("synapse policy and tool matrix references", () => {
 
 describe("canonical tool naming (no th0th_-prefixed tool names)", () => {
   const CHARTER_FILES = [
-    "agents/investigator/SKILL.md",
-    "agents/context-curator/SKILL.md",
-    "agents/navigator/SKILL.md",
-    "agents/plan-critic/SKILL.md",
-    "persona-router/SKILL.md",
+    "agents/code-explorer/SKILL.md",
+    "agents/code-reviewer/SKILL.md",
+    "agents/judge/SKILL.md",
+    "agents/product-manager/SKILL.md",
     "massa-ai/SKILL.md",
     "massa-ai/references/mcp-tools.md",
     "massa-ai/references/synapse-policy.md",
@@ -1183,11 +999,10 @@ describe("canonical tool naming (no th0th_-prefixed tool names)", () => {
 describe("docs workflow guides exist and link correctly", () => {
   const guides = [
     "massa-ai-spec-driven.md",
-    "massa-ai-tdd.md",
-    "massa-ai-rfc.md",
+    "massa-ai-create-tdd.md",
+    "massa-ai-create-rfc.md",
     "massa-ai-commit.md",
-    "massa-ai-ticket.md",
-    "massa-ai-maestro.md",
+    "massa-ai-create-ticket.md",
     "massa-ai-mobile-figma.md",
   ];
 

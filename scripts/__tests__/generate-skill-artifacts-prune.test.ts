@@ -2,8 +2,9 @@
  * Prune-before-emit unit tests for scripts/generate-skill-artifacts.ts
  * (T1, UGB-03/04).
  *
- * emitAll() must remove each managed root's prior contents — derived only
- * from managedRootsFor()/hookBinaryHosts(), never a second literal list —
+ * emitAll() must remove each managed root's prior contents — derived from
+ * managedRootsFor()/hookBinaryHosts() plus the one RETIRED_BUNDLE_ROOTS
+ * literal, which install-skills.sh's RETIRED_SKILL_NAMES must equal —
  * before copying, so a file whose source was deleted does not survive
  * regeneration as a stale artifact. Everything OUTSIDE those managed roots
  * (hand-authored quick skills that live directly under `skills/`, the
@@ -20,7 +21,12 @@ import { describe, test, expect, afterEach } from "bun:test";
 import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
-import { emitAll, managedRootsFor, type CapsLookup } from "../generate-skill-artifacts.ts";
+import {
+  emitAll,
+  managedRootsFor,
+  RETIRED_BUNDLE_ROOTS,
+  type CapsLookup,
+} from "../generate-skill-artifacts.ts";
 import { capabilitiesFor, type Host, type HostCapabilities } from "../lib/host-capabilities.ts";
 
 const tmpDirs: string[] = [];
@@ -65,12 +71,36 @@ describe("generate-skill-artifacts emitAll — prune-before-emit (T1, UGB-04)", 
     await expect(fs.access(staleFile)).rejects.toThrow();
   });
 
+  test("a retired bundle root (skills/persona-router/) left in a checkout vanishes after emit (PER AC-3)", async () => {
+    const tmp = await makeTmpRoot();
+    const targetRoots: Record<string, string> = { cursor: path.join(tmp, "cursor") };
+
+    const retiredRoot = path.join(targetRoots.cursor!, "skills", "persona-router");
+    await fs.mkdir(path.join(retiredRoot, "references"), { recursive: true });
+    await fs.writeFile(path.join(retiredRoot, "SKILL.md"), "stale retired bundle");
+    await fs.writeFile(path.join(retiredRoot, "references", "routing-details.md"), "stale");
+
+    await emitAll(targetRoots, ["cursor"]);
+
+    await expect(fs.access(retiredRoot)).rejects.toThrow();
+    // The sweep is scoped to the retired root: a current bundle is still emitted.
+    await expect(fs.access(path.join(targetRoots.cursor!, "skills", "bootstrap", "SKILL.md"))).resolves.toBeNull();
+  });
+
+  test("install-skills.sh RETIRED_SKILL_NAMES lists exactly RETIRED_BUNDLE_ROOTS", async () => {
+    const installer = await fs.readFile(path.join(import.meta.dir, "..", "install-skills.sh"), "utf8");
+    const assignment = installer.match(/^RETIRED_SKILL_NAMES="([^"]*)"$/m);
+    expect(assignment).not.toBeNull();
+    const shellNames = assignment![1].split(/\s+/).filter(Boolean).sort();
+    expect(shellNames).toEqual([...RETIRED_BUNDLE_ROOTS].sort());
+  });
+
   test("a hand-authored quick-skill file beside the managed roots (apps/codex-plugin/skills/def.md class) survives emit", async () => {
     const tmp = await makeTmpRoot();
     const targetRoots: Record<string, string> = { codex: path.join(tmp, "codex") };
 
     // Lives directly under skills/, a sibling of the managed
-    // skills/{massa-ai,persona-router,profile,agents} roots — never inside one.
+    // skills/{massa-ai,profile,bootstrap,agents} roots — never inside one.
     const quickSkill = path.join(targetRoots.codex!, "skills", "def.md");
     await fs.mkdir(path.dirname(quickSkill), { recursive: true });
     await fs.writeFile(quickSkill, "# quick skill\nhand-authored, not generated");

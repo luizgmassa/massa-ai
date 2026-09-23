@@ -603,8 +603,8 @@ for pair in "codex:$H1/.codex" "cursor:$H1/.cursor"; do
   # AC-7: the pointer states no rule of its own. These three literals are
   # policy headings of the contract body itself (skills/AGENTS.md), so their
   # presence would mean AGENTS.md became a second copy of the contract.
-  assert_not_contains "$HOST pointer carries no persona policy (BST-04 AC-7)" \
-    "$BLOCK" "Persona Router Policy"
+  assert_not_contains "$HOST pointer carries no conversation-feedback policy (BST-04 AC-7)" \
+    "$BLOCK" "Conversation Feedback Policy"
   assert_not_contains "$HOST pointer carries no plan-challenge policy (BST-04 AC-7)" \
     "$BLOCK" "Plan Challenge Policy"
   assert_not_contains "$HOST pointer carries no indexing policy (BST-04 AC-7)" \

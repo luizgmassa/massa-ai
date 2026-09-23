@@ -38,11 +38,30 @@ Not for a single requested audit lens — route directly to that lens. Do not ed
    - For a broad/full audit, run Correctness, Architecture, Code Quality, Security, and Tests. Run Requirements only when a requirements source is available.
    - Supported lenses: Correctness -> `workflows/bugs/bugs-audit.md`; Architecture -> `workflows/architecture/architecture-audit.md`; Code Quality -> `workflows/code-quality/code-quality-audit.md`; Security -> `workflows/security/security-audit.md`; Requirements -> `workflows/requirements/requirements-audit.md`; Tests -> `workflows/tests/tests-audit.md`.
    - When a broad audit lacks requirements, ask for a source when interactive and not forbidden; otherwise mark Requirements `not evaluated: missing source`. Never report a requirements all-clear without a source.
-7. Establish child contracts and dispatch `audit-specialist` per lens through `references/agent-orchestration.md`:
+7. Establish child contracts and dispatch one agent per lens through `references/agent-orchestration.md`: `code-reviewer` for Correctness (`lens: bugs`), Architecture, Code Quality, and Security; `product-manager` for Requirements; `test-engineer` for Tests.
 
-> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: broad/full audit requiring multiple lenses, or explicit multi-lens request
-> - scope: one lens per dispatch against the shared implementation scope packet (Correctness/Architecture/Code Quality/Security/Requirements/Tests)
+> - scope: one lens per dispatch against the shared implementation scope packet (Correctness as `lens: bugs`, Architecture as `lens: architecture`, Code Quality as `lens: code-quality`, Security as `lens: security`)
+> - inputs: exact `projectId`, parent `workflowSessionId`, child workflow, lens name, shared scope packet, resolved files/diff summary, relevant recalled facts, allowed surrounding-code depth, deterministic sensors, context-firewall limits, and output contract
+> - sensors: target-relevant deterministic commands (tests, builds, lint, type checks, static checks, import checks) per lens
+> - output: `Status`, `Scope checked`, `Evidence`, `Findings`, `Verification/Test Fidelity Checklist`, `Risks and skipped checks`, and `Exact next step`
+> - firewall: raw diffs/logs/search output summarized, not returned raw
+> - memory: suggest-only; children must not persist broad project memory unless assigned
+
+> **Dispatch: `product-manager`** (role: `product-manager`, mode: `audit`) — charter `skills/agents/product-manager/SKILL.md`
+> - trigger: the Requirements lens is in scope and a requirements source is available
+> - scope: the Requirements lens (`lens: requirements`) against the shared implementation scope packet and the resolved requirements source
+> - permissions: read-only
+> - inputs: exact `projectId`, parent `workflowSessionId`, child workflow, lens name, shared scope packet, resolved files/diff summary, relevant recalled facts, allowed surrounding-code depth, deterministic sensors, context-firewall limits, and output contract
+> - sensors: target-relevant deterministic commands (tests, builds, lint, type checks, static checks, import checks) per lens
+> - output: `Status`, `Scope checked`, `Evidence`, `Findings`, `Verification/Test Fidelity Checklist`, `Risks and skipped checks`, and `Exact next step`
+> - firewall: raw diffs/logs/search output summarized, not returned raw
+> - memory: suggest-only; children must not persist broad project memory unless assigned
+
+> **Dispatch: `test-engineer`** (role: `test-engineer`, mode: `audit`) — charter `skills/agents/test-engineer/SKILL.md`
+> - trigger: the Tests lens is in scope
+> - scope: the Tests lens (`lens: tests`) against the shared implementation scope packet
 > - permissions: read-only
 > - inputs: exact `projectId`, parent `workflowSessionId`, child workflow, lens name, shared scope packet, resolved files/diff summary, relevant recalled facts, allowed surrounding-code depth, deterministic sensors, context-firewall limits, and output contract
 > - sensors: target-relevant deterministic commands (tests, builds, lint, type checks, static checks, import checks) per lens

@@ -227,7 +227,7 @@ function readModelLine(filePath: string): string | null {
 
 /**
  * The ≤2-line session-start drift report (agent-runtime-drift): version
- * drift (live bundle vs recorded state), agent drift (active investigator
+ * drift (live bundle vs recorded state), agent drift (active code-reviewer
  * model vs the recorded profile's variant), and the host env override that
  * nullifies every per-agent model at runtime. Null when every recording
  * agrees — silent when healthy. Read-only (INV5); every failure degrades to
@@ -253,13 +253,13 @@ export function buildSessionStartDoctorLine(
 
   const profile = claude?.modelProfile?.profile;
   if (typeof profile === "string" && profile) {
-    const activeModel = readModelLine(path.join(pluginRoot, "agents", "massa-ai-investigator.md"));
+    const activeModel = readModelLine(path.join(pluginRoot, "agents", "code-reviewer.md"));
     const variantModel = readModelLine(
-      path.join(pluginRoot, "agent-profiles", profile, "massa-ai-investigator.md"),
+      path.join(pluginRoot, "agent-profiles", profile, "code-reviewer.md"),
     );
     if (activeModel && variantModel && activeModel !== variantModel) {
       lines.push(
-        `[massa-ai] agent drift: investigator ${activeModel} vs ${profile} variant ${variantModel} — re-run the profile switch`,
+        `[massa-ai] agent drift: code-reviewer ${activeModel} vs ${profile} variant ${variantModel} — re-run the profile switch`,
       );
     }
   }

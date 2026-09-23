@@ -68,17 +68,16 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
    - Do not delete coverage, snapshots, fixtures, or benchmarks unless the audit report explicitly calls them obsolete and behavior remains protected elsewhere.
    - Prefer production-code changes only when required to expose a deterministic seam or fix a real bug found while writing the audited test.
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: mandatory per the verification-ladder's Independent Verification Mandate for any TST finding closed at Standard+/Spec-driven size or high/critical severity; at Quick size the subagent hop is skipped and the standalone fresh-eyes assertion re-check below runs instead
 > - scope: the fixed TST finding's assertion strength, fixture/mock boundary, coverage-execution-map row, and report claim closure
 > - inputs: the finding, the applied test change, the coverage execution map row, the verification command, and validation assets
@@ -100,17 +99,28 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
    - Sequence the TST proof in two passes, in order: first reproduce the coverage execution map's `expected failure before fix` row red (the pre-fix run proves the assertion can fail); only then, at Standard+/Spec-driven size or high/critical severity, run the discrimination sensor from `references/discrimination-sensor.md` as the post-fix kill-check against the new/repaired test's subject code — Quick focused-assertion findings are exempt from the sensor pass but never from the pre-fix red check.
    - A surviving mutant means the TST claim is unproven: close that finding's row `blocked` rather than `fixed` and emit the `surviving_mutant` lessons signal via the recording command above.
    - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop (3 verification iterations, then `Blocked` with evidence preserved).
-11. Use agent orchestration only when it improves signal — except the verification-agent dispatch above, which `references/agent-orchestration.md`'s Independent Verification Exception mandates for TST closures at the sizes/severities its trigger names, regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
+11. Use agent orchestration only when it improves signal — except the `code-reviewer` `verify` dispatch above, which `references/agent-orchestration.md`'s Independent Verification Exception mandates for TST closures at the sizes/severities its trigger names, regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `test-engineer`** (role: `test-engineer`, mode: `fix`) — charter `skills/agents/test-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated test finding with a disjoint write set
-> - permissions: write (disjoint write set)
+> - permissions: write, test files only (disjoint write set)
 > - inputs: the finding ID, missing/weak coverage type, fixture/mock boundary, deterministic harness, and verification command
 > - sensors: focused test command (`bun test`, `pytest`, `cargo test`) with clean exit code; no weakened assertions
 > - output: implementation summary, test counts, commands run, deviations
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists reusable testing patterns
+
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> - trigger: a selected TST finding whose fix needs a production seam for deterministic testing (step 7 Standard) — never for a test-file change, which belongs to `test-engineer`, and never for a production behavior change, which routes to `workflows/spec-driven.md`
+> - scope: the seam-only production change for one TST finding, with a write set disjoint from the `test-engineer` test files
+> - permissions: write (disjoint write set, production seam files only; no behavior change)
+> - inputs: the finding ID, the coverage execution map row, the seam required (time, randomness, async scheduling, filesystem, network, or global-state control), and the verification command
+> - sensors: the existing suite stays green with the seam in place, then the focused test command passes against it
+> - output: implementation summary, changed files, commands run, deviations
+> - firewall: raw diffs and test output summarized
+> - memory: suggest-only; main agent persists reusable seam patterns
+
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 12. Close out with the Fix Closure Report:
    - The coverage execution map from step 6, now filled in through step 10's discrimination sensor result column, is the pre-edit draft of the Closure Matrix — carry its rows forward rather than re-deriving them.

@@ -61,7 +61,7 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
 // not prose drift. Measured differentially against the pre-header tree
 // (f414cdbf, the pre-WMH activation commit): 331 → 471.
 //
-// 483 since AEH-06 (agent-era-harness-upgrades): the `massa-ai-reviewer`
+// 483 since AEH-06 (agent-era-harness-upgrades): the `reviewer`
 // dispatch block instantiated in all 14 implementing workflows must be
 // structurally identical per the dispatch contract (`persona:` bullet and
 // all — skills-harness-integrity enforces the shape), so its shared runs are
@@ -72,7 +72,7 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
 // read-only` run) — attribution printed block-by-block during the merge of
 // v1.30.0, recorded in the raising commit.
 //
-// 498 since DSG-05/06 (designer-agent): the `massa-ai-designer` dispatch block
+// 498 since DSG-05/06 (designer-agent): the `designer` dispatch block
 // instantiated in 7 screen-capable workflows must be structurally identical per
 // the dispatch contract — skills-harness-integrity parses these blocks, and the
 // uniform trigger sentence is what stops "mandatory" reading as advisory in one

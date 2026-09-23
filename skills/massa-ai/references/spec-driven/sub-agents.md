@@ -189,13 +189,13 @@ Judge the tier by the work in front of the role, not by the role's title:
 | Batch worker — mechanical phase | Entities, DTOs, config, wiring, straightforward CRUD against a settled pattern | `light` / `standard` |
 | Verifier | Adversarial reasoning: designs mutations, re-derives coverage, judges outcome precision | `deep` (always — per the Rules of thumb below) |
 | Specify / Tasks authoring | Structured but judgment-heavy | `standard` / `deep` |
-| Read-only specialist (audit-specialist, context-curator, furps-analyst, investigator, mobile-specialist, navigator, requirements-analyst, reviewer) | No write access — findings, investigation, or review quality is the entire deliverable, with no implementation pass downstream to catch a missed nuance | `deep` (always — per the Rules of thumb below) |
-| Scoped writer (designer, documentation-agent, judge, test-engineer) | `permission: write`, narrowed by the charter's own Restrictions to one file class — UI-layer / doc / the agent's own report / test files — each with a disjoint write set. Not read-only, so the deep-tier rule below does **not** reach them | per the work, not per the permission |
+| Read-only specialist (code-explorer, code-reviewer, product-manager) | No write access — findings, investigation, or review quality is the entire deliverable, with no implementation pass downstream to catch a missed nuance | `deep` (always — per the Rules of thumb below) |
+| Scoped writer (designer, judge, test-engineer) | `permission: write`, narrowed by the charter's own Restrictions to one file class — UI-layer / the agent's own report / test files — each with a disjoint write set. Not read-only, so the deep-tier rule below does **not** reach them | per the work, not per the permission |
 
 **Rules of thumb:**
 
 - When unsure, size up, not down. An under-powered worker on ambiguous logic produces gaps the Verifier then has to catch — more expensive than paying for reasoning once.
-- **The Verifier always runs on the deepest tier** — in built-in profiles, the verification-agent carries no per-agent override and resolves to the profile's strongest model. A weak Verifier defeats the author ≠ verifier gate.
+- **The Verifier always runs on the deepest tier** — in built-in profiles, `code-reviewer` (whose `verify` mode is the Verifier) carries no per-agent override and resolves to the profile's strongest model. A weak Verifier defeats the author ≠ verifier gate.
 - **Read-only specialists always run on the deepest tier** — this generalizes the Verifier rule: in built-in profiles, every findings-only or investigation-only charter (`permission: read-only`) carries no per-agent override and resolves to the profile's strongest model, because there is no later implementation pass to catch what a weaker read-only pass missed. **Accepted risk:** user overlays via the Web UI Model Catalog can choose a weaker default; the UI help text documents this convention.
 - Set the tier per batch, from that batch's phases. A feature can mix tiers across batches.
 - Outside the Verifier's and read-only specialists' structural pins, this table is advisory metadata only — no gate, commit, or verification step depends on it.

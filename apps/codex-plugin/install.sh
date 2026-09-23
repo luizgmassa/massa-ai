@@ -295,7 +295,7 @@ NODE
 # ── Skills bundling (PDO-08, 09 / D3 two-writer ownership) ──────────────────
 # scripts/install-skills.sh remains the single writer once it has already
 # claimed this platform (skillsOwner: "repo" in the shared install-state.json).
-# This plugin installs its bundled massa-ai/persona-router skills into the
+# This plugin installs its bundled massa-ai/profile/bootstrap skills into the
 # SAME harness skills directory ($CODEX_DIR/skills — NOT $PLUGIN_DIR/skills,
 # which is Codex's own marketplace-plugin skill cache, a separate mechanism)
 # only when that has not happened, mirroring the MCP single-writer precedent
@@ -320,6 +320,44 @@ try {
 NODE
 }
 
+# C4: line 1 is the enumerated owner ("plugin" | "none" — never the raw
+# recorded value, so a hostile multi-line skillsOwner cannot smuggle a name
+# into the list); every further line is a harness skill this plugin recorded
+# as installed and no longer ships. The recorded list is the ownership proof,
+# so an unrecorded directory of the same name is never touched.
+plugin_skills_record() {
+  local runner="$1"
+  "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
+const fs = require("fs");
+const [, , file, host] = process.argv;
+try {
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const rec = data && data.platforms && data.platforms[host];
+  const owned = !!rec && rec.skillsOwner === "plugin";
+  const current = ["massa-ai", "profile", "bootstrap"];
+  const retired = owned && Array.isArray(rec.skills)
+    ? rec.skills.filter((s) => typeof s === "string" && /^[a-z0-9][a-z0-9-]*$/.test(s) && !current.includes(s))
+    : [];
+  process.stdout.write([owned ? "plugin" : "none", ...retired].join("\n"));
+} catch {
+  process.stdout.write("none");
+}
+NODE
+}
+
+# Removes every retired name in a plugin_skills_record output. The subshell
+# body scopes `set -f` and a newline-only IFS, so no name is ever
+# glob-expanded or split on a space.
+remove_retired_skills() (
+  set -f
+  IFS=$'\n'
+  state_retired_skills="$(printf '%s\n' "$1" | sed 1d)"
+  for name in $state_retired_skills; do
+    rm -rf "$HARNESS_SKILLS_DIR/$name"
+    vecho "  - removed retired harness skill $HARNESS_SKILLS_DIR/$name"
+  done
+)
+
 install_bundled_skills() {
   local runner=""
   if command -v node &>/dev/null; then runner="node"
@@ -335,7 +373,7 @@ install_bundled_skills() {
   fi
 
   local installed=0 name src dest
-  for name in massa-ai persona-router profile bootstrap; do
+  for name in massa-ai profile bootstrap; do
     src="$SCRIPT_DIR/skills/$name"
     [[ -d "$src" ]] || continue
     dest="$HARNESS_SKILLS_DIR/$name"
@@ -349,6 +387,11 @@ install_bundled_skills() {
     installed=$((installed + 1))
   done
   vecho "  + ${installed} harness skills installed to $HARNESS_SKILLS_DIR (plugin-owned)"
+
+  # C4: retired skills go BEFORE the record is rewritten — the recorded list
+  # is the only ownership proof, so a removal that fails (set -e aborts here)
+  # leaves it in place for the next run to retry.
+  remove_retired_skills "$(plugin_skills_record "$runner")"
 
   "$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" "$CODEX_DIR" <<'NODE'
 const fs = require("fs");
@@ -364,7 +407,8 @@ if (typeof data.platforms !== "object" || data.platforms === null || Array.isArr
 }
 data.version = 2;
 const prev = data.platforms[host];
-data.platforms[host] = { root, skillsOwner: "plugin", skills: ["massa-ai", "persona-router", "profile", "bootstrap"] };
+const current = ["massa-ai", "profile", "bootstrap"];
+data.platforms[host] = { root, skillsOwner: "plugin", skills: current };
 // The whole-record replace must not drop fields a previous successful install
 // wrote (R2) — re-attach them. modelProfile (T10, MPS-03 round-trip
 // obligation) is engine-owned; installRoute is installer-owned but written by
@@ -394,24 +438,16 @@ uninstall_bundled_skills() {
   else return 0
   fi
 
-  local raw_owner
-  raw_owner="$("$runner" - "$HARNESS_STATE_FILE" "$HARNESS_HOST" <<'NODE'
-const fs = require("fs");
-const [, , file, host] = process.argv;
-try {
-  const data = JSON.parse(fs.readFileSync(file, "utf8"));
-  const rec = data && data.platforms && data.platforms[host];
-  process.stdout.write(rec ? String(rec.skillsOwner) : "none");
-} catch {
-  process.stdout.write("none");
-}
-NODE
-  )"
-  [[ "$raw_owner" == "plugin" ]] && {
+  # Line 1 of the record is the enumerated owner; uninstall only ever acts on
+  # an exact "plugin" record.
+  local record
+  record="$(plugin_skills_record "$runner")"
+  [[ "${record%%$'\n'*}" == "plugin" ]] && {
     local name
-    for name in massa-ai persona-router profile bootstrap; do
+    for name in massa-ai profile bootstrap; do
       rm -rf "$HARNESS_SKILLS_DIR/$name"
     done
+    remove_retired_skills "$record"
     rmdir "$HARNESS_SKILLS_DIR" 2>/dev/null || true
     echo "  - removed plugin-owned harness skills from $HARNESS_SKILLS_DIR"
   }
@@ -588,6 +624,42 @@ unregister_codex_plugin() {
   CODEX_HOME="$CODEX_CLI_HOME" codex plugin marketplace remove "$CODEX_MARKETPLACE" </dev/null >/dev/null 2>&1 || true
 }
 
+# >>> massa-ai agent ownership predicates >>>
+# Byte-identical in every plugin installer and scripts/lib/installer-shared.sh
+# (plugin tarballs cannot source repo-only libs); the TS twin is
+# packages/shared/src/profile-switch/ownership.ts, and
+# scripts/__tests__/agent-ownership-parity.test.ts holds all copies and both
+# languages to identical verdicts. Ownership is a content marker, never a
+# filename; the legacy rule lets an upgrade prune the pre-rename
+# massa-ai-<name> files — exact names only, never an open massa-ai-* glob.
+MASSA_AI_OWNED_MARKER_MD='<!-- massa-ai-owned: true -->'
+MASSA_AI_LEGACY_AGENT_NAMES=" architecture-specialist audit-specialist builder context-curator designer documentation-agent furps-analyst investigator judge meta-judge mobile-specialist navigator plan-critic planner requirements-analyst reviewer test-engineer verification-agent "
+is_legacy_agent() {
+  local b="${1##*/}"
+  b="${b%.*}"
+  [[ "$b" == massa-ai-* && "$MASSA_AI_LEGACY_AGENT_NAMES" == *" ${b#massa-ai-} "* ]]
+}
+has_owned_marker() {
+  awk -v m="$MASSA_AI_OWNED_MARKER_MD" 'NR==1{if($0!="---")exit;next} !c&&$0=="---"{c=1;next} c{ok=($0==m);exit} END{exit !ok}' "$1" 2>/dev/null
+}
+is_owned_agent() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  is_legacy_agent "$1" || has_owned_marker "$1"
+}
+is_owned_agent_toml() {
+  [[ -f "$1" && ! -L "$1" ]] || return 1
+  [[ "$(head -n1 "$1")" == "# massa-ai-owned" ]]
+}
+is_owned_agent_link() {
+  [[ -L "$1" ]] || return 1
+  is_legacy_agent "$1" && return 0
+  local b="${1##*/}" t
+  t="$(readlink "$1")"
+  [[ "$t" == */opencode-plugin/agents/"$b" || "$t" == */plugins/massa-ai/agent-profiles/*/"$b" ]] && return 0
+  [[ -f "$1" ]] && has_owned_marker "$1"
+}
+# <<< massa-ai agent ownership predicates <<<
+
 # ── Uninstall ───────────────────────────────────────────────────────────────
 if [[ "$UNINSTALL" -eq 1 ]]; then
   echo "Uninstalling massa-ai Codex plugin (scope: $SCOPE)..."
@@ -608,8 +680,7 @@ if [[ "$UNINSTALL" -eq 1 ]]; then
   if [[ -d "$AGENTS_DIR" ]]; then
     removed=0
     for f in "$AGENTS_DIR/"*.toml; do
-      [[ -f "$f" ]] || continue
-      if head -n1 "$f" | grep -q "^# massa-ai-owned$"; then
+      if is_owned_agent_toml "$f"; then
         rm -f "$f"
         removed=$((removed + 1))
       fi
@@ -706,9 +777,13 @@ if [[ -n "$json_runner" ]]; then
 fi
 
 specialist_count=0
-for src in "$ACTIVE_AGENTS_SRC/"massa-ai-*.toml; do
+for src in "$ACTIVE_AGENTS_SRC/"*.toml; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
+  if [[ -e "$AGENTS_DIR/$name" || -L "$AGENTS_DIR/$name" ]] && ! is_owned_agent_toml "$AGENTS_DIR/$name"; then
+    echo "  ⚠ $AGENTS_DIR/$name exists and is not massa-ai-owned — skipped" >&2
+    continue
+  fi
   cp "$src" "$AGENTS_DIR/$name"
   vecho "  + $name"
   specialist_count=$((specialist_count + 1))
@@ -733,10 +808,9 @@ vecho "  + ${specialist_count} subagent specialists (generated from skills/agent
 # (AC-02.3, AC-02.5).
 pruned=0
 for f in "$AGENTS_DIR/"*.toml; do
-  [[ -f "$f" ]] || continue
-  head -n1 "$f" | grep -q "^# massa-ai-owned$" || continue   # ownership test (D3)
   base="$(basename "$f")"
   [[ -f "$ACTIVE_AGENTS_SRC/$base" ]] && continue             # keep-list: still shipped
+  is_owned_agent_toml "$f" || continue                        # ownership test (D3)
   rm -f "$f"
   pruned=$((pruned + 1))
 done
@@ -746,7 +820,7 @@ fi
 
 install_variant_tree
 
-# Skills bundling (PDO-08, 09): install massa-ai/persona-router into the
+# Skills bundling (PDO-08, 09): install massa-ai/profile/bootstrap into the
 # shared harness skills directory, unless scripts/install-skills.sh already
 # owns it for this platform.
 vecho ""

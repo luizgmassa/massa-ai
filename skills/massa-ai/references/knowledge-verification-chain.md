@@ -22,4 +22,3 @@ Step 2 reads whatever project documentation the target repository actually has; 
 ## Family Instantiations
 
 - **Requirements family:** the audit report's cited Requirement Source may be treated as Step 0 — the authoritative anchor the rest of the chain verifies implementation facts against. Step 0 answers *what was required*; Steps 1-5 still govern *how the code behaves*.
-- **Maestro:** `references/maestro/fact-ledger.md`'s Authority Order is the Maestro instantiation of this chain (official-doc → live-help → repo-convention → excluded/unverified). Do not layer the generic chain on top of it.

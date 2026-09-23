@@ -62,7 +62,7 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
    - Do not weaken tests, fixtures, snapshots, types, or public contracts to make the fix pass.
 9. Use agent orchestration only when it improves signal, except independent verification of the bug fix, which is mandated at the tiers named in `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated bug finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -72,17 +72,16 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable bug patterns
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `review`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
 > - inputs: diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven bug-fix size or high/critical bug severity, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`
 > - scope: the fixed bug finding's repro path, regression tests, and report claim closure
 > - inputs: the bug finding, the applied root-cause fix, the verification suggestion, and validation assets
@@ -100,7 +99,7 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.
    - Run the report's verification suggestion when available.
    - The red→green reproduction proves the regression test catches this bug; the discrimination sensor proves that same assertion would also discriminate against a future wrong implementation — complementary, and both required at Standard+.
-   - At the tiers named in the verification-agent dispatch's trigger above, run the discrimination sensor per `references/discrimination-sensor.md` against the divergence-point fix; a surviving mutant marks the finding's closure row `blocked` and records the `surviving_mutant` lessons signal even when the reproduction test is green.
+   - At the tiers named in the `code-reviewer` `verify` dispatch's trigger above, run the discrimination sensor per `references/discrimination-sensor.md` against the divergence-point fix; a surviving mutant marks the finding's closure row `blocked` and records the `surviving_mutant` lessons signal even when the reproduction test is green.
    - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop.
    - Run focused regression tests first, then relevant lint/type/build/test commands when feasible.
    - Confirm validation assets were not weakened.

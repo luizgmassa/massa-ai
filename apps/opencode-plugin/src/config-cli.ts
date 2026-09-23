@@ -16,6 +16,8 @@ import {
   syncGeneratedVariants,
   findRepoRootWithMarker,
   isHost,
+  isOwnedAgentFile,
+  isOwnedAgentLink,
   applyBootstrapState,
   assertKnownRuleId,
   bootstrapReportSucceeded,
@@ -90,8 +92,8 @@ Commands:
     --model <name>    Model name
     --base-url <url>  Base URL (for ollama/lmstudio)
 
-  agents            Manage the 18 subagent specialist definitions
-    agents install [--user|--project]   Write 18 agent .md files
+  agents            Manage the 7 subagent specialist definitions
+    agents install [--user|--project]   Write 7 agent .md files
     agents uninstall [--user|--project] Remove only massa-ai-owned agents
 
   profile list      List shipped model profiles + per-host active profile
@@ -439,9 +441,20 @@ export async function runCli(argv: string[]): Promise<number> {
       let count = 0;
       const entries = await fs.readdir(sourceAgentsDir);
       for (const entry of entries) {
-        if (!entry.startsWith("massa-ai-") || !entry.endsWith(".md")) continue;
+        if (!entry.endsWith(".md")) continue;
         const src = path.join(sourceAgentsDir, entry);
         const dest = path.join(agentsDir, entry);
+        let destExists = true;
+        try {
+          await fs.lstat(dest);
+        } catch {
+          destExists = false;
+        }
+        if (destExists && !isOwnedAgentFile(dest) && !isOwnedAgentLink(dest)) {
+          console.warn(`⚠ ${dest} exists and is not massa-ai-owned — skipped`);
+          continue;
+        }
+        if (isOwnedAgentLink(dest)) await fs.unlink(dest);
         await fs.copyFile(src, dest);
         count++;
       }
@@ -450,15 +463,14 @@ export async function runCli(argv: string[]): Promise<number> {
       );
       console.log(`  written to: ${agentsDir}`);
     } else {
-      // uninstall: remove only files with metadata: { massa-ai-owned: true }
+      // uninstall: remove only massa-ai-owned files (body marker or legacy name)
       let removed = 0;
       try {
         const entries = await fs.readdir(agentsDir);
         for (const entry of entries) {
-          if (!entry.startsWith("massa-ai-") || !entry.endsWith(".md")) continue;
+          if (!entry.endsWith(".md")) continue;
           const filePath = path.join(agentsDir, entry);
-          const content = await fs.readFile(filePath, "utf8");
-          if (content.includes("massa-ai-owned: true")) {
+          if (isOwnedAgentFile(filePath) || isOwnedAgentLink(filePath)) {
             await fs.unlink(filePath);
             removed++;
           }

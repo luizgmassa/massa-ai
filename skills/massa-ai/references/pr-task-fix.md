@@ -44,7 +44,7 @@ If stacked branching is declined, unavailable, or not applicable, continue seque
 
 ## Jira-Key Stacked Branches
 
-After the PR groups are stable, inspect their Jira keys. Offer stacked branch automation only when every PR group has a confirmed Jira key. Do not create Jira tickets from this reference; ticket creation remains owned by `workflows/ticket.md`.
+After the PR groups are stable, inspect their Jira keys. Offer stacked branch automation only when every PR group has a confirmed Jira key. Do not create Jira tickets from this reference; ticket creation remains owned by `workflows/create-ticket.md`.
 
 If every group has a Jira key, ask whether the user wants to automatically create separate stacked branches for each Jira task. If the user accepts, ask for:
 

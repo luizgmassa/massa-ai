@@ -1,4 +1,42 @@
-## Current — Model Catalog revamp + API log clarity (**VALIDATED PASS 2026-09-23** — 12/12 logging ACs, 9/9 catalog ACs, drift follow-ups T1/T1b/T2; independent verifier iteration 1 blocked on 5 surviving mutants, iteration 2 killed all; branch `feat/model-catalog-revamp`)
+## Current — Agent roster consolidation (**COMPLETE 2026-09-23** — 13 Tasks across 5 Phases via phase-batch workers, three review fix commits, three independent verification rounds: **FAIL, FAIL, then PASS at 49/49 ACs**)
+
+Branch `feat/agent-roster-consolidation` off `origin/main@f582b602` (v1.60.1), worktree
+`~/Projects/massa-ai-wt-roster`. Full account in `.specs/HANDOFF.md` and
+`.specs/features/agent-roster-consolidation/`.
+
+**What shipped.** Personas removed (router skill, catalog, `persona-router` bootstrap rule 9 → 8,
+`/persona` extractor trigger); 18 sub-agents → 7 (`builder`, `code-explorer`, `code-reviewer`,
+`designer`, `judge`, `product-manager`, `test-engineer`), merged charters keep every former output
+contract behind a packet `mode`; `massa-ai-` agent prefix dropped, ownership moved to the
+`massa-ai-owned` content marker on every host; `general` + three `maestro*` workflows removed
+(40 → 36) and six renamed (`product-discovery`, `create-adr|prd|rfc|tdd|ticket`); upgrades prune
+legacy `massa-ai-<18 names>` agents and a plugin-recorded `persona-router` skill.
+
+**Commits:** T1 `7d245183`, T2 `e7730585`, T3 `fb242b33`, T4 `f9776f41`, T5 `57dc9538`,
+T6 `c793377f`, fix `161b9a62`, T7 `9814cfd0`, T8 `dc7ed630`, fix `b655d16f`, T9 `32e8cd1c`,
+T10 `12700369`, T11 `8bf1abcf`, fix `d9326551`, `ae926f21` (tasks.md sweep-allowlist amendment),
+T12 `b30c9956`, T13 `bde889aa`, test fix `40299644`, spec amendments `6a78d0c0`, fix `738010a8`, test `e057feb5`.
+
+**Validation.** Independent validation: round 1 at `bde889aa` FAIL (23 mutations, 18 killed, 5 survived — all test gaps, no live defect); test-only fix `40299644` + spec amendments `6a78d0c0`; round 2 at `6a78d0c0` FAIL (49 ACs, 48 matched; 15/15 killed; ROS AC-7 prose spellings the sweep missed); fix `738010a8`; round 3 at `738010a8` **PASS — 49/49 ACs, 0 spec-precision gaps, 9/9 mutations killed**. Post-PASS test-only hardening `e057feb5` (massa-ai-prefixed + underscore retired-name sweep, observed red 59/1, 58/2, 59/1).
+
+**Final gate (T13, measured on `b30c9956` + the T13 CHANGELOG/removed-features edits,
+`XDG_CONFIG_HOME` scratch):** `build --force` 0 (6/6, 0 cached), `type-check --force` 0 (6/6,
+0 cached), `lint` 0, `generate:artifacts` 0 → `--check` 0 (no drift), `bun test scripts/__tests__
+scripts/tests/*.test.ts` 2172/0, `run-shell-suites.sh` 41/41, `test:plugins` 175/0,
+`packages/shared` 975/0, `check-stale-pointers` PASS (0 broken, historical pin 28),
+`validate_spec` 0 errors / 13 EARS-keyword warnings. `bun run test` (turbo) was not re-run for
+this batch: core and mcp-client hit a known Bun napi SIGTRAP at exit, red at base too.
+
+**Decisions recorded in the feature, not project-level:** A1–A20 in `spec.md` (notably A10 judge
+write permission, A16 plugin-only update keeps the old `MASSA-AI.md`, A17 exact legacy names,
+A18 no namespace off the Claude plugin route, A20 test-engineer audit mode is write-capable).
+
+**Post-validation merge (2026-09-23).** `origin/main` (model catalog v2 — tiers removed, per-agent overrides; logging) merged in `ec21d05e`; adaptation commit drops `documentation-agent` overrides from every built-in profile and repoints main's new generator tests to the 7-agent roster. Spec: Inventory AC-7 superseded (no `WORKFLOW_STEMS` upstream), A21 added. Post-merge gates, foreground: build, type-check, lint, generate --check, stale pointers green; scripts 2181/0, shell suites all pass, plugins 183/0, shared 1015/0, web-ui 751/0, opencode src 155/0, mcp-client config-cli 87/0, tools-api model-registry 36/0 + web-ui-contract 8/0.
+
+**Next step:** push `feat/agent-roster-consolidation` and open the PR (authorized at Execute
+start); watch CI. Merge is the user's call.
+
+## Previous — Model Catalog revamp + API log clarity (**VALIDATED PASS 2026-09-23** — 12/12 logging ACs, 9/9 catalog ACs, drift follow-ups T1/T1b/T2; independent verifier iteration 1 blocked on 5 surviving mutants, iteration 2 killed all; branch `feat/model-catalog-revamp`)
 
 Specs: `.specs/features/api-log-clarity/`, `.specs/features/model-catalog-revamp/`; validation reports beside them.
 Delivered as one PR, per the user on 2026-09-22.
