@@ -71,3 +71,17 @@ File reads only: `known_marketplaces.json`, `installed_plugins.json`,
   negative test pins real-run behavior.
 - R2 (T02) Frontmatter parser moves, generator imports it — byte-identical
   behavior pinned by existing generator tests plus new round-trip tests.
+
+## Follow-ups (2026-09-21, same session — branch fix/agent-drift-followups)
+
+### T1 — regeneration must respect the recorded active profile
+- AC: `selectProfile` precedence = `--profile` > `MASSA_AI_MODEL_PROFILE` > install-state `modelProfile` > `hostDefaults`; an unknown name at ANY rank throws before any file is written.
+- AC: `main()` threads `stateProfilesFromInstallState(state)` into `emitAll`; hosts without a recorded profile fall through to hostDefaults (fresh checkout/CI unchanged).
+- Evidence (live): post-fix `generate:artifacts` emitted `claude profile: work (from install-state)` with glm-5.3-flash actives, against the operator's real state.
+- AC: tests discriminate — state beats hostDefaults; flag and env beat state; unknown name throws; projection maps only hosts with a recorded profile.
+
+### T2 — `massa-ai-config doctor [--fix] [--host <h>] [--target <dir>]`
+- AC: both CLIs print the doctor report (route, three versions, per-role models, staleness, env override); `--target` is the test/home seam (bootstrap convention).
+- AC: `--fix` re-runs the profile switch for the RECORDED active profile (never a flag), then re-reports; no recorded profile → loud error, zero mutation; failed switch → non-zero exit.
+- AC: version drift and env overrides are report-only — their remedies live outside this CLI's write scope. The session-start hook remains read-only (INV5 unchanged).
+- Skipped check: the opencode-plugin suite crashes on origin/main WITHOUT this change-set (stash-verified baseline) — the mirrored CLI is import-smoked, not suite-tested; record as environmental, not a pass.

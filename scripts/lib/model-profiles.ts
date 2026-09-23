@@ -374,20 +374,35 @@ export interface SelectOpts {
   readonly flag?: string | null;
   /** Injected for tests; defaults to process.env. */
   readonly env?: Record<string, string | undefined>;
+  /**
+   * The host's recorded active profile from `install-state.json`
+   * (`platforms.<host>.modelProfile.profile`), threaded in by callers that
+   * hold the state — `selectProfile` stays fs-free. Rank 3 of 4: the switch
+   * engine records operator intent, so a regeneration must not silently
+   * reset the actives to the registry default (agent-drift followup T1 —
+   * measured 2026-09-21: a post-switch regeneration re-emitted actives from
+   * `hostDefaults`, and the session-start drift hook caught the divergence).
+   */
+  readonly stateProfile?: string | null;
 }
 
 export const PROFILE_ENV_VAR = "MASSA_AI_MODEL_PROFILE";
 
 /**
- * Precedence, first match wins: `--profile` > MASSA_AI_MODEL_PROFILE > hostDefaults[host].
- * There is no fourth rank — an unknown name at any rank throws.
+ * Precedence, first match wins: `--profile` > MASSA_AI_MODEL_PROFILE >
+ * stateProfile (install-state's recorded `modelProfile`) > hostDefaults[host].
+ * An unknown name at any rank throws.
  *
  * Selection also verifies the profile SUPPORTS this host, so `--profile=open_models` fails
  * before a single file is written rather than partway through emitting 60 of them.
  */
 export function selectProfile(registry: Registry, host: Host, opts: SelectOpts = {}): string {
   const env = opts.env ?? process.env;
-  const raw = opts.flag?.trim() || env[PROFILE_ENV_VAR]?.trim() || registry.hostDefaults[host];
+  const raw =
+    opts.flag?.trim() ||
+    env[PROFILE_ENV_VAR]?.trim() ||
+    opts.stateProfile?.trim() ||
+    registry.hostDefaults[host];
   if (!raw) {
     throw namedError(
       "InvalidHostDefaultError",

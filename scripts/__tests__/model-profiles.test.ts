@@ -213,11 +213,33 @@ describe("model-profiles: profile selection (MPR-R4)", () => {
     })(),
   ) as Registry;
 
-  test("rank 3: hostDefaults when no flag and no env", () => {
+  test("rank 4: hostDefaults when no flag, no env, no recorded state profile", () => {
     expect(selectProfile(r, "claude", { env: {} })).toBe("p1");
   });
 
-  test("rank 2: env var beats hostDefaults", () => {
+  test("rank 3: install-state's recorded profile beats hostDefaults (agent-drift followup T1)", () => {
+    expect(selectProfile(r, "claude", { env: {}, stateProfile: "p2" })).toBe("p2");
+  });
+
+  test("an unknown recorded state profile throws — never a silent fallback", () => {
+    expect(() => selectProfile(r, "claude", { env: {}, stateProfile: "nope" })).toThrow(/unknown profile/);
+  });
+
+  test("rank 2: env var beats the recorded state profile", () => {
+    expect(selectProfile(r, "claude", { env: { [PROFILE_ENV_VAR]: "p1" }, stateProfile: "p2" })).toBe("p1");
+  });
+
+  test("rank 1: flag beats env var and the recorded state profile", () => {
+    expect(
+      selectProfile(r, "claude", { flag: "p1", env: { [PROFILE_ENV_VAR]: "p2" }, stateProfile: "p2" }),
+    ).toBe("p1");
+  });
+
+  test("blank flag and blank env fall through to the recorded state profile, not an empty name", () => {
+    expect(selectProfile(r, "claude", { flag: "   ", env: { [PROFILE_ENV_VAR]: "  " }, stateProfile: "p2" })).toBe("p2");
+  });
+
+  test("rank 2: env var beats hostDefaults (no state rank given)", () => {
     expect(selectProfile(r, "claude", { env: { [PROFILE_ENV_VAR]: "p2" } })).toBe("p2");
   });
 

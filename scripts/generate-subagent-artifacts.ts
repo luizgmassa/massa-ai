@@ -15,7 +15,7 @@
 
 import { promises as fs } from "fs";
 import path from "path";
-import { tmpdir } from "os";
+import { tmpdir, homedir } from "os";
 import {
   hostsSupportedBy,
   loadRegistry,
@@ -32,6 +32,11 @@ export { HOSTS, type Host };
 // and the profile-switch doctor (reader). A second parser here would let the
 // writer and the reader disagree about what `model:` means.
 import { parseFrontmatter } from "../packages/shared/src/profile-switch/frontmatter.ts";
+// agent-drift followup T1: the actives' profile rank-3 source — the SAME
+// state file (and the same default path resolution) the switch engine reads,
+// so generator and engine cannot disagree about what "active" means.
+import { readInstallState } from "../packages/shared/src/profile-switch/state.ts";
+import type { InstallState } from "../packages/shared/src/profile-switch/state.ts";
 
 // ── Paths ───────────────────────────────────────────────────────────────────
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -396,10 +401,22 @@ export function emitOpenCode(c: Charter, m: Resolved): string {
 export interface EmitOptions {
   /** Pre-loaded registry; loaded from disk when omitted. */
   readonly registry?: Registry;
-  /** `--profile=<name>`. Overrides the env var and each host's default. */
+  /** `--profile=<name>`. Overrides the env var, the recorded state profile, and each host's default. */
   readonly profileFlag?: string | null;
   /** Injected for tests; defaults to process.env. */
   readonly env?: Record<string, string | undefined>;
+  /**
+   * Per-host recorded active profile from `install-state.json`
+   * (`platforms.<host>.modelProfile.profile`) — rank 3 of the selection
+   * precedence (agent-drift followup T1). `main()` threads it so a
+   * regeneration re-emits the ACTIVES for the profile the operator switched
+   * to, instead of silently resetting them to the registry's `hostDefaults`
+   * (measured 2026-09-21: a post-switch regenerate re-emitted claude actives
+   * from `balanced` while the state said `work`; the session-start drift
+   * hook caught the divergence). Absent for a host → that host falls through
+   * to `hostDefaults`, exactly as before.
+   */
+  readonly stateProfiles?: Partial<Record<Host, string>>;
   /**
    * Dedup set for `warnStaleAgentTiers` (design D-2, plan-critic blocking finding #2). A
    * real run's `main()` calls both `emitAll` and `emitVariants` against the same registry,
@@ -424,6 +441,22 @@ const EMIT_BY_HOST: Record<Host, EmitFn> = {
   opencode: emitOpenCode,
 };
 
+/**
+ * agent-drift followup T1: the rank-3 selection source, extracted from
+ * `main()` so the state → profiles mapping is unit-testable without touching
+ * a real home. Pure projection of the switch engine's own state shape —
+ * a host with no recorded `modelProfile` contributes nothing and falls
+ * through to `hostDefaults` downstream.
+ */
+export function stateProfilesFromInstallState(state: InstallState): Partial<Record<Host, string>> {
+  const out: Partial<Record<Host, string>> = {};
+  for (const host of HOSTS) {
+    const recorded = state.platforms[host]?.modelProfile?.profile;
+    if (recorded) out[host] = recorded;
+  }
+  return out;
+}
+
 /** Which profile each host resolves against, after the full precedence chain. */
 export function profilesPerHost(
   registry: Registry,
@@ -435,6 +468,7 @@ export function profilesPerHost(
     out[host] = selectProfile(registry, host, {
       flag: opts.profileFlag ?? null,
       env: opts.env,
+      stateProfile: opts.stateProfiles?.[host] ?? null,
     });
   }
   return out;
@@ -746,7 +780,23 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   // finding #2) — a real run reaches emitAll then emitVariants against this same registry,
   // so a shared Set is what keeps a stale agentTiers name warning exactly once.
   const warnedStaleAgents = new Set<string>();
-  const runtimeOpts: EmitOptions = { ...opts, registry, warnedStaleAgents };
+  // agent-drift followup T1: the recorded active profile (install-state's
+  // modelProfile) outranks hostDefaults so a regeneration re-emits the ACTIVES
+  // for the profile the operator switched to instead of silently resetting
+  // them to the registry default. Absent/unreadable state → empty map, and
+  // every host falls through to hostDefaults exactly as before (fresh
+  // installs and CI keep their behavior). Unknown profile names at this rank
+  // throw inside selectProfile — loud, before any file is written.
+  const stateProfiles: Partial<Record<Host, string>> = {};
+  try {
+    // Same default resolution as the switch engine's defaultStatePath.
+    const state = readInstallState(path.join(homedir(), ".config", "massa-ai", "install-state.json"));
+    Object.assign(stateProfiles, stateProfilesFromInstallState(state));
+  } catch {
+    // No state / unreadable state → no rank-3 entries. Deliberately silent:
+    // a fresh checkout has no state, and that is the normal path.
+  }
+  const runtimeOpts: EmitOptions = { ...opts, registry, warnedStaleAgents, stateProfiles };
   const profiles = await emitAll(HOST_DIRS, runtimeOpts);
   const hostCount = Object.keys(HOST_DIRS).length;
   const total = SPECIALIST_NAMES.length * hostCount;
@@ -757,7 +807,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   // --profile typo or a stray MASSA_AI_MODEL_PROFILE indistinguishable from a
   // normal run, and the whole point of the registry is that model choice is legible.
   for (const [host, profile] of Object.entries(profiles)) {
-    console.log(`  ${host.padEnd(9)} profile: ${profile}`);
+    const fromState = stateProfiles[host] === profile ? " (from install-state)" : "";
+    console.log(`  ${host.padEnd(9)} profile: ${profile}${fromState}`);
   }
   // Variant trees (design.md Component 1, MPS-01): every profile a host supports,
   // pre-rendered under agent-profiles/<profile>/ — independent of --profile/env,

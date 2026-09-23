@@ -28,6 +28,7 @@ import {
   runCheck,
   main,
   profilesPerHost,
+  stateProfilesFromInstallState,
   warnStaleAgentTiers,
   OPENCODE_OWNED_MARKER,
   type Charter,
@@ -555,6 +556,38 @@ describe("generator profile selection", () => {
 
   test("MASSA_AI_MODEL_PROFILE applies when no flag is given", () => {
     const p = profilesPerHost(registry, { env: { [PROFILE_ENV_VAR]: "heavy" } });
+    expect(p.claude).toBe("heavy");
+  });
+
+  test("install-state's recorded profile outranks the host default (agent-drift followup T1)", () => {
+    const state = {
+      version: 2,
+      platforms: {
+        claude: { root: "/x", skills: [], skillsOwner: "plugin", modelProfile: { profile: "cheap" } },
+      },
+    } as unknown as Parameters<typeof stateProfilesFromInstallState>[0];
+    const p = profilesPerHost(registry, { env: {}, stateProfiles: stateProfilesFromInstallState(state) });
+    expect(p.claude).toBe("cheap");
+  });
+
+  test("stateProfilesFromInstallState projects only hosts with a recorded modelProfile", () => {
+    const state = {
+      version: 2,
+      platforms: {
+        claude: { root: "/x", skills: [], skillsOwner: "plugin", modelProfile: { profile: "work" } },
+        codex: { root: "/y", skills: [], skillsOwner: "plugin" },
+      },
+    } as unknown as Parameters<typeof stateProfilesFromInstallState>[0];
+    const out = stateProfilesFromInstallState(state);
+    expect(out).toEqual({ claude: "work" });
+  });
+
+  test("the flag beats the recorded state profile", () => {
+    const p = profilesPerHost(registry, {
+      profileFlag: "heavy",
+      env: {},
+      stateProfiles: { claude: "cheap" },
+    });
     expect(p.claude).toBe("heavy");
   });
 

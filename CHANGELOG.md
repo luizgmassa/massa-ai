@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`massa-ai-config doctor [--fix] [--host <h>] [--target <dir>]`** in both
+  the mcp-client and opencode-plugin CLIs (agent-drift followup T2). Prints
+  the profile-switch doctor's drift report — live-tree vs recorded vs pinned
+  versions, per-role models, variant staleness, and the host env override —
+  and `--fix` is the sanctioned mutation surface the session-start hook
+  deliberately is not: it re-runs the profile switch for the RECORDED active
+  profile (never a flag), then re-reports. Version drift and env overrides
+  stay report-only; their remedies live outside this CLI's write scope.
+
+### Fixed
+
+- **Regeneration no longer silently resets the active profile
+  (agent-drift followup T1).** `selectProfile`'s precedence gains rank 3:
+  `--profile` > `MASSA_AI_MODEL_PROFILE` > **install-state's recorded
+  `modelProfile`** > `hostDefaults`. Measured 2026-09-21: after an operator
+  switched to `work`, the next `generate:artifacts` re-emitted the claude
+  actives from the registry default models while the state still said `work`
+  — the session-start drift hook caught the divergence its own generator had
+  caused. `main()` now threads the recorded profile through `emitAll`
+  (`stateProfilesFromInstallState`), so a regeneration re-emits the actives
+  for the profile the operator actually switched to; fresh checkouts and CI
+  (no state) keep the old behavior, and an unknown recorded name still
+  throws before any file is written.
+
 ## [1.60.1] - 2026-09-21
 
 ### Fixed

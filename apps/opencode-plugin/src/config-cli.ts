@@ -28,6 +28,8 @@ import {
   type ProfileInventory,
   type SwitchReport,
   type VariantSyncHostResult,
+  runtimeDriftReport,
+  type AgentRuntimeReport,
 } from "@massa-ai/shared";
 import { INFERENCE_PROVIDERS, deriveInferenceBaseUrls } from "@massa-ai/shared/inference-providers";
 import { promises as fs } from "fs";
@@ -97,6 +99,14 @@ Commands:
   profile set <name> [--host <h>] [--dry-run]
                     Switch installed agents to a profile (restart required after)
 
+  doctor [--fix] [--host <h>] [--target <dir>]
+                    Report agent model/profile drift: live-tree vs recorded
+                    versions, per-role models, variant staleness, env
+                    overrides. --fix re-runs the profile switch for the
+                    recorded active profile (restart required after).
+                    --target redirects the home the state/registries are
+                    read from (test seam, same convention as bootstrap)
+
   bootstrap list    List every startup-contract rule: state, default, description
   bootstrap show    Same as 'bootstrap list'
   bootstrap enable <rule-id> [--target <dir> --yes] [--dry-run]
@@ -114,6 +124,8 @@ Examples:
   massa-ai-config set embedding.dimensions 1024
   massa-ai-config agents install --user
   massa-ai-config profile set work --dry-run
+  massa-ai-config doctor
+  massa-ai-config doctor --fix
   massa-ai-config bootstrap list
   massa-ai-config bootstrap disable caveman
 `);
@@ -164,6 +176,45 @@ function formatSwitchReport(report: SwitchReport): void {
   }
   if (report.restartRequired) {
     console.log("\nA host session restart is required for the change to take effect.");
+  }
+}
+
+/**
+ * agent-drift followup T2: the CLI front for the profile-switch doctor
+ * (`runtimeDriftReport`). Read-only by default; `--fix` is the sanctioned
+ * mutation surface — the session-start hook deliberately never mutates, so
+ * this command is where the human applies the remedy the drift line names.
+ * Version drift and env overrides stay report-only: their remedies (plugin
+ * update / host env edit) are outside this CLI's write scope.
+ */
+function formatDriftReport(report: AgentRuntimeReport): void {
+  console.log(`doctor (${report.host}, route: ${report.route})`);
+  console.log(`  live root:       ${report.liveRoot ?? "n/a"}`);
+  console.log(`  source version:  ${report.sourceVersion ?? "n/a"} (live tree)`);
+  console.log(`  state version:   ${report.stateVersion ?? "n/a"} (install-state)`);
+  console.log(`  pinned version:  ${report.pinnedVersion ?? "n/a"} (installed_plugins)`);
+  console.log(`  active profile:  ${report.activeProfile ?? "n/a"}`);
+  for (const role of report.roles) {
+    const stale = role.staleVariant ? " — STALE vs the recorded profile's variant" : "";
+    console.log(`  ${role.name}: model=${role.model ?? "unknown"} effort=${role.effort ?? "unknown"}${stale}`);
+  }
+  if (report.versionDrift) {
+    console.log(
+      `  drift: live tree ${report.sourceVersion} != recorded ${report.stateVersion} — update the plugin (or re-run the installer)`,
+    );
+  }
+  if (report.profileMaterialized) {
+    console.log(
+      "  drift: active agent files differ from the recorded profile's variants — run `massa-ai-config doctor --fix` (re-runs the profile switch)",
+    );
+  }
+  if (report.envOverride) {
+    console.log(
+      `  override: ${report.envOverride.name}=${report.envOverride.value} wins over every per-agent model at runtime — remove it from the host env to let profiles govern`,
+    );
+  }
+  if (report.route !== "unresolved" && !report.versionDrift && !report.profileMaterialized && !report.envOverride) {
+    console.log("  healthy: every recording agrees.");
   }
 }
 
@@ -471,6 +522,45 @@ export async function runCli(argv: string[]): Promise<number> {
 
     console.error("Usage: massa-ai-config profile <list|show|set> ...");
     return 1;
+  }
+
+  case "doctor": {
+    const fix = options["fix"] === true;
+    const hostOpt = typeof options.host === "string" ? options.host : undefined;
+    if (hostOpt !== undefined && !isHost(hostOpt)) {
+      console.error(`Error: unknown host "${hostOpt}"`);
+      return 1;
+    }
+    const targetHome = typeof options.target === "string" ? options.target : os.homedir();
+    try {
+      let report = runtimeDriftReport({ targetHome });
+      if (fix) {
+        const profile = report.activeProfile;
+        if (!profile) {
+          console.error(
+            "Error: no recorded active profile in install-state.json — run " +
+              "`massa-ai-config profile set <name>` first; there is nothing to fix from.",
+          );
+          return 1;
+        }
+        // Same bridge `profile set` uses: a dev checkout refreshes the
+        // installed variant root before switching; a published install
+        // (null sourceRoot) makes it a silent no-op.
+        const sourceRoot = findRepoRootWithMarker(__dirname, GENERATOR_MARKER, GENERATOR_MARKER_MAX_LEVELS);
+        formatVariantSync(syncGeneratedVariants({ sourceRoot }));
+        const switchReport = switchProfile({ profile, host: hostOpt as Host | undefined, targetHome });
+        formatSwitchReport(switchReport);
+        if (!reportSucceeded(switchReport)) {
+          return 1;
+        }
+        report = runtimeDriftReport({ targetHome });
+      }
+      formatDriftReport(report);
+      return 0;
+    } catch (e) {
+      console.error(`Error: ${(e as Error).message}`);
+      return 1;
+    }
   }
 
   /*
