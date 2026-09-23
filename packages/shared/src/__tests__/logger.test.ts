@@ -6,7 +6,7 @@
  * the ring buffer (log-buffer.ts) wiring added by T11 (LOG-01, LOG-02).
  */
 
-import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach, mock, spyOn, setSystemTime } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -217,6 +217,22 @@ describe("Logger", () => {
       expect(out).toContain('"code":7');
       expect(out).not.toContain('"error"');
     });
+
+    test("a non-Error second arg never serializes to an empty error block", () => {
+      configState = { level: "error", enableMetrics: false };
+      const nonError = { code: "WEIRD" } as unknown as Error;
+      loggerInstance.error("op failed", nonError);
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).not.toContain('"error":{}');
+      expect(out).toContain('"error":{"message":"[object Object]"}');
+    });
+
+    test("a thrown string second arg is stringified rather than dropped", () => {
+      configState = { level: "error", enableMetrics: false };
+      loggerInstance.error("op failed", "plain string reason" as unknown as Error);
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).toContain('"error":{"message":"plain string reason"}');
+    });
   });
 
   describe("metric()", () => {
@@ -367,6 +383,43 @@ describe("Logger", () => {
       const out = errSpy.mock.calls[errSpy.mock.calls.length - 1][0] as string;
       expect(out).not.toContain("occurrences");
     });
+
+    test("a repeat outside the 15-minute window starts a fresh streak (window must actually reset)", () => {
+      configState = { level: "warn", enableMetrics: false };
+      setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+      try {
+        loggerInstance.warn("disk low");
+        // 15 minutes + 1s later: the window has elapsed, so this must read
+        // as a brand-new first occurrence, not occurrences:2. A mutant that
+        // never re-checks the window (always treats the key as "still
+        // fresh") would keep incrementing here.
+        setSystemTime(new Date("2026-01-01T00:15:01.000Z"));
+        loggerInstance.warn("disk low");
+        const second = errSpy.mock.calls[1][0] as string;
+        expect(second).not.toContain("occurrences");
+        expect(second).not.toContain("firstSeenAgo");
+      } finally {
+        setSystemTime();
+      }
+    });
+
+    test("does not mutate the caller's meta object", () => {
+      configState = { level: "warn", enableMetrics: false };
+      const meta = { label: "reranker" };
+      loggerInstance.warn("llm call failed", meta);
+      loggerInstance.warn("llm call failed", meta);
+      expect(meta).toEqual({ label: "reranker" });
+      expect(Object.keys(meta)).toHaveLength(1);
+    });
+
+    test("the ring buffer receives the repeat-accounted meta, including occurrences", () => {
+      configState = { level: "warn", enableMetrics: false };
+      loggerInstance.warn("disk low", { pct: 90 });
+      loggerInstance.warn("disk low", { pct: 91 });
+      const entries = logBuffer.snapshot(); // newest-first
+      expect(entries[0].meta).toMatchObject({ pct: 91, occurrences: 2 });
+      expect(entries[0].meta?.firstSeenAgo).toBeDefined();
+    });
   });
 
   describe("error serialization (design §5, AC5)", () => {
@@ -406,6 +459,54 @@ describe("Logger", () => {
       const out = errSpy.mock.calls[0][0] as string;
       expect(out).not.toContain("requestBodyValues");
       expect(out).not.toContain("secret prompt text");
+      // The old buggy output for a spread Error is "error":{} — assert the
+      // picked fields are actually present, so a regression to spreading
+      // (or to dropping the fields entirely) both fail here.
+      expect(out).toContain('"name":"Error"');
+      expect(out).toContain('"message":"api call failed"');
+    });
+
+    test("a long error message is capped at 300 chars with a truncation marker", () => {
+      configState = { level: "error", enableMetrics: false };
+      const rawOutput = "x".repeat(400);
+      const err = new Error(rawOutput);
+      err.stack = undefined; // the stack (uncapped, unlike message) also embeds the raw
+      // message text — isolate the assertion to the picked `message` field.
+      loggerInstance.error("llmObject failed", err);
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).toContain(`"message":"${"x".repeat(300)}…(truncated 100 chars)"`);
+      expect(out).not.toContain(`"message":"${rawOutput}"`);
+    });
+
+    test("a long error.cause message is capped at 300 chars with a truncation marker", () => {
+      configState = { level: "error", enableMetrics: false };
+      const rawCause = "y".repeat(500);
+      const err = new Error("wrapper") as Error & { cause?: unknown };
+      err.cause = new Error(rawCause);
+      loggerInstance.error("llmObject failed", err);
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).not.toContain(rawCause);
+      expect(out).toContain("y".repeat(300));
+      expect(out).toContain("…(truncated 200 chars)");
+    });
+  });
+
+  describe("meta serialization safety (design §4 fix-round)", () => {
+    test("a circular reference in meta never throws and still logs the message", () => {
+      configState = { level: "info", enableMetrics: false };
+      const meta: Record<string, unknown> = { a: 1 };
+      meta.self = meta;
+      expect(() => loggerInstance.info("circular meta", meta)).not.toThrow();
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).toContain("circular meta");
+      expect(out).toContain('"self":"[Circular]"');
+    });
+
+    test("a bigint value in meta never throws", () => {
+      configState = { level: "info", enableMetrics: false };
+      expect(() => loggerInstance.info("bigint meta", { big: 10n })).not.toThrow();
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).toContain('"big":"10"');
     });
   });
 

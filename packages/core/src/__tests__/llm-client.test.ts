@@ -1156,4 +1156,149 @@ describe("llm-client — failure WARN / recovery INFO / decode DEBUG (AC1/AC2/AC
       infoSpy.mockRestore();
     }
   });
+
+  test("llmComplete: a throw increments the failure streak and logs the canonical failure WARN", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateShouldThrow = "network down";
+      const res = await llmComplete("hello", { label: "complete-throw-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).label).toBe("complete-throw-label");
+      expect((failure![1] as any).consecutiveFailures).toBe(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("llmComplete: empty content with no reasoning recovery increments the failure streak", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateReturn = { text: "" };
+      const res = await llmComplete("hello", { label: "complete-empty-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).label).toBe("complete-empty-label");
+      expect((failure![1] as any).consecutiveFailures).toBe(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("llmObject: a fallback-path schema-validation failure (not a throw) also increments the failure streak", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectReturn = { object: { summary: 123 } }; // wrong type, missing required fields
+      const res = await llmObject("hello", sampleSchema, { label: "validation-fail-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).consecutiveFailures).toBe(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("label isolation: label A's failure streak survives label B's success, and B logs no recovery line", async () => {
+    const infoSpy = spyOn(logger, "info");
+    try {
+      generateObjectShouldThrow = "boom";
+      await llmObject("hello", sampleSchema, { label: "iso-a" });
+      await llmObject("hello", sampleSchema, { label: "iso-a" }); // A's streak -> 2
+      generateObjectShouldThrow = null;
+
+      const resB = await llmObject("hello", sampleSchema, { label: "iso-b" }); // B never failed
+      expect(resB.ok).toBe(true);
+      const bRecoveries = infoSpy.mock.calls.filter(
+        (c) => c[0] === "LLM call recovered" && (c[1] as any).label === "iso-b",
+      );
+      expect(bRecoveries.length).toBe(0);
+
+      infoSpy.mockClear();
+      const resA = await llmObject("hello", sampleSchema, { label: "iso-a" }); // A recovers
+      expect(resA.ok).toBe(true);
+      const aRecoveries = infoSpy.mock.calls.filter((c) => c[0] === "LLM call recovered");
+      expect(aRecoveries.length).toBe(1);
+      expect(aRecoveries[0][1]).toMatchObject({ label: "iso-a", afterFailures: 2 });
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+});
+
+describe("llm-client — provider identity in failure logging (finding 5)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test('an unresolved baseUrl reports provider: "unknown" in the failure WARN, never a false "ollama"', async () => {
+    _setLlmBaseUrlForTesting("http://example.com:9999/v1");
+    const prevEmbeddingProvider = process.env.EMBEDDING_PROVIDER;
+    process.env.EMBEDDING_PROVIDER = "openai"; // not in LOCAL_INFERENCE_IDS — no legitimate match
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = "boom";
+      const res = await llmObject("hello", sampleSchema, { label: "unknown-provider-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).provider).toBe("unknown");
+    } finally {
+      warnSpy.mockRestore();
+      if (prevEmbeddingProvider === undefined) delete process.env.EMBEDDING_PROVIDER;
+      else process.env.EMBEDDING_PROVIDER = prevEmbeddingProvider;
+    }
+  });
+
+  test("a matched baseUrl (default ollama) still reports its real provider id, unaffected by the lazy resolution", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = "boom";
+      const res = await llmObject("hello", sampleSchema, { label: "known-provider-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect((failure![1] as any).provider).toBe("ollama");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+describe("llm-client — zod issues attached to the fallback-path validation error (finding 6)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test("llmObject fallback-path validation failure attaches a compact zod-issues summary as the error's cause", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectReturn = { object: { summary: 123 } }; // wrong type, missing required fields
+      const res = await llmObject("hello", sampleSchema, { label: "zod-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      const err = (failure![1] as any).error as Error & { cause?: unknown };
+      expect(err).toBeInstanceOf(Error);
+      expect(typeof err.cause).toBe("string");
+      expect(err.cause as string).toContain("summary");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });

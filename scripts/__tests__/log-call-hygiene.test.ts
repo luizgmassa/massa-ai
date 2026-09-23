@@ -14,13 +14,23 @@ interface LogCall {
 }
 
 function productionFiles(): string[] {
-  const out = execFileSync("git", ["ls-files", "--", ...SOURCE_ROOTS.map((r) => `${r}/**/*.ts`)], {
+  // `**/*.ts` needs at least one directory level to match (a git pathspec
+  // trait, not a bug in this repo) — it silently drops every file that sits
+  // directly under the root (e.g. a barrel `index.ts`). `*.ts` alone has the
+  // opposite gap: it never crosses a `/`, so it only sees those direct
+  // children. Both patterns together are required for full coverage.
+  const patterns = SOURCE_ROOTS.flatMap((r) => [`${r}/*.ts`, `${r}/**/*.ts`]);
+  const out = execFileSync("git", ["ls-files", "--", ...patterns], {
     cwd: REPO_ROOT,
     encoding: "utf8",
   });
-  return out
-    .split("\n")
-    .filter((f) => f && !f.includes("__tests__") && !f.endsWith(".test.ts") && !f.includes("/generated/"));
+  return [
+    ...new Set(
+      out
+        .split("\n")
+        .filter((f) => f && !f.includes("__tests__") && !f.endsWith(".test.ts") && !f.includes("/generated/")),
+    ),
+  ];
 }
 
 function skipString(src: string, i: number): number {
@@ -178,7 +188,7 @@ describe("log-call hygiene (api-log-clarity H1-H4)", () => {
         if (v.length > 0) offenders.push(`${call.file}:${call.line} ${v.join(", ")}`);
       }
     }
-    expect(population).toBeGreaterThan(200);
-    expect(offenders).toEqual([]);
+    expect(population, `expected >200 logger.(warn|error) call sites, found ${population}`).toBeGreaterThan(200);
+    expect(offenders, `${offenders.length} offender(s) among ${population} call sites`).toEqual([]);
   });
 });

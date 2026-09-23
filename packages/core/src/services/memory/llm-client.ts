@@ -274,7 +274,14 @@ function hostPort(url: string): string | null {
  * behaviour, so an unresolvable baseUrl regresses to nothing.
  * @internal
  */
-export function resolveInferenceSpec(baseUrl: string): InferenceProviderSpec {
+/**
+ * Same resolution `resolveInferenceSpec` performs, minus its final
+ * catch-all fallback to `ollama` — returns `undefined` when neither the
+ * host:port match nor the embedding-provider fallback names a real
+ * provider. Shared so the two never drift apart.
+ * @internal
+ */
+function resolveMatchedProviderSpec(baseUrl: string): InferenceProviderSpec | undefined {
   const target = hostPort(baseUrl);
   if (target) {
     const match = inferenceProviderList().find(
@@ -293,7 +300,21 @@ export function resolveInferenceSpec(baseUrl: string): InferenceProviderSpec {
   if (embeddingProvider && (LOCAL_INFERENCE_IDS as readonly string[]).includes(embeddingProvider)) {
     return INFERENCE_PROVIDERS[embeddingProvider as InferenceProviderId];
   }
-  return INFERENCE_PROVIDERS.ollama;
+  return undefined;
+}
+
+export function resolveInferenceSpec(baseUrl: string): InferenceProviderSpec {
+  return resolveMatchedProviderSpec(baseUrl) ?? INFERENCE_PROVIDERS.ollama;
+}
+
+/**
+ * Provider id for logging only: unlike `resolveInferenceSpec` (which must
+ * always hand back a usable, functional provider), an unresolved baseUrl is
+ * reported as `"unknown"` here rather than silently mislabeled `"ollama"`.
+ * @internal
+ */
+function resolveProviderIdForLogging(baseUrl: string): string {
+  return resolveMatchedProviderSpec(baseUrl)?.id ?? "unknown";
 }
 
 /**
@@ -493,6 +514,19 @@ export function _isAbortOrTimeoutError(err: unknown): boolean {
 }
 
 /**
+ * Compact `path: message` summary of the first few zod issues, capped so a
+ * validation failure with dozens of issues never blows up a log line — the
+ * logger's own `cause` cap (300 chars) is a second, generic backstop.
+ * @internal
+ */
+function summarizeZodIssues(error: z.ZodError, maxIssues = 5): string {
+  return error.issues
+    .slice(0, maxIssues)
+    .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+    .join("; ");
+}
+
+/**
  * Per-label consecutive-failure streak, reset to 0 on the next success.
  * Keyed by `opts.label` so unrelated LLM features never share a counter.
  * @internal
@@ -517,7 +551,7 @@ function recordLlmFailure(
   label: string,
   role: LlmModelRole,
   model: string,
-  provider: string,
+  baseUrl: string,
   timeoutMs: number,
   elapsedMs: number,
   err: Error,
@@ -528,7 +562,7 @@ function recordLlmFailure(
     label,
     role,
     model,
-    provider,
+    provider: resolveProviderIdForLogging(baseUrl),
     timeoutMs,
     elapsedMs,
     timedOut: _isAbortOrTimeoutError(err),
@@ -565,7 +599,6 @@ export async function llmComplete(
     return { ok: false, error: "llm disabled" };
   }
   const llm = getLlmConfig({ modelRole: opts.modelRole });
-  const provider = resolveInferenceSpec(llm.baseUrl).id;
   const role: LlmModelRole = opts.modelRole ?? "instruct";
   const timeoutMs = opts.timeoutMs ?? llm.timeoutMs;
   const startedAt = Date.now();
@@ -602,10 +635,10 @@ export async function llmComplete(
       });
     }
     const emptyErr = new Error("empty content (thinking model)");
-    recordLlmFailure(opts.label, role, llm.model, provider, timeoutMs, Date.now() - startedAt, emptyErr);
+    recordLlmFailure(opts.label, role, llm.model, llm.baseUrl, timeoutMs, Date.now() - startedAt, emptyErr);
     return { ok: false, error: emptyErr.message };
   } catch (e) {
-    recordLlmFailure(opts.label, role, llm.model, provider, timeoutMs, Date.now() - startedAt, e as Error);
+    recordLlmFailure(opts.label, role, llm.model, llm.baseUrl, timeoutMs, Date.now() - startedAt, e as Error);
     return { ok: false, error: (e as Error).message };
   }
 }
@@ -626,7 +659,6 @@ export async function llmObject<T>(
     return { ok: false, error: "llm disabled" };
   }
   const llm = getLlmConfig({ modelRole: opts.modelRole });
-  const provider = resolveInferenceSpec(llm.baseUrl).id;
   const role: LlmModelRole = opts.modelRole ?? "instruct";
   const timeoutMs = opts.timeoutMs ?? llm.timeoutMs;
   const startedAt = Date.now();
@@ -692,8 +724,10 @@ export async function llmObject<T>(
         }
       }
     }
-    const validationErr = new Error("schema validation failed (fallback path)");
-    recordLlmFailure(opts.label, role, llm.model, provider, timeoutMs, Date.now() - startedAt, validationErr);
+    const validationErr = new Error("schema validation failed (fallback path)", {
+      cause: summarizeZodIssues(validated.error),
+    });
+    recordLlmFailure(opts.label, role, llm.model, llm.baseUrl, timeoutMs, Date.now() - startedAt, validationErr);
     return { ok: false, error: validationErr.message };
   } catch (e) {
     // generateObject throws AI_NoObjectGeneratedError on schema mismatch / empty
@@ -725,7 +759,7 @@ export async function llmObject<T>(
         finishReason: (e as any)?.finishReason ?? null,
       });
     }
-    recordLlmFailure(opts.label, role, llm.model, provider, timeoutMs, Date.now() - startedAt, e as Error);
+    recordLlmFailure(opts.label, role, llm.model, llm.baseUrl, timeoutMs, Date.now() - startedAt, e as Error);
     return { ok: false, error: (e as Error).message };
   }
 }

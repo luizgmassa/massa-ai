@@ -1,6 +1,6 @@
 /**
  * Logger Utility
- * 
+ *
  * Structured logging with levels and metadata support
  */
 
@@ -50,19 +50,34 @@ function formatAgo(ms: number): string {
   return `${Math.floor(totalSeconds / 60)}m`;
 }
 
+/** Cap for `message`/`cause` strings picked from an Error (design §5 fix-round). */
+const MAX_ERROR_TEXT_CHARS = 300;
+
+/**
+ * Caps a picked Error string field at `MAX_ERROR_TEXT_CHARS` so a validation
+ * error whose message embeds the full raw model output (AI SDK's
+ * `NoObjectGeneratedError` → `TypeValidationError`/`JSONParseError`) never
+ * blows up a log line.
+ */
+function capErrorText(value: string): string {
+  if (value.length <= MAX_ERROR_TEXT_CHARS) return value;
+  const truncatedChars = value.length - MAX_ERROR_TEXT_CHARS;
+  return `${value.slice(0, MAX_ERROR_TEXT_CHARS)}…(truncated ${truncatedChars} chars)`;
+}
+
 /**
  * Picks name/message(+stack)/code/cause from an Error, never spreads it —
  * the AI SDK's `APICallError` carries `requestBodyValues`, which holds the
  * prompt. `cause` is a one-level message: a non-Error cause becomes `String(v)`.
  */
 function pickErrorFields(err: Error, includeStack: boolean): Record<string, unknown> {
-  const out: Record<string, unknown> = { name: err.name, message: err.message };
+  const out: Record<string, unknown> = { name: err.name, message: capErrorText(err.message) };
   if (includeStack) out.stack = err.stack;
   const code = (err as { code?: unknown }).code;
   if (code !== undefined) out.code = code;
   const cause = (err as { cause?: unknown }).cause;
   if (cause !== undefined) {
-    out.cause = cause instanceof Error ? cause.message : String(cause);
+    out.cause = capErrorText(cause instanceof Error ? cause.message : String(cause));
   }
   return out;
 }
@@ -225,6 +240,31 @@ export class Logger implements ILogger {
   }
 
   /**
+   * JSON.stringify(meta), but never throws: a bigint is stringified via the
+   * replacer (so JSON.stringify never sees the raw bigint), a circular
+   * reference is broken with a WeakSet cycle guard, and any other
+   * unserializable shape falls back to a one-line marker. Logging must never
+   * throw.
+   */
+  private safeStringifyMeta(meta: Record<string, unknown>): string {
+    const seen = new WeakSet<object>();
+    try {
+      return JSON.stringify(meta, (_key, value) => {
+        if (typeof value === 'bigint') return value.toString();
+        if (typeof value === 'object' && value !== null) {
+          if (seen.has(value)) return '[Circular]';
+          seen.add(value);
+        }
+        return value;
+      });
+    } catch (err) {
+      return JSON.stringify({
+        metaUnserializable: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
    * Format log message
    */
   private formatMessage(
@@ -233,7 +273,7 @@ export class Logger implements ILogger {
     meta?: Record<string, unknown>,
     timestamp: string = new Date().toISOString()
   ): string {
-    const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
+    const metaStr = meta ? ` ${this.safeStringifyMeta(meta)}` : '';
     return `[${timestamp}] [${level}] ${message}${metaStr}`;
   }
 
@@ -295,7 +335,10 @@ export class Logger implements ILogger {
   error(message: string, error?: Error, meta?: Record<string, unknown>): void {
     if (this.shouldLog(LogLevel.ERROR)) {
       const errorMeta = error
-        ? { ...meta, error: pickErrorFields(error, true) }
+        ? {
+            ...meta,
+            error: error instanceof Error ? pickErrorFields(error, true) : { message: String(error) },
+          }
         : meta;
       this.emit(LogLevel.ERROR, message, errorMeta);
     }
