@@ -263,16 +263,16 @@ describe("every dispatch packet names a real charter mode and lens (repo-wide)",
   });
 });
 
-describe("no retired agent name in skills prose, backticked or not", () => {
+describe("no retired agent name in skills prose, backticked or not, any case, hyphenated or spaced, suffixed", () => {
   const RETIRED_WORD =
-    /(?<![\w-])(planner|context-curator|documentation-agent|investigator|navigator|meta-judge|plan-critic|furps-analyst|requirements-analyst|verification-agent|mobile-specialist|architecture-specialist|audit-specialist|reviewer)(?![\w-])/g;
+    /(?<![\w-])(?<!code[-\s])(planner|context[-\s]curator|documentation[-\s]agent|investigator|navigator|meta[-\s]judge|plan[-\s]critic|furps[-\s]analyst|requirements[-\s]analyst|verification[-\s]agent|mobile[-\s]specialist|architecture[-\s]specialist|audit[-\s]specialist|reviewer)(?!\w)/gi;
 
   // Sanctioned exceptions, each scoped to one file and one line shape.
   const SANCTIONED: Array<{ file: string; line: RegExp; why: string }> = [
     { file: "skills/AGENTS.md", line: /^\| [a-z-]+ \| (?:[a-z-]+ \| `|— \| Retired;)/, why: "the single old→new mapping table" },
     { file: "skills/massa-ai/references/agent-orchestration.md", line: /^\| `[a-z-]+` \| `[a-z-]+` \| /, why: "legacy role vocabulary table" },
     { file: "skills/massa-ai/references/mobile-diagnosis.md", line: /nested navigator state/, why: "navigation state, not an agent" },
-    { file: "skills/massa-ai/references/lessons.md", line: /no reviewer feedback/, why: "a human reviewer, not an agent" },
+    { file: "skills/massa-ai/references/lessons.md", line: /no reviewer feedback|reviewer-feedback records/, why: "a human reviewer, not an agent" },
     { file: "skills/massa-ai/workflows/pr-review.md", line: /write as a reviewer/, why: "a human reviewer voice, not an agent" },
   ];
 
