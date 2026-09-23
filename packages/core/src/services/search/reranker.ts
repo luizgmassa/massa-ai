@@ -88,9 +88,11 @@ export class LLMJudgeReranker {
     const prompt = buildPrompt(query, head);
 
     let verdict: RerankVerdict | null;
+    let verdictError: string | undefined;
     try {
-      const res = await this.llm.object(prompt, RerankVerdictSchema, { modelRole: "code" });
+      const res = await this.llm.object(prompt, RerankVerdictSchema, { label: "reranker", modelRole: "code" });
       verdict = res.ok ? (res.value ?? null) : null;
+      verdictError = res.ok ? undefined : res.error;
     } catch (e) {
       logger.warn("LLMJudgeReranker threw — degrading to input order", {
         query,
@@ -102,6 +104,7 @@ export class LLMJudgeReranker {
     if (!verdict) {
       logger.warn("LLMJudgeReranker got {ok:false} — degrading to input order", {
         query,
+        error: verdictError,
       });
       return results;
     }

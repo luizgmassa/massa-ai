@@ -137,7 +137,7 @@ async function probeMerge(contents: string[]): Promise<{ areDuplicates: boolean;
     "Entries:",
     ...contents.map((c, i) => `[${i}] ${c}`),
   ].join("\n");
-  const res = await llmObject(prompt, DupVerdictSchema, { modelRole: "instruct" });
+  const res = await llmObject(prompt, DupVerdictSchema, { label: "llm-judge-dedup", modelRole: "instruct" });
   return {
     areDuplicates: res.ok && res.value ? !!res.value.areDuplicates : false,
     latencyMs: Date.now() - start,

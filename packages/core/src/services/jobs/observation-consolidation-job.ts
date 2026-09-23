@@ -187,7 +187,7 @@ export class ObservationConsolidationJob {
 
     let batch: ConsolidatedBatch | null;
     try {
-      const res = await this.llm.object(prompt, ConsolidatedBatchSchema);
+      const res = await this.llm.object(prompt, ConsolidatedBatchSchema, { label: "observation-consolidation" });
       if (!res.ok || !res.value) {
         return noop; // {ok:false} / timeout / invalid → silent skip
       }

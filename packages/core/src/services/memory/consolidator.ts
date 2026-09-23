@@ -71,7 +71,7 @@ export interface LlmSurface {
   object<T>(
     prompt: string,
     schema: z.ZodSchema<T>,
-    opts?: { timeoutMs?: number; modelRole?: "instruct" | "code" },
+    opts: { label: string; timeoutMs?: number; modelRole?: "instruct" | "code" },
   ): Promise<{ ok: boolean; value?: T; error?: string }>;
   isEnabled(): boolean;
 }
@@ -207,7 +207,7 @@ export async function consolidateWindow(
   if (!llm.isEnabled()) return null;
 
   const prompt = buildPrompt(window);
-  const result = await llm.object(prompt, ConsolidatedBatchSchema);
+  const result = await llm.object(prompt, ConsolidatedBatchSchema, { label: "memory-consolidation" });
   if (!result.ok || !result.value) return null;
 
   const batch: ConsolidatedBatch = {

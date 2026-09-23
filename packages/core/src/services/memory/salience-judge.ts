@@ -74,9 +74,11 @@ export class SalienceJudge {
     const prompt = buildPrompt(trimmed, type);
 
     let verdict: Salience | null;
+    let verdictError: string | undefined;
     try {
-      const res = await this.llm.object(prompt, SalienceSchema);
+      const res = await this.llm.object(prompt, SalienceSchema, { label: "salience-judge" });
       verdict = res.ok ? (res.value ?? null) : null;
+      verdictError = res.ok ? undefined : res.error;
     } catch (e) {
       logger.warn("SalienceJudge threw — degrading to neutral default", {
         type,
@@ -88,6 +90,7 @@ export class SalienceJudge {
     if (!verdict) {
       logger.warn("SalienceJudge got {ok:false} — degrading to neutral default", {
         type,
+        error: verdictError,
       });
       return { salience: NEUTRAL_SALIENCE, source: "default" };
     }

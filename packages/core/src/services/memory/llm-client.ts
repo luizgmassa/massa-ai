@@ -38,6 +38,8 @@ import { z } from "zod";
 export type LlmModelRole = "instruct" | "code";
 
 export interface LlmCompleteOptions {
+  /** Caller identity for logs/streaks (e.g. "reranker", "hyde"). */
+  label: string;
   /** Optional system prompt. */
   system?: string;
   /** Per-call timeout override (ms). Defaults to `config.llm.timeoutMs`. */
@@ -491,6 +493,65 @@ export function _isAbortOrTimeoutError(err: unknown): boolean {
 }
 
 /**
+ * Per-label consecutive-failure streak, reset to 0 on the next success.
+ * Keyed by `opts.label` so unrelated LLM features never share a counter.
+ * @internal
+ */
+const llmFailureStreaks = new Map<string, number>();
+
+/**
+ * Test seam: clear every label's failure streak.
+ * @internal
+ */
+export function _resetLlmFailureStreaksForTesting(): void {
+  llmFailureStreaks.clear();
+}
+
+/**
+ * Record a failed LLM call: bumps the label's streak and logs the single
+ * canonical failure WARN. `err` is passed through as the meta `error` value
+ * (never a `.message` string) so the logger's Error serialization applies.
+ * @internal
+ */
+function recordLlmFailure(
+  label: string,
+  role: LlmModelRole,
+  model: string,
+  provider: string,
+  timeoutMs: number,
+  elapsedMs: number,
+  err: Error,
+): number {
+  const consecutiveFailures = (llmFailureStreaks.get(label) ?? 0) + 1;
+  llmFailureStreaks.set(label, consecutiveFailures);
+  logger.warn("LLM call failed — using non-LLM fallback", {
+    label,
+    role,
+    model,
+    provider,
+    timeoutMs,
+    elapsedMs,
+    timedOut: _isAbortOrTimeoutError(err),
+    error: err,
+    consecutiveFailures,
+  });
+  return consecutiveFailures;
+}
+
+/**
+ * Record a successful LLM call: resets the label's streak, and when the
+ * streak being reset was non-zero, logs one INFO recovery line.
+ * @internal
+ */
+function recordLlmSuccess(label: string, model: string): void {
+  const priorFailures = llmFailureStreaks.get(label) ?? 0;
+  if (priorFailures > 0) {
+    logger.info("LLM call recovered", { label, model, afterFailures: priorFailures });
+  }
+  llmFailureStreaks.set(label, 0);
+}
+
+/**
  * Generate a free-form text completion. Returns `{ ok: false }` (never throws)
  * when the LLM is disabled, times out, or errors. When the content channel is
  * empty (qwen3 thinking-model failure mode), falls back to the reasoning
@@ -498,13 +559,16 @@ export function _isAbortOrTimeoutError(err: unknown): boolean {
  */
 export async function llmComplete(
   prompt: string,
-  opts: LlmCompleteOptions = {},
+  opts: LlmCompleteOptions,
 ): Promise<LlmResult<string>> {
   if (!isLlmEnabled()) {
     return { ok: false, error: "llm disabled" };
   }
   const llm = getLlmConfig({ modelRole: opts.modelRole });
+  const provider = resolveInferenceSpec(llm.baseUrl).id;
+  const role: LlmModelRole = opts.modelRole ?? "instruct";
   const timeoutMs = opts.timeoutMs ?? llm.timeoutMs;
+  const startedAt = Date.now();
   try {
     const result = await generateText({
       model: buildProvider(llm),
@@ -515,7 +579,10 @@ export async function llmComplete(
       abortSignal: timeoutSignal(timeoutMs),
     });
     const text = (result as any).text ?? "";
-    if (text.length > 0) return { ok: true, value: text };
+    if (text.length > 0) {
+      recordLlmSuccess(opts.label, llm.model);
+      return { ok: true, value: text };
+    }
     // Empty content — try to recover from the reasoning channel.
     if (llm.disableThink) {
       const reasoning = _reasoningToText(result);
@@ -523,6 +590,7 @@ export async function llmComplete(
         logger.warn("llmComplete: empty content — recovered from reasoning channel", {
           reasoningLen: reasoning.length,
         });
+        recordLlmSuccess(opts.label, llm.model);
         return { ok: true, value: reasoning };
       }
       // #7 safety net: reasoning recovery yielded nothing. With the pure-instruct
@@ -533,12 +601,11 @@ export async function llmComplete(
         finishReason: (result as any)?.finishReason ?? null,
       });
     }
-    logger.warn("llmComplete: empty content and no reasoning — degrading", {});
-    return { ok: false, error: "empty content (thinking model)" };
+    const emptyErr = new Error("empty content (thinking model)");
+    recordLlmFailure(opts.label, role, llm.model, provider, timeoutMs, Date.now() - startedAt, emptyErr);
+    return { ok: false, error: emptyErr.message };
   } catch (e) {
-    logger.warn("llmComplete failed — degrading to non-LLM path", {
-      error: (e as Error).message,
-    });
+    recordLlmFailure(opts.label, role, llm.model, provider, timeoutMs, Date.now() - startedAt, e as Error);
     return { ok: false, error: (e as Error).message };
   }
 }
@@ -553,13 +620,16 @@ export async function llmComplete(
 export async function llmObject<T>(
   prompt: string,
   schema: z.ZodSchema<T>,
-  opts: LlmObjectOptions = {},
+  opts: LlmObjectOptions,
 ): Promise<LlmResult<T>> {
   if (!isLlmEnabled()) {
     return { ok: false, error: "llm disabled" };
   }
   const llm = getLlmConfig({ modelRole: opts.modelRole });
+  const provider = resolveInferenceSpec(llm.baseUrl).id;
+  const role: LlmModelRole = opts.modelRole ?? "instruct";
   const timeoutMs = opts.timeoutMs ?? llm.timeoutMs;
+  const startedAt = Date.now();
   let result: any = null;
   try {
     // json_schema constrained decoding (W7-07): when Ollama >= 0.5.0,
@@ -582,7 +652,8 @@ export async function llmObject<T>(
         maxOutputTokens: llm.maxOutputTokens,
         abortSignal: timeoutSignal(timeoutMs),
       });
-      logger.info("json_schema: constrained decoding used", {});
+      logger.debug("json_schema: constrained decoding used", { label: opts.label, model: llm.model });
+      recordLlmSuccess(opts.label, llm.model);
       return { ok: true, value: result.object };
     }
 
@@ -600,7 +671,8 @@ export async function llmObject<T>(
     });
     const validated = schema.safeParse(result.object);
     if (validated.success) {
-      logger.info("json_schema: fallback to json_object — validated", {});
+      logger.debug("json_schema: fallback to json_object — validated", { label: opts.label, model: llm.model });
+      recordLlmSuccess(opts.label, llm.model);
       return { ok: true, value: validated.data };
     }
     // Manual validation failed — try reasoning-channel recovery before degrading.
@@ -614,15 +686,15 @@ export async function llmObject<T>(
             logger.warn("llmObject: recovered object from reasoning channel (fallback path)", {
               reasoningLen: reasoning.length,
             });
+            recordLlmSuccess(opts.label, llm.model);
             return { ok: true, value: recovered.data };
           }
         }
       }
     }
-    logger.warn("llmObject: fallback validation failed", {
-      zodError: validated.error.issues.map((i) => i.message).join("; "),
-    });
-    return { ok: false, error: "schema validation failed (fallback path)" };
+    const validationErr = new Error("schema validation failed (fallback path)");
+    recordLlmFailure(opts.label, role, llm.model, provider, timeoutMs, Date.now() - startedAt, validationErr);
+    return { ok: false, error: validationErr.message };
   } catch (e) {
     // generateObject throws AI_NoObjectGeneratedError on schema mismatch / empty
     // parse — the thrown error carries the raw response (with reasoning). The
@@ -641,6 +713,7 @@ export async function llmObject<T>(
             logger.warn("llmObject: recovered object from reasoning channel", {
               reasoningLen: reasoning.length,
             });
+            recordLlmSuccess(opts.label, llm.model);
             return { ok: true, value: validated.data };
           }
         }
@@ -652,9 +725,7 @@ export async function llmObject<T>(
         finishReason: (e as any)?.finishReason ?? null,
       });
     }
-    logger.warn("llmObject failed — degrading to non-LLM path", {
-      error: (e as Error).message,
-    });
+    recordLlmFailure(opts.label, role, llm.model, provider, timeoutMs, Date.now() - startedAt, e as Error);
     return { ok: false, error: (e as Error).message };
   }
 }

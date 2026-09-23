@@ -41,7 +41,7 @@ export async function enrichWithLlm(
   const prompt = buildEnrichmentPrompt(candidates, observations);
   let enrichment: ProposalEnrichment | null = null;
   try {
-    const res = await surface.object(prompt, ProposalEnrichmentSchema);
+    const res = await surface.object(prompt, ProposalEnrichmentSchema, { label: "auto-improve" });
     if (!res.ok || !res.value || !Array.isArray(res.value.items)) {
       return { candidates, used: false };
     }
