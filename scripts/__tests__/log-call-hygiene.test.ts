@@ -13,7 +13,7 @@ interface LogCall {
   args: string[];
 }
 
-function productionFiles(): string[] {
+export function productionFiles(): string[] {
   // `**/*.ts` needs at least one directory level to match (a git pathspec
   // trait, not a bug in this repo) — it silently drops every file that sits
   // directly under the root (e.g. a barrel `index.ts`). `*.ts` alone has the
@@ -152,6 +152,19 @@ export function violations(call: LogCall): string[] {
   if (ERROR_STRINGIFY.test(restText)) found.push("String(error) instead of the Error");
   return found;
 }
+
+describe("productionFiles() (M21 — both the `${r}/*.ts` and `${r}/**/*.ts` globs are required)", () => {
+  test("includes a nested source file AND a root-level src/index.ts — dropping either glob loses one class", () => {
+    const files = productionFiles();
+    // Only reachable via `${r}/**/*.ts` (nested under apps/mcp-client/src/).
+    expect(files).toContain("apps/mcp-client/src/embedded-api-client.ts");
+    // Only reachable via `${r}/*.ts` (a bare `index.ts` sitting directly under
+    // a source root never crosses a `/`, so `**/*.ts` alone misses it — see
+    // this file's own docblock comment above `productionFiles`).
+    const rootIndexFiles = files.filter((f) => f.endsWith("/src/index.ts"));
+    expect(rootIndexFiles.length).toBeGreaterThan(0);
+  });
+});
 
 describe("log-call hygiene (api-log-clarity H1-H4)", () => {
   test("detector flags each forbidden shape and passes a clean call", () => {

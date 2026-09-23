@@ -137,8 +137,19 @@ The user wants profiles to be the only lever, with each model picked from a type
     and the docs listed in T4.
 
   Sensor: `git grep -nE 'model_tier|workflowTiers|agentTiers|hostDefaults|resolveTier|charterTier'`
-  outside `.specs/` and `CHANGELOG.md` history returns only the v1-detection literal and
-  its test.
+  outside `.specs/` and `CHANGELOG.md` history returns only: the v1-detection/rejection
+  literals (`scripts/lib/model-profiles.ts`'s `V1_MARKER_KEYS`,
+  `apps/tools-api/src/routes/model-registry.ts`'s `LEGACY_OVERLAY_KEYS`); tests asserting
+  their absence or rejection; and comments recording the removal.
+
+  (Amended, verification iteration 1, 2026-09-23: the original wording — "only the
+  v1-detection literal and its test" — undercounted the sensor's own allowed population;
+  a live `git grep` also legitimately hits the rejection literal's own test file, the
+  charter-tier removal comment in `model-registry.test.ts`, and several `hostDefaults`-is-gone
+  comments/tests across `apps/tools-api`, `packages/shared/src/profile-switch/`, and
+  `scripts/__tests__/`. All of those are v1-detection/rejection literals, tests asserting
+  their absence/rejection, or comments recording the removal — the category the sensor was
+  always meant to allow — so this amends the wording to match, not the sensor's behavior.)
 - **AC2: generation is byte-identical except for the judge Model Hint.** With a scratch
   `XDG_CONFIG_HOME` and a fixed install-state, run `bun run generate:artifacts` at
   `a075e1bb` and on the branch tip. The `apps/*-plugin/agents/**` and

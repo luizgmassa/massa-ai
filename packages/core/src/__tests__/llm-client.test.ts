@@ -1157,6 +1157,68 @@ describe("llm-client — failure WARN / recovery INFO / decode DEBUG (AC1/AC2/AC
     }
   });
 
+  test("AC6b twin (llmComplete): a disabled call emits zero WARN and leaves the failure streak untouched", async () => {
+    generateShouldThrow = "boom";
+    await llmComplete("hello", { label: "ac6b-complete-label" }); // streak -> 1
+    generateShouldThrow = null;
+
+    _setLlmEnabledForTesting(false);
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      const res = await llmComplete("hello", { label: "ac6b-complete-label" });
+      expect(res.ok).toBe(false);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+
+    _setLlmEnabledForTesting(true);
+    const infoSpy = spyOn(logger, "info");
+    try {
+      const res2 = await llmComplete("hello", { label: "ac6b-complete-label" });
+      expect(res2.ok).toBe(true);
+      const recoveries = infoSpy.mock.calls.filter((c) => c[0] === "LLM call recovered");
+      // afterFailures:1 (not 0 or 2) proves the disabled call neither reset nor
+      // incremented the streak — it left it exactly where the one real failure put it.
+      expect(recoveries.length).toBe(1);
+      expect(recoveries[0][1]).toMatchObject({ label: "ac6b-complete-label", afterFailures: 1 });
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
+  test("M8: an aborted/timeout failure's WARN meta reports timedOut: true (llmComplete)", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateShouldThrow = "The operation timed out.";
+      const res = await llmComplete("hello", { label: "timeout-meta-complete-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).timedOut).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("M8: an aborted/timeout failure's WARN meta reports timedOut: true (llmObject)", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = "The operation timed out.";
+      const res = await llmObject("hello", sampleSchema, { label: "timeout-meta-object-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).timedOut).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   test("llmComplete: a throw increments the failure streak and logs the canonical failure WARN", async () => {
     const warnSpy = spyOn(logger, "warn");
     try {

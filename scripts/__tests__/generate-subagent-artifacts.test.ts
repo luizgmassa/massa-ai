@@ -9,6 +9,7 @@
  */
 import { describe, test, expect, spyOn } from "bun:test";
 import { promises as fs } from "fs";
+import { spawnSync } from "child_process";
 import path from "path";
 import os from "os";
 import toml from "toml";
@@ -541,15 +542,129 @@ describe("runCheck / main drift gate", () => {
     expect(readStateProfiles(path.join(os.tmpdir(), "massa-ai-state-does-not-exist.json"))).toEqual({});
   });
 
-  test("main() resolves stateProfiles BEFORE deciding the --check branch (agent-drift followup T4 — " +
-    "--check must resolve the same rank-3 profile a real run would, not a state-blind default)", async () => {
-    const source = await fs.readFile(path.join(REPO_ROOT, "scripts/generate-subagent-artifacts.ts"), "utf8");
-    const mainBody = source.slice(source.indexOf("export async function main("));
-    const stateComputedAt = mainBody.indexOf("readStateProfiles(");
-    const checkBranchAt = mainBody.indexOf("if (check)");
-    expect(stateComputedAt).toBeGreaterThan(-1);
-    expect(checkBranchAt).toBeGreaterThan(-1);
-    expect(stateComputedAt).toBeLessThan(checkBranchAt);
+});
+
+// ── main()/runCheck behavioral threading of the recorded install-state
+// profile (agent-drift followup T1/T1b) ─────────────────────────────────────
+//
+// The retired test above only checked that `readStateProfiles(` appeared
+// before `if (check)` in main()'s source text — a mutant that keeps that call
+// but drops its result on the floor (never assigning it into `opts`, or
+// dropping `opts` from the `runCheck(opts)` call) reads as source-order-clean
+// and stays green. These tests exercise the REAL `main()`/`runCheck()` against
+// the real checked-in `apps/claude-plugin/agents/` tree, backing up and
+// restoring its 18 files around each run so a mid-run failure or crash never
+// leaves the checked-in bundle mutated.
+describe("main()/runCheck thread the recorded install-state profile end-to-end (agent-drift T1/T1b)", () => {
+  const CLAUDE_AGENTS_DIR = path.join(REPO_ROOT, "apps/claude-plugin/agents");
+  const GENERATOR_SCRIPT = path.join(REPO_ROOT, "scripts/generate-subagent-artifacts.ts");
+
+  async function backupDir(dir: string): Promise<Map<string, Buffer>> {
+    const backup = new Map<string, Buffer>();
+    for (const f of await fs.readdir(dir)) {
+      backup.set(f, await fs.readFile(path.join(dir, f)));
+    }
+    return backup;
+  }
+
+  async function restoreDir(dir: string, backup: Map<string, Buffer>): Promise<void> {
+    for (const [f, buf] of backup) {
+      await fs.writeFile(path.join(dir, f), buf);
+    }
+  }
+
+  async function writeInstallState(homeDir: string, profile: string): Promise<void> {
+    const configDir = path.join(homeDir, ".config", "massa-ai");
+    await fs.mkdir(configDir, { recursive: true });
+    await fs.writeFile(
+      path.join(configDir, "install-state.json"),
+      JSON.stringify({
+        version: 2,
+        platforms: {
+          claude: { root: "/x", skills: [], skillsOwner: "plugin", modelProfile: { profile } },
+        },
+      }),
+    );
+  }
+
+  /**
+   * readStateProfiles()'s default path is built from `homedir()`, and
+   * `main()`/`runCheck()` take no injection for it. Bun's `os.homedir()`
+   * resolves HOME once at process start and ignores a later in-process
+   * reassignment of `process.env.HOME` (measured directly: `bun -e` code that
+   * sets `process.env.HOME` then calls `os.homedir()` still returns the real
+   * system home; only a HOME set on the process's own env BEFORE it starts is
+   * honored). So exercising the real CLI entrypoint's HOME-derived default
+   * needs a fresh child process, not an in-process override — `spawnSync`
+   * with an explicit `env`, exactly like a real invocation with a different
+   * $HOME. `import.meta.main` runs `main(process.argv.slice(2))` for us.
+   */
+  function runGeneratorInSubprocess(args: string[], homeDir: string): number {
+    const res = spawnSync(
+      process.execPath,
+      [GENERATOR_SCRIPT, ...args],
+      {
+        cwd: REPO_ROOT,
+        env: { ...process.env, HOME: homeDir, XDG_CONFIG_HOME: path.join(homeDir, ".config") },
+        encoding: "utf8",
+      },
+    );
+    if (res.error) throw res.error;
+    return res.status ?? 1;
+  }
+
+  test("main() (real run, no --check) re-emits claude's ACTIVE agents for the recorded install-state " +
+    "profile, not balanced (T1: main() must not drop readStateProfiles()'s result)", async () => {
+    const backup = await backupDir(CLAUDE_AGENTS_DIR);
+    const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-home-"));
+    try {
+      await writeInstallState(homeDir, "cheap");
+      const code = runGeneratorInSubprocess([], homeDir);
+      expect(code).toBe(0);
+
+      const out = await fs.readFile(path.join(CLAUDE_AGENTS_DIR, "massa-ai-documentation-agent.md"), "utf8");
+      // Compare against an independent "cheap" emission (the same production
+      // resolver, a throwaway target dir) instead of a hardcoded model literal.
+      const tmpOut = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
+      await emitAll(
+        { claude: tmpOut, codex: tmpOut, cursor: tmpOut, opencode: tmpOut },
+        { profileFlag: "cheap", env: {} },
+        ["claude"],
+      );
+      const expected = await fs.readFile(path.join(tmpOut, "massa-ai-documentation-agent.md"), "utf8");
+      expect(out).toBe(expected);
+      // And it must actually have moved off the checked-in ("balanced") baseline.
+      expect(out).not.toBe(backup.get("massa-ai-documentation-agent.md")!.toString("utf8"));
+    } finally {
+      await restoreDir(CLAUDE_AGENTS_DIR, backup);
+    }
+  });
+
+  test("main(['--check']) resolves the SAME recorded profile a real run would: 0 against a " +
+    "cheap-flavored checked-in tree, and flags drift once the state is dropped (T1b: runCheck must " +
+    "receive readStateProfiles()'s result, not a state-blind default)", async () => {
+    const backup = await backupDir(CLAUDE_AGENTS_DIR);
+    const homeWithState = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-home-"));
+    const homeWithoutState = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-home-"));
+    try {
+      // Make the checked-in tree itself "cheap"-flavored, mirroring an operator
+      // whose machine is switched to "cheap" and who just regenerated.
+      const unused = path.join(os.tmpdir(), "massa-ai-unused-host-dir");
+      await emitAll(
+        { claude: CLAUDE_AGENTS_DIR, codex: unused, cursor: unused, opencode: unused },
+        { profileFlag: "cheap", env: {} },
+        ["claude"],
+      );
+      await writeInstallState(homeWithState, "cheap");
+
+      const codeWithState = runGeneratorInSubprocess(["--check"], homeWithState);
+      expect(codeWithState).toBe(0); // recorded state matches the cheap checked-in tree
+
+      const codeWithoutState = runGeneratorInSubprocess(["--check"], homeWithoutState); // no install-state.json at all
+      expect(codeWithoutState).toBe(1); // default "balanced" now mismatches the cheap tree
+    } finally {
+      await restoreDir(CLAUDE_AGENTS_DIR, backup);
+    }
   });
 });
 
