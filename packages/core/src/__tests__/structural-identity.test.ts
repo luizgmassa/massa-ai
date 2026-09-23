@@ -203,6 +203,22 @@ describe("versioned structural FQN codec goldens", () => {
     });
   });
 
+  test("escapes every # occurrence, not just the first (e.g. \"C# vs F#\")", () => {
+    // A single-# input can't discriminate a regex missing the global flag
+    // (.replace(/#/, ...) vs .replace(/#/gu, ...)) — both escape one # and
+    // pass. This needs two.
+    const identity = createStructuralIdentity({
+      ...METHOD,
+      name: "C# vs F#",
+      qualifiedName: "C# vs F#",
+      kind: "heading",
+      scope: "top_level",
+      overload: "unique",
+    });
+    expect(identity.name).toBe("C%23 vs F%23");
+    expect(identity.fqn).toBe("src/example.ts#C%23 vs F%23");
+  });
+
   test("canonical serialization is position-free, NFC, whitespace-normalized, and modifier-sorted", () => {
     const first = canonicalizeStructuralSignature(METHOD);
     const second = canonicalizeStructuralSignature({
