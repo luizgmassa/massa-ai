@@ -96,6 +96,19 @@ classes_for() {
   esac
 }
 
+# plant_user_agent <host> <home> — replace the owned subagents with one
+# user-authored agent of the same name that carries no massa-ai marker (for
+# opencode: a regular file, not a bundle symlink).
+plant_user_agent() {
+  local d
+  case "$1" in
+    claude) d="$2/.claude/agents"; rm -f "$d/"*.md; printf -- '---\nname: builder\n---\nmine\n' > "$d/builder.md" ;;
+    codex) d="$2/.codex/agents"; rm -f "$d/"*.toml; printf 'name = "builder"\n' > "$d/builder.toml" ;;
+    cursor) d="$2/.cursor/agents"; rm -f "$d/"*.md; printf -- '---\nname: builder\n---\nmine\n' > "$d/builder.md" ;;
+    opencode) d="$2/.config/opencode/agents"; rm -f "$d/"*.md; printf -- '---\nname: builder\n---\nmine\n' > "$d/builder.md" ;;
+  esac
+}
+
 for host in claude codex cursor opencode; do
   echo ""
   echo "Host ${host}: every installed artifact class is watched"
@@ -113,6 +126,12 @@ for host in claude codex cursor opencode; do
     eval "$wipe"
     assert_eq "${host} ${cls} wiped → sentinel absent (reinstall)" "$(sentinel "$host" "$H")" "1"
   done < <(classes_for "$host")
+
+  # NAM AC-7: detection is by ownership, not presence — a user's unmarked
+  # agent must not stand in for the owned subagents.
+  rm -rf "$H"; cp -a "$PRISTINE" "$H"
+  plant_user_agent "$host" "$H"
+  assert_eq "${host} only an unmarked user agent → sentinel absent (reinstall)" "$(sentinel "$host" "$H")" "1"
 done
 
 # ── Route case 1: Cursor's bridge route legitimately has no local hooks ──────
@@ -155,6 +174,11 @@ printf -- '---\nname: builder\n---\n<!-- massa-ai-owned: true -->\nbody\n' > "$C
 touch "$CACHE/commands/spec-driven.md"
 assert_eq "marketplace bundle intact → sentinel present" "$(sentinel claude "$HM")" "0"
 assert_eq "marketplace route ignores absent ~/.claude/agents" "$(sentinel claude "$HM")" "0"
+mv "$CACHE/agents/builder.md" "$ROOT/builder.marked"
+printf -- '---\nname: builder\n---\nmine\n' > "$CACHE/agents/builder.md"
+assert_eq "marketplace bundle with only an unmarked agent → sentinel absent" "$(sentinel claude "$HM")" "1"
+mv "$ROOT/builder.marked" "$CACHE/agents/builder.md"
+assert_eq "marketplace bundle marked agent restored → sentinel present" "$(sentinel claude "$HM")" "0"
 rm -f "$CACHE/commands/spec-driven.md"
 assert_eq "marketplace bundle lost its commands → sentinel absent" "$(sentinel claude "$HM")" "1"
 touch "$CACHE/commands/spec-driven.md"

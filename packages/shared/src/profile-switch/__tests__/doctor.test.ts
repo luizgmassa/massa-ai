@@ -149,6 +149,19 @@ describe("runtimeDriftReport — directory-source route", () => {
     expect(report.roles.find((r) => r.name === "code-explorer.md")?.staleVariant).toBe(false);
     expect(report.profileMaterialized).toBe(false);
   });
+
+  test("an unmarked agent file is not a role (NAM AC-6: marker, not extension)", () => {
+    const bundleRoot = stageDirectorySource("1.57.0");
+    writeText(path.join(bundleRoot, "agents", "code-explorer.md"), AGENT_FILE);
+    writeText(path.join(bundleRoot, "agents", "builder.md"), "---\nname: builder\nmodel: mine\n---\nbody\n");
+    stageState({
+      root: "/x", skills: [], skillsOwner: "plugin",
+      installRoute: "marketplace", plugin: { version: "1.57.0" },
+    });
+
+    const report = runtimeDriftReport({ targetHome: home, env: {} });
+    expect(report.roles.map((r) => r.name)).toEqual(["code-explorer.md"]);
+  });
 });
 
 describe("runtimeDriftReport — registry-cache route (AC-01.2 fallback fixture)", () => {

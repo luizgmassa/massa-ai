@@ -561,12 +561,12 @@ describe("agents harness routing", () => {
     }
   });
 
-  test("every agent charter has YAML frontmatter with name", async () => {
+  test("every agent charter has YAML frontmatter with name equal to its directory (ROS AC-1)", async () => {
     for (const agent of EXPECTED_AGENTS) {
       const content = await readFile(path.join(AGENTS_SUBDIR, agent, "SKILL.md"));
       expect(content.startsWith("---")).toBe(true);
       const fm = content.slice(0, content.indexOf("---", 3));
-      expect(fm).toContain("name:");
+      expect(fm.match(/^name:\s*(.+?)\s*$/m)?.[1]).toBe(agent);
     }
   });
 });

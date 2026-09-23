@@ -173,6 +173,16 @@ describe("dispatch resolution: every Dispatch: block names a shipped agent", () 
     }
     expect(offenders).toEqual([]);
   });
+
+  test("the router states the Claude plugin-route namespaced dispatch rule (NAM AC-10)", async () => {
+    const flat = (s: string) => s.replace(/\s+/g, " ");
+    expect(flat(await read(ROUTER))).toContain(
+      "On the Claude plugin route, dispatch the plugin-namespaced `massa-ai:<name>`",
+    );
+    expect(flat(await read(AGENT_ORCHESTRATION))).toContain(
+      "**Claude plugin route: dispatch `massa-ai:<role>`.**",
+    );
+  });
 });
 
 // ── 2. No phantom roles (P0-2) ─────────────────────────────────────────────

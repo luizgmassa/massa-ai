@@ -204,6 +204,31 @@ assert_eq "recorded modelProfile is unchanged — the installer only ever reads 
 unset MOCK_INSTALL_PATH
 
 echo ""
+echo "Scenario 6b (CPP-07, NAM AC-3): the re-apply never overwrites an unmarked same-named agent"
+NAME6B=cpp7-foreign
+SCEN_PRE6B="$ROOT/$NAME6B"
+mkdir -p "$SCEN_PRE6B/.config/massa-ai"
+printf '{"version":2,"platforms":{"claude":{"root":"/irrelevant","skillsOwner":"plugin","skills":["massa-ai","profile"],"modelProfile":{"profile":"cheap","switchedAt":"2026-01-01T00:00:00.000Z"}}}}\n' \
+  > "$SCEN_PRE6B/.config/massa-ai/install-state.json"
+INSTALL_ROOT6B="$ROOT/$NAME6B-install-root"
+mkdir -p "$INSTALL_ROOT6B/agents" "$INSTALL_ROOT6B/agent-profiles/cheap"
+printf -- '---\nmodel: bundle-default\n---\n<!-- massa-ai-owned: true -->\n' > "$INSTALL_ROOT6B/agents/builder.md"
+printf -- '---\nname: judge\n---\nmine\n' > "$INSTALL_ROOT6B/agents/judge.md"
+cp "$INSTALL_ROOT6B/agents/judge.md" "$ROOT/$NAME6B-judge.before"
+printf -- '---\nmodel: cheap-variant\n---\n<!-- massa-ai-owned: true -->\n' > "$INSTALL_ROOT6B/agent-profiles/cheap/builder.md"
+printf -- '---\nmodel: cheap-variant\n---\n<!-- massa-ai-owned: true -->\n' > "$INSTALL_ROOT6B/agent-profiles/cheap/judge.md"
+
+export MOCK_SEED_VERSION="0.0.1" MOCK_INSTALL_PATH="$INSTALL_ROOT6B"
+run_scenario "$NAME6B"
+assert_eq "installer exits 0" "$CODE" "0"
+assert_contains "owned builder.md still receives the recorded variant" \
+  "$(cat "$INSTALL_ROOT6B/agents/builder.md")" "cheap-variant"
+if cmp -s "$ROOT/$NAME6B-judge.before" "$INSTALL_ROOT6B/agents/judge.md"; then JUDGE_SAME=yes; else JUDGE_SAME=no; fi
+assert_eq "unmarked judge.md is byte-identical after the re-apply" "$JUDGE_SAME" "yes"
+assert_contains "the skip is reported" "$OUT" "agents/judge.md exists and is not massa-ai-owned — skipped"
+unset MOCK_INSTALL_PATH
+
+echo ""
 echo "Scenario 7 (CPP-07): no recorded profile → re-apply is a logged no-op, and the installer never invents modelProfile"
 NAME7=cpp7-noop
 INSTALL_ROOT7="$ROOT/$NAME7-install-root"

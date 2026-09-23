@@ -963,6 +963,27 @@ describe("opencode-plugin retired harness-skill prune (PER AC-5)", () => {
     expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
   });
 
+  // M6b: the record is the ownership proof only when it is plugin-owned — a
+  // record with no owner, or a repo-owned one, must never drive the prune.
+  for (const [label, owner] of [
+    ["no skillsOwner", {}],
+    ['skillsOwner "repo"', { skillsOwner: "repo" }],
+  ] as const) {
+    test(`a persona-router listed by a record with ${label} survives install and uninstall byte-identical`, async () => {
+      const skills = ["massa-ai", "persona-router", "profile", "bootstrap"];
+      await plantRetired();
+      const before = await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8");
+
+      await writeRecord({ ...owner, skills });
+      expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+      expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
+
+      await writeRecord({ ...owner, skills });
+      expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
+      expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
+    });
+  }
+
   async function writeRecord(rec: Record<string, unknown>): Promise<void> {
     await fs.mkdir(path.dirname(stateFile()), { recursive: true });
     await fs.writeFile(
