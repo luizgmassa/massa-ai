@@ -10,6 +10,8 @@
 - **Uncommitted files**: none
 - **Branch**: `feat/agent-roster-consolidation` @ `~/Projects/massa-ai-wt-roster`, off `origin/main@f582b602`
 
+**Post-validation merge (2026-09-23).** `origin/main` (model catalog v2 — tiers removed, per-agent overrides; logging) merged in `ec21d05e`; adaptation commit drops `documentation-agent` overrides from every built-in profile and repoints main's new generator tests to the 7-agent roster. Spec: Inventory AC-7 superseded (no `WORKFLOW_STEMS` upstream), A21 added. Post-merge gates, foreground: build, type-check, lint, generate --check, stale pointers green; scripts 2181/0, shell suites all pass, plugins 183/0, shared 1015/0, web-ui 751/0, opencode src 155/0, mcp-client config-cli 87/0, tools-api model-registry 36/0 + web-ui-contract 8/0.
+
 ## Deferred advisories (recorded, not fixed — true and unflattering)
 
 - **Phase 2 review F3** — the profile-switch tracked-path guard refuses a switch when a user's

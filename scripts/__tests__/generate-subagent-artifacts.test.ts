@@ -32,7 +32,7 @@ import {
   stateProfilesFromInstallState,
   readStateProfiles,
   warnStaleAgentOverrides,
-  OPENCODE_OWNED_MARKER,
+  OWNED_MARKER_MD,
   type Charter,
   type Host,
 } from "../generate-subagent-artifacts";
@@ -383,9 +383,9 @@ describe("emitCodex + TOML helpers", () => {
 // ── Real charter loading ────────────────────────────────────────────────────
 
 describe("loadCharter / loadAllCharters (repo charters)", () => {
-  test("loadCharter reads investigator with description + read-only permission", async () => {
-    const c = await loadCharter("investigator");
-    expect(c.name).toBe("investigator");
+  test("loadCharter reads code-explorer with description + read-only permission", async () => {
+    const c = await loadCharter("code-explorer");
+    expect(c.name).toBe("code-explorer");
     expect(c.description.length).toBeGreaterThan(0);
     expect(c.permission).toBe("read-only");
   });
@@ -418,7 +418,7 @@ describe("loadCharter / loadAllCharters (repo charters)", () => {
     // Without this, a broken harness would make every throw-assertion below pass for the
     // wrong reason — a thrown ENOENT is still a thrown error.
     const c = await loadFromTemp((raw) => raw);
-    expect(c.name).toBe("investigator");
+    expect(c.name).toBe("code-explorer");
     expect(c.description.length).toBeGreaterThan(0);
   });
 
@@ -636,7 +636,7 @@ describe("main()/runCheck thread the recorded install-state profile end-to-end (
       const code = runGeneratorInSubprocess([], homeDir);
       expect(code).toBe(0);
 
-      const out = await fs.readFile(path.join(CLAUDE_AGENTS_DIR, "massa-ai-documentation-agent.md"), "utf8");
+      const out = await fs.readFile(path.join(CLAUDE_AGENTS_DIR, "builder.md"), "utf8");
       // Compare against an independent "cheap" emission (the same production
       // resolver, a throwaway target dir) instead of a hardcoded model literal.
       const tmpOut = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
@@ -645,10 +645,10 @@ describe("main()/runCheck thread the recorded install-state profile end-to-end (
         { profileFlag: "cheap", env: {} },
         ["claude"],
       );
-      const expected = await fs.readFile(path.join(tmpOut, "massa-ai-documentation-agent.md"), "utf8");
+      const expected = await fs.readFile(path.join(tmpOut, "builder.md"), "utf8");
       expect(out).toBe(expected);
       // And it must actually have moved off the checked-in ("balanced") baseline.
-      expect(out).not.toBe(backup.get("massa-ai-documentation-agent.md")!.toString("utf8"));
+      expect(out).not.toBe(backup.get("builder.md")!.toString("utf8"));
     } finally {
       await restoreDir(CLAUDE_AGENTS_DIR, backup);
     }
@@ -812,10 +812,10 @@ function withAgentOverride(
 describe("per-agent override resolution (registry v2, D1)", () => {
   test("profile.agents[agent][host] wins over the profile's host default for that host only — an unmentioned host still resolves the host default", async () => {
     const builtin = loadRegistry();
-    // investigator carries no override in the shipped registry, so it resolves the
+    // code-explorer carries no override in the shipped registry, so it resolves the
     // profile's own host default (ALLWF-03: read-only specialists run the strongest
     // model). Override claude to "haiku"; codex is never mentioned and must stay default.
-    const registry = withAgentOverride(builtin, "investigator", {
+    const registry = withAgentOverride(builtin, "code-explorer", {
       claude: { model: "haiku", effort: "high" },
     });
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
@@ -827,8 +827,8 @@ describe("per-agent override resolution (registry v2, D1)", () => {
         opencode: path.join(tmp, "opencode"),
       };
       await emitAll(dirs, { registry, env: {} });
-      const claudeOut = await fs.readFile(path.join(dirs.claude, "massa-ai-investigator.md"), "utf8");
-      const codexOut = await fs.readFile(path.join(dirs.codex, "massa-ai-investigator.toml"), "utf8");
+      const claudeOut = await fs.readFile(path.join(dirs.claude, "code-explorer.md"), "utf8");
+      const codexOut = await fs.readFile(path.join(dirs.codex, "code-explorer.toml"), "utf8");
       expect(claudeOut).toContain("model: haiku"); // overridden
       expect(codexOut).toContain('model = "gpt-5.6-sol"'); // balanced host default, unaffected
     } finally {
@@ -838,7 +838,7 @@ describe("per-agent override resolution (registry v2, D1)", () => {
 
   test("an override changes only that agent's emitted file, not its siblings", async () => {
     const builtin = loadRegistry();
-    const registry = withAgentOverride(builtin, "investigator", {
+    const registry = withAgentOverride(builtin, "code-explorer", {
       claude: { model: "haiku", effort: "high" },
     });
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-gen-"));
@@ -850,10 +850,10 @@ describe("per-agent override resolution (registry v2, D1)", () => {
         opencode: path.join(tmp, "opencode"),
       };
       await emitAll(dirs, { registry, env: {} });
-      const investigatorOut = await fs.readFile(path.join(dirs.claude, "massa-ai-investigator.md"), "utf8");
-      const plannerOut = await fs.readFile(path.join(dirs.claude, "massa-ai-planner.md"), "utf8");
-      expect(investigatorOut).toContain("model: haiku");
-      expect(plannerOut).toContain("model: opus"); // balanced host default, untouched
+      const explorerOut = await fs.readFile(path.join(dirs.claude, "code-explorer.md"), "utf8");
+      const reviewerOut = await fs.readFile(path.join(dirs.claude, "code-reviewer.md"), "utf8");
+      expect(explorerOut).toContain("model: haiku");
+      expect(reviewerOut).toContain("model: opus"); // balanced host default, untouched
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -962,13 +962,13 @@ describe("stale agent-override warn (registry v2)", () => {
 
   test("an override naming a real charter never warns", async () => {
     const builtin = loadRegistry();
-    const registry = withAgentOverride(builtin, "investigator", {
+    const registry = withAgentOverride(builtin, "code-explorer", {
       claude: { model: "haiku", effort: "high" },
     });
     const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
     try {
       // The FULL real charter set — every override the shipped registry already carries
-      // (builder, designer, test-engineer, documentation-agent) names a real charter too,
+      // (builder, designer, test-engineer) names a real charter too,
       // so only a singleton fake charter list would make those look stale.
       const charters = await loadAllCharters();
       warnStaleAgentOverrides(registry, charters, new Set());

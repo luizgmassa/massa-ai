@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import fs from "fs";
 import path from "path";
-import { WORKFLOW_STEMS } from "../static/views/registry.js";
 
 const mod = await import("../static/app.js");
 const UI = (globalThis as any).MASSA_AI_UI || {};

@@ -31,6 +31,8 @@ this batch: core and mcp-client hit a known Bun napi SIGTRAP at exit, red at bas
 write permission, A16 plugin-only update keeps the old `MASSA-AI.md`, A17 exact legacy names,
 A18 no namespace off the Claude plugin route, A20 test-engineer audit mode is write-capable).
 
+**Post-validation merge (2026-09-23).** `origin/main` (model catalog v2 — tiers removed, per-agent overrides; logging) merged in `ec21d05e`; adaptation commit drops `documentation-agent` overrides from every built-in profile and repoints main's new generator tests to the 7-agent roster. Spec: Inventory AC-7 superseded (no `WORKFLOW_STEMS` upstream), A21 added. Post-merge gates, foreground: build, type-check, lint, generate --check, stale pointers green; scripts 2181/0, shell suites all pass, plugins 183/0, shared 1015/0, web-ui 751/0, opencode src 155/0, mcp-client config-cli 87/0, tools-api model-registry 36/0 + web-ui-contract 8/0.
+
 **Next step:** push `feat/agent-roster-consolidation` and open the PR (authorized at Execute
 start); watch CI. Merge is the user's call.
 
