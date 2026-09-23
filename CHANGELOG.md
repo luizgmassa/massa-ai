@@ -43,6 +43,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **spec-driven `Specify` now dispatches `product-manager` `audit` in every run**, over the
   drafted `spec.md`, as a read-only carve-out from the "Planning: do not delegate" rule
   recorded in `references/spec-driven/sub-agents.md`.
+
+### Removed
+
+- **The `skills/profile/` Claude skill front is retired.** `profile` joins
+  `RETIRED_BUNDLE_ROOTS` and `RETIRED_SKILL_NAMES`, so no generator, installer, or harness
+  verifier ships or expects it, and a stale installed or bundled copy is pruned on upgrade.
+  The MCP tools (`profile_list`/`profile_set`) and both `massa-ai-config profile` CLIs are
+  unchanged and are the only fronts left.
+- **Five near-duplicate or never-dispatched agent modes are gone.** `code-reviewer` `guide`
+  is dropped (architecture findings route to `audit` `lens: architecture`; mobile
+  platform/lifecycle/build/offline-sync guidance is answered by the main agent from
+  `references/mobile-context.md` directly); `code-reviewer` `review` is merged into `audit`,
+  which gains a new `lens: diff` (bugs, regressions, smells, missing edge cases over a diff,
+  ranked findings) — all 13 former `review` dispatch blocks now read `mode: audit` with
+  `lens: diff`; `code-explorer` `lookup` is dropped, leaving `trace` as its sole mode and
+  default; `product-manager` `requirements` is merged into `audit`, whose single lens is
+  `requirements`; `test-engineer` `plan` is dropped and `mode` is now a required packet field
+  with no default.
+
+## [1.62.0] - 2026-09-23
+
+### Changed
+
 - **Breaking: six workflows are renamed, with no aliases.** `discovery` → `product-discovery`,
   `adr` → `create-adr`, `to-prd` → `create-prd`, `rfc` → `create-rfc`, `tdd` → `create-tdd`,
   `ticket` → `create-ticket` — the files, frontmatter names, session-id prefixes, `workflow:`
@@ -121,21 +144,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file, under its Core Contract; there is no fallback workflow.
 - **The `/persona` prompt prefix is no longer an observation-extractor role signal.** `act as`
   and `you are a` still are.
-- **The `skills/profile/` Claude skill front is retired.** `profile` joins
-  `RETIRED_BUNDLE_ROOTS` and `RETIRED_SKILL_NAMES`, so no generator, installer, or harness
-  verifier ships or expects it, and a stale installed or bundled copy is pruned on upgrade.
-  The MCP tools (`profile_list`/`profile_set`) and both `massa-ai-config profile` CLIs are
-  unchanged and are the only fronts left.
-- **Five near-duplicate or never-dispatched agent modes are gone.** `code-reviewer` `guide`
-  is dropped (architecture findings route to `audit` `lens: architecture`; mobile
-  platform/lifecycle/build/offline-sync guidance is answered by the main agent from
-  `references/mobile-context.md` directly); `code-reviewer` `review` is merged into `audit`,
-  which gains a new `lens: diff` (bugs, regressions, smells, missing edge cases over a diff,
-  ranked findings) — all 13 former `review` dispatch blocks now read `mode: audit` with
-  `lens: diff`; `code-explorer` `lookup` is dropped, leaving `trace` as its sole mode and
-  default; `product-manager` `requirements` is merged into `audit`, whose single lens is
-  `requirements`; `test-engineer` `plan` is dropped and `mode` is now a required packet field
-  with no default.
 
 ## [1.61.0] - 2026-09-23
 
