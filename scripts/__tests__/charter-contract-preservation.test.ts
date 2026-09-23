@@ -236,3 +236,56 @@ describe("lazy-mode stub binding (agent-roster-revision LZY-02, synthetic — no
     }
   });
 });
+
+/**
+ * agent-roster-revision AC3: every lazy mode's stub must bind to exactly its
+ * own contract file. The `output contracts` describe block above only proves
+ * this for a mode a retired-charter fixture field happens to route through —
+ * `designer` has zero such fields (nothing was absorbed into it), so that
+ * describe block never exercises `designer`'s real stubs at all. This block
+ * closes that gap: it scans every `### Mode:` heading in every LAZY charter
+ * that actually exists on this branch and checks its citations bind, using
+ * the real charter text rather than a constructed section.
+ */
+const LAZY_AGENTS = ["designer", "judge", "test-engineer"] as const;
+
+function modeHeadings(text: string): string[] {
+  return [...text.matchAll(/^#{2,4} Mode: `([a-z-]+)`\s*$/gm)].map((m) => m[1]!);
+}
+
+describe("lazy-mode stub binding (agent-roster-revision AC3, real charters)", () => {
+  // A LAZY_AGENTS member not yet converted to stubs on this branch (T7/T9 land
+  // separately from this task) still holds an inline `Mode:` section with zero
+  // `references/agent-modes/...` citations. That is a different lifecycle
+  // state, not a binding failure — this check only fires once a mode has
+  // actually become a stub (>=1 citation), so it stays generically correct as
+  // each remaining charter converts without needing another edit here.
+  const lazyPresent = LAZY_AGENTS.filter((name) => existsSync(charterPath(name)));
+
+  test(`binding checked against every real lazy-mode stub present (charters scanned: ${lazyPresent.join(", ") || "none"})`, () => {
+    expect(lazyPresent.length).toBeGreaterThan(0);
+    let stubsChecked = 0;
+    let inlineSkipped = 0;
+    for (const agent of lazyPresent) {
+      const content = readCharter(agent);
+      for (const mode of modeHeadings(content)) {
+        const section = modeSection(content, mode);
+        expect(section, `${agent} Mode \`${mode}\` section not found`).not.toBeNull();
+        const citations = stubCitations(section!);
+        if (citations.length === 0) {
+          inlineSkipped += 1;
+          continue;
+        }
+        expect(
+          citesOwnMode(agent, mode, citations),
+          `${agent} Mode \`${mode}\` stub does not bind to its own contract file (citations: ${citations.join(", ")})`,
+        ).toBe(true);
+        stubsChecked += 1;
+      }
+    }
+    console.log(
+      `[charter-contract-preservation] real lazy-charter binding population: ${stubsChecked} stub mode(s) checked, ${inlineSkipped} still-inline mode(s) skipped`,
+    );
+    expect(stubsChecked).toBeGreaterThan(0);
+  });
+});
