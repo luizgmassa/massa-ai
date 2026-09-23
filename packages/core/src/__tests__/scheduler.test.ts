@@ -314,6 +314,57 @@ describe("job registry dispatch", () => {
   });
 });
 
+// ── status() consecutiveFailures / lastSuccessAt (AC10) ─────────────────────
+
+describe("status()", () => {
+  test("reports the real per-job consecutiveFailures, reset by a following success", async () => {
+    const store = makeInMemoryStore();
+    const scheduler = new Scheduler({
+      store,
+      tickIntervalMs: 1000,
+      maxConcurrent: 2,
+      enabled: true,
+    });
+
+    let shouldFail = true;
+    const handler: JobHandler = async () => {
+      if (shouldFail) throw new Error("boom");
+    };
+    scheduler.registerHandler("status-test-kind" as JobKind, handler);
+
+    store.save(
+      makeJob({
+        id: "status-test",
+        jobKind: "status-test-kind" as JobKind,
+        nextRunAt: Date.now() - 1,
+        schedule: { type: "interval", intervalMs: 60_000 },
+      }),
+    );
+
+    await scheduler.tick();
+    await new Promise((r) => setTimeout(r, 50));
+    let jobStatus = scheduler.status().jobs.find((j) => j.id === "status-test")!;
+    expect(jobStatus.consecutiveFailures).toBe(1);
+    expect(jobStatus.lastSuccessAt).toBeNull();
+
+    // Make it due again and fail a second time in a row.
+    store.save({ ...store.get("status-test")!, nextRunAt: Date.now() - 1 });
+    await scheduler.tick();
+    await new Promise((r) => setTimeout(r, 50));
+    jobStatus = scheduler.status().jobs.find((j) => j.id === "status-test")!;
+    expect(jobStatus.consecutiveFailures).toBe(2);
+
+    // A following success resets the streak and sets lastSuccessAt.
+    shouldFail = false;
+    store.save({ ...store.get("status-test")!, nextRunAt: Date.now() - 1 });
+    await scheduler.tick();
+    await new Promise((r) => setTimeout(r, 50));
+    jobStatus = scheduler.status().jobs.find((j) => j.id === "status-test")!;
+    expect(jobStatus.consecutiveFailures).toBe(0);
+    expect(jobStatus.lastSuccessAt).not.toBeNull();
+  });
+});
+
 // ── Concurrent-execution guard ───────────────────────────────────────────────
 
 describe("concurrent-execution guard", () => {

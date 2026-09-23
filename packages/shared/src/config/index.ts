@@ -1002,7 +1002,7 @@ export const defaultConfig: ServerConfig = {
   },
 
   logging: {
-    level: (process.env.LOG_LEVEL as any) || fileConfig.logging?.level || "info",
+    level: (process.env.MASSA_AI_LOG_LEVEL as any) || fileConfig.logging?.level || "info",
     enableMetrics:
       process.env.ENABLE_METRICS === "true" ||
       (process.env.ENABLE_METRICS === undefined &&

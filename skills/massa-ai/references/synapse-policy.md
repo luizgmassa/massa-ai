@@ -44,7 +44,7 @@ Config knobs (env, read by the server, not by the agent):
 |---|---|---|
 | `SYNAPSE_ENABLED` | `true` | Master kill switch; `false` bypasses the whole pipeline, and `search` behaves statelessly even when a `sessionId` is passed. |
 | `SYNAPSE_ATTENTION_ENABLED` | `false` | Multi-signal attention re-ranker. **Off by default** — do not attribute re-ranking to Synapse unless it is on. |
-| `LOG_LEVEL` | `info` | `debug` emits one pipeline log line per query (see Reading Pipeline Output). |
+| `MASSA_AI_LOG_LEVEL` | `info` | `debug` emits one pipeline log line per query (see Reading Pipeline Output). |
 
 ## MCP-First Lifecycle
 
@@ -103,7 +103,7 @@ optional. REST prefetch requires `filePath` and may include `symbols`, `chains`,
 
 ## Reading Pipeline Output
 
-With `LOG_LEVEL=debug`, the server emits one structured line per Synapse-scoped
+With `MASSA_AI_LOG_LEVEL=debug`, the server emits one structured line per Synapse-scoped
 query. Use it to decide whether Synapse is helping or whether the query needs
 refining — not as evidence about the codebase.
 

@@ -284,6 +284,131 @@ describe("Logger", () => {
     });
   });
 
+  describe("repeat accounting (design §4, AC4)", () => {
+    test("first WARN occurrence is byte-identical to a plain call (no occurrences/firstSeenAgo)", () => {
+      configState = { level: "warn", enableMetrics: false };
+      loggerInstance.warn("disk low", { pct: 90 });
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).toContain('disk low {"pct":90}');
+      expect(out).not.toContain("occurrences");
+      expect(out).not.toContain("firstSeenAgo");
+    });
+
+    test("second WARN with the same level+message within the window gets occurrences and firstSeenAgo", () => {
+      configState = { level: "warn", enableMetrics: false };
+      loggerInstance.warn("disk low", { pct: 90 });
+      loggerInstance.warn("disk low", { pct: 91 });
+      const second = errSpy.mock.calls[1][0] as string;
+      expect(second).toContain('"occurrences":2');
+      expect(second).toMatch(/"firstSeenAgo":"\d+[ms]"/);
+    });
+
+    test("same meta.label repeats count together", () => {
+      configState = { level: "warn", enableMetrics: false };
+      loggerInstance.warn("llm call failed", { label: "reranker" });
+      loggerInstance.warn("llm call failed", { label: "reranker" });
+      const second = errSpy.mock.calls[1][0] as string;
+      expect(second).toContain('"occurrences":2');
+    });
+
+    test("different meta.label values never share a counter", () => {
+      configState = { level: "warn", enableMetrics: false };
+      loggerInstance.warn("llm call failed", { label: "reranker" });
+      loggerInstance.warn("llm call failed", { label: "hyde" });
+      const second = errSpy.mock.calls[1][0] as string;
+      expect(second).not.toContain("occurrences");
+    });
+
+    test("ERROR level is also tracked", () => {
+      configState = { level: "error", enableMetrics: false };
+      loggerInstance.error("boom");
+      loggerInstance.error("boom");
+      const second = errSpy.mock.calls[1][0] as string;
+      expect(second).toContain('"occurrences":2');
+    });
+
+    test("INFO/DEBUG are never tracked, even when repeated", () => {
+      configState = { level: "debug", enableMetrics: false };
+      loggerInstance.info("hi");
+      loggerInstance.info("hi");
+      const second = errSpy.mock.calls[1][0] as string;
+      expect(second).not.toContain("occurrences");
+    });
+
+    test("a meta-less repeat gains a meta blob", () => {
+      configState = { level: "warn", enableMetrics: false };
+      loggerInstance.warn("plain repeat");
+      loggerInstance.warn("plain repeat");
+      const first = errSpy.mock.calls[0][0] as string;
+      const second = errSpy.mock.calls[1][0] as string;
+      expect(first).not.toContain("{");
+      expect(second).toContain('"occurrences":2');
+    });
+
+    test("_resetRepeatsForTesting clears the streak", () => {
+      configState = { level: "warn", enableMetrics: false };
+      loggerInstance.warn("disk low");
+      loggerInstance._resetRepeatsForTesting();
+      loggerInstance.warn("disk low");
+      const second = errSpy.mock.calls[1][0] as string;
+      expect(second).not.toContain("occurrences");
+    });
+
+    test("cap: the 501st distinct key clears the map instead of growing unbounded", () => {
+      configState = { level: "warn", enableMetrics: false };
+      for (let i = 0; i < 500; i++) {
+        loggerInstance.warn(`msg-${i}`);
+      }
+      // Forces the cap check to fire and clear before insert.
+      loggerInstance.warn("msg-500");
+      // Without the clear, this would still be in the map from the loop above
+      // and would read as a repeat (occurrences:2).
+      loggerInstance.warn("msg-0");
+      const out = errSpy.mock.calls[errSpy.mock.calls.length - 1][0] as string;
+      expect(out).not.toContain("occurrences");
+    });
+  });
+
+  describe("error serialization (design §5, AC5)", () => {
+    test("logger.error serializes err.code and a one-level err.cause message", () => {
+      configState = { level: "error", enableMetrics: false };
+      const err = new Error("connection refused") as Error & { code?: string; cause?: unknown };
+      err.code = "ECONNREFUSED";
+      err.cause = new Error("upstream reset");
+      loggerInstance.error("fetch failed", err);
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).toContain('"code":"ECONNREFUSED"');
+      expect(out).toContain('"cause":"upstream reset"');
+    });
+
+    test("a non-Error cause becomes String(v)", () => {
+      configState = { level: "error", enableMetrics: false };
+      const err = new Error("x") as Error & { cause?: unknown };
+      err.cause = { reason: "weird" };
+      loggerInstance.error("op", err);
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).toContain('"cause":"[object Object]"');
+    });
+
+    test("warn(msg, {error: err}) no longer serializes to {}", () => {
+      configState = { level: "warn", enableMetrics: false };
+      const err = new Error("boom");
+      loggerInstance.warn("op failed", { error: err });
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).toContain('"error":{"name":"Error","message":"boom"}');
+    });
+
+    test("an Error at the top level of meta never spreads extra fields (e.g. requestBodyValues)", () => {
+      configState = { level: "warn", enableMetrics: false };
+      const err = new Error("api call failed") as Error & { requestBodyValues?: unknown };
+      err.requestBodyValues = { prompt: "secret prompt text" };
+      loggerInstance.warn("llm call failed", { error: err });
+      const out = errSpy.mock.calls[0][0] as string;
+      expect(out).not.toContain("requestBodyValues");
+      expect(out).not.toContain("secret prompt text");
+    });
+  });
+
   describe("global logger instance", () => {
     test("exported logger exposes the ILogger methods", () => {
       expect(typeof logger.debug).toBe("function");

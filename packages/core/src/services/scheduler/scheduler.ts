@@ -529,6 +529,8 @@ export class Scheduler {
         enabled: j.enabled,
         nextRunAt: j.nextRunAt,
         lastRunAt: j.lastRunAt,
+        lastSuccessAt: j.lastSuccessAt ?? null,
+        consecutiveFailures: j.consecutiveFailures ?? 0,
         due: j.enabled && j.nextRunAt <= now,
         currentlyRunning: this.running.has(j.jobKind),
       })),

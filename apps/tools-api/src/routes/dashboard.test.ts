@@ -17,6 +17,8 @@ const status = mock(() => ({
       enabled: true,
       nextRunAt: 100,
       lastRunAt: 50,
+      lastSuccessAt: 50 as number | null,
+      consecutiveFailures: 0,
       due: true,
       currentlyRunning: false,
     },
@@ -52,7 +54,18 @@ describe("GET /api/v1/scheduler/status", () => {
       running: true,
       tickIntervalMs: 1000,
       jobs: [
-        { id: "a", name: "n", jobKind: "etl", enabled: false, nextRunAt: 1, lastRunAt: 2, due: false, currentlyRunning: true },
+        {
+          id: "a",
+          name: "n",
+          jobKind: "etl",
+          enabled: false,
+          nextRunAt: 1,
+          lastRunAt: 2,
+          lastSuccessAt: null,
+          consecutiveFailures: 0,
+          due: false,
+          currentlyRunning: true,
+        },
       ],
     }));
     const res = await get("/api/v1/scheduler/status");
@@ -70,6 +83,29 @@ describe("GET /api/v1/scheduler/status", () => {
       lastSuccessAt: null,
       consecutiveFailures: 0,
     });
+  });
+
+  test("reports real consecutiveFailures/lastSuccessAt from the scheduler, not hardcoded zeros (AC10)", async () => {
+    status.mockImplementationOnce(() => ({
+      running: true,
+      tickIntervalMs: 1000,
+      jobs: [
+        {
+          id: "b",
+          name: "n",
+          jobKind: "etl",
+          enabled: true,
+          nextRunAt: 1,
+          lastRunAt: 2,
+          lastSuccessAt: 12345,
+          consecutiveFailures: 2,
+          due: false,
+          currentlyRunning: false,
+        },
+      ],
+    }));
+    const res = await get("/api/v1/scheduler/status");
+    expect(res.json.jobs[0]).toMatchObject({ lastSuccessAt: 12345, consecutiveFailures: 2 });
   });
 
   test("degrades gracefully when scheduler throws", async () => {
