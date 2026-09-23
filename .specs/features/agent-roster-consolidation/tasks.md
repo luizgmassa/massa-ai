@@ -238,7 +238,7 @@ T12 → T13
 **Done when**:
 
 - [x] Test: persisted `{"persona-router": false}` renders 8 rules and emits no "Ignored persisted rule state" line
-- [x] `git grep -i -l -wE 'persona(s|-router|_pin)?'` outside `.specs/`, `.ua/`, CHANGELOG returns only files on this task's explicit allowlist (the files T10–T12 still own, plus `references/the-fool/`), and after T12 only `docs/removed-features.md` + `references/the-fool/`
+- [x] `git grep -i -l -wE 'persona(s|-router|_pin)?'` outside `.specs/`, `.ua/`, CHANGELOG returns only files on this task's explicit allowlist (the files T10–T12 still own, plus `references/the-fool/`), and after T12 only `docs/removed-features.md`, `references/the-fool/`, and the absence sensors and retired literals that must name what they prove gone (`RETIRED_RULE_IDS`, `RETIRED_BUNDLE_ROOTS`, `RETIRED_SKILL_NAMES`, and the tests asserting persona absence, retired-id silence, or retired-skill prune) — *amended 2026-09-23 by the orchestrator after the T9 worker reported the original allowlist unreachable: deleting those sensors to satisfy a sweep would remove PER AC-3/5/6/8 evidence*
   - T9 allowlist beyond T10–T12 files: the retired-id literal (`packages/shared/src/bootstrap/rules.ts`) and the sensors that must name what they prove absent (shared `engine`/`rules`/`state` tests, `profile-switch` `state.test.ts` legacy install-state fixture, `skills-harness-integrity`, `validate-repository`, `skill-artifact-parity`); history comments in `agent-era-guidance-content` and `skills-duplication-metric` tests
 - [x] Gate: shared + scripts green
 
@@ -293,6 +293,7 @@ T12 → T13
 **Done when**:
 
 - [ ] `ROSTER = 7` scan green; no "18" specialist count, "nine" rule count, or "40 workflows" left
+- [ ] T9 persona sweep (amended allowlist) and T8 old-name sweep leave no doc hit; tick T8's sweep box
 - [ ] Gate: scripts green
 
 **Tests**: content
