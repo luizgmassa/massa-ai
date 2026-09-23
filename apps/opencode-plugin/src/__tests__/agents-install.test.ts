@@ -99,7 +99,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     const agentsDir = path.join(xdgConfig, "opencode/agents");
     for (const name of SPECIALIST_NAMES) {
       expect(
-        await pathExists(path.join(agentsDir, `massa-ai-${name}.md`)),
+        await pathExists(path.join(agentsDir, `${name}.md`)),
       ).toBe(true);
     }
 
@@ -115,7 +115,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     const agentsDir = path.join(xdgConfig, "opencode/agents");
     for (const name of SPECIALIST_NAMES) {
       const content = await fs.readFile(
-        path.join(agentsDir, `massa-ai-${name}.md`),
+        path.join(agentsDir, `${name}.md`),
         "utf8",
       );
       expect(content).toContain("mode: all");
@@ -135,7 +135,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     const agentsDir = path.join(xdgConfig, "opencode/agents");
     for (const name of SPECIALIST_NAMES) {
       const content = await fs.readFile(
-        path.join(agentsDir, `massa-ai-${name}.md`),
+        path.join(agentsDir, `${name}.md`),
         "utf8",
       );
       const fmBlock = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(content)![1]!;
@@ -179,7 +179,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
 
     // new body-marker form removed
     for (const name of SPECIALIST_NAMES) {
-      expect(await pathExists(path.join(agentsDir, `massa-ai-${name}.md`))).toBe(false);
+      expect(await pathExists(path.join(agentsDir, `${name}.md`))).toBe(false);
     }
     // old frontmatter-marker form removed too
     expect(await pathExists(oldForm)).toBe(false);
@@ -204,7 +204,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
 
     for (const name of SPECIALIST_NAMES) {
       const content = await fs.readFile(
-        path.join(agentsDir, `massa-ai-${name}.md`),
+        path.join(agentsDir, `${name}.md`),
         "utf8",
       );
       const permLine = content.split("\n").find((l) => l.startsWith("permission:")) ?? "";
@@ -238,11 +238,30 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
     // every massa-ai-owned file removed
     for (const name of SPECIALIST_NAMES) {
       expect(
-        await pathExists(path.join(agentsDir, `massa-ai-${name}.md`)),
+        await pathExists(path.join(agentsDir, `${name}.md`)),
       ).toBe(false);
     }
     // User agent survives (R3: no ownership marker)
     expect(await pathExists(path.join(agentsDir, "user-custom.md"))).toBe(true);
+  });
+
+  test("NAM AC-3: install never overwrites an unmarked same-named agent and warns; uninstall leaves it", async () => {
+    const agentsDir = path.join(xdgConfig, "opencode/agents");
+    await fs.mkdir(agentsDir, { recursive: true });
+    const foreign = path.join(agentsDir, "builder.md");
+    const userBody = "---\ndescription: user's own builder\nmode: all\n---\nmine\n";
+    await fs.writeFile(foreign, userBody);
+
+    const res = runCli(["agents", "install", "--user"], { HOME: tmp, XDG_CONFIG_HOME: xdgConfig });
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toContain(`${foreign} exists and is not massa-ai-owned — skipped`);
+    expect(await fs.readFile(foreign, "utf8")).toBe(userBody);
+    expect(await pathExists(path.join(agentsDir, "reviewer.md"))).toBe(true);
+
+    const un = runCli(["agents", "uninstall", "--user"], { HOME: tmp, XDG_CONFIG_HOME: xdgConfig });
+    expect(un.exitCode).toBe(0);
+    expect(await fs.readFile(foreign, "utf8")).toBe(userBody);
+    expect(await pathExists(path.join(agentsDir, "reviewer.md"))).toBe(false);
   });
 
   test("OPC-06: idempotent re-run overwrites with identical content", async () => {
@@ -255,7 +274,7 @@ describe("opencode-plugin config-cli agents subcommand (T7 / OPC-01,02,05,06,07 
       const out: Record<string, string> = {};
       for (const name of SPECIALIST_NAMES) {
         out[name] = await fs.readFile(
-          path.join(agentsDir, `massa-ai-${name}.md`),
+          path.join(agentsDir, `${name}.md`),
           "utf8",
         );
       }

@@ -66,7 +66,7 @@ Not for findings-only requirements review — route to `workflows/requirements/r
    - If a finding exposes a product decision gap, stop and ask rather than inventing policy.
 10. Use agent orchestration only when it improves signal, with one carve-out: the verification-agent dispatch below is mandatory at its tier gate rather than discretionary, per `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated requirements finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -76,7 +76,7 @@ Not for findings-only requirements review — route to `workflows/requirements/r
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable requirements patterns
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
 > - permissions: read-only
@@ -86,7 +86,7 @@ Not for findings-only requirements review — route to `workflows/requirements/r
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven REQ-fix size or high/critical requirement severity, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`'s Mandatory Verification Fix Gate; a Quick-tier REQ finding takes the fallback below instead
 > - scope: the closed REQ row's Requirement Source alignment, acceptance evidence, and report claim closure
 > - inputs: the finding, its Requirement Source and Requirement ID or Quote, the applied fix, the verification suggestion, and validation assets

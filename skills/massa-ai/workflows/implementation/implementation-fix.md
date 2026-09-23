@@ -62,14 +62,14 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 9. Size each finding with `references/verification-ladder.md`. Quick findings may proceed locally; Standard findings require characterization and an explicit recipe; ambiguous, cross-boundary, migration-heavy, or broad redesign findings pause and route to `spec-driven`.
 10. Orchestrate conservatively. The main agent owns report parsing, scope/freshness, prioritization, questions, memory, and final evidence. Dispatch per `references/agent-orchestration.md`:
 
-**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
+**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
-> **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
+> **Dispatch: `designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: isolated finding with disjoint write set and concrete verification
 > - scope: one isolated implementation finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -81,7 +81,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 
     Never run parallel writers against shared files or contracts.
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
 > - permissions: read-only
@@ -91,7 +91,7 @@ Do not execute from chat summaries, inline review comments, remembered findings,
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: an `Area/PREFIX-N` finding's closure meets the verification-ladder's Independent Verification Mandate tier gate — Standard+/Spec-driven size or any high/critical-severity finding
 > - scope: the closed `Area/PREFIX-N` finding's fix diff, its source-lens claim, and the validation assets the fix touches
 > - inputs: the source-qualified finding ID, the applied fix diff, the report's Verification Suggestion, and the pending closure-matrix row

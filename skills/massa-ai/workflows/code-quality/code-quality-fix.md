@@ -62,7 +62,7 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
    - Prefer small reversible edits; verify after each finding or coherent group.
 10. Use agent orchestration only when it improves signal — except the verification-agent dispatch below, which `references/agent-orchestration.md`'s Independent Verification Exception mandates at the tiers named in its trigger regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated code-quality finding or disjoint file group
 > - permissions: write (disjoint write set)
@@ -72,7 +72,7 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable code-quality patterns
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation of the CQ finding complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
 > - permissions: read-only
@@ -82,7 +82,7 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists review outcomes for the code-quality fix
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory per the verification-ladder's Independent Verification Mandate at Standard+/Spec-driven finding size or high/critical severity; at Quick size the subagent hop is skipped and the standalone fresh-eyes check below runs instead
 > - scope: the fixed finding's behavior-preservation claim over the moved/transformed code, its call sites/imports, and report claim closure
 > - inputs: the finding, the applied fix, the verification suggestion, and validation assets

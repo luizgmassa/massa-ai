@@ -183,9 +183,9 @@ T12 → T13
 
 **Done when**:
 
-- [ ] No generated file under `apps/*-plugin/{agents,agent-profiles}/` starts with `massa-ai-`
-- [ ] Every Dispatch target is unprefixed and exists in all 4 bundles
-- [ ] Phase 2 full gate green
+- [x] No generated file under `apps/*-plugin/{agents,agent-profiles}/` starts with `massa-ai-`
+- [x] Every Dispatch target is unprefixed and exists in all 4 bundles
+- [x] Phase 2 full gate green
 
 **Tests**: unit + parity + content
 **Gate**: full

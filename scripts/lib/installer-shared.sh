@@ -385,8 +385,7 @@ NODE
 MASSA_AI_OWNED_MARKER_MD='<!-- massa-ai-owned: true -->'
 MASSA_AI_LEGACY_AGENT_NAMES=" architecture-specialist audit-specialist builder context-curator designer documentation-agent furps-analyst investigator judge meta-judge mobile-specialist navigator plan-critic planner requirements-analyst reviewer test-engineer verification-agent "
 is_legacy_agent() {
-  local b
-  b="$(basename "$1")"
+  local b="${1##*/}"
   b="${b%.*}"
   [[ "$b" == massa-ai-* && "$MASSA_AI_LEGACY_AGENT_NAMES" == *" ${b#massa-ai-} "* ]]
 }
@@ -404,8 +403,7 @@ is_owned_agent_toml() {
 is_owned_agent_link() {
   [[ -L "$1" ]] || return 1
   is_legacy_agent "$1" && return 0
-  local b t
-  b="$(basename "$1")"
+  local b="${1##*/}" t
   t="$(readlink "$1")"
   [[ "$t" == */opencode-plugin/agents/"$b" || "$t" == */plugins/massa-ai/agent-profiles/*/"$b" ]] && return 0
   [[ -f "$1" ]] && has_owned_marker "$1"

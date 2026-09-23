@@ -50,7 +50,7 @@ Every `*-fix` workflow must execute this gate for each selected finding or coher
 
 ### Independent Verification Mandate (author ≠ verifier)
 
-- At **Standard+ or Spec-driven size, or for any high/critical-severity finding**, dispatching `massa-ai-verification-agent` is **mandatory** before closure — the author must not be the sole verifier of their own work. At Quick size, the subagent hop may be skipped, but the check itself is never skipped: run a standalone fresh-eyes re-check (re-read the finding/ACs, changed files, tests, and diff from scratch) against the same output contract.
+- At **Standard+ or Spec-driven size, or for any high/critical-severity finding**, dispatching `verification-agent` is **mandatory** before closure — the author must not be the sole verifier of their own work. At Quick size, the subagent hop may be skipped, but the check itself is never skipped: run a standalone fresh-eyes re-check (re-read the finding/ACs, changed files, tests, and diff from scratch) against the same output contract.
 - **Exception — `security-fix` dispatches the verifier unconditionally** for every finding closed `fixed`, at every tier.
 - Fallback discipline: when the subagent is unavailable (not registered, spawning forbidden), run the standalone fresh-eyes re-check from scratch and record the skipped-delegation reason in closure evidence.
 - Reviewer + verifier both dispatching at Standard+ is intentional cost, mirroring spec-driven's always-on pair — not accidental duplication.

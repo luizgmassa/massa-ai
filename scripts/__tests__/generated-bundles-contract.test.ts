@@ -60,8 +60,8 @@ describe("managed subtrees stay gitignored (UGB-01)", () => {
     // line's deletion hide behind the other's.
     "apps/claude-plugin/skills/bootstrap/SKILL.md",
     "apps/opencode-plugin/skills/agents/investigator/SKILL.md",
-    "apps/claude-plugin/agents/massa-ai-builder.md",
-    "apps/opencode-plugin/agent-profiles/work/massa-ai-builder.md",
+    "apps/claude-plugin/agents/builder.md",
+    "apps/opencode-plugin/agent-profiles/work/builder.md",
     "apps/codex-plugin/hooks/massa-ai-hook",
     "apps/cursor-plugin/hooks/massa-ai-hook",
     "apps/opencode-plugin/lib/opencode-config.cjs",

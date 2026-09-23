@@ -60,14 +60,14 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
    - Modify tracked Maestro flows only when the selected finding explicitly identifies the flow as incorrect or missing and the user-approved scope includes that change.
 9. Dispatch per `references/agent-orchestration.md`; the verification-agent block below is tier-gated mandatory, not merely discretionary — carved out of ordinary delegation gating by that reference's Independent Verification Exception:
 
-**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
+**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
-> **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
+> **Dispatch: `designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: a selected `MFM-*` finding spans a disjoint surface or shared-root slice, or an explicit subagent request
 > - scope: one `MFM-*` finding, or a coherent surface group sharing one KMP root cause, with a disjoint write set
 > - permissions: write (disjoint write set, per-surface or per-module ownership)
@@ -77,7 +77,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
 > - firewall: raw diffs and screenshots summarized
 > - memory: suggest-only; main agent persists reusable token/mapping patterns
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
 > - permissions: read-only
@@ -87,7 +87,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven size or high/critical severity per the Independent Verification Mandate in `references/verification-ladder.md`; a Quick-tier finding runs the fallback fresh-eyes self-check below instead
 > - scope: the fixed `MFM-*` finding's surface, resolved token/value, comparison-matrix row, and closure claim
 > - inputs: the finding, the applied fix, the comparison-matrix row, the render sensor used, and validation assets

@@ -62,7 +62,7 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
    - Do not weaken tests, fixtures, snapshots, types, or public contracts to make the fix pass.
 9. Use agent orchestration only when it improves signal, except independent verification of the bug fix, which is mandated at the tiers named in `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated bug finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -72,7 +72,7 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable bug patterns
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
 > - permissions: read-only
@@ -82,7 +82,7 @@ Not for findings-only bug discovery — route to `workflows/bugs/bugs-audit.md`.
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven bug-fix size or high/critical bug severity, per the Independent Verification Mandate tier gate in `references/verification-ladder.md`
 > - scope: the fixed bug finding's repro path, regression tests, and report claim closure
 > - inputs: the bug finding, the applied root-cause fix, the verification suggestion, and validation assets

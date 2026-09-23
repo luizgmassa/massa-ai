@@ -43,7 +43,7 @@ Five gates, five distinct error classes. A green gate elsewhere never substitute
 5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Tests row of Per-Lens Scope Deltas).
 6. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
 
-> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
 > - scope: the tests audit target — test files, fixtures, harnesses, coverage
 > - permissions: read-only

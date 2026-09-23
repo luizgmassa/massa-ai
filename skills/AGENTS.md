@@ -308,7 +308,7 @@ of `skills/massa-ai/references/code-annotation.md`.
 
 Single registry for the 18 reusable sub-agent skills in this repo. Workflows remain the orchestrators; these agents are single-purpose specialists any workflow can invoke via the host's task/subagent tool.
 
-**Dispatch names are prefixed.** A charter at `skills/agents/<role>/SKILL.md` is registered by every host as `massa-ai-<role>`. Dispatch `massa-ai-investigator`, not `investigator`; the bare name is the registry key only. See `skills/massa-ai/references/agent-orchestration.md` -> Name Resolution for the convention and for the fallback when a named agent is unavailable.
+**Dispatch names are the bare role.** A charter at `skills/agents/<role>/SKILL.md` is registered by every host as `<role>`; on the Claude plugin route dispatch the plugin-namespaced `massa-ai:<role>`. See `skills/massa-ai/references/agent-orchestration.md` -> Name Resolution for the convention and for the fallback when a named agent is unavailable.
 
 ## Capability Packet (dispatch contract)
 

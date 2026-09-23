@@ -109,9 +109,9 @@ JSON
   run_installer "$host" "$H"
   assert_eq "$host recorded-profile install → exit 0" "$RC" "0"
   assert_contains "$host re-apply log line names the profile" "$OUT" "re-applying recorded model profile 'work'"
-  INSTALLED="$H/$cfg_dir/agents/massa-ai-builder.$ext"
-  WORK_VARIANT="$BUNDLE_AGENT_PROFILES/work/massa-ai-builder.$ext"
-  DEFAULT_ACTIVE="$PROJECT_ROOT/apps/${host}-plugin/agents/massa-ai-builder.$ext"
+  INSTALLED="$H/$cfg_dir/agents/builder.$ext"
+  WORK_VARIANT="$BUNDLE_AGENT_PROFILES/work/builder.$ext"
+  DEFAULT_ACTIVE="$PROJECT_ROOT/apps/${host}-plugin/agents/builder.$ext"
   assert_file "$host installed active file exists" "$INSTALLED"
   if cmp -s "$INSTALLED" "$WORK_VARIANT"; then
     ok "$host installed content == work variant content"
@@ -143,7 +143,7 @@ JSON
   assert_eq "$host missing-profile install → exit 0" "$RC" "0"
   assert_contains "$host missing-profile → loud fallback line" "$OUT" \
     "recorded model profile 'does_not_exist' is not in this bundle — falling back to the default profile"
-  INSTALLED="$H/$cfg_dir/agents/massa-ai-builder.$ext"
+  INSTALLED="$H/$cfg_dir/agents/builder.$ext"
   if cmp -s "$INSTALLED" "$DEFAULT_ACTIVE"; then
     ok "$host missing-profile → installed content == shipped default"
   else
@@ -161,11 +161,11 @@ JSON
   else
     VARIANT_DEST="$H/$cfg_dir/massa-ai/agent-profiles"
   fi
-  assert_file "$host variant tree: balanced/massa-ai-builder.$ext installed" \
-    "$VARIANT_DEST/balanced/massa-ai-builder.$ext"
-  assert_file "$host variant tree: work/massa-ai-builder.$ext installed" \
-    "$VARIANT_DEST/work/massa-ai-builder.$ext"
-  if cmp -s "$VARIANT_DEST/work/massa-ai-builder.$ext" "$BUNDLE_AGENT_PROFILES/work/massa-ai-builder.$ext"; then
+  assert_file "$host variant tree: balanced/builder.$ext installed" \
+    "$VARIANT_DEST/balanced/builder.$ext"
+  assert_file "$host variant tree: work/builder.$ext installed" \
+    "$VARIANT_DEST/work/builder.$ext"
+  if cmp -s "$VARIANT_DEST/work/builder.$ext" "$BUNDLE_AGENT_PROFILES/work/builder.$ext"; then
     ok "$host installed work variant content == bundle work variant content"
   else
     fail "$host installed work variant content == bundle work variant content  →  differs"

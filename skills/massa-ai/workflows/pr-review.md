@@ -17,7 +17,7 @@ conflict with the base.
 Use when the user explicitly asks to review a hosted PR (Pull Request, GitHub) or
 MR (Merge Request, GitLab) — "review PR 128", "review this MR", "check pull request
 42". Explicit route only: never auto-trigger during coding. Local working-tree diff
-review stays with the audit workflows and `massa-ai-reviewer`; this workflow exists
+review stays with the audit workflows and `reviewer`; this workflow exists
 to **post findings back to the host**.
 
 Load `references/project-context.md` (intake sweep) before the first substantive
@@ -142,17 +142,17 @@ the severity labels, and the reply contract.
 
 | # | Dimension | Agent | Packet delta (lens / scope) | Marker `{type}` |
 | --- | --- | --- | --- | --- |
-| 1 | Security | `massa-ai-audit-specialist` | `lens: security` — secrets, authn/authz on new endpoints, injection, unsafe deserialization, PII in logs, permissive CORS, leaking payload fields | `security` |
-| 2 | Requirements & DoD (Definition of Done) | `massa-ai-audit-specialist` | `lens: requirements` — score merged Track A + Track B criteria against the diff, evidence-or-zero: ✅ implemented (`path:line`) / 🟡 partial / ❌ missing; no source ⇒ report "requirements verification skipped" | `requirements` |
-| 3 | Architecture & conventions | `massa-ai-audit-specialist` | `lens: architecture` — extract every explicit rule from the profile's CONVENTIONS/REVIEW_SKILLS docs into a numbered matrix, grade each changed file PASS/VIOLATION/N/A; no docs ⇒ minimal generic boundary sweep, stated | `architecture` |
-| 4 | Performance | `massa-ai-audit-specialist` | `lens: performance` — only issues clearly visible in the diff: N+1 queries, unbounded fetches, per-row lazy I/O, sequential awaits of independent calls, loop-invariant recomputation, unbatched writes | `performance` |
-| 5 | Test coverage | `massa-ai-audit-specialist` | `lens: tests` (dedicated lens: coverage, regression protection, assertion quality, variation — `tests-audit.md` precedent) — new/changed behavior with no test, wrong level (unit vs integration), placement/naming vs profile TEST row, missing negative case, missing variation beyond the fixture example, assertions that exercise but never assert | `tests` |
-| 6 | Regression & hallucination | `massa-ai-reviewer` | diff review — unrelated deletions, references to symbols absent from the repo, wrong signature/arity, duplicated existing logic, weakened error handling or assertions, leftover TODO/stub, dead code | `regression` |
+| 1 | Security | `audit-specialist` | `lens: security` — secrets, authn/authz on new endpoints, injection, unsafe deserialization, PII in logs, permissive CORS, leaking payload fields | `security` |
+| 2 | Requirements & DoD (Definition of Done) | `audit-specialist` | `lens: requirements` — score merged Track A + Track B criteria against the diff, evidence-or-zero: ✅ implemented (`path:line`) / 🟡 partial / ❌ missing; no source ⇒ report "requirements verification skipped" | `requirements` |
+| 3 | Architecture & conventions | `audit-specialist` | `lens: architecture` — extract every explicit rule from the profile's CONVENTIONS/REVIEW_SKILLS docs into a numbered matrix, grade each changed file PASS/VIOLATION/N/A; no docs ⇒ minimal generic boundary sweep, stated | `architecture` |
+| 4 | Performance | `audit-specialist` | `lens: performance` — only issues clearly visible in the diff: N+1 queries, unbounded fetches, per-row lazy I/O, sequential awaits of independent calls, loop-invariant recomputation, unbatched writes | `performance` |
+| 5 | Test coverage | `audit-specialist` | `lens: tests` (dedicated lens: coverage, regression protection, assertion quality, variation — `tests-audit.md` precedent) — new/changed behavior with no test, wrong level (unit vs integration), placement/naming vs profile TEST row, missing negative case, missing variation beyond the fixture example, assertions that exercise but never assert | `tests` |
+| 6 | Regression & hallucination | `reviewer` | diff review — unrelated deletions, references to symbols absent from the repo, wrong signature/arity, duplicated existing logic, weakened error handling or assertions, leftover TODO/stub, dead code | `regression` |
 
 Consolidation check (≥ 5 subagents): recorded in the feature design — rows 4 and 5
 share only the lens label, not a knowledge domain; they stay separate dispatches.
 
-> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
 > - trigger: pr-review Step 2, dimension rows 1–5 (one dispatch per row)
 > - scope: the PR/MR diff and surrounding context for one dimension row; never the whole repository
 > - permissions: read-only; no host CLI calls, no posting
@@ -162,7 +162,7 @@ share only the lens label, not a knowledge domain; they stay separate dispatches
 > - firewall: raw diff/log/search output summarized, never returned raw
 > - memory: suggest-only; the main agent persists durable outcomes
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: pr-review Step 2, dimension row 6 (regression & hallucination)
 > - scope: the full PR/MR diff against the repository's real symbol surface
 > - permissions: read-only; no host CLI calls, no posting

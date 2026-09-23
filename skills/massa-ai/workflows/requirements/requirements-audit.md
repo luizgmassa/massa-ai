@@ -32,7 +32,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
 5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Requirements row of Per-Lens Scope Deltas). Implementation parent scope additionally carries the requirement source from `implementation-audit`.
 6. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
 
-> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
 > - scope: the requirements audit target — files, contracts, specs, acceptance criteria
 > - permissions: read-only

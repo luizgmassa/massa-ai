@@ -116,7 +116,7 @@ describe("opencode-plugin install.sh", () => {
     // Agent symlinks created
     const agentsDir = path.join(tmp, ".config/opencode/agents");
     for (const name of SPECIALIST_NAMES) {
-      const agentPath = path.join(agentsDir, `massa-ai-${name}.md`);
+      const agentPath = path.join(agentsDir, `${name}.md`);
       expect(await pathExists(agentPath)).toBe(true);
       expect(await isSymlink(agentPath)).toBe(true);
     }
@@ -217,7 +217,7 @@ describe("opencode-plugin install.sh", () => {
     // Agent symlinks removed
     const agentsDir = path.join(tmp, ".config/opencode/agents");
     for (const name of SPECIALIST_NAMES) {
-      const agentPath = path.join(agentsDir, `massa-ai-${name}.md`);
+      const agentPath = path.join(agentsDir, `${name}.md`);
       expect(await pathExists(agentPath)).toBe(false);
     }
   });
@@ -289,7 +289,7 @@ describe("opencode-plugin install.sh", () => {
   test("agent regular file at symlink target is skipped with warning", async () => {
     const agentPath = path.join(
       tmp,
-      ".config/opencode/agents/massa-ai-investigator.md",
+      ".config/opencode/agents/investigator.md",
     );
     await fs.mkdir(path.dirname(agentPath), { recursive: true });
 
@@ -322,7 +322,7 @@ describe("opencode-plugin install.sh", () => {
     const agentsDir = path.join(projectDir, ".opencode/agents");
     for (const name of SPECIALIST_NAMES.slice(0, 3)) {
       // sample 3
-      const agentPath = path.join(agentsDir, `massa-ai-${name}.md`);
+      const agentPath = path.join(agentsDir, `${name}.md`);
       expect(await pathExists(agentPath)).toBe(true);
     }
 
@@ -885,7 +885,7 @@ describe("opencode-plugin generated-bundle contract (T8, UGB-05..08)", () => {
       expect(res.status).toBe(0);
       expect(
         await pathExists(
-          path.join(tmp, ".config/opencode/agents/massa-ai-navigator.md"),
+          path.join(tmp, ".config/opencode/agents/navigator.md"),
         ),
       ).toBe(true);
     } finally {

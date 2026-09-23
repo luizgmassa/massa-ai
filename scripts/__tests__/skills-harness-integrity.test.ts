@@ -5,8 +5,8 @@
  * shipped silently before this test existed (see
  * .specs/features/skills-harness-audit/audit-report.md):
  *
- *   1. Dispatch resolution  — workflows named bare roles (`investigator`) while
- *      every host registers `massa-ai-investigator`, so no dispatch resolved.
+ *   1. Dispatch resolution  — a Dispatch: block named an agent no host
+ *      registered, so the dispatch never resolved.
  *   2. No phantom roles     — `plan-critic` was mandated by the Plan Challenge
  *      gate with Charter = "role-based (no charter)" and no artifact anywhere.
  *   3. Policy single-source — the Plan Challenge Policy existed in two copies
@@ -99,7 +99,7 @@ function dispatchBlocks(content: string): string[] {
   const blocks: string[] = [];
   let current: string[] | null = null;
   for (const line of lines) {
-    if (line.startsWith('> **Dispatch: `massa-ai-')) {
+    if (line.startsWith('> **Dispatch: `')) {
       if (current) blocks.push(current.join("\n"));
       current = [line];
     } else if (current) {
@@ -149,7 +149,7 @@ describe("dispatch resolution: every Dispatch: block names a shipped agent", () 
 
     const missing: string[] = [];
     for (const { agent, file } of targets) {
-      expect(agent.startsWith("massa-ai-")).toBe(true);
+      expect(agent.startsWith("massa-ai-")).toBe(false);
       for (const host of HOSTS) {
         const artifact = path.join(
           REPO_ROOT,
@@ -166,16 +166,16 @@ describe("dispatch resolution: every Dispatch: block names a shipped agent", () 
     expect(missing).toEqual([]);
   });
 
-  test("no dispatch block uses a bare role name", async () => {
+  test("no dispatch block uses the retired massa-ai- prefix or an unquoted name (NAM AC-1)", async () => {
     const files = await skillMarkdownFiles();
-    const bare: string[] = [];
+    const offenders: string[] = [];
     for (const file of files) {
       const content = await read(file);
-      for (const m of content.matchAll(/\*\*Dispatch: (?!`massa-ai-)([^*]+)\*\*/g)) {
-        bare.push(`${path.relative(REPO_ROOT, file)}: ${m[1]!.trim()}`);
+      for (const m of content.matchAll(/\*\*Dispatch: (?!`(?!massa-ai-)[a-z-]+`\*\*)([^*]+)\*\*/g)) {
+        offenders.push(`${path.relative(REPO_ROOT, file)}: ${m[1]!.trim()}`);
       }
     }
-    expect(bare).toEqual([]);
+    expect(offenders).toEqual([]);
   });
 });
 
@@ -213,7 +213,7 @@ describe("no phantom roles: every orchestration role has a real charter", () => 
     // a rename that retires an agent must not leave a legacy alias pointing at
     // nothing.
     const content = await read(AGENT_ORCHESTRATION);
-    const mapped = [...content.matchAll(/\|\s*`massa-ai-([a-z-]+)`\s*\|/g)].map((m) => m[1]!);
+    const mapped = [...content.matchAll(/^\|\s*`[a-z-]+`\s*\|\s*`([a-z-]+)`\s*\|/gm)].map((m) => m[1]!);
     expect(mapped.length).toBeGreaterThanOrEqual(5);
     const names = new Set(await charterNames());
     expect(mapped.filter((n) => !names.has(n))).toEqual([]);
@@ -463,7 +463,7 @@ describe("charter permission matches the shipped artifact", () => {
       const declaredWrite = permMatch![1] === "write";
 
       const artifact = await read(
-        path.join(REPO_ROOT, "apps/claude-plugin/agents", `massa-ai-${name}.md`),
+        path.join(REPO_ROOT, "apps/claude-plugin/agents", `${name}.md`),
       );
       const grantsWrite = claudeGrantsWrite(artifact);
 
@@ -485,7 +485,7 @@ describe("charter permission matches the shipped artifact", () => {
       );
       const declaredWrite = /^\s{2}permission:\s*write\s*$/m.test(charter);
       const toml = await read(
-        path.join(REPO_ROOT, "apps/codex-plugin/agents", `massa-ai-${name}.toml`),
+        path.join(REPO_ROOT, "apps/codex-plugin/agents", `${name}.toml`),
       );
       const sandboxWrite = /sandbox_mode = "workspace-write"/.test(toml);
       if (declaredWrite !== sandboxWrite) {
@@ -839,9 +839,9 @@ describe("dispatch role defaults: shared field values live in exactly one place"
    */
   const DEFAULTED_FIELDS: Record<string, string[]> = {
     "*": ["persona"],
-    "massa-ai-reviewer": ["fallback"],
-    "massa-ai-verification-agent": ["permissions"],
-    "massa-ai-designer": ["trigger", "sensors", "inputs", "firewall", "memory"],
+    "reviewer": ["fallback"],
+    "verification-agent": ["permissions"],
+    "designer": ["trigger", "sensors", "inputs", "firewall", "memory"],
   };
 
   test("agent-orchestration.md carries a Role Defaults section that claims universality", async () => {
@@ -904,7 +904,7 @@ describe("dispatch role defaults: shared field values live in exactly one place"
     let designerBlocks = 0;
     for (const file of files) {
       for (const block of dispatchBlocks(await read(file))) {
-        if (!block.includes("**Dispatch: `massa-ai-designer`**")) continue;
+        if (!block.includes("**Dispatch: `designer`**")) continue;
         designerBlocks += 1;
         for (const field of ["scope", "permissions", "output"]) {
           expect(

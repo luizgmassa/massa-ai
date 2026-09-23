@@ -772,7 +772,7 @@ describe("plan challenge: every full-gate workflow carries the gate step", () =>
 // .specs/features/designer-agent/ — DSG-05, DSG-06.
 //
 // Added after independent verification: two mutations survived every gate in
-// the suite. Removing the whole `massa-ai-designer` block from one of the seven
+// the suite. Removing the whole `designer` block from one of the seven
 // workflows was caught by NOTHING (the duplication ceiling shifted as a side
 // effect of the line-window moving, which is not a check), and rewording one
 // block's `trigger:` so the seven disagree was caught by nothing at all.
@@ -803,7 +803,7 @@ describe("designer dispatch: exactly 6 workflows, one wording", () => {
     "spec-driven.md",
   ] as const;
 
-  const DISPATCH_HEADER = "> **Dispatch: `massa-ai-designer`**";
+  const DISPATCH_HEADER = "> **Dispatch: `designer`**";
   const TRIGGER_PREFIX = "> - trigger: the task creates or modifies a user-facing screen";
 
   test("each of the 6 carries the designer dispatch block", async () => {

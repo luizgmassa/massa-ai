@@ -189,14 +189,14 @@ function parseMdFrontmatter(raw: string): Record<string, string> {
 
 async function readAgentMd(hostDir: string, name: SpecialistName): Promise<string> {
   return fs.readFile(
-    path.join(REPO_ROOT, "apps", hostDir, "agents", `massa-ai-${name}.md`),
+    path.join(REPO_ROOT, "apps", hostDir, "agents", `${name}.md`),
     "utf8",
   );
 }
 
 async function readAgentToml(name: SpecialistName): Promise<string> {
   return fs.readFile(
-    path.join(REPO_ROOT, "apps/codex-plugin/agents", `massa-ai-${name}.toml`),
+    path.join(REPO_ROOT, "apps/codex-plugin/agents", `${name}.toml`),
     "utf8",
   );
 }
@@ -219,36 +219,36 @@ describe("subagent parity — exact 18 names per host (CLA-09/CRS-07/OPC-09)", (
   test("claude: exactly 18 specialist .md files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/claude-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
-      (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
+      (f) => f.endsWith(".md"),
     );
     expect(files.length).toBe(18);
-    const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
+    const names = files.map((f) => f.replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
   test("codex: exactly 18 specialist .toml files with the registry names", async () => {
     const dir = path.join(REPO_ROOT, "apps/codex-plugin/agents");
-    const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".toml"));
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".toml"));
     expect(files.length).toBe(18);
-    const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.toml$/, ""));
+    const names = files.map((f) => f.replace(/\.toml$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
   test("cursor: exactly 18 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/cursor-plugin/agents");
     const files = (await fs.readdir(dir)).filter(
-      (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
+      (f) => f.endsWith(".md"),
     );
     expect(files.length).toBe(18);
-    const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
+    const names = files.map((f) => f.replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 
   test("opencode: exactly 18 specialist .md files", async () => {
     const dir = path.join(REPO_ROOT, "apps/opencode-plugin/agents");
-    const files = (await fs.readdir(dir)).filter((f) => f.startsWith("massa-ai-") && f.endsWith(".md"));
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".md"));
     expect(files.length).toBe(18);
-    const names = files.map((f) => f.replace(/^massa-ai-/, "").replace(/\.md$/, ""));
+    const names = files.map((f) => f.replace(/\.md$/, ""));
     expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
   });
 });
@@ -285,11 +285,11 @@ describe("subagent parity — variant bundles: exact 18 per (host, supported pro
       const ext = HOST_EXT[host];
       const dir = path.join(REPO_ROOT, `apps/${host}-plugin/agent-profiles/${profile}`);
       const files = (await fs.readdir(dir)).filter(
-        (f) => f.startsWith("massa-ai-") && f.endsWith(`.${ext}`),
+        (f) => f.endsWith(`.${ext}`),
       );
       expect(files.length).toBe(18);
       const names = files.map((f) =>
-        f.replace(/^massa-ai-/, "").replace(new RegExp(`\\.${ext}$`), ""),
+        f.replace(new RegExp(`\\.${ext}$`), ""),
       );
       expect(names.sort()).toEqual([...SPECIALIST_NAMES].sort());
     });
@@ -328,16 +328,37 @@ describe("subagent parity — variant bundles: exact 18 per (host, supported pro
   });
 });
 
-describe("subagent parity — name collision (CLA-08/CDX-09/OPC-09)", () => {
-  test("no shipped agent name collides with host built-ins", async () => {
-    for (const [_host, builtins] of Object.entries(HOST_BUILTINS)) {
-      for (const name of SPECIALIST_NAMES) {
-        // The shipped name is massa-ai-<name>; the registry name is <name>.
-        // Collision check is against the registry name (spec AC: "name fields").
-        expect(builtins.has(name)).toBe(false);
-        expect(builtins.has(`massa-ai-${name}`)).toBe(false);
+describe("subagent parity — name collision (CLA-08/CDX-09/OPC-09, NAM AC-9)", () => {
+  // Every host's built-in agent names, checked against every host: the names are
+  // unprefixed now, so the host prefix no longer shields a collision.
+  const ALL_BUILTINS = new Set(
+    Object.values(HOST_BUILTINS).flatMap((set) => [...set].map((n) => n.toLowerCase())),
+  );
+
+  test("the built-in list covers every name the spec lists", () => {
+    expect([...ALL_BUILTINS].sort()).toEqual(
+      ["build", "default", "explore", "explorer", "general", "general-purpose", "plan", "scout", "worker"],
+    );
+  });
+
+  test("no generated agent file or name field, in agents/ or any agent-profiles/<p>/, equals a host built-in", async () => {
+    let checked = 0;
+    for (const hostDir of ["claude-plugin", "codex-plugin", "cursor-plugin", "opencode-plugin"]) {
+      const root = path.join(REPO_ROOT, "apps", hostDir);
+      const dirs = [path.join(root, "agents")];
+      for (const p of await fs.readdir(path.join(root, "agent-profiles"))) dirs.push(path.join(root, "agent-profiles", p));
+      for (const dir of dirs) {
+        for (const f of await fs.readdir(dir)) {
+          const base = f.replace(/\.(md|toml)$/, "");
+          expect(`${hostDir}/${f}: ${ALL_BUILTINS.has(base.toLowerCase())}`).toBe(`${hostDir}/${f}: false`);
+          const raw = await fs.readFile(path.join(dir, f), "utf8");
+          const nameField = /^name(?::| =) "?([^"\n]+)"?$/m.exec(raw)?.[1];
+          if (nameField) expect(ALL_BUILTINS.has(nameField.toLowerCase())).toBe(false);
+          checked++;
+        }
       }
     }
+    expect(checked).toBeGreaterThan(SPECIALIST_NAMES.length * 4);
   });
 });
 
@@ -400,7 +421,7 @@ describe("subagent parity — Claude permission boundary (CLA-02/CLA-03, STI-01/
 
   test("active apps/claude-plugin/agents/: only navigator carries tools:, read-only agents carry the exact disallowedTools line, write agents carry neither key", async () => {
     for (const name of SPECIALIST_NAMES) {
-      assertGating(await readAgentMd("claude-plugin", name), name, `apps/claude-plugin/agents/massa-ai-${name}.md`);
+      assertGating(await readAgentMd("claude-plugin", name), name, `apps/claude-plugin/agents/${name}.md`);
     }
   });
 
@@ -413,23 +434,23 @@ describe("subagent parity — Claude permission boundary (CLA-02/CLA-03, STI-01/
     for (const profile of profiles) {
       const dir = path.join(REPO_ROOT, `apps/claude-plugin/agent-profiles/${profile}`);
       for (const name of SPECIALIST_NAMES) {
-        const raw = await fs.readFile(path.join(dir, `massa-ai-${name}.md`), "utf8");
-        assertGating(raw, name, `apps/claude-plugin/agent-profiles/${profile}/massa-ai-${name}.md`);
+        const raw = await fs.readFile(path.join(dir, `${name}.md`), "utf8");
+        assertGating(raw, name, `apps/claude-plugin/agent-profiles/${profile}/${name}.md`);
         checked++;
       }
     }
     expect(checked).toBe(profiles.length * SPECIALIST_NAMES.length);
   });
 
-  // STI-02 Independent Test: "diff massa-ai-navigator.md against its pre-change bytes —
+  // STI-02 Independent Test: "diff navigator.md against its pre-change bytes —
   // the frontmatter must be unchanged." Pins the exact three gating-relevant lines rather
   // than a full-file byte compare, since model/effort pins are governed by a separate
   // registry-driven contract (the CLA-10 group) and are expected to change independently.
-  test("massa-ai-navigator.md is byte-identical to its recorded pre-change frontmatter (STI-02 Independent Test)", async () => {
+  test("navigator.md is byte-identical to its recorded pre-change frontmatter (STI-02 Independent Test)", async () => {
     const raw = await readAgentMd("claude-plugin", "navigator");
     const fmBlock = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(raw)![1]!;
     const lines = fmBlock.split(/\r?\n/);
-    expect(lines[0]).toBe("name: massa-ai-navigator");
+    expect(lines[0]).toBe("name: navigator");
     expect(lines[1]).toMatch(/^description: /);
     expect(lines[2]).toBe(NAVIGATOR_TOOLS_LINE);
     expect(fmBlock).not.toContain("disallowedTools");
@@ -457,7 +478,7 @@ describe("subagent parity — no host emits an MCP-blocking construct (STI-03.5)
       const fm = parseMdFrontmatter(await readAgentMd("cursor-plugin", name));
       if (fm.tools !== undefined) {
         throw new Error(
-          `MCP-blocking construct on cursor: massa-ai-${name}.md carries "tools: ${fm.tools}", ` +
+          `MCP-blocking construct on cursor: ${name}.md carries "tools: ${fm.tools}", ` +
             `which Cursor has no MCP concept for and could be mistaken for a scoping mechanism.`,
         );
       }
@@ -469,7 +490,7 @@ describe("subagent parity — no host emits an MCP-blocking construct (STI-03.5)
       const parsed = toml.parse(await readAgentToml(name)) as Record<string, unknown>;
       if (parsed.mcp_servers !== undefined) {
         throw new Error(
-          `MCP-blocking construct on codex: massa-ai-${name}.toml sets mcp_servers = ` +
+          `MCP-blocking construct on codex: ${name}.toml sets mcp_servers = ` +
             `${JSON.stringify(parsed.mcp_servers)}, which restricts MCP inheritance from the parent session.`,
         );
       }
@@ -484,7 +505,7 @@ describe("subagent parity — no host emits an MCP-blocking construct (STI-03.5)
       const mcpDeny = /"?[\w*]*mcp[\w*]*"?\s*:\s*"?deny"?/i.exec(perm);
       if (mcpDeny) {
         throw new Error(
-          `MCP-blocking construct on opencode: massa-ai-${name}.md permission map denies an MCP ` +
+          `MCP-blocking construct on opencode: ${name}.md permission map denies an MCP ` +
             `pattern ("${mcpDeny[0]}"), which would deny every tool from a matching MCP server.`,
         );
       }
@@ -543,7 +564,7 @@ describe("subagent parity — Codex TOML round-trip + owned marker (CDX-07)", ()
       expect(firstLine).toBe("# massa-ai-owned");
       // Parses cleanly (round-trip)
       const parsed = toml.parse(raw) as Record<string, unknown>;
-      expect(parsed.name).toBe(`massa-ai-${name}`);
+      expect(parsed.name).toBe(`${name}`);
       expect(typeof parsed.developer_instructions).toBe("string");
       expect((parsed.developer_instructions as string).length).toBeGreaterThan(0);
     }
@@ -624,9 +645,9 @@ describe("subagent parity — OpenCode model + effort pin (OPC-10)", () => {
       const file = path.join(
         REPO_ROOT,
         "apps/opencode-plugin/agents",
-        `massa-ai-${name}.md`,
+        `${name}.md`,
       );
-      expect(path.basename(file, ".md")).toBe(`massa-ai-${name}`);
+      expect(path.basename(file, ".md")).toBe(`${name}`);
       await fs.access(file);
     }
   });

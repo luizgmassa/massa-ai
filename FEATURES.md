@@ -206,7 +206,7 @@ memory_delete { id: "<id>" }
 
 ### Claude Code plugin (`apps/claude-plugin/`)
 
-**What it bundles:** 6 slash commands (`/massa-ai-map`, `/massa-ai-index`, `/massa-ai-find`, `/massa-ai-def`, `/massa-ai-graph`, `/massa-ai-status`), the `massa-ai-navigator` subagent, and 5 hook events auto-written into `~/.claude/settings.json`.
+**What it bundles:** 6 slash commands (`/massa-ai-map`, `/massa-ai-index`, `/massa-ai-find`, `/massa-ai-def`, `/massa-ai-graph`, `/massa-ai-status`), the `navigator` subagent, and 5 hook events auto-written into `~/.claude/settings.json`.
 
 **Hook events (5):** `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PreCompact`, `Stop`.
 
@@ -260,7 +260,7 @@ Unlike Claude Code, the two Codex routes are **complementary, not exclusive**. A
 
 ### Cursor plugin (`apps/cursor-plugin/`)
 
-**What it bundles:** 6 skills, 7 hook events, and the `massa-ai-navigator` agent. MCP registration is delegated to `scripts/install-agents.sh --agent cursor`, which the installer calls for you.
+**What it bundles:** 6 skills, 7 hook events, and the `navigator` agent. MCP registration is delegated to `scripts/install-agents.sh --agent cursor`, which the installer calls for you.
 
 **Hook events (7):** `sessionStart`, `sessionEnd`, `beforeSubmitPrompt`, `preToolUse`, `postToolUse`, `preCompact`, `stop`. This closes the historical gap where Cursor was documented as having only 3 events — Cursor now supports 18+ events including `sessionStart` and `preCompact`.
 
@@ -370,7 +370,7 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 **The 18 specialists:** investigator, planner, builder, reviewer, context-curator, verification-agent, requirements-analyst, architecture-specialist, test-engineer, documentation-agent, audit-specialist, mobile-specialist, designer, plan-critic, furps-analyst, navigator, meta-judge, judge.
 
-Workflows dispatch these agents under their **host-registered** names, prefixed `massa-ai-` (for example `massa-ai-investigator`). The bare charter name is the registry key, not the dispatch name.
+Workflows dispatch these agents by their charter name (for example `investigator`). On the Claude plugin route the host namespaces them as `massa-ai:<name>`, which is the name to dispatch there.
 
 **Single source of truth:** `scripts/generate-subagent-artifacts.ts` reads `skills/agents/*/SKILL.md` and emits per-host agent files into `apps/{claude,codex,cursor,opencode}-plugin/agents/` (plus the pre-rendered per-profile variants under `agent-profiles/`). Outputs are **generated-on-demand, gitignored build output — not checked in** (AD-016); `bun run generate:artifacts` is the single entrypoint and runs ahead of every consumer via Bun pre-scripts. A parity test (`scripts/__tests__/subagent-parity.test.ts`) re-runs the generator in `--check` mode and asserts byte-identity — drift fails CI.
 
@@ -378,10 +378,10 @@ Workflows dispatch these agents under their **host-registered** names, prefixed 
 
 | Host | Location | Format | Ownership marker |
 | --- | --- | --- | --- |
-| Claude Code | `apps/claude-plugin/agents/massa-ai-*.md` → installed to `~/.claude/agents/` | `.md` (YAML frontmatter: `name`, `description`, `model`, `effort`, plus **either** `disallowedTools` for ordinary read-only charters **or** `tools` for the one allowlist exception — see Permission mapping) | Name prefix `massa-ai-` (uninstall excludes `massa-ai-navigator.md` by name — R1) |
-| Codex | `apps/codex-plugin/agents/massa-ai-*.toml` → installed to `~/.codex/agents/` (OUTSIDE plugin dir) | `.toml` (`name`, `description`, `model`, `model_reasoning_effort`, `sandbox_mode`, `developer_instructions`) | `# massa-ai-owned` top comment |
-| Cursor | `apps/cursor-plugin/agents/massa-ai-*.md` → bundled in plugin `agents/` dir | `.md` (YAML frontmatter: `name`, `description`, `model`, `readonly` — Cursor's entire documented schema; **no** `tools`, **no** `reasoningEffort`) | Name prefix `massa-ai-` (removed with plugin dir) |
-| OpenCode | `apps/opencode-plugin/agents/massa-ai-*.md` → installed to `~/.config/opencode/agents/` (shipped IN the npm package, installed outside the plugin dir) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission` — **no** `name`, **no** `metadata`) | `<!-- massa-ai-owned: true -->` as the first body line |
+| Claude Code | `apps/claude-plugin/agents/*.md` → installed to `~/.claude/agents/` | `.md` (YAML frontmatter: `name`, `description`, `model`, `effort`, plus **either** `disallowedTools` for ordinary read-only charters **or** `tools` for the one allowlist exception — see Permission mapping) | `<!-- massa-ai-owned: true -->` as the first body line |
+| Codex | `apps/codex-plugin/agents/*.toml` → installed to `~/.codex/agents/` (OUTSIDE plugin dir) | `.toml` (`name`, `description`, `model`, `model_reasoning_effort`, `sandbox_mode`, `developer_instructions`) | `# massa-ai-owned` top comment |
+| Cursor | `apps/cursor-plugin/agents/*.md` → bundled in plugin `agents/` dir | `.md` (YAML frontmatter: `name`, `description`, `model`, `readonly` — Cursor's entire documented schema; **no** `tools`, **no** `reasoningEffort`) | `<!-- massa-ai-owned: true -->` as the first body line |
+| OpenCode | `apps/opencode-plugin/agents/*.md` → installed to `~/.config/opencode/agents/` (shipped IN the npm package, installed outside the plugin dir) | `.md` (`description`, `mode: all`, `model`, `reasoningEffort`, `permission` — **no** `name`, **no** `metadata`) | `<!-- massa-ai-owned: true -->` as the first body line |
 
 > Codex and OpenCode agents are *installed* outside the plugin dir because their host discovery loads agents from a shared config-root directory, not from the plugin bundle. They are still **shipped inside** their npm package — OpenCode's `files` declares `agents/*.md`, and until the package-contents gate landed those 18 charters were silently missing from every published tarball, because the publish job has no `actions/checkout` and the build artifact never uploaded `agents/`. The in-file ownership marker enables scoped uninstall that preserves user agents (R3).
 

@@ -19,7 +19,7 @@ Plus 36 generated workflow commands, one per massa-ai workflow (`/massa-ai:debug
 
 Subagent:
 
-- **`massa-ai-navigator`** — exploration specialist that prefers semantic queries over blind file reads. Protects the parent agent's context during large investigations.
+- **`navigator`** — exploration specialist that prefers semantic queries over blind file reads. Protects the parent agent's context during large investigations.
 
 ## Install
 

@@ -35,6 +35,9 @@ Before reading any massa-ai file:
 
 - Every coding/planning task uses one stable `projectId` and
   `workflowSessionId`.
+- Sub-agents are dispatched by bare charter name (`builder`, `reviewer`, ...).
+  On the Claude plugin route, dispatch the plugin-namespaced `massa-ai:<name>`
+  so a same-named user or project agent cannot intercept the dispatch.
 - Start with `recall` for relevant prior decisions/patterns.
 - Default startup/context recall is budgeted: use `limit <= 3`,
   `minImportance >= 0.7`, and `types=["critical","decision","pattern"]`
@@ -196,7 +199,7 @@ Read and apply the canonical Plan Challenge Policy from the installed
 user instructions override that policy for the current turn.
 
 For a low-risk plan that receives the lite gate, attempt a read-only
-`massa-ai-plan-critic` subagent with a bounded checklist packet instead of
+`plan-critic` subagent with a bounded checklist packet instead of
 running the checklist in the main agent. The packet includes the proposed plan, scope,
 constraints, compact recalled facts/evidence, known risks, verification recipe,
 parent identifiers, and this output requirement:
@@ -214,7 +217,7 @@ Fool stays for `spec-driven`, `design`, `create-adr`, `create-rfc`, `create-tdd`
 requests, high-risk domains, or plans touching more than 5 files/classes/modules.
 When the policy selects the full gate, or lite escalates, load
 `workflows/the-fool.md`, select the mode in the main agent, load only the
-selected The Fool references, and attempt a read-only `massa-ai-plan-critic`
+selected The Fool references, and attempt a read-only `plan-critic`
 subagent with selected mode context and a bounded critique packet. Subagents inherit
 `projectId`, parent `workflowSessionId`, workflow name, entity, and compact
 evidence; they do not receive full conversation context.
@@ -222,7 +225,7 @@ evidence; they do not receive full conversation context.
 If the policy file is unavailable, use the conservative fallback: run the full
 gate for high-risk domains, broad multi-module plans, explicit challenge
 requests, and planning workflows that commit to a feature, refactor, ADR, RFC,
-or TDD. If the `massa-ai-plan-critic` agent is unavailable for any reason —
+or TDD. If the `plan-critic` agent is unavailable for any reason —
 spawning forbidden, plugin not installed, unknown `subagent_type` — run a strict
 standalone fresh-eyes local critique against the same output contract and report
 the skipped delegation reason. Do not retry under a different agent name. Reuse

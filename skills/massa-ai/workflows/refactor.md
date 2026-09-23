@@ -66,7 +66,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - Refactored architectural decisions via `remember` as scored `decision` memories
    - Identified and decoupled anti-patterns via `remember` as scored `pattern` memories
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the change's diff surface and its task/AC context
 > - permissions: read-only
@@ -76,7 +76,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: Standard+ refactor sizing or any PR-group execution per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once reviewer fix items are resolved; Quick-sized refactors dispatch only when validation assets were touched, otherwise run the fresh-eyes fallback below and record the skip reason
 > - scope: the moved/transformed code across this refactor's PR groups and the characterization tests that must protect it
 > - inputs: the characterization baseline from step 6 (and step 7 for mobile refactors), the diff of moved code per PR group, and the PR-group map from step 9

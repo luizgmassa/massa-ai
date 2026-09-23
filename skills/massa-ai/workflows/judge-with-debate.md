@@ -68,10 +68,10 @@ the capability, per-slot diversity activates automatically with no harness edit.
 
 ## Step 1 — Meta-judge (exactly once)
 
-Dispatch `massa-ai-meta-judge` (read-only) with the task description, artifact type, context,
+Dispatch `meta-judge` (read-only) with the task description, artifact type, context,
 and artifact paths. Model request: `kimi-k3` (see Step 0.5).
 
-> **Dispatch: `massa-ai-meta-judge`** (role: `meta-judge`) — charter `skills/agents/meta-judge/SKILL.md`
+> **Dispatch: `meta-judge`** (role: `meta-judge`) — charter `skills/agents/meta-judge/SKILL.md`
 > - trigger: judge-with-debate Step 1; runs exactly once per evaluation
 > - scope: the artifact under evaluation (paths supplied), task description, artifact type
 > - permissions: read-only
@@ -103,14 +103,14 @@ then `🤖 [Agent Done]` or `🤖 [Agent Blocked]` with the one-line reason.
 
 ## Step 2 — Independent analysis (3 judges in parallel)
 
-Dispatch three `massa-ai-judge` agents **in parallel** (round 0), one per judge number, each
+Dispatch three `judge` agents **in parallel** (round 0), one per judge number, each
 with: the verbatim specification YAML, task description, artifact paths, its own report path,
 `round: 0`, and its model request (Step 0.5). The fixed panel of 3 sits inside the wave cap of
 4 concurrent subagents (`references/agent-orchestration.md`, Orchestrator Working Memory).
 Each judge writes its own `audits/judge/<...> judge-N.md` per the report contract and returns
 the reply block:
 
-> **Dispatch: `massa-ai-judge`** (role: `judge`) — charter `skills/agents/judge/SKILL.md` — 3 per panel, rounds 0..3
+> **Dispatch: `judge`** (role: `judge`) — charter `skills/agents/judge/SKILL.md` — 3 per panel, rounds 0..3
 > - trigger: judge-with-debate Steps 2 and 4; panel of exactly 3, never more
 > - scope: the artifact under evaluation, the verbatim specification YAML, own report path; debate rounds add all three report paths as peer paths and `round: R`
 > - permissions: read-only except appending to its own judge-N report file
@@ -159,7 +159,7 @@ Step 5. If no consensus and rounds remain → Step 4. If no consensus after roun
 
 ## Step 4 — Debate round (rounds 1..3, max 3)
 
-Increment the round. Dispatch three `massa-ai-judge` agents **in parallel** again, each with:
+Increment the round. Dispatch three `judge` agents **in parallel** again, each with:
 the verbatim specification YAML (unchanged), task description, artifact paths, its own report
 path, **all three** report paths as peer paths, and `round: R`. Each judge:
 

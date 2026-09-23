@@ -61,11 +61,11 @@ describe("parseSimpleYaml", () => {
     const y = parseSimpleYaml([
       "# a comment",
       "",
-      "name: massa-ai-builder",
+      "name: builder",
       'description: "Builds things"',
       "mode: subagent",
     ].join("\n"));
-    expect(y.name).toBe("massa-ai-builder");
+    expect(y.name).toBe("builder");
     expect(y.description).toBe("Builds things");
     expect(y.mode).toBe("subagent");
   });
@@ -181,7 +181,7 @@ describe("emitClaude", () => {
 
   test("read-only agent (investigator, no override) gets the denylist, never an allowlist", () => {
     const out = emitClaude(charter({ name: "investigator" }), resolved("haiku", "high"));
-    expect(out).toContain("name: massa-ai-investigator");
+    expect(out).toContain("name: investigator");
     expect(out).toContain("disallowedTools: Write, Edit, NotebookEdit");
     expect(out).not.toContain("tools:");
     expect(out).toContain("model: haiku");
@@ -239,7 +239,7 @@ describe("emitCursor", () => {
   // https://cursor.com/docs/subagents.md
   test("emits ONLY documented keys — no tools, no reasoningEffort", () => {
     const out = emitCursor(charter({ name: "investigator" }), resolved(null, null));
-    expect(out).toContain("name: massa-ai-investigator");
+    expect(out).toContain("name: investigator");
     expect(out).toContain("model: inherit");
     expect(out).not.toContain("tools:");
     expect(out).not.toContain("reasoningEffort");
@@ -344,14 +344,14 @@ describe("emitCodex + TOML helpers", () => {
   test("read-only codex agent -> sandbox read-only + massa-ai-owned header", () => {
     const out = emitCodex(charter({ name: "investigator" }), resolved("gpt-5.4-mini", "high"));
     expect(out.split("\n")[0]).toBe("# massa-ai-owned");
-    expect(out).toContain('name = "massa-ai-investigator"');
+    expect(out).toContain('name = "investigator"');
     expect(out).toContain('sandbox_mode = "read-only"');
     expect(out).toContain('model = "gpt-5.4-mini"');
     expect(out).toContain('model_reasoning_effort = "high"');
     expect(out).toContain('developer_instructions = """');
     // round-trips through a real TOML parser
     const parsed = toml.parse(out) as Record<string, unknown>;
-    expect(parsed.name).toBe("massa-ai-investigator");
+    expect(parsed.name).toBe("investigator");
   });
 
   test("write codex agent (builder) -> sandbox workspace-write", () => {
@@ -505,9 +505,9 @@ describe("emitAll + diffHost", () => {
       for (const f of await fs.readdir(generated)) {
         await fs.copyFile(path.join(generated, f), path.join(checkedIn, f));
       }
-      await fs.writeFile(path.join(generated, "massa-ai-investigator.md"), "mutated\n");
+      await fs.writeFile(path.join(generated, "investigator.md"), "mutated\n");
       const diffs = await diffHost(generated, checkedIn, "claude");
-      expect(diffs).toContain("M massa-ai-investigator.md");
+      expect(diffs).toContain("M investigator.md");
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -524,12 +524,12 @@ describe("emitAll + diffHost", () => {
         await fs.copyFile(path.join(generated, f), path.join(checkedIn, f));
       }
       // remove from generated -> "+ <rel> (missing in generated)"
-      await fs.rm(path.join(generated, "massa-ai-builder.md"));
+      await fs.rm(path.join(generated, "builder.md"));
       // remove from checked-in (different file) -> "- <rel> (missing in checked-in)"
-      await fs.rm(path.join(checkedIn, "massa-ai-planner.md"));
+      await fs.rm(path.join(checkedIn, "planner.md"));
       const diffs = await diffHost(generated, checkedIn, "claude");
-      expect(diffs).toContain("+ massa-ai-builder.md (missing in generated)");
-      expect(diffs).toContain("- massa-ai-planner.md (missing in checked-in)");
+      expect(diffs).toContain("+ builder.md (missing in generated)");
+      expect(diffs).toContain("- planner.md (missing in checked-in)");
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -607,11 +607,11 @@ describe("generator profile selection", () => {
       // documentation-agent is the remaining light-tier charter; the bumped
       // read-only roles (ALLWF-03) resolve identically across these profiles.
       const a = await fs.readFile(
-        path.join(dirsFor("a").claude, "massa-ai-documentation-agent.md"),
+        path.join(dirsFor("a").claude, "documentation-agent.md"),
         "utf8"
       );
       const b = await fs.readFile(
-        path.join(dirsFor("b").claude, "massa-ai-documentation-agent.md"),
+        path.join(dirsFor("b").claude, "documentation-agent.md"),
         "utf8"
       );
       expect(a).toContain("model: haiku"); // balanced, light tier
@@ -643,8 +643,8 @@ describe("agentTiers override resolution (design D-2, APUX-02, P1-A AC4)", () =>
         opencode: path.join(tmp, "opencode"),
       };
       await emitAll(dirs, { registry, env: {} });
-      const claudeOut = await fs.readFile(path.join(dirs.claude, "massa-ai-investigator.md"), "utf8");
-      const codexOut = await fs.readFile(path.join(dirs.codex, "massa-ai-investigator.toml"), "utf8");
+      const claudeOut = await fs.readFile(path.join(dirs.claude, "investigator.md"), "utf8");
+      const codexOut = await fs.readFile(path.join(dirs.codex, "investigator.toml"), "utf8");
       expect(claudeOut).toContain("model: haiku"); // balanced, LIGHT tier (overridden)
       expect(codexOut).toContain('model = "gpt-5.6-sol"'); // balanced, DEEP tier (unaffected)
     } finally {

@@ -576,8 +576,7 @@ NODE
 MASSA_AI_OWNED_MARKER_MD='<!-- massa-ai-owned: true -->'
 MASSA_AI_LEGACY_AGENT_NAMES=" architecture-specialist audit-specialist builder context-curator designer documentation-agent furps-analyst investigator judge meta-judge mobile-specialist navigator plan-critic planner requirements-analyst reviewer test-engineer verification-agent "
 is_legacy_agent() {
-  local b
-  b="$(basename "$1")"
+  local b="${1##*/}"
   b="${b%.*}"
   [[ "$b" == massa-ai-* && "$MASSA_AI_LEGACY_AGENT_NAMES" == *" ${b#massa-ai-} "* ]]
 }
@@ -595,8 +594,7 @@ is_owned_agent_toml() {
 is_owned_agent_link() {
   [[ -L "$1" ]] || return 1
   is_legacy_agent "$1" && return 0
-  local b t
-  b="$(basename "$1")"
+  local b="${1##*/}" t
   t="$(readlink "$1")"
   [[ "$t" == */opencode-plugin/agents/"$b" || "$t" == */plugins/massa-ai/agent-profiles/*/"$b" ]] && return 0
   [[ -f "$1" ]] && has_owned_marker "$1"
@@ -785,9 +783,9 @@ vecho "  + ${specialist_count} subagent specialists (generated from skills/agent
 # keep — never loop over the bundle to decide removals. Ownership test is
 # is_owned_agent (D3), same as the uninstall loop above.
 for f in "$CURSOR_AGENTS_DIR/"*.md; do
-  is_owned_agent "$f" || continue
   name="$(basename "$f")"
   [[ -f "$SCRIPT_DIR/agents/$name" ]] && continue   # keep-list: still shipped
+  is_owned_agent "$f" || continue
   rm -f "$f"
   vecho "  - $name (retired, no longer shipped)"
 done

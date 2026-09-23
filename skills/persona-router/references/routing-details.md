@@ -13,10 +13,10 @@ one never implies the other ran.
 
 | Persona | Overlapping agent |
 |---|---|
-| `senior-mobile-engineer` | `massa-ai-mobile-specialist` |
-| `senior-mobile-qa-automation-engineer` | `massa-ai-test-engineer` |
-| `context-skill-harness-engineer-architect` | `massa-ai-architecture-specialist` |
-| `product-manager` | `massa-ai-requirements-analyst` |
+| `senior-mobile-engineer` | `mobile-specialist` |
+| `senior-mobile-qa-automation-engineer` | `test-engineer` |
+| `context-skill-harness-engineer-architect` | `architecture-specialist` |
+| `product-manager` | `requirements-analyst` |
 
 ## Multi-Persona Requests
 

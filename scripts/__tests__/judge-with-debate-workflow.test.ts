@@ -64,8 +64,8 @@ describe("judge-with-debate workflow contract markers", () => {
     ["judge report family", "audits/judge/"],
     ["collision suffix rule", "`-2`, `-3`"],
     // JD-12: prefixed dispatch names inline
-    ["meta-judge dispatch name", "`massa-ai-meta-judge`"],
-    ["judge dispatch name", "`massa-ai-judge`"],
+    ["meta-judge dispatch name", "`meta-judge`"],
+    ["judge dispatch name", "`judge`"],
     // JD-01: specification verbatim across rounds
     ["specification verbatim", "verbatim"],
   ];

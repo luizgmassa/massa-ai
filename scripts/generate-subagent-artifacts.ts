@@ -121,7 +121,7 @@ const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
 // spells "inherit". They never know what a profile is.
 
 // ── Permission -> tool-gating mapping (STI-01/STI-02) ────────────────────────
-// Navigator precedent (apps/claude-plugin/agents/massa-ai-navigator.md) uses
+// Navigator precedent (apps/claude-plugin/agents/navigator.md) uses
 // JSON-array tools with capital "Glob"; match that convention for the one
 // remaining allowlisted agent.
 
@@ -256,7 +256,7 @@ export async function loadAllCharters(): Promise<Charter[]> {
  * session has active, including any MCP server.
  */
 export function emitClaude(c: Charter, m: Resolved): string {
-  const agentName = `massa-ai-${c.name}`;
+  const agentName = c.name;
   const policy = claudeToolPolicyFor(c.name);
   const lines = ["---", `name: ${agentName}`, `description: ${c.description}`];
   if (policy.kind === "allowlist") {
@@ -290,7 +290,7 @@ export function emitClaude(c: Charter, m: Resolved): string {
  * already its default.
  */
 export function emitCursor(c: Charter, m: Resolved): string {
-  const agentName = `massa-ai-${c.name}`;
+  const agentName = c.name;
   const model =
     m.model === null ? "inherit" : m.effort === null ? m.model : `${m.model}[effort=${m.effort}]`;
   const lines = ["---", `name: ${agentName}`, `description: ${c.description}`, `model: ${model}`];
@@ -313,7 +313,7 @@ export function escapeTomlTripleQuote(s: string): string {
  * which is how a null registry value is spelled on this host.
  */
 export function emitCodex(c: Charter, m: Resolved): string {
-  const agentName = `massa-ai-${c.name}`;
+  const agentName = c.name;
   const isWrite = WRITE_AGENTS.has(c.name);
   const sandboxMode = isWrite ? "workspace-write" : "read-only";
   const bodyEscaped = escapeTomlTripleQuote(c.body);
@@ -356,7 +356,7 @@ export const OWNED_MARKER_MD = "<!-- massa-ai-owned: true -->";
  * directly to the provider as model options."
  *
  *   - `name`: not a frontmatter key at all. "The markdown file name becomes the agent
- *     name." The file is already massa-ai-<n>.md, so dropping this is behaviour-preserving.
+ *     name." The file is already <n>.md, so dropping this is behaviour-preserving.
  *   - `metadata`: not a key either. But it is NOT dead — the literal substring
  *     "massa-ai-owned: true" scopes `agents uninstall` in
  *     apps/opencode-plugin/src/config-cli.ts, which installs real file copies (the
@@ -470,7 +470,7 @@ async function emitHostProfile(
     const tierOverride = registry.agentTiers[c.name]?.[host];
     const resolved = resolveTier(registry, host, profile, tierOverride ?? c.modelTier);
     const ext = capabilitiesFor(host).artifactExtension;
-    const fileName = `massa-ai-${c.name}.${ext}`;
+    const fileName = `${c.name}.${ext}`;
     const filePath = path.join(dir, fileName);
     const content = emit(c, resolved);
     await fs.writeFile(filePath, content, "utf8");

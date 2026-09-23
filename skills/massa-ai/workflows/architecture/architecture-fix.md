@@ -73,7 +73,7 @@ Not for findings-only architecture review — route to `workflows/architecture/a
    - Update tests, docs, and imports only where required by the architecture fix.
 10. Use agent orchestration only when it improves signal — except the verifier dispatch below, which is tier-gated mandatory rather than discretionary, carved out under `references/agent-orchestration.md`'s Independent Verification Exception. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated architecture finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -83,7 +83,7 @@ Not for findings-only architecture review — route to `workflows/architecture/a
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable architecture patterns
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation of the architecture finding complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
 > - permissions: read-only
@@ -93,7 +93,7 @@ Not for findings-only architecture review — route to `workflows/architecture/a
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists review outcomes for the architecture fix
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven-sized findings or high/critical severity, per the Independent Verification Mandate in `references/verification-ladder.md`'s Mandatory Verification Fix Gate; Quick-tier findings take the fallback below instead
 > - scope: the fixed finding's dependency direction, seam/adapter shape, tests, imports, and report claim closure
 > - inputs: the finding, the applied fix, the verification suggestion, dependency-direction/import-cycle evidence, and validation assets

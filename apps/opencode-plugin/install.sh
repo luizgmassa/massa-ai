@@ -430,8 +430,7 @@ NODE
 MASSA_AI_OWNED_MARKER_MD='<!-- massa-ai-owned: true -->'
 MASSA_AI_LEGACY_AGENT_NAMES=" architecture-specialist audit-specialist builder context-curator designer documentation-agent furps-analyst investigator judge meta-judge mobile-specialist navigator plan-critic planner requirements-analyst reviewer test-engineer verification-agent "
 is_legacy_agent() {
-  local b
-  b="$(basename "$1")"
+  local b="${1##*/}"
   b="${b%.*}"
   [[ "$b" == massa-ai-* && "$MASSA_AI_LEGACY_AGENT_NAMES" == *" ${b#massa-ai-} "* ]]
 }
@@ -449,8 +448,7 @@ is_owned_agent_toml() {
 is_owned_agent_link() {
   [[ -L "$1" ]] || return 1
   is_legacy_agent "$1" && return 0
-  local b t
-  b="$(basename "$1")"
+  local b="${1##*/}" t
   t="$(readlink "$1")"
   [[ "$t" == */opencode-plugin/agents/"$b" || "$t" == */plugins/massa-ai/agent-profiles/*/"$b" ]] && return 0
   [[ -f "$1" ]] && has_owned_marker "$1"
@@ -651,7 +649,10 @@ for src in "$ACTIVE_AGENTS_SRC/"*.md; do
   # massa-ai does not own. An owned symlink is always relinked regardless of
   # which bundle copy it points into — that is what makes an upgrade re-apply
   # a switched profile (F3) instead of freezing it.
-  if [[ -e "$AGENTS_DIR/$name" || -L "$AGENTS_DIR/$name" ]] && ! is_owned_agent_link "$AGENTS_DIR/$name"; then
+  # A link already resolving to this very source file is ours (fast path,
+  # no readlink fork on a reinstall).
+  if [[ -e "$AGENTS_DIR/$name" || -L "$AGENTS_DIR/$name" ]] && ! [[ -L "$AGENTS_DIR/$name" && "$AGENTS_DIR/$name" -ef "$src" ]] \
+    && ! is_owned_agent_link "$AGENTS_DIR/$name"; then
     echo "  ⚠ $AGENTS_DIR/$name exists and is not massa-ai-owned — skipped" >&2
     continue
   fi
@@ -675,9 +676,9 @@ vecho "  + ${specialist_count} subagent specialists (generated from skills/agent
 if [[ -d "$AGENTS_DIR" ]]; then
   agents_pruned=0
   for dest in "$AGENTS_DIR/"*.md; do
-    is_owned_agent_link "$dest" || continue
     dest_name="$(basename "$dest")"
     [[ -f "$ACTIVE_AGENTS_SRC/$dest_name" ]] && continue
+    is_owned_agent_link "$dest" || continue
     rm -f "$dest"
     agents_pruned=$((agents_pruned + 1))
   done

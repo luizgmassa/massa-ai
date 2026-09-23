@@ -68,7 +68,7 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
    - Do not delete coverage, snapshots, fixtures, or benchmarks unless the audit report explicitly calls them obsolete and behavior remains protected elsewhere.
    - Prefer production-code changes only when required to expose a deterministic seam or fix a real bug found while writing the audited test.
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
 > - permissions: read-only
@@ -78,7 +78,7 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
 > - trigger: mandatory per the verification-ladder's Independent Verification Mandate for any TST finding closed at Standard+/Spec-driven size or high/critical severity; at Quick size the subagent hop is skipped and the standalone fresh-eyes assertion re-check below runs instead
 > - scope: the fixed TST finding's assertion strength, fixture/mock boundary, coverage-execution-map row, and report claim closure
 > - inputs: the finding, the applied test change, the coverage execution map row, the verification command, and validation assets
@@ -102,7 +102,7 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
    - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop (3 verification iterations, then `Blocked` with evidence preserved).
 11. Use agent orchestration only when it improves signal — except the verification-agent dispatch above, which `references/agent-orchestration.md`'s Independent Verification Exception mandates for TST closures at the sizes/severities its trigger names, regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated test finding with a disjoint write set
 > - permissions: write (disjoint write set)

@@ -232,7 +232,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     const agentsDir = path.join(tmp, ".codex/agents");
     for (const name of SPECIALIST_NAMES) {
       expect(
-        await pathExists(path.join(agentsDir, `massa-ai-${name}.toml`)),
+        await pathExists(path.join(agentsDir, `${name}.toml`)),
       ).toBe(true);
     }
     // Agents dir is OUTSIDE the plugin dir
@@ -246,7 +246,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     runInstall(["--user"], { HOME: tmp });
     for (const name of SPECIALIST_NAMES) {
       const content = await fs.readFile(
-        path.join(tmp, `.codex/agents/massa-ai-${name}.toml`),
+        path.join(tmp, `.codex/agents/${name}.toml`),
         "utf8",
       );
       const firstLine = content.split(/\r?\n/)[0] ?? "";
@@ -270,7 +270,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     // 12 massa-ai-owned TOML files removed
     for (const name of SPECIALIST_NAMES) {
       expect(
-        await pathExists(path.join(agentsDir, `massa-ai-${name}.toml`)),
+        await pathExists(path.join(agentsDir, `${name}.toml`)),
       ).toBe(false);
     }
     // User agent survives (R3: no ownership marker)
@@ -283,7 +283,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
       const out: Record<string, string> = {};
       for (const name of SPECIALIST_NAMES) {
         out[name] = await fs.readFile(
-          path.join(tmp, `.codex/agents/massa-ai-${name}.toml`),
+          path.join(tmp, `.codex/agents/${name}.toml`),
           "utf8",
         );
       }
@@ -543,7 +543,7 @@ describe("codex-plugin generated-bundle contract (T6, UGB-05..08)", () => {
       });
       expect(res.status).toBe(0);
       expect(
-        await pathExists(path.join(tmp, ".codex/agents/massa-ai-navigator.toml")),
+        await pathExists(path.join(tmp, ".codex/agents/navigator.toml")),
       ).toBe(true);
     } finally {
       await fs.rm(pkgRoot, { recursive: true, force: true });

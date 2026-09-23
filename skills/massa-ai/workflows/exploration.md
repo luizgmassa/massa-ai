@@ -53,7 +53,7 @@ When researching or resolving any technical question during exploration, follow 
    - ask only if the objective or scope cannot be inferred from local context
 6. Recon with progressive disclosure. Dispatch `investigator` per `references/agent-orchestration.md` when the investigation justifies an isolated read-only subagent:
 
-> **Dispatch: `massa-ai-investigator`** (role: `investigator`) — charter `skills/agents/investigator/SKILL.md`
+> **Dispatch: `investigator`** (role: `investigator`) — charter `skills/agents/investigator/SKILL.md`
 > - trigger: isolated read-only investigation justified; large scope, repeated searches, or context-firewall threshold exceeded
 > - scope: the exploration target — symbols, files, routes, commands, docs, or runtime artifacts to inspect
 > - permissions: read-only

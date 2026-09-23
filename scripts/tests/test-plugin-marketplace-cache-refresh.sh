@@ -182,23 +182,23 @@ printf '{"version":2,"platforms":{"claude":{"root":"/irrelevant","skillsOwner":"
   > "$SCEN_PRE6/.config/massa-ai/install-state.json"
 
 # The marketplace install root the mock CLI records (CPP-01/06 topology). It
-# ships a "cheap" variant whose massa-ai-builder.md content differs from the
+# ships a "cheap" variant whose builder.md content differs from the
 # bundle-default copy already in agents/, so a content diff proves the
 # re-apply actually ran rather than a no-op copy.
 INSTALL_ROOT6="$ROOT/$NAME6-install-root"
 mkdir -p "$INSTALL_ROOT6/agents" "$INSTALL_ROOT6/agent-profiles/cheap"
-printf '# massa-ai-owned\nmodel: bundle-default\n' > "$INSTALL_ROOT6/agents/massa-ai-builder.md"
-printf '# massa-ai-owned\nmodel: cheap-variant\n' > "$INSTALL_ROOT6/agent-profiles/cheap/massa-ai-builder.md"
+printf -- '---\nmodel: bundle-default\n---\n<!-- massa-ai-owned: true -->\n' > "$INSTALL_ROOT6/agents/builder.md"
+printf -- '---\nmodel: cheap-variant\n---\n<!-- massa-ai-owned: true -->\n' > "$INSTALL_ROOT6/agent-profiles/cheap/builder.md"
 
 export MOCK_SEED_VERSION="0.0.1" MOCK_INSTALL_PATH="$INSTALL_ROOT6"
 unset MOCK_UPDATE_FAIL MOCK_NO_UPDATE_SUBCOMMAND 2>/dev/null || true
 run_scenario "$NAME6"
 assert_eq "installer exits 0" "$CODE" "0"
 assert_eq "one plugin update call (served older than bundle)" "$(update_calls)" "1"
-assert_contains "agents/massa-ai-builder.md now carries the recorded 'cheap' variant" \
-  "$(cat "$INSTALL_ROOT6/agents/massa-ai-builder.md")" "cheap-variant"
-assert_not_contains "agents/massa-ai-builder.md no longer carries the bundle default" \
-  "$(cat "$INSTALL_ROOT6/agents/massa-ai-builder.md")" "bundle-default"
+assert_contains "agents/builder.md now carries the recorded 'cheap' variant" \
+  "$(cat "$INSTALL_ROOT6/agents/builder.md")" "cheap-variant"
+assert_not_contains "agents/builder.md no longer carries the bundle default" \
+  "$(cat "$INSTALL_ROOT6/agents/builder.md")" "bundle-default"
 assert_eq "recorded modelProfile is unchanged — the installer only ever reads it (AD-015)" \
   "$(state_field modelProfile.profile)" "cheap"
 unset MOCK_INSTALL_PATH
@@ -208,15 +208,15 @@ echo "Scenario 7 (CPP-07): no recorded profile → re-apply is a logged no-op, a
 NAME7=cpp7-noop
 INSTALL_ROOT7="$ROOT/$NAME7-install-root"
 mkdir -p "$INSTALL_ROOT7/agents" "$INSTALL_ROOT7/agent-profiles/cheap"
-printf '# massa-ai-owned\nmodel: bundle-default\n' > "$INSTALL_ROOT7/agents/massa-ai-builder.md"
-printf '# massa-ai-owned\nmodel: cheap-variant\n' > "$INSTALL_ROOT7/agent-profiles/cheap/massa-ai-builder.md"
+printf -- '---\nmodel: bundle-default\n---\n<!-- massa-ai-owned: true -->\n' > "$INSTALL_ROOT7/agents/builder.md"
+printf -- '---\nmodel: cheap-variant\n---\n<!-- massa-ai-owned: true -->\n' > "$INSTALL_ROOT7/agent-profiles/cheap/builder.md"
 
 export MOCK_SEED_VERSION="0.0.1" MOCK_INSTALL_PATH="$INSTALL_ROOT7"
 run_scenario "$NAME7"
 assert_eq "installer exits 0" "$CODE" "0"
 assert_eq "one plugin update call" "$(update_calls)" "1"
-assert_contains "agents/massa-ai-builder.md keeps the bundle default (nothing recorded to re-apply)" \
-  "$(cat "$INSTALL_ROOT7/agents/massa-ai-builder.md")" "bundle-default"
+assert_contains "agents/builder.md keeps the bundle default (nothing recorded to re-apply)" \
+  "$(cat "$INSTALL_ROOT7/agents/builder.md")" "bundle-default"
 assert_eq "the installer never wrote a modelProfile of its own" "$(state_field modelProfile.profile)" ""
 unset MOCK_INSTALL_PATH
 

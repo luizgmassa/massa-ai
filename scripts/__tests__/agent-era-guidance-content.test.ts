@@ -229,7 +229,7 @@ describe("pr-review.md: coverage dimension uses the dedicated tests lens (AEH-08
   const content = readSkill("workflows/pr-review.md");
 
   test("coverage dimension dispatches lens: tests, not coverage-under-performance", () => {
-    expect(content).toContain("| 5 | Test coverage | `massa-ai-audit-specialist` | `lens: tests`");
+    expect(content).toContain("| 5 | Test coverage | `audit-specialist` | `lens: tests`");
     expect(content).not.toContain("the charter's lens set has no `tests` lens");
   });
 });
@@ -388,13 +388,13 @@ describe("references/spec-driven/validate.md: post-validation metric snapshot re
 });
 
 // ---------------------------------------------------------------------------
-// AEH-06: massa-ai-reviewer dispatch block wired into the implementing/fix
+// AEH-06: reviewer dispatch block wired into the implementing/fix
 // workflows (T15-T17; 12 since agent-roster-consolidation removed `general` and `maestro-fix`). Shared constants and target lists below are reused
 // across the T15/T16/T17 describe blocks as each batch lands.
 // ---------------------------------------------------------------------------
 
 const REVIEWER_DISPATCH_HEADER =
-  "> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`";
+  "> **Dispatch: `reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`";
 /**
  * The reviewer's `fallback` and the universal `persona` bullet used to be
  * asserted here, per file, because each block carried them verbatim. Both are
@@ -438,7 +438,7 @@ const IMPLEMENTING_WORKFLOW_TARGETS: ReviewerDispatchTarget[] = [
   { file: "workflows/spec-driven.md", scope: "the task's diff surface and its task/AC context" },
 ];
 
-describe("massa-ai-reviewer dispatch block: 4 implementing workflows (T15, AEH-06)", () => {
+describe("reviewer dispatch block: 4 implementing workflows (T15, AEH-06)", () => {
   test("the reviewer's fallback clause survived the move into the shared role defaults", () => {
     expectReviewerFallbackDefault();
   });
@@ -452,7 +452,7 @@ describe("massa-ai-reviewer dispatch block: 4 implementing workflows (T15, AEH-0
   test("spec-driven.md's existing verification-agent dispatch block stays intact", () => {
     const content = readSkill("workflows/spec-driven.md");
     expect(content).toContain(
-      "> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`",
+      "> **Dispatch: `verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`",
     );
     expect(content).toContain("> - scope: the feature's git diff surface, test files, and spec ACs");
     expect(content).toContain(
@@ -463,7 +463,7 @@ describe("massa-ai-reviewer dispatch block: 4 implementing workflows (T15, AEH-0
   test("the reviewer dispatch block precedes the verification-agent dispatch block in spec-driven.md", () => {
     const content = readSkill("workflows/spec-driven.md");
     const reviewerIdx = content.indexOf(REVIEWER_DISPATCH_HEADER);
-    const verificationIdx = content.indexOf("> **Dispatch: `massa-ai-verification-agent`**");
+    const verificationIdx = content.indexOf("> **Dispatch: `verification-agent`**");
     expect(reviewerIdx).toBeGreaterThan(-1);
     expect(verificationIdx).toBeGreaterThan(-1);
     expect(reviewerIdx).toBeLessThan(verificationIdx);
@@ -478,7 +478,7 @@ const FIX_WORKFLOW_BATCH_1_TARGETS: ReviewerDispatchTarget[] = [
   "workflows/requirements/requirements-fix.md",
 ].map((file) => ({ file, scope: "the fix's diff surface and its task/AC context" }));
 
-describe("massa-ai-reviewer dispatch block: fix workflows batch 1 (T16, AEH-06)", () => {
+describe("reviewer dispatch block: fix workflows batch 1 (T16, AEH-06)", () => {
   for (const target of FIX_WORKFLOW_BATCH_1_TARGETS) {
     test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
       expectReviewerDispatchBlock(target);
@@ -492,7 +492,7 @@ const FIX_WORKFLOW_BATCH_2_TARGETS: ReviewerDispatchTarget[] = [
   "workflows/mobile-figma/mobile-figma-fix.md",
 ].map((file) => ({ file, scope: "the fix's diff surface and its task/AC context" }));
 
-describe("massa-ai-reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)", () => {
+describe("reviewer dispatch block: fix workflows batch 2 (T17, AEH-06)", () => {
   for (const target of FIX_WORKFLOW_BATCH_2_TARGETS) {
     test(`${target.file} carries the reviewer dispatch block with fallback and persona bullets`, () => {
       expectReviewerDispatchBlock(target);
