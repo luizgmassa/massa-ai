@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.63.0] - 2026-09-23
+
 ### Added
 
 - **`designer` gains a read-only `trace` mode** — design-source investigation (Figma MCP
