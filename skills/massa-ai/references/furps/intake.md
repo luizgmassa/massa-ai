@@ -70,7 +70,7 @@ The main agent builds one packet reused across sub-agents:
 
 ### judge `plan-critique` (The Fool) — evidence_audit
 
-- role: `judge`; mode: `plan-critique`; depth: `full`; The Fool mode: `evidence_audit`
+- role: `judge`; mode: `plan-critique`; depth: `full`; fool_mode: `evidence_audit`
 - purpose: grade whether the PRD/ADR claims are source-backed, complete, falsifiable
 - scope: the document as the challenged thesis
 - permissions: read-only
@@ -82,7 +82,7 @@ The main agent builds one packet reused across sub-agents:
 
 ### judge `plan-critique` (The Fool) — pre_mortem
 
-- role: `judge`; mode: `plan-critique`; depth: `full`; The Fool mode: `pre_mortem`
+- role: `judge`; mode: `plan-critique`; depth: `full`; fool_mode: `pre_mortem`
 - purpose: anticipate execution-phase failures of the proposed solution
 - inputs: document packet, DoR, recalled facts, AND the evidence_audit summary
 - output: Fool critique contract, focused on failure narratives

@@ -161,9 +161,9 @@ resolves to a current agent.
 |---|---|---|
 | `implementer` | `builder` | renamed |
 | `verifier` | `code-reviewer` | folded in; `mode: verify`, which centralizes the Verification Ladder |
-| `domain-mapper` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, sub-mode `domain` |
-| `coupling-auditor` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, sub-mode `coupling` |
-| `deepening-architect` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, sub-mode `deepening` |
+| `domain-mapper` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: domain` (packet field defined in the `code-reviewer` charter Inputs) |
+| `coupling-auditor` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: coupling` |
+| `deepening-architect` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: deepening` |
 
 The charter names retired by the roster consolidation map to current agents in the
 single old→new table of `skills/AGENTS.md`; this file does not repeat it. Workflows
@@ -337,7 +337,7 @@ per-platform `installRoute` field, never guessed from directory presence.
 
 ## Plan-Critique Contract
 
-Dispatch `judge` with `mode: plan-critique` only after a concrete plan exists. Dispatch it with the capability packet above and the standard output contract. The subagent receives the plan, scope, constraints, compact recalled facts/evidence, selected depth, selected The Fool mode only for full gates, known risks, verification recipe, parent identifiers, and context-firewall limits. It never receives full conversation context.
+Dispatch `judge` with `mode: plan-critique` only after a concrete plan exists. Dispatch it with the capability packet above and the standard output contract. The subagent receives the plan, scope, constraints, compact recalled facts/evidence, selected depth, `fool_mode` (the selected The Fool mode: `pre_mortem`, `red_team`, `evidence_audit`, `socratic`, or `dialectic`; distinct from the packet `mode`, which stays `plan-critique`) only for full gates, known risks, verification recipe, parent identifiers, and context-firewall limits. It never receives full conversation context.
 
 For `depth: lite`, the packet uses the low-risk checklist and does not include The Fool mode references. It returns:
 
@@ -348,9 +348,9 @@ For `depth: lite`, the packet uses the low-risk checklist and does not include T
 - `escalate_to_full: true|false`
 - escalation reason
 
-For `depth: full`, or after lite escalation, the main agent selects the mode, loads the relevant The Fool references, and dispatches a full packet. It returns:
+For `depth: full`, or after lite escalation, the main agent selects the The Fool mode, loads the relevant The Fool references, and dispatches a full packet carrying it as `fool_mode`. It returns:
 
-- selected mode
+- selected `fool_mode`
 - steelmanned thesis
 - 3-5 strongest challenges
 - severity: `critical`, `high`, `medium`, or `low`

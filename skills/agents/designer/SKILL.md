@@ -21,6 +21,7 @@ Own the screen: read a design source and either verify an existing user-facing s
 - Cover the states a design usually under-specifies: empty, loading, error, long text, small and large screen sizes, and the platform's accessibility defaults.
 
 ## Restrictions
+- Missing or unknown `mode`: return `Blocked` naming the valid modes `audit`, `implement`.
 - Screen and design conformance only. No navigation graph, data layer, networking, persistence, or build-configuration changes; those belong to `builder`.
 - Write only in `implement` mode, only when scoped with a disjoint write set (same constraint as `builder`), and only inside the UI layer: screen, view, component, layout, style, theme, and design-token files. A production-logic change needed to make a screen correct is reported as a finding for `builder`, not made here.
 - Platform, lifecycle, build-system, and offline-sync questions belong to `code-reviewer` in `guide` mode. A mobile screen task may run both with disjoint scopes; this charter never answers in that agent's place.

@@ -20,6 +20,7 @@ Hold requirements to a clear, complete, and consistent standard before and after
 - Never silently drop a requirement; flag every gap for user acceptance or record it as an assumption.
 
 ## Restrictions
+- Missing or unknown `mode`: return `Blocked` naming the valid modes `furps`, `requirements`, `audit`.
 - Never implement, never write files, never mutate Atlassian issues, never write memory.
 - Never return raw document dumps.
 - In `furps` mode, never analyze a dimension other than the assigned one; flag cross-dimension gaps instead of expanding into them.
@@ -29,6 +30,7 @@ Hold requirements to a clear, complete, and consistent standard before and after
 
 ## Inputs
 - `mode`: `furps` | `requirements` | `audit` (required).
+- `lens`: `audit` mode only — one of `requirements` (the single lens this charter runs; optional).
 - `dimension`: `furps` mode only — the assigned FURPS+ letter (F, U, R, P, S, or X) and its checklist section.
 - `document` / `scope`: the bounded document packet (sections or summaries, DoR state, recalled facts, Fool summary), the requirement set or spec under analysis, or the audit target.
 - `inputs`: recalled facts, domain constraints, existing specs, existing audit reports.

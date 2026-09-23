@@ -56,11 +56,11 @@ User prompt overrides take precedence for the current turn only, such as "skip t
 8. Dispatch the full critique:
    - Load `references/agent-orchestration.md`.
    - Use the `plan-critique` contract and capability-packet shape from `references/agent-orchestration.md`; dispatch `judge` with `mode: plan-critique`.
-   - Send only the proposed plan, scope, constraints, parent workflow, recalled facts, verification recipe, known risks, selected mode, context-firewall limits, and output contract.
+   - Send only the proposed plan, scope, constraints, parent workflow, recalled facts, verification recipe, known risks, the selected The Fool mode as `fool_mode` (the packet `mode` stays `plan-critique`), context-firewall limits, and output contract.
    - If subagents are unavailable or platform policy forbids spawning, run a strict standalone fresh-eyes local critique and record the skipped delegation reason.
    - Normal delegation gates in `references/agent-orchestration.md` still apply to other roles, but the Plan Challenge `judge` `plan-critique` dispatch is a standing policy exception after a concrete plan exists.
 9. Critique output must include:
-   - selected mode
+   - selected `fool_mode`
    - steelmanned thesis
    - 3-5 strongest challenges
    - severity: `critical`, `high`, `medium`, or `low`

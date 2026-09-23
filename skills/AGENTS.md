@@ -354,7 +354,7 @@ The single old→new table for the charters retired by the roster consolidation.
 | reviewer | code-reviewer | `review` |
 | verification-agent | code-reviewer | `verify` |
 | audit-specialist | code-reviewer | `audit` (the `requirements` lens moved to product-manager `audit`, the `tests` lens to test-engineer `audit`) |
-| architecture-specialist | code-reviewer | `guide` |
+| architecture-specialist | code-reviewer | `guide` for architecture guidance; architecture findings (its folded `domain-mapper`, `coupling-auditor`, `deepening-architect` roles) go to `audit` with `lens: architecture` and a `sub-mode` (see `agent-orchestration.md` §Roles) |
 | mobile-specialist | code-reviewer | `guide` (mobile detection gate kept) |
 | meta-judge | judge | `spec-author` |
 | plan-critic | judge | `plan-critique` |

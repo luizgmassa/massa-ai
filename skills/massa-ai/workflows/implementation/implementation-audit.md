@@ -42,7 +42,7 @@ Not for a single requested audit lens — route directly to that lens. Do not ed
 
 > **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: broad/full audit requiring multiple lenses, or explicit multi-lens request
-> - scope: one lens per dispatch against the shared implementation scope packet (Correctness as `lens: bugs`, Architecture, Code Quality, Security)
+> - scope: one lens per dispatch against the shared implementation scope packet (Correctness as `lens: bugs`, Architecture as `lens: architecture`, Code Quality as `lens: code-quality`, Security as `lens: security`)
 > - inputs: exact `projectId`, parent `workflowSessionId`, child workflow, lens name, shared scope packet, resolved files/diff summary, relevant recalled facts, allowed surrounding-code depth, deterministic sensors, context-firewall limits, and output contract
 > - sensors: target-relevant deterministic commands (tests, builds, lint, type checks, static checks, import checks) per lens
 > - output: `Status`, `Scope checked`, `Evidence`, `Findings`, `Verification/Test Fidelity Checklist`, `Risks and skipped checks`, and `Exact next step`
@@ -51,7 +51,7 @@ Not for a single requested audit lens — route directly to that lens. Do not ed
 
 > **Dispatch: `product-manager`** (role: `product-manager`, mode: `audit`) — charter `skills/agents/product-manager/SKILL.md`
 > - trigger: the Requirements lens is in scope and a requirements source is available
-> - scope: the Requirements lens against the shared implementation scope packet and the resolved requirements source
+> - scope: the Requirements lens (`lens: requirements`) against the shared implementation scope packet and the resolved requirements source
 > - permissions: read-only
 > - inputs: exact `projectId`, parent `workflowSessionId`, child workflow, lens name, shared scope packet, resolved files/diff summary, relevant recalled facts, allowed surrounding-code depth, deterministic sensors, context-firewall limits, and output contract
 > - sensors: target-relevant deterministic commands (tests, builds, lint, type checks, static checks, import checks) per lens
@@ -61,7 +61,7 @@ Not for a single requested audit lens — route directly to that lens. Do not ed
 
 > **Dispatch: `test-engineer`** (role: `test-engineer`, mode: `audit`) — charter `skills/agents/test-engineer/SKILL.md`
 > - trigger: the Tests lens is in scope
-> - scope: the Tests lens against the shared implementation scope packet
+> - scope: the Tests lens (`lens: tests`) against the shared implementation scope packet
 > - permissions: read-only
 > - inputs: exact `projectId`, parent `workflowSessionId`, child workflow, lens name, shared scope packet, resolved files/diff summary, relevant recalled facts, allowed surrounding-code depth, deterministic sensors, context-firewall limits, and output contract
 > - sensors: target-relevant deterministic commands (tests, builds, lint, type checks, static checks, import checks) per lens

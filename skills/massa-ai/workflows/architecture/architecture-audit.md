@@ -56,7 +56,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
 > **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, isolated audit slice, or independent verification of high-impact finding
 > - scope: exact files/modules/boundaries in the audit target
-> - inputs: shared scope packet; `lens: architecture` with sub-mode (`domain` for bounded-context mapping, `coupling` for dependency-graph/strength/distance/volatility, `deepening` for module-depth opportunities); recalled ADRs and rejected refactors
+> - inputs: shared scope packet; `lens: architecture` with optional `sub-mode` (`domain` for bounded-context mapping, `coupling` for dependency-graph/strength/distance/volatility, `deepening` for module-depth opportunities); recalled ADRs and rejected refactors
 > - sensors: `search_definitions` / `get_references` for exported surfaces and dependency direction; source inspection against current files
 > - output: findings with lens-specific evidence, provisional severity, tradeoff, and what would disprove it
 > - firewall: raw dependency graphs, generated reports, and broad search output summarized, not returned raw

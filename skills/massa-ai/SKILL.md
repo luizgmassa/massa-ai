@@ -217,7 +217,7 @@ Fool stays for `spec-driven`, `design`, `create-adr`, `create-rfc`, `create-tdd`
 requests, high-risk domains, or plans touching more than 5 files/classes/modules.
 When the policy selects the full gate, or lite escalates, load
 `workflows/the-fool.md`, select the mode in the main agent, load only the
-selected The Fool references, and attempt a `judge` subagent in `plan-critique` mode with selected mode context
+selected The Fool references, and attempt a `judge` subagent in `plan-critique` mode with the selected mode passed as `fool_mode`
 and a bounded critique packet. Subagents inherit
 `projectId`, parent `workflowSessionId`, workflow name, entity, and compact
 evidence; they do not receive full conversation context.

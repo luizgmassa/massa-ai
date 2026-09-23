@@ -110,6 +110,17 @@ Not for findings-only test coverage, assertion quality, fixture health, flakines
 > - output: implementation summary, test counts, commands run, deviations
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists reusable testing patterns
+
+> **Dispatch: `builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> - trigger: a selected TST finding whose fix needs a production seam for deterministic testing (step 7 Standard) — never for a test-file change, which belongs to `test-engineer`, and never for a production behavior change, which routes to `workflows/spec-driven.md`
+> - scope: the seam-only production change for one TST finding, with a write set disjoint from the `test-engineer` test files
+> - permissions: write (disjoint write set, production seam files only; no behavior change)
+> - inputs: the finding ID, the coverage execution map row, the seam required (time, randomness, async scheduling, filesystem, network, or global-state control), and the verification command
+> - sensors: the existing suite stays green with the seam in place, then the focused test command passes against it
+> - output: implementation summary, changed files, commands run, deviations
+> - firewall: raw diffs and test output summarized
+> - memory: suggest-only; main agent persists reusable seam patterns
+
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 12. Close out with the Fix Closure Report:
    - The coverage execution map from step 6, now filled in through step 10's discrimination sensor result column, is the pre-edit draft of the Closure Matrix — carry its rows forward rather than re-deriving them.

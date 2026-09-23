@@ -33,8 +33,8 @@ Findings-only: do not edit the PRD/ADR unless the user separately asks.
    - If the source is missing or ambiguous, ask once before proceeding.
 4. The Fool pre-validation (sub-agents, one per mode):
    - Load `workflows/the-fool.md`. Treat the PRD/ADR as the challenged thesis (direct challenge; inherit `projectId`/`workflowSessionId`).
-   - Dispatch a `judge` sub-agent in `plan-critique` mode (full depth, The Fool mode `evidence_audit`; it writes nothing) with the document packet, DoR, and recalled facts.
-   - Then dispatch a `judge` sub-agent in `plan-critique` mode (full depth, The Fool mode `pre_mortem`), passing the `evidence_audit` summary as input.
+   - Dispatch a `judge` sub-agent in `plan-critique` mode (full depth, `fool_mode: evidence_audit`; it writes nothing) with the document packet, DoR, and recalled facts.
+   - Then dispatch a `judge` sub-agent in `plan-critique` mode (full depth, `fool_mode: pre_mortem`), passing the `evidence_audit` summary as input.
    - Collect the compact validation: source-confidence gaps, unsourceable claims, and execution-phase failure assumptions.
    - Gate: if `evidence_audit` surfaces critical gaps that block meaningful FURPS analysis, ask the user whether to proceed-with-caveats or pause for document completion. Otherwise attach the Fool summary to the FURPS packets.
 5. FURPS+ dimension analysis (sub-agents, one per dimension, parallel):
