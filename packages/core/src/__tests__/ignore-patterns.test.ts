@@ -98,6 +98,13 @@ describe("ignore-patterns — loadProjectIgnore edge cases", () => {
     }
   });
 
+  test("CocoaPods checkouts are ignored at any depth", async () => {
+    const ig = await loadProjectIgnore(fixtureDir);
+    expect(ig.ignores("Pods/Alamofire/LICENSE.md")).toBe(true);
+    expect(ig.ignores("ios/Pods/Alamofire/Source/Session.swift")).toBe(true);
+    expect(ig.ignores("ios/App/PodsView.swift")).toBe(false);
+  });
+
   test(".gitignore rules merge with DEFAULT_IGNORES", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "ignore-merge-"));
     await writeFile(path.join(dir, ".gitignore"), "*.tmp\n");
