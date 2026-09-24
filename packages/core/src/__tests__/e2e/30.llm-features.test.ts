@@ -806,7 +806,7 @@ describe.skipIf(!READY)("EB-LLM-3b — the code role reads MASSA_AI_LLM_CODE_MOD
 
       // The code-role model really is what failed — the broken id is named.
       expect(apiLog).toContain(NONEXISTENT_CODE_MODEL);
-      expect(apiLog).toContain("llmObject failed — degrading to non-LLM path");
+      expect(apiLog).toContain("LLM call failed — using non-LLM fallback");
       // …and the reranker really is the site that took the {ok:false} branch
       // (reranker.ts:102-107).
       expect(apiLog).toContain("LLMJudgeReranker got {ok:false} — degrading to input order");
@@ -818,7 +818,7 @@ describe.skipIf(!READY)("EB-LLM-3b — the code role reads MASSA_AI_LLM_CODE_MOD
       const instructModel = process.env.MASSA_AI_E2E_LLM_MODEL ?? "qwen3-vl:8b";
       const failureLines = apiLog
         .split("\n")
-        .filter((l) => l.includes("llmObject failed") || l.includes("not found"));
+        .filter((l) => l.includes("LLM call failed") || l.includes("not found"));
       for (const line of failureLines) {
         expect(line).not.toContain(`model '${instructModel}' not found`);
       }
