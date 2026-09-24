@@ -7,9 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<<<<<<< HEAD
-## [1.63.1] - 2026-09-24
-=======
 ### Changed
 
 - **The Plan Challenge gate is fixed behavior, no longer a configurable policy.**
@@ -27,8 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Upgrade note: re-render your startup contract.** A plugin-only update does not rewrite
   the installed `MASSA-AI.md`, which keeps the old eight-rule text — including the
   Plan Challenge policy that sent `feature`/`refactor` straight to the full gate — until you
-  run `bash scripts/install-harness.sh`, `bash scripts/install-skills.sh --apply`, or any
-  `massa-ai-config bootstrap enable|disable`.
+  run `bash scripts/install-harness.sh` or `bash scripts/install-skills.sh --apply` from a
+  repository checkout.
 
 ### Removed
 
@@ -52,7 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `architecture-lenses.md`, `design-implementation.md`, `pr-task-fix.md`,
   `decision-engine.md`, `spec-driven/memory.md`, `synapse-policy.md` and
   `conversation-feedback.md` point to the owner instead of restating it.
->>>>>>> 3dabd9e0 (docs(changelog): record the bootstrap trim and references cleanup)
+
+## [1.63.1] - 2026-09-24
 
 ### Fixed
 
