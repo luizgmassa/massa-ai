@@ -86,8 +86,9 @@ technique, not this feature, and stay.
 
 The `massa-ai-` agent-name prefix went with them: agents ship unprefixed, and ownership
 moved to the `massa-ai-owned` content marker. Installers prune the legacy
-`massa-ai-<name>` files for the 18 pre-consolidation names on upgrade. The mapping table
-in `skills/AGENTS.md` is the single current-tense record of this change.
+`massa-ai-<name>` files for the 18 pre-consolidation names on upgrade. The old→new
+mapping table that recorded this change was removed from `skills/AGENTS.md` in
+agents-md-bootstrap-trim; `CHANGELOG.md` and git history keep it.
 
 ### Removed workflows
 
@@ -124,8 +125,8 @@ and read as a build-tool rather than an implementation specialist.
 `skills/agents/builder/` moved to `skills/agents/senior-engineer/` with the same one
 output contract, the same disjoint-write-set implementation role, and the same charter
 identity — no behavior changed. Every dispatch block, registry row, model-profile
-override key, and generator constant now names `senior-engineer`. The mapping table in
-`skills/AGENTS.md` records `builder → senior-engineer`. A user's model-profile overlay
+override key, and generator constant now names `senior-engineer` (`builder →
+senior-engineer`). A user's model-profile overlay
 still keyed under the pre-rename `builder` name keeps applying: the overlay merge maps it
 onto `senior-engineer` unless the overlay already sets `senior-engineer` directly.
 

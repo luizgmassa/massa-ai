@@ -388,7 +388,7 @@ per dispatch through the capability packet's `mode` field.
 | `product-manager` | Hold requirements to a clear, complete, consistent standard | `furps`, `audit` | read-only |
 | `test-engineer` | Audit and fix tests | `audit`, `fix` | read-only (test-write when scoped) |
 
-Retired agents and where their work went: the mapping table in `skills/AGENTS.md`.
+Retired agents and where their work went: [`docs/removed-features.md`](removed-features.md).
 
 Tool gating differs per host — only Claude needed a fix. Read-only Claude charters get
 `disallowedTools: Write, Edit, NotebookEdit` (a denylist that keeps MCP tools reachable);

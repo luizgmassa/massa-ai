@@ -287,7 +287,6 @@ describe("no retired agent name in skills prose, backticked or not, any case, hy
 
   // Sanctioned exceptions, each scoped to one file and one line shape.
   const SANCTIONED: Array<{ file: string; line: RegExp; why: string }> = [
-    { file: "skills/AGENTS.md", line: /^\| [a-z-]+ \| (?:[a-z-]+ \| `|— \| Retired;)/, why: "the single old→new mapping table" },
     { file: "skills/massa-ai/references/agent-orchestration.md", line: /^\| `[a-z-]+` \| `[a-z-]+` \| /, why: "legacy role vocabulary table" },
     { file: "skills/massa-ai/references/mobile-diagnosis.md", line: /nested navigator state/, why: "navigation state, not an agent" },
     { file: "skills/massa-ai/references/lessons.md", line: /no reviewer feedback|reviewer-feedback records/, why: "a human reviewer, not an agent" },
@@ -325,9 +324,22 @@ describe("no retired agent name in skills prose, backticked or not, any case, hy
     expect(bad).toEqual([]);
   });
 
-  test("the sweep sees the mapping table (guard the guard)", () => {
-    const text = read(path.join(SKILLS, "AGENTS.md"));
-    expect([...text.matchAll(RETIRED_WORD)].length).toBeGreaterThanOrEqual(14);
+  test("the sweep sees every retired name, in every spelling it claims (guard the guard)", () => {
+    // The old→new mapping table in skills/AGENTS.md was the live subject this
+    // guard counted; agents-md-bootstrap-trim deleted it (D9), so the live tree
+    // may legitimately hold zero retired names. A synthetic fixture keeps the
+    // regex itself sensed: every retired name, spelled each way the sweep's
+    // header claims to catch, must still match — and code-explorer must not.
+    const fixture = [
+      "planner", "context-curator", "context curator", "documentation_agent", "investigator",
+      "navigator", "meta-judge", "Plan Critic", "furps-analyst", "requirements-analyst",
+      "verification-agent", "mobile-specialist", "architecture-specialist", "audit-specialist",
+      "reviewer", "REVIEWER",
+    ];
+    for (const word of fixture) {
+      expect([...` ${word} `.matchAll(RETIRED_WORD)].length, word).toBe(1);
+    }
+    expect([..." code-reviewer code reviewer ".matchAll(RETIRED_WORD)]).toEqual([]);
   });
 });
 

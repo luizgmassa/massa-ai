@@ -28,8 +28,7 @@ Dispatch under the bare role name; on the Claude plugin route use the
 plugin-namespaced `massa-ai:<role>` (see
 `skills/massa-ai/references/agent-orchestration.md` → Name Resolution). A charter
 with several output contracts selects one per dispatch through the capability
-packet's `mode` field; `skills/AGENTS.md` lists the modes and maps retired agents
-to current ones.
+packet's `mode` field; `skills/AGENTS.md` lists the modes.
 
 - `senior-engineer/` — write-permitted implementation (disjoint write set)
 - `code-explorer/` — read-only codebase exploration: index-first lookup, flow tracing, dependencies, impact

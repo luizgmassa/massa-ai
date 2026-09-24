@@ -164,10 +164,8 @@ resolves to a current agent.
 | `coupling-auditor` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: coupling` |
 | `deepening-architect` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: deepening` |
 
-The charter names retired by the roster consolidation map to current agents in the
-single old→new table of `skills/AGENTS.md`; this file does not repeat it. Workflows
-dispatch the current `<role>` name through a named dispatch block — the legacy column
-is traceability only, never a dispatch target.
+Workflows dispatch the current `<role>` name through a named dispatch block — the
+legacy column is traceability only, never a dispatch target.
 
 ## Capability Packet
 
