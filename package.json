@@ -68,7 +68,7 @@
     "@types/pg": "^8.18.0",
     "oxlint": "1.76.0",
     "toml": "^4.3.0",
-    "turbo": "^2.5.0",
+    "turbo": "^2.11.3",
     "typescript": "^5.4.0"
   },
   "engines": {
