@@ -185,6 +185,40 @@ describe("versioned structural FQN codec goldens", () => {
     expect(identity.legacyFqn).toBe("src/example.ts#topic~method~draft");
   });
 
+  test("escapes a mid-string # instead of throwing (e.g. a markdown heading naming an issue)", () => {
+    const identity = createStructuralIdentity({
+      ...METHOD,
+      name: "Fixes issue #456",
+      qualifiedName: "Fixes issue #456",
+      kind: "heading",
+      scope: "top_level",
+      overload: "unique",
+    });
+    expect(identity.name).toBe("Fixes issue %23456");
+    expect(identity.qualifiedName).toBe("Fixes issue %23456");
+    expect(identity.fqn).toBe("src/example.ts#Fixes issue %23456");
+    expect(parseStructuralFqn(identity.fqn)).toMatchObject({
+      format: "simple",
+      name: "Fixes issue %23456",
+    });
+  });
+
+  test("escapes every # occurrence, not just the first (e.g. \"C# vs F#\")", () => {
+    // A single-# input can't discriminate a regex missing the global flag
+    // (.replace(/#/, ...) vs .replace(/#/gu, ...)) — both escape one # and
+    // pass. This needs two.
+    const identity = createStructuralIdentity({
+      ...METHOD,
+      name: "C# vs F#",
+      qualifiedName: "C# vs F#",
+      kind: "heading",
+      scope: "top_level",
+      overload: "unique",
+    });
+    expect(identity.name).toBe("C%23 vs F%23");
+    expect(identity.fqn).toBe("src/example.ts#C%23 vs F%23");
+  });
+
   test("canonical serialization is position-free, NFC, whitespace-normalized, and modifier-sorted", () => {
     const first = canonicalizeStructuralSignature(METHOD);
     const second = canonicalizeStructuralSignature({

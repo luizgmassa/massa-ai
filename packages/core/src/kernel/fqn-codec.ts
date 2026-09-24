@@ -105,8 +105,12 @@ export function normalizeStructuralFile(file: string): string {
 
 function normalizeSymbolText(value: string, label: string): string {
   const normalized = normalizedNfcText(value, label);
-  if (normalized.includes("#")) throw new TypeError(`${label} contains reserved #`);
-  return normalized;
+  // "#" is the fqn/legacyFqn delimiter (file#name), so it can never survive
+  // into name/qualifiedName as a literal — but it is legitimate source text
+  // (JS/TS private-member names, markdown headings like "Fixes issue #456",
+  // export-specifier text). Escape it here, once, instead of throwing, so no
+  // extraction call site has to remember to pre-sanitize it.
+  return normalized.includes("#") ? normalized.replace(/#/gu, "%23") : normalized;
 }
 
 function hasReservedModernSuffix(value: string): boolean {

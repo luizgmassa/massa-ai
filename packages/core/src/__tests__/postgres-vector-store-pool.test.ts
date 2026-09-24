@@ -17,12 +17,14 @@
 
 import { describe, test, expect, mock, beforeEach } from "bun:test";
 import type { VectorEmbeddingProviderFactory } from "@massa-ai/shared";
+import { resolveConnectionTimeoutMs } from "../kernel/db-connection.js";
 
 let poolConstructCount = 0;
 let connectCallCount = 0;
 let endCallCount = 0;
 let connectShouldThrow = false;
 let capturedSql: string[] = [];
+let capturedPoolConfig: { connectionTimeoutMillis?: number } | null = null;
 
 type QueryImpl = (sql: string, params?: unknown[]) => Promise<{ rows: unknown[] }>;
 
@@ -43,8 +45,9 @@ class FakeClient {
 }
 
 class FakePool {
-  constructor(_config: unknown) {
+  constructor(config: { connectionTimeoutMillis?: number }) {
     poolConstructCount++;
+    capturedPoolConfig = config;
   }
   async connect() {
     connectCallCount++;
@@ -86,6 +89,7 @@ beforeEach(() => {
   endCallCount = 0;
   connectShouldThrow = false;
   capturedSql = [];
+  capturedPoolConfig = null;
   queryImpl = async (sql: string) => {
     if (sql.includes("pg_tables")) return { rows: [{ schemaname: "public", tablename: "vector_documents_768d" }] };
     if (sql.includes("pg_indexes")) return { rows: [{ indexname: "idx_vector_documents_768d_embedding" }] };
@@ -125,6 +129,17 @@ describe("PostgresVectorStore — one pool per store instance (APCR-03)", () => 
     // The retry reused the pool constructed by the first, failed attempt.
     expect(poolConstructCount).toBe(1);
     expect(connectCallCount).toBe(2);
+  });
+
+  test("the constructed pool carries the configured connectionTimeoutMillis, not a hardcoded 5000", async () => {
+    // Regression: this pool's connectionTimeoutMillis was hardcoded to 5000,
+    // independently of db-connection.ts's getPgPool — a shared local Postgres
+    // under concurrent-reindex load timed out this pool's vector-upsert
+    // connections at the same incident that produced the ETL "Connection
+    // terminated due to connection timeout" failures.
+    const store = makeStore();
+    await store.ensureInitialized();
+    expect(capturedPoolConfig?.connectionTimeoutMillis).toBe(resolveConnectionTimeoutMs());
   });
 
   test("close() ends the pool the store constructed (APCR-03.3)", async () => {

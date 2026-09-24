@@ -7,6 +7,7 @@ import path from "node:path";
 import { ParseStage } from "../services/etl/stages/parse.js";
 import { ResolveStage } from "../services/etl/stages/resolve.js";
 import { buildSymbolPersistenceBatch } from "../services/etl/stages/load.js";
+import { generationDefinitionIdentityColumns } from "../data/symbol/symbol-repo-identity.js";
 import { matchesStructuralPathAlias, resolveStructuralSpecifier } from "../services/structural/resolvers/typescript.js";
 import { smartChunk } from "../services/search/smart-chunker.js";
 import { StructuralRuntime } from "../services/structural/structural-runtime.js";
@@ -355,5 +356,31 @@ describeNative("TS/JS structural ETL adapter", () => {
     expect(batch.references.map((item) => item.ref_kind)).toEqual(["import", "http_call", "data_flow"]);
     expect(batch.references[1]?.meta).toMatchObject({ sourceSpan: SPAN, route: "/api" });
     expect(batch.imports).toHaveLength(2);
+  });
+
+  test("resolves a #-bearing markdown heading with the persisted name matching the fqn's escape", async () => {
+    // Regression: a real heading containing '#' (e.g. "Fixes issue #456",
+    // "C# vs F#") used to abort indexing at the resolve stage
+    // (fqn-codec.ts's normalizeSymbolText threw on any '#'). Fixed by
+    // escaping every '#' to '%23' instead of throwing — but the escape must
+    // reach the PERSISTED symbol name too, not just the fqn, or
+    // generationDefinitionIdentityColumns rejects the write downstream with
+    // definition_fqn_name_mismatch. Exercises the real native parser through
+    // resolveStructuralFile (the code path an earlier, narrower unit test
+    // missed by not populating ParsedFile.structure).
+    const { dir, file } = await fixture("notes.md", "## C# vs F#\n");
+    const [parsed] = await new ParseStage().run(context(dir), [file]);
+    // Inject a stub repository (this file's established pattern, e.g. the
+    // AD-008/AD-009 test above) so this test doesn't require a live
+    // DATABASE_URL — ResolveStage's default constructor arg reaches the real
+    // DB-backed getSymbolRepository().
+    const repository = { listAllDefinitions: async () => [] };
+    const [resolved] = await new ResolveStage(repository as never).run(context(dir), [parsed!]);
+    const symbol = resolved!.symbols[0]!;
+    expect(symbol.name).toBe("C%23 vs F%23");
+    expect(symbol.fqn).toBe("notes.md#C%23 vs F%23");
+
+    const batch = buildSymbolPersistenceBatch("p", resolved!);
+    expect(() => generationDefinitionIdentityColumns(batch.definitions[0]!)).not.toThrow();
   });
 });
