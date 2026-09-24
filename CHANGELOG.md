@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`MASSA_AI_INDEX_INCLUDE` limits the MCP client's upload walk to listed directories.**
+  Comma-separated paths relative to the project root (for example
+  `app,features/promotion`); unset or empty keeps the full walk. Use it to bound reindex time
+  and memory on repos larger than the collector's file cap.
+
+### Changed
+
+- **The MCP client's file collector caps rose to 15000 files / 150 MB** (from 3000 / 50 MB).
+  The walk follows filesystem order, so a repo over the old cap silently lost whichever
+  modules the walk reached last.
+- **Turborepo bumped to 2.11.3** (`turbo.json` `$schema` pinned to the matching version).
+
+### Fixed
+
+- **CocoaPods checkouts (`Pods/`) are no longer indexed.** Both the MCP client's collector
+  and core discovery skip them; vendored Pod files burned the file cap before the walk
+  reached real source, and a Pod `LICENSE.md` once aborted graph activation with a
+  `file_count_mismatch`.
+- **The stale-job reaper no longer kills a healthy index job whose persisted heartbeat
+  lags.** `reapStaleJobs` now reads the in-process heartbeat before the PostgreSQL row, which
+  can trail the live job by 30 s or more when the write chain is contended.
+- **The MLX embedding server serializes inference and releases Metal buffers.** Concurrent
+  requests used to run parallel MLX graphs, and a client that timed out and retried stacked
+  new graphs on top of the abandoned ones (a 3000-file index reached 50 GB). Each batch now
+  clears the MLX cache afterwards, and requests above `MASSA_AI_MLX_EMBED_MAX_TEXTS`
+  (default 256) are rejected with a 400.
+
 ## [1.64.0] - 2026-09-24
 
 ### Changed
