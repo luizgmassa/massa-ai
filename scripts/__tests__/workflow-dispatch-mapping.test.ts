@@ -192,13 +192,10 @@ describe("Plan Challenge dispatches judge in plan-critique mode (Dispatch AC-6)"
     });
   }
 
-  test("skills/AGENTS.md Plan Challenge Policy names judge in plan-critique mode", () => {
-    const text = read(path.join(SKILLS, "AGENTS.md"));
-    const span = text.slice(
-      text.indexOf("<!-- massa-ai:rule:plan-challenge:start -->"),
-      text.indexOf("<!-- massa-ai:rule:plan-challenge:end -->"),
-    );
-    expect(span).toContain("dispatch the `judge` agent in `plan-critique` mode");
+  test("SKILL.md §Plan Challenge Gate names judge in plan-critique mode", () => {
+    const text = read(path.join(SKILLS, "massa-ai", "SKILL.md"));
+    const span = text.slice(text.indexOf("## Plan Challenge Gate"), text.indexOf("## Retrieval And Synapse"));
+    expect(span).toContain("dispatch `judge` in `plan-critique` mode");
     expect([...span.matchAll(RETIRED)].map((m) => m[0])).toEqual([]);
   });
 });

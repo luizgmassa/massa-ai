@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: Inspect or toggle the massa-ai startup-contract rules (caveman, massa-ai-router, dedupe-guardrails, plan-challenge, conversation-feedback, indexing-hygiene, english-code, code-comments) that the installed MASSA-AI.md delivers to this host. Use when the user asks which startup rules are active, asks to turn one on or off, or asks why a rule is or is not being applied. Do NOT use for editing the rule text itself (that is a massa-ai repository change, not a runtime toggle) and do NOT claim a toggle is live before the user restarts the host session.
+description: Inspect or toggle the massa-ai startup-contract rules (massa-ai-router, dedupe-guardrails, conversation-feedback, indexing-hygiene, english-code, code-comments) that the installed MASSA-AI.md delivers to this host. Use when the user asks which startup rules are active, asks to turn one on or off, or asks why a rule is or is not being applied. Do NOT use for editing the rule text itself (that is a massa-ai repository change, not a runtime toggle) and do NOT claim a toggle is live before the user restarts the host session.
 license: MIT
 metadata:
   author: Luiz Massa
@@ -33,18 +33,18 @@ Run `bootstrap list` before any toggle, so the reported change is against a stat
 `--target <dir>` exists for scratch homes and requires `--yes`; it redirects only where the contract is *rendered*. The preference itself is always persisted to `~/.config/massa-ai/config.json`, so under a redirected target the CLI names both paths on stderr. Do not pass `--target` unless the user asked for a specific directory.
 
 ## The Rule Ids
-Exactly eight ids exist, and only these are accepted. There is no protected subset — every one of them can be switched both ways, including `massa-ai-router`.
+Exactly six ids exist, and only these are accepted. There is no protected subset — every one of them can be switched both ways, including `massa-ai-router`.
 
-- `caveman` — keep communication compressed while preserving technical accuracy. Default: enabled.
 - `massa-ai-router` — load the massa-ai skill as the workflow router before substantive work. Default: enabled.
 - `dedupe-guardrails` — reuse already-loaded massa-ai context instead of bulk-loading workflows or references. Default: enabled.
-- `plan-challenge` — run The Fool as a post-plan challenge gate per the configured policy. Default: enabled.
 - `conversation-feedback` — emit chat-visible status updates for massa-ai workflow progress. Default: enabled.
 - `indexing-hygiene` — ignore build output, dependency, and secret paths during indexing and context loading. Default: enabled.
 - `english-code` — write generated code, identifiers, comments, and commit-facing artifacts in English regardless of conversational language. Default: enabled.
 - `code-comments` — require API doc blocks and rationale comments on generated code. Default: **disabled**.
 
-Never invent an id. An unrecognised id is refused before anything is read or written, and the error names the id and lists all eight — relay that list rather than guessing what the user meant.
+`caveman` and `plan-challenge` were retired: the CLI refuses them as retired, and a persisted entry for one is skipped silently. The Plan Challenge gate itself still runs — it is fixed workflow behavior in the massa-ai router, no longer a toggle.
+
+Never invent an id. An unrecognised id is refused before anything is read or written, and the error names the id and lists all six — relay that list rather than guessing what the user meant.
 
 Disabling `massa-ai-router` is allowed and is the user's call. Say plainly that it removes the router which reads the startup contract, and that the recovery is this same CLI (`massa-ai-config bootstrap enable massa-ai-router`), which is a binary and not a rule, so it stays reachable.
 
@@ -66,7 +66,7 @@ On a dry run, say so and that no files changed.
 
 ## Restrictions
 - Never use an MCP tool for this surface; none exists. The CLI must keep working with the MCP server unreachable.
-- Never invent, abbreviate, or pluralise a rule id; use only the eight ids above, exactly as the engine lists them.
+- Never invent, abbreviate, or pluralise a rule id; use only the six ids above, exactly as the engine lists them.
 - Never hand-edit a delivered `MASSA-AI.md`, a host's `AGENTS.md`, or `~/.config/massa-ai/config.json` to satisfy a toggle request — the engine owns those bytes, and a hand edit is overwritten by the next apply.
 - Never edit the rule text itself to satisfy a toggle request; that is a massa-ai repository change owned by a different workflow.
 - Never claim a toggle is live before the affected host's session restarts.

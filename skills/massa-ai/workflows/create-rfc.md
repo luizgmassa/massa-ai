@@ -34,7 +34,7 @@ Load `references/project-context.md` (intake sweep) before the first substantive
 6. Choose the artifact path from an explicit user path or established project convention. Otherwise default to `docs/rfc/<entity>.md`.
    - If the target exists, update it only when the user explicitly requested an update; otherwise ask before overwriting.
    - When file mutation is unavailable or the user requested plan-only output, present the complete draft and intended path without writing.
-7. Run the full configured Plan Challenge Gate. Preserve all required RFC fields while revising valid critical or high findings, especially one-sided options, unsupported claims, hidden assumptions, status quo bias, weak cost estimates, and criteria chosen to justify a predetermined conclusion.
+7. Run the full Plan Challenge Gate. Preserve all required RFC fields while revising valid critical or high findings, especially one-sided options, unsupported claims, hidden assumptions, status quo bias, weak cost estimates, and criteria chosen to justify a predetermined conclusion.
 8. Load `references/create-rfc/quality-and-lifecycle.md`, validate every required behavior, and resolve blocking gaps. Keep unresolved facts explicit instead of silently removing mandatory fields.
 9. Save the proposal with status `NOT STARTED` or `IN PROGRESS`. Set `COMPLETE` and fill the Outcome section only when an explicit human decision or authoritative project record is available.
 10. Persist proposal state after recall, deduplication, and scoring:

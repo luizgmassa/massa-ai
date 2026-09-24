@@ -46,7 +46,7 @@ Keep focus on whether and which direction should be selected. Route detailed imp
 
 ## Plan Challenge Gate
 
-Run the full configured Plan Challenge Gate after the draft exists. Challenge at least:
+Run the full Plan Challenge Gate after the draft exists. Challenge at least:
 
 - strongest counterargument to the recommendation
 - evidence quality and interested-party or vendor bias

@@ -130,7 +130,7 @@ describe("resolveBootstrapState — defaults and merge", () => {
     }
   });
 
-  test("every one of the eight ids is overridable in both directions", () => {
+  test("every one of the six ids is overridable in both directions", () => {
     // BST-09 AC-3: no protected subset. Each id is driven to the opposite of
     // its own default and asserted, so a rule that silently ignored its
     // persisted value would redden here rather than hide behind a default that
@@ -152,38 +152,40 @@ describe("resolveBootstrapState — defaults and merge", () => {
 });
 
 describe("resolveBootstrapState — ignored entries (BST-10 AC-12)", () => {
-  test("a retired id is skipped silently, not reported as ignored (PER AC-6)", () => {
-    const { state, ignoredStateKeys } = resolveBootstrapState({
-      bootstrap: { rules: { "persona-router": false } },
+  for (const id of ["persona-router", "caveman", "plan-challenge"]) {
+    test(`retired "${id}" is skipped silently, not reported as ignored (PER AC-6)`, () => {
+      const { state, ignoredStateKeys } = resolveBootstrapState({
+        bootstrap: { rules: { [id]: false } },
+      });
+      expect(ignoredStateKeys).toEqual([]);
+      expect(state).toEqual(bootstrapRuleDefaults());
+      expect(Object.keys(state)).toHaveLength(6);
     });
-    expect(ignoredStateKeys).toEqual([]);
-    expect(state).toEqual(bootstrapRuleDefaults());
-    expect(Object.keys(state)).toHaveLength(8);
-  });
+  }
 
   test("an id absent from the registry is ignored, reported once, and not fatal", () => {
     const { state, ignoredStateKeys } = resolveBootstrapState({
-      bootstrap: { rules: { "no-such-rule": false, caveman: false } },
+      bootstrap: { rules: { "no-such-rule": false, "dedupe-guardrails": false } },
     });
     expect(ignoredStateKeys).toEqual(["no-such-rule"]);
     // "once", not "repeatedly" — a duplicate would show as length 2.
     expect(ignoredStateKeys.filter((k) => k === "no-such-rule")).toHaveLength(1);
     // Not fatal, and the sibling known entry still applied.
-    expect(state.caveman).toBe(false);
-    expect(state).toEqual({ ...bootstrapRuleDefaults(), caveman: false });
+    expect(state["dedupe-guardrails"]).toBe(false);
+    expect(state).toEqual({ ...bootstrapRuleDefaults(), "dedupe-guardrails": false });
   });
 
   test("a known id with a non-boolean value falls back to its default and is named", () => {
     const defaults = bootstrapRuleDefaults();
     const { state, ignoredStateKeys } = resolveBootstrapState({
-      bootstrap: { rules: { caveman: "false", "plan-challenge": 0, "english-code": null } },
+      bootstrap: { rules: { "dedupe-guardrails": "false", "conversation-feedback": 0, "english-code": null } },
     });
     // Coercion would invent a preference: "false" and 0 are both falsy, and
     // reading them as `false` would disable two rules the user never disabled.
-    expect(state.caveman).toBe(defaults.caveman);
-    expect(state["plan-challenge"]).toBe(defaults["plan-challenge"]);
+    expect(state["dedupe-guardrails"]).toBe(defaults["dedupe-guardrails"]);
+    expect(state["conversation-feedback"]).toBe(defaults["conversation-feedback"]);
     expect(state["english-code"]).toBe(defaults["english-code"]);
-    expect(ignoredStateKeys).toEqual(["caveman", "english-code", "plan-challenge"]);
+    expect(ignoredStateKeys).toEqual(["conversation-feedback", "dedupe-guardrails", "english-code"]);
   });
 
   test("ignored keys are sorted, so the same document reports them identically twice", () => {
@@ -245,10 +247,10 @@ describe("setBootstrapRuleEnabled — persistence", () => {
       llm: { enabled: true, model: "qwen2.5:7b-instruct" },
       unknownFutureKey: { nested: [1, 2, { deep: "value" }] },
     };
-    seed({ ...siblings, bootstrap: { rules: { caveman: false } } });
+    seed({ ...siblings, bootstrap: { rules: { "dedupe-guardrails": false } } });
 
     const before = onDisk();
-    setBootstrapRuleEnabled("plan-challenge", false);
+    setBootstrapRuleEnabled("conversation-feedback", false);
     const after = onDisk();
 
     for (const key of Object.keys(siblings)) {
@@ -261,12 +263,12 @@ describe("setBootstrapRuleEnabled — persistence", () => {
 
   test("a sibling key under bootstrap, and a sibling rule, both survive a flip", () => {
     seed({
-      bootstrap: { somethingElse: { keep: true }, rules: { caveman: false } },
+      bootstrap: { somethingElse: { keep: true }, rules: { "dedupe-guardrails": false } },
     });
     setBootstrapRuleEnabled("code-comments", true);
     const bootstrap = onDisk().bootstrap as Record<string, unknown>;
     expect(bootstrap.somethingElse).toEqual({ keep: true });
-    expect(bootstrap.rules).toEqual({ caveman: false, "code-comments": true });
+    expect(bootstrap.rules).toEqual({ "dedupe-guardrails": false, "code-comments": true });
   });
 
   test("a flip round-trips: what was written resolves back to what was asked", () => {
@@ -280,11 +282,11 @@ describe("setBootstrapRuleEnabled — persistence", () => {
     // Writing a value equal to the registry default still materializes the
     // key: an implicit preference is not a recorded one, and the next default
     // change would silently move it.
-    const same = setBootstrapRuleEnabled("caveman", bootstrapRuleDefaults().caveman);
+    const same = setBootstrapRuleEnabled("dedupe-guardrails", bootstrapRuleDefaults()["dedupe-guardrails"]);
     expect(same.changed).toBe(false);
-    expect((onDisk().bootstrap as any).rules.caveman).toBe(bootstrapRuleDefaults().caveman);
+    expect((onDisk().bootstrap as any).rules["dedupe-guardrails"]).toBe(bootstrapRuleDefaults()["dedupe-guardrails"]);
 
-    const moved = setBootstrapRuleEnabled("caveman", !bootstrapRuleDefaults().caveman);
+    const moved = setBootstrapRuleEnabled("dedupe-guardrails", !bootstrapRuleDefaults()["dedupe-guardrails"]);
     expect(moved.changed).toBe(true);
   });
 
@@ -312,7 +314,7 @@ describe("setBootstrapRuleEnabled — refusals happen before any write", () => {
     }
     expect(thrown?.name).toBe("UnknownRuleError");
     expect(String(thrown?.message)).toContain("not-a-rule");
-    // Lists all eight valid ids (BST-09 AC-8).
+    // Lists all six valid ids (BST-09 AC-8).
     for (const id of BOOTSTRAP_RULE_IDS) expect(String(thrown?.message)).toContain(id);
     // Byte-identical: the file was never opened for writing.
     expect(vfs.get(CONFIG_PATH)).toBe(before);
@@ -325,19 +327,19 @@ describe("setBootstrapRuleEnabled — refusals happen before any write", () => {
 
   test("a malformed config.json throws ConfigParseError and writes nothing", () => {
     seedRaw("{ broken");
-    expect(() => setBootstrapRuleEnabled("caveman", false)).toThrow(ConfigParseError);
+    expect(() => setBootstrapRuleEnabled("dedupe-guardrails", false)).toThrow(ConfigParseError);
     expect(vfs.get(CONFIG_PATH)).toBe("{ broken");
   });
 
   test("a config.json holding a JSON array is refused, not spread into an object", () => {
     seedRaw("[1, 2, 3]");
-    expect(() => setBootstrapRuleEnabled("caveman", false)).toThrow(ConfigParseError);
+    expect(() => setBootstrapRuleEnabled("dedupe-guardrails", false)).toThrow(ConfigParseError);
     expect(vfs.get(CONFIG_PATH)).toBe("[1, 2, 3]");
   });
 });
 
 describe("every registry id is individually persistable (BST-09 AC-3)", () => {
-  test("each of the eight ids writes and reads back, in both directions", () => {
+  test("each of the six ids writes and reads back, in both directions", () => {
     for (const id of BOOTSTRAP_RULE_IDS as readonly BootstrapRuleId[]) {
       vfs = new Map();
       existing = new Set();

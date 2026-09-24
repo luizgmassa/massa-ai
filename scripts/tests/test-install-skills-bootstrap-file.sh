@@ -605,8 +605,8 @@ for pair in "codex:$H1/.codex" "cursor:$H1/.cursor"; do
   # presence would mean AGENTS.md became a second copy of the contract.
   assert_not_contains "$HOST pointer carries no conversation-feedback policy (BST-04 AC-7)" \
     "$BLOCK" "Conversation Feedback Policy"
-  assert_not_contains "$HOST pointer carries no plan-challenge policy (BST-04 AC-7)" \
-    "$BLOCK" "Plan Challenge Policy"
+  assert_not_contains "$HOST pointer carries no dedupe policy (BST-04 AC-7)" \
+    "$BLOCK" "Dedupe And Lazy-Load Guardrails"
   assert_not_contains "$HOST pointer carries no indexing policy (BST-04 AC-7)" \
     "$BLOCK" "Indexing / Context Hygiene"
   # The three assertions above are an absence list, and an absence list cannot

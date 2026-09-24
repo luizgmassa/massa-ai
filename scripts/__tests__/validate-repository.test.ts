@@ -80,7 +80,7 @@ describe("skills/AGENTS.md bootstrap contract", () => {
       content.indexOf(BOOTSTRAP_START),
       content.indexOf(BOOTSTRAP_END) + BOOTSTRAP_END.length
     );
-    expect(block).toContain("caveman full");
+    expect(block).not.toContain("caveman");
     expect(block).toContain("coding-guidelines");
     expect(block).toContain("massa-ai");
     expect(block).not.toContain("persona-router");
@@ -94,7 +94,9 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     );
     expect(block).not.toContain("persona_router");
     expect(block).not.toContain("persona_pin");
-    expect(block).toContain("plan_challenge");
+    // plan_challenge retired with its rule: the gate is fixed router behavior now.
+    expect(block).not.toContain("plan_challenge");
+    expect(block).not.toContain("Plan Challenge Policy");
     expect(block).toContain("conversation_feedback");
   });
 

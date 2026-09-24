@@ -354,9 +354,8 @@ For `depth: full`, or after lite escalation, the main agent selects the The Fool
 - confidence impact
 - exact next step
 
-The main agent owns final synthesis and applies the canonical Plan Challenge
-Policy: the `<!-- massa-ai:bootstrap -->` block installed as `<host>/AGENTS.md`,
-whose single source is `skills/AGENTS.md` in the product repo.
+The main agent owns final synthesis and applies the fixed Plan Challenge Gate
+in `SKILL.md` §Plan Challenge Gate.
 
 ## Memory Rules
 

@@ -151,7 +151,7 @@ export interface SetBootstrapRuleResult {
  *
  * The id is validated **before** any read or write, so an unknown id can never
  * be the reason a file was touched: `assertKnownRuleId` throws
- * `UnknownRuleError` naming the bad id and listing all eight valid ones
+ * `UnknownRuleError` naming the bad id and listing all six valid ones
  * (BST-09 AC-8).
  *
  * The bytes read here are handed to {@link writeRawConfig} as its

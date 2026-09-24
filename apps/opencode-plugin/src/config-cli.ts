@@ -129,7 +129,7 @@ Examples:
   massa-ai-config doctor
   massa-ai-config doctor --fix
   massa-ai-config bootstrap list
-  massa-ai-config bootstrap disable caveman
+  massa-ai-config bootstrap enable code-comments
 `);
 }
 

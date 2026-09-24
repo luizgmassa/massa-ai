@@ -10,12 +10,6 @@ order they appear. Each rule can be switched off individually through
 rendered contract, and the remaining rules still activate in their own
 relative order.
 
-<!-- massa-ai:rule:caveman:start -->
-### `caveman full`
-
-Keep communication compressed while preserving technical accuracy; relax
-compression when clarity or safety requires it.
-<!-- massa-ai:rule:caveman:end -->
 <!-- massa-ai:rule:massa-ai-router:start -->
 ### `massa-ai`
 
@@ -65,56 +59,6 @@ The first load is mandatory in each new coding conversation and must load
 `massa-ai`. Dedupe applies only after that load and must never skip initial
 activation.
 <!-- massa-ai:rule:dedupe-guardrails:end -->
-
-<!-- massa-ai:rule:plan-challenge:start -->
-## Plan Challenge Policy
-
-This user-editable policy controls whether massa-ai runs The Fool after
-constructing a plan. It is a second-pass gate, not the initial workflow router.
-
-```yaml
-plan_challenge:
-  enabled: auto
-  depth: lite
-  mode: auto
-  full_gate: high_risk_or_explicit
-  serious_findings: revise_plan
-```
-
-Supported values:
-
-- `enabled`: `auto` runs the configured gate; `off` disables it;
-  `explicit_only` runs only when the user asks for a challenge, pre-mortem,
-  red-team, or evidence audit.
-- `depth`: `lite` uses an inline checklist for low-risk plans; `full` loads
-  `workflows/the-fool.md` when needed.
-- `full_gate`: `high_risk_or_explicit` loads full The Fool for high-risk plans
-  or direct requests; `always` loads it for every plan; `explicit_only` loads it
-  only on direct request.
-- `mode`: `auto` chooses from The Fool mode-selection guide; `ask` asks when
-  interactive input is available; concrete modes are `pre_mortem`, `red_team`,
-  `evidence_audit`, `socratic`, or `dialectic`.
-- `serious_findings`: `revise_plan` incorporates valid high-risk findings
-  before finalizing; `append_critique` keeps the plan and attaches critique;
-  `warn_only` briefly reports risks.
-
-Prompt-level user instructions override this policy for the current turn.
-
-Load full `workflows/the-fool.md` when the workflow is `spec-driven`,
-`feature`, `create-adr`, `create-rfc`, `create-tdd`, or `refactor`; when the plan touches security,
-data loss, migrations, irreversible actions, auth/privacy, cross-service
-contracts; or when the plan touches more than 5 files, classes, or modules. If
-The Fool or the selected Fool reference is already loaded, reuse it.
-
-Both gates dispatch the `judge` agent in `plan-critique` mode (`depth: lite` or
-`depth: full`); it writes nothing in that mode. For low-risk plans, the lite packet
-carries this auto-lite checklist without loading The Fool references:
-
-- What assumption would most likely make this plan fail?
-- What evidence or deterministic check would falsify success?
-- Does the plan touch more than 5 files/classes/modules or a high-risk domain?
-- If a serious risk is found, revise the plan or load full The Fool.
-<!-- massa-ai:rule:plan-challenge:end -->
 
 <!-- massa-ai:rule:conversation-feedback:start -->
 ## Conversation Feedback Policy

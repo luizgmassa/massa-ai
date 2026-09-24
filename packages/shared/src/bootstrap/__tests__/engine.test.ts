@@ -276,15 +276,15 @@ describe("targetHome threading", () => {
   test("rule state comes from config.json under targetHome", () => {
     seedInstallState(["codex"]);
     seedAllWiring();
-    seedRuleState({ "plan-challenge": false });
+    seedRuleState({ "conversation-feedback": false });
 
     apply();
 
     const contract = fs.readFileSync(bootstrapContractPath("codex", home), "utf-8");
-    expect(contract).not.toContain(ruleToken("plan-challenge"));
+    expect(contract).not.toContain(ruleToken("conversation-feedback"));
     // A sibling rule proves the omission is the persisted preference and not a
     // render that dropped everything.
-    expect(contract).toContain(ruleToken("caveman"));
+    expect(contract).toContain(ruleToken("dedupe-guardrails"));
   });
 
   test("writes land only under targetHome", () => {
@@ -448,7 +448,7 @@ describe("dryRun writes nothing", () => {
   test("the scratch home is byte-identical before and after", () => {
     seedInstallState([...HOSTS]);
     seedAllWiring();
-    seedRuleState({ "plan-challenge": false });
+    seedRuleState({ "conversation-feedback": false });
 
     const before = fingerprint(home);
     const report = apply({ dryRun: true });
@@ -596,7 +596,7 @@ describe("unreadable rule state (BST-10 AC-10b)", () => {
   test("a readable config.json warns nothing and is not written", () => {
     seedInstallState(["codex"]);
     seedAllWiring();
-    seedRuleState({ "plan-challenge": false });
+    seedRuleState({ "conversation-feedback": false });
     const before = fs.readFileSync(bootstrapStateFilePath(home), "utf-8");
 
     const warnings: string[] = [];
@@ -626,24 +626,24 @@ describe("rule state", () => {
     expect(bootstrapReportSucceeded(report)).toBe(true);
   });
 
-  test("a persisted retired persona-router id renders the 8-rule contract with no ignored-state line (PER AC-6)", () => {
-    seedInstallState(["codex"]);
-    seedAllWiring();
-    seedRuleStateRaw(
-      `${JSON.stringify({ bootstrap: { rules: { "persona-router": false } } }, null, 2)}\n`,
-    );
+  for (const id of ["persona-router", "caveman", "plan-challenge"]) {
+    test(`a persisted retired ${id} id renders the 6-rule contract with no ignored-state line (PER AC-6)`, () => {
+      seedInstallState(["codex"]);
+      seedAllWiring();
+      seedRuleStateRaw(`${JSON.stringify({ bootstrap: { rules: { [id]: false } } }, null, 2)}\n`);
 
-    const report = apply();
+      const report = apply();
 
-    expect(report.ignoredStateKeys).toEqual([]);
-    expect(formatBootstrapReport(report)).not.toContain("Ignored persisted rule state");
-    expect(BOOTSTRAP_RULES).toHaveLength(8);
-    const contract = fs.readFileSync(bootstrapContractPath("codex", home), "utf-8");
-    for (const rule of BOOTSTRAP_RULES.filter((r) => r.defaultEnabled)) {
-      expect(contract).toContain(ruleToken(rule.id));
-    }
-    expect(statusByHost(report.rows)).toEqual({ codex: "written" });
-  });
+      expect(report.ignoredStateKeys).toEqual([]);
+      expect(formatBootstrapReport(report)).not.toContain("Ignored persisted rule state");
+      expect(BOOTSTRAP_RULES).toHaveLength(6);
+      const contract = fs.readFileSync(bootstrapContractPath("codex", home), "utf-8");
+      for (const rule of BOOTSTRAP_RULES.filter((r) => r.defaultEnabled)) {
+        expect(contract).toContain(ruleToken(rule.id));
+      }
+      expect(statusByHost(report.rows)).toEqual({ codex: "written" });
+    });
+  }
 
   test("a re-apply over an identical contract is skipped, not written", () => {
     seedInstallState(["codex"]);
@@ -670,12 +670,12 @@ describe("rule state", () => {
     seedWiring("codex");
     apply();
 
-    seedRuleState({ caveman: false });
+    seedRuleState({ "dedupe-guardrails": false });
     const report = apply();
 
     expect(statusByHost(report.rows)).toEqual({ codex: "written" });
     expect(fs.readFileSync(bootstrapContractPath("codex", home), "utf-8")).not.toContain(
-      ruleToken("caveman"),
+      ruleToken("dedupe-guardrails"),
     );
   });
 });

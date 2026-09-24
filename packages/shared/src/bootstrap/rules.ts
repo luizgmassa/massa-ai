@@ -1,7 +1,7 @@
 /**
  * Bootstrap rule registry (design "Rule registry", BST-08, BST-09).
  *
- * The eight rules `skills/AGENTS.md` marks up with
+ * The six rules `skills/AGENTS.md` marks up with
  * `<!-- massa-ai:rule:<id>:start|end -->` pairs, in the fixed order the
  * renderer (T6) must reproduce — determinism there comes from iterating this
  * array in registry order, never from object key order. This module owns no
@@ -25,18 +25,16 @@
  */
 
 /**
- * The eight bootstrap rule ids, in the fixed order they render in
+ * The six bootstrap rule ids, in the fixed order they render in
  * `skills/AGENTS.md` and in `MASSA-AI.md`. BST-09 AC-1 fixes this exact set;
  * BST-09 AC-3 requires every one of them to be individually switchable both
  * ways, so there is deliberately no separate "protected ids" list anywhere in
- * this module — `assertKnownRuleId` and `validateRuleIds` treat all eight
+ * this module — `assertKnownRuleId` and `validateRuleIds` treat all six
  * identically for both `enable` and `disable`.
  */
 export const BOOTSTRAP_RULE_IDS = [
-  "caveman",
   "massa-ai-router",
   "dedupe-guardrails",
-  "plan-challenge",
   "conversation-feedback",
   "indexing-hygiene",
   "english-code",
@@ -50,7 +48,7 @@ export type BootstrapRuleId = (typeof BOOTSTRAP_RULE_IDS)[number];
  * persist one; state resolution skips it silently instead of reporting it as
  * unknown, because that warning would print on every install forever.
  */
-export const RETIRED_RULE_IDS = ["persona-router"] as const;
+export const RETIRED_RULE_IDS = ["persona-router", "caveman", "plan-challenge"] as const;
 
 export function isRetiredRuleId(value: string): boolean {
   return (RETIRED_RULE_IDS as readonly string[]).includes(value);
@@ -66,7 +64,7 @@ export interface BootstrapRuleDefinition {
   /** Whether a fresh install — or any state with no persisted entry for this
    *  id — renders this rule's span. Every rule defaults to `true` except
    *  `code-comments` (BST-08 AC-2), which ships disabled because turning it
-   *  on changes every future generated diff's shape, unlike the other seven
+   *  on changes every future generated diff's shape, unlike the other five
    *  rules, which only change agent process. */
   readonly defaultEnabled: boolean;
   /** One-line description surfaced by `massa-ai-config bootstrap list`
@@ -80,11 +78,6 @@ export interface BootstrapRuleDefinition {
  */
 export const BOOTSTRAP_RULES: readonly BootstrapRuleDefinition[] = [
   {
-    id: "caveman",
-    defaultEnabled: true,
-    description: "Keep communication compressed while preserving technical accuracy.",
-  },
-  {
     id: "massa-ai-router",
     defaultEnabled: true,
     description: "Load the massa-ai skill as the workflow router before substantive work.",
@@ -93,11 +86,6 @@ export const BOOTSTRAP_RULES: readonly BootstrapRuleDefinition[] = [
     id: "dedupe-guardrails",
     defaultEnabled: true,
     description: "Reuse already-loaded massa-ai context instead of bulk-loading workflows or references.",
-  },
-  {
-    id: "plan-challenge",
-    defaultEnabled: true,
-    description: "Run The Fool as a post-plan challenge gate per the configured policy.",
   },
   {
     id: "conversation-feedback",
@@ -172,11 +160,11 @@ function namedError(name: string, message: string): BootstrapRuleError {
 }
 
 /**
- * BST-09 AC-8: naming the bad id and listing all eight valid ones. `known`
+ * BST-09 AC-8: naming the bad id and listing all six valid ones. `known`
  * defaults to the full registry id list so every call site gets the complete
  * list without having to thread it through — a caller validating a batch
  * (e.g. {@link validateRuleIds}) can still override it, though every
- * violation in this registry names the same eight ids regardless.
+ * violation in this registry names the same six ids regardless.
  */
 export const UnknownRuleError = (
   id: string,
@@ -189,10 +177,10 @@ export const UnknownRuleError = (
 };
 
 /**
- * Throws {@link UnknownRuleError} unless `id` is one of the eight registry
+ * Throws {@link UnknownRuleError} unless `id` is one of the six registry
  * ids. BST-09 AC-3: this function — and therefore every caller that gates
  * `enable`/`disable` through it — draws no distinction between any of the
- * eight ids; there is no protected subset.
+ * six ids; there is no protected subset.
  */
 export function assertKnownRuleId(id: string): asserts id is BootstrapRuleId {
   if (!isBootstrapRuleId(id)) throw UnknownRuleError(id, BOOTSTRAP_RULE_IDS);

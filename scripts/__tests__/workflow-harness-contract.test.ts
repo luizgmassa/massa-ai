@@ -712,8 +712,9 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
 //
 // .specs/features/designer-agent/ — ADRG-01, ADRG-02.
 //
-// `skills/AGENTS.md` names the workflows that take the full Plan Challenge
-// Gate. `workflows/create-adr.md` was named there and carried no gate step at all,
+// `SKILL.md` §Plan Challenge Gate names the workflows that take the lite or
+// full Plan Challenge Gate (until agents-md-bootstrap-trim the full list lived
+// in the `skills/AGENTS.md` policy). `workflows/create-adr.md` was named there and carried no gate step at all,
 // and `workflows/refactor.md` carried none either — the policy reached both
 // only if the orchestrator recalled the bootstrap list unaided. Every other
 // workflow-side contract in this repo is inline in its own file for exactly
@@ -721,35 +722,42 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
 // workflow carries the prefixed name inline so dispatch never depends on this
 // file being loaded").
 //
-// The list is PARSED from the policy sentence, never hardcoded here. A
+// The list is PARSED from the gate section, never hardcoded here. A
 // hardcoded copy would need the same edit the workflow needs, by the same
 // person, in the same commit — so it could not catch the next omission. The
-// policy line is the population.
+// gate section is the population.
 
-describe("plan challenge: every full-gate workflow carries the gate step", () => {
-  const REGISTRY = path.join(REPO_ROOT, "skills", "AGENTS.md");
-  const MARKER = "Load full `workflows/the-fool.md` when the workflow is";
+describe("plan challenge: every gated workflow carries the gate step", () => {
+  const ROUTER = path.join(REPO_ROOT, "skills", "massa-ai", "SKILL.md");
 
   /**
-   * Backtick-quoted workflow names from the policy sentence, up to its first
-   * `;` (after which the sentence lists risk domains, not workflows).
-   * Newline-tolerant: the sentence wraps across lines in the source.
+   * Backtick-quoted workflow names from the Lite and Full bullets of
+   * SKILL.md §Plan Challenge Gate — each bullet's first parenthetical, which
+   * lists workflows before any risk trigger. Newline-tolerant: the Full
+   * parenthetical wraps across lines in the source.
    */
   async function fullGateWorkflows(): Promise<string[]> {
-    const body = await fs.readFile(REGISTRY, "utf8");
-    const start = body.indexOf(MARKER);
-    expect(start, `policy sentence not found in skills/AGENTS.md — marker: ${MARKER}`).toBeGreaterThan(-1);
-    const rest = body.slice(start + MARKER.length);
-    const clause = rest.slice(0, rest.indexOf(";")).replace(/\s+/g, " ");
-    return [...clause.matchAll(/`([a-z-]+)`/g)].map((m) => m[1]!);
+    const body = await fs.readFile(ROUTER, "utf8");
+    const start = body.indexOf("## Plan Challenge Gate");
+    expect(start, "SKILL.md has no §Plan Challenge Gate").toBeGreaterThan(-1);
+    const section = body.slice(start, body.indexOf("\n## ", start + 1));
+    const names: string[] = [];
+    for (const bullet of ["- **Lite** (", "- **Full** ("]) {
+      const at = section.indexOf(bullet);
+      expect(at, `SKILL.md §Plan Challenge Gate lost its ${bullet} bullet`).toBeGreaterThan(-1);
+      const rest = section.slice(at + bullet.length);
+      const clause = rest.slice(0, rest.indexOf(")")).replace(/\s+/g, " ");
+      names.push(...[...clause.matchAll(/`([a-z-]+)`/g)].map((m) => m[1]!));
+    }
+    return names;
   }
 
   test("the parsed population is real, not a vacuous empty list", async () => {
-    // Guard the guard. A reworded policy sentence that yields [] or a partial
+    // Guard the guard. A reworded gate section that yields [] or a partial
     // parse would make every assertion below pass by matching nothing.
     const names = await fullGateWorkflows();
-    expect(names.length).toBeGreaterThanOrEqual(6);
-    expect(names).toContain("refactor");
+    expect(names.length).toBeGreaterThanOrEqual(7);
+    for (const name of ["feature", "refactor", "spec-driven", "design"]) expect(names).toContain(name);
     // agent-roster-consolidation WFL-03 (Inventory AC-5): the renamed stems.
     for (const stem of ["create-adr", "create-rfc", "create-tdd"]) expect(names).toContain(stem);
     for (const old of ["adr", "rfc", "tdd"]) expect(names).not.toContain(old);
