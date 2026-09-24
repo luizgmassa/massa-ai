@@ -41,17 +41,37 @@ import { logger } from "@massa-ai/shared";
  */
 export interface CreateProviderOptions {
   /**
-   * Provider to use:
+   * Provider to use — one of `embeddingProviders`' own keys (`config.ts`),
+   * plus `'auto'`:
    * - 'auto': Try providers by priority until one works (Ollama first)
    * - 'ollama': Ollama local embeddings (768D, free, local-first)
+   * - 'lmstudio': LM Studio, a thin alias over 'custom' (768D for the
+   *   measured nomic-embed-text model, free, local-first)
    * - 'transformers' / 'local': In-process transformers.js ONNX embeddings
    *   (384D, fully offline after first model download — roadmap A5)
    * - 'mistralText': Mistral text embeddings (1024D)
    * - 'mistralCode': Mistral code embeddings (1536D)
+   * - 'openai', 'google', 'vercel', 'litellm', 'custom': API/gateway providers
    *
    * Default: 'auto'
+   *
+   * This union used to omit 'custom', 'litellm', 'vercel', 'google' and
+   * 'openai' even though `embeddingProviders` has always carried all five —
+   * a stale façade over the real key set, not a deliberate restriction.
    */
-  provider?: "auto" | "ollama" | "transformers" | "local" | "mistralText" | "mistralCode";
+  provider?:
+    | "auto"
+    | "ollama"
+    | "lmstudio"
+    | "transformers"
+    | "local"
+    | "mistralText"
+    | "mistralCode"
+    | "openai"
+    | "google"
+    | "vercel"
+    | "litellm"
+    | "custom";
 
   /**
    * Enable transparent caching using SHA-256 content hashing
@@ -137,10 +157,9 @@ function refuseOnDimensionMismatch(
   mismatch: DimensionMismatchError,
 ): never {
   logger.error(
-    `[${providerId}] Configured embedding provider failed with a dimension mismatch — refusing to ` +
-      `fall through to another provider (that would silently degrade retrieval quality). ` +
-      `configured dimensions ${mismatch.expected} ≠ model output ${mismatch.got} — fix ` +
-      "`embedding.dimensions` in config.json or OLLAMA_EMBEDDING_DIMENSIONS to match the model actually pulled.",
+    "EmbeddingProvider: configured provider failed with a dimension mismatch, refusing to fall through",
+    mismatch,
+    { providerId, configuredDimensions: mismatch.expected, modelDimensions: mismatch.got },
   );
   throw mismatch;
 }

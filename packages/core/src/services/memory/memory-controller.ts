@@ -345,7 +345,8 @@ export class MemoryController {
         }
       } catch (err) {
         logger.warn("Graph enrichment failed", {
-          error: (err as Error).message,
+          projectId,
+          error: err as Error,
         });
       }
     }

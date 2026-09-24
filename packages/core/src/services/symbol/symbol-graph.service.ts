@@ -477,9 +477,9 @@ export class SymbolGraphService {
     // attached when non-empty).
     const arch = await this.computeArchitectureMapSafe(graphSnapshot.architecture).catch(
       (err) => {
-        logger.warn("getProjectMap: architecture map failed; skipping", {
+        logger.warn("SymbolGraphService: getProjectMap architecture map failed, skipping", {
           projectId,
-          error: (err as Error)?.message?.slice(0, 160),
+          error: err as Error,
         });
         return null;
       },

@@ -7,6 +7,7 @@
 
 import { parsePositiveIntEnv, loadConfigSafe, resolveEmbeddingDimensions } from "@massa-ai/shared/config";
 import { logger } from "@massa-ai/shared";
+import { LOCAL_INFERENCE_IDS, INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
 
 export interface EmbeddingProviderConfig {
   provider: "openai" | "google" | "cohere" | "ollama" | "mistral" | "vercel" | "custom" | "litellm" | string;
@@ -145,17 +146,30 @@ const fileFor = (provider: string) =>
   fileEmbedding?.provider === provider ? fileEmbedding : undefined;
 
 /**
- * Names an entry below can be selected by. A selection outside this set
- * (e.g. `provider: "cohere"` in config.json) would otherwise fall through
- * to the ollama default silently — the exact lie the file layer exists to
- * end — so it is warned once at module load. Logged to stderr (the shared
- * logger never writes stdout), safe under a stdio MCP server.
+ * API-only embedding providers writable to config.json. Mirrors
+ * `massa-ai-config.ts`'s `API_PROVIDER_IDS`; duplicated here rather than
+ * imported because this package only value-imports the seam's
+ * side-effect-free `inference-providers` subpath (which carries the
+ * local-inference half, `LOCAL_INFERENCE_IDS`) — reaching the shared
+ * package's config barrel from here would pull in `config/index.ts`.
+ * `scripts/__tests__/provider-list-parity.test.ts` asserts this stays in
+ * agreement with the shared package's copy.
  */
-const SELECTABLE_PROVIDERS = new Set([
-  "ollama",
-  "mistral",
-  "google",
-  "openai",
+const API_PROVIDER_IDS = ["mistral", "google", "openai", "cohere"] as const;
+
+/**
+ * Names an entry below can be selected by: `LOCAL_INFERENCE_IDS ∪
+ * API_PROVIDER_IDS` (config.json's writable set, LIP-01) ∪ the
+ * internal-only ids that never appear in config.json (`vercel`, `litellm`,
+ * `custom`, `transformers`, `local`). A selection outside this set (e.g. a
+ * typo) would otherwise fall through to the ollama default silently — the
+ * exact lie the file layer exists to end — so it is warned once at module
+ * load. Logged to stderr (the shared logger never writes stdout), safe
+ * under a stdio MCP server.
+ */
+export const SELECTABLE_PROVIDERS = new Set<string>([
+  ...LOCAL_INFERENCE_IDS,
+  ...API_PROVIDER_IDS,
   "vercel",
   "litellm",
   "custom",
@@ -164,8 +178,11 @@ const SELECTABLE_PROVIDERS = new Set([
 ]);
 if (!SELECTABLE_PROVIDERS.has(selectedProvider)) {
   logger.warn(
-    `[EmbeddingConfig] selected provider "${selectedProvider}" has no runtime entry — falling back to priority order`,
-    { source: process.env.EMBEDDING_PROVIDER ? "EMBEDDING_PROVIDER env" : "config.json embedding.provider" },
+    "EmbeddingConfig: selected provider has no runtime entry, falling back to priority order",
+    {
+      selectedProvider,
+      source: process.env.EMBEDDING_PROVIDER ? "EMBEDDING_PROVIDER env" : "config.json embedding.provider",
+    },
   );
 }
 
@@ -229,7 +246,7 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
 
   ollama: (() => {
     const file = fileFor("ollama");
-    const model = process.env.OLLAMA_EMBEDDING_MODEL || file?.model || "qwen3-embedding:4b";
+    const model = process.env.OLLAMA_EMBEDDING_MODEL || file?.model || INFERENCE_PROVIDERS.ollama.defaultModels.embedding;
     // `env > the model's known native width > config.json > default`. The
     // known width outranks config.json deliberately: fixing the installer
     // template only fixes what a NEW install writes, and an install carrying
@@ -250,9 +267,13 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
     const resolvedDimensions = resolveEmbeddingDimensions(model, file?.dimensions, envDimensions);
     if (resolvedDimensions.correctedFrom !== undefined) {
       logger.warn(
-        `[ollama] config.json records embedding.dimensions ${resolvedDimensions.correctedFrom} for model ` +
-          `"${model}", which emits ${resolvedDimensions.dimensions}. Using ${resolvedDimensions.dimensions}. ` +
-          "Update embedding.dimensions in config.json (or set OLLAMA_EMBEDDING_DIMENSIONS) to silence this.",
+        "EmbeddingConfig: ollama config.json dimensions mismatch corrected",
+        {
+          provider: "ollama",
+          model,
+          configuredDimensions: resolvedDimensions.correctedFrom,
+          correctedDimensions: resolvedDimensions.dimensions,
+        },
       );
     }
     return {
@@ -375,6 +396,51 @@ export const embeddingProviders: Record<string, EmbeddingProviderConfig> = {
       maxRetries: 1,
       maxChars: getMaxChars("TRANSFORMERS", model),
       rateLimits: getRateLimits("TRANSFORMERS"),
+    };
+  })(),
+
+  /**
+   * LM Studio — a thin alias over the `custom` OpenAI-compatible path
+   * (`provider: "custom"`, dispatched by `getEmbeddingModel()` exactly like
+   * any other `custom` entry; no new SDK adapter, no new switch case).
+   * Mirrors the `local` → `transformers` alias above: the object key
+   * ("lmstudio") is what `EMBEDDING_PROVIDER=lmstudio` / config.json's
+   * `embedding.provider: "lmstudio"` select against, while the inner
+   * `provider` field names the code path that actually runs it. Placed
+   * after `transformers`/`local` in this object (all three share fallback
+   * priority 100 and JS object/array sort is stable) so a priority tie only
+   * ever resolves to this new no-API-key-required local provider once every
+   * pre-existing fallback has already been tried.
+   */
+  lmstudio: (() => {
+    const file = fileFor("lmstudio");
+    const model =
+      process.env.LMSTUDIO_EMBEDDING_MODEL || file?.model || INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
+    return {
+      provider: "custom",
+      model,
+      apiKey: process.env.LMSTUDIO_API_KEY || file?.apiKey,
+      baseURL:
+        process.env.LMSTUDIO_BASE_URL ||
+        file?.baseURL ||
+        INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+      // ponytail: G6 — 768 below only fires for a model outside
+      // knownDimensions (no LMSTUDIO_EMBEDDING_DIMENSIONS/file.dimensions
+      // override); refuseOnDimensionMismatch catches a wrong guess loudly.
+      // Upgrade path: wire the async, probe-backed resolveModelDimensions
+      // (shared/config/embedding-dimensions.ts) in here if this table ever
+      // becomes async — it already backs the installer wizard.
+      dimensions: Number(
+        process.env.LMSTUDIO_EMBEDDING_DIMENSIONS ||
+          file?.dimensions ||
+          INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ||
+          768,
+      ),
+      priority: selectedProvider === "lmstudio" ? 1 : 100,
+      timeout: Number(process.env.LMSTUDIO_EMBEDDING_TIMEOUT || "60000"),
+      maxRetries: 3,
+      maxChars: getMaxChars("LMSTUDIO", model),
+      rateLimits: getRateLimits("LMSTUDIO"),
     };
   })(),
 

@@ -126,7 +126,607 @@ in that window. Two figures were withdrawn during this work for exactly that rea
 left uncommitted for the user. L-004 is stale regardless — it describes a SQLite fallback
 removed in `5d43a96f`.
 
-# Previous handoff — installer-prune-and-test-scoping (EXECUTE COMPLETE 2026-08-17 — 13 commits, 4 Phases / 10 Tasks, 7 parallel batch workers plus independent verification; every gate green; unpushed, push/PR is the user's call)
+# Previous handoff — agent-roster-consolidation (COMPLETE 2026-09-23 — T1–T13 across 5 Phases; independent validation PASS at 49/49 ACs, 9/9 mutations killed)
+
+- **Feature**: `.specs/features/agent-roster-consolidation/` (spec, design, tasks, `fixtures/`)
+- **Phase / Task**: Phase 5 / T13 done — Execute and validation complete
+- **Validation**: Independent validation: round 1 at `bde889aa` FAIL (23 mutations, 18 killed, 5 survived — all test gaps, no live defect); test-only fix `40299644` + spec amendments `6a78d0c0`; round 2 at `6a78d0c0` FAIL (49 ACs, 48 matched; 15/15 killed; ROS AC-7 prose spellings the sweep missed); fix `738010a8`; round 3 at `738010a8` **PASS — 49/49 ACs, 0 spec-precision gaps, 9/9 mutations killed**. Post-PASS test-only hardening `e057feb5` (massa-ai-prefixed + underscore retired-name sweep, observed red 59/1, 58/2, 59/1).
+- **Completed**: T1–T13 (commits in `.specs/project/STATE.md` → Current)
+- **In-progress**: none
+- **Next step**: push the branch, open the PR, watch CI; merge is the user's call
+- **Blockers**: none
+- **Uncommitted files**: none
+- **Branch**: `feat/agent-roster-consolidation` @ `~/Projects/massa-ai-wt-roster`, off `origin/main@f582b602`
+
+**Post-validation merge (2026-09-23).** `origin/main` (model catalog v2 — tiers removed, per-agent overrides; logging) merged in `ec21d05e`; adaptation commit drops `documentation-agent` overrides from every built-in profile and repoints main's new generator tests to the 7-agent roster. Spec: Inventory AC-7 superseded (no `WORKFLOW_STEMS` upstream), A21 added. Post-merge gates, foreground: build, type-check, lint, generate --check, stale pointers green; scripts 2181/0, shell suites all pass, plugins 183/0, shared 1015/0, web-ui 751/0, opencode src 155/0, mcp-client config-cli 87/0, tools-api model-registry 36/0 + web-ui-contract 8/0.
+
+## Deferred advisories (recorded, not fixed — true and unflattering)
+
+- **Phase 2 review F3** — the profile-switch tracked-path guard refuses a switch when a user's
+  git-tracked file shares an agent's name. It fails safe (no write), but the skipped file is not
+  listed in the row's reason, so the refusal reads as unexplained.
+- **Phase 2 review F4** — a `massa-ai-handoff-writer.md` installed by ≤v1.3 is not pruned on
+  Claude/Cursor: it is not one of the 18 legacy names. Accepted under A17 (exact names only).
+- **Phase 2 review F5** — (the `doctor` unmarked-`.md` fixture was added in `40299644`); the engine suite lacks a
+  symlink-destination case; the `_copy_agents_unprefixed` test helper is a no-op; the ownership
+  shell suite exits 0 reporting "0 passed" when the generated bundles are missing.
+- **Phase 3 review A8** — the frozen `retired-charter-outputs.json` fixture freezes too little of
+  some retired contracts, so `charter-contract-preservation.test.ts` passing does not prove every
+  former output contract survived the merge intact.
+- **Phase 3 review A10** — reviewer and verifier are now one agent and one model
+  (`code-reviewer`, deep tier), so "author ≠ verifier" is a fresh-context guarantee, not a
+  different-model one.
+- **Fix-3 deviation (`d9326551`)** — `install-skills.sh` prunes only `RETIRED_SKILL_NAMES` on a
+  plugin → repo handover, not every plugin-recorded skill, to keep the version-skew
+  `ghost-plugin` guard (a newer plugin may record a skill this checkout does not know).
+  `RETIRED_SKILL_NAMES` must equal `generate-skill-artifacts.ts` `RETIRED_BUNDLE_ROOTS`
+  (asserted in `generate-skill-artifacts-prune.test.ts` since T12).
+- **Host noise, not code** — gate runs detached or in the background fake installer reds;
+  run them in the foreground. `packages/core` and `apps/mcp-client` hit a Bun napi SIGTRAP at
+  process exit (red at base too), so `bun run test` (turbo) was replaced by per-suite runs.
+
+## T12/T13 notes
+
+- The T12 `ROSTER = 7` scan now skips `.ua/` (a generated historical snapshot, out of scope per
+  the spec) — its `knowledge-graph.json` still says 18.
+- Sweep residuals left on purpose: persona hits are only absence/prune sensors, the retired-id
+  literals (`RETIRED_RULE_IDS`, `RETIRED_BUNDLE_ROOTS`, `RETIRED_SKILL_NAMES`), the `.gitignore`
+  `apps/*-plugin/skills/persona-router/` ignore, `docs/removed-features.md`, and
+  `references/the-fool/`; old-name hits are the `skills/AGENTS.md` mapping table, the A17
+  legacy-name lists, legacy-prune fixtures, review-finding ids (`plan-critic C3`), and ordinary
+  English (`reviewer`, `planner`, `navigator state`).
+- CHANGELOG `[Unreleased]` carries `### Removed` + `### Changed` (minor bump) with the A16
+  upgrade note.
+
+## Previous handoff — model-catalog-revamp + api-log-clarity (EXECUTE COMPLETE 2026-09-23 — one PR per the user, carrying the agent-runtime-drift follow-ups; independent verification PASS on iteration 2; delivery: push + PR, merge is the user's call)
+
+### What shipped on `feat/model-catalog-revamp`
+
+- **Logging** (`.specs/features/api-log-clarity/`):
+  - repeat counts (`occurrences`/`firstSeenAgo`, keyed by message + label);
+  - error `code`/`cause`, capped at 300 chars;
+  - every LLM call labelled (compiler-enforced), with failure lines carrying model, provider, timeout, elapsed time, `timedOut` and a per-label streak, plus one `recovered` line;
+  - decode lines moved to DEBUG;
+  - a sweep of every warn/error site, guarded by `scripts/__tests__/log-call-hygiene.test.ts`;
+  - `LOG_LEVEL` → `MASSA_AI_LOG_LEVEL` (breaking, AD-010);
+  - dashboard scheduler health made real.
+- **Model Catalog v2** (`.specs/features/model-catalog-revamp/`):
+  - typed `models` catalog;
+  - per-profile default model per tool, plus seeded per-agent overrides;
+  - removed: tiers, `hostDefaults`, `workflowTiers`, `agentTiers`, charter `model_tier`;
+  - v1 overlay is backed up and ignored;
+  - Web UI Models CRUD with dropdowns.
+
+  Generated agents stay byte-identical, except for the judge Model Hint.
+- **Drift follow-ups** (`a075e1bb`, from the main checkout's uncommitted work): `massa-ai-config doctor`, and a recorded-profile rank. Fixed on this branch: a stale recorded profile degrades instead of crashing, `--check` threads state, and `doctor --fix` is host-scoped.
+
+### Open items / traps for the next session
+
+- **The main checkout still has the original uncommitted agent-runtime-drift edits.** They are now committed here as `a075e1bb`. Discard them in `/Users/luizmassa/Projects/massa-ai` once this PR merges; nothing else owns them.
+- **Local full `bun run test` cannot finish on this macOS.** A Bun 1.3.14 SIGTRAP panic at isolated-child exit, also present on `main`, stops the runner. CI on Linux is the gate.
+- **The `web-ui` bundle is compiled.** `/ui` serves `apps/web-ui/dist/static`, so a stale `dist` shows the old UI after a source change. Rebuild (`cd apps/web-ui && bun run build`).
+- **Two generator tests rewrite the real gitignored `apps/claude-plugin/agents/`** and restore it in `finally` (no output-dir seam exists). An output-dir seam would remove that hazard.
+
+## Previous handoff — per-provider-default-models (MERGED — PR #122; COMPLETE 2026-09-21 — 21 Tasks across 8 Phases via 8 batch workers, two fix passes via 5 more, three independent verification rounds: FAIL, FAIL, then PASS at 25/25 ACs; unpushed, push/PR is the user's call)
+
+## Final verdict — round 3, PASS
+
+**25/25 ACs matched, 0 spec-precision gaps.** Round 3 also corrected round 2's own "28/28" as an
+overcount — `spec.md`'s six Acceptance Criteria lists hold 5+3+4+5+5+3 = 25 — and flagged one of
+its own mutations as an **invalid measurement**, because the CLIs resolve `@massa-ai/shared` from
+`dist/` while only `src/` had been mutated; it re-ran that one with a rebuild. Both self-corrections
+are why the verdict is worth something.
+
+**Discrimination sensor across the three rounds:** 16 injected / 12 killed / **4 survived** → 16 /
+15 / 1 → 14 / 11 / 3. The three round-3 survivors are all documentation prose whose values are
+currently correct, recorded as a residual with their mutation evidence so the judgement can be
+overturned on it rather than argued about.
+
+**Gates on `54298e10`, turbo cache forced** (a cached replay is not a measurement): `lint` 0,
+`type-check` 0 (0 cached), `build` 0 (0 cached), `test` 0 (12/12), `test:plugins` 0 (142/0),
+parity 0 (21/0, 41 assertions), `check_specs_delivered` 0 (7 paths). `test:scripts` exits **1** on
+3 host-specific shell suites — a real `~/.claude` leaking into host detection plus a missing CLI —
+deliberately not skipped or excluded.
+
+## Verification outcome across all three rounds — read this before the delivery account below
+
+The independent run (author ≠ verifier) returned **FAIL** over `main..bc7caa4b`: 27/28 ACs traced
+to `file:line`, **PDM-02 AC-2 not met**, 2 spec-precision gaps, and **16 mutations injected, 12
+killed, 4 survived**. The four surviving mutants were worth more than every green suite in this
+feature.
+
+**The defect class that dominated this feature: a requirement names a set, and the task meant to
+implement it names a subset.** It produced four separate defects, and only the first three were
+caught before the verifier:
+
+1. PDM-12 AC-2 named **five** config fields; four got a reader (→ T06b).
+2. PDM-02 AC-2 said "that provider's **three** model ids"; the writers shipped two (→ T07b).
+3. PDM-03 AC-1 named the ollama embedding default; T03 derived only `.llm` (→ T03b).
+4. The `use ollama` CLI branch assigned **none** of the three `config.llm.*` fields while the
+   `lmstudio` branch below it assigned all three (→ F1). `init --lmstudio` then `use ollama` left
+   the LLM on the old provider. The `baseUrl` leak pre-dated the feature; **the model leak was
+   new**.
+
+**The gate corollary is the part to carry forward.** The parity gate could not see #4 because its
+`DERIVED_SURFACES` table had `(use lmstudio, instruct/coding)` rows and no `(use ollama, …)`
+counterparts — the population was enumerated from the implementation's subset rather than from the
+requirement's set, so it mirrored the bug. F4 re-derived it from PDM-02 AC-2's own text (provider ×
+branch × role × CLI, 24 → 28 rows), narrowed the blanket `process.env` exclusion to admit
+`process.env.X || "literal"` — which is both a read **and** a default declaration, exactly the
+shape F2's defect lived in — and added an instruct/coding completeness scan that had never existed
+outside the Markdown tier. **Acceptance was not a green gate:** F1's and F2's original defects were
+reproduced and killed by name.
+
+**The same shape, one level down, in the tests.** Three mutations in the production `llm.*` reader
+survived **945 passing tests**, because `config.get("llm")` always returns a populated
+`defaultConfig.llm`, making `_resolveLlmConfig`'s `cfg?.X ??` fallbacks dead code in production —
+while the tests that looked like coverage exercised `loadConfig()`, *a different function on a
+different type* (→ F5, all three re-injected and killed). Separately,
+`apps/tools-api/src/routes/system.test.ts` **pinned the retired `qwen3-embedding:4b` as the
+contract**, keeping `bun run test` green over a wrong answer (→ F2).
+
+**Two gates were repaired rather than trusted.** `embedding-defaults-parity.test.ts` used to
+**abort the whole file** (`0 pass / 0 fail / 1 error` — `referencePair()` ran in the `describe`
+body, and an aborted file reads as "no failures" to anything counting only `fail`), and before
+that silently slid its regex into an adjacent branch and reported `mistral-embed/1024` as though it
+were a pass. A silent wrong match is indistinguishable from a pass. `test:scripts` short-circuited
+on `&&` and skipped all 37 shell suites while still printing the bun half's counts (→ T15b), then
+still aborted at suite 16 of 39 (→ F6; `scripts/run-shell-suites.sh` now reports every failing
+suite together).
+
+**One error was the orchestrator's, not an implementer's.** F2's task text specified the precedence
+backwards — "config first, then env" — against `CLAUDE.md:321`'s documented
+`env > config.json > literal defaults`, restated twice in this feature's own design. The
+implementer followed the literal text and flagged the divergence, which was the right call; F2b
+restored the order and inverted the test's expected value with it.
+
+**Still open:** re-verification (iteration 2 of a maximum of 3). `FEATURES.json` records
+`status: in_progress` and `completed: null` until a PASS exists — the earlier `complete` was
+written before the verifier ran and was not supported by it.
+
+**Branch:** `feat/per-provider-default-models`, off `origin/main@8ea21839` (v1.58.0).
+Worktree `~/Projects/massa-ai-feat-per-provider-default-models`.
+
+## Objective (delivered)
+
+One equivalent trio per provider — embedding, instruct, coding — plus per-role runtime
+parameters exposed in `config.json` and the Admin Portal Config tab, where a configured value
+always beats the code default.
+
+| Role | Ollama | LM Studio | Context | Other |
+| --- | --- | --- | --- | --- |
+| Embedding | `qwen3-embedding:0.6b` | `text-embedding-qwen3-embedding-0.6b` | 8192 | batch 64, 1024 dims |
+| Instruct | `qwen3-vl:8b` | `qwen3-vl-8b-instruct` | 16384 | temperature 0.2 |
+| Coding | `qwen2.5-coder:7b` | `qwen2.5-coder-7b-instruct` | 32768 | temperature 0.0 |
+
+**Breaking.** The Ollama embedding default moves from `qwen3-embedding:4b`/2560 to
+`qwen3-embedding:0.6b`/1024, invalidating every existing workspace's `embedding_fingerprint` and
+flipping `postgres-vector-store.ts` from its `> 2000` binary-quantization branch to the `<= 2000`
+direct-HNSW-cosine branch. The fingerprint read and write gates fail closed with an actionable
+message; no migration is built. **Retrieval quality at 1024 is unmeasured** — the user chose to
+ship without running the LIP-22 harness at the new width. This is an accepted risk, not a closed
+one.
+
+## State
+
+All 21 Tasks across 8 Phases done, 8 batch workers (W1-W8), one atomic commit per task.
+`CHANGELOG.md` carries the `### Changed` entry under `[Unreleased]`. `.specs/project/STATE.md`
+and `.specs/project/FEATURES.json` updated. `check_specs_delivered.ts` result is recorded in
+`STATE.md` and `FEATURES.json`'s `notes` field — read those for the exact exit code, since this
+file is a snapshot and will not update after this write.
+
+**Success Criteria from `spec.md`, reported honestly, not as a clean sweep:**
+
+- `bun test scripts/__tests__/embedding-defaults-parity.test.ts` — green, 14/0, all tiers.
+- Every repaired sensor has an observed red, induced and reverted by file copy — done across
+  T01-T16, `git status --porcelain` clean before every commit.
+- `bun run lint` / `type-check` / `build` / `test` — green (0 / 6/6 / 6/6 / 12/12 turbo tasks).
+- **`bun run test:scripts`** — T15b/F6 fixed the gate itself (it used to short-circuit past 37
+  shell suites on a bun-half failure with `&&`). Once fixed it surfaced 3 shell failures recorded
+  through most of this feature as "pre-existing, host-specific, unrelated": 36/39 shell suites,
+  bun-half 2057/0. **H1 diagnosed and fixed them** — a test-harness defect, not a product one, and
+  not actually pre-existing in the sense the note implied: the three suites now measure 47/0, 46/0
+  and 210/0 on this host (39/39). Do not read a green `test:scripts` claim anywhere in older
+  per-Phase notes as still current — it never ran the shell half honestly until T15b.
+- A live LM Studio embedding sensor (`lmstudio-embedding-live.test.ts`) was repointed by T15 and
+  passes when a real LM Studio is reachable; not independently re-verified by W8 (no local stack
+  in this environment — see below).
+- **T14 could not be observed live.** No Ollama/LM Studio/API stack exists in this environment,
+  so `14.needles.test.ts` reports 0 pass / 2 skip / 0 fail (`READY=false`) — a **skipped sensor**,
+  never a pass. Its claims were verified statically and with an isolated reproduction script.
+
+## Next step
+
+Independent verification (`massa-ai-verification-agent`, author ≠ verifier) is the mandatory
+next step per `spec.md`'s Verification Approach — not yet run by this batch. After that: push
+and PR are the user's call, same as every other unpushed feature in this project's history.
+
+## Named residuals carried forward (true and unflattering — do not soften)
+
+1. **Retrieval quality at 1024 dimensions is unmeasured**, accepted as a risk by explicit user
+   choice rather than closed by measurement.
+2. **T14's claims are statically verified, not live-observed** — no local inference stack in
+   this environment. `14.needles.test.ts` reports skip, not pass.
+3. **3 shell-suite failures are host-specific**, caused by this development machine's own Claude
+   install state, unrelated to this feature. Do not fix, skip, or exclude them to force a green
+   `test:scripts` — T15b exists specifically to stop that gate from hiding this exact class of
+   news.
+4. **`bun skills/massa-ai/scripts/lessons.ts list` rewrites and destroys `.specs/lessons.json`.**
+   Measured this session on a scratch copy: 25 entries before, 6 after, different sha256. The
+   file in this worktree was restored; the primary checkout `~/Projects/massa-ai` still carries
+   the same damage from an earlier session. **Do not run this script to verify the claim** — it
+   reproduces the destruction.
+5. **T15's population discrepancy.** `design.md` estimated "~16 test files" hardcoding retired
+   literals; behavioral verification (running each candidate, not just grepping it) found
+   **2 true positives** — most grep hits were the tests' own fixture data, not assertions about
+   the production default.
+6. **T13's SPEC_DEVIATION.** Six one-line production fixes outside its named write set, found by
+   the repaired parity gate — all pre-existing T11/T12-era staleness (`.env.example`,
+   `setup-local-first.sh`, `installer-api-key.sh`, `embeddings/config.ts` ×2, `diagnose.ts`).
+7. **`benchmarks/needles/run.ts`'s own `NEEDLE_MODEL` default is stale** (`qwen3-embedding:4b`),
+   unlike the E2E baseline and everything the parity gate covers. Found during T16; the parity
+   gate does not scan this `.ts` file (only its README), and no task in this feature owned it.
+   `benchmarks/needles/README.md` now says so explicitly rather than silently repeating a claim
+   ("same model as the E2E baseline") that went false when the E2E side moved.
+   **Closed (G4, 2026-09-20).** Also found: `scripts/needles-rename-control.ts:118` carried the
+   same undeclared, byte-identical pin — the residual above had named only one of two files.
+   Both repointed to `qwen3-embedding:0.6b`, matching the E2E baseline again; the README's note
+   now reads "Drift closed" and names both files. Kept here as the before-state of record.
+
+## Fix Pass 2 (G1-G6, 2026-09-20/21)
+
+Round 2 independent verification returned **FAIL** again: 28/28 ACs met and traced, 9 of round 1's
+10 gaps confirmed closed, 16 mutations injected / 15 killed / 1 survived, plus 4 new defects. Six
+fix tasks, all now closed:
+
+- **G1** — restored env-over-config precedence in `_resolveEmbedContextWindow`
+  (`packages/core/src/services/embeddings/provider.ts`), the only surface where config had been
+  beating env, against `CLAUDE.md`'s own documented `env > config.json > default` order.
+- **G2** — `use <provider> --base-url` now derives an embedding base URL AND an LLM base URL per
+  provider from the seam, instead of writing one URL for both (a regression F1's mirrored-branch
+  fix had introduced, safe only for lmstudio's coincidentally-identical pair).
+- **G3** — the parity gate's printed structural-surface population was inflated by 2 (28 vs 26
+  distinct labels) by a duplicate-row accounting defect inside `DERIVED_SURFACES` — two
+  `embeddings/config.ts` rows sat inside a `flatMap` without depending on the loop variable, so
+  they were emitted once per CLI. Detection was unaffected. Fixed, and a self-check added so a
+  future loop-independent row fails by name instead of re-inflating the count.
+- **G4** — closed the half-declared `NEEDLE_MODEL` residual above.
+- **G5** — added the sensor PDM-10 AC-3 had none of, for `setup-local-first.sh`'s `lms load -c`
+  per-role context values — the one mutation of sixteen that survived round 2.
+- **G6** — corrected F2/F2b's stale "`system.test.ts` 13 pass / 1 fail" claim: re-measured
+  **14 pass / 0 fail, 36 expect() calls** on `d556c6d9`, matching round 2's own figure exactly.
+  Corrected in `tasks.md`'s and `STATE.md`'s own F2/F2b entries, each with a dated correction note
+  rather than a silent edit. The three host-specific shell-suite failures named in residual 3 above
+  were re-confirmed still failing, not stale in the other direction.
+
+Round 3 independent verification (author ≠ verifier) is the mandatory next step — this is
+iteration 3 of the bounded fix→re-verify loop's maximum of 3. If round 3 does not pass, the
+feature stops as `Blocked` and goes to the user rather than looping again; the status flip on a
+PASS is the orchestrator's, not this batch's.
+
+## Traps worth carrying forward (from planning, still true post-Execute)
+
+1. **LM Studio model ids are catalog names, underivable from the HuggingFace repo path.** Three
+   measured samples: `mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ` → `qwen3-embedding-0.6b-dwq`;
+   `mlx-community/Qwen3-VL-8B-Instruct-4bit` → `qwen3-vl-8b-instruct`;
+   `lmstudio-community/Qwen3-4B-Instruct-2507-MLX-4bit` → `qwen/qwen3-4b-2507`. The only way to
+   know is to download and read `GET /v1/models`.
+2. **LM Studio types a model by architecture, and MLX Qwen3-Embedding types as an LLM** —
+   invisible to `/v1/embeddings`. This is why the embedding default is GGUF, not MLX.
+3. **`knownDimensions` must stay additive.** Four call sites resolve
+   `knownDimensions[model] ?? 768` (two branches × two CLIs). Dropping the nomic row corrupts an
+   existing user's resolved width.
+4. **`benchmarks/llm-judge/fixtures/known-{dup,distinct}.json`, `run.ts:171`, and
+   `benchmarks/llm-judge/reports/llm-judge-baseline.md` must NOT change** — they carry
+   `qwen2.5:7b-instruct` as historical memory content or a dated run record, not as a default.
+   `design.md`'s "Must NOT change" section now names all three explicitly (T16 added the third).
+5. **The Portal coverage gate used to be section-level only.** T10 added the field-level parity
+   gate (`config-section-coverage.test.ts` now checks `name:`, not just `key:`).
+
+## Environment notes
+
+No live Ollama, LM Studio, or Postgres-backed API stack was available to this batch worker
+(W8). Every claim above marked "statically verified" or "not live-observed" reflects that
+constraint, not a skipped check that should have been run.
+
+## Previous handoff — per-provider-default-models (PLANNING COMPLETE 2026-09-20 — Specify, Design and Tasks closed and validated; Execute NOT started, by the user's explicit choice; superseded the same session once Execute ran to completion — see the current handoff above)
+
+**Branch:** `feat/per-provider-default-models`, off `origin/main@8ea21839` (v1.58.0).
+Worktree `~/Projects/massa-ai-feat-per-provider-default-models`, provisioned
+(`bun install` + native tree-sitter addons copied from the primary checkout + `bun run build`).
+
+## Objective
+
+Equalize the default models across the two local inference providers, and make every model
+setting configurable. Three roles, one equivalent model per provider in that provider's native
+format, plus per-role runtime parameters exposed in `config.json` and the Admin Portal.
+
+| Role | Ollama | LM Studio | Context | Other |
+| --- | --- | --- | --- | --- |
+| Embedding | `qwen3-embedding:0.6b` | `text-embedding-qwen3-embedding-0.6b` | 8192 | batch 64, 1024 dims |
+| Instruct | `qwen3-vl:8b` | `qwen3-vl-8b-instruct` | 16384 | temperature 0.2 |
+| Coding | `qwen2.5-coder:7b` | `qwen2.5-coder-7b-instruct` | 32768 | temperature 0.0 |
+
+## State
+
+`.specs/features/per-provider-default-models/` holds `spec.md`, `design.md`, `tasks.md` —
+all three exit clean from their validators (`validate_spec`, `validate_design`, `validate_tasks`;
+the one remaining `validate_tasks` warning is T17's advisory `Tests: none`, confirmed in the
+coverage matrix). **8 Phases = 17 Tasks.** No implementation commit exists.
+
+## Next step
+
+Start at **T01** (the seam). Nothing else can land first — every other task depends on it.
+
+The user chose **8 workers, 5 in parallel**: W1=T01 alone → then W2(T02-04), W3(T05-06),
+W4(T07-08), W5(T09-10), W6(T11-12) concurrently → W7(T13-15) → W8(T16-17). The packing is not
+arbitrary: T02/T03 share `config/index.ts` and `massa-ai-config.ts`, and T05/T06 share
+`llm-client.ts`, so those pairs must stay inside one worker to keep write sets disjoint.
+
+Delivery authorization was **not** given. Obtain it before the first commit.
+
+## Traps worth carrying forward
+
+1. **LM Studio model ids are catalog names, underivable from the HuggingFace repo path.** Three
+   measured samples: `mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ` → `qwen3-embedding-0.6b-dwq`;
+   `mlx-community/Qwen3-VL-8B-Instruct-4bit` → `qwen3-vl-8b-instruct`;
+   `lmstudio-community/Qwen3-4B-Instruct-2507-MLX-4bit` → `qwen/qwen3-4b-2507`. A lowercased-path
+   rule fits the first two and not the third. The only way to know is to download and read
+   `GET /v1/models`.
+2. **LM Studio types a model by architecture, and MLX Qwen3-Embedding types as an LLM.** Measured:
+   it loads, answers `/v1/chat/completions`, and is invisible to `/v1/embeddings` ("No models
+   loaded") while nomic succeeds on the same server. The GGUF build of the identical model is
+   typed EMBEDDING and returns 1024. This is why the embedding default is GGUF, not MLX.
+3. **The live defect the feature exists for.** On `8ea21839`,
+   `massa-ai-config init --lmstudio` writes `"baseUrl": "http://localhost:1234/v1"` next to
+   `"model": "qwen2.5:7b-instruct"` and `"codeModel": "qwen2.5-coder:7b"`. Installers serialize
+   models as **file values**, and file beats default — so fixing only the seam default changes
+   nothing for anyone who ran an installer. The writers are the deliverable.
+4. **The parity gate's LM Studio reference extractor is positional.** `referencePairLmStudio()`
+   anchors `/knownDimensions:\s*\{\s*"([^"]+)":\s*\d+/g` on the opening brace and returns entry
+   **#1**. It is safe today only because the table has one row — and this feature is what makes
+   it multi-entry. Re-anchor on `defaultModels.embedding` with a by-key width lookup (T13).
+5. **`knownDimensions` must be additive.** Four call sites resolve
+   `knownDimensions[model] ?? 768` (two branches × two CLIs). Dropping the nomic row, or moving
+   the fallback literal before adding the qwen3 row, produces an inconsistent model/width pair.
+6. **The 11th `MASSA_AI_LLM_*` knob fires a different gate than the obvious one.**
+   `turbo-passthrough-env.test.ts` sees only literal `process.env.X`; the LLM knobs are read
+   through `envNum(...)`. The gate that goes red is `llm-env-passthrough.test.ts:36-48`, a
+   `toEqual` against a hardcoded ten-name array, plus `llm-env-prefix.test.ts:32-56`'s `KNOBS`.
+7. **The needles `ollama` floor is already unsatisfiable, before this feature.** The file's own
+   comment at `14.needles.test.ts:161`: hit@5 caps at 7/14 = 0.50 against its own 0.64 floor.
+   Nulling it replaces a broken assertion, not a working one — but a `null` row takes a bare
+   `console.log` path and asserts nothing, so with both rows null F-NEEDLE-1 asserts nothing for
+   any arm. F-NEEDLE-2 and F-NEEDLE-3 survive.
+8. **`benchmarks/llm-judge/fixtures/known-{dup,distinct}.json` and `run.ts:171` must NOT change.**
+   They carry `qwen2.5:7b-instruct` as memory *content* about a past decision, not as a default.
+   A literal sweep corrupts the judge benchmark.
+9. **The 1024 path is not new.** `prisma/schema.prisma:458-468` defines `vector_documents_1024d`,
+   created by the initial migration, its HNSW cosine index built lazily at runtime. No migration
+   is needed. What is genuinely unmeasured is retrieval *quality* at 1024 — the user chose to
+   ship without measuring it (spec A-03).
+10. **The Portal coverage gate is section-level.** `config-section-coverage.test.ts` extracts
+    `key:` and never `name:`, so a schema field absent from the Portal passes silently. The
+    field-level gate the review requires does not exist and is T10.
+
+## Environment notes
+
+Models on disk for verification: LM Studio holds all three of the new trio plus the unusable MLX
+embedding build (`qwen3-embedding-0.6b-dwq`, 351 MB — safe to delete, kept only as the evidence
+for trap 2). Ollama pulls of `qwen3-embedding:0.6b` and `qwen3-vl:8b` were started at the user's
+request; confirm with `ollama list` before relying on a live Ollama sensor.
+
+
+## Previous handoff — local-inference-provider-abstraction (MERGED 2026-09-20 — PR #121, released as v1.58.0; the head line below said "unpushed, push/PR is the user's call" and was stale at rotation time)
+
+**Branch:** `feat/local-inference-provider-abstraction`, off `main@d523f06f` (v1.57.0).
+Worktree `~/Projects/massa-ai-feat-local-inference-provider-abstraction`.
+
+**What shipped.** LM Studio is a second local inference provider, and the way it was added
+matters more than the provider itself: one shared seam
+(`packages/shared/src/config/inference-providers.ts`, 108 lines) holds a spec per provider,
+and the config lists, both CLIs, the installers and the Web UI now *derive* from it instead
+of each carrying its own copy of Ollama's literals. That derivation closed a pre-existing
+gap nobody was looking for — `cohere` was a valid embedding provider the lists never
+offered. Probing moved from HTTP status to response body, in both the TypeScript and bash
+dialects, pinned to the same verdict by `scripts/__tests__/probe-dialect-parity.test.ts`.
+A `workspaces.embedding_fingerprint` read gate and write gate stop a workspace indexed
+under one provider/model/width from being queried or appended to under another. The two
+Ollama-only LLM behaviours — the `/api/version` probe and the `think` key — are now gated
+as dialect rather than treated as general local-LLM behaviour.
+
+**The gate that was going to lie.** `embedding-defaults-parity.test.ts` anchored every
+extractor on the literal token `OLLAMA_EMBEDDING_` and skipped any file lacking it, so an
+`LMSTUDIO_*` model/width pair was invisible to every scan in the file. Its failure mode was
+**green**, not red — verbatim the defect the file exists to prevent. Tier 3 is re-keyed to
+`*_EMBEDDING_(MODEL|DIMENSIONS)` with any prefix, and the red was induced on the LM Studio
+pair specifically and observed before being trusted.
+
+**LIP-22 is measured.** `14.needles.test.ts` was run on both arms through the real
+`postgres-vector-store.ts`, identical 743-file corpus, separate profile-keyed workspaces:
+**2560** (`binary-quantization`) → hit@1 0.5000, MRR 0.5893; **768** (`hnsw-cosine`) →
+hit@1 0.1429, MRR 0.2116. Full table in `spec.md`'s LIP-22 block.
+
+The `bench:needles` bound previously recorded here said ΔMRR −0.1773; the real-store
+measurement says **−0.3777**. **Resist the obvious reading.** A draft of this handoff
+concluded the old benchmark "understated the risk by half"; the verifier refuted it with the
+shared control arm, and the refutation is the more useful artifact. `bench:needles` ran its
+768 arm on Ollama's `nomic-embed-text`, not LM Studio's model, so three variables moved
+between harnesses — and on the identical 2560 arm with the identical fixture the two
+instruments disagree by 4 needles at hit@10 and −0.0530 MRR anyway. **Before attributing a
+difference-of-deltas to the variable under test, check that the two instruments agree on the
+control arm they share.** Here they do not, so the decomposition is unavailable and only the
+end-to-end measurement stands.
+
+Widths are attested twice over — direct `curl` per provider (2560 / 768) and the LIP-15
+fingerprint each workspace stamped itself. Determinism held across two sweeps per run and a
+third confirming run per arm in a fresh process.
+
+**The trap that made this unmeasurable, and it is wider than LIP-22.** The file gated on
+`OLLAMA_UP`, read from `/system/ollama`. **15 of the 19 E2E test files gate on that flag** (measured; the other four are
+`06.checkpoints`, `13.cli`, `17.cleanup-verify`, `23.owned-destructive`), and in
+every case they mean "embeddings are available" — so under any non-Ollama provider the
+entire E2E suite skips and reports no failures, which reads as a pass. `probeAvailability`
+now resolves it from the neutral `/system/inference`, falling back to `/system/ollama` only
+against a server predating LIP-10, so one edit unblocks the other 14 without touching them. Two
+smaller ones in the same file: the floors were a single Ollama-calibrated triple (now keyed
+per arm), and the `beforeAll` budget was 700s against a cold index that measured 1h 12m.
+
+Method, reusable: the whole run used an ephemeral stack — a scratch PostgreSQL cluster on
+`127.0.0.1:5433/massa_ai_test`, the API on `127.0.0.1:3334`, a scratch `XDG_CONFIG_HOME`
+per arm — so the developer's own database was never written to, and it was torn down
+afterward. `SHARED_PID` is already keyed on `{commit, provider, model, dimensions}`, so the
+two arms got independent workspaces with no harness change at all.
+
+**Four Phase-7 gates could not observe their own subjects, and were amended with their
+reasons at `bc2f2f82` rather than silently failed.** `bun run lint` is oxlint and reads no
+markdown, so T16's stated gate was exit 0 before and after any docs edit — replaced by a
+FEATURES.md TOC-resolution check (0 unresolved on both sides, measured by the worker and
+again by the orchestrator) and 23-site coverage accounting. T17 was going to create
+`validation.md`, which `validate_state.ts:130` treats as proof of completeness on mere
+existence — and `TASK_HEADING_RE` (`:45`) requires `T\d+:` while this file writes
+`### T16 — `, so existence is the *only* trigger; an inputs-only file would have reddened
+the closing gate at exit 1. `check_specs_delivered.ts` proves tracked-and-clean and never
+content, and all three state files were already tracked from the previous feature — it
+exited **0 before T18 edited anything**, measured.
+
+### Open, recorded, not built
+
+1. ~~**`scripts/diagnose.ts` never got its promised change.**~~ **Closed in Phase 8**
+   (T19 `a59e7901`, plus `06ddadb1` for the literal T19 missed). `+190/−71`, 14
+   `lmstudio`/`probeProvider` mentions. Measured end to end rather than asserted: LM Studio
+   up → exit 0, `dimensions=768 latency=36ms`; Ollama up → `dimensions=2560`; LM Studio
+   down on `:1299` → `API not responding (tried: …)` naming every candidate and
+   `Inference: FAILED`. The three doc sites T16 correctly left alone now say "inference
+   provider" instead of "Ollama", because the excuse for leaving them expired with the fix.
+   **Carry the tail forward as a pattern:** the conversion left one Ollama literal behind —
+   the WSL2 last-resort candidate was built as `http://<nameserver>:11434` regardless of
+   provider, dropping both the configured port and the `/v1` path, and the function was
+   still named `ollamaCandidates`. It was found by *running* the command with the server
+   down, not by reading the diff, and no test covered that arm. A provider-dispatch
+   conversion is not finished when the main path dispatches; the last-resort branches carry
+   the surviving literals.
+2. **Existing installs are unprotected until their first full reindex.** The fingerprint
+   gate reads legacy/`NULL` on every workspace indexed before the migration. Any claim of
+   stale-index protection needs that qualifier.
+3. **Only `MASSA_AI_MODE=docker` and `=build` miss the provider prompt.** The claim that
+   stood here first — inherited from Phase 5 bounded residual #4 — was that `install.sh`
+   installs Ollama unconditionally and has no provider menu. **Both halves are false**, and
+   it reached a shipped user-facing doc before the Phase 7 reviewer caught it. `install.sh`
+   installs no provider at all (its only Ollama handling is `check_ollama()` at `:265-276`,
+   a warning; the `ollama.com/install.sh` curl is in `scripts/setup-local-first.sh:162`),
+   and its **default** `source` mode runs the wizard at `:1055`, so the one-liner already
+   prompts. Residual #4 is struck through and corrected in place in `tasks.md`. Worth
+   carrying as a pattern, not just a fact: a residual recorded in one phase was read as
+   established truth by the next and shipped — it took a worker checking the claim before
+   documenting it, plus the reviewer, to catch it.
+4. **The LM Studio install and daemon commands were never executed**, here or in Phase 5.
+   `lms` is not on this host's `PATH` while the server itself runs on `:1234`, and T12
+   forbids running the vendor installer. T16's "execute every changed command once" AC was
+   narrowed in writing to exclude exactly those lines.
+5. **`tasks.md` has never passed `validate_tasks.ts`.** It reports 3 errors plus
+   `no tasks (### T1: ...) parsed` — the file writes `### T16 — ` (em dash, no colon)
+   against a `/^#{2,4}\s+T\d+\s*:/m` regex, and has since Phase 1. The task-level half of
+   that validator has therefore been vacuous for this feature throughout.
+6. **Phase 6 residual #2 stands:** `embedding-dimensions.ts` is in the parity gate's `known`
+   set, which skips the file *entirely* from Tier 3 rather than excluding its colliding
+   lines. A genuinely new unreviewed default added there would now be invisible.
+
+### Not part of this feature, found in passing
+
+`.specs/lessons.json` was dirty in **both** worktrees with an uncommitted deletion of 15
+lessons (L-002…L-016; 25 → 10, `next_id` untouched at 26). It was neither committed nor
+discarded — copied aside and restored from HEAD in this worktree, so the
+`check_specs_delivered` run would mean something. **The prune is still the user's call, and
+still undecided.** State as of 2026-09-20: this worktree is clean, `~/Projects/massa-ai`
+still carries the modification in its working tree. The copies were moved off `/tmp`, which
+does not survive a reboot, to
+`~/.config/massa-ai/lessons-prune-2026-09-20/lessons-pruned-{main,worktree}.json`
+(sha256 `b2fb278a…` for the main copy, verified identical after the move).
+
+## Previous handoff — bootstrap-file-and-rule-toggles (EXECUTE COMPLETE 2026-09-08 — 45 tasks across 11 phases plus 11 verification-fix iterations, delegated batch workers with every figure re-measured by the orchestrator; final independent gate PASS at 46/46 ACs; every gate green; unpushed, push/PR is the user's call)
+
+**Branch:** `feat/bootstrap-file-and-rule-toggles`, off `main@d32fce58`. Worktree
+`~/Projects/massa-ai-wt-bootstrap-toggles`.
+
+**What shipped.** The startup contract moved out of each host's `AGENTS.md` into its own
+`MASSA-AI.md` per host, and every host is now wired to load it: a managed `@MASSA-AI.md`
+import block in `~/.claude/CLAUDE.md`, the absolute path in OpenCode's `instructions`
+array, and a policy-free pointer block of at most 10 lines in Codex's and Cursor's
+`AGENTS.md`. All nine bootstrap rules are individually switchable with no protected id,
+persisted under `bootstrap.rules`, driven by `massa-ai-config bootstrap
+list|show|enable|disable` in both CLIs plus a `bootstrap` skill in all four plugin
+bundles. RTK is gone from the contract; `english-code` and `code-comments` are new, the
+latter defaulting **off** — a behaviour change, so the render carries an explicit negative
+directive rather than relying on omission. `--check` now consults the bootstrap surface,
+which it previously never did, so its clean exit had proved nothing.
+
+**The measured premise.** Claude Code documents reading `CLAUDE.md` and not `AGENTS.md`,
+and no installer in this repository wrote `~/.claude/CLAUDE.md` — so unless a user had
+hand-added the import, every policy in that block had been **inert on Claude**. That is
+what the feature exists to fix, not a side effect of it.
+
+**Verification: PASS, with three recorded bounds.** The gate ran eleven times. Read
+`validation.md` before touching the pointer checker — the bounds are T36 (a directive
+composed only from `POINTER_LEXICON` words is not caught; both available strengthenings
+were rejected against a counter-example whose token multiset is byte-for-byte the
+legitimate pointer's), T43/T45 (a payload sharing a line with a marker literal is invisible
+to the whole checker, bounded in two halves by the installer's `desired` validation and by
+`wrapBootstrapBlock`'s marker-alone-on-its-line form), and T46 (the `contract` half of the
+render sweep is killed by no test, falsified as an equivalent mutation at 256/256). Each is
+frozen as an executable green-on-a-hole case. **If one of those cases reddens, the bound was
+closed — delete the case and its docblock paragraph together, never restore the hole.**
+
+**Two shipped-behaviour defects were found by the gate, not by the suite**, and are in
+`CHANGELOG.md` under `### Fixed`. Both are the same shape: `bootstrap_engine`'s
+duplicate-marker guard counted markers in the *existing target file* rather than in the
+block being written, so the first `--apply` delivered a corrupt block at rc 0 and only the
+second refused; and `renderBootstrap`'s marker sweep runs on the rule *body* while the
+header and pointer interpolate `targetHome`/`hostRoot` after it, so a home path containing
+a marker was emitted straight through — after which the installer refused in **both**
+directions and the user could not uninstall out of it.
+
+**The generalizable finding, and the reason this loop ran eleven times.** Six findings were
+one class: **a correct check applied to the wrong subject.** Not a missing check — a sound
+one pointed at the wrong value. The pointer-bypass sub-sequence is the same lesson in
+miniature: three bypasses (non-Latin script, symbol-script Latin, invisible Unicode tag
+characters) were each closed by naming the category the previous fix forgot, each time with
+a docblock asserting the class was closed. It ended only when the approach **inverted** —
+from category subtraction to an explicit codepoint allowlist, which names no categories and
+so cannot forget one.
+
+**Assumption A12 was amended, not satisfied.** The portal's `bootstrap` field ships
+**editable**: `collectConfigSectionFields` reads `el.value` off every `[data-section=…]`
+element with no regard for `readonly`, so a bare `readonly` attribute would still be
+collected by Save and persisted. A field that looks non-editable and writes anyway is worse
+than one honestly editable. The guide text pointing at the CLI is the mitigation.
+
+**Two measurement traps confirmed here, both worth carrying.** Running `turbo run test` and
+`bun run test:plugins` concurrently drives the same installer suite against shared state and
+produces a false red with real-looking `(fail)` lines naming real suites — run gates
+serially. And the `EmbeddedApiClient` 5001 ms phantom does **not** track load average: it
+failed at 1-minute load 3.36 and passed at 11.39 in consecutive runs. The tell is wall
+clock, ~24 s bailing against ~77 s complete.
+
+**Live-config hazard, unfixed and out of scope (FU-5).** `setBootstrapRuleEnabled` writes
+`getConfigPath()`, frozen at module-eval time, so `massa-ai-config bootstrap
+enable|disable` **cannot be redirected by `--target`** and always writes the real
+`~/.config/massa-ai/config.json`. Never invoke it as a real process while testing. `--target`
+scopes the render only.
+
+**Gates at HEAD.** `bunx turbo run test --force` 12/12 exit 0, 0 cached, 77 s wall;
+`test:scripts` 1916/2 across 85 (the 2 are pre-existing `pyts golden: lessons`);
+`test:plugins` 142/0; oxlint 0; `generate:artifacts --check` 0 with "No drift" twice; the
+38-suite shell battery with exactly the 3 pre-existing environment failures (`cli` 44/2,
+`plugin-auto-install` 194/16, `plugin-registry-registration` 43/4, each identical at
+`origin/main`); `bootstrap-file` 147/0; `uninstall` 43/0; `packages/shared/src/bootstrap`
+376/0; `apps/web-ui` 784/0.
+
+**Next step.** Push and open the PR — that is the user's call and was explicitly not
+authorized during execution. The CHANGELOG carries `### Added`, `### Changed` and `###
+Fixed` under `[Unreleased]`, so the release bump derives as **minor**.
+
+## Previous handoff — installer-prune-and-test-scoping (EXECUTE COMPLETE 2026-08-17 — 13 commits, 4 Phases / 10 Tasks, 7 parallel batch workers plus independent verification; every gate green; unpushed, push/PR is the user's call)
 
 **Branch:** `fix/installer-prune-and-test-scoping`, off `main@89909051`. Worktree
 `~/Projects/massa-ai-wt-prune`. Shares no source file with PR #107 or
@@ -150,7 +750,7 @@ and `### Fixed`, so this cuts a **minor** bump. Open follow-ups IPT-F1, F4, F6,
 F7 are recorded in `validation.md`, plus Feature 3's carried AC-03.3c, HPC-06,
 HPC-07.
 
-# Previous handoff — portal-handoff-proposal-crud (EXECUTE COMPLETE 2026-08-13 — 9 commits; gates green; unpushed)
+## Previous handoff — portal-handoff-proposal-crud (EXECUTE COMPLETE 2026-08-13 — 9 commits; gates green; unpushed)
 
 Session `spec-portal-handoff-proposal-crud` · workflow **spec-driven** · branch
 `feat/portal-handoff-proposal-crud` stacked on `dbdceead` (PR #107, **unmerged**),
@@ -203,7 +803,7 @@ throwing read).
 
 ---
 
-# Previous handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
+## Previous handoff — marketplace-directory-source-switching (EXECUTE COMPLETE 2026-08-13 — 11 commits; gates green; unpushed)
 
 Session `spec-marketplace-directory-source-switching` · workflow **spec-driven** ·
 branch `fix/marketplace-directory-source-switching` from `origin/main` @ `89909051`,

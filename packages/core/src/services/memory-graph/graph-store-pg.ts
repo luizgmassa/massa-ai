@@ -134,7 +134,11 @@ export class GraphStorePg implements IGraphStore {
 
       return rows[0] ? rowToEdge(rows[0]) : null;
     } catch (error) {
-      logger.error("Failed to create edge", error as Error);
+      logger.error("Failed to create edge", error as Error, {
+        sourceId: edge.sourceId,
+        targetId: edge.targetId,
+        relationType: edge.relationType,
+      });
       return null;
     }
   }

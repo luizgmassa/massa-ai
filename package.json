@@ -1,6 +1,6 @@
 {
   "name": "massa-ai",
-  "version": "1.55.0",
+  "version": "1.64.0",
   "private": true,
   "author": "luizgmassa",
   "description": "massa-ai - Ancient knowledge keeper for modern code. Semantic search with 98% token reduction",
@@ -35,7 +35,7 @@
     "verify:model-ids": "bun scripts/verify-model-ids.ts",
     "verify:model-tokens": "bun scripts/verify-model-tokens.ts",
     "pretest:scripts": "bun run generate:artifacts",
-    "test:scripts": "bun test scripts/__tests__ scripts/tests/*.test.ts; rc=$?; for f in scripts/tests/*.sh; do bash \"$f\" || rc=1; done; exit $rc",
+    "test:scripts": "bun test scripts/__tests__ scripts/tests/*.test.ts; s1=$?; bash scripts/run-shell-suites.sh; s2=$?; [ $s1 -eq 0 ] && [ $s2 -eq 0 ]",
     "pretest:plugins": "bun run generate:artifacts",
     "test:plugins": "bun test apps/claude-plugin/__tests__ apps/codex-plugin/__tests__ apps/cursor-plugin/__tests__ apps/opencode-plugin/__tests__",
     "diagnose": "bun scripts/diagnose.ts",

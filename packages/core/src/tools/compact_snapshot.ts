@@ -151,7 +151,8 @@ export class CompactSnapshotTool implements IToolHandler {
           });
         } catch (e) {
           logger.warn("compact_snapshot: persist failed (non-fatal)", {
-            error: (e as Error).message,
+            sessionId,
+            error: e as Error,
           });
           persistedId = undefined;
         }

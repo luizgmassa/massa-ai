@@ -11,7 +11,7 @@
  *   3. Universal intake — every workflow on disk loads project-context. The set
  *      is derived from the filesystem, so a NEW workflow cannot skip it.
  *   4. Mutation-scoped references — exactly the 16 implementation workflows load
- *      the delivery/annotation/root-cause references, and the 19 read-only ones
+ *      the delivery/annotation/root-cause references, and the 24 read-only ones
  *      provably do NOT. Both directions are asserted; a one-line deletion in any
  *      single workflow flips exactly one assertion.
  *   5. Invariant correctness — not that the references EXIST, but that the
@@ -28,16 +28,18 @@
 
 import { describe, test, expect } from "bun:test";
 import { promises as fs } from "fs";
+import os from "os";
 import path from "path";
 import { resolveHostLayout } from "../../packages/shared/src/profile-switch/hosts";
+import { resolveClaudeMarketplaceInstall } from "../../packages/shared/src/profile-switch/claude-marketplace";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const SKILL_DIR = path.join(REPO_ROOT, "skills", "massa-ai");
 const WORKFLOWS_DIR = path.join(SKILL_DIR, "workflows");
 const REFERENCES_DIR = path.join(SKILL_DIR, "references");
 
-/** Total workflow files expected after the overhaul removed three routes. */
-const EXPECTED_WORKFLOW_COUNT = 40;
+/** Total workflow files expected after agent-roster-consolidation removed `general` and the three `maestro` routes (WFL-02). */
+const EXPECTED_WORKFLOW_COUNT = 36;
 
 /**
  * The workflows that mutate the repository. These, and only these, carry the
@@ -51,10 +53,7 @@ const IMPLEMENTATION_WORKFLOWS = [
   "debug.md",
   "design.md",
   "feature.md",
-  "general.md",
   "implementation/implementation-fix.md",
-  "maestro/maestro-fix.md",
-  "maestro/maestro.md",
   "mobile-figma/mobile-figma-fix.md",
   "refactor.md",
   "requirements/requirements-fix.md",
@@ -293,9 +292,9 @@ describe("delivery scope: only mutating workflows carry the delivery contract", 
     expect(leaked).toEqual([]);
   });
 
-  test("the read-only complement is exactly 24 workflows", async () => {
+  test("the read-only complement is exactly 23 workflows", async () => {
     const all = await listWorkflows();
-    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(24);
+    expect(all.length - IMPLEMENTATION_WORKFLOWS.length).toBe(23);
   });
 });
 
@@ -396,9 +395,9 @@ describe("invariants: the references still encode the decisions that were made",
 
 // ── 6. Roster count ───────────────────────────────────────────────────────
 
-describe("roster: nothing advertises a specialist count other than 18", () => {
+describe("roster: nothing advertises a specialist count other than 7", () => {
   /** The roster size every current-tense claim must agree with. */
-  const ROSTER = 18;
+  const ROSTER = 7;
 
   /**
    * A count-shaped claim, matched within one line OR across exactly one line
@@ -471,9 +470,13 @@ describe("roster: nothing advertises a specialist count other than 18", () => {
     const files = (await new Response(proc.stdout).text())
       .split("\n")
       .filter(Boolean)
-      // .specs/ is historical record and CHANGELOG.md documents each change;
+      // .specs/ is historical record, .ua/ is a generated knowledge-graph
+      // snapshot of past sources, and CHANGELOG.md documents each change;
       // this file carries the counts as assertion data.
-      .filter((f) => !f.startsWith(".specs/") && f !== "CHANGELOG.md" && f !== SELF);
+      .filter(
+        (f) =>
+          !f.startsWith(".specs/") && !f.startsWith(".ua/") && f !== "CHANGELOG.md" && f !== SELF,
+      );
 
     const offenders: string[] = [];
     for (const rel of files) {
@@ -530,6 +533,8 @@ describe("roster: nothing advertises a specialist count other than 18", () => {
       "15 specialists",
       "12 subagent specialists",
       "9 reusable sub-agent specialists",
+      // The pre-consolidation roster size is now a wrong count too.
+      "18 subagent specialists",
     ]) {
       const m = COUNT_CLAIM.exec(text);
       expect(m, `no match for ${text}`).not.toBeNull();
@@ -539,19 +544,19 @@ describe("roster: nothing advertises a specialist count other than 18", () => {
 
   test("a correct count in any spelling passes", () => {
     for (const text of [
-      "18 specialists",
-      "18 subagent specialists",
-      "18 sub-agent specialists",
-      "18 reusable sub-agent specialists",
+      "7 specialists",
+      "7 subagent specialists",
+      "7 sub-agent specialists",
+      "7 reusable sub-agent specialists",
     ]) {
       expect(COUNT_CLAIM.exec(text)![1]).toBe(String(ROSTER));
     }
   });
 
-  test("the shell installers advertise 18", async () => {
+  test("the shell installers advertise 7", async () => {
     for (const rel of ["install.sh", "scripts/install-agents.sh"]) {
       const body = await fs.readFile(path.join(REPO_ROOT, rel), "utf8");
-      expect(body).toContain("18 subagent specialists");
+      expect(body).toMatch(/(?<!\d)7 subagent specialists/);
     }
   });
 });
@@ -707,8 +712,9 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
 //
 // .specs/features/designer-agent/ — ADRG-01, ADRG-02.
 //
-// `skills/AGENTS.md` names the workflows that take the full Plan Challenge
-// Gate. `workflows/adr.md` was named there and carried no gate step at all,
+// `SKILL.md` §Plan Challenge Gate names the workflows that take the lite or
+// full Plan Challenge Gate (until agents-md-bootstrap-trim the full list lived
+// in the `skills/AGENTS.md` policy). `workflows/create-adr.md` was named there and carried no gate step at all,
 // and `workflows/refactor.md` carried none either — the policy reached both
 // only if the orchestrator recalled the bootstrap list unaided. Every other
 // workflow-side contract in this repo is inline in its own file for exactly
@@ -716,36 +722,45 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
 // workflow carries the prefixed name inline so dispatch never depends on this
 // file being loaded").
 //
-// The list is PARSED from the policy sentence, never hardcoded here. A
+// The list is PARSED from the gate section, never hardcoded here. A
 // hardcoded copy would need the same edit the workflow needs, by the same
 // person, in the same commit — so it could not catch the next omission. The
-// policy line is the population.
+// gate section is the population.
 
-describe("plan challenge: every full-gate workflow carries the gate step", () => {
-  const REGISTRY = path.join(REPO_ROOT, "skills", "AGENTS.md");
-  const MARKER = "Load full `workflows/the-fool.md` when the workflow is";
+describe("plan challenge: every gated workflow carries the gate step", () => {
+  const ROUTER = path.join(REPO_ROOT, "skills", "massa-ai", "SKILL.md");
 
   /**
-   * Backtick-quoted workflow names from the policy sentence, up to its first
-   * `;` (after which the sentence lists risk domains, not workflows).
-   * Newline-tolerant: the sentence wraps across lines in the source.
+   * Backtick-quoted workflow names from the Lite and Full bullets of
+   * SKILL.md §Plan Challenge Gate — each bullet's first parenthetical, which
+   * lists workflows before any risk trigger. Newline-tolerant: the Full
+   * parenthetical wraps across lines in the source.
    */
   async function fullGateWorkflows(): Promise<string[]> {
-    const body = await fs.readFile(REGISTRY, "utf8");
-    const start = body.indexOf(MARKER);
-    expect(start, `policy sentence not found in skills/AGENTS.md — marker: ${MARKER}`).toBeGreaterThan(-1);
-    const rest = body.slice(start + MARKER.length);
-    const clause = rest.slice(0, rest.indexOf(";")).replace(/\s+/g, " ");
-    return [...clause.matchAll(/`([a-z-]+)`/g)].map((m) => m[1]!);
+    const body = await fs.readFile(ROUTER, "utf8");
+    const start = body.indexOf("## Plan Challenge Gate");
+    expect(start, "SKILL.md has no §Plan Challenge Gate").toBeGreaterThan(-1);
+    const section = body.slice(start, body.indexOf("\n## ", start + 1));
+    const names: string[] = [];
+    for (const bullet of ["- **Lite** (", "- **Full** ("]) {
+      const at = section.indexOf(bullet);
+      expect(at, `SKILL.md §Plan Challenge Gate lost its ${bullet} bullet`).toBeGreaterThan(-1);
+      const rest = section.slice(at + bullet.length);
+      const clause = rest.slice(0, rest.indexOf(")")).replace(/\s+/g, " ");
+      names.push(...[...clause.matchAll(/`([a-z-]+)`/g)].map((m) => m[1]!));
+    }
+    return names;
   }
 
   test("the parsed population is real, not a vacuous empty list", async () => {
-    // Guard the guard. A reworded policy sentence that yields [] or a partial
+    // Guard the guard. A reworded gate section that yields [] or a partial
     // parse would make every assertion below pass by matching nothing.
     const names = await fullGateWorkflows();
-    expect(names.length).toBeGreaterThanOrEqual(6);
-    expect(names).toContain("adr");
-    expect(names).toContain("refactor");
+    expect(names.length).toBeGreaterThanOrEqual(7);
+    for (const name of ["feature", "refactor", "spec-driven", "design"]) expect(names).toContain(name);
+    // agent-roster-consolidation WFL-03 (Inventory AC-5): the renamed stems.
+    for (const stem of ["create-adr", "create-rfc", "create-tdd"]) expect(names).toContain(stem);
+    for (const old of ["adr", "rfc", "tdd"]) expect(names).not.toContain(old);
   });
 
   test("every named workflow exists on disk", async () => {
@@ -771,7 +786,7 @@ describe("plan challenge: every full-gate workflow carries the gate step", () =>
 // .specs/features/designer-agent/ — DSG-05, DSG-06.
 //
 // Added after independent verification: two mutations survived every gate in
-// the suite. Removing the whole `massa-ai-designer` block from one of the seven
+// the suite. Removing the whole `designer` block from one of the seven
 // workflows was caught by NOTHING (the duplication ceiling shifted as a side
 // effect of the line-window moving, which is not a check), and rewording one
 // block's `trigger:` so the seven disagree was caught by nothing at all.
@@ -786,7 +801,7 @@ describe("plan challenge: every full-gate workflow carries the gate step", () =>
 // sentence is what states the dispatch is mandatory-on-condition, so one file
 // drifting to weaker wording silently makes it advisory there.
 
-describe("designer dispatch: exactly 7 workflows, one wording", () => {
+describe("designer dispatch: exactly 6 workflows, one wording", () => {
   /**
    * The screen-capable workflows (spec A1). Hardcoded deliberately, unlike
    * ADRG-02's parsed list: there is no policy sentence enumerating these, and
@@ -796,17 +811,16 @@ describe("designer dispatch: exactly 7 workflows, one wording", () => {
   const SCREEN_WORKFLOWS = [
     "design.md",
     "feature.md",
-    "general.md",
     "implementation/implementation-fix.md",
     "mobile-figma/mobile-figma-audit.md",
     "mobile-figma/mobile-figma-fix.md",
     "spec-driven.md",
   ] as const;
 
-  const DISPATCH_HEADER = "> **Dispatch: `massa-ai-designer`**";
+  const DISPATCH_HEADER = "> **Dispatch: `designer`**";
   const TRIGGER_PREFIX = "> - trigger: the task creates or modifies a user-facing screen";
 
-  test("each of the 7 carries the designer dispatch block", async () => {
+  test("each of the 6 carries the designer dispatch block", async () => {
     const without: string[] = [];
     for (const rel of SCREEN_WORKFLOWS) {
       const body = await readWorkflow(rel);
@@ -826,20 +840,40 @@ describe("designer dispatch: exactly 7 workflows, one wording", () => {
     expect(extra).toEqual([]);
   });
 
-  test("the trigger line is byte-identical across all 7", async () => {
-    const seen = new Map<string, string[]>();
-    for (const rel of SCREEN_WORKFLOWS) {
-      const line = (await readWorkflow(rel))
-        .split(/\r?\n/)
-        .find((l) => l.startsWith(TRIGGER_PREFIX));
-      // A missing trigger line is its own failure, distinct from a divergent one.
-      expect(line, `${rel} has no designer trigger line`).toBeDefined();
-      const key = line!.trim();
-      seen.set(key, [...(seen.get(key) ?? []), rel]);
+  // The trigger was byte-identical across the 7 because DSG-06 required it:
+  // the trigger sentence is what states the dispatch is mandatory-on-condition,
+  // so one file drifting to weaker wording silently made it advisory there.
+  //
+  // Seven identical copies is one way to hold that property. Stating the
+  // sentence once is a stronger one — there is no second copy to drift. The
+  // designer's trigger is now a Role Default in `agent-orchestration.md`, so
+  // these two assertions replace the byte-identical check with the two
+  // properties it was standing in for: the sentence exists, in its one place,
+  // with the mandatory clause intact; and no workflow has re-inlined it.
+  //
+  // `skills-harness-integrity.test.ts`'s role-defaults group asserts the
+  // complement — that a designer block still carries the three fields the
+  // default does NOT fix — so "no trigger anywhere" cannot pass by the blocks
+  // having been emptied.
+
+  test("the canonical designer trigger lives in agent-orchestration.md with its mandatory clause", async () => {
+    const body = await readReference("agent-orchestration.md");
+    const line = body
+      .split(/\r?\n/)
+      .find((l) => l.includes("the task creates or modifies a user-facing screen"));
+    expect(line, "agent-orchestration.md has no canonical designer trigger").toBeDefined();
+    expect(line).toContain("mandatory once that condition holds");
+    expect(line).toContain("Screen Implementation Exception");
+    expect(line).toContain("it does not fire when no screen surface is touched");
+  });
+
+  test("no workflow re-inlines the designer trigger", async () => {
+    const offenders: string[] = [];
+    for (const rel of await listWorkflows()) {
+      const body = await readWorkflow(rel);
+      if (body.split(/\r?\n/).some((l) => l.startsWith(TRIGGER_PREFIX))) offenders.push(rel);
     }
-    // Guard the guard: 7 files must have been read, not 0.
-    expect([...seen.values()].flat().length).toBe(SCREEN_WORKFLOWS.length);
-    expect([...seen.keys()].length, `divergent trigger wording: ${JSON.stringify([...seen.entries()], null, 1)}`).toBe(1);
+    expect(offenders).toEqual([]);
   });
 });
 
@@ -918,12 +952,42 @@ describe("nesting prohibition retirement: references carry no spawn prohibition"
 // which is exactly what Approach A's mitigation exists to prevent, so this
 // group imports and calls the real function rather than re-deriving paths.
 
+// agents-md-bootstrap-trim AC4: the always-in-context Conversation Feedback
+// Policy must require model/effort on `Agent Started`, show it in its worked
+// example, and cite the canonical definition instead of restating it (S8).
+describe("conversation feedback policy announces model and effort (AC4)", () => {
+  async function feedbackSpan(): Promise<string> {
+    const body = await fs.readFile(path.join(REPO_ROOT, "skills", "AGENTS.md"), "utf8");
+    const start = body.indexOf("<!-- massa-ai:rule:conversation-feedback:start -->");
+    const end = body.indexOf("<!-- massa-ai:rule:conversation-feedback:end -->");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    return body.slice(start, end);
+  }
+
+  test("the worked example has an Agent Started line naming a model and an effort", async () => {
+    const lines = (await feedbackSpan()).split("\n").filter((l) => l.includes("[Agent Started]"));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) expect(line).toMatch(/\bmodel \S+.*\beffort \S+/);
+  });
+
+  test("a rule requires model and effort and cites the canonical Model/Effort Announcement", async () => {
+    const span = (await feedbackSpan()).replace(/\s+/g, " ");
+    expect(span).toContain("Every `Agent Started` line names the agent, its model, and its effort");
+    expect(span).toContain("§Model/Effort Announcement");
+    for (const marker of ["effort: inherit", "model: inherit"]) expect(span).not.toContain(marker);
+  });
+});
+
 describe("dispatch announcement contract: single canonical shape (S8)", () => {
   /**
    * Substrings that together identify "a rule telling the orchestrator how
    * to announce a sub-agent's model/effort" -- specific enough not to
    * collide with unrelated mentions of "model" or "effort" elsewhere in the
-   * harness (Model Diversity Fallback, model_tier resolution, etc).
+   * harness (Model Diversity Fallback, per-profile model resolution, etc).
+   * (`model_tier` resolution was the pre-model-catalog-revamp mechanism this
+   * example used to name; that field no longer exists — see
+   * .specs/features/model-catalog-revamp/spec.md AC1.)
    */
   const ANNOUNCEMENT_MARKERS = ["effort: inherit", "model: inherit"] as const;
 
@@ -991,8 +1055,8 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(relative).toBe("~/.claude/agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain(relative);
-    expect(body).toContain(layout.activeGlob);
-    expect(layout.activeGlob).toBe("massa-ai-*.md");
+    expect(layout.activeExt).toBe(".md");
+    expect(body).toContain("| `*.md` whose first body line is `<!-- massa-ai-owned: true -->` |");
   });
 
   test("claude marketplace route: the doc's <marketplaceRoot>/agents pattern equals the resolver's suffix", async () => {
@@ -1009,6 +1073,48 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(body).toContain("<marketplaceRoot>/agents");
   });
 
+  test("claude directory-source marketplace: the doc's example root is the resolver's composed live root (agent-runtime-drift)", async () => {
+    // Fixed fixture (never the real home): a directory-source marketplace
+    // whose composed bundle root is <repo>/apps/claude-plugin — the exact
+    // shape the doc's example names. The host loads this root LIVE (D1,
+    // measured 2026-09-21); the doc must teach the resolver's answer, not the
+    // versioned cache snapshot.
+    const outer = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-s9-"));
+    try {
+      const repoRoot = path.join(outer, "repo");
+      const bundleRoot = path.join(repoRoot, "apps", "claude-plugin");
+      await fs.mkdir(path.join(repoRoot, ".claude-plugin"), { recursive: true });
+      await fs.writeFile(
+        path.join(repoRoot, ".claude-plugin", "marketplace.json"),
+        JSON.stringify({ plugins: [{ name: "massa-ai", source: "./apps/claude-plugin" }] }),
+      );
+      await fs.mkdir(bundleRoot, { recursive: true });
+      await fs.mkdir(path.join(outer, "home", ".claude", "plugins"), { recursive: true });
+      await fs.writeFile(
+        path.join(outer, "home", ".claude", "plugins", "known_marketplaces.json"),
+        JSON.stringify({ "massa-ai": { source: { source: "directory" }, installLocation: repoRoot } }),
+      );
+      const install = resolveClaudeMarketplaceInstall({ targetHome: path.join(outer, "home") });
+      expect(install?.route).toBe("directory-source");
+      expect(install?.root).toBe(bundleRoot);
+      const body = await readReference("agent-orchestration.md");
+      expect(body).toContain("<repo>/apps/claude-plugin/agents");
+    } finally {
+      await fs.rm(outer, { recursive: true, force: true });
+    }
+  });
+
+  test("negative control: the cache path is the qualified fallback, never the marketplace route's definition", async () => {
+    const body = await readReference("agent-orchestration.md");
+    // The old table taught the versioned cache AS the marketplace-route root —
+    // the exact drift that made agents announce stale models. Retired wording
+    // must stay retired:
+    expect(body).not.toContain("a *versioned* bundle root, e.g.");
+    // ...while the non-directory fallback example survives, qualified:
+    expect(body).toContain("~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents");
+    expect(body).toContain("profile_list");
+  });
+
   test("codex: the doc's ~/.codex/agents literal equals the resolver's home-relative path", async () => {
     const layout = resolveHostLayout("codex", { targetHome: TARGET_HOME });
     expect(layout.route).toBe("files");
@@ -1017,8 +1123,8 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(relative).toBe("~/.codex/agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain(relative);
-    expect(layout.activeGlob).toBe("massa-ai-*.toml");
-    expect(body).toContain(layout.activeGlob);
+    expect(layout.activeExt).toBe(".toml");
+    expect(body).toContain("| `*.toml` whose first line is `# massa-ai-owned` |");
   });
 
   test("opencode: the doc's ~/.config/opencode/agents literal equals the resolver's home-relative path", async () => {
@@ -1029,8 +1135,8 @@ describe("dispatch announcement contract: per-host path table matches resolveHos
     expect(relative).toBe("~/.config/opencode/agents");
     const body = await readReference("agent-orchestration.md");
     expect(body).toContain(relative);
-    expect(layout.activeGlob).toBe("massa-ai-*.md");
-    expect(body).toContain(layout.activeGlob);
+    expect(layout.activeExt).toBe(".md");
+    expect(body).toContain("| `*.md` symlinks into the massa-ai bundle |");
   });
 
   test("cursor: resolveHostLayout returns route skip, and the doc names no cursor installed-agent path", async () => {

@@ -22,6 +22,14 @@ let generateObjectShouldThrow: string | null = null;
 let lastCall: any = null;
 // The model string passed to the openai(model) provider factory in buildProvider.
 let lastModel: string | null = null;
+// The options object createOpenAI was constructed with — lets a test assert
+// whether buildProvider injected a wrapped `fetch` (LIP-07 gating).
+let lastProviderOpts: any = null;
+// Which entrypoint of the constructed provider buildProvider actually invoked:
+// "responses" is `@ai-sdk/openai@3`'s default callable, "chat" is the explicit
+// `/v1/chat/completions` one. A boolean on the spec is not evidence of the
+// call position, so the stub records the member rather than the flag.
+let lastProviderEntrypoint: "responses" | "chat" | null = null;
 // Overrides let a test customize the SDK return shape (e.g. empty content +
 // reasoning) without throwing.
 let generateReturn: any = null;
@@ -42,10 +50,21 @@ mock.module("ai", () => ({
 
 mock.module("@ai-sdk/openai", () => ({
   // Capture the model string the provider was constructed with so tests can
-  // assert per-call role routing (instruct → model, code → codeModel).
-  createOpenAI: (_opts: any) => (model: string) => {
-    lastModel = model;
-    return { model, __mock: true };
+  // assert per-call role routing (instruct → model, code → codeModel), and
+  // the options object itself so tests can assert whether a wrapped `fetch`
+  // (think:false injection) was attached (LIP-07).
+  createOpenAI: (opts: any) => {
+    const build = (entrypoint: "responses" | "chat") => (model: string) => {
+      lastModel = model;
+      lastProviderOpts = opts;
+      lastProviderEntrypoint = entrypoint;
+      return { model, __mock: true };
+    };
+    const provider = build("responses") as ((model: string) => unknown) & {
+      chat: (model: string) => unknown;
+    };
+    provider.chat = build("chat");
+    return provider;
   },
 }));
 
@@ -55,12 +74,18 @@ import {
   isLlmEnabled,
   _setLlmEnabledForTesting,
   _setJsonSchemaSupportedForTesting,
+  _setLlmBaseUrlForTesting,
   _reasoningToText,
   _extractJsonObject,
   _checkJsonSchemaSupport,
   _wrapFetchDisableThink,
+  _wrapFetchContextWindow,
   _isAbortOrTimeoutError,
+  resolveInferenceSpec,
+  _resolveLlmConfig,
+  _resetLlmFailureStreaksForTesting,
 } from "../services/memory/llm-client.js";
+import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
 import { z } from "zod";
 
 const sampleSchema = z.object({
@@ -80,6 +105,9 @@ beforeEach(() => {
   generateObjectReturn = null;
   lastCall = null;
   lastModel = null;
+  lastProviderOpts = null;
+  _setLlmBaseUrlForTesting(null);
+  _resetLlmFailureStreaksForTesting();
 });
 
 describe("llm-client — default-off gate (P1-LLMCLIENT-03)", () => {
@@ -88,14 +116,14 @@ describe("llm-client — default-off gate (P1-LLMCLIENT-03)", () => {
   });
 
   test("llmComplete returns {ok:false} without contacting the provider when disabled", async () => {
-    const res = await llmComplete("hello");
+    const res = await llmComplete("hello", { label: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/disabled/);
     expect(lastCall).toBeNull(); // provider never invoked
   });
 
   test("llmObject returns {ok:false} without contacting the provider when disabled", async () => {
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
     expect(lastCall).toBeNull();
   });
@@ -106,21 +134,21 @@ describe("llm-client — silent degradation (P1-LLMCLIENT-04)", () => {
 
   test("llmComplete swallows a throw and returns {ok:false} (no throw to caller)", async () => {
     generateShouldThrow = "connection refused";
-    const res = await llmComplete("hello");
+    const res = await llmComplete("hello", { label: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/connection refused/);
   });
 
   test("llmObject swallows a throw and returns {ok:false} (no throw to caller)", async () => {
     generateObjectShouldThrow = "timeout";
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/timeout/);
   });
 
   test("a zod-invalid LLM response is treated as failure (degrade path)", async () => {
     generateObjectShouldThrow = "Response did not match schema";
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
   });
 });
@@ -129,20 +157,20 @@ describe("llm-client — success path (P1-LLMCLIENT-02)", () => {
   beforeEach(() => { _setLlmEnabledForTesting(true); _setJsonSchemaSupportedForTesting(false); });
 
   test("llmComplete returns {ok:true, value} when the provider succeeds", async () => {
-    const res = await llmComplete("hello");
+    const res = await llmComplete("hello", { label: "test" });
     expect(res.ok).toBe(true);
     expect(res.value).toBe("mocked completion");
   });
 
   test("llmObject returns {ok:true, value} parsed against the schema", async () => {
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(true);
     expect(res.value?.summary).toBe("mocked summary");
     expect(res.value?.type).toBe("pattern");
   });
 
   test("abortSignal is forwarded (timeoutMs respected)", async () => {
-    await llmComplete("hello", { timeoutMs: 1234 });
+    await llmComplete("hello", { label: "test", timeoutMs: 1234 });
     expect(lastCall.abortSignal).toBeDefined();
   });
 });
@@ -152,14 +180,14 @@ describe("llm-client — thinking-model mitigations", () => {
 
   test("llmObject uses no-schema fallback (json_object) when json_schema unsupported", async () => {
     _setJsonSchemaSupportedForTesting(false);
-    await llmObject("hello", sampleSchema);
+    await llmObject("hello", sampleSchema, { label: "test" });
     expect(lastCall.output).toBe("no-schema");
     expect(lastCall.providerOptions).toBeUndefined();
   });
 
   test("llmObject uses schemaName when json_schema supported (constrained decoding)", async () => {
     _setJsonSchemaSupportedForTesting(true);
-    await llmObject("hello", sampleSchema);
+    await llmObject("hello", sampleSchema, { label: "test" });
     expect(lastCall.schemaName).toBe("response");
     expect(lastCall.output).toBeUndefined(); // default "object" output
   });
@@ -169,14 +197,14 @@ describe("llm-client — thinking-model mitigations", () => {
       text: "",
       reasoning: [{ type: "reasoning", text: "The answer is 42.\nFinal: 42" }],
     };
-    const res = await llmComplete("hello");
+    const res = await llmComplete("hello", { label: "test" });
     expect(res.ok).toBe(true);
     expect(res.value).toContain("The answer is 42");
   });
 
   test("llmComplete returns {ok:false} when both content and reasoning are empty", async () => {
     generateReturn = { text: "" };
-    const res = await llmComplete("hello");
+    const res = await llmComplete("hello", { label: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/empty content/);
   });
@@ -218,7 +246,7 @@ describe("llm-client — thinking-model mitigations", () => {
     expect(validated.success).toBe(true);
     expect(validated.success && validated.data.summary).toBe("recovered");
     // And confirm the thrown-but-unrecoverable path still degrades cleanly:
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
     delete (globalThis as any).__testErrShape;
   });
@@ -266,7 +294,7 @@ describe("llm-client — per-task model routing (T4)", () => {
   beforeEach(() => { _setLlmEnabledForTesting(true); _setJsonSchemaSupportedForTesting(false); });
 
   test("instruct role (default) selects config.llm.model", async () => {
-    await llmComplete("hello"); // default role = instruct
+    await llmComplete("hello", { label: "test" }); // default role = instruct
     // lastModel is whatever config.llm.model resolves to (constant fallback in
     // test env where MASSA_AI_LLM_MODEL is unset → DEFAULT_LLM_MODEL). The key
     // assertion is that it is NOT the codeModel.
@@ -282,7 +310,7 @@ describe("llm-client — per-task model routing (T4)", () => {
     const instructModel = llmCfg?.model;
     const codeModel = llmCfg?.codeModel;
 
-    await llmComplete("hello", { modelRole: "code" });
+    await llmComplete("hello", { label: "test", modelRole: "code" });
     expect(lastModel).toBe(codeModel);
     // Sanity: when the two are distinct, code routing must pick codeModel.
     if (instructModel && codeModel && instructModel !== codeModel) {
@@ -293,7 +321,7 @@ describe("llm-client — per-task model routing (T4)", () => {
   test.skipIf(!LLM_CFG_AVAILABLE)("llmObject routes by modelRole too (code → codeModel)", async () => {
     const { config } = await import("@massa-ai/shared");
     const codeModel = config.get("llm")?.codeModel;
-    await llmObject("hello", sampleSchema, { modelRole: "code" });
+    await llmObject("hello", sampleSchema, { label: "test", modelRole: "code" });
     expect(lastModel).toBe(codeModel);
   });
 
@@ -306,15 +334,21 @@ describe("llm-client — per-task model routing (T4)", () => {
     // constant exported from shared is the new non-thinking default.
     const { config, DEFAULT_LLM_MODEL } = await import("@massa-ai/shared");
     const cfgModel = config.get("llm")?.model;
-    await llmComplete("hello");
+    await llmComplete("hello", { label: "test" });
     // When a sibling suite's process-wide mock starves config.llm, cfgModel is
     // undefined and llm-client falls back to DEFAULT_LLM_MODEL — assert that
     // fallback instead. Otherwise the resolved model must match config exactly.
     expect(lastModel).toBe(cfgModel ?? DEFAULT_LLM_MODEL);
-    // The constant itself must be the pure-instruct default (not the legacy
-    // thinking model).
-    expect(DEFAULT_LLM_MODEL).toBe("qwen2.5:7b-instruct");
+    // The constant itself must be the pure-instruct default of whichever
+    // provider the running config is active for (per-provider-default-models
+    // T01/T03) — not the retired "qwen2.5:7b-instruct"/"qwen3.5:9b" literals.
+    // Provider-agnostic on purpose: this suite intentionally does not pin
+    // embedding.provider (see docblock), and this host's own config may name
+    // either provider.
+    const instructDefaults = Object.values(INFERENCE_PROVIDERS).map((p) => p.defaultModels.instruct);
+    expect(instructDefaults).toContain(DEFAULT_LLM_MODEL);
     expect(DEFAULT_LLM_MODEL).not.toBe("qwen3.5:9b");
+    expect(DEFAULT_LLM_MODEL).not.toBe("qwen2.5:7b-instruct");
   });
 
   test("#7 WARN: empty reasoning recovery emits one structured warn (dormant on instruct)", async () => {
@@ -326,7 +360,7 @@ describe("llm-client — per-task model routing (T4)", () => {
     // {ok:false} degrade path (the WARN is the safety net, the contract is the
     // degrade). This guards that the branch is reachable and does not throw.
     try {
-      const res = await llmComplete("hello");
+      const res = await llmComplete("hello", { label: "test" });
       expect(res.ok).toBe(false);
       expect(res.error).toMatch(/empty content/);
       expect(warnings).toEqual([]); // logger.warn not intercepted here; contract holds
@@ -610,7 +644,7 @@ describe("llm-client — llmObject fallback reasoning recovery", () => {
       object: { summary: "", type: "bogus", level: 99, rationale: "", sourceIds: ["x"] },
       reasoning: '```json\n{"summary":"recovered","type":"pattern","level":1,"rationale":"because","sourceIds":["a","b"]}\n```',
     };
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(true);
     expect(res.value?.summary).toBe("recovered");
   });
@@ -620,7 +654,7 @@ describe("llm-client — llmObject fallback reasoning recovery", () => {
       object: { summary: "", type: "bogus", level: 99, rationale: "", sourceIds: ["x"] },
       reasoning: '```json\n{"summary":"recovered","type":"bogus","level":1,"rationale":"because","sourceIds":["a","b"]}\n```',
     };
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
   });
 
@@ -629,7 +663,7 @@ describe("llm-client — llmObject fallback reasoning recovery", () => {
       object: { summary: "", type: "bogus", level: 99, rationale: "", sourceIds: ["x"] },
       reasoning: "no json here",
     };
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
   });
 
@@ -638,7 +672,7 @@ describe("llm-client — llmObject fallback reasoning recovery", () => {
       object: { summary: "", type: "bogus", level: 99, rationale: "", sourceIds: ["x"] },
       reasoning: "",
     };
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
   });
 });
@@ -674,14 +708,14 @@ describe("llm-client — llmObject catch-block reasoning recovery", () => {
     // the thrown error. The mock throws `new Error(generateObjectShouldThrow)`
     // which has no .response.body.output → _reasoningToText returns "".
     // So this test exercises the catch block but degrades.
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
     delete (globalThis as any).__testErrShape;
   });
 
   test("degrades when thrown error has no reasoning", async () => {
     generateObjectShouldThrow = "plain error with no reasoning";
-    const res = await llmObject("hello", sampleSchema);
+    const res = await llmObject("hello", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/plain error/);
   });
@@ -713,12 +747,12 @@ describe("llm-client — abort/timeout skips reasoning recovery (#7 noise fix)",
     const warnSpy = spyOn(logger, "warn");
     try {
       generateObjectShouldThrow = "The operation timed out.";
-      const res = await llmObject("hello", sampleSchema);
+      const res = await llmObject("hello", sampleSchema, { label: "test" });
       expect(res.ok).toBe(false);
       const warned = warnSpy.mock.calls.map((c) => String(c[0]));
       expect(warned).not.toContain("llm reasoning-recovery empty");
       // The honest degradation signal must stay.
-      expect(warned).toContain("llmObject failed — degrading to non-LLM path");
+      expect(warned).toContain("LLM call failed — using non-LLM fallback");
     } finally {
       warnSpy.mockRestore();
     }
@@ -728,10 +762,603 @@ describe("llm-client — abort/timeout skips reasoning recovery (#7 noise fix)",
     const warnSpy = spyOn(logger, "warn");
     try {
       generateObjectShouldThrow = "No object generated: could not parse the response.";
-      const res = await llmObject("hello", sampleSchema);
+      const res = await llmObject("hello", sampleSchema, { label: "test" });
       expect(res.ok).toBe(false);
       const warned = warnSpy.mock.calls.map((c) => String(c[0]));
       expect(warned).toContain("llm reasoning-recovery empty");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+// ─── LIP-07: provider-aware gating of the two Ollama-only behaviours ────────
+
+describe("llm-client — resolveInferenceSpec (LIP-07 provider identity)", () => {
+  test("Ollama's default baseUrl (host:port) resolves to the ollama spec", () => {
+    expect(resolveInferenceSpec("http://localhost:11434/v1").id).toBe("ollama");
+  });
+
+  test("LM Studio's default baseUrl (host:port) resolves to the lmstudio spec", () => {
+    expect(resolveInferenceSpec("http://localhost:1234/v1").id).toBe("lmstudio");
+  });
+
+  test("an unmatched baseUrl (no known provider's port) falls back to ollama", () => {
+    expect(resolveInferenceSpec("http://example.com:9999/v1").id).toBe("ollama");
+  });
+});
+
+// ─── T05: getLlmConfig reads the seam instead of Ollama-shaped fallbacks ────
+
+describe("llm-client — _resolveLlmConfig seam-derived fallbacks (T05)", () => {
+  test("code role falls back to defaultModels.coding, never to the instruct model", () => {
+    // A config that only carries an instruct `model` (no `codeModel`) is the
+    // exact shape that used to regress the code role onto the instruct
+    // model — a vision-language model after this feature (COVERAGE #5).
+    const result = _resolveLlmConfig({ model: "some-instruct-model" }, "code", null);
+    expect(result.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
+    expect(result.model).not.toBe("some-instruct-model");
+  });
+
+  test("instruct role falls back to defaultModels.instruct when config carries no model", () => {
+    const result = _resolveLlmConfig(undefined, "instruct", null);
+    expect(result.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+  });
+
+  test("code role falls back to the resolved provider's own coding default (LM Studio)", () => {
+    const result = _resolveLlmConfig(undefined, "code", "http://localhost:1234/v1");
+    expect(result.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.coding);
+  });
+
+  test("disableThink follows the resolved provider's injectsDisableThink, not a hardcoded true", () => {
+    const ollamaResult = _resolveLlmConfig(undefined, "instruct", null);
+    expect(ollamaResult.disableThink).toBe(INFERENCE_PROVIDERS.ollama.injectsDisableThink);
+    expect(ollamaResult.disableThink).toBe(true);
+
+    const lmstudioResult = _resolveLlmConfig(undefined, "instruct", "http://localhost:1234/v1");
+    expect(lmstudioResult.disableThink).toBe(INFERENCE_PROVIDERS.lmstudio.injectsDisableThink);
+    expect(lmstudioResult.disableThink).toBe(false);
+  });
+
+  test("apiKey and baseUrl fall back to the resolved provider's seam entry, not a bare Ollama literal", () => {
+    const ollamaResult = _resolveLlmConfig(undefined, "instruct", null);
+    expect(ollamaResult.baseUrl).toBe(INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl);
+    expect(ollamaResult.apiKey).toBe("ollama");
+
+    const lmstudioResult = _resolveLlmConfig(undefined, "instruct", "http://localhost:1234/v1");
+    expect(lmstudioResult.baseUrl).toBe("http://localhost:1234/v1");
+    expect(lmstudioResult.apiKey).toBe("lmstudio");
+    expect(lmstudioResult.apiKey).not.toBe("ollama");
+  });
+
+  test("per-role temperature resolves from INFERENCE_ROLE_DEFAULTS: instruct 0.2, coding 0.0", () => {
+    expect(_resolveLlmConfig(undefined, "instruct", null).temperature).toBe(0.2);
+    expect(_resolveLlmConfig(undefined, "code", null).temperature).toBe(0.0);
+  });
+
+  test("per-role context window resolves from INFERENCE_ROLE_DEFAULTS: instruct 16384, coding 32768", () => {
+    expect(_resolveLlmConfig(undefined, "instruct", null).contextWindow).toBe(16384);
+    expect(_resolveLlmConfig(undefined, "code", null).contextWindow).toBe(32768);
+  });
+
+  test("config values win over every role-table/seam default (PDM-12 AC-2 shape)", () => {
+    const cfg = {
+      model: "cfg-instruct",
+      codeModel: "cfg-code",
+      temperature: 0.9,
+      codeTemperature: 0.1,
+      contextWindow: 1111,
+      codeContextWindow: 2222,
+      apiKey: "cfg-key",
+      baseUrl: "http://custom-host:9999/v1",
+      disableThink: false,
+    };
+    const instructResult = _resolveLlmConfig(cfg, "instruct", null);
+    expect(instructResult.model).toBe("cfg-instruct");
+    expect(instructResult.temperature).toBe(0.9);
+    expect(instructResult.contextWindow).toBe(1111);
+    expect(instructResult.apiKey).toBe("cfg-key");
+    expect(instructResult.baseUrl).toBe("http://custom-host:9999/v1");
+    expect(instructResult.disableThink).toBe(false);
+
+    const codeResult = _resolveLlmConfig(cfg, "code", null);
+    expect(codeResult.model).toBe("cfg-code");
+    expect(codeResult.temperature).toBe(0.1);
+    expect(codeResult.contextWindow).toBe(2222);
+  });
+});
+
+// ─── T06: per-role options.num_ctx, gated on appliesContextPerRequest ───────
+
+describe("llm-client — _wrapFetchContextWindow", () => {
+  test("injects options.num_ctx into JSON body", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 16384);
+    await wrapped("http://test", {
+      method: "POST",
+      body: JSON.stringify({ messages: [] }),
+    });
+    const parsed = JSON.parse(capturedInit.body);
+    expect(parsed.options.num_ctx).toBe(16384);
+    expect(parsed.messages).toEqual([]);
+  });
+
+  test("merges into an existing options object rather than overwriting it", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 32768);
+    await wrapped("http://test", {
+      body: JSON.stringify({ options: { seed: 1 } }),
+    });
+    const parsed = JSON.parse(capturedInit.body);
+    expect(parsed.options).toEqual({ seed: 1, num_ctx: 32768 });
+  });
+
+  test("leaves non-JSON body untouched (no throw)", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 8192);
+    await wrapped("http://test", { body: "not-json-at-all" });
+    expect(capturedInit.body).toBe("not-json-at-all");
+  });
+
+  test("leaves request with no body untouched", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchContextWindow(fakeFetch as any, 8192);
+    await wrapped("http://test", { method: "GET" });
+    expect(capturedInit.body).toBeUndefined();
+  });
+});
+
+describe("llm-client — buildProvider sends per-role num_ctx (T06 / PDM-08, PDM-09)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test("ollama: instruct role's chat request carries options.num_ctx = 16384", async () => {
+    let captured: any = null;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (_input: any, init?: any) => {
+      captured = init;
+      return new Response("{}");
+    };
+    try {
+      await llmComplete("hello", { label: "test" });
+      expect(typeof lastProviderOpts.fetch).toBe("function");
+      await lastProviderOpts.fetch("http://test", {
+        method: "POST",
+        body: JSON.stringify({ messages: [] }),
+      });
+      const parsed = JSON.parse(captured.body);
+      expect(parsed.options.num_ctx).toBe(16384);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("ollama: code role's chat request carries options.num_ctx = 32768", async () => {
+    let captured: any = null;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (_input: any, init?: any) => {
+      captured = init;
+      return new Response("{}");
+    };
+    try {
+      await llmComplete("hello", { label: "test", modelRole: "code" });
+      await lastProviderOpts.fetch("http://test", {
+        method: "POST",
+        body: JSON.stringify({ messages: [] }),
+      });
+      const parsed = JSON.parse(captured.body);
+      expect(parsed.options.num_ctx).toBe(32768);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("lmstudio: buildProvider attaches no fetch wrapper at all — num_ctx never sent (spec A-07)", async () => {
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    await llmComplete("hello", { label: "test" });
+    // LM Studio has both appliesContextPerRequest=false and
+    // injectsDisableThink=false, so no wrapped fetch is attached — the
+    // strongest available proof that num_ctx is never sent to it.
+    expect(lastProviderOpts.fetch).toBeUndefined();
+  });
+});
+
+describe("llm-client — provider-aware gating (LIP-07)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(null);
+  });
+
+  test("lmstudio: _checkJsonSchemaSupport returns true WITHOUT calling fetch (no /api/version request)", async () => {
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    let fetchCalled = false;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async () => {
+      fetchCalled = true;
+      throw new Error("fetch should not have been called for lmstudio");
+    };
+    try {
+      const supported = await _checkJsonSchemaSupport();
+      expect(supported).toBe(true);
+      expect(fetchCalled).toBe(false);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("lmstudio: buildProvider does NOT attach a wrapped fetch (no think:false injection)", async () => {
+    _setJsonSchemaSupportedForTesting(false);
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    await llmComplete("hello", { label: "test" });
+    expect(lastProviderOpts.fetch).toBeUndefined();
+  });
+
+  test("ollama (default baseUrl): buildProvider DOES attach a wrapped fetch (think:false active)", async () => {
+    _setJsonSchemaSupportedForTesting(false);
+    await llmComplete("hello", { label: "test" });
+    expect(typeof lastProviderOpts.fetch).toBe("function");
+  });
+
+  test("lmstudio end-to-end: json-schema path stays enabled (not downgraded to json_object)", async () => {
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    await llmObject("hello", sampleSchema, { label: "test" });
+    expect(lastCall.schemaName).toBe("response");
+    expect(lastCall.output).toBeUndefined();
+  });
+
+  // Enabling json_schema is not the same as delivering it. Measured against a
+  // live LM Studio 0.3.x serving qwen/qwen3-4b-2507: POST /v1/responses with
+  // `text.format` = json_schema came back `"text":{"format":{"type":"text"}}`
+  // and the prose "The capital of France is Paris.", while the identical
+  // schema on POST /v1/chat/completions returned `{ "capital": "Paris" }`.
+  // `@ai-sdk/openai@3`'s default callable resolves to Responses, so gating the
+  // version probe correctly still yielded unparseable prose until buildProvider
+  // switched entrypoints. Ollama is unaffected — its /v1/responses answered 400
+  // for a model reason, so it implements the endpoint.
+  test("lmstudio: buildProvider uses the chat-completions entrypoint, not Responses", async () => {
+    _setJsonSchemaSupportedForTesting(false);
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    await llmComplete("hello", { label: "test" });
+    expect(lastProviderEntrypoint).toBe("chat");
+  });
+
+  test("ollama (default baseUrl): buildProvider keeps the default Responses entrypoint", async () => {
+    _setJsonSchemaSupportedForTesting(false);
+    await llmComplete("hello", { label: "test" });
+    expect(lastProviderEntrypoint).toBe("responses");
+  });
+});
+
+// ─── Call identity, failure/recovery logging (AC1/AC2/AC3/AC6b) ─────────────
+
+describe("llm-client — failure WARN / recovery INFO / decode DEBUG (AC1/AC2/AC3/AC6b)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test("AC1: a failed call logs one WARN with full identity meta; two failures in a row give 1 then 2", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = "boom";
+      const res1 = await llmObject("hello", sampleSchema, { label: "ac1-label" });
+      expect(res1.ok).toBe(false);
+      const failures1 = warnSpy.mock.calls.filter(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failures1.length).toBe(1);
+      const meta1 = failures1[0][1] as any;
+      expect(meta1.label).toBe("ac1-label");
+      expect(meta1.role).toBe("instruct");
+      expect(typeof meta1.model).toBe("string");
+      expect(typeof meta1.provider).toBe("string");
+      expect(typeof meta1.timeoutMs).toBe("number");
+      expect(typeof meta1.elapsedMs).toBe("number");
+      expect(meta1.timedOut).toBe(false);
+      expect(meta1.error).toBeInstanceOf(Error);
+      expect(meta1.consecutiveFailures).toBe(1);
+
+      const res2 = await llmObject("hello", sampleSchema, { label: "ac1-label" });
+      expect(res2.ok).toBe(false);
+      const failures2 = warnSpy.mock.calls.filter(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failures2.length).toBe(2);
+      expect((failures2[1][1] as any).consecutiveFailures).toBe(2);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("AC2: first success after N failures logs one INFO recovery line; a later success logs nothing", async () => {
+    generateObjectShouldThrow = "boom";
+    await llmObject("hello", sampleSchema, { label: "ac2-label" });
+    await llmObject("hello", sampleSchema, { label: "ac2-label" });
+    generateObjectShouldThrow = null;
+    const infoSpy = spyOn(logger, "info");
+    try {
+      const res = await llmObject("hello", sampleSchema, { label: "ac2-label" });
+      expect(res.ok).toBe(true);
+      const recoveries = infoSpy.mock.calls.filter((c) => c[0] === "LLM call recovered");
+      expect(recoveries.length).toBe(1);
+      expect(recoveries[0][1]).toMatchObject({ label: "ac2-label", afterFailures: 2 });
+      infoSpy.mockClear();
+      const res2 = await llmObject("hello", sampleSchema, { label: "ac2-label" });
+      expect(res2.ok).toBe(true);
+      expect(infoSpy.mock.calls.filter((c) => c[0] === "LLM call recovered").length).toBe(0);
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
+  test("AC3: a successful structured call logs the decode-path line at DEBUG (not INFO) with label+model", async () => {
+    const debugSpy = spyOn(logger, "debug");
+    const infoSpy = spyOn(logger, "info");
+    try {
+      const res = await llmObject("hello", sampleSchema, { label: "ac3-label" });
+      expect(res.ok).toBe(true);
+      const debugCalls = debugSpy.mock.calls.filter((c) => String(c[0]).startsWith("json_schema:"));
+      expect(debugCalls.length).toBe(1);
+      expect((debugCalls[0][1] as any).label).toBe("ac3-label");
+      expect(typeof (debugCalls[0][1] as any).model).toBe("string");
+      const infoDecodeCalls = infoSpy.mock.calls.filter((c) => String(c[0]).startsWith("json_schema:"));
+      expect(infoDecodeCalls.length).toBe(0);
+    } finally {
+      debugSpy.mockRestore();
+      infoSpy.mockRestore();
+    }
+  });
+
+  test("AC6b: a disabled call emits zero WARN and leaves the failure streak untouched", async () => {
+    generateObjectShouldThrow = "boom";
+    await llmObject("hello", sampleSchema, { label: "ac6b-label" }); // streak -> 1
+    generateObjectShouldThrow = null;
+
+    _setLlmEnabledForTesting(false);
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      const res = await llmObject("hello", sampleSchema, { label: "ac6b-label" });
+      expect(res.ok).toBe(false);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+
+    _setLlmEnabledForTesting(true);
+    const infoSpy = spyOn(logger, "info");
+    try {
+      const res2 = await llmObject("hello", sampleSchema, { label: "ac6b-label" });
+      expect(res2.ok).toBe(true);
+      const recoveries = infoSpy.mock.calls.filter((c) => c[0] === "LLM call recovered");
+      // afterFailures:1 (not 0 or 2) proves the disabled call neither reset nor
+      // incremented the streak — it left it exactly where the one real failure put it.
+      expect(recoveries.length).toBe(1);
+      expect(recoveries[0][1]).toMatchObject({ label: "ac6b-label", afterFailures: 1 });
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
+  test("AC6b twin (llmComplete): a disabled call emits zero WARN and leaves the failure streak untouched", async () => {
+    generateShouldThrow = "boom";
+    await llmComplete("hello", { label: "ac6b-complete-label" }); // streak -> 1
+    generateShouldThrow = null;
+
+    _setLlmEnabledForTesting(false);
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      const res = await llmComplete("hello", { label: "ac6b-complete-label" });
+      expect(res.ok).toBe(false);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+
+    _setLlmEnabledForTesting(true);
+    const infoSpy = spyOn(logger, "info");
+    try {
+      const res2 = await llmComplete("hello", { label: "ac6b-complete-label" });
+      expect(res2.ok).toBe(true);
+      const recoveries = infoSpy.mock.calls.filter((c) => c[0] === "LLM call recovered");
+      // afterFailures:1 (not 0 or 2) proves the disabled call neither reset nor
+      // incremented the streak — it left it exactly where the one real failure put it.
+      expect(recoveries.length).toBe(1);
+      expect(recoveries[0][1]).toMatchObject({ label: "ac6b-complete-label", afterFailures: 1 });
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
+  test("M8: an aborted/timeout failure's WARN meta reports timedOut: true (llmComplete)", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateShouldThrow = "The operation timed out.";
+      const res = await llmComplete("hello", { label: "timeout-meta-complete-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).timedOut).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("M8: an aborted/timeout failure's WARN meta reports timedOut: true (llmObject)", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = "The operation timed out.";
+      const res = await llmObject("hello", sampleSchema, { label: "timeout-meta-object-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).timedOut).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("llmComplete: a throw increments the failure streak and logs the canonical failure WARN", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateShouldThrow = "network down";
+      const res = await llmComplete("hello", { label: "complete-throw-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).label).toBe("complete-throw-label");
+      expect((failure![1] as any).consecutiveFailures).toBe(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("llmComplete: empty content with no reasoning recovery increments the failure streak", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateReturn = { text: "" };
+      const res = await llmComplete("hello", { label: "complete-empty-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).label).toBe("complete-empty-label");
+      expect((failure![1] as any).consecutiveFailures).toBe(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("llmObject: a fallback-path schema-validation failure (not a throw) also increments the failure streak", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectReturn = { object: { summary: 123 } }; // wrong type, missing required fields
+      const res = await llmObject("hello", sampleSchema, { label: "validation-fail-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).consecutiveFailures).toBe(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("label isolation: label A's failure streak survives label B's success, and B logs no recovery line", async () => {
+    const infoSpy = spyOn(logger, "info");
+    try {
+      generateObjectShouldThrow = "boom";
+      await llmObject("hello", sampleSchema, { label: "iso-a" });
+      await llmObject("hello", sampleSchema, { label: "iso-a" }); // A's streak -> 2
+      generateObjectShouldThrow = null;
+
+      const resB = await llmObject("hello", sampleSchema, { label: "iso-b" }); // B never failed
+      expect(resB.ok).toBe(true);
+      const bRecoveries = infoSpy.mock.calls.filter(
+        (c) => c[0] === "LLM call recovered" && (c[1] as any).label === "iso-b",
+      );
+      expect(bRecoveries.length).toBe(0);
+
+      infoSpy.mockClear();
+      const resA = await llmObject("hello", sampleSchema, { label: "iso-a" }); // A recovers
+      expect(resA.ok).toBe(true);
+      const aRecoveries = infoSpy.mock.calls.filter((c) => c[0] === "LLM call recovered");
+      expect(aRecoveries.length).toBe(1);
+      expect(aRecoveries[0][1]).toMatchObject({ label: "iso-a", afterFailures: 2 });
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+});
+
+describe("llm-client — provider identity in failure logging (finding 5)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test('an unresolved baseUrl reports provider: "unknown" in the failure WARN, never a false "ollama"', async () => {
+    _setLlmBaseUrlForTesting("http://example.com:9999/v1");
+    const prevEmbeddingProvider = process.env.EMBEDDING_PROVIDER;
+    process.env.EMBEDDING_PROVIDER = "openai"; // not in LOCAL_INFERENCE_IDS — no legitimate match
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = "boom";
+      const res = await llmObject("hello", sampleSchema, { label: "unknown-provider-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      expect((failure![1] as any).provider).toBe("unknown");
+    } finally {
+      warnSpy.mockRestore();
+      if (prevEmbeddingProvider === undefined) delete process.env.EMBEDDING_PROVIDER;
+      else process.env.EMBEDDING_PROVIDER = prevEmbeddingProvider;
+    }
+  });
+
+  test("a matched baseUrl (default ollama) still reports its real provider id, unaffected by the lazy resolution", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = "boom";
+      const res = await llmObject("hello", sampleSchema, { label: "known-provider-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect((failure![1] as any).provider).toBe("ollama");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+describe("llm-client — zod issues attached to the fallback-path validation error (finding 6)", () => {
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test("llmObject fallback-path validation failure attaches a compact zod-issues summary as the error's cause", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectReturn = { object: { summary: 123 } }; // wrong type, missing required fields
+      const res = await llmObject("hello", sampleSchema, { label: "zod-label" });
+      expect(res.ok).toBe(false);
+      const failure = warnSpy.mock.calls.find(
+        (c) => c[0] === "LLM call failed — using non-LLM fallback",
+      );
+      expect(failure).toBeDefined();
+      const err = (failure![1] as any).error as Error & { cause?: unknown };
+      expect(err).toBeInstanceOf(Error);
+      expect(typeof err.cause).toBe("string");
+      expect(err.cause as string).toContain("summary");
     } finally {
       warnSpy.mockRestore();
     }

@@ -169,3 +169,13 @@ export async function loadProjectIgnore(projectPath: string): Promise<Ignore> {
 
   return ig;
 }
+
+/**
+ * Historical alias for {@link loadProjectIgnore}, kept because
+ * `contextual-search-rlm.ts` and two test suites reach for this name. It lived
+ * in `project-indexer.ts` purely as a re-export; gitignore loading is this
+ * module's concern, not the indexer's.
+ */
+export function loadGitignore(projectPath: string) {
+  return loadProjectIgnore(projectPath);
+}

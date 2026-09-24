@@ -28,7 +28,6 @@ import {
   LockError,
 } from "@massa-ai/shared";
 import { getDeploymentRoot } from "./model-registry-deployment.js";
-import { getRegistryHostDefaults } from "./model-registry.js";
 
 const PROFILE_DETAIL = {
   tags: ["profiles"],
@@ -78,10 +77,7 @@ export const profileRoutes = new Elysia({ prefix: "/api/v1/profiles" })
         return { success: false, error: { code: "InvalidHostError", message: `unknown host "${hostParam}"` } };
       }
       try {
-        const inventory = listProfiles({
-          ...(hostParam ? { hosts: [hostParam as Host] } : {}),
-          hostDefaults: getRegistryHostDefaults(),
-        });
+        const inventory = listProfiles(hostParam ? { hosts: [hostParam as Host] } : {});
         set.status = 200;
         return { success: true, data: inventory };
       } catch (e) {
@@ -96,7 +92,7 @@ export const profileRoutes = new Elysia({ prefix: "/api/v1/profiles" })
         ...PROFILE_DETAIL,
         summary: "List shipped profiles + per-host active profile",
         description:
-          "Returns the shipped profile names, per-host active profile (from recorded state; the registry's declared per-host default shown when unrecorded, falling back to 'balanced' when the registry is unreachable), and per-host bundle version. Available profile names come from on-disk variant directories only; the registry is consulted only for that unrecorded-host default.",
+          "Returns the shipped profile names, per-host active profile (from recorded install-state, falling back to 'balanced' when unrecorded), and per-host bundle version. Available profile names come from on-disk variant directories only; the registry is never consulted.",
       },
     },
   )

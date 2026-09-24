@@ -121,12 +121,10 @@ fi
 DATABASE_URL="postgresql://massa_ai:pw@localhost:5432/massa_ai"
 EMBEDDING_MODEL="qwen3-embedding:4b"
 OLLAMA_URL="http://localhost:11434"
-LLM_MODEL="qwen3:8b"
-CODE_MODEL="qwen3-coder:30b"
 SEARCH_QU_ENABLED=false
 SEARCH_RERANK_ENABLED=false
 DATA_DIR="${TMP_ROOT}/data"
-export DATABASE_URL EMBEDDING_MODEL OLLAMA_URL LLM_MODEL CODE_MODEL DATA_DIR
+export DATABASE_URL EMBEDDING_MODEL OLLAMA_URL DATA_DIR
 
 WRITTEN_CFG="${TMP_ROOT}/written/config.json"
 mkdir -p "$(dirname "$WRITTEN_CFG")"
@@ -153,13 +151,108 @@ assert_eq "written config keeps database.url" \
     "$DATABASE_URL" "$(json_field "$WRITTEN_CFG" 'c.database.url')"
 assert_eq "written config keeps embedding.model" \
     "$EMBEDDING_MODEL" "$(json_field "$WRITTEN_CFG" 'c.embedding.model')"
-assert_eq "written config keeps llm.codeModel" \
-    "$CODE_MODEL" "$(json_field "$WRITTEN_CFG" 'c.llm.codeModel')"
 assert_eq "written config keeps dataDir" \
     "$DATA_DIR" "$(json_field "$WRITTEN_CFG" 'c.dataDir')"
 
 PERMS="$(ls -l "$WRITTEN_CFG" | cut -c2-10)"
 assert_eq "written config is owner-only (holds DATABASE_URL and the API key)" "rw-------" "$PERMS"
+
+# ---- The Ollama block is no longer three hardcoded literals (LIP-06) --------
+# Every case above drives the write with OLLAMA_URL alone, exactly as the
+# wizard does, so the defaults must still produce today's file. The llm.baseUrl
+# assertion is the one that used to be unconditionally true: the template
+# hardcoded http://localhost:11434/v1 regardless of OLLAMA_URL.
+assert_eq "written config still names ollama as the embedding provider" \
+    "ollama" "$(json_field "$WRITTEN_CFG" 'c.embedding.provider')"
+assert_eq "written config takes embedding.baseURL from OLLAMA_URL" \
+    "$OLLAMA_URL" "$(json_field "$WRITTEN_CFG" 'c.embedding.baseURL')"
+assert_eq "written config derives llm.baseUrl from OLLAMA_URL" \
+    "${OLLAMA_URL}/v1" "$(json_field "$WRITTEN_CFG" 'c.llm.baseUrl')"
+assert_eq "written config keeps the ollama llm.apiKey" \
+    "ollama" "$(json_field "$WRITTEN_CFG" 'c.llm.apiKey')"
+assert_eq "written config keeps disableThink on for ollama" \
+    "true" "$(json_field "$WRITTEN_CFG" 'c.llm.disableThink')"
+assert_eq "written config resolves the known width for qwen3-embedding:4b" \
+    "2560" "$(json_field "$WRITTEN_CFG" 'c.embedding.dimensions')"
+
+# A remote/WSL Ollama is the case the hardcoded literal got wrong.
+REMOTE_CFG="${TMP_ROOT}/remote/config.json"
+mkdir -p "$(dirname "$REMOTE_CFG")"
+(
+    OLLAMA_URL="http://192.168.1.50:11434"
+    export OLLAMA_URL
+    installer_write_config "$REMOTE_CFG" "$FIRST_KEY"
+)
+assert_eq "a remote OLLAMA_URL reaches llm.baseUrl too" \
+    "http://192.168.1.50:11434/v1" "$(json_field "$REMOTE_CFG" 'c.llm.baseUrl')"
+
+# ---- An LM Studio write (LIP-06) -------------------------------------------
+# Same writer, different provider globals. The model is one LM Studio's own
+# knownDimensions table carries, so this resolves 768 without a live probe —
+# the suite stays offline.
+LMS_CFG="${TMP_ROOT}/lmstudio/config.json"
+mkdir -p "$(dirname "$LMS_CFG")"
+(
+    INFERENCE_PROVIDER="lmstudio"
+    EMBEDDING_MODEL="text-embedding-nomic-embed-text-v1.5"
+    export INFERENCE_PROVIDER EMBEDDING_MODEL
+    installer_write_config "$LMS_CFG" "$FIRST_KEY"
+)
+assert_eq "an LM Studio write records provider lmstudio" \
+    "lmstudio" "$(json_field "$LMS_CFG" 'c.embedding.provider')"
+assert_eq "an LM Studio write points embedding.baseURL at :1234/v1" \
+    "http://localhost:1234/v1" "$(json_field "$LMS_CFG" 'c.embedding.baseURL')"
+assert_eq "an LM Studio write points llm.baseUrl at :1234/v1" \
+    "http://localhost:1234/v1" "$(json_field "$LMS_CFG" 'c.llm.baseUrl')"
+assert_eq "an LM Studio write keeps the embedding model it was given" \
+    "text-embedding-nomic-embed-text-v1.5" "$(json_field "$LMS_CFG" 'c.embedding.model')"
+assert_eq "an LM Studio write resolves 768, not the retired 2560 catch-all" \
+    "768" "$(json_field "$LMS_CFG" 'c.embedding.dimensions')"
+# PDM-13: this used to assert "false". The injection is gated by the provider
+# seam's `injectsDisableThink`, not by this field, so writing "false" on the LM
+# Studio path changed no request and only made the Admin Portal render the
+# toggle off against a shipped default of on. Both providers now write the
+# shipped default; the provider difference stays in the seam.
+assert_eq "an LM Studio write agrees with the shipped disableThink default" \
+    "true" "$(json_field "$LMS_CFG" 'c.llm.disableThink')"
+if [ "$(json_field "$LMS_CFG" 'c.llm.apiKey')" = "ollama" ]; then
+    fail "an LM Studio write still carries the hardcoded ollama llm.apiKey"
+else
+    ok "an LM Studio write does not carry the hardcoded ollama llm.apiKey"
+fi
+
+# ---- F3/G5: an explicit MASSA_AI_LLM_MODEL survives installer_write_config -
+# setup-local-first.sh:334-339 honours MASSA_AI_LLM_MODEL/MASSA_AI_LLM_CODE_MODEL
+# before installer_write_config ever runs (pulls, loads and announces that
+# model); installer_provider_defaults used to overwrite LLM_MODEL/CODE_MODEL
+# from INFERENCE_PROVIDER unconditionally, silently discarding the override.
+# Each case runs in its own subshell so the override never leaks into a
+# sibling assertion — the isolation this suite's own comment above already
+# names as the reason `installer_provider_defaults`'s assignments must not
+# read a previous call's leftover state.
+OVERRIDE_CFG="${TMP_ROOT}/override/config.json"
+mkdir -p "$(dirname "$OVERRIDE_CFG")"
+(
+    MASSA_AI_LLM_MODEL="custom-instruct-model"
+    MASSA_AI_LLM_CODE_MODEL="custom-code-model"
+    export MASSA_AI_LLM_MODEL MASSA_AI_LLM_CODE_MODEL
+    installer_write_config "$OVERRIDE_CFG" "$FIRST_KEY"
+)
+assert_eq "an explicit MASSA_AI_LLM_MODEL survives installer_write_config" \
+    "custom-instruct-model" "$(json_field "$OVERRIDE_CFG" 'c.llm.model')"
+assert_eq "an explicit MASSA_AI_LLM_CODE_MODEL survives installer_write_config" \
+    "custom-code-model" "$(json_field "$OVERRIDE_CFG" 'c.llm.codeModel')"
+
+NO_OVERRIDE_CFG="${TMP_ROOT}/no-override/config.json"
+mkdir -p "$(dirname "$NO_OVERRIDE_CFG")"
+(
+    unset MASSA_AI_LLM_MODEL MASSA_AI_LLM_CODE_MODEL
+    installer_write_config "$NO_OVERRIDE_CFG" "$FIRST_KEY"
+)
+assert_eq "the ollama llm.model default still applies when MASSA_AI_LLM_MODEL is unset" \
+    "qwen3-vl:8b" "$(json_field "$NO_OVERRIDE_CFG" 'c.llm.model')"
+assert_eq "the ollama llm.codeModel default still applies when MASSA_AI_LLM_CODE_MODEL is unset" \
+    "qwen2.5-coder:7b" "$(json_field "$NO_OVERRIDE_CFG" 'c.llm.codeModel')"
 
 # ---- Re-run idempotency: the whole point of the task ------------------------
 

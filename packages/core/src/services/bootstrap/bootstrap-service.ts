@@ -235,7 +235,7 @@ export class BootstrapService {
       } catch (e) {
         logger.warn("bootstrap: marker check threw (continuing)", {
           projectId,
-          error: (e as Error).message,
+          error: e as Error,
         });
       }
     } else if (!cfg.refreshEnabled) {
@@ -297,7 +297,7 @@ export class BootstrapService {
     } catch (e) {
       logger.warn("bootstrap: storeSeeds failed (silent)", {
         projectId,
-        error: (e as Error).message,
+        error: e as Error,
       });
       return { ...noopResult("insert-failed"), signalCount, source };
     }
@@ -493,7 +493,7 @@ export async function summarizeWithLlm(
 
   const prompt = buildSummarizePrompt(signals, maxSeedMemories);
   try {
-    const res = await surface.object(prompt, SeedMemoriesSchema, { modelRole: "code" });
+    const res = await surface.object(prompt, SeedMemoriesSchema, { label: "bootstrap-seed", modelRole: "code" });
     if (!res.ok || !res.value) {
       return { ok: false, reason: res.error || "llm returned no value" };
     }

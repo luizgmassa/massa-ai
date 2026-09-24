@@ -62,7 +62,7 @@ export async function applySynapseState(
     logger.warn("Synapse session lookup failed — using stateless search", {
       sessionId,
       projectId,
-      error: (error as Error).message,
+      error: error as Error,
     });
     return baseResults;
   }
@@ -85,7 +85,7 @@ export async function applySynapseState(
     logger.warn("Synapse processing failed — using stateless search", {
       sessionId,
       projectId,
-      error: (error as Error).message,
+      error: error as Error,
     });
     return baseResults;
   }

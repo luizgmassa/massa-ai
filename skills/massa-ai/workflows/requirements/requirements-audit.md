@@ -26,24 +26,13 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - `references/agent-orchestration.md` only for large scopes, explicit parallel/subagent requests, PR subagent invocation, or independent verification of high-impact findings
 3. `recall` -> load prior product decisions, accepted requirements, ADRs, scope constraints, known regressions, project patterns, and accepted exceptions for the target area.
    - Apply the Memory Freshness Gate from `references/audit-scope.md`; recalled exceptions are leads, not proof.
-4. Establish the investigation scope before proceeding:
-   - Modified files scope: use when the user says modified files, changed files, current changes, uncommitted changes, staged changes, or unstaged changes.
-   - Explicit files/globs scope: use when the user names files, directories, or globs.
-   - Commit range scope: use when the user provides commits/ranges or asks for commits made by me, my branch commits, or requirement drift introduced by branch commits.
-   - Branch comparison scope: use when the user names base/head branches, refs, or a branch diff.
-   - Codebase area scope: use when the user names a path, module, package, feature area, user journey, or glob.
-   - Symbol/class/function scope: use when the user names public classes, functions, APIs, handlers, or exported surfaces.
-   - Feature/flow scope: use when the user names a runtime flow, user journey, or feature area.
-   - Whole-repo scope: use only when the user explicitly asks for a whole-repo requirements audit.
-   - Implementation parent scope: use only when `workflows/implementation/implementation-audit.md` invokes this workflow with a concrete implementation scope packet.
+4. Establish the investigation scope: select the scope type and build the shared scope packet per `references/audit-scope.md`, which owns the supported scope types, the ask-when-vague rule, and the packet fields. Carry the packet into the report.
    - Requirements source scope: use provided prompt text, PR description, issue text, task file, spec, RFC, ADR, acceptance criteria, or README section as the expected behavior source.
-   - If the target focus is missing, vague, or too broad, ask for a concrete target from the supported scope types in `references/audit-scope.md`.
    - If requirements source is missing after checking the prompt, PR description, task file, spec, issue text, and repo docs, ask for the requirements source before proceeding.
-   - Build the shared scope packet from `references/audit-scope.md` and carry it into the report.
 5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Requirements row of Per-Lens Scope Deltas). Implementation parent scope additionally carries the requirement source from `implementation-audit`.
-6. Investigation pass. Dispatch `audit-specialist` per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
+6. Investigation pass. Dispatch `product-manager` (`audit` mode) per `references/agent-orchestration.md` when the scope justifies an isolated read-only subagent:
 
-> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `product-manager`** (role: `product-manager`, mode: `audit`) — charter `skills/agents/product-manager/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, or independent verification of high-impact finding
 > - scope: the requirements audit target — files, contracts, specs, acceptance criteria
 > - permissions: read-only
@@ -52,7 +41,6 @@ Findings-only: do not edit code unless the user separately asks for fixes.
 > - output: findings with requirement gap, location, evidence, severity, confidence, simplest fix direction, verification suggestion
 > - firewall: raw diffs/logs/search output summarized, not returned raw
 > - memory: suggest-only; main agent persists reusable requirements patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Build a requirement checklist from the source: must-have behavior, non-goals, acceptance criteria, compatibility constraints, inputs, outputs, and user-visible promises.
    - Compare implementation and tests against each checklist item.

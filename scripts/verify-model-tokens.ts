@@ -43,7 +43,7 @@
 
 import { readFileSync, readdirSync, existsSync, statSync } from "fs";
 import path from "path";
-import { loadRegistry } from "./lib/model-profiles.ts";
+import { loadRegistry, resolvedModelString } from "./lib/model-profiles.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "..");
 const FIXTURE = ".specs/features/model-profile-registry/fixtures/baseline-main.json";
@@ -66,10 +66,16 @@ export function modelTokens(root = REPO_ROOT): readonly string[] {
   };
 
   const registry = loadRegistry(path.join(root, "skills/model-profiles.json"));
+  for (const entry of Object.values(registry.models)) {
+    add(resolvedModelString(entry));
+  }
   for (const profile of Object.values(registry.profiles)) {
-    for (const tiers of Object.values(profile.hosts)) {
-      for (const resolved of Object.values(tiers)) {
-        if (resolved.model !== null) add(resolved.model);
+    for (const cell of Object.values(profile.hosts)) {
+      if (cell.model !== null) add(cell.model);
+    }
+    for (const hostMap of Object.values(profile.agents ?? {})) {
+      for (const cell of Object.values(hostMap)) {
+        if (cell.model !== null) add(cell.model);
       }
     }
   }
@@ -194,7 +200,7 @@ export function collectTargets(root = REPO_ROOT): readonly Target[] {
   // 5. the sub-agent registry.
   //
   // No mirrored copies: `generate-skill-artifacts.ts` bundles
-  // `skills/{massa-ai,persona-router,agents}/` into each host, but NOT
+  // `skills/{massa-ai,profile,bootstrap,agents}/` into each host, but NOT
   // `skills/AGENTS.md` — that file is the source of the bootstrap block
   // `install-skills.sh` writes to `<host>/AGENTS.md` at install time. Adding
   // `apps/*/skills/AGENTS.md` here would be four silently-inert paths, which is
@@ -204,10 +210,9 @@ export function collectTargets(root = REPO_ROOT): readonly Target[] {
   // written against the four surfaces MPR-R1 enumerated, and `skills/AGENTS.md`
   // was not among them — so while every charter was policed, the registry that
   // documents those charters carried a hand-authored "Model hint" column naming
-  // a model per agent, for an unstated host. It was already wrong for `planner`
-  // and `requirements-analyst`, two of the three roles whose tiers MPR
-  // normalized, and named models for `judge`/`meta-judge` that no profile
-  // resolves. Every gate stayed green throughout.
+  // a model per agent, for an unstated host. It was already wrong for two of
+  // the three roles whose tiers MPR normalized, and named models for the two
+  // debate-panel roles that no profile resolves. Every gate stayed green throughout.
   //
   // The lesson is about the surface list, not the matcher: the matcher would
   // have caught all four the moment it was pointed at the file.

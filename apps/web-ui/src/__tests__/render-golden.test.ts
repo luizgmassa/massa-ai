@@ -20,6 +20,97 @@
  *   MASSA_AI_WRITE_GOLDEN=1 bun test src/__tests__/render-golden.test.ts
  *
  * A diff here after a move means the move changed output. That is the signal.
+ *
+ * ── Deliberate regenerations (append one entry per rebase of the baseline) ───
+ *
+ * 1. a3ba8a6e — `renderConfig/read` and `renderConfig/write` moved because a
+ *    17th Config section, `bootstrap`, was added to
+ *    `src/static/views/config-sections.ts`. `CONFIG_SECTIONS_BY_KEY` there is a
+ *    mapped type over every `ConfigSectionKey`, so `MassaAiConfig.bootstrap`
+ *    (added by the bootstrap-file-and-rule-toggles feature) made `tsc` require
+ *    a matching section, and the fixture then carried 16 sections against a
+ *    renderer emitting 17. The delta is **additive and confined to that one
+ *    section**: both cases gained exactly one trailing
+ *    `<div class="config-section" data-section="bootstrap">` block — plus, in
+ *    write mode, its `data-action="config-save"` button — and no byte before it
+ *    changed. Every other case in the fixture is byte-untouched, so the
+ *    pre-split-behavior guarantee still holds for all of them.
+ *
+ * 2. T38 — the same two cases moved again because the `bootstrap` section's
+ *    **label** changed from "Bootstrap" to "Startup Contract", ending a
+ *    collision with the Memory section's pre-existing "Bootstrap …" fields
+ *    (`memory.bootstrap`, memory seeding — unrelated). The section `key` and
+ *    the persisted `bootstrap.rules` path are untouched; this is display text.
+ *    The delta was measured, not assumed: the case list is identical (88
+ *    before and after), exactly 2 cases differ, each by +7 bytes, and
+ *    substituting `>Startup Contract<` back to `>Bootstrap<` reproduces the
+ *    previous string **byte-for-byte** in both — so the change is that one
+ *    substitution and nothing else, and the other 86 cases are untouched.
+ *
+ * 3. T09 (per-provider-default-models, PDM-13) — `renderConfig/read` and
+ *    `renderConfig/write` moved because `config-sections.ts` gained two
+ *    `embedding` fields (`contextWindow`, `batchSize`) and three `llm` fields
+ *    (`contextWindow`, `codeContextWindow`, `codeTemperature`), plus updated
+ *    `guide` text for `embedding.model`/`embedding.dimensions`/`llm.model`
+ *    (retired `qwen3-embedding:4b`/2560/`qwen2.5:7b-instruct` examples
+ *    replaced with the current defaults). Diffed before regenerating: exactly
+ *    those 2 cases changed, no case was added or dropped, and the byte
+ *    divergence in both starts immediately after `embedding.dimensions`'s
+ *    closing `</div>` (the five new field blocks) plus the three guide-text
+ *    substitutions — every other case and every byte before that point is
+ *    untouched.
+ *
+ * 4. F8 (Fix Pass 1, per-provider-default-models) — `renderConfig/read` and
+ *    `renderConfig/write` moved because `llm.codeModel`'s guide text was
+ *    wrong: it read "falls back to the primary model", which PDM-01 AC-5
+ *    reverses (the fallback is the provider's coding default, never the
+ *    instruct model). Diffed before regenerating: exactly those 2 cases
+ *    changed, no case was added or dropped, and both are a pure insertion —
+ *    the old and new strings share an identical prefix up to "falls back to
+ *    " and an identical suffix from "the primary model." onward; the only
+ *    new bytes are "that provider's coding default (e.g., `qwen2.5-coder:7b`
+ *    for Ollama, `qwen2.5-coder-7b-instruct` for LM Studio), never " inserted
+ *    between them (HTML-escaped by the renderer: `'` to `&#39;`, backticks to
+ *    `<code>`, matching the existing treatment of every other guide string).
+ *    Every other case and every byte outside that one span is untouched.
+ *
+ * 5. model-catalog-revamp T3 — the Model Catalog tab was rebuilt: tiers,
+ *    `hostDefaults`, `workflowTiers` and the old `agentTiers` string map are gone;
+ *    `renderModelRegistry` now renders a typed Models CRUD section, a host x profile
+ *    model-select grid, and Per-Agent Model Overrides. `splitModelId`/`joinModelId`
+ *    were deleted (the grid uses a model `<select>`, not free-text Provider/Model
+ *    inputs), so their two golden cases are dropped rather than moved. The
+ *    `form:add-workflow` case is replaced by `form:model-add`/`form:model-edit` (2
+ *    kinds x read/write = 4 new cases for the 2 dropped). Diffed before regenerating:
+ *    every case prefixed `renderModelRegistry`, every `renderProfilesView` case ending
+ *    in `registry`, and every case prefixed `mergeRegistryForDisplay` changed or was
+ *    added/dropped exactly as described above; every other case (Projects, Memory,
+ *    Search, Handoffs, Proposals, Checkpoints, Logs, Config, markdownToHtml,
+ *    escapeHtml, buildConfigSectionBody, ...) is byte-untouched.
+ *
+ * 6. model-catalog-revamp fix round (findings 11, V1, V3, V4) — `renderModelRegistry`
+ *    gained `aria-label`s on every profile-grid and per-agent model/effort control
+ *    (e.g. `"balanced · Claude model"`, `"builder · Codex effort"`); the profile grid is
+ *    now wrapped in its own `.registry-profile-grid` card (heading "Profiles" + a
+ *    rows/columns help line) instead of a bare `.grid-scroll` div; the Add/Duplicate/
+ *    Delete Profile buttons and their inline forms moved from after Per-Agent Model
+ *    Overrides into that new card, next to the grid they manage; and a per-agent row
+ *    with no override now shows its inherited effort as disabled text
+ *    (`"<effort> (profile)"`) instead of an editable `<select>` defaulting to the host
+ *    enum's first option. Diffed before regenerating: exactly the 18 cases prefixed
+ *    `renderModelRegistry` or ending `renderProfilesView/.../registry` changed, no case
+ *    was added or dropped, and every diffed byte falls into one of the four changes
+ *    above; every other case is byte-untouched.
+ *
+ * 7. agent-roster-revision T1 (REN-01..04) — the `builder` charter was renamed to
+ *    `senior-engineer`; the Per-Agent Model Overrides help card's example agent name in
+ *    `src/static/views/registry.ts` was updated to match. Diffed before regenerating:
+ *    exactly the same 18 cases as entry 6 changed, no case was added or dropped, and the
+ *    only diffed bytes are that one `<code>builder</code>` -> `<code>senior-engineer</code>`
+ *    substitution repeated once per case; every other case and byte is untouched. (The
+ *    `builder` strings still present elsewhere in this fixture's per-agent-override table
+ *    rows come from this test file's own synthetic registry mock, not the real charter, and
+ *    are unaffected by the rename.)
  */
 
 import { describe, it, expect } from "bun:test";
@@ -138,7 +229,7 @@ const CONFIG = {
     // capturePolicy deliberately absent — exercises the "not configured" note
     // and the `json` field's undefined-renders-empty branch.
   },
-  // T43 (WUT-18 AC5): a deliberately small default set, not the full ~104-field
+  // T43 (WUT-18 AC5): a deliberately small default set, not the full ~105-field
   // defaultMassaAiConfig blob — enough to exercise the inherited-field marking
   // across text/number/boolean field types (embedding.baseURL not persisted
   // above; the whole llm section absent above) without a golden diff too large
@@ -161,45 +252,44 @@ const PROFILES = {
 
 const REGISTRY = {
   registry: {
-    tiers: ["light", "standard", "deep"],
+    models: {
+      "claude-sonnet-5": { name: "Sonnet 5", host: "claude", provider: "", model: "claude-sonnet-5" },
+      "claude-opus-5-5": { name: "Opus 5.5", host: "claude", provider: "", model: "claude-opus-5-5" },
+      "codex-gpt-5.6-terra": { name: "GPT-5.6 Terra", host: "codex", provider: "", model: "gpt-5.6-terra" },
+      "opencode-zai-glm-5-2": { name: "GLM 5.2", host: "opencode", provider: "zai-coding-plan", model: "glm-5.2/x" },
+    },
     profiles: {
       work: {
         description: "work",
         hosts: {
-          claude: { light: { model: "haiku", effort: "low" }, standard: { model: "sonnet", effort: "high" }, deep: { model: "opus", effort: "max" } },
-          codex: { light: { model: "gpt-5.6-terra", effort: "minimal" } },
-          cursor: { standard: { model: null, effort: null } },
-          opencode: { deep: { model: "zai-coding-plan/glm-5.2/x", effort: "max" } },
+          claude: { model: "claude-sonnet-5", effort: "high" },
+          codex: { model: "gpt-5.6-terra", effort: "minimal" },
+          cursor: { model: null, effort: null },
+          opencode: { model: "zai-coding-plan/glm-5.2/x", effort: "max" },
         },
+        agents: { builder: { opencode: { model: "zai-coding-plan/glm-5.2/x", effort: "max" } } },
       },
-      cheap: { description: "cheap", hosts: { claude: { light: { model: "haiku", effort: "low" } } } },
+      cheap: { description: "cheap", hosts: { claude: { model: "claude-sonnet-5", effort: "low" } } },
     },
-    hostDefaults: { claude: "work", codex: "work", cursor: "cheap", opencode: "work" },
-    workflowTiers: { "spec-driven": "deep", refactor: "standard" },
-    agentTiers: { builder: { opencode: "deep" } },
   },
   source: { overlay: { profiles: { cheap: {} } }, tombstoned: ["legacy"] },
   overlayOverrideCount: 3,
-  agents: [
-    { name: "builder", charterTier: "standard" },
-    { name: NASTY, charterTier: "light" },
-  ],
+  agents: [{ name: "builder" }, { name: NASTY }],
 };
 
-// T42 (WUT-17 AC3/AC4): a dedicated fixture, not a mutation of REGISTRY above — REGISTRY
-// also feeds `renderProfilesView/*`, and the task's own scoping requirement is that a
-// golden diff touch only `renderModelRegistry/*` keys. Exercises all three non-profile
-// overlay categories (hostDefaults, workflowTiers, agentTiers) plus a server-computed
-// breakdown, so the count line names its categories and every corresponding row/cell
-// carries the badge.
+// T42-equivalent (model-catalog-revamp): a dedicated fixture, not a mutation of REGISTRY
+// above — REGISTRY also feeds `renderProfilesView/*`, and the task's own scoping
+// requirement is that a golden diff touch only `renderModelRegistry/*` keys. Exercises the
+// non-profile overlay category (models) plus a server-computed breakdown, so the count line
+// names its category.
 const REGISTRY_NON_PROFILE_OVERLAY = {
   ...REGISTRY,
   source: {
-    overlay: { hostDefaults: { cursor: "cheap" }, workflowTiers: { "spec-driven": "deep" }, agentTiers: { builder: { opencode: "deep" } } },
+    overlay: { models: { "claude-opus-5-5": { name: "Opus 5.5", host: "claude", provider: "", model: "claude-opus-5-5" } } },
     tombstoned: ["legacy"],
   },
-  overlayOverrideCount: 3,
-  overlayOverrideBreakdown: { hostDefaults: 1, workflowTiers: 1, agentTiers: 1, tiers: 0, profiles: 0 },
+  overlayOverrideCount: 1,
+  overlayOverrideBreakdown: { models: 1, profiles: 0 },
 };
 
 type Case = { name: string; run: () => unknown };
@@ -248,9 +338,9 @@ for (const wm of [false, true]) {
   add(`renderProfiles/${s}`, () => withWriteMode(wm, () => mod.renderProfiles(PROFILES, { writeMode: wm })));
   add(`renderProfiles/${s}/empty`, () => withWriteMode(wm, () => mod.renderProfiles({ hosts: [] }, { writeMode: wm })));
   add(`renderModelRegistry/${s}`, () => withWriteMode(wm, () => mod.renderModelRegistry(REGISTRY, { writeMode: wm, unsaved: true })));
-  for (const kind of ["add-workflow", "duplicate-profile", "delete-profile", "add-profile"]) {
+  for (const kind of ["duplicate-profile", "delete-profile", "add-profile", "model-add", "model-edit"]) {
     add(`renderModelRegistry/${s}/form:${kind}`, () =>
-      withWriteMode(wm, () => mod.renderModelRegistry(REGISTRY, { writeMode: wm, registryForm: { kind, error: "bad" } })),
+      withWriteMode(wm, () => mod.renderModelRegistry(REGISTRY, { writeMode: wm, registryForm: { kind, host: "claude", editId: "claude-sonnet-5", error: "bad" } })),
     );
   }
   add(`renderProfilesView/${s}/switch`, () =>
@@ -289,12 +379,6 @@ for (const [i, src] of [
 }
 add("escapeHtml/nasty", () => mod.escapeHtml(NASTY));
 add("escapeHtml/nullish", () => JSON.stringify([mod.escapeHtml(null), mod.escapeHtml(undefined)]));
-add("splitModelId", () =>
-  JSON.stringify(["a/b/c", "m", "", null, "a/"].map((v) => mod.splitModelId(v as unknown))),
-);
-add("joinModelId", () =>
-  JSON.stringify([["a", "b/c"], ["", "m"], ["", ""], [" p ", " m "]].map(([p, m]) => mod.joinModelId(p, m))),
-);
 add("buildConfigSectionBody/dataDir", () => JSON.stringify(mod.buildConfigSectionBody("dataDir", { dataDir: "/x" })));
 add("buildConfigSectionBody/search", () =>
   JSON.stringify(
@@ -330,11 +414,12 @@ add("buildConfigSectionBody/badJsonThrows", () => {
 add("mergeRegistryForDisplay/delta", () =>
   JSON.stringify(
     mod.mergeRegistryForDisplay(REGISTRY, {
-      profiles: { work: { hosts: { opencode: { deep: { model: "x", effort: "low" } } } }, gone: { _delete: true }, fresh: { description: "f", hosts: {} } },
-      hostDefaults: { claude: "cheap", codex: null },
-      workflowTiers: { refactor: null, debug: "light" },
-      agentTiers: { builder: { claude: "deep" }, dropped: null },
-      tiers: ["light", "standard", "deep"],
+      profiles: {
+        work: { hosts: { opencode: { model: "x", effort: "low" } }, agents: { builder: { claude: { model: "y", effort: "high" } } } },
+        gone: { _delete: true },
+        fresh: { description: "f", hosts: {} },
+      },
+      models: { "claude-opus-5-5": null, "codex-gpt-6": { name: "GPT-6", host: "codex", provider: "", model: "gpt-6" } },
     }),
   ),
 );

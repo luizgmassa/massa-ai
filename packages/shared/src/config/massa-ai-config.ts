@@ -1,5 +1,20 @@
 import path from "path";
 import { configDir } from "./xdg";
+import { LOCAL_INFERENCE_IDS, INFERENCE_PROVIDERS, INFERENCE_ROLE_DEFAULTS } from "./inference-providers";
+import { knownEmbeddingDimensions } from "./embedding-dimensions";
+
+/**
+ * API-only embedding providers writable to `config.json` — the other half of
+ * the union the three config provider lists derive from (LIP-01).
+ * Local-inference ids (`ollama`, `lmstudio`) live in `inference-providers.ts`.
+ */
+export const API_PROVIDER_IDS = ["mistral", "openai", "google", "cohere"] as const;
+
+/** `LOCAL_INFERENCE_IDS ∪ API_PROVIDER_IDS` — the writable `embedding.provider` set. */
+export const EMBEDDING_PROVIDER_IDS = [
+  ...LOCAL_INFERENCE_IDS,
+  ...API_PROVIDER_IDS,
+] as const;
 
 /** Registered scheduler job kinds exposed on the config surface. The row ids
  *  (`scheduled-*`) stay an implementation detail; the kind is the contract
@@ -34,11 +49,20 @@ export interface MassaAiConfig {
     url: string;
   };
   embedding: {
-    provider: "ollama" | "mistral" | "openai" | "google" | "cohere";
+    provider: (typeof EMBEDDING_PROVIDER_IDS)[number];
     model: string;
     baseURL?: string;
     apiKey?: string;
     dimensions?: number;
+    /** Context window sent/loaded for the embedding role (PDM-12). Optional like
+     *  `dimensions` above — a config predating this field has none. Config wins over
+     *  the role-table default (`INFERENCE_ROLE_DEFAULTS.embedding.contextWindow`)
+     *  when present. */
+    contextWindow?: number;
+    /** Texts submitted per provider call (PDM-12). Optional like `dimensions` above.
+     *  Config wins over the provider's measured default
+     *  (`InferenceProviderSpec.embedBatchSize`) when present. */
+    batchSize?: number;
   };
   compression: {
     // Runtime canonical shape — mirrors ServerConfig.compression. The loader
@@ -119,6 +143,16 @@ export interface MassaAiConfig {
     maxOutputTokens: number;
     timeoutMs: number;
     disableThink: boolean;
+    /** Context window for the instruct role (PDM-12). Config wins over
+     *  `INFERENCE_ROLE_DEFAULTS.instruct.contextWindow`. */
+    contextWindow: number;
+    /** Context window for the coding role (PDM-12). Config wins over
+     *  `INFERENCE_ROLE_DEFAULTS.coding.contextWindow`. */
+    codeContextWindow: number;
+    /** Temperature for the coding role — a new field, not a reinterpretation of
+     *  `temperature` (design decision 3). Config wins over
+     *  `INFERENCE_ROLE_DEFAULTS.coding.temperature`. */
+    codeTemperature: number;
   };
   memory: {
     decay: {
@@ -195,6 +229,18 @@ export interface MassaAiConfig {
   // SCH-06) exactly like every other section — this comment records the
   // reversal rather than silently deleting the prior decision.
   scheduler?: SchedulerConfig;
+  // Bootstrap rule toggle state (BST-10). Persisted under `bootstrap.rules`,
+  // one boolean per registry id in `packages/shared/src/bootstrap/rules.ts`.
+  // Optional and late-added, same precedent as `scheduler` above: an install
+  // whose config.json predates this section has no persisted overrides, and
+  // the renderer resolves that absence against the registry's own defaults
+  // (T5) rather than requiring every install to carry a full rules map. A
+  // key present here but absent from the registry is intentionally not
+  // rejected at this type level — the state resolver reports and ignores it
+  // (BST-10 AC-12) rather than failing config load entirely.
+  bootstrap?: {
+    rules?: Record<string, boolean>;
+  };
 }
 
 /**
@@ -268,10 +314,14 @@ export const MAX_IGNORE_PATTERNS = 1_024;
  * `packages/core/src/services/search/capture-policy.ts`, which now re-exports
  * this (`core` depends on `shared`, never the reverse).
  *
- * It is a REAL default, not `undefined`. Leaving it absent made
- * `GET /api/v1/config` return 14 of the Admin Portal's 16 sections, so the
- * Capture Policy tab rendered "not configured" while these 30 rules were the
- * ones actually dropping files from every index.
+ * It is a REAL default, not `undefined`. `GET /api/v1/config` returns a
+ * section only when the merged config carries a value for it, so leaving this
+ * absent made the Capture Policy tab render "not configured" while these 30
+ * rules were the ones actually dropping files from every index. The portal
+ * declared 16 sections then and the endpoint resolved 14 of them (Scheduler
+ * was the other); measured at HEAD it declares 17 — `CONFIG_SECTIONS` in
+ * `apps/web-ui/src/static/views/config-sections.ts` — and all 17 resolve
+ * against an empty scratch home.
  *
  * Content-identical to the previous core-side literal, which is what keeps
  * this a disclosure rather than a behavior change: `getActivePolicy()` used to
@@ -350,9 +400,13 @@ export const defaultMassaAiConfig: MassaAiConfig = {
   // env-only path defaults to, or the merge itself would change behavior.
   embedding: {
     provider: "ollama",
-    model: "qwen3-embedding:4b",
+    model: INFERENCE_PROVIDERS.ollama.defaultModels.embedding,
     baseURL: "http://localhost:11434",
-    dimensions: 2560,
+    dimensions: knownEmbeddingDimensions(INFERENCE_PROVIDERS.ollama.defaultModels.embedding) ?? 768,
+    // contextWindow / batchSize are deliberately left unset here (unlike
+    // `dimensions` above): the role table (`INFERENCE_ROLE_DEFAULTS.embedding`,
+    // `InferenceProviderSpec.embedBatchSize`) is their default source, applied
+    // at the consumption site, not duplicated into this shipped template.
   },
   compression: {
     defaultStrategy: "code_structure",
@@ -397,12 +451,15 @@ export const defaultMassaAiConfig: MassaAiConfig = {
     enabled: false,
     baseUrl: "http://localhost:11434/v1",
     apiKey: "ollama",
-    model: "qwen2.5:7b-instruct",
-    codeModel: "qwen2.5-coder:7b",
+    model: INFERENCE_PROVIDERS.ollama.defaultModels.instruct,
+    codeModel: INFERENCE_PROVIDERS.ollama.defaultModels.coding,
     temperature: 0.2,
     maxOutputTokens: 8000,
     timeoutMs: 90_000,
     disableThink: true,
+    contextWindow: INFERENCE_ROLE_DEFAULTS.instruct.contextWindow,
+    codeContextWindow: INFERENCE_ROLE_DEFAULTS.coding.contextWindow,
+    codeTemperature: INFERENCE_ROLE_DEFAULTS.coding.temperature,
   },
   memory: {
     decay: {
@@ -498,4 +555,12 @@ export const defaultMassaAiConfig: MassaAiConfig = {
   // otherwise showed the Admin Portal's Scheduler tab with no fields at all.
   // These are the same literals `config/index.ts` resolves against.
   scheduler: DEFAULT_SCHEDULER_CONFIG,
+  // Present, not absent, same reasoning as `scheduler` above. Empty rather
+  // than pre-populated with every registry id's default: this section holds
+  // only the user's *overrides* of `bootstrap/rules.ts`'s registry defaults
+  // (BST-10), and `massa-ai-config.ts` deliberately does not import that
+  // module — the rule registry's own defaults are what an absent/empty
+  // override map resolves against (T5's `resolveBootstrapState`), not a
+  // second copy of them duplicated into this file.
+  bootstrap: { rules: {} },
 };

@@ -60,13 +60,15 @@ API_ORIGIN="http://127.0.0.1:${API_PORT}"
 DB_URL="postgresql://test:test@127.0.0.1:${PG_PORT}/massa_ai_test"
 OLLAMA_ORIGIN="http://127.0.0.1:${OLLAMA_PORT}"
 
-# The embedding model that is actually installed locally. The historical runbook
-# pins qwen3-embedding:8b at 4096 dimensions; that model is not present, and a
-# dimension mismatch degrades silently to a different vector table rather than
-# failing, so the pin is corrected here rather than inherited.
-EMBED_MODEL="${MASSA_AI_E2E_EMBED_MODEL:-qwen3-embedding:4b}"
-EMBED_DIMS="${MASSA_AI_E2E_EMBED_DIMS:-2560}"
-LLM_MODEL="${MASSA_AI_E2E_LLM_MODEL:-qwen2.5:7b-instruct}"
+# The product's own Ollama defaults (INFERENCE_PROVIDERS.ollama.defaultModels),
+# held equal to them by scripts/__tests__/embedding-defaults-parity.test.ts. The
+# historical runbook pinned qwen3-embedding:8b at 4096 and this script later
+# pinned qwen3-embedding:4b at 2560; a dimension mismatch degrades silently to a
+# different vector table rather than failing, so the pin follows the default
+# instead of being inherited.
+EMBED_MODEL="${MASSA_AI_E2E_EMBED_MODEL:-qwen3-embedding:0.6b}"
+EMBED_DIMS="${MASSA_AI_E2E_EMBED_DIMS:-1024}"
+LLM_MODEL="${MASSA_AI_E2E_LLM_MODEL:-qwen3-vl:8b}"
 LLM_CODE_MODEL="${MASSA_AI_E2E_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
 
 FIXTURE_PATH="${MASSA_AI_E2E_PROJECT_PATH:-/tmp/massa-ai-e2e-fixture}"

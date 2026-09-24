@@ -42,21 +42,6 @@ mock.module("@massa-ai/shared", () => ({
   syncGeneratedVariants: (...args: unknown[]) => syncGeneratedVariants(...args),
 }));
 
-// getRegistryHostDefaults is mocked so a test can assert exactly what
-// listProfiles() receives, without pulling in the real scripts/lib
-// dynamic-require plumbing (already covered by model-registry.test.ts).
-const getRegistryHostDefaults = mock((..._args: unknown[]): unknown => ({
-  claude: "balanced",
-  codex: "balanced",
-  cursor: "balanced",
-  opencode: "balanced",
-}));
-const actualModelRegistry = require("./model-registry.ts");
-mock.module("./model-registry.ts", () => ({
-  ...actualModelRegistry,
-  getRegistryHostDefaults: (...args: unknown[]) => getRegistryHostDefaults(...args),
-}));
-
 // getDeploymentRoot controls the sourceRoot syncGeneratedVariants is called
 // with (assertable below); real resolution by default (a real checkout).
 const actualDeployment = require("./model-registry-deployment.ts");
@@ -78,7 +63,6 @@ beforeEach(() => {
   listProfiles.mockClear();
   switchProfile.mockClear();
   syncGeneratedVariants.mockClear();
-  getRegistryHostDefaults.mockClear();
   getDeploymentRoot.mockClear();
 });
 
@@ -124,13 +108,11 @@ describe("GET /api/v1/profiles", () => {
     expect((listProfiles.mock.calls.at(-1) as any[] | undefined)?.[0]).toMatchObject({ hosts: ["codex"] });
   });
 
-  test("T3: hostDefaults from getRegistryHostDefaults() reaches listProfiles", async () => {
+  test("spec AC8: listProfiles is called with no hostDefaults option — the registry key is gone in v2, the active label falls back to install-state then \"balanced\"", async () => {
     listProfiles.mockImplementationOnce(() => ({ hosts: [] }));
     await get("/api/v1/profiles");
-    expect(getRegistryHostDefaults).toHaveBeenCalled();
-    expect((listProfiles.mock.calls.at(-1) as any[] | undefined)?.[0]).toMatchObject({
-      hostDefaults: { claude: "balanced", codex: "balanced", cursor: "balanced", opencode: "balanced" },
-    });
+    const arg = (listProfiles.mock.calls.at(-1) as any[] | undefined)?.[0];
+    expect(arg).not.toHaveProperty("hostDefaults");
   });
 });
 

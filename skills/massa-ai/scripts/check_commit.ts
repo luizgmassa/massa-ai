@@ -33,7 +33,10 @@
 
 import { readFileSync } from "node:fs";
 
-const TYPES = ["feat", "fix", "refactor", "docs", "test", "style", "perf", "build", "ci", "chore"];
+// `revert` is in the list because `workflows/commit.md` §8 names it in the type
+// precedence order the workflow tells the agent to pick from. Without it the
+// script rejected a message the workflow had just instructed the agent to write.
+const TYPES = ["feat", "fix", "refactor", "docs", "test", "style", "perf", "build", "ci", "chore", "revert"];
 
 // massa-ai patch (D1c): an optional leading Jira-style key prefix, e.g.
 // "[SA-142] feat(auth): reject expired tokens" (workflows/commit.md §8). The

@@ -100,7 +100,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
       } catch (e) {
         rethrowCanonicalHandoffError(e);
         const err = e as Error;
-        logger.error("handoff begin failed", err);
+        logger.error("handoff begin failed", err, { projectId: b.projectId });
         set.status = 500;
         return { success: false, error: `handoff begin failed: ${err.message}` };
       }
@@ -142,7 +142,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
       } catch (e) {
         rethrowCanonicalHandoffError(e);
         const err = e as Error;
-        logger.error("handoff accept failed", err);
+        logger.error("handoff accept failed", err, { id: b.id, projectId: b.projectId });
         set.status = 500;
         return { success: false, error: `handoff accept failed: ${err.message}` };
       }
@@ -179,7 +179,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
       } catch (e) {
         rethrowCanonicalHandoffError(e);
         const err = e as Error;
-        logger.error("handoff cancel failed", err);
+        logger.error("handoff cancel failed", err, { id: b.id, projectId: b.projectId });
         set.status = 500;
         return { success: false, error: `handoff cancel failed: ${err.message}` };
       }
@@ -219,7 +219,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
       } catch (e) {
         rethrowCanonicalHandoffError(e);
         const err = e as Error;
-        logger.error("handoff list failed", err);
+        logger.error("handoff list failed", err, { projectId: b.projectId, targetAgent: b.targetAgent });
         set.status = 500;
         return { success: false, error: `handoff list failed: ${err.message}` };
       }
@@ -320,7 +320,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
       } catch (e) {
         rethrowCanonicalHandoffError(e);
         const err = e as Error;
-        logger.error("handoff update failed", err);
+        logger.error("handoff update failed", err, { id: params.id, projectId: query.projectId });
         set.status = 500;
         return { success: false, error: `handoff update failed: ${err.message}` };
       }
@@ -363,7 +363,7 @@ export const handoffRoutes = new Elysia({ prefix: "/api/v1/handoff" })
       } catch (e) {
         rethrowCanonicalHandoffError(e);
         const err = e as Error;
-        logger.error("handoff delete failed", err);
+        logger.error("handoff delete failed", err, { id: params.id, projectId: query.projectId });
         set.status = 500;
         return { success: false, error: `handoff delete failed: ${err.message}` };
       }

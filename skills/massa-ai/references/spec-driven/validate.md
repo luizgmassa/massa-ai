@@ -164,7 +164,7 @@ For mobile or UI features, follow the [references/mobile-context.md](../mobile-c
 
 For each issue found during UAT or from the Verifier:
 
-1. **Diagnose** — Analyze the codebase to find root cause. Prefer massa-ai code-analysis tools first (search, optimized_context) for symbol and dependency location; fall back to ast-grep/rg/grep when the index is stale or unavailable. Current source overrides stale index/memory.
+1. **Diagnose** — Analyze the codebase to find root cause, following `references/spec-driven/code-analysis.md` §Tool Priority for search order. Current source overrides stale index/memory.
 2. **Create fix task** — Write a task definition with:
    - What: The specific fix
    - Where: File paths
@@ -180,14 +180,14 @@ Fix tasks follow the same format as regular tasks and can be executed with the i
 
 After all checks complete, the Verifier MUST:
 
-1. **Write the persisted report** to `.specs/features/<slug>/validation.md` (see template below). This file is the evidence artifact — it survives the session and can be referenced by CI, reviewers, or future agents. Record in `.specs/project/STATE.md` (Decisions) that validation evidence is available at that path.
+1. **Write the persisted report** to `.specs/features/<slug>/validation.md` (see template below). This file is the evidence artifact — it survives the session and can be referenced by CI, reviewers, or future agents. It is the only file the Verifier writes (the `code-reviewer` `verify` carve-out); the orchestrator records in `.specs/project/STATE.md` (Decisions) that validation evidence is available at that path.
 2. **Return a compact summary in chat** to the orchestrator (see Compact Chat Summary section below). The orchestrator surfaces it to the user and routes any ranked gaps to fix tasks.
 
 **Deterministic backing (run it, do not eyeball it):** after writing the report, run `bun skills/massa-ai/scripts/validate_state.ts <feature> [--root .]`. It confirms the report is real — present, verdict filled to PASS, and backed by at least one `file:line` evidence citation — so a missing, hollow, placeholder, or FAIL report cannot slip through as done. A non-zero exit means the feature is NOT done: repair the report or route the FAIL gaps to fix tasks, then re-run. This is the closing gate of Execute and runs automatically, the same way the lessons layer runs at distillation — never a manual step. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
 ### 10. Distill Lessons (MANDATORY when validation.md has signal)
 
-This is the closing action of validation — not a separate phase. Immediately after the report is written, turn its grounded failures into reusable, project-local guidance by following [references/lessons.md](../lessons.md) and the stub at [references/spec-driven/lessons.md](lessons.md). In short: for each surviving mutant, spec-precision gap, failed/uncovered AC, or `// SPEC_DEVIATION`, record one terse general lesson via:
+This is the closing action of validation — not a separate phase. Immediately after the report is written, turn its grounded failures into reusable, project-local guidance by following [references/lessons.md](../lessons.md). In short: for each surviving mutant, spec-precision gap, failed/uncovered AC, or `// SPEC_DEVIATION`, record one terse general lesson via:
 
 ```bash
 bun skills/massa-ai/scripts/lessons.ts --root . add --feature <slug> --signal "<signal>" --source "<source>" --text "<lesson>" --scope "<scope>"

@@ -12,10 +12,7 @@
  * Source -> destination (design.md D2):
  *
  *   skills/massa-ai/**            -> apps/<host>-plugin/skills/massa-ai/**
- *   skills/persona-router/**      -> apps/<host>-plugin/skills/persona-router/**
- *   skills/profile/**             -> apps/<host>-plugin/skills/profile/**
- *     (model-profile-switching T15 — a whole-directory bundle, same as massa-ai/
- *     and persona-router/, not an agents/<n>/SKILL.md charter)
+ *   skills/bootstrap/**           -> apps/<host>-plugin/skills/bootstrap/**
  *   skills/agents/<n>/SKILL.md    -> apps/<host>-plugin/skills/agents/<n>/SKILL.md
  *   scripts/lib/opencode-config.cjs -> apps/opencode-plugin/lib/opencode-config.cjs
  *   apps/claude-plugin/hooks/massa-ai-hook.ts -> apps/{codex,cursor}-plugin/hooks/massa-ai-hook
@@ -128,14 +125,20 @@ async function walkFiles(dir: string): Promise<string[]> {
 
 /**
  * Every file this generator owns under `apps/<host>-plugin/skills/`, for all
- * four hosts: skills/massa-ai/**, skills/persona-router/**, and one SKILL.md
- * per skills/agents/<name>/ directory. `relPath` is relative to the plugin's
- * `skills/` directory.
+ * four hosts: skills/massa-ai/**, skills/bootstrap/**,
+ * and one SKILL.md per skills/agents/<name>/ directory.
+ * `relPath` is relative to the plugin's `skills/` directory.
+ *
+ * The bundle list below is one of TWO hardcoded lists a new bundle has to be
+ * added to; `managedRootsFor` is the other. Adding it here alone makes emit
+ * work while `--check` never walks the new subtree and prune never reaches
+ * into it, so a stale file there survives forever and the drift gate reports
+ * clean (T21 / TASK-021).
  */
 export async function collectSkillEntries(): Promise<ManagedEntry[]> {
   const entries: ManagedEntry[] = [];
 
-  for (const bundleName of ["massa-ai", "persona-router", "profile"] as const) {
+  for (const bundleName of ["massa-ai", "bootstrap"] as const) {
     const sourceDir = path.join(SKILLS_DIR, bundleName);
     const files = await walkFiles(sourceDir);
     for (const rel of files) {
@@ -214,10 +217,13 @@ async function assertCopyable(entry: ManagedEntry): Promise<void> {
 // arbitrary capability combination drives this list (production always uses
 // the real capabilitiesFor()).
 export function managedRootsFor(host: string, capsLookup: CapsLookup = REAL_CAPS_LOOKUP): string[] {
+  // Keep in step with `collectSkillEntries`'s bundle list: that one decides
+  // what is emitted, this one decides what `--check` walks and what prune may
+  // delete inside. A bundle present in only one of the two is the failure mode
+  // T21 documents at the other site.
   const common = [
     path.join("skills", "massa-ai"),
-    path.join("skills", "persona-router"),
-    path.join("skills", "profile"),
+    path.join("skills", "bootstrap"),
     path.join("skills", "agents"),
   ];
   const extra = capsLookup(host)?.extraManagedRoots ?? [];
@@ -240,17 +246,27 @@ async function copyEntries(
 }
 
 /**
+ * Bundle roots a previous generator emitted and this one no longer does. They
+ * left `managedRootsFor`, so without this sweep a stale copy in a checkout
+ * would survive forever — and the cursor installer would copy it into the
+ * command-skill cache once it left that installer's exclusion list (PER AC-3).
+ */
+export const RETIRED_BUNDLE_ROOTS = ["persona-router", "profile"] as const;
+
+/**
  * Removes a host's prior managed-root contents (and its hook-binary file, if
  * it is a hookBinaryHosts() member) before emit copies anything back in.
  *
  * Why: git no longer tracks deletions once these bundles are gitignored
  * (UGB-04) — a source file removed from `skills/` must not leave a stale
  * copy behind in every plugin forever. Removal targets come only from
- * `managedRootsFor()` (the same table `--check` walks) and
- * `hookBinaryHosts()`; there is no second literal list to drift, so a
- * hand-authored file living beside a managed root (a codex/cursor quick
- * skill under `skills/`, `hooks.json` beside `hooks/massa-ai-hook`) is never
- * a prune candidate — it is not enumerated by either table.
+ * `managedRootsFor()` (the same table `--check` walks), `hookBinaryHosts()`,
+ * and `RETIRED_BUNDLE_ROOTS`. That last one is a literal list with a twin:
+ * `scripts/install-skills.sh`'s `RETIRED_SKILL_NAMES` must name the same
+ * skills, and generate-skill-artifacts-prune.test.ts asserts the two are
+ * equal. A hand-authored file living beside a managed root (a codex/cursor
+ * quick skill under `skills/`, `hooks.json` beside `hooks/massa-ai-hook`) is
+ * never a prune candidate — none of the three enumerates it.
  * Impacts: UGB-03/04, T1.
  * Test: bun test scripts/__tests__/generate-skill-artifacts-prune.test.ts
  */
@@ -262,6 +278,9 @@ async function pruneManagedRoots(
 ): Promise<void> {
   for (const managedRel of managedRootsFor(host, capsLookup)) {
     await fs.rm(path.join(targetRoot, managedRel), { recursive: true, force: true });
+  }
+  for (const retired of RETIRED_BUNDLE_ROOTS) {
+    await fs.rm(path.join(targetRoot, "skills", retired), { recursive: true, force: true });
   }
   // Pruned unconditionally on host, not gated on current hookBinaryHosts()
   // membership — a host whose capability entry just flipped away from

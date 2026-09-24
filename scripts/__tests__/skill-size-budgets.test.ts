@@ -1,12 +1,10 @@
 /**
- * Skill size-budget gate (persona-router-token-optimization, PRT-07).
+ * Skill size-budget gate (PRT-07).
  *
- * Persona routing once cost ~8k tokens per session because these artifacts
- * grew unwatched (SKILL.md 13,316 B, catalog.json 8,871 B, prompts up to
- * 8,308 B — measured 2026-08-04). The budgets below are the ceilings the
- * feature shipped under; regrowth past them re-creates the per-session tax.
- * Raising a budget is a deliberate decision that belongs in a PR touching
- * this file, never a side effect.
+ * Budgets are per-file byte ceilings for always-loaded skill artifacts;
+ * regrowth past them re-creates a per-session token tax. Raising a budget is
+ * a deliberate decision that belongs in a PR touching this file, never a
+ * side effect.
  *
  * Two structural rules (both from memory-lesson classes this repo has hit):
  * - The resolved file population is printed beside the verdict — a budget
@@ -33,13 +31,9 @@ type Budget = {
 };
 
 const BUDGETS: Budget[] = [
-  { subject: "skills/persona-router/SKILL.md", maxBytes: 5_500 },
-  { subject: "skills/persona-router/references", pattern: /\.md$/, maxBytes: 8_000 },
-  { subject: "skills/massa-ai/personas/catalog.json", maxBytes: 2_500 },
-  { subject: "skills/massa-ai/personas", pattern: /\.md$/, maxBytes: 4_500 },
-  { subject: "skills/massa-ai/personas/signals", pattern: /\.json$/, maxBytes: 2_500 },
-  // Freeze ceiling only — slimming the router SKILL.md is a separate feature.
-  { subject: "skills/massa-ai/SKILL.md", maxBytes: 21_000 },
+  // agent-roster-revision (RTR-03) slimmed the router to its routing contract
+  // (12,846 B measured); ceiling is that size rounded up to the next 500 B.
+  { subject: "skills/massa-ai/SKILL.md", maxBytes: 13_000 },
 ];
 
 function resolveFiles(b: Budget): string[] {

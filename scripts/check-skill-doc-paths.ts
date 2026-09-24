@@ -3,7 +3,7 @@
  *
  * Resolves every relative path citation (`references/…`, `workflows/…`,
  * `scripts/…`, `skills/…`) found in the skill markdown surface
- * (skills/massa-ai/**, skills/agents/**, skills/persona-router/**) against
+ * (skills/massa-ai/**, skills/agents/**) against
  * the repository. A citation resolves if it exists relative to the citing
  * file's skill root (skills/massa-ai/) or the repository root.
  *
@@ -47,7 +47,6 @@ const skillRoot = join(root, "skills", "massa-ai");
 const files: string[] = [];
 walkMd(skillRoot, files);
 walkMd(join(root, "skills", "agents"), files);
-walkMd(join(root, "skills", "persona-router"), files);
 
 let citations = 0;
 const misses: string[] = [];

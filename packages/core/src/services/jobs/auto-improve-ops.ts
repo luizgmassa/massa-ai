@@ -25,7 +25,7 @@ export async function runOnce(job: AutoImproveJob, projectId: string): Promise<A
   try {
     observations = job.observationStore.listRecent(projectId, job.maxWindow);
   } catch (e) {
-    logger.warn("auto-improve: listRecent failed", { projectId, error: (e as Error).message });
+    logger.warn("auto-improve: listRecent failed", { projectId, error: e as Error });
     return noop;
   }
   if (observations.length < 2) return noop;
@@ -39,7 +39,7 @@ export async function runOnce(job: AutoImproveJob, projectId: string): Promise<A
     candidates = res.candidates;
     if (res.used) source = "llm";
   } catch (e) {
-    logger.warn("auto-improve: enrichWithLlm threw (silent)", { projectId, error: (e as Error).message });
+    logger.warn("auto-improve: enrichWithLlm threw (silent)", { projectId, error: e as Error });
   }
 
   const seen = new Set<string>();
@@ -79,7 +79,7 @@ export async function runOnce(job: AutoImproveJob, projectId: string): Promise<A
         }
       } catch (e) {
         if (e instanceof SearchServiceError) throw e;
-        logger.warn("proposal:auto-approved:threw", { id: r.id, projectId, error: (e as Error).message });
+        logger.warn("proposal:auto-approved:threw", { id: r.id, projectId, error: e as Error });
       }
     }
     result.proposalsApplied = applied;
@@ -113,7 +113,7 @@ export async function approve(
     appliedMemoryId = await applyProposal(job, row);
   } catch (e) {
     const reason = e instanceof ApplyRejection ? e.reason : "apply-failed";
-    logger.warn("proposal:apply-failed", { id, projectId: row.projectId, reason, error: (e as Error).message });
+    logger.warn("proposal:apply-failed", { id, projectId: row.projectId, reason, error: e as Error });
     return { ok: false, reason };
   }
 

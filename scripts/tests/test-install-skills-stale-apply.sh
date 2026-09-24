@@ -143,4 +143,45 @@ assert_contains "stale copy named as drift" "$OUTF" "Stale copy: ghost-copy"
 assert_eq "check wrote nothing" "$AFTERF" "$BEFOREF"
 assert_file "target still exists after check" "$HF/.claude/skills/ghost-copy/SKILL.md"
 
+# plant_plugin_record HOME SKILLS_JSON — a plugin-owned record, as a plugin
+# installer writes it, plus a persona-router directory with no marker.
+plant_plugin_record() {
+  local home="$1" skills="$2"
+  mkdir -p "$home/.claude/skills/persona-router" "$home/.config/massa-ai"
+  printf 'plugin content\n' > "$home/.claude/skills/persona-router/SKILL.md"
+  cat > "$home/.config/massa-ai/install-state.json" <<EOF
+{
+  "version": 2,
+  "repository": "$PROJECT_ROOT",
+  "platforms": {
+    "claude": { "root": "$home/.claude", "skills": $skills, "skillsOwner": "plugin" }
+  }
+}
+EOF
+}
+
+record_field() {
+  "$RUNNER" -e 'const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).platforms.claude; console.log(process.argv[2] === "skills" ? s.skills.join(",") : s[process.argv[2]]);' "$1/.config/massa-ai/install-state.json" "$2"
+}
+
+echo ""
+echo "Scenario g: plugin->repo handover removes a retired skill the plugin record names (PER AC-5)"
+HG="$ROOT/hg"
+plant_plugin_record "$HG" '["massa-ai", "persona-router", "profile", "bootstrap"]'
+OUTG="$(apply "$HG")"; RCG=$?
+assert_eq "apply exits 0" "$RCG" "0"
+assert_contains "removal reported" "$OUTG" "Removed retired plugin skill:"
+assert_no_file "recorded retired skill is gone" "$HG/.claude/skills/persona-router"
+assert_eq "record handed over to repo" "$(record_field "$HG" skillsOwner)" "repo"
+assert_not_contains "record no longer names persona-router" "$(record_field "$HG" skills)" "persona-router"
+
+echo ""
+echo "Scenario h: an unrecorded persona-router directory survives the handover"
+HH="$ROOT/hh"
+plant_plugin_record "$HH" '["massa-ai", "profile", "bootstrap"]'
+OUTH="$(apply "$HH")"; RCH=$?
+assert_eq "apply exits 0" "$RCH" "0"
+assert_not_contains "no removal reported" "$OUTH" "persona-router"
+assert_file "unrecorded persona-router survives" "$HH/.claude/skills/persona-router/SKILL.md"
+
 summary "install-skills --apply stale removal (IPT-04)"

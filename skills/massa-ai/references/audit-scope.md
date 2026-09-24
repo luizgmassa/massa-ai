@@ -4,7 +4,7 @@ Use from audit workflows, implementation audit, bug finder, mobile Figma, and ex
 
 ## Scope Packets
 
-Every audit scope must produce a compact scope packet before analysis:
+Every audit scope must produce a compact scope packet before analysis. Resolve the mechanical half of it with `bun skills/massa-ai/scripts/resolve_scope.ts --scope modified|range|branch|files|whole`, which emits scope type, target focus, resolution method, base, head, resolved files, applied exclusions, and a freshness timestamp as JSON. It resolves files, not judgment: the ask-when-vague rule below and the per-lens evidence selection stay with the agent, and the script refuses rather than inventing a base when none can be resolved.
 
 ```text
 Scope Type: <modified files | explicit files/globs | commit range | branch comparison | codebase area | symbol/class/function | feature/flow | PR diff>

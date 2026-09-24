@@ -187,6 +187,93 @@ export function resolveHookApiKey(): string {
   return "";
 }
 
+// ── Session-start drift line (agent-runtime-drift T06) ─────────────────────
+
+/** Same XDG resolution as getHookConfigPath — duplicated for the same
+ *  dependency-freeze reason, pinned by tests on both sides. */
+export function getInstallStatePath(): string {
+  const xdg = process.env.XDG_CONFIG_HOME;
+  const base = xdg && xdg.trim() ? xdg : path.join(homedir(), ".config");
+  return path.join(base, "massa-ai", "install-state.json");
+}
+
+function readJsonAt(filePath: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, "utf8"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pinned one-key read (`^model:`) — deliberately NOT the shared frontmatter
+ * parser: this binary's dependency freeze (see getHookConfigPath) forbids
+ * importing @massa-ai/shared. The cross-side test pins this regex against the
+ * shared parser's output (spec INV B3), so the writer and this reader cannot
+ * silently disagree about what `model:` means.
+ */
+function readModelLine(filePath: string): string | null {
+  try {
+    const match = /^model:\s*(.+)\r?$/m.exec(readFileSync(filePath, "utf8"));
+    const value = match?.[1]?.trim();
+    return value ? value.replace(/^["']|["']$/g, "") : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The ≤2-line session-start drift report (agent-runtime-drift): version
+ * drift (live bundle vs recorded state), agent drift (active code-reviewer
+ * model vs the recorded profile's variant), and the host env override that
+ * nullifies every per-agent model at runtime. Null when every recording
+ * agrees — silent when healthy. Read-only (INV5); every failure degrades to
+ * fewer lines, never a throw. The fix path is the existing profile switch,
+ * never the hook.
+ */
+export function buildSessionStartDoctorLine(
+  pluginRoot: string,
+  env: Readonly<Record<string, string | undefined>>,
+): string | null {
+  const lines: string[] = [];
+
+  const sourceVersion = readJsonAt(path.join(pluginRoot, ".claude-plugin", "plugin.json"))?.version;
+  const state = readJsonAt(getInstallStatePath());
+  const platforms = state?.platforms as Record<string, Record<string, unknown>> | undefined;
+  const claude = platforms?.claude;
+  const stateVersion = claude?.plugin?.version;
+  if (typeof sourceVersion === "string" && typeof stateVersion === "string" && sourceVersion !== stateVersion) {
+    lines.push(
+      `[massa-ai] version drift: live bundle ${sourceVersion} vs recorded ${stateVersion} — update the plugin or re-run the installer`,
+    );
+  }
+
+  const profile = claude?.modelProfile?.profile;
+  if (typeof profile === "string" && profile) {
+    const activeModel = readModelLine(path.join(pluginRoot, "agents", "code-reviewer.md"));
+    const variantModel = readModelLine(
+      path.join(pluginRoot, "agent-profiles", profile, "code-reviewer.md"),
+    );
+    if (activeModel && variantModel && activeModel !== variantModel) {
+      lines.push(
+        `[massa-ai] agent drift: code-reviewer ${activeModel} vs ${profile} variant ${variantModel} — re-run the profile switch`,
+      );
+    }
+  }
+
+  const override = env.CLAUDE_CODE_SUBAGENT_MODEL;
+  if (typeof override === "string" && override.trim()) {
+    lines.push(
+      `[massa-ai] CLAUDE_CODE_SUBAGENT_MODEL=${override.trim()} overrides every per-agent model at runtime`,
+    );
+  }
+
+  return lines.length ? lines.slice(0, 2).join("\n") : null;
+}
+
 // ── POST helper ─────────────────────────────────────────────────────────────
 
 export function postObservation(
@@ -298,6 +385,17 @@ export async function main(stdinInput?: string): Promise<void> {
     "unknown";
 
   const projectId = resolveProjectId(sessionId, cwd);
+
+  // agent-runtime-drift (T06): session-start prints a bounded drift line when
+  // the recordings disagree (read-only, silent when healthy — INV5).
+  if (subcommand === "session-start") {
+    try {
+      const doctorLine = buildSessionStartDoctorLine(path.resolve(import.meta.dirname, ".."), process.env);
+      if (doctorLine) process.stdout.write(doctorLine + "\n");
+    } catch {
+      // silent-degrade: drift reporting must never block the agent
+    }
+  }
 
   const baseUrl = process.env.MASSA_AI_API_BASE || "http://localhost:3333";
   const hookUrl = `${baseUrl}/api/v1/hook`;

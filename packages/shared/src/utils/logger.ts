@@ -1,6 +1,6 @@
 /**
  * Logger Utility
- * 
+ *
  * Structured logging with levels and metadata support
  */
 
@@ -32,6 +32,56 @@ const LOG_LEVEL_BUFFER_TAGS: Record<LogLevel, LogEntry['level']> = {
   [LogLevel.ERROR]: 'error',
 };
 
+/** Repeat-accounting window (design §4): 15 minutes from first sight. */
+const REPEAT_WINDOW_MS = 15 * 60 * 1000;
+
+/** Repeat-accounting cap: cleared (not LRU-evicted) on overflow. */
+const MAX_REPEAT_KEYS = 500;
+
+interface RepeatEntry {
+  firstSeenAt: number;
+  count: number;
+}
+
+/** `12m` / `40s` — coarse enough for the 15-minute window it is used in. */
+function formatAgo(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  return `${Math.floor(totalSeconds / 60)}m`;
+}
+
+/** Cap for `message`/`cause` strings picked from an Error (design §5 fix-round). */
+const MAX_ERROR_TEXT_CHARS = 300;
+
+/**
+ * Caps a picked Error string field at `MAX_ERROR_TEXT_CHARS` so a validation
+ * error whose message embeds the full raw model output (AI SDK's
+ * `NoObjectGeneratedError` → `TypeValidationError`/`JSONParseError`) never
+ * blows up a log line.
+ */
+function capErrorText(value: string): string {
+  if (value.length <= MAX_ERROR_TEXT_CHARS) return value;
+  const truncatedChars = value.length - MAX_ERROR_TEXT_CHARS;
+  return `${value.slice(0, MAX_ERROR_TEXT_CHARS)}…(truncated ${truncatedChars} chars)`;
+}
+
+/**
+ * Picks name/message(+stack)/code/cause from an Error, never spreads it —
+ * the AI SDK's `APICallError` carries `requestBodyValues`, which holds the
+ * prompt. `cause` is a one-level message: a non-Error cause becomes `String(v)`.
+ */
+function pickErrorFields(err: Error, includeStack: boolean): Record<string, unknown> {
+  const out: Record<string, unknown> = { name: err.name, message: capErrorText(err.message) };
+  if (includeStack) out.stack = err.stack;
+  const code = (err as { code?: unknown }).code;
+  if (code !== undefined) out.code = code;
+  const cause = (err as { cause?: unknown }).cause;
+  if (cause !== undefined) {
+    out.cause = capErrorText(cause instanceof Error ? cause.message : String(cause));
+  }
+  return out;
+}
+
 export class Logger implements ILogger {
   private _level?: LogLevel;
   private _enableMetrics?: boolean;
@@ -40,6 +90,7 @@ export class Logger implements ILogger {
   private _maxFileSizeBytes?: number;
   private _maxFiles?: number;
   private _initialized = false;
+  private repeats = new Map<string, RepeatEntry>();
 
   constructor() {
     // Lazy initialization to avoid circular dependency with config
@@ -55,8 +106,8 @@ export class Logger implements ILogger {
         this._level = this.parseLogLevel(loggingConfig.level);
         this._enableMetrics = loggingConfig.enableMetrics;
         // env > config.json precedence is already resolved by config/index.ts
-        // (mirrors `level`'s MASSA_AI_LOG_FILE/LOG_LEVEL handling), so this is
-        // a plain read. `file` is always concrete since T8 (LOG-02).
+        // (mirrors `level`'s MASSA_AI_LOG_FILE/MASSA_AI_LOG_LEVEL handling), so
+        // this is a plain read. `file` is always concrete since T8 (LOG-02).
         this._logFilePath = loggingConfig.file;
         // LOG-02 AC 2b: the ONLY way to disable the file sink.
         this._enableFileSink = loggingConfig.enableFileSink;
@@ -131,6 +182,89 @@ export class Logger implements ILogger {
   }
 
   /**
+   * Any Error value sitting at the top level of `meta` is replaced by its
+   * picked fields (design §5) — returns `meta` unchanged (same reference)
+   * when nothing needs replacing, so a first-occurrence line stays
+   * byte-identical.
+   */
+  private serializeMetaErrors(
+    meta?: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    if (!meta) return meta;
+    let out: Record<string, unknown> | undefined;
+    for (const [key, value] of Object.entries(meta)) {
+      if (value instanceof Error) {
+        if (!out) out = { ...meta };
+        out[key] = pickErrorFields(value, false);
+      }
+    }
+    return out ?? meta;
+  }
+
+  /**
+   * Repeat accounting (design §4): only WARN/ERROR are tracked, keyed by
+   * level + message (+ meta.label when present). The first occurrence in a
+   * 15-minute window is returned unchanged; later ones gain `occurrences`
+   * and `firstSeenAgo`. Capped at 500 keys, cleared (not LRU-evicted) on
+   * overflow.
+   */
+  private applyRepeatAccounting(
+    level: LogLevel,
+    message: string,
+    meta?: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    if (level !== LogLevel.WARN && level !== LogLevel.ERROR) return meta;
+    const label = typeof meta?.label === 'string' ? meta.label : '';
+    const key = `${level}|${message}|${label}`;
+    const now = Date.now();
+    const existing = this.repeats.get(key);
+
+    if (!existing || now - existing.firstSeenAt > REPEAT_WINDOW_MS) {
+      if (this.repeats.size >= MAX_REPEAT_KEYS) this.repeats.clear();
+      this.repeats.set(key, { firstSeenAt: now, count: 1 });
+      return meta;
+    }
+
+    existing.count += 1;
+    return {
+      ...meta,
+      occurrences: existing.count,
+      firstSeenAgo: formatAgo(now - existing.firstSeenAt),
+    };
+  }
+
+  /** Test-only seam: `packages/shared` runs plain `bun test`, so module- or
+   * instance-scoped repeat state must be resettable between cases. */
+  _resetRepeatsForTesting(): void {
+    this.repeats.clear();
+  }
+
+  /**
+   * JSON.stringify(meta), but never throws: a bigint is stringified via the
+   * replacer (so JSON.stringify never sees the raw bigint), a circular
+   * reference is broken with a WeakSet cycle guard, and any other
+   * unserializable shape falls back to a one-line marker. Logging must never
+   * throw.
+   */
+  private safeStringifyMeta(meta: Record<string, unknown>): string {
+    const seen = new WeakSet<object>();
+    try {
+      return JSON.stringify(meta, (_key, value) => {
+        if (typeof value === 'bigint') return value.toString();
+        if (typeof value === 'object' && value !== null) {
+          if (seen.has(value)) return '[Circular]';
+          seen.add(value);
+        }
+        return value;
+      });
+    } catch (err) {
+      return JSON.stringify({
+        metaUnserializable: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
    * Format log message
    */
   private formatMessage(
@@ -139,7 +273,7 @@ export class Logger implements ILogger {
     meta?: Record<string, unknown>,
     timestamp: string = new Date().toISOString()
   ): string {
-    const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
+    const metaStr = meta ? ` ${this.safeStringifyMeta(meta)}` : '';
     return `[${timestamp}] [${level}] ${message}${metaStr}`;
   }
 
@@ -153,8 +287,10 @@ export class Logger implements ILogger {
    * unconditionally, before either of the two additive sinks are touched.
    */
   private emit(level: LogLevel, message: string, meta?: Record<string, unknown>): void {
+    const serializedMeta = this.serializeMetaErrors(meta);
+    const finalMeta = this.applyRepeatAccounting(level, message, serializedMeta);
     const ts = new Date().toISOString();
-    const line = this.formatMessage(LOG_LEVEL_LABELS[level], message, meta, ts);
+    const line = this.formatMessage(LOG_LEVEL_LABELS[level], message, finalMeta, ts);
     console.error(line);
 
     if (this.enableFileSink) {
@@ -174,7 +310,7 @@ export class Logger implements ILogger {
       ts,
       level: LOG_LEVEL_BUFFER_TAGS[level],
       message,
-      ...(meta ? { meta } : {}),
+      ...(finalMeta ? { meta: finalMeta } : {}),
     });
   }
 
@@ -198,14 +334,12 @@ export class Logger implements ILogger {
 
   error(message: string, error?: Error, meta?: Record<string, unknown>): void {
     if (this.shouldLog(LogLevel.ERROR)) {
-      const errorMeta = error ? {
-        ...meta,
-        error: {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        }
-      } : meta;
+      const errorMeta = error
+        ? {
+            ...meta,
+            error: error instanceof Error ? pickErrorFields(error, true) : { message: String(error) },
+          }
+        : meta;
       this.emit(LogLevel.ERROR, message, errorMeta);
     }
   }

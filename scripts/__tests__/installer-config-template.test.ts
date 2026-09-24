@@ -21,6 +21,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { DEFAULT_CAPTURE_POLICY } from "../../packages/shared/src/config/massa-ai-config";
+import { INFERENCE_PROVIDERS } from "../../packages/shared/src/config/inference-providers";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const LIB = path.join(REPO_ROOT, "scripts/lib/installer-api-key.sh");
@@ -36,7 +37,7 @@ const CONFIG_SECTIONS_SRC = path.join(REPO_ROOT, "apps/web-ui/src/static/views/c
 
 interface WrittenConfig {
   embedding: { model: string; dimensions: number };
-  llm: { enabled: boolean };
+  llm: { enabled: boolean; baseUrl: string; model: string; codeModel: string };
   hooks: { enabled: boolean; bridge: { enabled: boolean } };
   handoffs: { enabled: boolean };
   impact: { bfsCteEnabled: boolean };
@@ -61,7 +62,9 @@ interface WrittenConfig {
   [key: string]: unknown;
 }
 
-/** Sources the library, calls `installer_write_config`, returns what landed. */
+/** Sources the library, calls `installer_write_config`, returns what landed.
+ *  Throws with the installer's own stderr when the write fails — the
+ *  unknown-model case below asserts on that message. */
 function writeConfig(env: Record<string, string> = {}): WrittenConfig {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-installer-tpl-"));
   try {
@@ -113,9 +116,34 @@ describe("installer config template — embedding width", () => {
     expect(config.embedding.dimensions).toBe(dimensions);
   });
 
-  test("an unrecognized model falls back to the reference default, never 4096", () => {
-    const config = writeConfig({ EMBEDDING_MODEL: "some-future-model" });
-    expect(config.embedding.dimensions).toBe(2560);
+  /**
+   * Repointed by LIP-04/LIP-06, not weakened: this used to assert the silent
+   * 2560 catch-all, which is the behaviour the requirement retires. A guessed
+   * width is not a safe default — `createEmbeddingProvider` refuses to fall
+   * through on a mismatch, so a wrong guess throws on every embedding call
+   * until someone hand-edits config.json. The unknown model now probes the
+   * endpoint for its real width, and fails loudly naming both when it cannot.
+   *
+   * The endpoint is a closed port on purpose: pointed at the default
+   * `http://localhost:11434`, this case reaches whatever Ollama the developer
+   * happens to be running and stops being a measurement.
+   */
+  test("an unrecognized model fails loudly rather than guessing a width", () => {
+    expect(() =>
+      writeConfig({
+        EMBEDDING_MODEL: "some-future-model",
+        OLLAMA_URL: "http://127.0.0.1:1",
+      }),
+    ).toThrow(/some-future-model/);
+  });
+
+  test("an explicit OLLAMA_EMBEDDING_DIMENSIONS still wins for an unknown model", () => {
+    const config = writeConfig({
+      EMBEDDING_MODEL: "some-future-model",
+      OLLAMA_EMBEDDING_DIMENSIONS: "1536",
+      OLLAMA_URL: "http://127.0.0.1:1",
+    });
+    expect(config.embedding.dimensions).toBe(1536);
   });
 
   test("the pair matches install.sh's own .env defaults", () => {
@@ -128,6 +156,28 @@ describe("installer config template — embedding width", () => {
 
     const config = writeConfig({ EMBEDDING_MODEL: model as string });
     expect(config.embedding.dimensions).toBe(Number(dims));
+  });
+});
+
+describe("installer config template — LLM model trio (PDM-02 AC-2, T08)", () => {
+  test("INFERENCE_PROVIDER=ollama (or unset) writes ollama's instruct/coding trio", () => {
+    const config = writeConfig({ INFERENCE_PROVIDER: "ollama" });
+    expect(config.llm.baseUrl).toBe(`${INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl}`);
+    expect(config.llm.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+    expect(config.llm.codeModel).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
+
+    const unset = writeConfig();
+    expect(unset.llm.model).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+    expect(unset.llm.codeModel).toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
+  });
+
+  test("INFERENCE_PROVIDER=lmstudio writes LM Studio's instruct/coding trio, not Ollama's", () => {
+    const config = writeConfig({ INFERENCE_PROVIDER: "lmstudio" });
+    expect(config.llm.baseUrl).toBe(INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl);
+    expect(config.llm.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct);
+    expect(config.llm.codeModel).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.coding);
+    expect(config.llm.model).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.instruct);
+    expect(config.llm.codeModel).not.toBe(INFERENCE_PROVIDERS.ollama.defaultModels.coding);
   });
 });
 

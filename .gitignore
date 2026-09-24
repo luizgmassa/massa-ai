@@ -77,8 +77,11 @@ benchmarks/datasets/
 
 # Generated plugin bundles (regenerate via `bun run generate:artifacts`)
 apps/*-plugin/skills/massa-ai/
+# Retired bundle (PER AC-3): the generator prunes it, but a pre-upgrade
+# checkout can still hold one until the next generate:artifacts run.
 apps/*-plugin/skills/persona-router/
 apps/*-plugin/skills/profile/
+apps/*-plugin/skills/bootstrap/
 apps/*-plugin/skills/agents/
 apps/*-plugin/agents/
 apps/*-plugin/agent-profiles/

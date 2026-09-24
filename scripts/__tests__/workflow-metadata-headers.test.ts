@@ -29,7 +29,7 @@ import path from "path";
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const WORKFLOWS_DIR = path.join(REPO_ROOT, "skills/massa-ai/workflows");
 
-const EXPECTED_WORKFLOW_COUNT = 40;
+const EXPECTED_WORKFLOW_COUNT = 36;
 
 const NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
@@ -156,5 +156,48 @@ describe("workflow metadata headers (WMH-03)", () => {
       .filter((r) => r.errors.length > 0)
       .map((r) => `${r.relPath}:\n  - ${r.errors.join("\n  - ")}`);
     expect(failures).toEqual([]);
+  });
+});
+
+// Inventory AC-2: the six renamed workflows carry session-id and memory-tag
+// prefixes built from the new stem, and no old stem survives as a prefix.
+describe("renamed workflow session-id and tag prefixes (Inventory AC-2)", () => {
+  const NEW_STEM_FORMS: Record<string, string[]> = {
+    "product-discovery": [
+      "`product-discovery-<entity>`",
+      "`session:product-discovery-<entity>`",
+      "`workflow:product-discovery`",
+    ],
+    "create-adr": ["`create-adr-[entity]`"],
+    "create-prd": ["`workflow:create-prd`"],
+    "create-rfc": ["`workflowSessionId=create-rfc-[entity]`"],
+    "create-tdd": ["`workflowSessionId=create-tdd-[entity]`"],
+    "create-ticket": ["`workflowSessionId=create-ticket-<entity>`"],
+  };
+  const OLD = "discovery|adr|to-prd|rfc|tdd|ticket";
+  const OLD_PREFIX_RE = new RegExp(
+    `(?:session|workflow):(?:${OLD})(?![a-z0-9])|(?<![\\w-])(?:${OLD})-[<\\[]entity[>\\]]`,
+    "g",
+  );
+
+  test("each renamed workflow uses its new stem as the session-id / tag prefix", () => {
+    const missing: string[] = [];
+    for (const [stem, forms] of Object.entries(NEW_STEM_FORMS)) {
+      const content = readFileSync(path.join(WORKFLOWS_DIR, `${stem}.md`), "utf8");
+      for (const form of forms) if (!content.includes(form)) missing.push(`${stem}.md: ${form}`);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  test("no workflow file keeps an old stem as a session-id or tag prefix", () => {
+    const files = findMarkdownFiles(WORKFLOWS_DIR);
+    expect(files.length).toBe(EXPECTED_WORKFLOW_COUNT);
+    const offenders: string[] = [];
+    for (const file of files) {
+      for (const m of readFileSync(file, "utf8").matchAll(OLD_PREFIX_RE)) {
+        offenders.push(`${path.relative(REPO_ROOT, file)}: ${m[0]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });

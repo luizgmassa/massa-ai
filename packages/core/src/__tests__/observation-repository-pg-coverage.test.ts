@@ -59,9 +59,19 @@ function makeObservation(overrides: Partial<Observation> = {}): InsertableObserv
   return { ...merged, payloadJson: scrubCredentials(merged.payloadJson).sanitized };
 }
 
+/**
+ * `__drain()` is a real flush now — it awaits the per-id write chain — so this
+ * is a plain await with no sleep beside it.
+ *
+ * It used to be `__drain()` plus a fixed 120 ms sleep, and both halves were
+ * hope: `__drain()` was itself only `setTimeout(10)` against an untracked
+ * fire-and-forget persist, so "settled" meant "130 ms have elapsed". On a
+ * loaded CI runner that was not enough and the round-trip assertion below read
+ * zero rows (observed 2026-09-21, coverage run 35613084296). A bigger sleep
+ * would have moved the threshold, not removed it.
+ */
 async function settle(store: PgObservationStore): Promise<void> {
   await store.__drain();
-  await new Promise((r) => setTimeout(r, 120));
 }
 
 async function cleanup(): Promise<void> {
@@ -555,5 +565,74 @@ describe.skipIf(!DEDICATED_DB)("PgObservationStore — coverage", () => {
     await store2.__hydrate();
     expect(store2.countByProject(pid)).toBe(1);
     expect(store2.listRecent(pid, 10)[0]!.id).toBe(id);
+  });
+
+  /**
+   * The contract `__drain()`'s docstring always claimed and did not have: after
+   * it resolves, every write issued before it is durable in PostgreSQL.
+   *
+   * Discriminating by CONSTRUCTION, not by volume. The first draft inserted 40
+   * rows and asserted they all landed — and it did not go red when `__drain()`
+   * was mutated back to `setTimeout(10)`, because 40 local round-trips fit
+   * inside 10 ms on an idle machine. Load is not a test oracle.
+   *
+   * So the write path is slowed deterministically instead: `insert`'s persist
+   * awaits the alias resolver, and the resolver is injectable. A resolver that
+   * takes 250 ms makes "10 ms have passed" provably insufficient while a real
+   * flush must still wait — the assertion now fails on a sleep-based drain on
+   * any machine, fast or slow.
+   */
+  test("__drain awaits the in-flight write rather than a fixed delay", async () => {
+    const SLOW_MS = 250;
+    setProjectIdentityAliasResolverForTests({
+      resolve: async (id: string) => {
+        await new Promise((r) => setTimeout(r, SLOW_MS));
+        return id;
+      },
+      resolveCached: () => undefined,
+      invalidateProject: () => {},
+      clearCache: () => {},
+      cacheSize: 0,
+    } as unknown as ProjectIdentityAliasResolver);
+
+    // afterEach resets the resolver, matching every other swap in this file.
+    const store = new PgObservationStore();
+    const pid = projectId();
+    const id = newObservationId();
+
+    store.insert(makeObservation({ id, projectId: pid }));
+    await store.__drain();
+
+    const rows = await pool.query("SELECT id FROM observations WHERE id = $1", [id]);
+    expect(`durable=${rows.rows.length}`).toBe("durable=1");
+  }, 30_000);
+
+  /**
+   * The same-id commit-order caveat the insert comment carried from 2026-07-12
+   * and no longer does. Five upserts on ONE id: with the writes chained per id
+   * the row must reflect the LAST call, because each awaits its predecessor.
+   *
+   * Weaker than the test above, and honestly so: without chaining these five
+   * IIFEs would usually still commit in order, because each starts in order and
+   * does identical work. This pins the contract rather than reliably killing
+   * the mutation — the ordering guarantee is what `chainWrite` buys, and a
+   * future change that drops it should have to delete this test on purpose.
+   */
+  test("repeated inserts on one id commit in call order (last write wins)", async () => {
+    const store = new PgObservationStore();
+    const pid = projectId();
+    const id = newObservationId();
+
+    for (const importance of [0.1, 0.2, 0.3, 0.4, 0.5]) {
+      store.insert(makeObservation({ id, projectId: pid, importance }));
+    }
+    await store.__drain();
+
+    const rows = await pool.query(
+      "SELECT importance FROM observations WHERE id = $1",
+      [id],
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(Number(rows.rows[0]!.importance)).toBe(0.5);
   });
 });

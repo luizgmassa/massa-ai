@@ -1,0 +1,8 @@
+{
+  "verify": {},
+  "queue": {},
+  "claude": {
+    "exec_effort": "high",
+    "plan_effort": "high"
+  }
+}

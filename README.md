@@ -2,7 +2,7 @@
 
 massa-ai is a local-first MCP server that indexes your codebase — semantic search, keyword search, and a symbol graph ranked by dependency centrality — and keeps a persistent, cross-session memory of decisions, patterns, and critical facts.
 
-Instead of loading whole files into context, your assistant retrieves just the relevant symbols, references, and memories, so it reads less, forgets nothing between sessions, and costs less to run. It runs on Ollama (free, offline), with optional LLM consolidation, rerank, and query understanding, and plugs into Claude Code, Codex, Cursor, and OpenCode via MCP plus passive-capture hooks.
+Instead of loading whole files into context, your assistant retrieves just the relevant symbols, references, and memories, so it reads less, forgets nothing between sessions, and costs less to run. It runs on a local inference provider — Ollama or LM Studio (free, offline) — with optional LLM consolidation, rerank, and query understanding, and plugs into Claude Code, Codex, Cursor, and OpenCode via MCP plus passive-capture hooks.
 
 > **[FEATURES.md](./FEATURES.md)** contains a complete reference for every feature — what it does, why it exists, and how to use it. This README covers installation, integration, and quick-start; FEATURES.md has the depth.
 
@@ -44,11 +44,16 @@ git clone https://github.com/luizgmassa/massa-ai.git
 cd massa-ai
 bun install
 
-# 2. Setup (100% offline with Ollama)
+# 2. Setup (100% offline — Ollama by default, or LM Studio)
 ./scripts/setup-local-first.sh
-# - Installs/starts Ollama
-# - Pulls qwen3-embedding:4b (embeddings, 2560 dims), qwen2.5:7b-instruct (default LLM),
-#   and qwen2.5-coder:7b (code-oriented LLM sites)
+# - Prompts for a local inference provider (Ollama or LM Studio), or set
+#   MASSA_AI_INFERENCE_PROVIDER=ollama|lmstudio to skip the prompt
+# - Ollama: pulls qwen3-embedding:0.6b (embeddings, 1024 dims), qwen3-vl:8b
+#   (default LLM), and qwen2.5-coder:7b (code-oriented LLM sites)
+# - LM Studio: installs the `lms` CLI if missing, starts the server, and fetches
+#   text-embedding-qwen3-embedding-0.6b (embeddings, 1024 dims), qwen3-vl-8b-instruct
+#   (default LLM) and qwen2.5-coder-7b-instruct (code-oriented LLM sites) —
+#   override via LMSTUDIO_EMBEDDING_MODEL, MASSA_AI_LLM_MODEL, MASSA_AI_LLM_CODE_MODEL
 # - Creates .env with defaults
 # - Runs bun run diagnose to validate the stack
 
@@ -73,8 +78,9 @@ Instead of Docker (~5GB RAM), run PostgreSQL natively (~100MB):
 
 Linux/WSL: install `postgresql` + `postgresql-*-pgvector` from your distro, create the role/db/extension, then set `DATABASE_URL`. Or use Docker (option 3, ~5GB RAM).
 
-> **Tip:** Run `bun run diagnose` at any time to validate Ollama connectivity,
-> database access, embedding generation, and migration status.
+> **Tip:** Run `bun run diagnose` at any time to validate your local inference
+> provider (Ollama or LM Studio), database access, embedding generation, and
+> migration status.
 
 ---
 
@@ -99,7 +105,7 @@ the repo's `dist/index.js` (re-run the installer after `bun run build` to
 refresh it — a symlink here used to go dead whenever the gitignored `dist/`
 vanished, and OpenCode skips an unresolvable local plugin silently), adds
 `"./plugins/massa-ai/index.js"` to the `plugin` array of `opencode.json`, and
-symlinks the 18 specialist agents into `~/.config/opencode/agents/`. The plugin
+symlinks the 7 specialist agents into `~/.config/opencode/agents/`. The plugin
 is hooks-only (AD-017: plugins deliver, MCP serves tools, hooks observe) — it
 registers zero in-process tools, so the installer delegates MCP registration to
 `scripts/install-agents.sh --agent opencode`, giving you all 59 MCP tools
@@ -129,7 +135,9 @@ File: `~/.config/opencode/opencode.json`
       "type": "local",
       "command": [
         "bunx",
-        "@massa-ai/mcp-client"
+        "-p",
+        "@massa-ai/mcp-client",
+        "massa-ai"
       ],
       "environment": {
         "MASSA_AI_API_URL": "http://localhost:3333"
@@ -152,7 +160,7 @@ File: `~/.config/opencode/opencode.json`
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "massa-ai": {
       "type": "local",
       "command": ["bun", "run", "/path/to/massa-ai/apps/mcp-client/src/index.ts"],
@@ -161,6 +169,10 @@ File: `~/.config/opencode/opencode.json`
   }
 }
 ```
+
+> OpenCode's MCP key is `mcp`, not `mcpServers`. Do not copy Claude's or
+> Cursor's shape here — `scripts/install-agents.sh --agent opencode` writes the
+> correct one for you.
 
 **Events wired (in-process, 6 lifecycle handlers):** `session.created`,
 `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`,
@@ -175,12 +187,12 @@ backup + `_massaAiOwned` marker — user hooks are always preserved.
 
 | Tool | Install command | Events | Bundles | Trust step? |
 |------|----------------|--------|---------|-------------|
-| **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + 18 subagent specialists + hooks into `settings.json` | No |
-| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 18 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + MCP into `~/.codex/config.toml` | Yes — run `/hooks` in Codex |
-| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 18 subagent specialists | No |
-| **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | MCP into `opencode.json`/`opencode.jsonc` (59 tools) + lifecycle handlers + 18 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
+| **Claude Code** | `bash apps/claude-plugin/install.sh --user` | 5 | 6 slash commands + 7 subagent specialists + hooks into `settings.json` | No |
+| **Codex** | `bash apps/codex-plugin/install.sh --user` | 6 | 6 skills + 7 subagent specialists (TOML to `~/.codex/agents/`) + hooks into `hooks.json` + MCP into `~/.codex/config.toml` | Yes — run `/hooks` in Codex |
+| **Cursor** | `bash apps/cursor-plugin/install.sh --user` | 7 | 6 skills + hooks into `hooks.json` + MCP into `~/.cursor/mcp.json` + 7 subagent specialists | No |
+| **OpenCode** | `bash apps/opencode-plugin/install.sh --user` | 6 (in-process) | MCP into `opencode.json`/`opencode.jsonc` (59 tools) + lifecycle handlers + 7 subagent specialists (`.md` to `~/.config/opencode/agents/`) | No |
 
-Each plugin also ships generated slash commands — one per massa-ai workflow (40 today)
+Each plugin also ships generated slash commands — one per massa-ai workflow (36 today)
 (`/massa-ai:debug`, `$debug`, etc., naming varies by host) — alongside the 6
 quick commands in the table above; see
 [Workflow Commands](./FEATURES.md#workflow-commands-generated-slash-commands)
@@ -222,10 +234,12 @@ automated, copy this into `.git/hooks/post-merge` (and `chmod +x` it):
 cd "$(git rev-parse --show-toplevel)" && bun run generate:artifacts
 ```
 
-Standalone `massa-ai-config agents install` run against an ungenerated
-checkout fails (the source `agents/`/`agent-profiles/` directories it copies
-from do not exist yet) until `bun run generate:artifacts` has run at least
-once. Tarball installs are unaffected — they ship pre-generated.
+Standalone `massa-ai-config agents install` (the `@massa-ai/opencode-plugin`
+bin — the `@massa-ai/mcp-client` bin of the same name has no `agents`
+subcommand) run against an ungenerated checkout fails (the source
+`agents/`/`agent-profiles/` directories it copies from do not exist yet) until
+`bun run generate:artifacts` has run at least once. Tarball installs are
+unaffected — they ship pre-generated.
 
 On Claude Code the plugin ships its own hooks, so running `install.sh` after a
 plugin install skips the hook merge instead of double-firing. On Codex the two
@@ -259,8 +273,11 @@ Direct per-host installs (`apps/<host>-plugin/install.sh --user`) behave
 exactly as before, plus the same version recording.
 
 **Shared binary:** Claude Code, Codex, and Cursor all use the same
-`massa-ai-hook.ts` Bun binary from `apps/claude-plugin/hooks/`. Codex and
-Cursor symlink to it. OpenCode uses in-process handlers (no external hooks file).
+`massa-ai-hook.ts` Bun binary from `apps/claude-plugin/hooks/`. Codex and Cursor
+each ship a **generated real copy** at `hooks/massa-ai-hook` — not a symlink,
+because `npm pack` silently drops symlink entries and the hook would have been
+absent from every published tarball. OpenCode uses in-process handlers (no
+external hooks file).
 
 **MCP has exactly one writer.** `scripts/install-agents.sh` owns every host's
 MCP config; the plugin installers call it for you (`--agent claude-code` /
@@ -280,18 +297,29 @@ plugin does not remove the MCP entry — plugin lifecycle and MCP tool-surface
 lifecycle are independent; remove the entry with
 `bash scripts/install-agents.sh --agent opencode --uninstall` if wanted.
 
-**18 subagent specialists:** all four plugins ship the 18 massa-ai
-sub-agent specialists (investigator, planner, builder, reviewer,
-context-curator, verification-agent, requirements-analyst,
-architecture-specialist, test-engineer, documentation-agent,
-audit-specialist, mobile-specialist, designer, plan-critic, furps-analyst,
-navigator, meta-judge, judge) as host-native subagent definitions, registered
-under the prefixed names `massa-ai-<role>`.
-Model + effort are pinned per host: Claude `effort: high` + aliases
-(haiku/sonnet/opus); Codex `model_reasoning_effort = "high"` + IDs
-(gpt-5.4-mini/gpt-5.6-terra/gpt-5.6-sol); Cursor/OpenCode
-`reasoningEffort: max` + charter model hints (DeepSeek V4 Pro / GLM-5.2 /
-MiniMax M3 / kimi-k3). See [FEATURES.md → Subagent Skills (18 Specialists)](./FEATURES.md#subagent-skills-18-specialists)
+**7 subagent specialists:** all four plugins ship the 7 massa-ai
+sub-agent specialists (senior-engineer, code-explorer, code-reviewer, designer,
+judge, product-manager, test-engineer) as host-native subagent definitions,
+registered under their bare names (`test-engineer`, not `massa-ai-test-engineer`; on the
+Claude plugin route the host namespaces them as `massa-ai:<name>`). Installers
+tell their own agent files apart by a `massa-ai-owned` content marker, never by
+name: a same-named agent you own is skipped with a warning and left untouched,
+and the pre-consolidation `massa-ai-<name>` files are pruned on upgrade.
+
+Model + effort are pinned per host, resolved at build time from
+`skills/model-profiles.json` — the only hand-authored place that names a model
+or an effort level for any agent on any host. Under the default `balanced`
+profile: Claude `effort: high` + aliases (haiku/sonnet/opus); Codex
+`model_reasoning_effort = "high"` + IDs
+(gpt-5.4-mini/gpt-5.6-terra/gpt-5.6-sol); OpenCode `reasoningEffort: max` +
+`opencode-go/` IDs (deepseek-v4-pro / glm-5.2 / minimax-m3); **Cursor
+deliberately resolves every tier to `model: inherit`**, because Cursor
+publishes no display-name→ID mapping and its frontmatter schema carries no
+effort key at all. Seven profiles ship (`balanced`, `cheap`, `heavy`, `work`,
+`home`, plus OpenCode-only `open_models` and `local_models`) and an installed
+machine switches between them at runtime — see
+[FEATURES.md → Model Profile Switching](./FEATURES.md#model-profile-switching).
+See [FEATURES.md → Subagent Skills (7 Specialists)](./FEATURES.md#subagent-skills-7-specialists)
 for the full per-agent model/effort/permission tables, file locations, and
 the generator + parity-test contract.
 
@@ -306,18 +334,19 @@ tables and [FEATURES.md](./FEATURES.md#plugins-4-tool-parity) for details.
 
 ## Skills & Install System
 
-The repo ships a set of repo-local skills plus a unified installer that symlinks them into each tool's config directory. The per-plugin installers (above) handle hooks + MCP + subagent specialists; this installer handles skills and the bootstrap contract.
+The repo ships a set of repo-local skills plus a unified installer that copies them into each tool's config directory. The per-plugin installers (above) handle hooks + MCP + subagent specialists; this installer handles skills and the bootstrap contract.
 
 ### Included skills
 
 | Skill | Location | Purpose |
 |-------|----------|---------|
-| `massa-ai` | `skills/massa-ai/` | Workflow router (spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
-| `persona-router` | `skills/persona-router/` | Automatic persona selection from catalog (`skills/massa-ai/personas/`) |
+| `massa-ai` | `skills/massa-ai/` | Workflow router (36 workflows: spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
+| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the six startup-contract rules delivered by `MASSA-AI.md` |
+| `agents/<n>` | `skills/agents/` | The 7 sub-agent specialist charters |
 
 ### Unified skills installer
 
-Symlinks all `skills/*/SKILL.md` into each detected tool's config dir and writes the bootstrap contract block into the tool's `AGENTS.md`. Symlink-based — updates to the repo are immediately reflected without re-running.
+Installs every skill bundle into each detected tool's config dir and delivers the startup contract. Installs are **real copies, not symlinks** — nothing installed depends on this checkout staying where it was installed from, which also means a repo edit is only picked up by re-running `--apply`.
 
 ```bash
 # Install skills for all detected tools
@@ -329,16 +358,31 @@ bash scripts/install-skills.sh --apply --platform claude --yes
 # Preview changes (write nothing)
 bash scripts/install-skills.sh --dry-run --platform all
 
-# Check for drift (exit 1 if symlinks missing or pointing wrong)
+# Check for drift (exit 1 if an installed copy is missing or stale)
 bash scripts/install-skills.sh --check --platform all
 
-# Uninstall (remove only massa-ai-owned symlinks + bootstrap block)
+# Uninstall (remove only massa-ai-owned copies + the contract wiring)
 bash scripts/install-skills.sh --uninstall --platform all --yes
 ```
 
+**The startup contract is a file, not an inlined block.** The contract body lives
+in a per-host `MASSA-AI.md` at that host's config root; the host is then wired to
+load it through its own real mechanism:
+
+| Platform | Skills dir | Contract | Wiring |
+|----------|-----------|----------|--------|
+| Claude Code | `~/.claude/skills/<name>` | `~/.claude/MASSA-AI.md` | `@MASSA-AI.md` managed block in `~/.claude/CLAUDE.md` (Claude Code reads `CLAUDE.md`, never `AGENTS.md`) |
+| Codex | `$CODEX_HOME/skills/<name>` | `$CODEX_HOME/MASSA-AI.md` | pointer block in `AGENTS.md` |
+| Cursor | `~/.cursor/skills/<name>` | `~/.cursor/MASSA-AI.md` | pointer block in `AGENTS.md` |
+| OpenCode | `~/.config/opencode/skills/<name>` | `~/.config/opencode/MASSA-AI.md` | absolute path in the config's `instructions` array |
+
+Six contract rules ship (`massa-ai-router`, `dedupe-guardrails`,
+`conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`), each individually
+toggleable at runtime — `massa-ai-config bootstrap list|enable|disable`.
+
 **State:** `~/.config/massa-ai/install-state.json` (v2 format; v1 auto-migrates).
 
-**Safety:** aborts on non-symlink conflict (won't overwrite user files); `--dry-run` and `--check` write nothing; requires `--yes` for real `$HOME`.
+**Safety:** aborts on a foreign conflict at a target path (won't overwrite user files); `--dry-run` and `--check` write nothing; requires `--yes` for real `$HOME`.
 
 ### MCP registration
 
@@ -423,18 +467,24 @@ Migrated documentation for massa-ai workflows lives in `docs/`:
 | Guide | File |
 |-------|------|
 | Spec-Driven | `docs/massa-ai-spec-driven.md` |
-| TDD | `docs/massa-ai-tdd.md` |
-| RFC | `docs/massa-ai-rfc.md` |
+| TDD | `docs/massa-ai-create-tdd.md` |
+| RFC | `docs/massa-ai-create-rfc.md` |
 | Commit | `docs/massa-ai-commit.md` |
-| Ticket | `docs/massa-ai-ticket.md` |
-| Maestro | `docs/massa-ai-maestro.md` |
+| Ticket | `docs/massa-ai-create-ticket.md` |
 | Mobile Figma | `docs/massa-ai-mobile-figma.md` |
 | Context Slices | `docs/context-slices.md` |
+| Cheatsheet (commands, flags, tools, skills, agents) | `docs/CHEATSHEET.md` |
 | Onboarding (generated) | `docs/ONBOARDING.md` — see [Understanding the codebase](#understanding-the-codebase) |
+
+### Running the MCP server from Docker
+
+For a Docker deployment, point the host at the `mcp` compose service instead of a
+local checkout. OpenCode shape (`opencode.json`) shown; Claude/Cursor use
+`mcpServers` with a string `command` plus an `args` array:
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "massa-ai": {
       "type": "local",
       "command": ["docker", "compose", "run", "--rm", "-i", "mcp"],
@@ -563,18 +613,19 @@ materially benefit its flow — e.g. `spec-driven` and `long-session` use
 checkpoints for task save/resume; `debug` uses `trace_path` for call-path
 tracing and `execute_file` for large-file analysis; `architecture-audit` uses
 `impact_analysis` and `get_architecture`; `onboarding` uses `bootstrap`. See
-[FEATURES.md → Workflow Tools (52-Tool Adoption)](./FEATURES.md#workflow-tools-52-tool-adoption)
+[FEATURES.md → Workflow Tools (59-Tool Adoption)](./FEATURES.md#workflow-tools-59-tool-adoption)
 for the full tool-to-workflow adoption map.
 
 ---
 
-## Local-first LLM (Ollama)
+## Local-first LLM (Ollama or LM Studio)
 
-All LLM-driven features run against a local Ollama instance and **default OFF**,
-degrading silently to rule-based behavior when disabled. Everything still works
-without an LLM — you just lose consolidation, polish, rerank, and query rewrite.
+All LLM-driven features run against a local inference provider — Ollama or
+LM Studio — and **default OFF**, degrading silently to rule-based behavior
+when disabled. Everything still works without an LLM — you just lose
+consolidation, polish, rerank, and query rewrite.
 
-### Prerequisites
+### Prerequisites (Ollama)
 
 ```bash
 # Install Ollama (if missing)
@@ -584,16 +635,38 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama serve
 
 # Pull models
-ollama pull qwen3-embedding:4b    # embeddings (2560 dims)
-ollama pull qwen2.5:7b-instruct   # default LLM (consolidation, salience, handoff, query rewrite, HyDE)
+ollama pull qwen3-embedding:0.6b  # embeddings (1024 dims)
+ollama pull qwen3-vl:8b           # default LLM (consolidation, salience, handoff, query rewrite, HyDE)
 ollama pull qwen2.5-coder:7b      # code-oriented LLM sites (bootstrap seed, reranker, code compression)
 ```
+
+### Prerequisites (LM Studio)
+
+```bash
+# Install LM Studio's CLI (if missing)
+curl -fsSL https://lmstudio.ai/install.sh | bash
+
+# Start the daemon
+lms daemon up
+
+# Download and load models (pick any instruct + embedding model you prefer)
+lms get -y text-embedding-qwen3-embedding-0.6b    # embeddings (1024 dims)
+lms get -y <your-instruct-model>                   # chat model
+```
+
+Or run `./scripts/setup-local-first.sh` with `MASSA_AI_INFERENCE_PROVIDER=lmstudio`
+(or answer the interactive prompt) — it drives this flow for you, fetching its
+own default models rather than offering a picker. Note where the settings land:
+it writes only `DATABASE_URL` into `.env`, while the provider, model and LLM
+settings go to `~/.config/massa-ai/config.json`.
 
 ### Validate the stack
 
 `bun run diagnose` (also auto-runs as `predev` / `predev:api` / `predev:mcp`)
 checks Ollama connectivity, database access, embedding generation, and migration
-status.
+status. It does not currently probe LM Studio — verify an LM Studio setup with
+`curl http://localhost:1234/v1/models` and `bun run start:api` +
+`curl http://localhost:3333/health` instead.
 
 > **Ran without a reachable embedding provider before? Re-index.** Earlier versions
 > silently substituted **random vectors** when no provider was available, and stored and
@@ -621,18 +694,25 @@ status.
 MASSA_AI_LLM_ENABLED=true
 MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
 MASSA_AI_LLM_API_KEY=ollama
-MASSA_AI_LLM_MODEL=qwen2.5:7b-instruct        # default instruct model (NL-judgment sites)
+MASSA_AI_LLM_MODEL=qwen3-vl:8b                # default instruct model (NL-judgment sites)
 MASSA_AI_LLM_CODE_MODEL=qwen2.5-coder:7b      # code-oriented sites (bootstrap seed, reranker, compress)
 # MASSA_AI_LLM_DISABLE_THINK=true             # best-effort thinking-disable (default true; safety net)
 ```
+
+On LM Studio, point the same variables at its OpenAI-compatible server instead
+(`MASSA_AI_LLM_BASE_URL=http://localhost:1234/v1`, any non-empty
+`MASSA_AI_LLM_API_KEY`, and the model ids loaded in LM Studio). LM Studio
+implements `response_format: {type:"json_schema"}` natively and needs neither
+the Ollama-only version probe nor the injected `think:false` flag — provider
+identity handles that automatically.
 
 With `MASSA_AI_LLM_ENABLED=true` you get: hook→memory consolidation, handoff-summary
 polish, query understanding (rewrite + HyDE), LLM-judge rerank, and auto
 importance scoring. Set it `false` (the default) and every one of those silently
 falls back to its rule-based path.
 
-> **Per-task model routing (new 2026-07-09):** the 11 LLM call sites split by
-> task shape. The 8 NL-judgment sites (salience judge, consolidator,
+> **Per-task model routing:** the 10 LLM call sites split by
+> task shape. The 7 NL-judgment sites (salience judge, consolidator,
 > observation/auto-improve jobs, handoff summary, query rewrite, HyDE) use
 > `MASSA_AI_LLM_MODEL`; the 3 code-oriented sites (bootstrap `SeedMemoriesSchema`,
 > reranker, `code-compressor`) use `MASSA_AI_LLM_CODE_MODEL`. Routing is per-call via
@@ -643,14 +723,30 @@ falls back to its rule-based path.
 > reasoning channel and silently degraded). Override either with the env vars
 > above.
 
-> **Embeddings note:** The config default embedding model is `qwen3-embedding:4b`
-> (2560d — see `massa-ai-config.ts`). It balances recall against on-device speed
-> better than `nomic-embed-text` (768d) or `bge-m3` (1024d), but it is slower:
-> bulk indexing a large corpus takes minutes. Override via
-> `OLLAMA_EMBEDDING_MODEL` or config `embedding.model`, and move
-> `embedding.dimensions` with it — a width that disagrees with what the model
-> returns fails loudly rather than degrading. Switch to `bge-m3` for speed if
-> its recall quality is sufficient.
+> **Embeddings note:** The config default embedding model is `qwen3-embedding:0.6b`
+> (1024d — see `massa-ai-config.ts`), a smaller/faster model than the prior
+> default (`qwen3-embedding:4b`, 2560d). Override via `OLLAMA_EMBEDDING_MODEL`
+> or config `embedding.model`, and move `embedding.dimensions` with it — a
+> width that disagrees with what the model returns fails loudly rather than
+> degrading. On LM Studio, `LMSTUDIO_EMBEDDING_MODEL` defaults to
+> `text-embedding-qwen3-embedding-0.6b` (1024d, resolved automatically);
+> override `LMSTUDIO_EMBEDDING_DIMENSIONS` alongside a different model the
+> same way. **Breaking change if you upgrade an existing install:** switching
+> the default moves every workspace's embedding width from 2560 to 1024
+> dimensions, which invalidates the stored `embedding_fingerprint` and
+> requires a full reindex (see the reindex command above) — the fingerprint
+> gates fail closed with an actionable message rather than silently mixing
+> widths. Retrieval quality at 1024 dimensions has not been re-measured
+> against the retired 2560-dimension default.
+
+> **Switching providers:** changing `embedding.provider` or the embedding
+> model changes what future searches expect the stored vectors to look like.
+> massa-ai stamps a per-project embedding fingerprint and blocks search with a
+> named error until you run a full reindex (the reindex command above forces
+> one with `"force": true`). **This protects only projects that have been
+> fully reindexed since the fingerprint was introduced** — an existing project
+> with no stamped fingerprint is treated as legacy and is not blocked; it gets
+> protected starting from its next full reindex.
 
 ---
 
@@ -903,8 +999,28 @@ curl -X POST http://localhost:3333/api/v1/proposal/list \
 ## Configuration
 
 Config file: `~/.config/massa-ai/config.json` (auto-created on first run).
-The canonical annotated reference for every environment variable is
+Precedence is env > `config.json` > literal defaults. The canonical annotated
+reference for every environment variable is
 [`.env.example`](./.env.example) — mirror it into `.env` and edit there.
+
+The `massa-ai-config` CLI (a bin of `@massa-ai/mcp-client`, and of
+`@massa-ai/opencode-plugin`) is the front for everything stored there:
+
+```bash
+massa-ai-config show                              # current configuration
+massa-ai-config path                              # config file path
+massa-ai-config init --mistral your-api-key       # or --ollama (default) / --lmstudio / --openai <key>
+massa-ai-config use ollama --model qwen3-embedding:0.6b   # or: use lmstudio --model text-embedding-qwen3-embedding-0.6b
+massa-ai-config set embedding.dimensions 1024
+massa-ai-config recover my-project --path /new/path   # re-associate a moved index
+massa-ai-config profile list                      # shipped profiles + per-host active one
+massa-ai-config profile set work --dry-run
+massa-ai-config bootstrap list                    # the six startup-contract rules
+massa-ai-config bootstrap enable code-comments
+```
+
+The two bins differ slightly: `recover` ships only on the `mcp-client` bin, and
+`agents install|uninstall` only on the `opencode-plugin` bin.
 
 **See [FEATURES.md](./FEATURES.md#configuration) for the complete environment
 variable table, search quality tuning, operational knobs, embedding providers,
@@ -922,11 +1038,16 @@ and config CLI commands.**
 | `bun run dev:mcp` | MCP server with watch |
 | `bun run start:api` | Start REST API |
 | `bun run start:mcp` | Start MCP server |
-| `bun run test` | Run tests |
+| `bun run test` | Workspace tests (turbo — does **not** reach `scripts/` or the plugin suites) |
+| `bun run test:scripts` | Root-level suites: `scripts/__tests__` + `scripts/tests` |
+| `bun run test:plugins` | All four plugin `__tests__/` directories |
+| `bun run test:coverage` | The 90%-per-file coverage floor |
 | `bun run lint` | Lint code (oxlint, `correctness` rules — CI-enforced) |
 | `bun run lint:fix` | Apply oxlint's safe auto-fixes |
 | `bun run type-check` | Type checking |
-| `bun run diagnose` | Validate full stack (Ollama, database, embeddings) |
+| `bun run generate:artifacts` | Regenerate the skill/agent/command bundles (add `--check` to diff only) |
+| `bun run diagnose` | Validate full stack (inference provider, database, embeddings) |
+| `bun run version:sync` | Bump root + workspace versions (all bumps go through this) |
 | `bun run bench:fixture` | Run the massa-ai retrieval fixture benchmark |
 
 > **`dev:ui` was removed.** Its target (`@massa-ai/ui-client`) did not exist.
@@ -956,7 +1077,7 @@ massa-ai/
 | **Semantic Search** | Hybrid vector + keyword with RRF ranking, `enriched` response mode |
 | **Synapse** | Post-retrieval cognitive modulation: task alignment, agent affinity, working-memory buffer |
 | **Symbol Graph** | PageRank-based centrality, definitions, references, go-to-definition |
-| **Embeddings** | Ollama (local) or Mistral/OpenAI API |
+| **Embeddings** | Ollama or LM Studio (local), or Mistral/OpenAI API |
 | **Compression** | Rule-based code structure extraction (target 70% reduction) |
 | **Memory** | Persistent PostgreSQL/pgvector storage across sessions |
 | **Cache** | Multi-level L1/L2 with TTL |

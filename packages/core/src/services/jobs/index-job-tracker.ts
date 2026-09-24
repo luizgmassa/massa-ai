@@ -211,8 +211,14 @@ export class IndexJobTracker {
       if (!stale) continue;
 
       logger.warn(
-        `indexJobTracker: reaping stale running job ${job.jobId} (heartbeatAt=${job.heartbeatAt?.toISOString() ?? "n/a"}, startedAt=${job.startedAt?.toISOString() ?? "n/a"}, staleMs=${staleMs})`,
-        { jobId: job.jobId, projectId: job.projectId, staleMs },
+        "indexJobTracker: reaping stale running job",
+        {
+          jobId: job.jobId,
+          projectId: job.projectId,
+          staleMs,
+          heartbeatAt: job.heartbeatAt?.toISOString() ?? "n/a",
+          startedAt: job.startedAt?.toISOString() ?? "n/a",
+        },
       );
       // Promote into the hot cache so setResult mutates the same object the
       // next getJob() will return, then flip to failed with a clear cause.
@@ -256,8 +262,8 @@ export class IndexJobTracker {
       // the durable job store never recorded completion, so a caller polling
       // via the durable path would see the job stuck in "running".
       logger.warn(
-        `indexJobTracker: job store write failed for ${jobId} on setResult`,
-        { jobId, error: (err as Error)?.message ?? String(err) },
+        "indexJobTracker: job store write failed on setResult",
+        { jobId, error: err },
       );
     }
     // Publish on state CHANGE only, and ONLY for early-exit transitions the
@@ -328,7 +334,7 @@ export class IndexJobTracker {
       const overflow = remaining.slice(this.MAX_JOBS); // oldest non-terminal
       for (const job of overflow) {
         logger.warn(
-          `indexJobTracker: evicting non-terminal job ${job.jobId} (status=${job.status}) to honor MAX_JOBS cap — caller may lose visibility`,
+          "indexJobTracker: evicting non-terminal job to honor MAX_JOBS cap — caller may lose visibility",
           { jobId: job.jobId, projectId: job.projectId, status: job.status },
         );
         this.jobs.delete(job.jobId);

@@ -54,21 +54,15 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
    - Quick: rename, inline, delete unused speculation, extract constant, collapse trivial wrapper, or local parameter-object change.
    - Standard: multi-file consolidation, shared behavior cleanup, public helper contract change, or meaningful test impact; define characterization checks first.
    - Spec-driven: broad redesign, unclear behavior, cross-boundary migration, or user-visible behavior change; pause and route to `workflows/spec-driven.md` or ask for approval.
-8. Apply code quality fixing methods:
-   - SOLID: separate mixed responsibilities only when the split yields an externally-findable named unit (locatable by search or grep from outside the file) or reduces change risk; replace caller-side type switches with polymorphism or data maps only when new variants are real; preserve base contracts; narrow fat interfaces; inject dependencies when hardcoded concretes block testing or substitution.
-   - Clean Code: name domain concepts precisely using `references/naming-standards.md`, replace repeated magic values with named constants, split functions only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk — never split on size or "more than one thing" alone — remove code-restating comments, finish or delete stubs, and convert long positional parameter lists to options objects when it improves call-site clarity.
-   - KISS: inline shallow helpers, collapse needless layers, choose direct control flow over clever indirection, and remove configuration that hides rather than expresses behavior. When choosing whether to split instead of inline, apply the same discoverability-or-change-risk criterion used for the Clean Code split direction above.
-   - YAGNI: delete unused extension points, future hooks, unused options, one-implementation factories, and speculative public APIs when usage evidence is absent.
-   - DRY: consolidate duplicated domain rules or transformations into one clear source of truth, but avoid abstractions that make trivial duplication harder to read.
-   - AI-slop cleanup: remove generic wrappers, fabricated-looking abstractions, one-call factories, code-restating comments, and unused configurability when current usage evidence does not justify them.
-   - Do not introduce ports, adapters, bounded contexts, new service/module boundaries, or VSA-style folder migration to satisfy a code-quality finding.
+8. Apply the Fix-direction column of `references/code-quality-lens.md` (SOLID, Clean Code, KISS/YAGNI/DRY) plus its Standing Rules, which include the architecture boundary this workflow must not cross. Every extraction decision — and every decision to inline instead — goes through that file's Split Criterion.
+   - Fix only what the audit report confirmed. A lens rule the report did not raise is not an invitation to widen the diff.
 9. Preserve behavior:
    - Run or identify characterization tests before changing behavior-adjacent code.
    - Do not weaken tests, fixtures, snapshots, types, or public contracts to make cleanup pass.
    - Prefer small reversible edits; verify after each finding or coherent group.
-10. Use agent orchestration only when it improves signal — except the verification-agent dispatch below, which `references/agent-orchestration.md`'s Independent Verification Exception mandates at the tiers named in its trigger regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
+10. Use agent orchestration only when it improves signal — except the `code-reviewer` `verify` dispatch below, which `references/agent-orchestration.md`'s Independent Verification Exception mandates at the tiers named in its trigger regardless of signal improvement. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated code-quality finding or disjoint file group
 > - permissions: write (disjoint write set)
@@ -77,31 +71,25 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable code-quality patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation of the CQ finding complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
-> - inputs: diff, CQ acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, CQ acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become CQ fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists review outcomes for the code-quality fix
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: mandatory per the verification-ladder's Independent Verification Mandate at Standard+/Spec-driven finding size or high/critical severity; at Quick size the subagent hop is skipped and the standalone fresh-eyes check below runs instead
 > - scope: the fixed finding's behavior-preservation claim over the moved/transformed code, its call sites/imports, and report claim closure
-> - permissions: read-only
 > - inputs: the finding, the applied fix, the verification suggestion, and validation assets
 > - sensors: deterministic command (behavior-preservation check, import graph, characterization tests); discrimination sensor per `references/discrimination-sensor.md` (mutate the pre-fix moved/transformed code the behavior-preservation claim protects, never newly introduced code)
 > - output: confirmed/disproven closure verdict with evidence
 > - firewall: raw test output/logs summarized
 > - memory: suggest-only; main agent persists code-quality verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of the code-quality closure evidence against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 
 11. Verify each completed finding:
@@ -116,7 +104,7 @@ Not for findings-only SOLID, Clean Code, KISS, YAGNI, DRY, maintainability, or o
    - Record command/artifact, result, skipped reason or `none`, highest Verification Ladder level reached, validation assets protected, and residual risk.
    - At the same Standard+/Spec-driven-or-high/critical tiers as the Independent Verification Mandate, run the discrimination sensor from `references/discrimination-sensor.md` against the pre-fix moved/transformed code the behavior-preservation claim protects; Quick mechanical transforms (rename, inline, delete) are exempt. A surviving mutant is an unproven preservation claim: strengthen the characterization test or close the row `blocked` and emit the `surviving_mutant` lessons signal — do not mark it `fixed`.
    - When a survivor traces to cross-boundary coupling rather than a weak assertion, route it through this workflow's step 5 reclassification gate (bounded-context/dependency-direction/seam/module-depth invalidity check) to `workflows/architecture/architecture-fix.md` instead of forcing a local fix.
-   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; exceeding the cap stops the finding at `Blocked` with evidence preserved. That cap is a separate counter from the two-consecutive-failed-fixes breaker in the preamble above — the breaker fires inside a single iteration and neither consumes nor resets the cap.
+   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; exceeding the cap stops the finding at `Blocked` with evidence preserved.
 12. Close out with the Fix Closure Report:
    - Write the Fix Closure Report per `references/audit-report-io.md` (Fix Closure Report Contract) to `audits/code-quality/<YYYY-MM-DD code-quality-fix-closure>.md`, one Closure Matrix row per selected finding.
    - Run `bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family code-quality` before Propose/Evidence Gate; a non-zero exit blocks Propose. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
@@ -134,6 +122,3 @@ User asks: "Use code-quality-fix to fix latest findings for billing services."
 3. Execute confirmed non-suspect findings by severity and behavior risk.
 4. Prefer delete/inline/rename/extract before introducing new abstractions.
 5. Verify behavior and validation assets after each finding group.
-
-<!-- validator anchors: references/discrimination-sensor.md; references/knowledge-verification-chain.md; references/brownfield-mapping.md; Independent Verification Exception; Fix Closure Report Contract; check_fix_closure.ts --family code-quality; Bounded Fix→Re-verify Loop; Stage 3 delivery-authorization scope -->
-

@@ -77,11 +77,19 @@ describe("managed subtrees stay gitignored (UGB-01)", () => {
   // regardless of how the .gitignore is formatted.
   const ignoredRepresentatives = [
     "apps/claude-plugin/skills/massa-ai/SKILL.md",
-    "apps/codex-plugin/skills/persona-router/SKILL.md",
     "apps/cursor-plugin/skills/profile/SKILL.md",
-    "apps/opencode-plugin/skills/agents/investigator/SKILL.md",
-    "apps/claude-plugin/agents/massa-ai-builder.md",
-    "apps/opencode-plugin/agent-profiles/work/massa-ai-builder.md",
+    // T21: the bootstrap bundle's own root-precise entry. One representative
+    // per pattern, and a different host from profile's on purpose — the two
+    // entries are separate lines in .gitignore, so a shared host would let one
+    // line's deletion hide behind the other's.
+    "apps/claude-plugin/skills/bootstrap/SKILL.md",
+    // Retired persona-router bundle: a pre-upgrade stale copy must never be
+    // committable. Codex, because cursor's skills/*/SKILL.md pattern would
+    // cover a cursor representative without this entry.
+    "apps/codex-plugin/skills/persona-router/references/routing-details.md",
+    "apps/opencode-plugin/skills/agents/code-explorer/SKILL.md",
+    "apps/claude-plugin/agents/senior-engineer.md",
+    "apps/opencode-plugin/agent-profiles/work/senior-engineer.md",
     "apps/codex-plugin/hooks/massa-ai-hook",
     "apps/cursor-plugin/hooks/massa-ai-hook",
     "apps/opencode-plugin/lib/opencode-config.cjs",
@@ -128,8 +136,8 @@ describe("managed subtrees stay gitignored (UGB-01)", () => {
       [
         "ls-files",
         "apps/claude-plugin/skills/massa-ai",
-        "apps/codex-plugin/skills/persona-router",
         "apps/cursor-plugin/skills/profile",
+        "apps/claude-plugin/skills/bootstrap",
         "apps/opencode-plugin/skills/agents",
         "apps/claude-plugin/agents",
         "apps/codex-plugin/agents",

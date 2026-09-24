@@ -97,6 +97,14 @@ for host in claude codex; do
   assert_eq "$host never writes modelProfile on a fresh install" \
     "$(state_field "$STATE" "$STATE_HOST" modelProfile.profile)" ""
 
+  # The shipped-default reference for sections 2-3, frozen right after this
+  # fresh (no recorded profile) install — regeneration at the top of every
+  # install.sh run targets the SAME checkout path, so re-reading that live
+  # path after a later section's non-default install would compare the
+  # default against itself.
+  DEFAULT_ACTIVE="$ROOT/default-active-$host.$ext"
+  cp "$PROJECT_ROOT/apps/${host}-plugin/agents/senior-engineer.$ext" "$DEFAULT_ACTIVE"
+
   # ── Section 2: recorded profile honored ───────────────────────────────────
   echo ""
   echo "2.$host recorded profile honored — active set comes from agent-profiles/work/"
@@ -109,9 +117,8 @@ JSON
   run_installer "$host" "$H"
   assert_eq "$host recorded-profile install → exit 0" "$RC" "0"
   assert_contains "$host re-apply log line names the profile" "$OUT" "re-applying recorded model profile 'work'"
-  INSTALLED="$H/$cfg_dir/agents/massa-ai-builder.$ext"
-  WORK_VARIANT="$BUNDLE_AGENT_PROFILES/work/massa-ai-builder.$ext"
-  DEFAULT_ACTIVE="$PROJECT_ROOT/apps/${host}-plugin/agents/massa-ai-builder.$ext"
+  INSTALLED="$H/$cfg_dir/agents/senior-engineer.$ext"
+  WORK_VARIANT="$BUNDLE_AGENT_PROFILES/work/senior-engineer.$ext"
   assert_file "$host installed active file exists" "$INSTALLED"
   if cmp -s "$INSTALLED" "$WORK_VARIANT"; then
     ok "$host installed content == work variant content"
@@ -143,7 +150,7 @@ JSON
   assert_eq "$host missing-profile install → exit 0" "$RC" "0"
   assert_contains "$host missing-profile → loud fallback line" "$OUT" \
     "recorded model profile 'does_not_exist' is not in this bundle — falling back to the default profile"
-  INSTALLED="$H/$cfg_dir/agents/massa-ai-builder.$ext"
+  INSTALLED="$H/$cfg_dir/agents/senior-engineer.$ext"
   if cmp -s "$INSTALLED" "$DEFAULT_ACTIVE"; then
     ok "$host missing-profile → installed content == shipped default"
   else
@@ -161,11 +168,11 @@ JSON
   else
     VARIANT_DEST="$H/$cfg_dir/massa-ai/agent-profiles"
   fi
-  assert_file "$host variant tree: balanced/massa-ai-builder.$ext installed" \
-    "$VARIANT_DEST/balanced/massa-ai-builder.$ext"
-  assert_file "$host variant tree: work/massa-ai-builder.$ext installed" \
-    "$VARIANT_DEST/work/massa-ai-builder.$ext"
-  if cmp -s "$VARIANT_DEST/work/massa-ai-builder.$ext" "$BUNDLE_AGENT_PROFILES/work/massa-ai-builder.$ext"; then
+  assert_file "$host variant tree: balanced/senior-engineer.$ext installed" \
+    "$VARIANT_DEST/balanced/senior-engineer.$ext"
+  assert_file "$host variant tree: work/senior-engineer.$ext installed" \
+    "$VARIANT_DEST/work/senior-engineer.$ext"
+  if cmp -s "$VARIANT_DEST/work/senior-engineer.$ext" "$BUNDLE_AGENT_PROFILES/work/senior-engineer.$ext"; then
     ok "$host installed work variant content == bundle work variant content"
   else
     fail "$host installed work variant content == bundle work variant content  →  differs"

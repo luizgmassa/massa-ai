@@ -138,8 +138,11 @@ profile each: `EB-SCH-3b` only under `scheduler-fast`, and `EB-SCH-6` only under
 The first run on a stack brought up by `scripts/e2e-stack.sh` rather than by hand, against a
 fixture built by `scripts/prepare-e2e-fixture.ts` (70 tracked files, commit
 `788facbd87a568e4e3354cb541ef0d019fa5aaaf`, 35 discoverable sources) and the embedding
-profile that is actually installed — **`qwen3-embedding:4b` at 2560 dimensions**, not the
-`qwen3-embedding:8b`/4096 the 2026-07-13 ledger below pins.
+profile that was installed then — **`qwen3-embedding:4b` at 2560 dimensions**, not the
+`qwen3-embedding:8b`/4096 the 2026-07-13 ledger below pins. `scripts/e2e-stack.sh` has since
+followed the product default to `qwen3-embedding:0.6b` at 1024, which takes the direct HNSW
+store branch rather than the `> 2000` binary-quantization one; these counts predate that move
+and are not a baseline for it.
 
 **Before repairs: 223 pass / 5 fail / 4 skip, 232 tests across 16 files, 641.19 s, exit 1.**
 **After test repairs: 231 pass / 1 fail / 3 skip, 235 tests across 16 files, 360.69 s, exit 1.**

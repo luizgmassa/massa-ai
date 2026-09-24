@@ -85,8 +85,8 @@ ENV MASSA_AI_API_PORT=3333
 ENV XDG_CONFIG_HOME=/data
 # Default: Ollama on host network
 ENV OLLAMA_BASE_URL=http://host.docker.internal:11434
-ENV OLLAMA_EMBEDDING_MODEL=qwen3-embedding:4b
-ENV OLLAMA_EMBEDDING_DIMENSIONS=2560
+ENV OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
+ENV OLLAMA_EMBEDDING_DIMENSIONS=1024
 # SEC-05: a container reached through a bridge port mapping sees the host
 # browser as a bridge address (::ffff:172.17.0.x), never as loopback, so the
 # address check can never pass here and /ui would be permanently unusable.

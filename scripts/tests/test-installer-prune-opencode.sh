@@ -5,12 +5,12 @@
 # apps/opencode-plugin/install.sh — IPT-02 sites 4-5, IPT-03 site 7, IPT-05.
 #
 #   Site 4 (agent symlinks into $AGENTS_DIR, D1 copy-then-prune): ownership is
-#   SYMLINK-NESS ([[ -L ]]), not a name prefix — the copy loop directly above
-#   refuses to clobber a regular file at an owned path (it is the user's
-#   content), so the prune must leave a regular file alone too, or it would
-#   delete exactly what that loop protects (AC-02.3). Scenario (b) below is
-#   the discriminating case: it catches a prune written as an unconditional
-#   `rm -f massa-ai-*.md` that ignores symlink-ness.
+#   is_owned_agent_link (a symlink into a massa-ai bundle or to a marked file),
+#   not a name prefix — the copy loop directly above refuses to clobber a
+#   regular file (it is the user's content), so the prune must leave a regular
+#   file alone too, or it would delete exactly what that loop protects
+#   (AC-02.3). Scenario (b) below is the discriminating case: it catches a
+#   prune written as an unconditional `rm -f *.md` that ignores symlink-ness.
 #
 #   Site 5 (workflow commands into $COMMANDS_DIR, D1 copy-then-prune):
 #   ownership IS the massa-ai- name prefix (D3, opencode's own uninstall at
@@ -28,8 +28,8 @@
 #   stated precondition never holds, and the test would be green for the
 #   wrong reason.
 #
-#   IPT-05/AC-05.1: install_bundled_skills now installs three harness skills
-#   (massa-ai, persona-router, profile), not two.
+#   IPT-05/AC-05.1 + PER AC-4: install_bundled_skills installs exactly the
+#   harness skills massa-ai, profile, and bootstrap.
 #
 # Runs the real install.sh against scratch HOMEs. MASSA_AI_SKIP_ARTIFACT_GENERATION=1
 # is set for every ordinary invocation because this checkout's
@@ -59,9 +59,9 @@ ROOT="$(mktemp -d "${TMPDIR:-/tmp}/massa-ai-prune-opencode.XXXXXX")"
 # source bundle for scenario (c), and always restores. Chosen because it is
 # generated content (safe to touch, gitignored under AD-016) and is not a
 # file any other in-flight worker in this worktree reads.
-FIXTURE_AGENT_NAME="massa-ai-builder.md"
+FIXTURE_AGENT_NAME="senior-engineer.md"
 FIXTURE_AGENT_PATH="${SOURCE_AGENTS_DIR}/${FIXTURE_AGENT_NAME}"
-FIXTURE_BACKUP="${ROOT}/massa-ai-builder.md.bak"
+FIXTURE_BACKUP="${ROOT}/senior-engineer.md.bak"
 
 restore_fixture_agent() {
   if [[ -f "$FIXTURE_BACKUP" && ! -f "$FIXTURE_AGENT_PATH" ]]; then
@@ -105,7 +105,7 @@ H1="$ROOT/h1"; mkdir -p "$H1"
 AGENTS_DIR1="$H1/.config/opencode/agents"
 mkdir -p "$AGENTS_DIR1"
 
-RETIRED_LINK="$AGENTS_DIR1/massa-ai-retired-specialist.md"
+RETIRED_LINK="$AGENTS_DIR1/retired-specialist.md"
 ln -sfn "$FIXTURE_AGENT_PATH" "$RETIRED_LINK"
 assert_symlink_to "fixture planted as a real symlink (not a regular file)" "$RETIRED_LINK" "$FIXTURE_AGENT_PATH"
 
@@ -125,7 +125,7 @@ H2="$ROOT/h2"; mkdir -p "$H2"
 AGENTS_DIR2="$H2/.config/opencode/agents"
 mkdir -p "$AGENTS_DIR2"
 
-REGULAR_FILE="$AGENTS_DIR2/massa-ai-fake-specialist.md"
+REGULAR_FILE="$AGENTS_DIR2/fake-specialist.md"
 echo "this is a regular file the installer must never delete" > "$REGULAR_FILE"
 BEFORE_CONTENT="$(cat "$REGULAR_FILE")"
 
@@ -139,7 +139,7 @@ echo ""
 # ── Scenario (d), agents half: the current agent set is present ────────────
 echo "Scenario (d): the current agent and command sets are present after install"
 CURRENT_AGENT_COUNT=0
-for src in "$SOURCE_AGENTS_DIR/"massa-ai-*.md; do
+for src in "$SOURCE_AGENTS_DIR/"*.md; do
   [[ -f "$src" ]] || continue
   name="$(basename "$src")"
   assert_file "current agent $name installed (h2)" "$AGENTS_DIR2/$name"
@@ -194,7 +194,7 @@ assert_symlink_to "pre-step: fixture agent installed as a symlink" \
 INSTALLED_BEFORE_UNINSTALL=()
 while IFS= read -r -d '' f; do
   INSTALLED_BEFORE_UNINSTALL+=("$(basename "$f")")
-done < <(find "$AGENTS_DIR4" -maxdepth 1 -name 'massa-ai-*.md' -print0)
+done < <(find "$AGENTS_DIR4" -maxdepth 1 -name '*.md' -print0)
 check "sanity: pre-step installed more than zero agent symlinks" \
   "$([ "${#INSTALLED_BEFORE_UNINSTALL[@]}" -gt 0 ] && echo 0 || echo 1)"
 
@@ -220,14 +220,15 @@ done
 
 echo ""
 
-# ── IPT-05/AC-05.1: three harness skills, not two ────────────────────────────
-echo "Scenario: install_bundled_skills installs massa-ai, persona-router, AND profile"
+# ── IPT-05/AC-05.1 + PER AC-4: the two harness skills ────────────────────────────
+echo "Scenario: install_bundled_skills installs massa-ai AND bootstrap (PER AC-4)"
 H5="$ROOT/h5"; mkdir -p "$H5"
 OUT5="$(run_install "$H5")"; RC5=$?
 assert_eq "install exits 0" "$RC5" "0"
 SKILLS_DIR5="$H5/.config/opencode/skills"
 assert_file "massa-ai skill installed" "$SKILLS_DIR5/massa-ai/SKILL.md"
-assert_file "persona-router skill installed" "$SKILLS_DIR5/persona-router/SKILL.md"
-assert_file "profile skill installed" "$SKILLS_DIR5/profile/SKILL.md"
+assert_file "bootstrap skill installed" "$SKILLS_DIR5/bootstrap/SKILL.md"
+assert_no_file "retired persona-router skill is not installed" "$SKILLS_DIR5/persona-router"
+assert_no_file "retired profile skill is not installed" "$SKILLS_DIR5/profile"
 
 summary "installer prune (opencode)"

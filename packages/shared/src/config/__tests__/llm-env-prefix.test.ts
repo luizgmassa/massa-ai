@@ -25,6 +25,7 @@ import {
   runIsolated,
   type IsolatedConfigHome,
 } from "./isolated-config";
+import { INFERENCE_ROLE_DEFAULTS } from "../inference-providers";
 
 const CONFIG_INDEX = path.join(import.meta.dir, "..", "index.ts");
 
@@ -44,7 +45,9 @@ const KNOBS = [
     probe: "probe-instruct-model",
     field: "model",
     expected: "probe-instruct-model",
-    default: "qwen2.5:7b-instruct",
+    // Provider-derived (T03): the ollama seam entry's instruct default, not a
+    // disconnected literal — see inference-providers.ts's `defaultModels`.
+    default: "qwen3-vl:8b",
   },
   {
     suffix: "CODE_MODEL",
@@ -54,6 +57,16 @@ const KNOBS = [
     default: "qwen2.5-coder:7b",
   },
   { suffix: "TEMPERATURE", probe: "0.77", field: "temperature", expected: 0.77, default: 0.2 },
+  {
+    // The 11th MASSA_AI_LLM_* knob (T04, AD-010/R-08). contextWindow and
+    // codeContextWindow are also new PDM-12 fields but take no env var of
+    // their own — codeTemperature is the only one this feature wires.
+    suffix: "CODE_TEMPERATURE",
+    probe: "0.55",
+    field: "codeTemperature",
+    expected: 0.55,
+    default: 0.0,
+  },
   {
     suffix: "MAX_OUTPUT_TOKENS",
     probe: "4242",
@@ -145,5 +158,137 @@ describe("AD-010: MASSA_AI_LLM_* is the project's only LLM env prefix", () => {
     for (const k of KNOBS) {
       expect(resolved[k.field], `config.${k.field} is not its documented default`).toBe(k.default);
     }
+  }, 30_000);
+});
+
+describe("T03: DEFAULT_LLM_MODEL / DEFAULT_LLM_CODE_MODEL are provider-derived", () => {
+  let home: IsolatedConfigHome;
+
+  beforeEach(() => {
+    home = makeIsolatedConfigHome("massa-ai-default-model-");
+  });
+
+  afterEach(() => {
+    removeIsolatedConfigHome(home);
+  });
+
+  /**
+   * Asserts the exported constants directly, not through `config.get("llm")` —
+   * `llm.model` is already resolved by `defaultMassaAiConfig.llm.model` before
+   * this fallback is ever consulted, so testing only the resolved field would
+   * leave `DEFAULT_LLM_MODEL`/`DEFAULT_LLM_CODE_MODEL` themselves unobserved
+   * (T03's actual deliverable).
+   */
+  test("with no embedding.provider configured, both constants derive from ollama's seam entry", () => {
+    const child = `
+      import { DEFAULT_LLM_MODEL, DEFAULT_LLM_CODE_MODEL } from ${JSON.stringify(CONFIG_INDEX)};
+      import { INFERENCE_PROVIDERS } from ${JSON.stringify(
+        path.join(import.meta.dir, "..", "inference-providers.ts"),
+      )};
+      console.log(JSON.stringify({
+        model: DEFAULT_LLM_MODEL,
+        codeModel: DEFAULT_LLM_CODE_MODEL,
+        expectedModel: INFERENCE_PROVIDERS.ollama.defaultModels.instruct,
+        expectedCodeModel: INFERENCE_PROVIDERS.ollama.defaultModels.coding,
+      }));
+    `;
+    const res = runIsolated(home, "default-model-ollama", child, [], clearedEnv());
+    expect(res.exitCode, `child failed:\n${res.stderr}`).toBe(0);
+    const out = JSON.parse(res.stdout.trim().split("\n").pop() ?? "");
+    expect(out.model).toBe(out.expectedModel);
+    expect(out.codeModel).toBe(out.expectedCodeModel);
+  }, 30_000);
+
+  test("with embedding.provider=lmstudio, both constants derive from lmstudio's seam entry", () => {
+    const child = `
+      import fs from "fs";
+      import path from "path";
+      import os from "os";
+      const dir = path.join(${JSON.stringify(home.configDir)});
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, "config.json"),
+        JSON.stringify({ embedding: { provider: "lmstudio", model: "x" } }),
+      );
+      const { DEFAULT_LLM_MODEL, DEFAULT_LLM_CODE_MODEL } = await import(${JSON.stringify(CONFIG_INDEX)});
+      const { INFERENCE_PROVIDERS } = await import(${JSON.stringify(
+        path.join(import.meta.dir, "..", "inference-providers.ts"),
+      )});
+      console.log(JSON.stringify({
+        model: DEFAULT_LLM_MODEL,
+        codeModel: DEFAULT_LLM_CODE_MODEL,
+        expectedModel: INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct,
+        expectedCodeModel: INFERENCE_PROVIDERS.lmstudio.defaultModels.coding,
+      }));
+    `;
+    const res = runIsolated(home, "default-model-lmstudio", child, [], clearedEnv());
+    expect(res.exitCode, `child failed:\n${res.stderr}`).toBe(0);
+    const out = JSON.parse(res.stdout.trim().split("\n").pop() ?? "");
+    expect(out.model).toBe(out.expectedModel);
+    expect(out.codeModel).toBe(out.expectedCodeModel);
+  }, 30_000);
+});
+
+/**
+ * F5/PDM-12 AC-2 — `contextWindow`, `codeContextWindow` and `codeTemperature`
+ * take no env var of their own (see the KNOBS comment above), so the only way
+ * `config.json` can override them is `defaultConfig`'s own
+ * `fileConfig.llm?.X ?? INFERENCE_ROLE_DEFAULTS...` fallback at
+ * `config/index.ts:781,783,785`. M12a/b/c each deleted one of those three
+ * `??` fallbacks and survived both `bun test packages/shared/src` and
+ * `llm-client.test.ts`, because neither suite reads `config.get("llm")` after
+ * writing a real `config.json` — `config-loader.test.ts` exercises
+ * `loadConfig()` (a different function on a different type) and
+ * `llm-client.test.ts` calls `_resolveLlmConfig` directly with a synthetic
+ * `cfg` that already carries the field, never through the production
+ * `config.get("llm")` path. This block writes a real `config.json`, imports
+ * `config/index.ts` fresh in a subprocess, and reads `config.get("llm")` —
+ * the exact call `getLlmConfig()` makes in production.
+ */
+describe("PDM-12 AC-2: llm.contextWindow/codeContextWindow/codeTemperature — config.json wins over the seam default", () => {
+  let home: IsolatedConfigHome;
+
+  beforeEach(() => {
+    home = makeIsolatedConfigHome("massa-ai-llm-role-fields-");
+  });
+
+  afterEach(() => {
+    removeIsolatedConfigHome(home);
+  });
+
+  const PROBE = { contextWindow: 12000, codeContextWindow: 40000, codeTemperature: 0.66 };
+
+  function childReadingLlm(): string {
+    return `
+      import { config } from ${JSON.stringify(CONFIG_INDEX)};
+      const llm = config.get("llm");
+      console.log(JSON.stringify({
+        contextWindow: llm.contextWindow,
+        codeContextWindow: llm.codeContextWindow,
+        codeTemperature: llm.codeTemperature,
+      }));
+    `;
+  }
+
+  test("a config.json value wins over the seam default for all three fields (production reader)", () => {
+    const fs = require("fs");
+    fs.mkdirSync(home.configDir, { recursive: true });
+    fs.writeFileSync(home.configPath, JSON.stringify({ llm: PROBE }));
+
+    const res = runIsolated(home, "llm-role-fields-config-wins", childReadingLlm(), [], clearedEnv());
+    expect(res.exitCode, `child failed:\n${res.stderr}`).toBe(0);
+    const out = JSON.parse(res.stdout.trim().split("\n").pop() ?? "");
+    expect(out.contextWindow).toBe(PROBE.contextWindow);
+    expect(out.codeContextWindow).toBe(PROBE.codeContextWindow);
+    expect(out.codeTemperature).toBe(PROBE.codeTemperature);
+  }, 30_000);
+
+  test("the seam default applies to all three fields when config.json sets none of them", () => {
+    const res = runIsolated(home, "llm-role-fields-seam-default", childReadingLlm(), [], clearedEnv());
+    expect(res.exitCode, `child failed:\n${res.stderr}`).toBe(0);
+    const out = JSON.parse(res.stdout.trim().split("\n").pop() ?? "");
+    expect(out.contextWindow).toBe(INFERENCE_ROLE_DEFAULTS.instruct.contextWindow);
+    expect(out.codeContextWindow).toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+    expect(out.codeTemperature).toBe(INFERENCE_ROLE_DEFAULTS.coding.temperature);
   }, 30_000);
 });

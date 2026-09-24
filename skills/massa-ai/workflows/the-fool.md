@@ -1,6 +1,6 @@
 ---
 name: the-fool
-description: "Use this workflow for direct requests to challenge ideas, plans, decisions, or evidence, and as the configured post-plan challenge gate after other workflows construct a plan."
+description: "Use this workflow for direct requests to challenge ideas, plans, decisions, or evidence, and as the post-plan challenge gate after other workflows construct a plan."
 license: MIT
 metadata:
   version: "1.1.0"
@@ -8,7 +8,7 @@ metadata:
 
 ### The Fool
 
-Use for direct requests to challenge ideas, plans, decisions, proposals, architectures, evidence, or assumptions. Also use as the configured post-plan challenge gate after other massa-ai workflows construct a plan.
+Use for direct requests to challenge ideas, plans, decisions, proposals, architectures, evidence, or assumptions. Also use as the post-plan challenge gate after other massa-ai workflows construct a plan.
 
 Load `references/project-context.md` (intake sweep) before the first substantive read.
 
@@ -16,12 +16,13 @@ Not to build the initial plan, make the decision, or execute implementation work
 
 ## Configuration
 
-Read the canonical **Plan Challenge Policy** from the installed `AGENTS.md`
-bootstrap block (`<!-- massa-ai:bootstrap -->`), whose single source is
-`skills/AGENTS.md` in the product repo. If that
-file is unavailable, use the deterministic runtime fallback: run the lite gate
-with `pre_mortem` mode (do not judgment-select the gate or mode), and revise
-the parent plan when critical or high findings are valid.
+The gate is fixed behavior, defined once in `SKILL.md` §Plan Challenge Gate
+(which workflows run lite or full, and what escalates). There is no policy file
+to read: the mode is always auto-selected, and valid `critical` or `high`
+findings always revise the parent plan. The gate runs where a workflow carries a
+Plan Challenge step — the workflows named in those Lite and Full bullets; the
+risk and size triggers escalate a plan inside them to full, and a direct
+challenge request runs it anywhere.
 
 User prompt overrides take precedence for the current turn only, such as "skip the Fool gate", "use red-team mode", or "append critique without revising the plan".
 
@@ -32,20 +33,19 @@ User prompt overrides take precedence for the current turn only, such as "skip t
    - Post-plan gate: inherit the parent workflow's exact `projectId`,
      `workflowSessionId`, workflow name, entity, and memory context.
 2. `recall` -> load prior decisions, rejected approaches, constraints, accepted risks, and relevant evidence for the target entity.
-3. Require a concrete proposed plan before critique. If there is no plan, return to the parent workflow and construct the plan first. After a concrete plan exists, always attempt a read-only `massa-ai-plan-critic` subagent when subagent tooling is available. If that agent is unavailable, follow the no-agent fallback in `references/agent-orchestration.md` (Name Resolution): run the critique locally against the same output contract and report the skipped delegation.
+3. Require a concrete proposed plan before critique. If there is no plan, return to the parent workflow and construct the plan first. After a concrete plan exists, always attempt a `judge` subagent in `plan-critique` mode (it writes nothing in that mode) when subagent tooling is available. If that agent is unavailable, follow the no-agent fallback in `references/agent-orchestration.md` (Name Resolution): run the critique locally against the same output contract and report the skipped delegation.
 4. Resolve gate depth:
-   - Post-plan lite gate: keep parent identifiers and dispatch a bounded lite checklist packet without loading The Fool mode references.
+   - Post-plan lite gate: keep parent identifiers and dispatch the bounded packet the Lite bullet of `SKILL.md` §Plan Challenge Gate defines, without loading The Fool mode references.
    - Post-plan full gate or direct challenge: continue to mode selection and full critique.
    - Direct challenge requests use `workflowSessionId=fool-[entity]`; post-plan gates keep the parent identifiers and send only a bounded packet.
-5. Lite `massa-ai-plan-critic` packet:
-   - Inputs: proposed plan, scope, constraints, parent workflow, compact recalled facts/evidence, known risks, verification recipe, context-firewall limits, and lite checklist.
+5. Lite `judge` `plan-critique` packet:
+   - Inputs: proposed plan, scope, constraints, parent workflow, compact recalled facts/evidence, known risks, verification recipe, context-firewall limits, and that Lite bullet's checklist (failing assumption, falsifying check, risk/size check).
    - Output must include the strongest low-risk challenges plus `escalate_to_full: true|false` and reason.
-   - If `escalate_to_full: false`, synthesize the lite critique, revise or accept risk according to policy, and complete the gate without loading The Fool mode references.
-   - If `escalate_to_full: true`, the main agent selects full mode, loads the relevant references, and dispatches a full `massa-ai-plan-critic` pass.
+   - If `escalate_to_full: false`, synthesize the lite critique, revise the plan for each challenge judged valid or record the accepted risk, and complete the gate without loading The Fool mode references.
+   - If `escalate_to_full: true`, the main agent selects full mode, loads the relevant references, and dispatches a full `judge` `plan-critique` pass.
 6. Select The Fool mode for full gates:
-   - `mode: auto`: read `references/the-fool/mode-selection-guide.md` and choose the best mode from plan content and domain.
-   - `mode: ask`: ask the user only when interactive input is available; otherwise fall back to `auto` and report the fallback.
-   - Concrete mode values map to The Fool references: `pre_mortem`, `red_team`, `evidence_audit`, `socratic`, or `dialectic`.
+   - Read `references/the-fool/mode-selection-guide.md` and choose the best mode from plan content and domain, unless the user named a mode for this turn.
+   - Mode values map to The Fool references: `pre_mortem`, `red_team`, `evidence_audit`, `socratic`, or `dialectic`.
    - Mode reference map:
      - `pre_mortem` -> `references/the-fool/pre-mortem-analysis.md`
      - `red_team` -> `references/the-fool/red-team-adversarial.md`
@@ -55,12 +55,12 @@ User prompt overrides take precedence for the current turn only, such as "skip t
 7. Load only the selected The Fool reference plus `references/the-fool/cognitive-bias-inventory.md`.
 8. Dispatch the full critique:
    - Load `references/agent-orchestration.md`.
-   - Use the `plan-critic` contract and capability-packet shape from `references/agent-orchestration.md`; dispatch under `massa-ai-plan-critic`.
-   - Send only the proposed plan, scope, constraints, parent workflow, recalled facts, verification recipe, known risks, selected mode, context-firewall limits, and output contract.
+   - Use the `plan-critique` contract and capability-packet shape from `references/agent-orchestration.md`; dispatch `judge` with `mode: plan-critique`.
+   - Send only the proposed plan, scope, constraints, parent workflow, recalled facts, verification recipe, known risks, the selected The Fool mode as `fool_mode` (the packet `mode` stays `plan-critique`), context-firewall limits, and output contract.
    - If subagents are unavailable or platform policy forbids spawning, run a strict standalone fresh-eyes local critique and record the skipped delegation reason.
-   - Normal delegation gates in `references/agent-orchestration.md` still apply to other roles, but Plan Challenge `plan-critic` is a standing policy exception after a concrete plan exists.
+   - Normal delegation gates in `references/agent-orchestration.md` still apply to other roles, but the Plan Challenge `judge` `plan-critique` dispatch is a standing policy exception after a concrete plan exists.
 9. Critique output must include:
-   - selected mode
+   - selected `fool_mode`
    - steelmanned thesis
    - 3-5 strongest challenges
    - severity: `critical`, `high`, `medium`, or `low`
@@ -69,10 +69,7 @@ User prompt overrides take precedence for the current turn only, such as "skip t
    - required revision or accepted-risk framing
    - confidence impact
    - exact next step
-10. Synthesize using `references/decision-engine.md`:
-   - `serious_findings: revise_plan`: revise valid `critical` or `high` findings before presenting the final plan.
-   - `serious_findings: append_critique`: keep the plan and attach the critique for user decision.
-   - `serious_findings: warn_only`: mention serious risks briefly without restructuring the plan.
+10. Synthesize using `references/decision-engine.md`: revise valid `critical` or `high` findings before presenting the final plan. Only a user override for the current turn keeps the plan unchanged and attaches the critique for user decision instead.
 11. Persist only durable outcomes after recall and scoring:
    - accepted architecture constraints, rejected approaches, durable risk decisions, or reusable critique patterns
    - required tags: `project:<projectId>`, `session:<workflowSessionId>`, `workflow:the-fool` or parent workflow for post-plan gates, `entity:<entity>`, and one `memory:<tier>`
@@ -87,4 +84,4 @@ When used as a gate, the final user-facing plan should not expose raw subagent c
 Plan Challenge: ran The Fool in pre-mortem mode; revised verification and rollout risks before finalizing.
 ```
 
-If the gate is skipped, state why only when it affects confidence, user expectation, or configured behavior.
+If the gate is skipped, state why only when it affects confidence or user expectation.

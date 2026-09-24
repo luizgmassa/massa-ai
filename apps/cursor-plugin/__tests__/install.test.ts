@@ -19,6 +19,7 @@ import { spawnSync } from "child_process";
 import { promises as fs, existsSync } from "fs";
 import path from "path";
 import os from "os";
+import { RESERVED_BUNDLE_ROOTS as SHARED_RESERVED_BUNDLE_ROOTS } from "../../../scripts/lib/workflow-commands.ts";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../..");
 const INSTALL_SH = path.resolve(
@@ -146,7 +147,7 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     const pluginDir = path.join(tmp, ".cursor/plugins/local/massa-ai");
     expect(await pathExists(path.join(pluginDir, ".cursor-plugin/plugin.json"))).toBe(true);
     // Agents land in the flat dir Cursor discovers, not inside the plugin dir.
-    expect(await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md"))).toBe(true);
+    expect(await pathExists(path.join(tmp, ".cursor/agents/code-explorer.md"))).toBe(true);
     expect(await pathExists(path.join(pluginDir, "agents"))).toBe(false);
 
     const cfg = await readJson(path.join(tmp, ".cursor/hooks.json"));
@@ -266,29 +267,18 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     ).toBe(false);
   });
 
-  // ── T6: 18 subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
+  // ── T6: subagent specialists bundled into plugin agents/ (CRS-01,04,07 + DOC-01) ─
   const SPECIALIST_NAMES = [
-    "investigator",
-    "planner",
-    "builder",
-    "reviewer",
-    "context-curator",
-    "verification-agent",
-    "requirements-analyst",
-    "architecture-specialist",
-    "test-engineer",
-    "documentation-agent",
-    "audit-specialist",
-    "mobile-specialist",
-    "plan-critic",
-    "furps-analyst",
-    "navigator",
-    "meta-judge",
-    "judge",
+    "senior-engineer",
+    "code-explorer",
+    "code-reviewer",
     "designer",
+    "judge",
+    "product-manager",
+    "test-engineer",
   ];
 
-  test("CRS-01/CRS-04/DOC-01: install copies all 18 specialists into ~/.cursor/agents/ as regular files + prints summary", async () => {
+  test("CRS-01/CRS-04/DOC-01: install copies every specialist into ~/.cursor/agents/ as regular files + prints summary", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
@@ -296,41 +286,39 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
     // subagents from (CRS-04, corrected); real copies, never symlinks.
     const agentsDir = path.join(tmp, ".cursor/agents");
     for (const name of SPECIALIST_NAMES) {
-      const agentPath = path.join(agentsDir, `massa-ai-${name}.md`);
+      const agentPath = path.join(agentsDir, `${name}.md`);
       expect(await pathExists(agentPath)).toBe(true);
       expect((await fs.lstat(agentPath)).isSymbolicLink()).toBe(false);
     }
-    // Exactly 17 massa-ai-owned .md files
-    const files = (await fs.readdir(agentsDir)).filter(
-      (f) => f.startsWith("massa-ai-") && f.endsWith(".md"),
-    );
-    expect(files.length).toBe(18);
+    // Exactly one massa-ai-owned .md file per specialist (fresh HOME: every .md is ours)
+    const files = (await fs.readdir(agentsDir)).filter((f) => f.endsWith(".md"));
+    expect(files.length).toBe(SPECIALIST_NAMES.length);
     // Nothing is bundled into the plugin dir anymore
     expect(
       await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai/agents")),
     ).toBe(false);
 
-    // Install output mentions the 18 subagent specialists (DOC-01)
-    expect(res.stdout).toContain("18 subagent specialists");
+    // Install output reports the specialist count (DOC-01)
+    expect(res.stdout).toContain(`${SPECIALIST_NAMES.length} subagent specialists`);
   });
 
   test("migration: a pre-fix agents copy inside the plugin dir is removed on install", async () => {
     const staleDir = path.join(tmp, ".cursor/plugins/local/massa-ai/agents");
     await fs.mkdir(staleDir, { recursive: true });
-    await fs.writeFile(path.join(staleDir, "massa-ai-navigator.md"), "stale");
+    await fs.writeFile(path.join(staleDir, "code-explorer.md"), "stale");
 
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(await pathExists(staleDir)).toBe(false);
     expect(
-      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+      await pathExists(path.join(tmp, ".cursor/agents/code-explorer.md")),
     ).toBe(true);
   });
 
   test("CRS-05: uninstall removes plugin dir + owned agents; user agents survive", async () => {
     runInstall(["--user"], { HOME: tmp });
     const agentsDir = path.join(tmp, ".cursor/agents");
-    expect(await pathExists(path.join(agentsDir, "massa-ai-navigator.md"))).toBe(true);
+    expect(await pathExists(path.join(agentsDir, "code-explorer.md"))).toBe(true);
     // A user-authored agent in the same flat dir must survive uninstall.
     await fs.writeFile(path.join(agentsDir, "my-own-agent.md"), "user agent");
 
@@ -340,8 +328,7 @@ describe("cursor-plugin install.sh (T10 / CRS-01,02,07 + F5)", () => {
       await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
     ).toBe(false);
     const remaining = await fs.readdir(agentsDir);
-    expect(remaining.filter((f) => f.startsWith("massa-ai-"))).toEqual([]);
-    expect(remaining).toContain("my-own-agent.md");
+    expect(remaining).toEqual(["my-own-agent.md"]);
   });
 });
 
@@ -366,7 +353,7 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
     ).toBe(true);
     expect(await ownedHookCount(path.join(tmp, ".cursor/hooks.json"))).toBe(0);
     expect(
-      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+      await pathExists(path.join(tmp, ".cursor/agents/code-explorer.md")),
     ).toBe(true);
     expect(
       await pathExists(path.join(tmp, ".cursor/skills/massa-ai/SKILL.md")),
@@ -525,7 +512,7 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
     ).toBe(true);
     expect(await ownedHookCount(path.join(tmp, ".cursor/hooks.json"))).toBe(0);
     expect(
-      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+      await pathExists(path.join(tmp, ".cursor/agents/code-explorer.md")),
     ).toBe(true);
 
     const state = await readJson(
@@ -566,7 +553,7 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
       await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
     ).toBe(false);
     expect(
-      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+      await pathExists(path.join(tmp, ".cursor/agents/code-explorer.md")),
     ).toBe(false);
     expect(await ownedHookCount(path.join(tmp, ".cursor/hooks.json"))).toBe(0);
   });
@@ -575,7 +562,7 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
     await writeClaudeRegistry(tmp);
     runInstall(["--user"], { HOME: tmp });
     expect(
-      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+      await pathExists(path.join(tmp, ".cursor/agents/code-explorer.md")),
     ).toBe(true);
 
     const res = runInstall(["--uninstall"], { HOME: tmp });
@@ -584,18 +571,18 @@ describe("cursor-plugin Claude-bridge preference (T6, PAU-08..11)", () => {
       await pathExists(path.join(tmp, ".cursor/plugins/local/massa-ai")),
     ).toBe(false);
     expect(
-      await pathExists(path.join(tmp, ".cursor/agents/massa-ai-navigator.md")),
+      await pathExists(path.join(tmp, ".cursor/agents/code-explorer.md")),
     ).toBe(false);
   });
 });
 
 describe("cursor-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
-  test("install copies massa-ai + persona-router into ~/.cursor/skills (not the plugin cache) as plugin-owned", async () => {
+  test("install copies massa-ai + bootstrap into ~/.cursor/skills (not the plugin cache) as plugin-owned", async () => {
     const res = runInstall(["--user", "--verbose"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("harness skills installed");
 
-    for (const name of ["massa-ai", "persona-router"]) {
+    for (const name of ["massa-ai", "bootstrap"]) {
       const skillMd = path.join(tmp, `.cursor/skills/${name}/SKILL.md`);
       expect(await pathExists(skillMd)).toBe(true);
       const lst = await fs.lstat(skillMd);
@@ -607,11 +594,11 @@ describe("cursor-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
     expect(platforms.cursor.skillsOwner).toBe("plugin");
   });
 
-  test("the existing 6 host-command skills copy is unaffected — no massa-ai/persona-router leak into the plugin cache", async () => {
+  test("the existing 6 host-command skills copy is unaffected — no harness skill leaks into the plugin cache", async () => {
     runInstall(["--user"], { HOME: tmp });
     const pluginDir = path.join(tmp, ".cursor/plugins/local/massa-ai");
     expect(await pathExists(path.join(pluginDir, "skills/massa-ai"))).toBe(false);
-    expect(await pathExists(path.join(pluginDir, "skills/persona-router"))).toBe(false);
+    expect(await pathExists(path.join(pluginDir, "skills/bootstrap"))).toBe(false);
     for (const name of ["def", "find", "graph", "index", "map", "status"]) {
       expect(await pathExists(path.join(pluginDir, `skills/${name}/SKILL.md`))).toBe(true);
     }
@@ -626,7 +613,7 @@ describe("cursor-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
         {
           version: 2,
           platforms: {
-            cursor: { root: path.join(tmp, ".cursor"), skillsOwner: "repo", skills: ["massa-ai", "persona-router"] },
+            cursor: { root: path.join(tmp, ".cursor"), skillsOwner: "repo", skills: ["massa-ai", "bootstrap"] },
           },
         },
         null,
@@ -652,7 +639,15 @@ describe("cursor-plugin skills bundling (PDO-08, PDO-09 / D3)", () => {
 // ── T9: generated workflow-command delivery + exclusion-list audit ──────────
 describe("cursor-plugin generated workflow-command delivery (T9, WFC-08)", () => {
   const QUICK_STEM_NAMES = ["def", "find", "graph", "index", "map", "status"];
-  const RESERVED_BUNDLE_ROOTS = ["massa-ai", "persona-router", "agents", "profile"];
+  // Every harness-bundle root the generator emits under this plugin's skills/
+  // dir. Taken from `scripts/lib/workflow-commands.ts` rather than restated:
+  // this used to be a local literal, and T21 found that a bundle added to one
+  // copy and not the other is invisible — the WFC-08 guard below is what makes
+  // membership load-bearing, since a root missing from both this list and
+  // install.sh's `case` is read as a workflow-command stem on both sides of
+  // the scan-derived equality and leaks into the command-skill cache with
+  // every assertion still green.
+  const RESERVED_BUNDLE_ROOTS: readonly string[] = SHARED_RESERVED_BUNDLE_ROOTS;
 
   async function sourceStemDirs(): Promise<string[]> {
     const skillsDir = path.join(REPO_ROOT, "apps/cursor-plugin/skills");
@@ -706,11 +701,15 @@ describe("cursor-plugin generated workflow-command delivery (T9, WFC-08)", () =>
     expect(res.exitCode).toBe(0);
     const installedSkillsDir = path.join(tmp, ".cursor/plugins/local/massa-ai/skills");
     expect(await pathExists(path.join(installedSkillsDir, "profile"))).toBe(false);
-    // massa-ai/persona-router/agents already asserted absent elsewhere; profile
+    // massa-ai/agents already asserted absent elsewhere; profile
     // was the pre-existing gap (design.md Risks table) — this is its regression
     // guard. Observed red before the install.sh exclusion-list fix: profile/
     // WAS present in installedSkillsDir (leaked, mislabeled as a command skill).
-    for (const reserved of ["massa-ai", "persona-router", "agents"]) {
+    // `bootstrap` (T21) is the same class and is asserted by name here for the
+    // same reason: the scan-derived equality above cannot see it, because a
+    // leaked root appears on both sides of that comparison.
+    expect(await pathExists(path.join(installedSkillsDir, "bootstrap"))).toBe(false);
+    for (const reserved of ["massa-ai", "agents"]) {
       expect(await pathExists(path.join(installedSkillsDir, reserved))).toBe(false);
     }
   });
@@ -832,7 +831,7 @@ describe("cursor-plugin generated-bundle contract (T7, UGB-05..08)", () => {
       expect(res.status).toBe(0);
       expect(
         await pathExists(
-          path.join(tmp, ".cursor/agents/massa-ai-navigator.md"),
+          path.join(tmp, ".cursor/agents/code-explorer.md"),
         ),
       ).toBe(true);
     } finally {
@@ -853,4 +852,165 @@ describe("cursor-plugin generated-bundle contract (T7, UGB-05..08)", () => {
     expect(res.stderr).toContain("bun required");
     expect(await pathExists(path.join(tmp, ".cursor"))).toBe(false);
   });
+});
+
+// PER AC-5 / design C4: a harness skill this plugin recorded in
+// install-state.json and no longer ships is removed on install and on
+// uninstall; an unrecorded directory of the same name is never touched.
+describe("cursor-plugin retired harness-skill prune (PER AC-5)", () => {
+  const stateFile = () => path.join(tmp, ".config/massa-ai/install-state.json");
+  const retiredDir = () => path.join(tmp, ".cursor/skills/persona-router");
+
+  async function plantRetired(): Promise<void> {
+    await fs.mkdir(retiredDir(), { recursive: true });
+    await fs.writeFile(path.join(retiredDir(), "SKILL.md"), "---\nname: persona-router\n---\n");
+  }
+
+  async function recordPluginSkills(skills: string[]): Promise<void> {
+    let data: Record<string, any> = { version: 2, platforms: {} };
+    if (await pathExists(stateFile())) data = await readJson(stateFile());
+    data.platforms.cursor = {
+      ...data.platforms.cursor,
+      root: path.join(tmp, ".cursor"),
+      skillsOwner: "plugin",
+      skills,
+    };
+    await fs.mkdir(path.dirname(stateFile()), { recursive: true });
+    await fs.writeFile(stateFile(), JSON.stringify(data, null, 2));
+  }
+
+  test("install removes a recorded persona-router skill and records only the current two", async () => {
+    await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
+    await plantRetired();
+
+    const res = runInstall(["--user"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(await pathExists(retiredDir())).toBe(false);
+    const state = await readJson(stateFile());
+    const platforms = state.platforms as Record<string, { skills: string[] }>;
+    expect(platforms.cursor.skills).toEqual(["massa-ai", "bootstrap"]);
+  });
+
+  test("uninstall removes a recorded persona-router skill", async () => {
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
+    await plantRetired();
+
+    const res = runInstall(["--uninstall"], { HOME: tmp });
+    expect(res.exitCode).toBe(0);
+
+    expect(await pathExists(retiredDir())).toBe(false);
+  });
+
+  test("an unrecorded persona-router directory survives install and uninstall byte-identical", async () => {
+    await plantRetired();
+    const before = await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8");
+
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
+
+    expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
+    expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
+  });
+
+  // M6b: the record is the ownership proof only when it is plugin-owned — a
+  // record with no owner, or a repo-owned one, must never drive the prune.
+  for (const [label, owner] of [
+    ["no skillsOwner", {}],
+    ['skillsOwner "repo"', { skillsOwner: "repo" }],
+  ] as const) {
+    test(`a persona-router listed by a record with ${label} survives install and uninstall byte-identical`, async () => {
+      const skills = ["massa-ai", "persona-router", "profile", "bootstrap"];
+      await plantRetired();
+      const before = await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8");
+
+      await writeRecord({ ...owner, skills });
+      expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+      expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
+
+      await writeRecord({ ...owner, skills });
+      expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
+      expect(await fs.readFile(path.join(retiredDir(), "SKILL.md"), "utf8")).toBe(before);
+    });
+  }
+
+  async function writeRecord(rec: Record<string, unknown>): Promise<void> {
+    await fs.mkdir(path.dirname(stateFile()), { recursive: true });
+    await fs.writeFile(
+      stateFile(),
+      JSON.stringify({ version: 2, platforms: { cursor: { root: path.join(tmp, ".cursor"), ...rec } } }, null, 2),
+    );
+  }
+
+  // What a hostile record may try to reach: a directory beside skills/, and
+  // two inside it under names the retired-skill filter must reject.
+  async function plantSentinels(): Promise<string[]> {
+    const sentinels = [
+      path.join(tmp, ".cursor/outside/keep.txt"),
+      path.join(tmp, ".cursor/skills/a/b/keep.txt"),
+      path.join(tmp, ".cursor/skills/Keep_Me/keep.txt"),
+    ];
+    for (const s of sentinels) {
+      await fs.mkdir(path.dirname(s), { recursive: true });
+      await fs.writeFile(s, "sentinel\n");
+    }
+    return sentinels;
+  }
+
+  async function expectSentinels(sentinels: string[]): Promise<void> {
+    for (const s of sentinels) expect(await pathExists(s)).toBe(true);
+  }
+
+  test("a multi-line skillsOwner cannot smuggle a path into the prune", async () => {
+    const sentinels = await plantSentinels();
+    const hostile = { skillsOwner: "plugin\n../outside", skills: ["massa-ai", "bootstrap"] };
+
+    await writeRecord(hostile);
+    expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
+    await expectSentinels(sentinels);
+
+    await writeRecord(hostile);
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    await expectSentinels(sentinels);
+  });
+
+  test("a hostile skills list removes nothing but conforming retired names", async () => {
+    const sentinels = await plantSentinels();
+    const hostile = { skillsOwner: "plugin", skills: ["../outside", "", "a/b", "*", "Keep_Me"] };
+
+    await writeRecord(hostile);
+    expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+    await expectSentinels(sentinels);
+
+    await writeRecord(hostile);
+    expect(runInstall(["--uninstall"], { HOME: tmp }).exitCode).toBe(0);
+    await expectSentinels(sentinels);
+  });
+
+  test.skipIf(process.getuid?.() === 0)(
+    "a failed retired-skill removal keeps the record's proof for a retry",
+    async () => {
+      await recordPluginSkills(["massa-ai", "persona-router", "profile", "bootstrap"]);
+      await plantRetired();
+      const locked = path.join(retiredDir(), "locked");
+      await fs.mkdir(locked);
+      await fs.writeFile(path.join(locked, "keep.txt"), "x");
+      await fs.chmod(locked, 0o555);
+      try {
+        expect(runInstall(["--user"], { HOME: tmp }).exitCode).not.toBe(0);
+        const state = await readJson(stateFile());
+        const platforms = state.platforms as Record<string, { skills: string[] }>;
+        expect(platforms.cursor.skills).toContain("persona-router");
+      } finally {
+        await fs.chmod(locked, 0o755);
+      }
+
+      expect(runInstall(["--user"], { HOME: tmp }).exitCode).toBe(0);
+      expect(await pathExists(retiredDir())).toBe(false);
+      const state = await readJson(stateFile());
+      const platforms = state.platforms as Record<string, { skills: string[] }>;
+      expect(platforms.cursor.skills).toEqual(["massa-ai", "bootstrap"]);
+    },
+  );
 });

@@ -103,7 +103,7 @@ describe("syncGeneratedVariants", () => {
   });
 
   test("(c) variantsRoot missing -> skipped, reason never claims the host is uninstalled (F6)", () => {
-    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
+    stageSource("claude", "balanced", { "x.md": "v1" });
     // Deliberately do NOT stage claude's installed variantsRoot.
     const results = syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
     expect(results).toHaveLength(1);
@@ -114,21 +114,24 @@ describe("syncGeneratedVariants", () => {
   });
 
   test("(d) happy path -> files land in variantsRoot/<profile>/", () => {
-    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
-    stageInstalledVariant("claude", "balanced", { "massa-ai-x.md": "v0" });
+    stageSource("claude", "balanced", { "x.md": "v1" });
+    stageInstalledVariant("claude", "balanced", { "x.md": "v0" });
 
     const results = syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
 
     expect(results[0].status).toBe("synced");
     expect(results[0].profiles).toEqual(["balanced"]);
     expect(results[0].files).toBe(1);
-    const written = fs.readFileSync(path.join(layoutFor("claude").variantDir("balanced"), "massa-ai-x.md"), "utf8");
+    const written = fs.readFileSync(path.join(layoutFor("claude").variantDir("balanced"), "x.md"), "utf8");
     expect(written).toBe("v1");
   });
 
   test("(e) THE LIVE-SYMLINK CASE — a sync without a subsequent switchProfile call still mutates the live-active file", () => {
-    stageSource("opencode", "balanced", { "massa-ai-x.md": "v1" });
-    stageInstalledVariant("opencode", "balanced", { "massa-ai-x.md": "v0" });
+    // Marker-owned content: switchProfile only links owned variant entries.
+    const v1 = "---\n---\n<!-- massa-ai-owned: true -->\nv1";
+    const v0 = "---\n---\n<!-- massa-ai-owned: true -->\nv0";
+    stageSource("opencode", "balanced", { "x.md": v1 });
+    stageInstalledVariant("opencode", "balanced", { "x.md": v0 });
 
     // switchProfile only detects a host as installed when its activeDir already exists,
     // and only copies/symlinks for a route:"file" install (detectRoute).
@@ -140,18 +143,18 @@ describe("syncGeneratedVariants", () => {
 
     // Create the live symlink (opencode actives are symlinks into variantsRoot — engine.ts F3).
     switchProfile({ profile: "balanced", host: "opencode", targetHome: home });
-    const activeFile = path.join(layoutFor("opencode").activeDir, "massa-ai-x.md");
-    expect(fs.readFileSync(activeFile, "utf8")).toBe("v0");
+    const activeFile = path.join(layoutFor("opencode").activeDir, "x.md");
+    expect(fs.readFileSync(activeFile, "utf8")).toBe(v0);
 
     // Sync only — no second switchProfile call.
     syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home });
 
-    expect(fs.readFileSync(activeFile, "utf8")).toBe("v1");
+    expect(fs.readFileSync(activeFile, "utf8")).toBe(v1);
   });
 
   test("(f) no .tmp residue in the destination directory after a successful sync", () => {
-    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
-    stageInstalledVariant("claude", "balanced", { "massa-ai-x.md": "v0" });
+    stageSource("claude", "balanced", { "x.md": "v1" });
+    stageInstalledVariant("claude", "balanced", { "x.md": "v0" });
 
     syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
 
@@ -160,8 +163,8 @@ describe("syncGeneratedVariants", () => {
   });
 
   test("(f) no .tmp residue after a forced write failure", () => {
-    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
-    stageInstalledVariant("claude", "balanced", { "massa-ai-x.md": "v0" });
+    stageSource("claude", "balanced", { "x.md": "v1" });
+    stageInstalledVariant("claude", "balanced", { "x.md": "v0" });
 
     // Force failure AFTER the temp file is successfully created, so the
     // cleanup path is actually exercised (a permission-denied directory
@@ -172,8 +175,8 @@ describe("syncGeneratedVariants", () => {
     // name), but renameSync(tempFile, destName) fails — POSIX rename(2)
     // refuses to replace a directory with a non-directory.
     const destDir = layoutFor("claude").variantDir("balanced");
-    fs.rmSync(path.join(destDir, "massa-ai-x.md"), { force: true });
-    fs.mkdirSync(path.join(destDir, "massa-ai-x.md"));
+    fs.rmSync(path.join(destDir, "x.md"), { force: true });
+    fs.mkdirSync(path.join(destDir, "x.md"));
 
     const results = syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
     expect(results[0].status).toBe("failed");
@@ -184,15 +187,15 @@ describe("syncGeneratedVariants", () => {
   });
 
   test("(g) retained: a profile dir present only in variantsRoot survives and is reported", () => {
-    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
-    stageInstalledVariant("claude", "balanced", { "massa-ai-x.md": "v0" });
-    stageInstalledVariant("claude", "legacy-only", { "massa-ai-old.md": "old" });
+    stageSource("claude", "balanced", { "x.md": "v1" });
+    stageInstalledVariant("claude", "balanced", { "x.md": "v0" });
+    stageInstalledVariant("claude", "legacy-only", { "old.md": "old" });
 
     const results = syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
 
     expect(results[0].retained).toEqual(["legacy-only"]);
     expect(fs.existsSync(layoutFor("claude").variantDir("legacy-only"))).toBe(true);
-    expect(fs.readFileSync(path.join(layoutFor("claude").variantDir("legacy-only"), "massa-ai-old.md"), "utf8")).toBe("old");
+    expect(fs.readFileSync(path.join(layoutFor("claude").variantDir("legacy-only"), "old.md"), "utf8")).toBe("old");
   });
 
   test("(h) a rejected profile directory name is skipped — not written, not thrown", () => {
@@ -201,8 +204,8 @@ describe("syncGeneratedVariants", () => {
     // platform) but is rejected by isSafeDirName's Windows-separator guard.
     const evilName = "evil\\name";
     fs.mkdirSync(path.join(srcDir, evilName), { recursive: true });
-    fs.writeFileSync(path.join(srcDir, evilName, "massa-ai-x.md"), "v1");
-    stageInstalledVariant("claude", "balanced", { "massa-ai-x.md": "v0" });
+    fs.writeFileSync(path.join(srcDir, evilName, "x.md"), "v1");
+    stageInstalledVariant("claude", "balanced", { "x.md": "v0" });
 
     expect(() => syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] })).not.toThrow();
     const results = syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
@@ -213,10 +216,10 @@ describe("syncGeneratedVariants", () => {
   });
 
   test("a per-host throw is caught and reported as failed, without aborting other hosts", () => {
-    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
-    stageSource("codex", "balanced", { "massa-ai-x.toml": "v1" });
-    stageInstalledVariant("claude", "balanced", { "massa-ai-x.md": "v0" });
-    stageInstalledVariant("codex", "balanced", { "massa-ai-x.toml": "v0" });
+    stageSource("claude", "balanced", { "x.md": "v1" });
+    stageSource("codex", "balanced", { "x.toml": "v1" });
+    stageInstalledVariant("claude", "balanced", { "x.md": "v0" });
+    stageInstalledVariant("codex", "balanced", { "x.toml": "v0" });
 
     // Force claude's profile dir to fail while codex stays writable.
     const claudeDest = layoutFor("claude").variantDir("balanced");
@@ -239,19 +242,19 @@ describe("syncGeneratedVariants", () => {
   test("(T18) a resolved marketplace root redirects the sync into the cache bundle's agent-profiles/", () => {
     const cacheRoot = path.join(home, ".claude", "plugins", "cache", "massa-ai", "massa-ai", "1.0.0");
     fs.mkdirSync(path.join(cacheRoot, "agent-profiles", "balanced"), { recursive: true });
-    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "balanced", "massa-ai-x.md"), "v0");
+    fs.writeFileSync(path.join(cacheRoot, "agent-profiles", "balanced", "x.md"), "v0");
     stageMarketplaceRegistry(home, cacheRoot);
     writeState(home, {
       version: 2,
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
     });
-    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
+    stageSource("claude", "balanced", { "x.md": "v1" });
 
     const results = syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
 
     expect(results[0].status).toBe("synced");
     expect(results[0].files).toBe(1);
-    expect(fs.readFileSync(path.join(cacheRoot, "agent-profiles", "balanced", "massa-ai-x.md"), "utf8")).toBe("v1");
+    expect(fs.readFileSync(path.join(cacheRoot, "agent-profiles", "balanced", "x.md"), "utf8")).toBe("v1");
     // Never wrote the $HOME-derived (non-marketplace) path.
     expect(fs.existsSync(path.join(home, ".claude", "massa-ai"))).toBe(false);
   });
@@ -262,7 +265,7 @@ describe("syncGeneratedVariants", () => {
       platforms: { claude: { root: "/x", skills: [], skillsOwner: "plugin", installRoute: "marketplace" } },
     });
     // No installed_plugins.json staged — root genuinely unresolvable.
-    stageSource("claude", "balanced", { "massa-ai-x.md": "v1" });
+    stageSource("claude", "balanced", { "x.md": "v1" });
 
     const results = syncGeneratedVariants({ sourceRoot: srcRoot, targetHome: home, hosts: ["claude"] });
 

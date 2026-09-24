@@ -24,10 +24,11 @@ export function isHost(v: unknown): v is Host {
 export interface HostFileLayout {
   readonly host: Host;
   readonly route: "files";
-  /** Directory containing the active `massa-ai-*` agent files. */
+  /** Directory containing the active agent files. */
   readonly activeDir: string;
-  /** Glob suffix identifying massa-ai-owned files in `activeDir`. */
-  readonly activeGlob: string;
+  /** Extension of this host's agent files; ownership within `activeDir` is
+   * decided by `ownership.ts`, never by filename. */
+  readonly activeExt: ".md" | ".toml";
   /** Root directory holding one subdirectory per shipped profile. */
   readonly variantsRoot: string;
   /** Full path to a given profile's variant directory. */
@@ -67,14 +68,14 @@ const CURSOR_SKIP_REASON = "all tiers inherit — Cursor publishes no resolvable
 function fileLayout(
   host: Host,
   activeDir: string,
-  activeGlob: string,
+  activeExt: ".md" | ".toml",
   variantsRoot: string,
 ): HostFileLayout {
   return {
     host,
     route: "files",
     activeDir,
-    activeGlob,
+    activeExt,
     variantsRoot,
     variantDir: (profile: string) => path.join(variantsRoot, profile),
   };
@@ -95,7 +96,7 @@ export function resolveHostLayout(host: Host, opts: ResolveHostLayoutOpts = {}):
         return fileLayout(
           host,
           path.join(marketplaceRoot, "agents"),
-          "massa-ai-*.md",
+          ".md",
           path.join(marketplaceRoot, "agent-profiles"),
         );
       }
@@ -103,7 +104,7 @@ export function resolveHostLayout(host: Host, opts: ResolveHostLayoutOpts = {}):
       return fileLayout(
         host,
         path.join(root, "agents"),
-        "massa-ai-*.md",
+        ".md",
         path.join(root, "massa-ai", "agent-profiles"),
       );
     }
@@ -113,7 +114,7 @@ export function resolveHostLayout(host: Host, opts: ResolveHostLayoutOpts = {}):
       return fileLayout(
         host,
         path.join(root, "agents"),
-        "massa-ai-*.toml",
+        ".toml",
         path.join(root, "massa-ai", "agent-profiles"),
       );
     }
@@ -121,7 +122,7 @@ export function resolveHostLayout(host: Host, opts: ResolveHostLayoutOpts = {}):
     case "opencode": {
       const root = override ?? path.join(targetHome, ".config", "opencode");
       const pluginsDir = path.join(root, "plugins", "massa-ai");
-      return fileLayout(host, path.join(root, "agents"), "massa-ai-*.md", path.join(pluginsDir, "agent-profiles"));
+      return fileLayout(host, path.join(root, "agents"), ".md", path.join(pluginsDir, "agent-profiles"));
     }
   }
 }

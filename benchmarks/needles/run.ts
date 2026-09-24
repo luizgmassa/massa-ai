@@ -6,7 +6,7 @@
  *   1. Read the fixture (needles + expected hits).
  *   2. Chunk every referenced source file with `smartChunk` (configurable).
  *   3. Embed the query + every chunk via the Ollama embedding endpoint
- *      (qwen3-embedding:4b by default — same model as the E2E baseline).
+ *      (qwen3-embedding:0.6b by default — same model as the E2E baseline).
  *   4. Cosine-rank chunks per query, take top-K.
  *   5. Score with the same hit@k / MRR / ±line-tolerance rules as scorer.ts.
  *
@@ -24,7 +24,7 @@
  *
  * Environment:
  *   OLLAMA_HOST          Ollama base URL (default http://localhost:11434)
- *   NEEDLE_MODEL         Embedding model (default qwen3-embedding:4b)
+ *   NEEDLE_MODEL         Embedding model (default qwen3-embedding:0.6b)
  *   NEEDLE_FLOOR_HIT1    Exit 1 if hit@1 below this float (default: off)
  *   NEEDLE_FLOOR_MRR     Exit 1 if MRR below this float (default: off)
  *
@@ -111,7 +111,7 @@ interface ResultsFile {
 
 // ── Embedding (Ollama /api/embeddings, bounded-parallel pool) ─────────────
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://localhost:11434";
-const DEFAULT_MODEL = process.env.NEEDLE_MODEL ?? "qwen3-embedding:4b";
+const DEFAULT_MODEL = process.env.NEEDLE_MODEL ?? "qwen3-embedding:0.6b";
 
 async function embed(text: string, model: string): Promise<number[]> {
   // Ollama on a constrained CI runner can serialize/queue concurrent embedding

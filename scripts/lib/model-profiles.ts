@@ -7,9 +7,11 @@
  * `model_reasoning_effort = "high"` vs a `[effort=high]` bracket parameter belongs to the
  * emitters in `scripts/generate-subagent-artifacts.ts`.
  *
- * It also knows nothing about WHICH AGENTS EXIST. A tier arrives as an argument, read from the
- * charter that owns it (`skills/agents/<n>/SKILL.md` -> `metadata.model_tier`). That is why
- * adding an agent needs no change here.
+ * V2 shape: a `models` catalog (dropdown options only — cells never reference it, D4) plus
+ * `profiles`, each with a per-host default cell and optional per-agent overrides. Resolution
+ * for an agent on a tool is `profile.agents[agent][host]` first, then `profile.hosts[host]`
+ * (`resolveAgent`). A cell stores the RESOLVED model string directly, never a catalog id, so
+ * a reference can never dangle.
  *
  * Every failure is a named error. Nothing falls back to a default model, ever — a typo in a
  * profile name must stop the build, not silently ship a different model to users.
@@ -18,7 +20,7 @@
  * without node_modules.
  */
 
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, renameSync } from "fs";
 import path from "path";
 import { configDir } from "../../packages/shared/src/config/xdg.ts";
 
@@ -30,29 +32,47 @@ export function isHost(v: unknown): v is Host {
   return typeof v === "string" && (HOSTS as readonly string[]).includes(v);
 }
 
-// ── Resolved pair ───────────────────────────────────────────────────────────
+// ── Resolved pair (a "cell") ─────────────────────────────────────────────────
 /** `model: null` / `effort: null` mean "do not pin — inherit". Rendered per host. */
 export interface Resolved {
   readonly model: string | null;
   readonly effort: string | null;
 }
+export type Cell = Resolved;
 
-export interface HostTierMap {
-  readonly [tier: string]: Resolved;
+// ── Catalog ──────────────────────────────────────────────────────────────────
+/** A dropdown option (D2/D4). Keyed by id in the registry — the id is an overlay merge key
+ *  only, never stored in a cell. `context1m` is valid only when `host === "claude"`. */
+export interface ModelEntry {
+  readonly name: string;
+  readonly host: Host;
+  readonly provider: string;
+  readonly model: string;
+  readonly context1m?: boolean;
 }
+
+/** `(provider ? provider + "/" : "") + model + (context1m ? "[1m]" : "")` — the one function
+ *  that builds a resolved model string from a catalog entry. Server and UI both call this. */
+export function resolvedModelString(entry: {
+  readonly provider: string;
+  readonly model: string;
+  readonly context1m?: boolean;
+}): string {
+  return (entry.provider ? entry.provider + "/" : "") + entry.model + (entry.context1m ? "[1m]" : "");
+}
+
 export interface Profile {
   readonly description: string;
-  readonly hosts: { readonly [host: string]: HostTierMap };
+  readonly hosts: { readonly [host: string]: Cell };
+  /** Per-agent overrides (D1), keyed by agent name then host. This lib knows nothing about
+   *  which agents exist (see file header), so agent-name validity is not checked here — the
+   *  generator warns instead. */
+  readonly agents?: { readonly [agent: string]: { readonly [host: string]: Cell } };
 }
+
 export interface Registry {
   readonly version: number;
-  readonly tiers: readonly string[];
-  readonly hostDefaults: { readonly [host: string]: string };
-  readonly workflowTiers: { readonly [name: string]: string };
-  /** Per-agent per-host tier overrides (design D-1). Opt-in user-overlay data, same standing
-   *  as `workflowTiers` — this lib knows nothing about which agents exist (see file header),
-   *  so agent-name validity is deliberately not checked here (the generator warns instead). */
-  readonly agentTiers: { readonly [agent: string]: { readonly [host: string]: string } };
+  readonly models: { readonly [id: string]: ModelEntry };
   readonly profiles: { readonly [name: string]: Profile };
 }
 
@@ -126,24 +146,6 @@ export const MissingHostError = (profile: string, host: string, supported: reado
       `This is deliberate for host-specific profiles; pick a profile that supports ${host}.`,
   );
 
-export const MissingTierError = (profile: string, host: string, tier: string) =>
-  namedError(
-    "MissingTierError",
-    `profile "${profile}" host "${host}" defines no entry for tier "${tier}"`,
-  );
-
-export const UnknownTierError = (tier: string, known: readonly string[], where: string) =>
-  namedError(
-    "UnknownTierError",
-    `unknown tier "${tier}" at ${where}. Declared tiers: ${known.join(", ")}`,
-  );
-
-export const UnknownWorkflowError = (name: string, known: readonly string[]) =>
-  namedError(
-    "UnknownWorkflowError",
-    `no tier declared for workflow "${name}". Declared: ${known.join(", ") || "none"}`,
-  );
-
 export const InvalidEffortError = (where: string, host: Host, effort: string | null) =>
   namedError(
     "InvalidEffortError",
@@ -160,6 +162,26 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+function validateCell(raw: unknown, where: string, hostName: string): string[] {
+  const errs: string[] = [];
+  if (!isPlainObject(raw)) {
+    errs.push(`${where} is not an object`);
+    return errs;
+  }
+  const model = raw.model;
+  const effort = raw.effort;
+  if (!(model === null || (typeof model === "string" && model.trim() !== ""))) {
+    errs.push(`${where}.model must be a non-empty string or null`);
+  }
+  if (!(effort === null || (typeof effort === "string" && effort.trim() !== ""))) {
+    errs.push(`${where}.effort must be a non-empty string or null`);
+  } else if (isHost(hostName)) {
+    const err = effortViolation(hostName, model, effort as string | null, where);
+    if (err) errs.push(err);
+  }
+  return errs;
+}
+
 /**
  * Validate a parsed registry, collecting EVERY violation before throwing.
  * Returns the value narrowed to `Registry` on success.
@@ -169,20 +191,48 @@ export function validateRegistry(raw: unknown): Registry {
 
   if (!isPlainObject(raw)) throw new RegistryValidationError(["registry root is not an object"]);
 
-  if (raw.version !== 1) v.push(`version must be 1, got ${JSON.stringify(raw.version)}`);
+  if (raw.version !== 2) v.push(`version must be 2, got ${JSON.stringify(raw.version)}`);
 
-  // tiers
-  const tiers = raw.tiers;
-  if (!Array.isArray(tiers) || tiers.length === 0 || !tiers.every((t) => typeof t === "string")) {
-    throw new RegistryValidationError(["tiers must be a non-empty array of strings"]);
+  // models — the dropdown catalog. Cells are never cross-checked against it (D4).
+  const models = raw.models;
+  if (!isPlainObject(models)) {
+    v.push("models must be an object (may be empty)");
+  } else {
+    for (const [id, mRaw] of Object.entries(models)) {
+      const where = `models.${id}`;
+      if (!isPlainObject(mRaw)) {
+        v.push(`${where} is not an object`);
+        continue;
+      }
+      if (typeof mRaw.name !== "string" || mRaw.name.trim() === "") {
+        v.push(`${where}.name is required and must be a non-empty string`);
+      }
+      if (!isHost(mRaw.host)) {
+        v.push(`${where}.host is not a known host (${HOSTS.join(", ")})`);
+      }
+      if (typeof mRaw.provider !== "string") {
+        v.push(`${where}.provider must be a string (may be empty)`);
+      }
+      if (typeof mRaw.model !== "string" || mRaw.model.trim() === "") {
+        v.push(`${where}.model must be a non-empty string`);
+      }
+      if (mRaw.context1m !== undefined) {
+        if (typeof mRaw.context1m !== "boolean") {
+          v.push(`${where}.context1m must be a boolean`);
+        } else if (mRaw.context1m && mRaw.host !== "claude") {
+          v.push(`${where}.context1m is only allowed when host is "claude"`);
+        }
+      }
+    }
   }
-  const tierList = tiers as string[];
-  if (new Set(tierList).size !== tierList.length) v.push("tiers contains duplicates");
 
   // profiles
   const profiles = raw.profiles;
   if (!isPlainObject(profiles) || Object.keys(profiles).length === 0) {
     throw new RegistryValidationError(["profiles must be a non-empty object"]);
+  }
+  if (!isPlainObject(profiles.balanced)) {
+    v.push(`profiles.balanced is required`);
   }
 
   for (const [pName, pRaw] of Object.entries(profiles)) {
@@ -196,116 +246,33 @@ export function validateRegistry(raw: unknown): Registry {
     const hosts = pRaw.hosts;
     if (!isPlainObject(hosts) || Object.keys(hosts).length === 0) {
       v.push(`profiles.${pName}.hosts must be a non-empty object`);
-      continue;
-    }
-    for (const [hName, hRaw] of Object.entries(hosts)) {
-      if (!isHost(hName)) {
-        v.push(`profiles.${pName}.hosts.${hName} is not a known host (${HOSTS.join(", ")})`);
-        continue;
-      }
-      if (!isPlainObject(hRaw)) {
-        v.push(`profiles.${pName}.hosts.${hName} is not an object`);
-        continue;
-      }
-      // every declared tier present, and no extras
-      for (const t of tierList) {
-        if (!(t in hRaw)) v.push(`profiles.${pName}.hosts.${hName} is missing tier "${t}"`);
-      }
-      for (const t of Object.keys(hRaw)) {
-        if (!tierList.includes(t)) {
-          v.push(`profiles.${pName}.hosts.${hName} declares unknown tier "${t}"`);
-        }
-      }
-      for (const [tName, tRaw] of Object.entries(hRaw)) {
-        if (!tierList.includes(tName)) continue;
-        const where = `profiles.${pName}.hosts.${hName}.${tName}`;
-        if (!isPlainObject(tRaw)) {
-          v.push(`${where} is not an object`);
-          continue;
-        }
-        const model = tRaw.model;
-        const effort = tRaw.effort;
-        if (!(model === null || (typeof model === "string" && model.trim() !== ""))) {
-          v.push(`${where}.model must be a non-empty string or null`);
-        }
-        if (!(effort === null || (typeof effort === "string" && effort.trim() !== ""))) {
-          v.push(`${where}.effort must be a non-empty string or null`);
-        } else {
-          const err = effortViolation(hName, model, effort as string | null, where);
-          if (err) v.push(err);
-        }
-      }
-    }
-  }
-
-  // hostDefaults — every host, naming a profile that supports it
-  const hostDefaults = raw.hostDefaults;
-  if (!isPlainObject(hostDefaults)) {
-    v.push("hostDefaults must be an object");
-  } else {
-    for (const h of HOSTS) {
-      const target = hostDefaults[h];
-      if (typeof target !== "string" || target.trim() === "") {
-        v.push(`hostDefaults.${h} is required and must name a profile`);
-        continue;
-      }
-      const prof = (profiles as Record<string, unknown>)[target];
-      if (!isPlainObject(prof)) {
-        v.push(`hostDefaults.${h} names unknown profile "${target}"`);
-      } else {
-        const pHosts = prof.hosts;
-        if (isPlainObject(pHosts) && !(h in pHosts)) {
-          v.push(
-            `hostDefaults.${h} names profile "${target}", which does not support host "${h}". ` +
-              `A host's default must be a profile it can actually resolve.`,
-          );
-        }
-      }
-    }
-    for (const k of Object.keys(hostDefaults)) {
-      if (!isHost(k)) v.push(`hostDefaults.${k} is not a known host`);
-    }
-  }
-
-  // workflowTiers
-  const workflowTiers = raw.workflowTiers;
-  if (!isPlainObject(workflowTiers)) {
-    v.push("workflowTiers must be an object (may be empty)");
-  } else {
-    for (const [wName, wTier] of Object.entries(workflowTiers)) {
-      if (typeof wTier !== "string" || !tierList.includes(wTier)) {
-        v.push(
-          `workflowTiers.${wName} must be one of ${tierList.join(", ")}, got ${JSON.stringify(wTier)}`,
-        );
-      }
-    }
-  }
-
-  // agentTiers — optional section (design D-1), sibling of workflowTiers. Absent is treated
-  // as `{}` rather than left `undefined`: several downstream call sites (merge, normalize,
-  // count, the generator's diff) need an iterable, never a branch on presence. Agent-name
-  // validity is NOT checked here — this lib knows nothing about which agents exist (file
-  // header); the generator warns on a stale name instead (design D-2).
-  const agentTiersRaw = raw.agentTiers;
-  if (agentTiersRaw === undefined) {
-    (raw as Record<string, unknown>).agentTiers = {};
-  } else if (!isPlainObject(agentTiersRaw)) {
-    v.push("agentTiers must be an object (may be omitted)");
-  } else {
-    for (const [aName, aRaw] of Object.entries(agentTiersRaw)) {
-      if (!isPlainObject(aRaw)) {
-        v.push(`agentTiers.${aName} is not an object`);
-        continue;
-      }
-      for (const [hName, tRaw] of Object.entries(aRaw)) {
+    } else {
+      for (const [hName, cellRaw] of Object.entries(hosts)) {
         if (!isHost(hName)) {
-          v.push(`agentTiers.${aName}.${hName} is not a known host (${HOSTS.join(", ")})`);
+          v.push(`profiles.${pName}.hosts.${hName} is not a known host (${HOSTS.join(", ")})`);
           continue;
         }
-        if (typeof tRaw !== "string" || !tierList.includes(tRaw)) {
-          v.push(
-            `agentTiers.${aName}.${hName} must be one of ${tierList.join(", ")}, got ${JSON.stringify(tRaw)}`,
-          );
+        v.push(...validateCell(cellRaw, `profiles.${pName}.hosts.${hName}`, hName));
+      }
+    }
+
+    const agents = pRaw.agents;
+    if (agents !== undefined) {
+      if (!isPlainObject(agents)) {
+        v.push(`profiles.${pName}.agents must be an object`);
+      } else {
+        for (const [aName, aRaw] of Object.entries(agents)) {
+          if (!isPlainObject(aRaw)) {
+            v.push(`profiles.${pName}.agents.${aName} is not an object`);
+            continue;
+          }
+          for (const [hName, cellRaw] of Object.entries(aRaw)) {
+            if (!isHost(hName)) {
+              v.push(`profiles.${pName}.agents.${aName}.${hName} is not a known host (${HOSTS.join(", ")})`);
+              continue;
+            }
+            v.push(...validateCell(cellRaw, `profiles.${pName}.agents.${aName}.${hName}`, hName));
+          }
         }
       }
     }
@@ -345,6 +312,53 @@ export function effortViolation(
   return null;
 }
 
+// ── v1 detection and backup (D5) ─────────────────────────────────────────────
+const V1_MARKER_KEYS = ["tiers", "hostDefaults", "workflowTiers", "agentTiers"] as const;
+const V1_TIER_NAMES = ["light", "standard", "deep"] as const;
+
+/** True when `v` carries a v1 tier sub-map: at least one of the three retired tier names
+ *  (`light`/`standard`/`deep`) keyed to an object with a `model` or `effort` field. A v2 cell
+ *  with a typo'd key (e.g. `modle`) has none of these tier keys and is correctly left alone —
+ *  it must surface as a validation error, not be mistaken for v1 and silently discarded. */
+function isV1TierMap(v: Record<string, unknown>): boolean {
+  return V1_TIER_NAMES.some((tier) => {
+    const entry = v[tier];
+    return isPlainObject(entry) && ("model" in entry || "effort" in entry);
+  });
+}
+
+/** A v1 registry/overlay carries a v1-only top-level key, or a `hosts.<host>` leaf shaped
+ *  like a tier map (`isV1TierMap`) rather than a cell. Detection only needs one profile's
+ *  one host to prove the shape, so it returns on the first hit. */
+export function isV1Shaped(raw: unknown): boolean {
+  if (!isPlainObject(raw)) return false;
+  if (V1_MARKER_KEYS.some((k) => k in raw)) return true;
+  const profiles = raw.profiles;
+  if (!isPlainObject(profiles)) return false;
+  for (const pRaw of Object.values(profiles)) {
+    if (!isPlainObject(pRaw)) continue;
+    const hosts = pRaw.hosts;
+    if (!isPlainObject(hosts)) continue;
+    for (const hRaw of Object.values(hosts)) {
+      if (isPlainObject(hRaw) && isV1TierMap(hRaw)) return true;
+    }
+  }
+  return false;
+}
+
+/** Renames a v1 overlay out of the way (D5) — `model-profiles.v1.json`, or
+ *  `model-profiles.v1.<epoch>.json` if that name is already taken. Returns the backup path.
+ *  This is the read path's only mutation, and it happens once per load. */
+export function backupV1Overlay(overlayPath: string): string {
+  const dir = path.dirname(overlayPath);
+  let target = path.join(dir, "model-profiles.v1.json");
+  if (existsSync(target)) {
+    target = path.join(dir, `model-profiles.v1.${Date.now()}.json`);
+  }
+  renameSync(overlayPath, target);
+  return target;
+}
+
 // ── Loading ─────────────────────────────────────────────────────────────────
 export const DEFAULT_REGISTRY_PATH = path.join(
   path.resolve(import.meta.dirname, "..", ".."),
@@ -374,26 +388,32 @@ export interface SelectOpts {
   readonly flag?: string | null;
   /** Injected for tests; defaults to process.env. */
   readonly env?: Record<string, string | undefined>;
+  /**
+   * The host's recorded active profile from `install-state.json`
+   * (`platforms.<host>.modelProfile.profile`), threaded in by callers that
+   * hold the state — `selectProfile` stays fs-free. Rank 3 of 4: the switch
+   * engine records operator intent, so a regeneration must not silently
+   * reset the actives to the registry's per-host default (agent-drift followup T1 —
+   * measured 2026-09-21: a post-switch regeneration re-emitted actives from the
+   * registry default, and the session-start drift hook caught the divergence).
+   */
+  readonly stateProfile?: string | null;
 }
 
 export const PROFILE_ENV_VAR = "MASSA_AI_MODEL_PROFILE";
 
 /**
- * Precedence, first match wins: `--profile` > MASSA_AI_MODEL_PROFILE > hostDefaults[host].
- * There is no fourth rank — an unknown name at any rank throws.
+ * Precedence, first match wins: `--profile` > MASSA_AI_MODEL_PROFILE >
+ * stateProfile (install-state's recorded `modelProfile`) > `"balanced"`.
+ * An unknown name at any rank throws.
  *
  * Selection also verifies the profile SUPPORTS this host, so `--profile=open_models` fails
  * before a single file is written rather than partway through emitting 60 of them.
  */
 export function selectProfile(registry: Registry, host: Host, opts: SelectOpts = {}): string {
   const env = opts.env ?? process.env;
-  const raw = opts.flag?.trim() || env[PROFILE_ENV_VAR]?.trim() || registry.hostDefaults[host];
-  if (!raw) {
-    throw namedError(
-      "InvalidHostDefaultError",
-      `no profile resolved for host "${host}": hostDefaults.${host} is missing`,
-    );
-  }
+  const raw =
+    opts.flag?.trim() || env[PROFILE_ENV_VAR]?.trim() || opts.stateProfile?.trim() || "balanced";
   const known = Object.keys(registry.profiles);
   const profile = registry.profiles[raw];
   if (!profile) throw UnknownProfileError(raw, known);
@@ -414,28 +434,16 @@ export function profileFlagFrom(argv: readonly string[]): string | null {
 }
 
 // ── Resolution ──────────────────────────────────────────────────────────────
-export function resolveTier(
-  registry: Registry,
-  host: Host,
-  profile: string,
-  tier: string,
-): Resolved {
+/** Resolution for an agent on a host: `profile.agents[agent][host]` first, then
+ *  `profile.hosts[host]` (spec D1/Registry v2 shape). `agent` is a bare name, unchecked
+ *  against any charter list — this lib knows nothing about which agents exist. */
+export function resolveAgent(registry: Registry, host: Host, profile: string, agent: string): Resolved {
   const p = registry.profiles[profile];
   if (!p) throw UnknownProfileError(profile, Object.keys(registry.profiles));
-  if (!registry.tiers.includes(tier)) {
-    throw UnknownTierError(tier, registry.tiers, `resolveTier(${host}, ${profile})`);
-  }
-  const hostMap = p.hosts[host];
-  if (!hostMap) throw MissingHostError(profile, host, Object.keys(p.hosts));
-  const entry = hostMap[tier];
-  if (!entry) throw MissingTierError(profile, host, tier);
-  return entry;
-}
-
-export function workflowTier(registry: Registry, name: string): string {
-  const t = registry.workflowTiers[name];
-  if (!t) throw UnknownWorkflowError(name, Object.keys(registry.workflowTiers));
-  return t;
+  const hostCell = p.hosts[host];
+  if (!hostCell) throw MissingHostError(profile, host, Object.keys(p.hosts));
+  const override = p.agents?.[agent]?.[host];
+  return override ?? hostCell;
 }
 
 /** Hosts a profile supports, sorted. Used by docs generation and the CLI's error text. */
@@ -445,51 +453,38 @@ export function hostsSupportedBy(registry: Registry, profile: string): Host[] {
   return HOSTS.filter((h) => h in p.hosts);
 }
 
-/** Count of hand-authored model-bearing facts in the registry (MPR-R2 accounting). */
-export function countRegistryFacts(registry: Registry): number {
-  let n = 0;
-  for (const p of Object.values(registry.profiles)) {
-    for (const hostMap of Object.values(p.hosts)) n += Object.keys(hostMap).length;
-  }
-  return n;
-}
-
 // ── Effective registry (builtin + overlay) ──────────────────────────────────
 
+export type OverlayModelEntry = ModelEntry;
+
+export interface OverlayCellMap {
+  readonly [host: string]: Cell | null;
+}
 export interface OverlayProfile {
   readonly description?: string;
-  readonly hosts?: { readonly [host: string]: HostTierMap };
+  readonly hosts?: OverlayCellMap;
+  readonly agents?: Record<string, OverlayCellMap | null>;
   readonly _delete?: true;
 }
 
-/** `null` is the nested-deletion tombstone (design D-1): key absent means "inherit the
- *  builtin's value", key present non-null means "override", key present `null` means
- *  "delete this key from the merged registry". Scoped to the two flat maps — `tiers`
- *  is an ordered array and stays a whole-value replace. */
+/** `null` is the tombstone (design D-1): key absent means "inherit the builtin's value", key
+ *  present non-null means "override", key present `null` means "delete this key from the
+ *  merged registry". `models.<id> = null` tombstones the whole catalog entry. */
 export interface OverlayData {
+  readonly models?: Record<string, OverlayModelEntry | null>;
   readonly profiles?: Record<string, OverlayProfile>;
-  readonly hostDefaults?: Record<string, string | null>;
-  readonly workflowTiers?: Record<string, string | null>;
-  /** Two-level delta (design D-1): `agentTiers[agent] === null` tombstones the whole agent
-   *  entry; `agentTiers[agent][host] === null` tombstones one host key; an absent key at
-   *  either level inherits. */
-  readonly agentTiers?: Record<string, Record<string, string | null> | null>;
-  readonly tiers?: string[];
 }
 
-/** Per-category breakdown of surviving overlay entries (WUT-17) — one key per top-level
+/** Per-category breakdown of surviving overlay entries — one key per top-level
  *  `OverlayData` key `normalizeOverlay` handles, so the UI never has to re-derive the
  *  counting rule to say *where* an override lives. Values sum to `overlayOverrideCount`. */
 export interface OverlayOverrideBreakdown {
-  readonly hostDefaults: number;
-  readonly workflowTiers: number;
-  readonly agentTiers: number;
-  readonly tiers: number;
+  readonly models: number;
   readonly profiles: number;
 }
 
 function zeroBreakdown(): OverlayOverrideBreakdown {
-  return { hostDefaults: 0, workflowTiers: 0, agentTiers: 0, tiers: 0, profiles: 0 };
+  return { models: 0, profiles: 0 };
 }
 
 export interface EffectiveRegistryResult {
@@ -499,14 +494,16 @@ export interface EffectiveRegistryResult {
     readonly overlay: OverlayData | null;
     readonly tombstoned: string[];
   };
-  /** Count of overlay entries that survive normalization (APCR-01.10) — how much of the
-   *  registry the operator's overlay is actually overriding, after collapsing entries that
-   *  are byte-identical to the current builtin. `0` when there is no overlay. */
+  /** Count of overlay entries that survive normalization — how much of the registry the
+   *  operator's overlay is actually overriding, after collapsing entries that are
+   *  byte-identical to the current builtin. `0` when there is no overlay. */
   readonly overlayOverrideCount: number;
-  /** WUT-17: the same count, broken down per category, so the UI can mark exactly which
-   *  overlay sections are non-empty rather than re-deriving the counting rule. */
+  /** The same count, broken down per category, so the UI can mark exactly which overlay
+   *  sections are non-empty rather than re-deriving the counting rule. */
   readonly overlayOverrideBreakdown: OverlayOverrideBreakdown;
   readonly overlayError?: string;
+  /** Set when a v1 overlay was found and backed up on this load (D5/D7). */
+  readonly v1BackupPath?: string;
 }
 
 function isOverlayProfile(v: unknown): v is OverlayProfile {
@@ -515,10 +512,10 @@ function isOverlayProfile(v: unknown): v is OverlayProfile {
 
 export function loadEffectiveRegistry(opts?: {
   readonly overlayPath?: string;
+  readonly builtinPath?: string;
 }): EffectiveRegistryResult {
-  const builtin = loadRegistry(DEFAULT_REGISTRY_PATH);
-  const overlayPath =
-    opts?.overlayPath ?? path.join(configDir("massa-ai"), "model-profiles.json");
+  const builtin = loadRegistry(opts?.builtinPath ?? DEFAULT_REGISTRY_PATH);
+  const overlayPath = opts?.overlayPath ?? path.join(configDir("massa-ai"), "model-profiles.json");
 
   if (!existsSync(overlayPath)) {
     return {
@@ -555,8 +552,34 @@ export function loadEffectiveRegistry(opts?: {
     };
   }
 
-  const overlay = overlayRaw as OverlayData;
+  // v1 overlay (D5): detected once, backed up once, and the builtin is used for this load.
+  if (isV1Shaped(overlayRaw)) {
+    try {
+      const backupPath = backupV1Overlay(overlayPath);
+      console.warn(
+        `[massa-ai] Overlay at ${overlayPath} is a v1 (tiers-based) format, no longer supported. ` +
+          `It has been renamed to ${backupPath} and the built-in registry is used instead.`,
+      );
+      return {
+        registry: builtin,
+        source: { builtin, overlay: null, tombstoned: [] },
+        overlayOverrideCount: 0,
+        overlayOverrideBreakdown: zeroBreakdown(),
+        v1BackupPath: backupPath,
+      };
+    } catch (e) {
+      console.warn(`[massa-ai] Overlay at ${overlayPath} is v1-shaped but could not be backed up: ${(e as Error).message}`);
+      return {
+        registry: builtin,
+        source: { builtin, overlay: null, tombstoned: [] },
+        overlayOverrideCount: 0,
+        overlayOverrideBreakdown: zeroBreakdown(),
+        overlayError: `v1 overlay backup failed: ${(e as Error).message}`,
+      };
+    }
+  }
 
+  const overlay = overlayRaw as OverlayData;
   const merged = mergeOverlay(builtin, overlay);
 
   try {
@@ -597,33 +620,21 @@ function collectTombstoned(builtin: Registry, overlay: OverlayData): string[] {
 }
 
 /**
- * Overlay + builtin -> merged registry (design D-1). The overlay is a *delta*: deep-merged
- * per profile/host/tier, and per key for the two flat maps (`hostDefaults`,
- * `workflowTiers`) — an absent key inherits the builtin's value, a `null` value tombstones
- * it. `tiers` is an ordered array and stays a whole-value replace. A profile's `_delete:
- * true` tombstones the whole profile, unchanged from before.
+ * Overlay + builtin -> merged registry (design D-1). The overlay is a *delta*:
+ * `models.<id>` is replaced whole (a `null` value tombstones it), and a profile merges per
+ * `hosts.<host>` leaf and per `agents.<agent>.<host>` leaf — an absent key inherits the
+ * builtin's value, a `null` leaf tombstones it. A profile's `_delete: true` tombstones the
+ * whole profile.
  *
  * The route (`apps/tools-api/src/routes/model-registry.ts`) calls this directly through
- * `profilesLib()` rather than keeping a hand-copied twin (APCR-01.7) — identical input
- * cannot produce differing output when there is only one implementation.
+ * `profilesLib()` rather than keeping a hand-copied twin — identical input cannot produce
+ * differing output when there is only one implementation.
  */
 export function mergeOverlay(builtin: Registry, overlay: OverlayData): Record<string, unknown> {
   const result: Record<string, unknown> = JSON.parse(JSON.stringify(builtin));
 
-  if (overlay.tiers) {
-    result.tiers = [...overlay.tiers];
-  }
-
-  if (overlay.hostDefaults) {
-    result.hostDefaults = mergeFlatMap(builtin.hostDefaults, overlay.hostDefaults);
-  }
-
-  if (overlay.workflowTiers) {
-    result.workflowTiers = mergeFlatMap(builtin.workflowTiers, overlay.workflowTiers);
-  }
-
-  if (overlay.agentTiers) {
-    result.agentTiers = mergeAgentTiers(builtin.agentTiers, overlay.agentTiers);
+  if (overlay.models) {
+    result.models = mergeFlatMap(builtin.models, overlay.models);
   }
 
   if (overlay.profiles) {
@@ -642,14 +653,15 @@ export function mergeOverlay(builtin: Registry, overlay: OverlayData): Record<st
   return result;
 }
 
-/** Per-key merge of a flat `{host/workflow: value}` map against the builtin. A `null`
- *  overlay value deletes the key from the result; every other builtin key not mentioned in
- *  the overlay is retained (APCR-01.2). */
-function mergeFlatMap(
-  builtin: { readonly [key: string]: string },
-  overlay: Record<string, string | null>,
-): Record<string, string> {
-  const result: Record<string, string> = { ...builtin };
+/** Per-key merge of a flat `{key: value}` map against the builtin. A `null` overlay value
+ *  deletes the key from the result; every other builtin key not mentioned in the overlay is
+ *  retained. Reused for both `models` (whole-entry replace) and, one level deeper, for a
+ *  profile's `hosts`/`agents.<agent>` cell maps. */
+function mergeFlatMap<T>(
+  builtin: { readonly [key: string]: T },
+  overlay: Record<string, T | null>,
+): Record<string, T> {
+  const result: Record<string, T> = { ...builtin };
   for (const [key, value] of Object.entries(overlay)) {
     if (value === null) {
       delete result[key];
@@ -660,19 +672,22 @@ function mergeFlatMap(
   return result;
 }
 
-/** Per-agent, per-host merge of `agentTiers` (design D-1) — mirrors `mergeFlatMap` one level
- *  deeper. `overlay[agent] === null` deletes the whole agent entry; otherwise the agent's
- *  host map is merged against the builtin's via `mergeFlatMap` itself, so a host-level
- *  `null` tombstones just that key and an absent host key inherits. */
-function mergeAgentTiers(
-  builtin: { readonly [agent: string]: { readonly [host: string]: string } },
-  overlay: Record<string, Record<string, string | null> | null>,
-): Record<string, Record<string, string>> {
-  const result: Record<string, Record<string, string>> = {};
+/** Per-agent, per-host merge of a profile's `agents` overlay — mirrors `mergeFlatMap` one
+ *  level deeper. `overlay[agent] === null` deletes the whole agent entry; otherwise the
+ *  agent's host cell map is merged against the builtin's via `mergeFlatMap` itself, so a
+ *  host-level `null` tombstones just that key and an absent host key inherits. */
+function mergeAgents(
+  builtin: { readonly [agent: string]: { readonly [host: string]: Cell } },
+  overlay: Record<string, OverlayCellMap | null>,
+): Record<string, Record<string, Cell>> {
+  const result: Record<string, Record<string, Cell>> = {};
   for (const [agent, hostMap] of Object.entries(builtin)) {
     result[agent] = { ...hostMap };
   }
-  for (const [agent, value] of Object.entries(overlay)) {
+  for (const [rawAgent, value] of Object.entries(overlay)) {
+    // REN-05: a pre-rename overlay keyed `builder` still applies to the renamed
+    // `senior-engineer` agent, unless the overlay already targets it directly.
+    const agent = rawAgent === "builder" && !("senior-engineer" in overlay) ? "senior-engineer" : rawAgent;
     if (value === null) {
       delete result[agent];
       continue;
@@ -682,58 +697,69 @@ function mergeAgentTiers(
   return result;
 }
 
-/** Merge one overlay profile against its builtin counterpart, per host and per tier
- *  (APCR-01.1). A host or tier the overlay does not mention is retained from the builtin.
- *  A profile the builtin does not have (a genuinely new profile) passes through as-is. */
-function mergeProfile(
-  builtinProfile: Profile | undefined,
-  overlayProfile: OverlayProfile,
-): Record<string, unknown> {
+/** A null leaf in a profile that has no builtin counterpart is a tombstone of nothing —
+ *  there is no builtin value to delete. Strips those leaves instead of passing them
+ *  through, so a new/duplicated profile with a leftover null cell doesn't fail
+ *  `validateCell` (which requires an object, not null) for a key that has no builtin
+ *  meaning to tombstone. */
+function stripNullLeavesForNewProfile(overlayProfile: Omit<OverlayProfile, "_delete">): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  if (overlayProfile.description !== undefined) result.description = overlayProfile.description;
+  if (overlayProfile.hosts) {
+    const hosts: Record<string, Cell> = {};
+    for (const [host, cell] of Object.entries(overlayProfile.hosts)) {
+      if (cell !== null) hosts[host] = cell;
+    }
+    result.hosts = hosts;
+  }
+  if (overlayProfile.agents) {
+    const agents: Record<string, Record<string, Cell>> = {};
+    for (const [agent, hostMap] of Object.entries(overlayProfile.agents)) {
+      if (hostMap === null) continue; // whole-agent null on a nonexistent profile — no-op, drop
+      const hosts: Record<string, Cell> = {};
+      for (const [host, cell] of Object.entries(hostMap)) {
+        if (cell !== null) hosts[host] = cell;
+      }
+      if (Object.keys(hosts).length > 0) agents[agent] = hosts;
+    }
+    if (Object.keys(agents).length > 0) result.agents = agents;
+  }
+  return result;
+}
+
+/** Merge one overlay profile against its builtin counterpart, per host cell and per
+ *  agent/host cell. A host or agent the overlay does not mention is retained from the
+ *  builtin. A profile the builtin does not have (a genuinely new profile) passes through
+ *  as-is, minus any null leaves (`stripNullLeavesForNewProfile`). */
+function mergeProfile(builtinProfile: Profile | undefined, overlayProfile: OverlayProfile): Record<string, unknown> {
   const { _delete: _unused, ...rest } = overlayProfile;
   void _unused;
   if (!builtinProfile) {
-    return rest as Record<string, unknown>;
+    return stripNullLeavesForNewProfile(rest);
   }
-  const mergedHosts: Record<string, unknown> = { ...builtinProfile.hosts };
-  if (rest.hosts) {
-    for (const [host, tierMap] of Object.entries(rest.hosts)) {
-      const builtinTierMap = builtinProfile.hosts[host];
-      mergedHosts[host] = builtinTierMap ? { ...builtinTierMap, ...tierMap } : tierMap;
-    }
-  }
-  return {
+  const mergedHosts = rest.hosts ? mergeFlatMap(builtinProfile.hosts, rest.hosts) : { ...builtinProfile.hosts };
+  const mergedAgents = rest.agents ? mergeAgents(builtinProfile.agents ?? {}, rest.agents) : builtinProfile.agents;
+  const result: Record<string, unknown> = {
     description: rest.description !== undefined ? rest.description : builtinProfile.description,
     hosts: mergedHosts,
   };
+  if (mergedAgents && Object.keys(mergedAgents).length > 0) result.agents = mergedAgents;
+  return result;
 }
 
 /**
- * Read-path normalization (design D-1, TD-4): drop overlay entries whose value is
- * byte-identical to the current builtin's value at the same path, and drop `null`
- * tombstones for keys the builtin does not have. Read-only — it never rewrites the overlay
- * file; a full-copy overlay collapses to a real delta only once the UI re-seeds from
- * `source.overlay` (which now carries the normalized form) and saves.
+ * Read-path normalization: drop overlay entries whose value is byte-identical to the
+ * current builtin's value at the same path, and drop `null` tombstones for keys the builtin
+ * does not have. Read-only — it never rewrites the overlay file; a full-copy overlay
+ * collapses to a real delta only once the UI re-seeds from `source.overlay` (which now
+ * carries the normalized form) and saves.
  */
 function normalizeOverlay(builtin: Registry, overlay: OverlayData): OverlayData {
   const result: { -readonly [K in keyof OverlayData]?: OverlayData[K] } = {};
 
-  if (overlay.tiers && JSON.stringify(overlay.tiers) !== JSON.stringify(builtin.tiers)) {
-    result.tiers = overlay.tiers;
-  }
-
-  if (overlay.hostDefaults) {
-    const normalized = normalizeFlatMap(builtin.hostDefaults, overlay.hostDefaults);
-    if (Object.keys(normalized).length > 0) result.hostDefaults = normalized;
-  }
-
-  if (overlay.workflowTiers) {
-    const normalized = normalizeFlatMap(builtin.workflowTiers, overlay.workflowTiers);
-    if (Object.keys(normalized).length > 0) result.workflowTiers = normalized;
-  }
-
-  if (overlay.agentTiers) {
-    const normalized = normalizeAgentTiers(builtin.agentTiers, overlay.agentTiers);
-    if (Object.keys(normalized).length > 0) result.agentTiers = normalized;
+  if (overlay.models) {
+    const normalized = normalizeFlatMap(builtin.models, overlay.models);
+    if (Object.keys(normalized).length > 0) result.models = normalized;
   }
 
   if (overlay.profiles) {
@@ -753,11 +779,11 @@ function normalizeOverlay(builtin: Registry, overlay: OverlayData): OverlayData 
   return result;
 }
 
-function normalizeFlatMap(
-  builtin: { readonly [key: string]: string },
-  overlay: Record<string, string | null>,
-): Record<string, string | null> {
-  const result: Record<string, string | null> = {};
+function normalizeFlatMap<T>(
+  builtin: { readonly [key: string]: T },
+  overlay: Record<string, T | null>,
+): Record<string, T | null> {
+  const result: Record<string, T | null> = {};
   for (const [key, value] of Object.entries(overlay)) {
     if (value === null) {
       if (key in builtin) result[key] = null; // tombstone for a real key — kept
@@ -770,16 +796,16 @@ function normalizeFlatMap(
   return result;
 }
 
-/** Per-agent normalization of `agentTiers` (design D-1) — mirrors `normalizeFlatMap` one
+/** Per-agent normalization of a profile's `agents` overlay — mirrors `normalizeFlatMap` one
  *  level deeper. A whole-agent `null` tombstone survives only if the builtin actually has
- *  that agent (otherwise it is a no-op and dropped); the per-host map reuses
+ *  that agent (otherwise it is a no-op and dropped); the per-host cell map reuses
  *  `normalizeFlatMap` directly against the agent's builtin host map (or `{}` for a genuinely
- *  new agent), so byte-identical leaves and no-op host tombstones drop the same way. */
-function normalizeAgentTiers(
-  builtin: { readonly [agent: string]: { readonly [host: string]: string } },
-  overlay: Record<string, Record<string, string | null> | null>,
-): Record<string, Record<string, string | null> | null> {
-  const result: Record<string, Record<string, string | null> | null> = {};
+ *  new agent). */
+function normalizeAgents(
+  builtin: { readonly [agent: string]: { readonly [host: string]: Cell } },
+  overlay: Record<string, OverlayCellMap | null>,
+): Record<string, OverlayCellMap | null> {
+  const result: Record<string, OverlayCellMap | null> = {};
   for (const [agent, value] of Object.entries(overlay)) {
     if (value === null) {
       if (agent in builtin) result[agent] = null; // tombstone for a real agent — kept
@@ -791,61 +817,39 @@ function normalizeAgentTiers(
   return result;
 }
 
-function normalizeProfile(
-  builtinProfile: Profile | undefined,
-  overlayProfile: OverlayProfile,
-): OverlayProfile | null {
+function normalizeProfile(builtinProfile: Profile | undefined, overlayProfile: OverlayProfile): OverlayProfile | null {
   if (!builtinProfile) return overlayProfile; // a genuinely new profile — nothing to collapse
 
-  const result: { description?: string; hosts?: Record<string, HostTierMap> } = {};
+  const result: { description?: string; hosts?: OverlayCellMap; agents?: Record<string, OverlayCellMap | null> } = {};
 
   if (overlayProfile.description !== undefined && overlayProfile.description !== builtinProfile.description) {
     result.description = overlayProfile.description;
   }
 
   if (overlayProfile.hosts) {
-    const hosts: Record<string, HostTierMap> = {};
-    for (const [host, tierMap] of Object.entries(overlayProfile.hosts)) {
-      const builtinTierMap = builtinProfile.hosts[host];
-      if (!builtinTierMap) {
-        hosts[host] = tierMap;
-        continue;
-      }
-      const normalizedTiers: Record<string, Resolved> = {};
-      for (const [tier, resolved] of Object.entries(tierMap)) {
-        const builtinResolved = builtinTierMap[tier];
-        if (!builtinResolved || JSON.stringify(resolved) !== JSON.stringify(builtinResolved)) {
-          normalizedTiers[tier] = resolved;
-        }
-      }
-      if (Object.keys(normalizedTiers).length > 0) hosts[host] = normalizedTiers;
-    }
-    if (Object.keys(hosts).length > 0) result.hosts = hosts;
+    const normalizedHosts = normalizeFlatMap(builtinProfile.hosts, overlayProfile.hosts);
+    if (Object.keys(normalizedHosts).length > 0) result.hosts = normalizedHosts;
   }
 
-  if (result.description === undefined && result.hosts === undefined) return null;
+  if (overlayProfile.agents) {
+    const normalizedAgents = normalizeAgents(builtinProfile.agents ?? {}, overlayProfile.agents);
+    if (Object.keys(normalizedAgents).length > 0) result.agents = normalizedAgents;
+  }
+
+  if (result.description === undefined && result.hosts === undefined && result.agents === undefined) return null;
   return result;
 }
 
-/** APCR-01.10 / WUT-17: count of leaf overlay entries surviving normalization — the size of
- *  what the operator's overlay is actually overriding — plus a per-category breakdown so the
- *  UI can say *where* those overrides live without re-deriving this rule. `total` is always
- *  the sum of `breakdown`'s five values. */
+/** Count of leaf overlay entries surviving normalization — the size of what the operator's
+ *  overlay is actually overriding — plus a per-category breakdown so the UI can say *where*
+ *  those overrides live without re-deriving this rule. `total` is always the sum of
+ *  `breakdown`'s two values. */
 function countOverlayEntries(overlay: OverlayData): {
   total: number;
   breakdown: OverlayOverrideBreakdown;
 } {
   const breakdown: { -readonly [K in keyof OverlayOverrideBreakdown]: number } = zeroBreakdown();
-  if (overlay.hostDefaults) breakdown.hostDefaults = Object.keys(overlay.hostDefaults).length;
-  if (overlay.workflowTiers) breakdown.workflowTiers = Object.keys(overlay.workflowTiers).length;
-  if (overlay.agentTiers) {
-    for (const value of Object.values(overlay.agentTiers)) {
-      // A surviving whole-agent tombstone counts as one override (removing that agent's
-      // overrides entirely); otherwise count each surviving host-level leaf (design D-1).
-      breakdown.agentTiers += value === null ? 1 : Object.keys(value).length;
-    }
-  }
-  if (overlay.tiers) breakdown.tiers = 1;
+  if (overlay.models) breakdown.models = Object.keys(overlay.models).length;
   if (overlay.profiles) {
     for (const val of Object.values(overlay.profiles)) {
       if (!isOverlayProfile(val)) continue;
@@ -854,18 +858,14 @@ function countOverlayEntries(overlay: OverlayData): {
         continue;
       }
       if (val.description !== undefined) breakdown.profiles += 1;
-      if (val.hosts) {
-        for (const tierMap of Object.values(val.hosts)) {
-          breakdown.profiles += Object.keys(tierMap).length;
+      if (val.hosts) breakdown.profiles += Object.keys(val.hosts).length;
+      if (val.agents) {
+        for (const hostMap of Object.values(val.agents)) {
+          breakdown.profiles += hostMap === null ? 1 : Object.keys(hostMap).length;
         }
       }
     }
   }
-  const total =
-    breakdown.hostDefaults +
-    breakdown.workflowTiers +
-    breakdown.agentTiers +
-    breakdown.tiers +
-    breakdown.profiles;
+  const total = breakdown.models + breakdown.profiles;
   return { total, breakdown };
 }

@@ -12,10 +12,10 @@ Use when the user explicitly asks to evaluate an artifact through multi-judge
 debate — "judge this", "judge-with-debate", "evaluate with debate", "run the judges on X". The
 user supplies artifact path(s) plus a task description (what the artifact was supposed to
 accomplish) and optionally evaluation context. Standalone, explicit-route workflow: never
-auto-selected by the router for generic review work (use `reviewer`, `*-audit`, or
-`plan-critic` for those).
+auto-selected by the router for generic review work (use `code-reviewer`, `*-audit`, or
+the Plan Challenge `judge` `plan-critique` dispatch for those).
 
-The protocol: a meta-judge authors a tailored evaluation specification **once**; three
+The protocol: one `judge` in `spec-author` mode authors a tailored evaluation specification **once**; three
 independent judges score the artifact against it with quoted evidence; the judges debate their
 disagreements over **up to 3 rounds**; the panel converges on a consensus verdict or reports an
 honest no-consensus. Ported from the NeoLabHQ `judge-with-debate` pattern; this file is the
@@ -57,7 +57,7 @@ Check whether the host supports **dispatch-time model selection** (a per-dispatc
 parameter on the task/subagent tool). This probe runs on every invocation — when a host gains
 the capability, per-slot diversity activates automatically with no harness edit.
 
-- Probe positive → request per-slot models at dispatch: meta-judge `kimi-k3`, Judge 1
+- Probe positive → request per-slot models at dispatch: spec-author `kimi-k3`, Judge 1
   `deepseek-v4-pro`, Judge 2 `minimax-m3`, Judge 3 `GLM-5.2`.
 - Probe negative (all four hosts today) → dispatch the charter-default artifacts and record the
   unmet per-slot requests. Every fallback is named; if any slot fell back the consensus file and
@@ -66,12 +66,12 @@ the capability, per-slot diversity activates automatically with no harness edit.
 - A pinned-but-unavailable model falls back to the host default for that slot, named loudly in
   the same way.
 
-## Step 1 — Meta-judge (exactly once)
+## Step 1 — Spec-author (exactly once)
 
-Dispatch `massa-ai-meta-judge` (read-only) with the task description, artifact type, context,
+Dispatch `judge` in `spec-author` mode (read-only) with the task description, artifact type, context,
 and artifact paths. Model request: `kimi-k3` (see Step 0.5).
 
-> **Dispatch: `massa-ai-meta-judge`** (role: `meta-judge`) — charter `skills/agents/meta-judge/SKILL.md`
+> **Dispatch: `judge`** (role: `judge`, mode: `spec-author`) — charter `skills/agents/judge/SKILL.md`
 > - trigger: judge-with-debate Step 1; runs exactly once per evaluation
 > - scope: the artifact under evaluation (paths supplied), task description, artifact type
 > - permissions: read-only
@@ -80,7 +80,6 @@ and artifact paths. Model request: `kimi-k3` (see Step 0.5).
 > - output: the evaluation-specification YAML, returned verbatim for all rounds; nothing else
 > - firewall: no artifact body quotes beyond what the rubric anchors need; no raw dumps
 > - memory: suggest-only; main agent persists
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 This packet is a specialization of the canonical Capability Packet
 (`references/agent-orchestration.md`): the spec YAML is its `output` contract; the
@@ -95,23 +94,23 @@ Validate the returned evaluation specification in two stages, in order; a retry 
    `rubric` with anchors for scores 1, 3, 5, and a `checklist` with ≥1 item. Parseable but
    invalid specs (e.g. `scale.max: 7`) fail here, not at stage 1.
 
-On failure: retry the meta-judge **once** with the failed stage + check name. Second failure →
-stop `Blocked`. The meta-judge runs exactly once per evaluation — never re-run between rounds,
+On failure: retry the spec-author **once** with the failed stage + check name. Second failure →
+stop `Blocked`. The spec-author runs exactly once per evaluation — never re-run between rounds,
 never edited by the orchestrator; the YAML passes to all judges in all rounds **verbatim**.
 
-Feedback: `🤖 [Agent Started] Meta-Judge is authoring the evaluation specification.`
+Feedback: `🤖 [Agent Started] Judge (spec-author) is authoring the evaluation specification.`
 then `🤖 [Agent Done]` or `🤖 [Agent Blocked]` with the one-line reason.
 
 ## Step 2 — Independent analysis (3 judges in parallel)
 
-Dispatch three `massa-ai-judge` agents **in parallel** (round 0), one per judge number, each
+Dispatch three `judge` agents in `scorer` mode **in parallel** (round 0), one per judge number, each
 with: the verbatim specification YAML, task description, artifact paths, its own report path,
 `round: 0`, and its model request (Step 0.5). The fixed panel of 3 sits inside the wave cap of
 4 concurrent subagents (`references/agent-orchestration.md`, Orchestrator Working Memory).
 Each judge writes its own `audits/judge/<...> judge-N.md` per the report contract and returns
 the reply block:
 
-> **Dispatch: `massa-ai-judge`** (role: `judge`) — charter `skills/agents/judge/SKILL.md` — 3 per panel, rounds 0..3
+> **Dispatch: `judge`** (role: `judge`, mode: `scorer`) — charter `skills/agents/judge/SKILL.md` — 3 per panel, rounds 0..3
 > - trigger: judge-with-debate Steps 2 and 4; panel of exactly 3, never more
 > - scope: the artifact under evaluation, the verbatim specification YAML, own report path; debate rounds add all three report paths as peer paths and `round: R`
 > - permissions: read-only except appending to its own judge-N report file
@@ -120,7 +119,6 @@ the reply block:
 > - output: the YAML reply block below (strengths/weaknesses capped at ≤3 items); report file is the persisted channel — dual-channel rule, the chat return never carries the report body
 > - firewall: quoted evidence snippets only; no artifact or peer-report dumps in the reply
 > - memory: suggest-only; main agent persists
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 This packet is a specialization of the canonical Capability Packet
 (`references/agent-orchestration.md`); the per-round additions are its `inputs` deltas.
@@ -161,7 +159,7 @@ Step 5. If no consensus and rounds remain → Step 4. If no consensus after roun
 
 ## Step 4 — Debate round (rounds 1..3, max 3)
 
-Increment the round. Dispatch three `massa-ai-judge` agents **in parallel** again, each with:
+Increment the round. Dispatch three `judge` agents **in parallel** again, each with:
 the verbatim specification YAML (unchanged), task description, artifact paths, its own report
 path, **all three** report paths as peer paths, and `round: R`. Each judge:
 
@@ -200,7 +198,7 @@ did not reach.**
 
 ## Pitfalls (each is a rule, not advice)
 
-- Never skip the meta-judge; never let judges score without the shared specification.
+- Never skip the spec-author; never let judges score without the shared specification.
 - Never modify or regenerate the specification between rounds — verbatim, every round.
 - Never let a debate judge create a new report file — append-only `## Debate Round {R}` sections.
 - Never relay reports between judges through the orchestrator — filesystem channel only.

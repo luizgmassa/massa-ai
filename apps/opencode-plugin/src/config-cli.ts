@@ -7,6 +7,7 @@ import {
   saveConfig,
   initConfig,
   defaultMassaAiConfig,
+  knownEmbeddingDimensions,
 } from "@massa-ai/shared/config";
 import {
   listProfiles,
@@ -15,11 +16,24 @@ import {
   syncGeneratedVariants,
   findRepoRootWithMarker,
   isHost,
+  isOwnedAgentFile,
+  isOwnedAgentLink,
+  applyBootstrapState,
+  assertKnownRuleId,
+  bootstrapReportSucceeded,
+  bootstrapStateFilePath,
+  formatBootstrapInventory,
+  formatBootstrapReport,
+  resolveBootstrapState,
+  setBootstrapRuleEnabled,
   type Host,
   type ProfileInventory,
   type SwitchReport,
   type VariantSyncHostResult,
+  runtimeDriftReport,
+  type AgentRuntimeReport,
 } from "@massa-ai/shared";
+import { INFERENCE_PROVIDERS, deriveInferenceBaseUrls } from "@massa-ai/shared/inference-providers";
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
@@ -27,14 +41,20 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// The writable embedding.provider set (design.md §6, LIP-01's derived union
+// LOCAL_INFERENCE_IDS ∪ API_PROVIDER_IDS). This CLI is a copy-fork, not a
+// delegating consumer, so the list stays a literal here — same as its
+// sibling in apps/mcp-client.
+const WRITABLE_PROVIDERS = ["ollama", "lmstudio", "mistral", "openai", "google", "cohere"] as const;
+
 // This CLI is a PUBLISHED app (npm) and, unlike apps/tools-api's routes,
 // cannot depend on scripts/lib/model-profiles.ts at all — that tree ships
 // only in a source checkout, not in the published package. `profile list`/
 // `show` below therefore keep listProfiles()'s own last-resort "balanced"
-// literal fallback rather than passing registry.hostDefaults (T2); the
-// generic findRepoRootWithMarker walk below is fine to use for
-// `syncGeneratedVariants`'s sourceRoot because it depends on nothing outside
-// this package.
+// literal fallback — the only fallback that exists, since v2 dropped the
+// registry's hostDefaults key (spec AC8); the generic findRepoRootWithMarker
+// walk below is fine to use for `syncGeneratedVariants`'s sourceRoot because
+// it depends on nothing outside this package.
 const GENERATOR_MARKER = "scripts/generate-subagent-artifacts.ts";
 const GENERATOR_MARKER_MAX_LEVELS = 6;
 
@@ -59,19 +79,21 @@ Usage:
 Commands:
   init              Initialize massa-ai configuration
     --ollama          Use Ollama (local, default)
+    --lmstudio        Use LM Studio (local)
     --mistral <key>   Use Mistral with API key
     --openai <key>    Use OpenAI with API key
 
   path              Show config file path
   show              Show current configuration
   set <key> <val>   Set a configuration value
-  use <provider>    Switch embedding provider
-    --api-key <key>   API key (required for mistral/openai)
+  use <provider>    Switch embedding provider (ollama, lmstudio, mistral,
+                    openai, google, cohere)
+    --api-key <key>   API key (required for mistral/openai/google/cohere)
     --model <name>    Model name
-    --base-url <url>  Base URL (for ollama)
+    --base-url <url>  Base URL (for ollama/lmstudio)
 
-  agents            Manage the 18 subagent specialist definitions
-    agents install [--user|--project]   Write 18 agent .md files
+  agents            Manage the 7 subagent specialist definitions
+    agents install [--user|--project]   Write 7 agent .md files
     agents uninstall [--user|--project] Remove only massa-ai-owned agents
 
   profile list      List shipped model profiles + per-host active profile
@@ -79,14 +101,35 @@ Commands:
   profile set <name> [--host <h>] [--dry-run]
                     Switch installed agents to a profile (restart required after)
 
+  doctor [--fix] [--host <h>] [--target <dir>]
+                    Report agent model/profile drift: live-tree vs recorded
+                    versions, per-role models, variant staleness, env
+                    overrides. --fix re-runs the profile switch for the
+                    recorded active profile (restart required after).
+                    --target redirects the home the state/registries are
+                    read from (test seam, same convention as bootstrap)
+
+  bootstrap list    List every startup-contract rule: state, default, description
+  bootstrap show    Same as 'bootstrap list'
+  bootstrap enable <rule-id> [--target <dir> --yes] [--dry-run]
+  bootstrap disable <rule-id> [--target <dir> --yes] [--dry-run]
+                    Toggle one rule and re-render MASSA-AI.md for every
+                    recorded host (restart required after)
+
 Examples:
   massa-ai-config init
+  massa-ai-config init --lmstudio
   massa-ai-config init --mistral your-api-key
-  massa-ai-config use ollama --model qwen3-embedding:4b
+  massa-ai-config use ollama --model qwen3-embedding:0.6b
+  massa-ai-config use lmstudio
   massa-ai-config use mistral --api-key your-key
   massa-ai-config set embedding.dimensions 1024
   massa-ai-config agents install --user
   massa-ai-config profile set work --dry-run
+  massa-ai-config doctor
+  massa-ai-config doctor --fix
+  massa-ai-config bootstrap list
+  massa-ai-config bootstrap enable code-comments
 `);
 }
 
@@ -138,6 +181,45 @@ function formatSwitchReport(report: SwitchReport): void {
   }
 }
 
+/**
+ * agent-drift followup T2: the CLI front for the profile-switch doctor
+ * (`runtimeDriftReport`). Read-only by default; `--fix` is the sanctioned
+ * mutation surface — the session-start hook deliberately never mutates, so
+ * this command is where the human applies the remedy the drift line names.
+ * Version drift and env overrides stay report-only: their remedies (plugin
+ * update / host env edit) are outside this CLI's write scope.
+ */
+function formatDriftReport(report: AgentRuntimeReport): void {
+  console.log(`doctor (${report.host}, route: ${report.route})`);
+  console.log(`  live root:       ${report.liveRoot ?? "n/a"}`);
+  console.log(`  source version:  ${report.sourceVersion ?? "n/a"} (live tree)`);
+  console.log(`  state version:   ${report.stateVersion ?? "n/a"} (install-state)`);
+  console.log(`  pinned version:  ${report.pinnedVersion ?? "n/a"} (installed_plugins)`);
+  console.log(`  active profile:  ${report.activeProfile ?? "n/a"}`);
+  for (const role of report.roles) {
+    const stale = role.staleVariant ? " — STALE vs the recorded profile's variant" : "";
+    console.log(`  ${role.name}: model=${role.model ?? "unknown"} effort=${role.effort ?? "unknown"}${stale}`);
+  }
+  if (report.versionDrift) {
+    console.log(
+      `  drift: live tree ${report.sourceVersion} != recorded ${report.stateVersion} — update the plugin (or re-run the installer)`,
+    );
+  }
+  if (report.profileMaterialized) {
+    console.log(
+      "  drift: active agent files differ from the recorded profile's variants — run `massa-ai-config doctor --fix` (re-runs the profile switch)",
+    );
+  }
+  if (report.envOverride) {
+    console.log(
+      `  override: ${report.envOverride.name}=${report.envOverride.value} wins over every per-agent model at runtime — remove it from the host env to let profiles govern`,
+    );
+  }
+  if (report.route !== "unresolved" && !report.versionDrift && !report.profileMaterialized && !report.envOverride) {
+    console.log("  healthy: every recording agrees.");
+  }
+}
+
 export async function runCli(argv: string[]): Promise<number> {
   const args = argv;
   const command = args[0];
@@ -173,6 +255,21 @@ export async function runCli(argv: string[]): Promise<number> {
       };
       saveConfig(config);
       console.log("✓ Configured for OpenAI embeddings");
+    } else if (options.lmstudio) {
+      const config = loadConfig();
+      const model = INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
+      config.embedding = {
+        provider: "lmstudio",
+        model,
+        baseURL: INFERENCE_PROVIDERS.lmstudio.defaultEmbeddingBaseUrl,
+        dimensions: INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ?? 768,
+      };
+      // LIP-09: keep llm.baseUrl off Ollama's :11434 so resolveInferenceSpec resolves lmstudio.
+      config.llm.baseUrl = INFERENCE_PROVIDERS.lmstudio.defaultLlmBaseUrl;
+      config.llm.model = INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct;
+      config.llm.codeModel = INFERENCE_PROVIDERS.lmstudio.defaultModels.coding;
+      saveConfig(config);
+      console.log("✓ Configured for LM Studio (local) embeddings");
     } else {
       console.log("✓ Configured for Ollama (local) embeddings");
     }
@@ -225,24 +322,45 @@ export async function runCli(argv: string[]): Promise<number> {
 
   case "use": {
     const provider = args[1];
-    
-    if (!provider || !["ollama", "mistral", "openai"].includes(provider)) {
-      console.error("Provider must be: ollama, mistral, or openai");
+
+    if (!provider || !(WRITABLE_PROVIDERS as readonly string[]).includes(provider)) {
+      console.error(`Provider must be one of: ${WRITABLE_PROVIDERS.join(", ")}`);
       return 1;
     }
-    
+
     const config = loadConfig();
-    
+
     if (provider === "ollama") {
+      const model = (options.model as string) || INFERENCE_PROVIDERS.ollama.defaultModels.embedding;
+      const urls = deriveInferenceBaseUrls("ollama", options["base-url"] as string | undefined);
       config.embedding = {
         provider: "ollama",
-        model: (options.model as string) || "qwen3-embedding:4b",
-        baseURL: (options["base-url"] as string) || "http://localhost:11434",
-        // Must match the default model's output width: qwen3-embedding:4b
-        // emits 2560-d vectors, and refuseOnDimensionMismatch fails loudly
-        // on a config that disagrees with what the model returns.
-        dimensions: 2560,
+        model,
+        baseURL: urls.embeddingBaseUrl,
+        // ponytail: G6 — 768 fallback for a custom --model outside
+        // knownDimensions; see embeddings/config.ts's matching comment.
+        dimensions: knownEmbeddingDimensions(model) ?? 768,
       };
+      // G0/PDM-02 AC-2: same fix as the lmstudio branch below — a switch
+      // away from lmstudio must not leave llm.* naming lmstudio's ids.
+      config.llm.baseUrl = urls.llmBaseUrl;
+      config.llm.model = INFERENCE_PROVIDERS.ollama.defaultModels.instruct;
+      config.llm.codeModel = INFERENCE_PROVIDERS.ollama.defaultModels.coding;
+    } else if (provider === "lmstudio") {
+      const model = (options.model as string) || INFERENCE_PROVIDERS.lmstudio.defaultModels.embedding;
+      const urls = deriveInferenceBaseUrls("lmstudio", options["base-url"] as string | undefined);
+      config.embedding = {
+        provider: "lmstudio",
+        model,
+        baseURL: urls.embeddingBaseUrl,
+        // ponytail: G6 — 768 fallback for a custom --model outside
+        // knownDimensions; see embeddings/config.ts's matching comment.
+        dimensions: INFERENCE_PROVIDERS.lmstudio.knownDimensions[model] ?? 768,
+      };
+      // LIP-09: same fix as init --lmstudio above.
+      config.llm.baseUrl = urls.llmBaseUrl;
+      config.llm.model = INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct;
+      config.llm.codeModel = INFERENCE_PROVIDERS.lmstudio.defaultModels.coding;
     } else if (provider === "mistral") {
       if (!options["api-key"]) {
         console.error("Error: --api-key required for Mistral");
@@ -265,8 +383,30 @@ export async function runCli(argv: string[]): Promise<number> {
         apiKey: options["api-key"] as string,
         dimensions: 1536,
       };
+    } else if (provider === "google") {
+      if (!options["api-key"]) {
+        console.error("Error: --api-key required for Google");
+        return 1;
+      }
+      config.embedding = {
+        provider: "google",
+        model: (options.model as string) || "gemini-embedding-001",
+        apiKey: options["api-key"] as string,
+        dimensions: 3072,
+      };
+    } else if (provider === "cohere") {
+      if (!options["api-key"]) {
+        console.error("Error: --api-key required for Cohere");
+        return 1;
+      }
+      config.embedding = {
+        provider: "cohere",
+        model: (options.model as string) || "embed-english-v3.0",
+        apiKey: options["api-key"] as string,
+        dimensions: 1024,
+      };
     }
-    
+
     saveConfig(config);
     console.log(`✓ Switched to ${provider} embeddings`);
     console.log(`  Model: ${config.embedding.model}`);
@@ -301,9 +441,20 @@ export async function runCli(argv: string[]): Promise<number> {
       let count = 0;
       const entries = await fs.readdir(sourceAgentsDir);
       for (const entry of entries) {
-        if (!entry.startsWith("massa-ai-") || !entry.endsWith(".md")) continue;
+        if (!entry.endsWith(".md")) continue;
         const src = path.join(sourceAgentsDir, entry);
         const dest = path.join(agentsDir, entry);
+        let destExists = true;
+        try {
+          await fs.lstat(dest);
+        } catch {
+          destExists = false;
+        }
+        if (destExists && !isOwnedAgentFile(dest) && !isOwnedAgentLink(dest)) {
+          console.warn(`⚠ ${dest} exists and is not massa-ai-owned — skipped`);
+          continue;
+        }
+        if (isOwnedAgentLink(dest)) await fs.unlink(dest);
         await fs.copyFile(src, dest);
         count++;
       }
@@ -312,15 +463,14 @@ export async function runCli(argv: string[]): Promise<number> {
       );
       console.log(`  written to: ${agentsDir}`);
     } else {
-      // uninstall: remove only files with metadata: { massa-ai-owned: true }
+      // uninstall: remove only massa-ai-owned files (body marker or legacy name)
       let removed = 0;
       try {
         const entries = await fs.readdir(agentsDir);
         for (const entry of entries) {
-          if (!entry.startsWith("massa-ai-") || !entry.endsWith(".md")) continue;
+          if (!entry.endsWith(".md")) continue;
           const filePath = path.join(agentsDir, entry);
-          const content = await fs.readFile(filePath, "utf8");
-          if (content.includes("massa-ai-owned: true")) {
+          if (isOwnedAgentFile(filePath) || isOwnedAgentLink(filePath)) {
             await fs.unlink(filePath);
             removed++;
           }
@@ -339,9 +489,8 @@ export async function runCli(argv: string[]): Promise<number> {
 
     if (subcommand === "list" || subcommand === "show") {
       try {
-        // No hostDefaults passed here (see the module-level comment) — this
-        // published CLI cannot reach the registry, so an unrecorded host's
-        // activeProfile falls back to listProfiles()'s own "balanced" literal.
+        // An unrecorded host's activeProfile falls back to listProfiles()'s
+        // own "balanced" literal (see the module-level comment).
         formatProfileInventory(listProfiles());
       } catch (e) {
         console.error(`Error: ${(e as Error).message}`);
@@ -383,6 +532,168 @@ export async function runCli(argv: string[]): Promise<number> {
     }
 
     console.error("Usage: massa-ai-config profile <list|show|set> ...");
+    return 1;
+  }
+
+  case "doctor": {
+    const fix = options["fix"] === true;
+    const hostOpt = typeof options.host === "string" ? options.host : undefined;
+    if (hostOpt !== undefined && !isHost(hostOpt)) {
+      console.error(`Error: unknown host "${hostOpt}"`);
+      return 1;
+    }
+    const host: Host = (hostOpt as Host | undefined) ?? "claude";
+    const targetHome = typeof options.target === "string" ? options.target : os.homedir();
+    try {
+      let report = runtimeDriftReport({ targetHome, host });
+      if (fix) {
+        const profile = report.activeProfile;
+        if (!profile) {
+          console.error(
+            "Error: no recorded active profile in install-state.json — run " +
+              "`massa-ai-config profile set <name>` first; there is nothing to fix from.",
+          );
+          return 1;
+        }
+        // Same bridge `profile set` uses: a dev checkout refreshes the
+        // installed variant root before switching; a published install
+        // (null sourceRoot) makes it a silent no-op.
+        const sourceRoot = findRepoRootWithMarker(__dirname, GENERATOR_MARKER, GENERATOR_MARKER_MAX_LEVELS);
+        formatVariantSync(syncGeneratedVariants({ sourceRoot, targetHome }));
+        const switchReport = switchProfile({ profile, host, targetHome });
+        formatSwitchReport(switchReport);
+        if (!reportSucceeded(switchReport)) {
+          return 1;
+        }
+        report = runtimeDriftReport({ targetHome, host });
+      }
+      formatDriftReport(report);
+      return 0;
+    } catch (e) {
+      console.error(`Error: ${(e as Error).message}`);
+      return 1;
+    }
+  }
+
+  /*
+   * `bootstrap list|show|enable <id>|disable <id>` (T17/T18, BST-09, BST-11).
+   * This block is byte-identical in `apps/mcp-client/src/config-cli.ts` and
+   * `apps/opencode-plugin/src/config-cli.ts` except for the one
+   * `import.meta.dirname` / `__dirname` line, the same single divergence the
+   * `profile` block above already carries.
+   *
+   * Every branch here is a thin front over `@massa-ai/shared`: the registry
+   * validates the id, the engine renders and delivers, and the two shared
+   * formatters (T16) produce the text. Nothing in this block re-implements a
+   * rule, a default, a status literal or a message the module already owns —
+   * that is what keeps the two CLIs from drifting apart (design.md:446).
+   *
+   * BST-11 AC-4 / BST-11.5: nothing on this path opens a socket. The whole
+   * point of the CLI front is that it still works when the massa-ai MCP server
+   * is unreachable, because that is the state a user is in after disabling
+   * `massa-ai-router` — the rule that loads the router which would otherwise
+   * drive the toggle. No `bootstrap_*` MCP tool exists, deliberately
+   * (design.md "MCP front | Not built").
+   */
+  case "bootstrap": {
+    const subcommand = args[1];
+
+    if (subcommand === "list" || subcommand === "show") {
+      try {
+        // Reads through the strict seam, so a malformed config.json surfaces
+        // as a named ConfigParseError instead of silently listing defaults
+        // that are not what is persisted.
+        console.log(formatBootstrapInventory(resolveBootstrapState().state));
+      } catch (e) {
+        console.error(`Error: ${(e as Error).message}`);
+        return 1;
+      }
+      return 0;
+    }
+
+    if (subcommand === "enable" || subcommand === "disable") {
+      const ruleId = args[2];
+      if (!ruleId) {
+        console.error(
+          "Usage: massa-ai-config bootstrap <enable|disable> <rule-id> [--target <dir> --yes] [--dry-run]",
+        );
+        return 1;
+      }
+
+      // BST-09 AC-8: validated here, before anything is read or written, so an
+      // unknown id can never be the reason a file was touched. `setBootstrapRuleEnabled`
+      // asserts the same thing internally (state.ts:165) — doing it again at the
+      // dispatch boundary is what makes "changes no state" observable, since a
+      // command that reached the writer at all has already reached its file.
+      try {
+        assertKnownRuleId(ruleId);
+      } catch (e) {
+        console.error(`Error: ${(e as Error).message}`);
+        return 1;
+      }
+
+      const targetOpt = typeof options.target === "string" ? options.target : undefined;
+      const targetHome = targetOpt === undefined ? os.homedir() : path.resolve(targetOpt);
+
+      // design.md:358-363: the typed command naming the mutation is the consent
+      // against the resolved home, but a redirected target is the case
+      // `installer_consent_gate` (scripts/install-skills.sh:133) already exists
+      // for. Refused before the writer, so an unconfirmed target changes nothing.
+      if (targetHome !== os.homedir() && options.yes !== true) {
+        console.error(
+          `Error: --target ${targetHome} is not your home (${os.homedir()}) — pass --yes to confirm writing there`,
+        );
+        return 1;
+      }
+
+      const dryRun = options["dry-run"] === true;
+
+      try {
+        if (dryRun) {
+          // A dry run writes nothing at all, config.json included, so the
+          // persisted flag is left alone and only the delivery plan is shown.
+          console.log(
+            `bootstrap ${subcommand} ${ruleId}: dry run — ${getConfigPath()} was not written`,
+          );
+        } else {
+          setBootstrapRuleEnabled(ruleId, subcommand === "enable");
+        }
+
+        // The preference is process-scoped (spec BST-10 AC-11 fixes it at
+        // ~/.config/massa-ai/config.json and `setBootstrapRuleEnabled` takes no
+        // path), while the engine resolves the state it renders from under
+        // `--target`. Those are the same file in the ordinary run and different
+        // files under a redirected target or a moved XDG_CONFIG_HOME, so the
+        // divergence is named rather than left to surprise the caller with a
+        // render that ignored the flag it just set.
+        const stateFile = bootstrapStateFilePath(targetHome);
+        if (stateFile !== getConfigPath()) {
+          console.error(
+            `Warning: the rule state is persisted to ${getConfigPath()}, but --target renders from ${stateFile} — set XDG_CONFIG_HOME to move the persisted state`,
+          );
+        }
+
+        // `skills/AGENTS.md` is the only marked-up copy of the contract and it
+        // exists only in a checkout; a rendered MASSA-AI.md cannot serve because
+        // the render strips every marker (render.ts:19-23). Outside a checkout
+        // this stays undefined and the engine raises its own named
+        // BootstrapSourceUnavailableError (engine.ts:265-270) rather than
+        // rendering from a guessed source.
+        const repoRoot = findRepoRootWithMarker(__dirname, GENERATOR_MARKER, GENERATOR_MARKER_MAX_LEVELS);
+        const report = applyBootstrapState({
+          targetHome,
+          dryRun,
+          sourcePath: repoRoot === null ? undefined : path.join(repoRoot, "skills", "AGENTS.md"),
+        });
+        console.log(formatBootstrapReport(report));
+        return bootstrapReportSucceeded(report) ? 0 : 1;
+      } catch (e) {
+        console.error(`Error: ${(e as Error).message}`);
+        return 1;
+      }
+    }
+
+    console.error("Usage: massa-ai-config bootstrap <list|show|enable|disable> ...");
     return 1;
   }
 

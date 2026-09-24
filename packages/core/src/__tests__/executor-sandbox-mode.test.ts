@@ -63,8 +63,10 @@ describe("sandbox mode visibility (SEC-03)", () => {
     const messages = warnMessages();
     expect(messages).toHaveLength(1);
     // Naming the tool is the actionable half: "no sandbox" alone does not tell
-    // an operator what to install.
-    expect(messages[0]).toMatch(process.platform === "darwin" ? /sandbox-exec/ : /docker/);
+    // an operator what to install. It lives in meta.missingTool (H2 — the
+    // message itself stays a constant string).
+    const meta = warnSpy.mock.calls[0]?.[1] as { missingTool?: string } | undefined;
+    expect(meta?.missingTool).toMatch(process.platform === "darwin" ? /sandbox-exec/ : /docker/);
   });
 
   test("the warning is once per process, not once per execution", () => {

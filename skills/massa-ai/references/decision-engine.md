@@ -61,13 +61,9 @@ Before a non-trivial change, ask:
 Most bugs come from state inconsistency, async/race issues, wrong data-shape
 assumptions, or environment differences.
 
-Debug loop:
+For the full diagnosis loop (intake, feedback-loop gate, hypothesis board,
+instrumentation, fix and prevention), see `references/debug-diagnosis-loop.md`.
 
-1. Recall prior attempts and known patterns.
-2. Define expected vs actual behavior.
-3. Trace input -> transformation -> output.
-4. Check recent changes first.
-5. Test one falsifiable hypothesis at a time.
-6. Persist durable lessons only after scoring.
+Persist durable lessons only after scoring.
 
 Avoid blind whole-repo scans when a targeted recall/search path exists.

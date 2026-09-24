@@ -118,7 +118,7 @@ export class KeywordSearchPg {
     } catch (error) {
       logger.warn(
         'pg_trgm unavailable — trigram RRF stream disabled on PG',
-        { err: (error as Error).message },
+        { error: error as Error },
       );
       this.trigramAvailable = false;
     }

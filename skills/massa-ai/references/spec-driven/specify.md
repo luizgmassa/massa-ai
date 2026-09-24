@@ -121,7 +121,7 @@ Write every acceptance criterion in **EARS** (Easy Approach to Requirements Synt
 
 ### 4. Requirement Closure Gate (before confirm)
 
-Before Design, Tasks, or Execute — and before presenting the spec for confirmation — run the checks below. The spec is not presentable for confirmation until every item is resolved or assumption-logged. This is the guarantee that no requirement leaves the spec silently unclear.
+Before Design, Tasks, or Execute — and before presenting the spec for confirmation — run the checks below. The spec is not presentable for confirmation until every item is resolved or assumption-logged. This is the guarantee that no requirement leaves the spec silently unclear. The `product-manager` `audit` dispatch in `spec-driven.md`'s Specify step (mandatory every run, over the drafted `spec.md`) feeds this gate: its ambiguity, gap, contradiction, implicit-requirement, and uncovered-scenario findings are resolved with the user or recorded as accepted assumptions alongside the rest of this checklist.
 
 **Scope-tiered:** Large/Complex = full gate; Medium = resolve obvious ambiguities, log the rest as assumptions; Small = skip entirely (consistent with skipping the sweep).
 

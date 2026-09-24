@@ -79,6 +79,40 @@ export async function upsertWorkspace(
   }, { timeout: 60_000, maxWait: 10_000 });
 }
 
+/**
+ * Read the workspace's stored embedding fingerprint (LIP-15) —
+ * `${provider}:${model}:${dimensions}`, written only by
+ * {@link stampEmbeddingFingerprint} from a completed full reindex. `null`
+ * covers both "no workspace row yet" and "row exists but was never stamped"
+ * (legacy) — callers treat both the same way: warn, never block.
+ */
+export async function getEmbeddingFingerprint(projectId: string): Promise<string | null> {
+  const p = getPrismaClient();
+  const rows = await p.$queryRaw<{ embedding_fingerprint: string | null }[]>`
+    SELECT embedding_fingerprint FROM workspaces WHERE project_id = ${projectId} LIMIT 1
+  `;
+  return rows[0]?.embedding_fingerprint ?? null;
+}
+
+/**
+ * Stamp the workspace's embedding fingerprint (LIP-15 write gate).
+ *
+ * Callers MUST only call this from a full/"clearing" reindex that just
+ * finished writing every row for the project under `fingerprint` — never
+ * from an incremental reindex, which would make a table holding two mixed
+ * embedding spaces report itself as consistent.
+ */
+export async function stampEmbeddingFingerprint(
+  projectId: string,
+  fingerprint: string,
+): Promise<void> {
+  const p = getPrismaClient();
+  await p.$executeRaw`
+    UPDATE workspaces SET embedding_fingerprint = ${fingerprint}, updated_at = NOW()
+    WHERE project_id = ${projectId}
+  `;
+}
+
 export async function updateWorkspaceStatus(
   projectId: string,
   status: WorkspaceStatus,

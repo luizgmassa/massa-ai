@@ -185,7 +185,7 @@ export class PgJobStore implements JobStore {
           } catch (e) {
             this.recovered = true; // don't retry loop; surface once
             logger.warn("PgJobStore markStaleRunningFailed failed (best-effort)", {
-              error: (e as Error).message,
+              error: e as Error,
             });
           }
         }
@@ -225,7 +225,7 @@ export class PgJobStore implements JobStore {
         // Hydration failed: leave hydrated=false so the next call retries. The
         // tracker's own Map still serves reads; PG writes still land.
         logger.warn("PgJobStore hydrate failed (best-effort)", {
-          error: (e as Error).message,
+          error: e as Error,
         });
       } finally {
         this.hydrating = null;
@@ -259,7 +259,7 @@ export class PgJobStore implements JobStore {
     next.catch((e) => {
       logger.warn("PgJobStore.save failed (best-effort)", {
         jobId: job.jobId,
-        error: (e as Error).message,
+        error: e as Error,
       });
     });
   }
@@ -422,7 +422,7 @@ export class PgJobStore implements JobStore {
         }
       } catch (e) {
         logger.warn("PgJobStore markStaleRunningFailed failed (best-effort)", {
-          error: (e as Error).message,
+          error: e as Error,
         });
       }
     })();

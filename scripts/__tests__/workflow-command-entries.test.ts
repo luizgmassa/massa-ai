@@ -160,6 +160,19 @@ describe("collectWorkflowCommandEntries — live inventory (WFC-02)", () => {
   test("live inventory passes every guard with no violation", async () => {
     await expect(collectWorkflowCommandEntries()).resolves.toBeDefined();
   });
+
+  // agent-roster-consolidation WFL-02/WFL-03 (Inventory AC-6): the generated
+  // commands follow the renamed stems, and no removed or old stem survives.
+  test("commands cover the 36 current stems: the six renames present, old and removed stems absent", async () => {
+    const stems = new Set((await collectWorkflowCommandEntries()).map((e) => e.stem));
+    expect(stems.size).toBe(36);
+    for (const stem of ["product-discovery", "create-adr", "create-prd", "create-rfc", "create-tdd", "create-ticket"]) {
+      expect(stems.has(stem), `missing renamed stem ${stem}`).toBe(true);
+    }
+    for (const stem of ["discovery", "adr", "to-prd", "rfc", "tdd", "ticket", "general", "maestro", "maestro-audit", "maestro-fix"]) {
+      expect(stems.has(stem), `old or removed stem ${stem} still generates a command`).toBe(false);
+    }
+  });
 });
 
 describe("collectWorkflowCommandEntries — rendered templates (WFC-01/06/13)", () => {

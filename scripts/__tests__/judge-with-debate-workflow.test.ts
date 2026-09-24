@@ -40,12 +40,12 @@ describe("judge-with-debate workflow contract markers", () => {
     ["per-slot model J2", "`minimax-m3`"],
     ["per-slot model J3", "`GLM-5.2`"],
     ["meta model", "`kimi-k3`"],
-    // JD-07 / design C5: two-stage meta-judge YAML validation
+    // JD-07 / design C5: two-stage spec-author YAML validation
     ["stage 1 syntactic", "**Syntactic**"],
     ["stage 2 weights", "**Weights**"],
     ["stage 3 semantic shape", "**Semantic shape**"],
     ["first failed check named", "first failed check"],
-    ["single retry then Blocked", "retry the meta-judge **once**"],
+    ["single retry then Blocked", "retry the spec-author **once**"],
     // Reply-block schema fields (orchestrator's only input)
     ["reply status field", "status: Complete | Partial | Blocked"],
     ["reply judge field", "judge: 1 | 2 | 3"],
@@ -63,9 +63,10 @@ describe("judge-with-debate workflow contract markers", () => {
     // JD-09: report naming + collision suffix
     ["judge report family", "audits/judge/"],
     ["collision suffix rule", "`-2`, `-3`"],
-    // JD-12: prefixed dispatch names inline
-    ["meta-judge dispatch name", "`massa-ai-meta-judge`"],
-    ["judge dispatch name", "`massa-ai-judge`"],
+    // JD-12: dispatch name and modes inline (agent-roster-consolidation Dispatch AC-7)
+    ["spec-author mode dispatch", "(role: `judge`, mode: `spec-author`)"],
+    ["scorer mode dispatch", "(role: `judge`, mode: `scorer`)"],
+    ["judge dispatch name", "`judge`"],
     // JD-01: specification verbatim across rounds
     ["specification verbatim", "verbatim"],
   ];
@@ -90,7 +91,7 @@ describe("judge-with-debate workflow contract markers", () => {
 
   test("pitfalls section encodes the base-pattern failure modes (JD-01/03/04)", () => {
     const pitfalls = text.split("## Pitfalls")[1] ?? "";
-    expect(pitfalls).toContain("Never skip the meta-judge");
+    expect(pitfalls).toContain("Never skip the spec-author");
     expect(pitfalls).toContain("verbatim");
     expect(pitfalls).toContain("append-only");
     expect(pitfalls).toContain("sycophancy");

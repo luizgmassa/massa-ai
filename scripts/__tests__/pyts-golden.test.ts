@@ -717,13 +717,61 @@ function buildLessonsRoot(label: string): string | undefined {
       if (seeded.exitCode !== 0) throw new Error(`boundary seed add failed (${seeded.exitCode}): ${seeded.stdout}`);
       return root;
     }
+    // `status` and `export` do NOT run `autoPrune`, so they see the fixture
+    // whole and their goldens are date-stable. `export`'s expected stdout pins
+    // the fixture's `created`/`last_seen` values verbatim, so it must keep the
+    // RAW snapshot — anchoring its dates would redden it.
     case "status over live .specs/lessons.json copy (all 15 lessons)":
-    case "list --status all over live .specs/lessons.json copy (key/confidence parity)":
-    case "list --query filter over live .specs/lessons.json copy":
     case "export stdout over live .specs/lessons.json copy": {
       const root = makeTempRoot("golden-lessons-snapshot");
       mkdirSync(join(root, ".specs"), { recursive: true });
       writeFileSync(join(root, ".specs", "lessons.json"), lessonsStoreSnapshotRaw, "utf-8");
+      return root;
+    }
+    // The two `list` cases DO run `autoPrune`, which drops a candidate whose
+    // `last_seen` is older than `window_days` (45) measured against
+    // `Date.now()` — `skills/massa-ai/scripts/lessons.ts`, `autoPrune`.
+    //
+    // The fixture's dates are ABSOLUTE (2026-07-22 … 2026-08-04) while the rule
+    // that judges them is RELATIVE, so these goldens rotted on a calendar:
+    // green in CI on 2026-08-23, red from roughly 2026-09-06 when L-002…L-005
+    // crossed 45 days, and L-006/L-007 would have followed on 2026-09-12/13.
+    // It failed for every PR against `main`, not for any one branch — verified
+    // by running clean `main` @ `d32fce58`, which reproduces it exactly.
+    //
+    // Anchoring the dates to the run is what removes the calendar from the
+    // assertion: every lesson is inside the window by construction, so these
+    // goldens test the CLI's filtering and formatting rather than the date the
+    // suite happens to run on. The expected stdout is unchanged and needs no
+    // recapture — `list` prints `(candidate, x1, conf=0.62)` and no dates.
+    //
+    // Re-capturing the golden instead would have rotted again within days.
+    case "list --status all over live .specs/lessons.json copy (key/confidence parity)":
+    case "list --query filter over live .specs/lessons.json copy": {
+      const root = makeTempRoot("golden-lessons-snapshot");
+      mkdirSync(join(root, ".specs"), { recursive: true });
+      const store = JSON.parse(lessonsStoreSnapshotRaw) as {
+        lessons: { created?: string; last_seen?: string }[];
+      };
+      const DAY_MS = 86_400_000;
+      // The store's own format, which is NOT what `toISOString()` produces.
+      // `parseDate` (`skills/massa-ai/scripts/lessons.ts`) matches
+      // `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$` exactly and **returns `new
+      // Date()` when it does not match** — so a millisecond field makes every
+      // lesson look brand new and silently disables the pruning this fixture
+      // exists to exercise. The first draft of this helper used `toISOString()`
+      // and passed for exactly that wrong reason: with dates aged 401 days it
+      // still reported 15 lessons and 0 failures. Strip the milliseconds.
+      const stamp = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+      // Distinct days preserve the fixture's ordering without reproducing its
+      // spans; index+1 keeps every entry strictly in the past and, at 15
+      // lessons against a 45-day window, well inside it.
+      store.lessons.forEach((lesson, index) => {
+        const seen = stamp(Date.now() - (index + 1) * DAY_MS);
+        lesson.created = seen;
+        lesson.last_seen = seen;
+      });
+      writeFileSync(join(root, ".specs", "lessons.json"), JSON.stringify(store, null, 2), "utf-8");
       return root;
     }
     default:

@@ -27,7 +27,7 @@ describe("resolveHostLayout — path table matches design exactly", () => {
     expect(layout.route).toBe("files");
     if (layout.route !== "files") throw new Error("expected files route");
     expect(layout.activeDir).toBe(path.join(targetHome, ".claude", "agents"));
-    expect(layout.activeGlob).toBe("massa-ai-*.md");
+    expect(layout.activeExt).toBe(".md");
     expect(layout.variantDir("work")).toBe(
       path.join(targetHome, ".claude", "massa-ai", "agent-profiles", "work"),
     );
@@ -38,7 +38,7 @@ describe("resolveHostLayout — path table matches design exactly", () => {
     expect(layout.route).toBe("files");
     if (layout.route !== "files") throw new Error("expected files route");
     expect(layout.activeDir).toBe(path.join(targetHome, ".codex", "agents"));
-    expect(layout.activeGlob).toBe("massa-ai-*.toml");
+    expect(layout.activeExt).toBe(".toml");
     expect(layout.variantDir("cheap")).toBe(
       path.join(targetHome, ".codex", "massa-ai", "agent-profiles", "cheap"),
     );
@@ -49,7 +49,7 @@ describe("resolveHostLayout — path table matches design exactly", () => {
     expect(layout.route).toBe("files");
     if (layout.route !== "files") throw new Error("expected files route");
     expect(layout.activeDir).toBe(path.join(targetHome, ".config", "opencode", "agents"));
-    expect(layout.activeGlob).toBe("massa-ai-*.md");
+    expect(layout.activeExt).toBe(".md");
     expect(layout.variantDir("balanced")).toBe(
       path.join(targetHome, ".config", "opencode", "plugins", "massa-ai", "agent-profiles", "balanced"),
     );
@@ -77,7 +77,7 @@ describe("resolveHostLayout — path table matches design exactly", () => {
     expect(layout.route).toBe("files");
     if (layout.route !== "files") throw new Error("expected files route");
     expect(layout.activeDir).toBe(path.join("/market/massa-ai/1.2.3", "agents"));
-    expect(layout.activeGlob).toBe("massa-ai-*.md");
+    expect(layout.activeExt).toBe(".md");
     expect(layout.variantsRoot).toBe(path.join("/market/massa-ai/1.2.3", "agent-profiles"));
     expect(layout.variantDir("cheap")).toBe(path.join("/market/massa-ai/1.2.3", "agent-profiles", "cheap"));
   });

@@ -5,8 +5,8 @@
  * shipped silently before this test existed (see
  * .specs/features/skills-harness-audit/audit-report.md):
  *
- *   1. Dispatch resolution  — workflows named bare roles (`investigator`) while
- *      every host registers `massa-ai-investigator`, so no dispatch resolved.
+ *   1. Dispatch resolution  — a Dispatch: block named an agent no host
+ *      registered, so the dispatch never resolved.
  *   2. No phantom roles     — `plan-critic` was mandated by the Plan Challenge
  *      gate with Charter = "role-based (no charter)" and no artifact anywhere.
  *   3. Policy single-source — the Plan Challenge Policy existed in two copies
@@ -16,16 +16,12 @@
  *      matched the tree.
  *   6. Charter <-> artifact permission — charters said `read-only` while the
  *      shipped artifact granted Write/Edit.
- *   7. Persona <-> sub-agent boundary — the persona layer and the 17 charters
- *      shared no stated contract: no Capability Packet copy mentioned persona,
- *      no charter forbade self-routing or self-reading one, and persona-router's
- *      Stop Conditions read as an absolute ban on subagents rather than a bound
- *      on persona routing. See
- *      .specs/features/persona-agent-boundary/spec.md.
- *   8. Dispatch persona emission — the Capability Packet's `persona` field was
- *      defined (class 7) but no workflow `Dispatch:` block ever emitted it, so
- *      a subagent never actually received the id the contract describes. See
- *      .specs/features/persona-emit/spec.md.
+ *   7. Retired role-routing layer — the persona catalog, its router skill,
+ *      and the Capability Packet field that carried its id were removed
+ *      (.specs/features/agent-roster-consolidation/spec.md PER AC-1, AC-7);
+ *      a surviving mention would route to a file that no longer ships.
+ *   8. Dispatch role defaults — a field value shared by every dispatch of a
+ *      role lives once, in agent-orchestration.md's Role Defaults section.
  *   9. Charter reference base — all 18 charters cited their references bare
  *      (`references/x.md`) while owning no references/ directory, and every
  *      host installs charters to <host>/agents/ but references to
@@ -92,14 +88,14 @@ async function skillMarkdownFiles(): Promise<string[]> {
 /**
  * Every `Dispatch:` capability-packet block in a file, as the contiguous run
  * of `> `-prefixed lines starting at its `**Dispatch:` line. Shared by the
- * dispatch resolution and dispatch persona-emission describe blocks below.
+ * dispatch resolution and dispatch role-defaults describe blocks below.
  */
 function dispatchBlocks(content: string): string[] {
   const lines = content.split(/\r?\n/);
   const blocks: string[] = [];
   let current: string[] | null = null;
   for (const line of lines) {
-    if (line.startsWith('> **Dispatch: `massa-ai-')) {
+    if (line.startsWith('> **Dispatch: `')) {
       if (current) blocks.push(current.join("\n"));
       current = [line];
     } else if (current) {
@@ -149,7 +145,7 @@ describe("dispatch resolution: every Dispatch: block names a shipped agent", () 
 
     const missing: string[] = [];
     for (const { agent, file } of targets) {
-      expect(agent.startsWith("massa-ai-")).toBe(true);
+      expect(agent.startsWith("massa-ai-")).toBe(false);
       for (const host of HOSTS) {
         const artifact = path.join(
           REPO_ROOT,
@@ -166,16 +162,26 @@ describe("dispatch resolution: every Dispatch: block names a shipped agent", () 
     expect(missing).toEqual([]);
   });
 
-  test("no dispatch block uses a bare role name", async () => {
+  test("no dispatch block uses the retired massa-ai- prefix or an unquoted name (NAM AC-1)", async () => {
     const files = await skillMarkdownFiles();
-    const bare: string[] = [];
+    const offenders: string[] = [];
     for (const file of files) {
       const content = await read(file);
-      for (const m of content.matchAll(/\*\*Dispatch: (?!`massa-ai-)([^*]+)\*\*/g)) {
-        bare.push(`${path.relative(REPO_ROOT, file)}: ${m[1]!.trim()}`);
+      for (const m of content.matchAll(/\*\*Dispatch: (?!`(?!massa-ai-)[a-z-]+`\*\*)([^*]+)\*\*/g)) {
+        offenders.push(`${path.relative(REPO_ROOT, file)}: ${m[1]!.trim()}`);
       }
     }
-    expect(bare).toEqual([]);
+    expect(offenders).toEqual([]);
+  });
+
+  test("the router states the Claude plugin-route namespaced dispatch rule (NAM AC-10)", async () => {
+    const flat = (s: string) => s.replace(/\s+/g, " ");
+    expect(flat(await read(ROUTER))).toContain(
+      "On the Claude plugin route, dispatch the plugin-namespaced `massa-ai:<name>`",
+    );
+    expect(flat(await read(AGENT_ORCHESTRATION))).toContain(
+      "**Claude plugin route: dispatch `massa-ai:<role>`.**",
+    );
   });
 });
 
@@ -213,7 +219,7 @@ describe("no phantom roles: every orchestration role has a real charter", () => 
     // a rename that retires an agent must not leave a legacy alias pointing at
     // nothing.
     const content = await read(AGENT_ORCHESTRATION);
-    const mapped = [...content.matchAll(/\|\s*`massa-ai-([a-z-]+)`\s*\|/g)].map((m) => m[1]!);
+    const mapped = [...content.matchAll(/^\|\s*`[a-z-]+`\s*\|\s*`([a-z-]+)`\s*\|/gm)].map((m) => m[1]!);
     expect(mapped.length).toBeGreaterThanOrEqual(5);
     const names = new Set(await charterNames());
     expect(mapped.filter((n) => !names.has(n))).toEqual([]);
@@ -233,18 +239,22 @@ describe("no phantom roles: every orchestration role has a real charter", () => 
   test("the roster guard enumerated a real charter list", async () => {
     // Guard the guard: an empty charter list makes every coverage check here
     // vacuous, including the AGENTS.md one below.
-    expect((await charterNames()).length).toBeGreaterThanOrEqual(17);
+    expect((await charterNames()).length).toBe(7);
   });
 
-  test("every charter is registered in skills/AGENTS.md and in the generator", async () => {
+  test("every charter is registered in skills/AGENTS.md and discovered by the generator", async () => {
+    // The generator no longer names agents literally (model-catalog-revamp): it scans
+    // skills/agents/*/SKILL.md at runtime (`scanCharterNames`) instead of carrying a
+    // hand-maintained SPECIALIST_NAMES list. So "registered in the generator" is now a
+    // behavioural check — does the scan actually find this charter — not a literal-string
+    // search over the generator's source.
+    const { scanCharterNames } = await import("../generate-subagent-artifacts.ts");
     const names = await charterNames();
     const registry = await read(path.join(SKILLS_DIR, "AGENTS.md"));
-    const generator = await read(
-      path.join(REPO_ROOT, "scripts/generate-subagent-artifacts.ts"),
-    );
+    const scanned = new Set(await scanCharterNames());
     for (const name of names) {
       expect(registry).toContain(`skills/agents/${name}/SKILL.md`);
-      expect(generator).toContain(`"${name}"`);
+      expect(scanned.has(name)).toBe(true);
     }
   });
 });
@@ -253,9 +263,7 @@ describe("no phantom roles: every orchestration role has a real charter", () => 
 
 describe("policy single-source: one copy of each agent policy", () => {
   const POLICY_KEYS = [
-    "plan_challenge:",
     "conversation_feedback:",
-    "persona_router:",
   ];
 
   test("root AGENTS.md restates no policy block", async () => {
@@ -341,14 +349,13 @@ describe("CHANGELOG heading-to-bump table is single-sourced", () => {
 // ── 4. Reference integrity ─────────────────────────────────────────────────
 
 describe("reference integrity: relative harness paths resolve on disk", () => {
-  test("every references/, workflows/, personas/ and skills/agents/ path mentioned under skills/ exists", async () => {
+  test("every references/, workflows/ and skills/agents/ path mentioned under skills/ exists", async () => {
     const files = await skillMarkdownFiles();
     const dead: string[] = [];
     for (const file of files) {
       const content = await read(file);
       const mentions = new Set<string>();
-      // A skill mentions its own references/ first (persona-router grew one in
-      // persona-router-token-optimization T3); files outside a skill root
+      // A skill mentions its own references/ first; files outside a skill root
       // (e.g. skills/AGENTS.md) resolve against massa-ai as before. A path is
       // dead only when it resolves in neither the mentioning skill's root nor
       // massa-ai's.
@@ -356,7 +363,7 @@ describe("reference integrity: relative harness paths resolve on disk", () => {
         path.relative(REPO_ROOT, file).replace(/\\/g, "/"),
       )?.[1];
       for (const m of content.matchAll(
-        /`((?:references|workflows|personas)\/[A-Za-z0-9._/-]+\.md)`/g,
+        /`((?:references|workflows)\/[A-Za-z0-9._/-]+\.md)`/g,
       )) {
         const inMassaAi = path.join(SKILLS_DIR, "massa-ai", m[1]!);
         const inOwnSkill = ownSkill
@@ -412,7 +419,12 @@ describe("router table matches the workflow and reference trees", () => {
     const listed = new Set(
       [...router.matchAll(/`(references\/[A-Za-z0-9._/-]+)`/g)].map((m) => m[1]!),
     );
-    expect(listed.size).toBeGreaterThan(20);
+    // agent-roster-revision (RTR-01) dropped the router's "## Shared
+    // References" list: workflows now name their own references instead of
+    // the router restating all of them. The floor is a sanity check against
+    // a total wipe-out, re-based on the post-slim count (14 measured), not a
+    // requirement that the router re-list every reference in the tree.
+    expect(listed.size).toBeGreaterThan(10);
     const missing: string[] = [];
     for (const rel of listed) {
       const target = path.join(SKILLS_DIR, "massa-ai", rel);
@@ -430,7 +442,7 @@ describe("charter permission matches the shipped artifact", () => {
    * three-way policy STI-01 introduced (.specs/features/
    * subagent-tool-inheritance/design.md Component 1/2): `disallowedTools:`
    * (denylist) blocks write when it names Write/Edit; a narrow `tools:`
-   * allowlist (only `navigator` today) grants write only if it names
+   * allowlist (no charter uses one today) grants write only if it names
    * Write/Edit; and neither key present means the charter inherits the full
    * pool, Write/Edit included. The prior version of this check read only the
    * `tools:` line, which is why it read every write charter as read-only the
@@ -463,7 +475,7 @@ describe("charter permission matches the shipped artifact", () => {
       const declaredWrite = permMatch![1] === "write";
 
       const artifact = await read(
-        path.join(REPO_ROOT, "apps/claude-plugin/agents", `massa-ai-${name}.md`),
+        path.join(REPO_ROOT, "apps/claude-plugin/agents", `${name}.md`),
       );
       const grantsWrite = claudeGrantsWrite(artifact);
 
@@ -485,7 +497,7 @@ describe("charter permission matches the shipped artifact", () => {
       );
       const declaredWrite = /^\s{2}permission:\s*write\s*$/m.test(charter);
       const toml = await read(
-        path.join(REPO_ROOT, "apps/codex-plugin/agents", `massa-ai-${name}.toml`),
+        path.join(REPO_ROOT, "apps/codex-plugin/agents", `${name}.toml`),
       );
       const sandboxWrite = /sandbox_mode = "workspace-write"/.test(toml);
       if (declaredWrite !== sandboxWrite) {
@@ -508,12 +520,12 @@ describe("charter permission matches the shipped artifact", () => {
   const SPAWN_PROHIBITION_CLASS =
     /\bspawn(?:s|ing|ed)?\s+(?:\w+\s+){0,2}(?:sub-?){1,3}agents?\b/i;
 
-  const ROUTER_PERSONA_CLAUSE =
-    "Never load the `massa-ai` or `persona-router` routers, and never open a `personas/` prompt file; the dispatching workflow owns routing and persona selection.";
+  const ROUTER_CLAUSE =
+    "Never load the `massa-ai` router skill; the dispatching workflow owns routing.";
 
   test("no charter contains a spawn prohibition of any shape (S5)", async () => {
     const names = await charterNames();
-    expect(names.length).toBeGreaterThanOrEqual(17); // guard the guard
+    expect(names.length).toBe(7); // guard the guard
     // STI-04.5 requires the failure to name the file AND the line, so the offender
     // is reported as `skills/agents/<name>/SKILL.md:<line>: <the matching line>`
     // rather than the bare charter name — a charter is long enough that the name
@@ -533,302 +545,157 @@ describe("charter permission matches the shipped artifact", () => {
     expect(offenders).toEqual([]);
   });
 
-  test("all 18 charters retain the router/persona self-routing clause (S5)", async () => {
+  test("all 7 charters retain the router self-routing clause (S5)", async () => {
     const names = await charterNames();
-    expect(names.length).toBe(18);
+    expect(names.length).toBe(7);
     const withClause = new Set<string>();
     for (const name of names) {
       const charter = await read(
         path.join(SKILLS_DIR, "agents", name, "SKILL.md"),
       );
-      if (charter.includes(ROUTER_PERSONA_CLAUSE)) withClause.add(name);
+      if (charter.includes(ROUTER_CLAUSE)) withClause.add(name);
     }
-    expect(withClause.size).toBe(18);
+    expect(withClause.size).toBe(7);
   });
 });
 
-// ── 7. Persona <-> sub-agent boundary (PAB) ────────────────────────────────
-//
-// Personas (skills/persona-router/ + skills/massa-ai/personas/) and the 17
-// charters are different layers with no shared contract before this feature.
-// Requirement IDs below are from
-// .specs/features/persona-agent-boundary/spec.md.
+// ── 7. Retired role-routing layer (PER AC-1, AC-7) ─────────────────────────
 
-describe("persona / sub-agent boundary", () => {
+describe("retired persona layer: nothing under skills/ still routes to it", () => {
   /**
-   * The two files that define the Capability Packet, by design (see
-   * design.md A1). `skills/AGENTS.md` was a third copy; its recorded
-   * rationale ("installer copies it to hosts") was factually wrong —
-   * `install-skills.sh` extracts only the bootstrap block, so the registry
-   * never reaches hosts — and the mirror is deleted (see
-   * .specs/features/registry-cleanup-skill-imports/design.md D4).
+   * The Fool's red-team mode names "adversary personas" as a critique
+   * technique; that is not the removed feature (spec Out of Scope), so its
+   * directory is the one exemption.
    */
-  const PACKET_FILES = [
-    path.join("massa-ai", "references", "agent-orchestration.md"),
-    path.join("massa-ai", "references", "subagent-design.md"),
-  ];
+  const EXEMPT_DIR = path.join(SKILLS_DIR, "massa-ai", "references", "the-fool") + path.sep;
+  const RETIRED_MENTION = /\bpersonas?\b|persona_pin/i;
 
-  /**
-   * The persona field's semantics, byte-identical across both packet
-   * copies. Uniform text is what makes a substring gate meaningful — a
-   * per-file paraphrase cannot be distinguished from a weakened one.
-   */
-  const PACKET_PERSONA_CLAUSE =
-    "advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions";
-
-  const PERSONA_ROUTER = path.join(SKILLS_DIR, "persona-router", "SKILL.md");
-
-  /**
-   * The span of a markdown section between a `## <heading>` line and the next
-   * `##` heading (or end of file). Generalizes the charter-specific span below
-   * to any named heading, so a rule's location can be asserted precisely
-   * instead of merely "somewhere in the file" (Task A,
-   * .specs/features/persona-emit/spec.md).
-   */
-  function namedSection(content: string, heading: string, label: string): string {
-    const marker = `## ${heading}`;
-    const start = content.indexOf(marker);
-    expect(start, `${label} has no "${marker}" section`).toBeGreaterThanOrEqual(0);
-    const rest = content.slice(start + marker.length);
-    const nextHeading = rest.search(/^## /m);
-    return nextHeading === -1 ? rest : rest.slice(0, nextHeading);
-  }
-
-  /**
-   * The span of a charter between its `## Restrictions` heading and the next
-   * `##` heading. PAB-02/AC2 and PAB-06 require the lines to live *there*, so a
-   * whole-file search would not actually enforce the acceptance criterion.
-   */
-  function restrictionsSection(charter: string, name: string): string {
-    return namedSection(charter, "Restrictions", `charter ${name}`);
-  }
-
-  /**
-   * Files whose persona prose must never grant authority. The two packet
-   * definitions join persona-router here: PE-02 left them presence-only, so a
-   * contradicting sentence could be added to a *definition* — the worst place
-   * for one — and every gate would stay green. `AGENTS.md` is re-added
-   * directly (not spread from `PACKET_FILES`) so shrinking the packet-file
-   * list does not silently drop persona-authority prose scanning over the
-   * bootstrap Persona Router Policy the file still carries.
-   */
-  const AUTHORITY_SCANNED_FILES = [
-    path.join("persona-router", "SKILL.md"),
-    // The reference carries the persona-boundary elaboration moved out of
-    // SKILL.md (persona-router-token-optimization T3); widened after a
-    // seeded-red run proved the scanner reaches it.
-    path.join("persona-router", "references", "routing-details.md"),
-    "AGENTS.md",
-    ...PACKET_FILES,
-  ];
-
-  /**
-   * An authority-granting claim is detected structurally, not by phrase list.
-   *
-   * The earlier approach enumerated phrasings (`persona may grant`, `grant
-   * authority to the persona`). It killed the two mutations it was written
-   * against and nothing else: "a persona is permitted to write" and "personas
-   * hold write access" both sailed through. Enumeration cannot win here — the
-   * space of ways to say "persona has power" is unbounded.
-   *
-   * So invert it. Find every sentence that mentions a persona *and* an
-   * authority term, then require that sentence to carry a negator. This
-   * repository's actual rules all do ("grants **no** tool access", "**never**
-   * overrides", "is **never** authority"), so correct prose passes while any
-   * affirmative grant fails regardless of how it is worded.
-   */
-  const AUTHORITY_TERM =
-    /\b(?:grant|authoriz|widen|overrid|permit|allow|entitl|empower|confer)\w*\b|\bwrite (?:scope|access|permission)\b|\bauthority\b|\bpermissions?\b|\btool access\b/i;
-  const NEGATOR = /\b(?:never|not|no|non-|cannot|can't|neither|nor|without|only)\b/i;
-
-  /** Sentence-ish split: markdown lines are short, so split on both. */
-  function sentences(content: string): string[] {
-    return content
-      .split(/\r?\n/)
-      .flatMap((line) => line.split(/(?<=[.!?;])\s+/))
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-
-  function authorityGrants(content: string): string[] {
-    return sentences(content).filter(
-      (s) => /\bpersonas?\b/i.test(s) && AUTHORITY_TERM.test(s) && !NEGATOR.test(s),
-    );
-  }
-
-  // PAB-01
-  test("both Capability Packet copies declare the optional persona field", async () => {
-    const missing: string[] = [];
-    for (const rel of PACKET_FILES) {
-      const content = await read(path.join(SKILLS_DIR, rel));
-      if (!content.includes("`persona`:") || !content.includes(PACKET_PERSONA_CLAUSE)) {
-        missing.push(rel);
-      }
-    }
-    expect(missing).toEqual([]);
+  test("the router skill and the catalog directory are gone", async () => {
+    expect(await exists(path.join(SKILLS_DIR, "persona-router"))).toBe(false);
+    expect(await exists(path.join(SKILLS_DIR, "massa-ai", "personas"))).toBe(false);
   });
 
-  // PAB-01/AC3 — a third packet *definition* would fork the contract
-  // silently. Workflow dispatch blocks are packet *uses*, not definitions:
-  // every `Dispatch:` block also carries this clause (see the dispatch
-  // persona-emission describe block below), so this assertion strips
-  // blockquote (`> `) lines — the format every dispatch block uses
-  // exclusively — before scanning, isolating definitions from uses.
-  test("the canonical persona clause appears in exactly those two files, outside dispatch-block uses", async () => {
+  test("no charter, workflow, reference, or registry mentions it", async () => {
     const files = await skillMarkdownFiles();
-    const found: string[] = [];
+    expect(files.length).toBeGreaterThan(50); // guard the guard
+    const offenders: string[] = [];
     for (const file of files) {
-      const content = await read(file);
-      const definitionProse = content
-        .split(/\r?\n/)
-        .filter((line) => !line.startsWith(">"))
-        .join("\n");
-      if (definitionProse.includes(PACKET_PERSONA_CLAUSE)) {
-        found.push(path.relative(SKILLS_DIR, file));
-      }
-    }
-    expect(found.sort()).toEqual([...PACKET_FILES].sort());
-  });
-
-  // PAB-02
-  test("every charter's Restrictions section carries the persona precedence line", async () => {
-    const names = await charterNames();
-    const missing: string[] = [];
-    for (const name of names) {
-      const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
-      const section = restrictionsSection(charter, name);
-      if (!section.includes("shapes emphasis only; these Restrictions win on any conflict")) {
-        missing.push(name);
-      }
-    }
-    expect(missing).toEqual([]);
-  });
-
-  // PAB-06/AC1, AC3, AC4
-  //
-  // STI-04 (.specs/features/subagent-tool-inheritance/) moved this clause
-  // from mid-sentence ("Never spawn subagents, never load the...") to the
-  // start of the Restrictions bullet, and design.md's Component 3 edit table
-  // mandates recapitalizing it into its own sentence ("Never load the...").
-  // `bansRouter` is matched case-insensitively on the leading word only for
-  // that reason -- the rest of the phrase, and the separate prompt-read ban
-  // below, are still matched at exact case.
-  test("every charter's Restrictions section forbids self-routing and self-reading a persona", async () => {
-    const names = await charterNames();
-    const missing: string[] = [];
-    for (const name of names) {
-      const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
-      const section = restrictionsSection(charter, name);
-      const bansRouter = /never load the `massa-ai` or `persona-router` routers/i.test(
-        section,
-      );
-      const bansPromptRead = section.includes("never open a `personas/` prompt file");
-      if (!bansRouter || !bansPromptRead) missing.push(name);
-    }
-    expect(missing).toEqual([]);
-  });
-
-  // PAB-06/AC5 — presence alone would pass if the old sentence were re-added.
-  test("no charter retains the superseded massa-ai-only restriction", async () => {
-    const names = await charterNames();
-    const offenders: string[] = [];
-    for (const name of names) {
-      const charter = await read(path.join(SKILLS_DIR, "agents", name, "SKILL.md"));
-      if (charter.includes("never load the `massa-ai` router")) offenders.push(name);
-    }
-    expect(offenders).toEqual([]);
-  });
-
-  // PAB-04 — hardened (Task A): section-scoped, not merely present anywhere
-  // in the file.
-  test("persona-router's Stop Conditions section scopes its subagent prohibition to persona routing", async () => {
-    const content = await read(PERSONA_ROUTER);
-    const section = namedSection(content, "Stop Conditions", "persona-router/SKILL.md");
-    expect(section).toContain("Persona routing itself stays inline");
-    expect(section).toContain(
-      "workflow-mandated agent dispatch is unaffected by an active persona route",
-    );
-  });
-
-  // PAB-04 — the absence side; the design's own stated reason for it.
-  test("persona-router no longer contains the unscoped prohibition", async () => {
-    const content = await read(PERSONA_ROUTER);
-    expect(content).not.toContain("launch subagents, create subprocess orchestration");
-  });
-
-  // PAB-03 + PAB-07 — hardened (Task A): section-scoped to where the boundary
-  // is actually stated, not merely present anywhere in the file.
-  test("persona-router's Persona And Sub-Agents section states persona grants no authority and reaches subagents as an id only", async () => {
-    const content = await read(PERSONA_ROUTER);
-    const section = namedSection(
-      content,
-      "Persona And Sub-Agents",
-      "persona-router/SKILL.md",
-    );
-    expect(section).toContain("grants no tool access, no write scope, and no permission");
-    expect(section).toContain("the persona is never authority");
-    expect(section).toContain("carries the persona **id only**, never the persona prompt");
-  });
-
-  // PAB-05 — hardened (Task A): section-scoped.
-  test("persona-router's Persona And Sub-Agents section states a persona route is not a specialist consultation", async () => {
-    const content = await read(PERSONA_ROUTER);
-    const section = namedSection(
-      content,
-      "Persona And Sub-Agents",
-      "persona-router/SKILL.md",
-    );
-    expect(section).toContain("A persona route is not a specialist consultation");
-  });
-
-  // Negative structural assertion — closes the contradiction-by-addition
-  // residual accepted in design.md § Test design for cases 6, 8, 9, and PE-02
-  // for cases 1 and 2. A future edit granting persona authority in the router
-  // OR in any of the two packet definitions now fails the gate, instead of
-  // passing alongside the still-present denial prose.
-  test("no file grants persona authority in prose", async () => {
-    const offenders: string[] = [];
-    for (const rel of AUTHORITY_SCANNED_FILES) {
-      const content = await read(path.join(SKILLS_DIR, rel));
-      for (const sentence of authorityGrants(content)) {
-        offenders.push(`${rel}: "${sentence.slice(0, 120)}"`);
-      }
+      if (file.startsWith(EXEMPT_DIR)) continue;
+      (await read(file)).split(/\r?\n/).forEach((line, i) => {
+        if (RETIRED_MENTION.test(line)) {
+          offenders.push(`${path.relative(REPO_ROOT, file)}:${i + 1}: ${line.trim().slice(0, 100)}`);
+        }
+      });
     }
     expect(offenders).toEqual([]);
   });
 });
 
-// ── 8. Dispatch persona emission ───────────────────────────────────────────
-//
-// The Capability Packet's `persona` field was defined (class 7 / PAB-01) but
-// deferred by .specs/features/persona-agent-boundary/spec.md § Out of scope:
-// no workflow `Dispatch:` block emitted it. See
-// .specs/features/persona-emit/spec.md.
+// ── 8. Dispatch role defaults ──────────────────────────────────────────────
 
-describe("dispatch persona emission: every Dispatch block emits the optional persona field", () => {
-  const PACKET_PERSONA_CLAUSE =
-    "advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions";
+describe("dispatch role defaults: shared field values live in exactly one place", () => {
+  /**
+   * A role default is supplied once by `agent-orchestration.md`'s Role
+   * Defaults section and never restated per block: the same field said twice
+   * is the same field free to disagree. The pair of assertions below holds
+   * that shape — the default must exist, AND no block may restate it.
+   */
+  const ROLE_DEFAULTS = path.join(
+    SKILLS_DIR,
+    "massa-ai",
+    "references",
+    "agent-orchestration.md",
+  );
 
-  test("every Dispatch block on disk emits the optional persona field", async () => {
+  /**
+   * Field values `agent-orchestration.md` fixes for a role. Keyed by the agent
+   * the default belongs to, by `agent/mode` for a default that holds for one
+   * mode only, or by `agent/mode:lens` for a default scoped to one lens within
+   * a mode (needed once `code-reviewer` `audit` covers six lenses and the
+   * fallback default must not spread from `lens: diff` to the other five). A
+   * block restating any of these has forked the contract.
+   */
+  const DEFAULTED_FIELDS: Record<string, string[]> = {
+    "code-reviewer": ["permissions"],
+    "code-reviewer/audit:diff": ["fallback"],
+    "designer": ["trigger", "sensors", "inputs", "firewall", "memory"],
+  };
+
+  test("agent-orchestration.md carries a Role Defaults section that forbids restating a default", async () => {
+    const body = await read(ROLE_DEFAULTS);
+    expect(body).toContain("### Role Defaults");
+    // Presence of a heading proves nothing; the load-bearing claim is that the
+    // defaults apply to every dispatch and are not to be restated.
+    expect(body).toMatch(/A block that restates one has forked the contract/);
+  });
+
+  test("every defaulted field is actually stated in the Role Defaults section", async () => {
+    // Guard the guard: a default removed from the reference while still absent
+    // from every block would leave the field defined nowhere, and the
+    // "no block restates it" assertion below would pass most loudly of all.
+    const body = await read(ROLE_DEFAULTS);
+    const start = body.indexOf("### Role Defaults");
+    expect(start).toBeGreaterThan(-1);
+    const section = body.slice(start);
+    const absent: string[] = [];
+    for (const [agent, fields] of Object.entries(DEFAULTED_FIELDS)) {
+      for (const field of fields) {
+        if (!section.includes(`\`${field}\``)) absent.push(`${agent}.${field}`);
+      }
+    }
+    expect(absent).toEqual([]);
+  });
+
+  test("no Dispatch block restates a field the role defaults already fix", async () => {
     const files = await skillMarkdownFiles();
     let total = 0;
-    const missing: string[] = [];
+    const offenders: string[] = [];
     for (const file of files) {
       const content = await read(file);
       const blocks = dispatchBlocks(content);
       total += blocks.length;
       for (const block of blocks) {
-        const hasPersonaBullet = /^> - persona:/m.test(block);
-        if (!hasPersonaBullet || !block.includes(PACKET_PERSONA_CLAUSE)) {
-          const m = /\*\*Dispatch: `([^`]+)`\*\*/.exec(block);
-          missing.push(`${path.relative(REPO_ROOT, file)} -> ${m?.[1] ?? "unknown"}`);
+        const agent = /\*\*Dispatch: `([^`]+)`\*\*/.exec(block)?.[1] ?? "unknown";
+        const mode = /\(role: `[^`]+`, mode: `([^`]+)`\)/.exec(block)?.[1];
+        const lens = /`lens: ([a-z-]+)`/.exec(block)?.[1];
+        const fields = [
+          ...(DEFAULTED_FIELDS[agent] ?? []),
+          ...(mode ? (DEFAULTED_FIELDS[`${agent}/${mode}`] ?? []) : []),
+          ...(mode && lens ? (DEFAULTED_FIELDS[`${agent}/${mode}:${lens}`] ?? []) : []),
+        ];
+        for (const field of fields) {
+          if (new RegExp(`^> - ${field}:`, "m").test(block)) {
+            offenders.push(`${path.relative(REPO_ROOT, file)} -> ${agent}: restates ${field}`);
+          }
         }
       }
     }
     // Guard the guard: the "dispatch resolution" describe block above already
     // requires >=20 blocks repo-wide; this parser must agree.
     expect(total).toBeGreaterThanOrEqual(20);
-    expect(missing).toEqual([]);
+    expect(offenders).toEqual([]);
+  });
+
+  test("a role's non-defaulted fields are still written in its blocks", async () => {
+    // Negative control for the assertion above. "No block restates a default"
+    // is trivially satisfied by a block with no bullets at all, or by deleting
+    // the blocks outright — so the fields that are NOT defaulted must still be
+    // present. Designer keeps exactly scope/permissions/output.
+    const files = await skillMarkdownFiles();
+    let designerBlocks = 0;
+    for (const file of files) {
+      for (const block of dispatchBlocks(await read(file))) {
+        if (!block.includes("**Dispatch: `designer`**")) continue;
+        designerBlocks += 1;
+        for (const field of ["scope", "permissions", "output"]) {
+          expect(
+            new RegExp(`^> - ${field}:`, "m").test(block),
+            `${path.relative(REPO_ROOT, file)} designer block is missing ${field}`,
+          ).toBe(true);
+        }
+      }
+    }
+    expect(designerBlocks).toBe(6);
   });
 });
 
@@ -839,8 +706,8 @@ describe("dispatch persona emission: every Dispatch block emits the optional per
 // developer's home directory therefore ships to every user, and resolves for
 // none of them.
 //
-// `references/maestro.md` and `references/maestro/fact-ledger.md` cited
-// `/Users/<name>/Downloads/questions.md` in three places -- once as a named
+// `references/maestro.md` and `references/maestro/fact-ledger.md` (both since
+// removed) cited `/Users/<name>/Downloads/questions.md` in three places -- once as a named
 // tier of the fact ledger's evidence taxonomy, so an agent was told to
 // quarantine claims as `excluded/unverified` unless they appeared in a file it
 // could not open. See .specs/features/skills-directive-dedup/spec.md SDD-02.
@@ -865,20 +732,20 @@ describe("portability: no shipped harness file names a developer's machine", () 
     expect(offenders).toEqual([]);
   });
 
-  test("the Maestro coverage-checklist rule survived the path removal", async () => {
-    // Absence of the path must not be reachable by deleting the rule. Both
-    // files still have to instruct the agent on how to treat a checklist.
-    const index = await read(
+  test("the Maestro files that carried the path are removed with their workflows", async () => {
+    // agent-roster-consolidation WFL-02 (Inventory AC-3) deleted the whole
+    // Maestro family, so the rule this test used to pin has no file left to
+    // live in. Absence is asserted per path, not inferred from the scan above.
+    const gone = [
       path.join(SKILLS_DIR, "massa-ai", "references", "maestro.md"),
-    );
-    const ledger = await read(
-      path.join(SKILLS_DIR, "massa-ai", "references", "maestro", "fact-ledger.md"),
-    );
-    for (const body of [index, ledger]) {
-      expect(body).toMatch(/coverage checklist/i);
+      path.join(SKILLS_DIR, "massa-ai", "references", "maestro"),
+      path.join(REPO_ROOT, "docs", "massa-ai-maestro.md"),
+    ];
+    const present: string[] = [];
+    for (const p of gone) {
+      if (await fs.stat(p).then(() => true, () => false)) present.push(path.relative(REPO_ROOT, p));
     }
-    expect(ledger).toMatch(/excluded\/unverified/);
-    expect(index).toMatch(/excluded\/unverified/);
+    expect(present).toEqual([]);
   });
 
   test("the scan actually enumerated the tree", async () => {
@@ -915,7 +782,7 @@ describe("charter reference base: a charter states where its references live", (
     }
     expect(offenders).toEqual([]);
     // Guard the guard: a regex that stops matching makes every charter vacuously
-    // compliant. Class 9 was found across all 18 charters, so the citing set is
+    // compliant. Class 9 was found across every charter, so the citing set is
     // the whole roster.
     expect(citing).toBe(names.length);
   });

@@ -97,6 +97,18 @@ export class PgObservationStore implements ObservationStore {
   private hydrated = false;
   private hydrating: Promise<void> | null = null;
   /**
+   * Per-observation-id serialized write chain, and the thing `__drain()` awaits.
+   *
+   * Before this existed, the persist was an untracked `void (async () => …)()`
+   * and `__drain()` was `setTimeout(10)` — a sleep wearing a flush's name,
+   * against a docstring that claimed to await in-flight writes. A caller that
+   * inserted and then queried PostgreSQL directly was racing the commit on a
+   * 10 ms budget, which is why `observation-repository-pg-coverage.test.ts`
+   * carried its own extra 120 ms sleep on top and still failed on a loaded CI
+   * runner (`SELECT … WHERE id = $1` returned zero rows).
+   */
+  private inflight: Map<string, Promise<void>> = new Map();
+  /**
    * Epoch (ms) of the last failed hydration attempt. Used to rate-limit
    * retries so a persistent PG error does not turn every op into a full
    * `SELECT *` retry storm. We retry at most once per HYDRATE_RETRY_MS.
@@ -154,7 +166,7 @@ export class PgObservationStore implements ObservationStore {
         // the mirror stays as-is and the op proceeds against it.
         this.hydrateFailedAt = Date.now();
         logger.warn("PgObservationStore hydrate failed (best-effort)", {
-          error: (e as Error).message,
+          error: e as Error,
         });
       } finally {
         this.hydrating = null;
@@ -183,16 +195,12 @@ export class PgObservationStore implements ObservationStore {
     void this.ensureHydrated();
     // Fire-and-forget persist (best-effort, matching PgScheduledJobStore).
     //
-    // Ordering caveat (2026-07-12): two concurrent inserts that share the same
-    // `obs.id` fire two independent async IIFEs with no per-id serialization
-    // (unlike PgJobStore's inflight chain). Either can commit first, so the
-    // last-writer-wins ON CONFLICT update may land in call-disorder — the row
-    // ends up reflecting whichever upsert committed last, not necessarily the
-    // most recent call. `__drain()` is only a 10 ms settle, not a flush, so it
-    // does not guarantee commit ordering either. Impact is low and bounded:
-    // observations are best-effort telemetry, ids are normally unique per
-    // event, and the in-memory mirror (the sync read path) is already correct.
-    // The nondeterminism only affects same-id concurrent writes to PG.
+    // Ordering (2026-07-12, closed 2026-09-21): two concurrent inserts sharing
+    // one `obs.id` used to fire two independent async IIFEs with no per-id
+    // serialization, so the last-writer-wins ON CONFLICT update could land in
+    // call-disorder. The persist is now chained per id through `chainWrite`,
+    // the same shape PgJobStore and PgSynapseSessionStore use, so commits for
+    // one id land in call order. Different ids stay concurrent.
     //
     // Alias caveat (2026-07-27, BUG-06): the mirror keying above is only as
     // good as the resolver's TTL cache. For a source id this process has never
@@ -203,51 +211,68 @@ export class PgObservationStore implements ObservationStore {
     // by tests. Closing the cold window entirely would mean making `insert`
     // async, which changes the fire-and-forget contract its hook callers rely
     // on; that is deliberately not done here.
-    void (async () => {
-      try {
-        const prisma = this.getClient();
-        // Resolve canonical project id at the persist seam (spec req 3). The
-        // sync mirror initially keeps the caller's id; once the canonical id
-        // resolves we overwrite the mirror entry so sync reads (listRecent /
-        // countByProject / listBySession) key on the SAME canonical id as the
-        // durable row — closing the post-rename read/write split (HAR-07).
-        const canonicalProjectId = await getProjectIdentityAliasResolver().resolve(obs.projectId);
-        if (canonicalProjectId !== obs.projectId) {
-          this.mirror.set(obs.id, { ...obs, projectId: canonicalProjectId });
-        }
-        await prisma.$executeRaw`
-          INSERT INTO observations (
-            id, project_id, session_id, source, category, payload_json, importance, created_at, agent_id, attribution_source
-          ) VALUES (
-            ${obs.id},
-            ${canonicalProjectId},
-            ${obs.sessionId},
-            ${obs.source},
-            ${obs.category ?? null},
-            ${obs.payloadJson},
-            ${obs.importance},
-            ${obs.createdAt}::bigint,
-            ${obs.agentId ?? null},
-            ${obs.attributionSource ?? null}
-          )
-          ON CONFLICT (id) DO UPDATE SET
-            project_id       = EXCLUDED.project_id,
-            session_id       = EXCLUDED.session_id,
-            source           = EXCLUDED.source,
-            category         = EXCLUDED.category,
-            payload_json     = EXCLUDED.payload_json,
-            importance       = EXCLUDED.importance,
-            created_at       = EXCLUDED.created_at,
-            agent_id         = EXCLUDED.agent_id,
-            attribution_source = EXCLUDED.attribution_source
-        `;
-      } catch (e) {
-        logger.warn("PgObservationStore.insert failed (best-effort)", {
-          id: obs.id,
-          error: (e as Error).message,
-        });
+    this.chainWrite(obs.id, async () => {
+      const prisma = this.getClient();
+      // Resolve canonical project id at the persist seam (spec req 3). The
+      // sync mirror initially keeps the caller's id; once the canonical id
+      // resolves we overwrite the mirror entry so sync reads (listRecent /
+      // countByProject / listBySession) key on the SAME canonical id as the
+      // durable row — closing the post-rename read/write split (HAR-07).
+      const canonicalProjectId = await getProjectIdentityAliasResolver().resolve(obs.projectId);
+      if (canonicalProjectId !== obs.projectId) {
+        this.mirror.set(obs.id, { ...obs, projectId: canonicalProjectId });
       }
-    })();
+      await prisma.$executeRaw`
+        INSERT INTO observations (
+          id, project_id, session_id, source, category, payload_json, importance, created_at, agent_id, attribution_source
+        ) VALUES (
+          ${obs.id},
+          ${canonicalProjectId},
+          ${obs.sessionId},
+          ${obs.source},
+          ${obs.category ?? null},
+          ${obs.payloadJson},
+          ${obs.importance},
+          ${obs.createdAt}::bigint,
+          ${obs.agentId ?? null},
+          ${obs.attributionSource ?? null}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          project_id       = EXCLUDED.project_id,
+          session_id       = EXCLUDED.session_id,
+          source           = EXCLUDED.source,
+          category         = EXCLUDED.category,
+          payload_json     = EXCLUDED.payload_json,
+          importance       = EXCLUDED.importance,
+          created_at       = EXCLUDED.created_at,
+          agent_id         = EXCLUDED.agent_id,
+          attribution_source = EXCLUDED.attribution_source
+      `;
+    });
+  }
+
+  /**
+   * Chain a write onto any in-flight write for the same key so commits land in
+   * call order. Different keys stay concurrent. Settled entries are dropped so
+   * the map does not grow. Mirrors PgSynapseSessionStore.chainWrite, which
+   * mirrors PgJobStore.inflight.
+   *
+   * The rejection handler is what keeps `insert`'s best-effort contract: a
+   * failed persist is logged and swallowed here, never surfaced to the
+   * synchronous caller, exactly as the old fire-and-forget try/catch did.
+   */
+  private chainWrite(key: string, fn: () => Promise<void>): void {
+    const prev = this.inflight.get(key) ?? Promise.resolve();
+    const next = prev.then(fn).catch((e) => {
+      logger.warn("PgObservationStore.insert failed (best-effort)", {
+        id: key,
+        error: e as Error,
+      });
+    });
+    this.inflight.set(key, next);
+    void next.then(() => {
+      if (this.inflight.get(key) === next) this.inflight.delete(key);
+    });
   }
 
   listRecent(projectId: string, limit: number): Observation[] {
@@ -286,9 +311,13 @@ export class PgObservationStore implements ObservationStore {
 
   /** Test helper: await in-flight writes. Not for production use. */
   async __drain(): Promise<void> {
-    // No per-id chain (observations are high-frequency but low-coupling); a
-    // short settle delay covers the fire-and-forget persist. Kept for API
-    // parity with PgScheduledJobStore.
+    // Snapshot the pending set ONCE. Re-reading `this.inflight` in a loop would
+    // re-await writes that a concurrent caller repopulated during the drain,
+    // risking a hang under load. We only owe the caller that the writes
+    // in-flight at drain-start have settled.
+    const pending = Array.from(this.inflight.values());
+    if (pending.length > 0) await Promise.allSettled(pending);
+    // A short settle delay covers any write queued during the drain.
     await new Promise((r) => setTimeout(r, 10));
   }
 }

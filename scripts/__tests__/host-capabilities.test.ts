@@ -56,8 +56,8 @@ describe("HOST_CAPABILITIES shape", () => {
     expect(["md", "toml"]).toContain(capabilitiesFor(host as Host).artifactExtension);
   });
 
-  test.each(HOSTS)("%s: ownershipMarker is one of the three known mechanisms", (host) => {
-    expect(["frontmatter", "body", "filename"]).toContain(capabilitiesFor(host as Host).ownershipMarker);
+  test.each(HOSTS)("%s: ownershipMarker is one of the two known mechanisms", (host) => {
+    expect(["frontmatter", "body"]).toContain(capabilitiesFor(host as Host).ownershipMarker);
   });
 });
 
@@ -95,11 +95,11 @@ describe("HOST_CAPABILITIES is frozen — no-mutation invariant (7-step Step 4)"
 // ── Per-host expected values (measured facts — see host-capabilities.ts docblocks) ──
 
 describe("per-host expected capability values", () => {
-  test("claude: md, frontmatter-name identity, filename-scoped ownership, source hook delivery", () => {
+  test("claude: md, frontmatter-name identity, body-marker ownership, source hook delivery", () => {
     const c = capabilitiesFor("claude");
     expect(c.artifactExtension).toBe("md");
     expect(c.agentIdentity).toBe("frontmatter-name");
-    expect(c.ownershipMarker).toBe("filename");
+    expect(c.ownershipMarker).toBe("body");
     expect(c.forwardsUnknownFrontmatter).toBe(false);
     expect(c.hookBinaryDelivery).toBe("source");
     expect(c.extraManagedRoots).toEqual([]);
@@ -120,11 +120,11 @@ describe("per-host expected capability values", () => {
     expect(c.toolGating).toBe("sandbox");
   });
 
-  test("cursor: md, frontmatter-name identity, filename-scoped ownership, real-copy hook delivery", () => {
+  test("cursor: md, frontmatter-name identity, body-marker ownership, real-copy hook delivery", () => {
     const c = capabilitiesFor("cursor");
     expect(c.artifactExtension).toBe("md");
     expect(c.agentIdentity).toBe("frontmatter-name");
-    expect(c.ownershipMarker).toBe("filename");
+    expect(c.ownershipMarker).toBe("body");
     expect(c.hookBinaryDelivery).toBe("real-copy");
     expect(c.extraManagedRoots).toEqual([]);
     expect(c.sessionStartStdoutDelivered).toBe(true);
@@ -161,9 +161,10 @@ describe("per-host expected capability values", () => {
     }
   });
 
-  test("exactly claude and cursor scope ownership by filename (the SPEC_DEVIATION third value)", () => {
-    const byFilename = HOSTS.filter((h) => capabilitiesFor(h).ownershipMarker === "filename").sort();
-    expect(byFilename).toEqual(["claude", "cursor"]);
+  test("every .md host scopes ownership by the body marker; codex by its top-of-file comment", () => {
+    const byBody = HOSTS.filter((h) => capabilitiesFor(h).ownershipMarker === "body").sort();
+    expect(byBody).toEqual(["claude", "cursor", "opencode"]);
+    expect(capabilitiesFor("codex").ownershipMarker).toBe("frontmatter");
   });
 
   test("exactly codex and cursor deliver the hook binary as a real copy; claude is the source; opencode has none", () => {

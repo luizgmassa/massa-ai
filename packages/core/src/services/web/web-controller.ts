@@ -188,6 +188,7 @@ export class WebController {
       const msg =
         s.reason instanceof Error ? s.reason.message : String(s.reason);
       logger.error("fetch_and_index job rejected", s.reason as Error, {
+        projectId,
         url: batch[i].url,
       });
       return { kind: "error", url: batch[i].url, error: msg };

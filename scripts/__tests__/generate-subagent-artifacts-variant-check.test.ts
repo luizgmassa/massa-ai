@@ -72,10 +72,10 @@ describe("diffHost — full-inventory variant diff (MPS-01 AC2)", () => {
 
       const checkedInWorkDir = path.join(root, "checked-in", "claude-plugin", "agent-profiles", "work");
       await copyDir(genWorkDir, checkedInWorkDir);
-      await fs.rm(path.join(checkedInWorkDir, "massa-ai-builder.md"));
+      await fs.rm(path.join(checkedInWorkDir, "senior-engineer.md"));
 
       const diffs = await diffHost(genWorkDir, checkedInWorkDir, "claude");
-      expect(diffs).toContain("- massa-ai-builder.md (missing in checked-in)");
+      expect(diffs).toContain("- senior-engineer.md (missing in checked-in)");
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
@@ -152,7 +152,7 @@ describe("staleVariantDirs — whole stale profile directory (MPS-01 AC2)", () =
       // directory was never cleaned up.
       const retiredDir = path.join(claudePluginRoot, "agent-profiles", "retired_profile");
       await fs.mkdir(retiredDir, { recursive: true });
-      await fs.writeFile(path.join(retiredDir, "massa-ai-builder.md"), "stale\n");
+      await fs.writeFile(path.join(retiredDir, "builder.md"), "stale\n");
 
       const stale = await staleVariantDirs(claudePluginRoot, supported.claude);
       expect(stale).toContain("retired_profile");

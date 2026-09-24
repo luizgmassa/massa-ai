@@ -30,7 +30,7 @@ The scan covers existing:
 Run the scan in one or more separate read-only subagents before new
 implementation code is planned or written:
 
-> **Dispatch: `massa-ai-investigator`** (role: `investigator`) — charter `skills/agents/investigator/SKILL.md`
+> **Dispatch: `code-explorer`** (role: `code-explorer`, mode: `trace`) — charter `skills/agents/code-explorer/SKILL.md`
 > - trigger: planning or writing new implementation code in any of the 16 implementation workflows — mandatory, not optional
 > - scope: the target feature/module area — candidate existing components, helpers, classes, use cases, repositories, and business logic that could satisfy or overlap the new work
 > - permissions: read-only
@@ -39,7 +39,6 @@ implementation code is planned or written:
 > - output: the reuse map (below), evidence-or-zero when nothing reusable is found
 > - firewall: summarized candidates and pointers only, never raw file dumps
 > - memory: suggest-only; main agent persists durable reuse findings
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 Dispatch one subagent per coherent target area; dispatch more than one only
 when the areas are independent enough to scope separately.

@@ -81,6 +81,10 @@ Output contract:
 - Risks and skipped checks
 - Exact next step
 
+Modes (only when the role owns more than one output contract):
+- One `### Mode: <name>` section per contract (the name in backticks), holding that mode's own output; the packet `mode` field selects it.
+- Lazy variant (owner decision D2, `agent-roster-revision`): instead of an inline output contract, the `### Mode: <name>` section is a stub naming exactly the contract file(s) it owns under `references/agent-modes/<agent>/<mode>.md` (a mode split by depth or similar cites `<mode>-lite.md`/`<mode>-full.md` instead of one file). The dispatching main agent reads the cited file and inlines it into the packet as `mode_contract` per `references/agent-orchestration.md`'s Capability Packet; the charter itself carries no other trace of the contract's content.
+
 Validation sensors:
 - [tests, build, typecheck, lint, static search, artifact inspection, or source-location proof]
 
@@ -97,24 +101,18 @@ sets drift into three diverging shapes before the canonical section existed. Whe
 workflow dispatches a reusable role, send that canonical packet, not a loose
 instruction.
 
-The one field this reference still names on its own is `persona`, because a
-persona-agent-boundary guard (`.specs/features/persona-agent-boundary/spec.md`)
-checks its clause byte-for-byte in every packet-defining file, this one included:
-
-`persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
-
 Design-time additions this reference owns: a new role's charter must be expressible
 as that packet (if a role needs fields the canonical list cannot carry, the role is
 mis-scoped — split it or fix the charter, do not grow a bespoke packet silently), and
-any deliberate bespoke specialization (judge panel, FURPS analyst, phase-batch
-worker) must declare itself a specialization in its own workflow file and map its
+any deliberate bespoke specialization (judge panel, FURPS `product-manager` fan-out,
+phase-batch worker) must declare itself a specialization in its own workflow file and map its
 fields onto the canonical ones from `agent-orchestration.md`.
 
 ## Quality Checklist
 
 Before adding or revising a reusable role:
 
-- One responsibility; no generic "helper" roles.
+- One responsibility; no generic "helper" roles. A role that absorbs another keeps every former output contract behind its own `Mode:` section rather than dropping one.
 - Trigger description names when to use it and when not to use it.
 - Scope can be represented as a bounded capability packet.
 - Read-only by default; write permissions require disjoint ownership and verification.

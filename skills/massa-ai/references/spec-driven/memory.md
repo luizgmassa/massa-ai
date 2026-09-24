@@ -2,24 +2,15 @@
 
 Use when recording decisions, progress, blockers, handoff, or completion evidence for a spec-driven feature.
 
-This memory layer is split across two artifacts with distinct lifecycles. Each has its own write triggers; writes are always section-scoped — never whole-file overwrites.
-
-- `.specs/project/STATE.md` owns project-level **Decisions** (append-only) plus current objective, progress, blockers, verification evidence, changed files, and exact next step.
-- `.specs/HANDOFF.md` owns the local **Handoff** snapshot (replace-on-pause).
-- `.specs/project/FEATURES.json` owns the feature registry: `active_feature`, status, dependencies, and completion evidence.
-- `.specs/features/<slug>/` owns approved feature artifacts.
-- Use `references/spec-driven/artifact-store.md` for artifact read/write operations.
+This memory layer is split across two artifacts with distinct lifecycles (see Artifact State below). Each has its own write triggers; writes are always section-scoped — never whole-file overwrites. Use `references/spec-driven/artifact-store.md` for artifact read/write operations.
 
 ## STATE Precedence Chain
 
-When sources conflict, resolve in this strict order — first match wins, lower sources never override higher:
-
-1. **Fresh user instruction** — the live user's explicit direction for the current decision.
-2. **Approved `.specs/` artifact** — the current `spec.md`/`design.md`/`tasks.md` approved for the active feature.
-3. **STATE / HANDOFF** — `.specs/project/STATE.md` and `.specs/HANDOFF.md` position and decision logs.
-4. **massa-ai memory** — durable cross-session recall; context until confirmed against current source.
-
-massa-ai memory and external summaries are discovery, not authority. If a higher source is silent, the next source decides; if a lower source contradicts a higher one, the higher source wins and the lower one is corrected. Record the resolution in STATE so the chain stays auditable. `references/spec-driven/artifact-store.md` mirrors this chain for artifact reads.
+Canonical chain, ordering, and silent/contradicting-source resolution rules:
+`references/artifact-persistence.md` STATE Precedence Chain. For spec-driven,
+the "approved `.specs/` artifact" link is the current `spec.md`/`design.md`/
+`tasks.md` approved for the active feature, and the "STATE/HANDOFF" link is
+`.specs/project/STATE.md` and `.specs/HANDOFF.md`.
 
 ---
 

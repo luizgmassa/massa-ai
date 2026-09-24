@@ -17,6 +17,8 @@ const status = mock(() => ({
       enabled: true,
       nextRunAt: 100,
       lastRunAt: 50,
+      lastSuccessAt: 50 as number | null,
+      consecutiveFailures: 0,
       due: true,
       currentlyRunning: false,
     },

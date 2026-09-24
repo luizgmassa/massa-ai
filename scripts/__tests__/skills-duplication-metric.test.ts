@@ -45,10 +45,14 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
  * edit that needs a reason in the commit message — that friction is the point.
  */
 // 331 since ALLWF-03 (tlc-330-harness-update): pinning the 8 remaining
-// read-only charters to `model_tier: deep` (14/18 now deep) made their
-// frontmatter runs identical across files — +18 excess of mandated
+// read-only charters to a (since-removed by model-catalog-revamp)
+// `model_tier: deep` frontmatter field (14/18 charters then "deep") made
+// their frontmatter runs identical across files — +18 excess of mandated
 // uniformity, not prose drift. Measured differentially: main 313 → branch
 // 331, every new block is charter frontmatter around the shared tier line.
+// The `model_tier` field itself no longer exists in any charter — this note
+// is a historical record of the baseline delta it produced, not a
+// description of current frontmatter.
 //
 // 471 since WMH-01/02 (workflow-metadata-headers): prepending Agent Skills
 // YAML frontmatter to all 36 skills/massa-ai/workflows/**/*.md files gave
@@ -57,7 +61,7 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
 // not prose drift. Measured differentially against the pre-header tree
 // (f414cdbf, the pre-WMH activation commit): 331 → 471.
 //
-// 483 since AEH-06 (agent-era-harness-upgrades): the `massa-ai-reviewer`
+// 483 since AEH-06 (agent-era-harness-upgrades): the `reviewer`
 // dispatch block instantiated in all 14 implementing workflows must be
 // structurally identical per the dispatch contract (`persona:` bullet and
 // all — skills-harness-integrity enforces the shape), so its shared runs are
@@ -68,7 +72,7 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
 // read-only` run) — attribution printed block-by-block during the merge of
 // v1.30.0, recorded in the raising commit.
 //
-// 498 since DSG-05/06 (designer-agent): the `massa-ai-designer` dispatch block
+// 498 since DSG-05/06 (designer-agent): the `designer` dispatch block
 // instantiated in 7 screen-capable workflows must be structurally identical per
 // the dispatch contract — skills-harness-integrity parses these blocks, and the
 // uniform trigger sentence is what stops "mandatory" reading as advisory in one
@@ -88,7 +92,42 @@ const REPO_ROOT = path.resolve(import.meta.dir, '../..');
 //
 // The base measured 478, five under the previous 483 ceiling. This raise
 // consumes that pre-existing headroom rather than pretending it was not there.
-const EXCESS_CEILING = 498;
+//
+// 474 since the workflow-slimming Phase 2 dedup (.specs/plans/workflow-slimming.md
+// A1/A4/A6): the per-workflow restatements that the references already own are
+// deleted — the two-counters disambiguation clause in 13 workflows (canonical in
+// `references/verification-ladder.md`), the 11-bullet "Establish the
+// investigation scope" enumeration in the 6 audit workflows (canonical in
+// `references/audit-scope.md`), and the inline context-firewall threshold triple
+// in 3 workflows (canonical in `references/context-firewall.md`). This is the
+// first LOWERING of this ceiling: the four raises above are mandated uniformity
+// and stay; what leaves is prose drift and nothing else. Measured differentially
+// with `measure(<tree>/skills, 4)` against a temp worktree of main @ 95f752f1:
+// base excess 494, branch 474, delta −20; normalized lines 15329 → 15261.
+//
+// The base measured 494, four under the previous 498 ceiling. As with the 483 →
+// 498 raise, that pre-existing headroom is consumed here rather than banked: the
+// ceiling is set to the branch's own measurement, not to 494 − 20.
+//
+// 456 since the workflow-slimming Phase 7 role defaults: the dispatch-block
+// fields whose value is fixed for a role move to `references/agent-orchestration.md`'s
+// new Role Defaults section — the universal `persona` bullet (57 blocks), the
+// reviewer's `fallback` (15), the verification-agent's `permissions` (15), and
+// the designer's `trigger`/`sensors`/`inputs`/`firewall`/`memory` (5 × 7). That
+// directly retires the AEH-06 and DSG-05/06 rationale above: those raises
+// recorded mandated uniformity across 14 and 7 instantiated templates, and a
+// value stated once cannot be non-uniform. 121 block lines leave the tree.
+// Measured differentially with `measure(<tree>/skills, 4)` against a temp
+// worktree of main @ 95f752f1: base excess 494, branch 456; dispatch-block
+// lines 597 → 476; normalized lines 15329 → 15219.
+//
+// What this ceiling can no longer see is a block that OMITS a field it should
+// carry — the defaults made 8 of the 10 packet fields optional at the block
+// level. `skills-harness-integrity.test.ts`'s role-defaults group is what covers
+// that: it asserts the reference states each default, that no block restates
+// one, and that a designer block still carries the three fields the default does
+// not fix.
+const EXCESS_CEILING = 456;
 const CEILING_WINDOW = 4;
 
 let dir: string;

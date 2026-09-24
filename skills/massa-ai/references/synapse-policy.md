@@ -23,11 +23,10 @@ resumed handoff reuses `workflowSessionId` and opens a fresh Synapse session.
 - Major focus shift: update task context through REST when available; otherwise
   create a fresh Synapse session and let the prior session expire.
 
-Default search budget inside a Synapse session:
+Default search budget inside a Synapse session follows
+`references/mcp-tools.md` §Retrieval Order; this file does not restate the
+numbers.
 
-- Summary discovery: `responseMode="summary"`, `maxResults=10`.
-- Targeted deep reads: `responseMode="enriched"`, `maxResults=3`.
-- Expanded deep reads: `maxResults=5` only when 4-5 exact files, symbols, or report finding IDs are already named.
 - Do not use Synapse for a single recall, project map, exact file read, or one symbol lookup.
 
 Server-side bounds that constrain the budget:
@@ -44,7 +43,7 @@ Config knobs (env, read by the server, not by the agent):
 |---|---|---|
 | `SYNAPSE_ENABLED` | `true` | Master kill switch; `false` bypasses the whole pipeline, and `search` behaves statelessly even when a `sessionId` is passed. |
 | `SYNAPSE_ATTENTION_ENABLED` | `false` | Multi-signal attention re-ranker. **Off by default** — do not attribute re-ranking to Synapse unless it is on. |
-| `LOG_LEVEL` | `info` | `debug` emits one pipeline log line per query (see Reading Pipeline Output). |
+| `MASSA_AI_LOG_LEVEL` | `info` | `debug` emits one pipeline log line per query (see Reading Pipeline Output). |
 
 ## MCP-First Lifecycle
 
@@ -103,7 +102,7 @@ optional. REST prefetch requires `filePath` and may include `symbols`, `chains`,
 
 ## Reading Pipeline Output
 
-With `LOG_LEVEL=debug`, the server emits one structured line per Synapse-scoped
+With `MASSA_AI_LOG_LEVEL=debug`, the server emits one structured line per Synapse-scoped
 query. Use it to decide whether Synapse is helping or whether the query needs
 refining — not as evidence about the codebase.
 

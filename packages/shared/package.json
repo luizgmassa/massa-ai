@@ -1,6 +1,6 @@
 {
   "name": "@massa-ai/shared",
-  "version": "1.55.0",
+  "version": "1.64.0",
   "author": "luizgmassa",
   "type": "module",
   "main": "dist/index.js",
@@ -24,6 +24,10 @@
     "./config": {
       "types": "./dist/config/index.d.ts",
       "default": "./dist/config/index.js"
+    },
+    "./inference-providers": {
+      "types": "./dist/config/inference-providers.d.ts",
+      "default": "./dist/config/inference-providers.js"
     }
   },
   "scripts": {

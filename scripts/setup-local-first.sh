@@ -18,6 +18,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-env-transaction.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-shared.sh"
 # shellcheck source=scripts/lib/installer-api-key.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-api-key.sh"
+# Sourced here rather than beside installer_feature_flow below: Step 0 needs
+# installer_detect_provider before anything else runs, and this file is
+# function-only with no side effects at source time.
+# shellcheck source=scripts/lib/installer-feature-prompts.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-feature-prompts.sh"
 massa_ai_banner
 
 # Back up an existing config file to <file>.bak before it gets regenerated.
@@ -50,66 +55,163 @@ require_postgres_database_url() {
     [ -n "$authority" ] && [ -n "$database_name" ] || die "DATABASE_URL must include a host and database name."
 }
 
-# ---- Step 1: Check Ollama ----
-echo -e "${BOLD}[1/6] Checking Ollama...${NC}"
+# massa_ai_probe_provider <base_url> [provider]
+#
+# Bash mirror of probeProvider() in packages/core/src/kernel/inference-probe.ts:
+# discriminates by response BODY SHAPE, never by HTTP status. LM Studio answers
+# 200 with {"error":...} for every endpoint it does not implement, so a status
+# check reports a live Ollama that is not there. Byte-identical in install.sh,
+# scripts/setup-local-first.sh, scripts/ensure-ollama.sh and
+# scripts/validate-vscode-integration.sh; scripts/__tests__/probe-dialect-parity.test.ts
+# holds the copies identical and asserts both halves agree on every fixture body.
+massa_ai_probe_provider() {
+  local base_url="$1" provider="${2:-ollama}" path key origin body
+  case "$provider" in
+    ollama)   path="/api/tags"  ; key="models" ;;
+    lmstudio) path="/v1/models" ; key="data"   ;;
+    *) return 1 ;;
+  esac
+  # probeProvider resolves with new URL(<absolute path>, baseUrl), which drops
+  # any path prefix on baseUrl; keep scheme://authority only so that
+  # http://localhost:1234/v1 does not become .../v1/v1/models.
+  origin="$(printf '%s' "$base_url" | sed -E 's#^([a-zA-Z][a-zA-Z0-9+.-]*://[^/]*).*#\1#')"
+  body="$(curl -s --max-time 3 "${origin}${path}" 2>/dev/null)" || return 1
+  printf '%s' "$body" | grep -Eq "\"${key}\"[[:space:]]*:[[:space:]]*\["
+}
 
+# ---- Step 0: Local inference provider ----
+# Runs before the Ollama step because it decides whether that step applies.
+# installer_detect_provider / installer_select_provider / migrate_provider live
+# in scripts/lib/installer-feature-prompts.sh so install.sh can reuse them and
+# so scripts/tests/test-lms-model-exists.sh can execute them.
+# Both providers' endpoint defaults live here rather than inside their own
+# setup function: ollama_model_exists and the Step 5 verification read
+# OLLAMA_URL / OLLAMA_HAS_CLI from installer scope whichever provider was
+# chosen, and moving those assignments into setup_ollama would leave them
+# unset on the LM Studio path.
 OLLAMA_URL="${OLLAMA_HOST:-http://localhost:11434}"
 OLLAMA_HAS_CLI=false
 OLLAMA_API_REACHABLE=false
-
-# Check if Ollama CLI is available
-if command -v ollama &> /dev/null; then
-    OLLAMA_HAS_CLI=true
-    echo -e "  ${GREEN}✓${NC} Ollama CLI is installed"
+LMSTUDIO_URL="${LMSTUDIO_BASE_URL:-http://localhost:1234/v1}"
+DETECTED_PROVIDER="$(installer_detect_provider "${HOME}/.config/massa-ai/config.json")"
+installer_select_provider "$DETECTED_PROVIDER"
+if [ -n "$INFERENCE_PROVIDER_FROM" ]; then
+    migrate_provider "$INFERENCE_PROVIDER_FROM" "$INFERENCE_PROVIDER"
 fi
+# PDM-13. Runs right after the provider is settled because it is a no-op on
+# every provider but LM Studio, and because Step 1's MLX-engine check and
+# Step 2's `lms get` flag both read the format it sets.
+installer_select_model_format
 
-# Check if Ollama API is reachable (covers WSL -> Windows host, remote, etc.)
-if curl -s "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
-    OLLAMA_API_REACHABLE=true
-    OLLAMA_VERSION=$(curl -s "${OLLAMA_URL}/api/version" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null || echo "unknown")
-    echo -e "  ${GREEN}✓${NC} Ollama API reachable at ${OLLAMA_URL} (v${OLLAMA_VERSION})"
-fi
-
-if [ "$OLLAMA_HAS_CLI" = false ] && [ "$OLLAMA_API_REACHABLE" = false ]; then
-    # Neither CLI nor API available - try to install
-    echo -e "  ${YELLOW}⚠${NC} Ollama not found. Installing..."
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        curl -fsSL https://ollama.com/install.sh | sh
-        OLLAMA_HAS_CLI=true
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo -e "  ${YELLOW}⚠${NC} On macOS, install Ollama first:"
-        echo -e "      brew install ollama   (then: brew services start ollama)"
-        echo -e "      or download from https://ollama.com/download"
-        echo -e "  ${YELLOW}⚠${NC} Then re-run this script."
-        exit 1
-    else
-        echo -e "  ${RED}✗${NC} Unsupported OS. Install Ollama manually: https://ollama.com"
-        exit 1
+# ---- Step 1: Check the selected provider ----
+# Echo the path to the lms CLI, or nothing. ~/.lmstudio/bin/lms is checked
+# BEFORE `command -v lms`: the CLI is not on PATH until LM Studio has
+# bootstrapped it, and that exact false negative happened during
+# investigation — `command -v lms` reported absent on a machine that had it.
+lms_cli_path() {
+    if [ -x "${HOME}/.lmstudio/bin/lms" ]; then
+        echo "${HOME}/.lmstudio/bin/lms"
+        return 0
     fi
-elif [ "$OLLAMA_HAS_CLI" = false ] && [ "$OLLAMA_API_REACHABLE" = true ]; then
-    # API reachable but no CLI (e.g. WSL with Ollama on Windows host)
-    echo -e "  ${GREEN}✓${NC} Using remote Ollama API (no local CLI needed)"
-fi
+    command -v lms 2>/dev/null
+}
 
-# If API is not reachable yet, try to start it
-if [ "$OLLAMA_API_REACHABLE" = false ]; then
-    if [ "$OLLAMA_HAS_CLI" = true ]; then
-        echo -e "  ${YELLOW}⚠${NC} Ollama API not responding. Starting..."
-        nohup ollama serve > /dev/null 2>&1 &
+setup_lmstudio() {
+    echo -e "${BOLD}[1/6] Checking LM Studio...${NC}"
+    LMSTUDIO_CLI="$(lms_cli_path)"
+
+    if [ -z "$LMSTUDIO_CLI" ]; then
+        echo -e "  ${YELLOW}⚠${NC} LM Studio CLI not found. Installing (headless)..."
+        curl -fsSL https://lmstudio.ai/install.sh | bash \
+            || die "LM Studio install failed. Install it manually: https://lmstudio.ai/download"
+        LMSTUDIO_CLI="$(lms_cli_path)"
+        [ -n "$LMSTUDIO_CLI" ] \
+            || die "LM Studio installed but no lms CLI at ~/.lmstudio/bin/lms or on PATH."
+    fi
+    echo -e "  ${GREEN}✓${NC} LM Studio CLI: ${LMSTUDIO_CLI}"
+
+    if ! massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio; then
+        echo -e "  ${YELLOW}⚠${NC} LM Studio server not responding. Starting..."
+        "$LMSTUDIO_CLI" daemon up >/dev/null 2>&1 || true
         sleep 2
+    fi
 
-        if curl -s "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
-            OLLAMA_API_REACHABLE=true
-            echo -e "  ${GREEN}✓${NC} Ollama started successfully"
+    # Body-shape probe, never the status code: LM Studio answers 200 with
+    # {"error":...} for endpoints it does not implement.
+    massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio \
+        || die "LM Studio API not reachable at ${LMSTUDIO_URL}. Start it: ${LMSTUDIO_CLI} daemon up"
+    echo -e "  ${GREEN}✓${NC} LM Studio API reachable at ${LMSTUDIO_URL}"
+
+    # PDM-13: MLX weights need LM Studio's MLX engine, which is a separate
+    # runtime extension from llama.cpp. A no-op unless the MLX format was
+    # chosen. Runs after the daemon is confirmed up — `lms runtime ls` talks to
+    # it.
+    installer_ensure_mlx_runtime "$LMSTUDIO_CLI"
+}
+
+setup_ollama() {
+    echo -e "${BOLD}[1/6] Checking Ollama...${NC}"
+
+    # Check if Ollama CLI is available
+    if command -v ollama &> /dev/null; then
+        OLLAMA_HAS_CLI=true
+        echo -e "  ${GREEN}✓${NC} Ollama CLI is installed"
+    fi
+
+    # Check if Ollama API is reachable (covers WSL -> Windows host, remote, etc.)
+    if massa_ai_probe_provider "$OLLAMA_URL"; then
+        OLLAMA_API_REACHABLE=true
+        OLLAMA_VERSION=$(curl -s "${OLLAMA_URL}/api/version" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null || echo "unknown")
+        echo -e "  ${GREEN}✓${NC} Ollama API reachable at ${OLLAMA_URL} (v${OLLAMA_VERSION})"
+    fi
+
+    if [ "$OLLAMA_HAS_CLI" = false ] && [ "$OLLAMA_API_REACHABLE" = false ]; then
+        # Neither CLI nor API available - try to install
+        echo -e "  ${YELLOW}⚠${NC} Ollama not found. Installing..."
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            curl -fsSL https://ollama.com/install.sh | sh
+            OLLAMA_HAS_CLI=true
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+            echo -e "  ${YELLOW}⚠${NC} On macOS, install Ollama first:"
+            echo -e "      brew install ollama   (then: brew services start ollama)"
+            echo -e "      or download from https://ollama.com/download"
+            echo -e "  ${YELLOW}⚠${NC} Then re-run this script."
+            exit 1
         else
-            echo -e "  ${RED}✗${NC} Failed to start Ollama. Please start it manually: ollama serve"
+            echo -e "  ${RED}✗${NC} Unsupported OS. Install Ollama manually: https://ollama.com"
             exit 1
         fi
-    else
-        echo -e "  ${RED}✗${NC} Ollama API not reachable at ${OLLAMA_URL}"
-        echo -e "      Set OLLAMA_HOST to point to your Ollama instance."
-        exit 1
+    elif [ "$OLLAMA_HAS_CLI" = false ] && [ "$OLLAMA_API_REACHABLE" = true ]; then
+        # API reachable but no CLI (e.g. WSL with Ollama on Windows host)
+        echo -e "  ${GREEN}✓${NC} Using remote Ollama API (no local CLI needed)"
     fi
+
+    # If API is not reachable yet, try to start it
+    if [ "$OLLAMA_API_REACHABLE" = false ]; then
+        if [ "$OLLAMA_HAS_CLI" = true ]; then
+            echo -e "  ${YELLOW}⚠${NC} Ollama API not responding. Starting..."
+            nohup ollama serve > /dev/null 2>&1 &
+            sleep 2
+
+            if massa_ai_probe_provider "$OLLAMA_URL"; then
+                OLLAMA_API_REACHABLE=true
+                echo -e "  ${GREEN}✓${NC} Ollama started successfully"
+            else
+                echo -e "  ${RED}✗${NC} Failed to start Ollama. Please start it manually: ollama serve"
+                exit 1
+            fi
+        else
+            echo -e "  ${RED}✗${NC} Ollama API not reachable at ${OLLAMA_URL}"
+            echo -e "      Set OLLAMA_HOST to point to your Ollama instance."
+            exit 1
+        fi
+    fi
+}
+
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    setup_lmstudio
+else
+    setup_ollama
 fi
 
 # Detect whether a named Ollama model is already pulled, without silently
@@ -156,24 +258,85 @@ print("yes" if sys.argv[1] in models else "no")
     fi
 }
 
-# ---- Step 2: Pull embedding models ----
+# Sibling of ollama_model_exists for LM Studio, same "yes"/"no" contract and
+# the same two fallbacks — a separate function, not a branch inside the one
+# above, because scripts/tests/test-setup-ollama-model-exists.sh extracts that
+# one by literal `sed -n '/^ollama_model_exists()/,/^}/p'` and must keep
+# finding it byte for byte.
+#
+# No CLI branch, deliberately: `lms` is not on PATH until bootstrapped and its
+# listing output format was never measured for this feature, while /v1/models
+# was (it is the shape probeProvider's lmstudio parser reads). LM Studio model
+# ids are exact — there is no :latest normalization to mirror.
+lms_model_exists() {
+    local model="$1" body
+    body="$(curl -s "${LMSTUDIO_URL}/models" 2>/dev/null || true)"
+    if [ -z "$body" ]; then echo "no"; return 0; fi
+    # 1. python3 JSON parse (model passed via argv — never interpolated into code)
+    if command -v python3 >/dev/null 2>&1; then
+        printf '%s' "$body" | python3 -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print("no"); sys.exit(0)
+ids = [m.get("id","") for m in data.get("data", [])]
+print("yes" if sys.argv[1] in ids else "no")
+' "$model" 2>/dev/null && return 0
+    fi
+    # 2. grep fallback: match \"id\":\"<model>\" exactly, closing quote included.
+    local model_re
+    model_re="$(printf '%s' "$model" | sed 's/[][\.*^$+?(){}|/]/\\&/g')"
+    if printf '%s' "$body" | grep -Eq "\"id\"[[:space:]]*:[[:space:]]*\"${model_re}\""; then
+        echo "yes"
+    else
+        echo "no"
+    fi
+}
+
+# The provider dispatch, a third function so neither sibling above has to grow
+# a provider branch. Defaults to Ollama: INFERENCE_PROVIDER is empty when the
+# install is on an API embedding provider, which LIP-13 leaves untouched.
+inference_model_exists() {
+    case "${INFERENCE_PROVIDER:-ollama}" in
+        lmstudio) lms_model_exists "$1" ;;
+        *) ollama_model_exists "$1" ;;
+    esac
+}
+
+# ---- Step 2: Pull models ----
 echo ""
-echo -e "${BOLD}[2/6] Pulling embedding models...${NC}"
+echo -e "${BOLD}[2/6] Pulling models...${NC}"
 
-EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:4b}"
-
-# Check if model is already available
-MODEL_EXISTS="$(ollama_model_exists "$EMBEDDING_MODEL")"
-
-if [ "$MODEL_EXISTS" = "yes" ]; then
-    echo -e "  ${GREEN}✓${NC} Model ${EMBEDDING_MODEL} already available"
-else
-    echo -e "  Pulling ${EMBEDDING_MODEL}..."
-    if [ "$OLLAMA_HAS_CLI" = true ]; then
-        ollama pull "$EMBEDDING_MODEL"
+# One pull path, provider-dispatched. The three blocks this replaces were the
+# same twelve lines with the model variable and a parenthetical swapped, which
+# is how the Ollama-only `ollama pull` survived into a provider-neutral wizard.
+#
+# <fetch_spec> is what `lms get` is handed, which is NOT always the model id.
+# On the MLX path it must be the Hugging Face repo URL: `lms get --mlx` run
+# against a catalog id answers "No staff picks found with the specified search
+# criteria", and run against a bare search term resolves to whatever staff pick
+# ranks first — measured 2026-09-21, `--mlx qwen3-vl` picked the 4B and
+# `--mlx qwen2.5-coder` the 32B. Only the repo URL pins a build. Defaults to
+# the model id, which is what every GGUF/Ollama caller wants.
+ensure_inference_model() {
+    local model="$1" note="$2" fetch="${3:-$1}"
+    if [ "$(inference_model_exists "$model")" = "yes" ]; then
+        echo -e "  ${GREEN}✓${NC} Model ${model} already available"
+        return 0
+    fi
+    echo -e "  Pulling ${model}${note}..."
+    if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+        # The format flag is always passed, never omitted: with neither flag
+        # `lms get` considers "only options supported by your system", which on
+        # Apple Silicon can resolve an MLX build for a GGUF install.
+        "$LMSTUDIO_CLI" get -y "--${LMSTUDIO_MODEL_FORMAT:-gguf}" "$fetch" \
+            || die "LM Studio could not fetch ${fetch}. Pull it from the app, then re-run this script."
+    elif [ "$OLLAMA_HAS_CLI" = true ]; then
+        ollama pull "$model"
     else
         # Pull via API (works for remote/WSL scenarios)
-        curl -s "${OLLAMA_URL}/api/pull" -d "{\"name\": \"${EMBEDDING_MODEL}\"}" | while IFS= read -r line; do
+        curl -s "${OLLAMA_URL}/api/pull" -d "{\"name\": \"${model}\"}" | while IFS= read -r line; do
             STATUS=$(echo "$line" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
             if [ -n "$STATUS" ]; then
                 printf "\r  %s" "$STATUS"
@@ -181,54 +344,106 @@ else
         done
         echo ""
     fi
-    echo -e "  ${GREEN}✓${NC} Model ${EMBEDDING_MODEL} pulled"
-fi
+    echo -e "  ${GREEN}✓${NC} Model ${model} pulled"
+}
 
-# Pull the local-first LLM model (consolidation, salience, query rewrite, HyDE).
-LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen2.5:7b-instruct}"
-LLM_EXISTS="$(ollama_model_exists "$LLM_MODEL")"
-
-if [ "$LLM_EXISTS" = "yes" ]; then
-    echo -e "  ${GREEN}✓${NC} Model ${LLM_MODEL} already available"
+# Model ids are provider-specific — an Ollama tag is not an LM Studio id — so
+# the defaults are too. The LM Studio values are the ones measured for this
+# feature; the env overrides keep their existing names.
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    # PDM-13. The id/fetch split and the whole MLX override matrix live in
+    # scripts/lib/installer-feature-prompts.sh so they can be executed by
+    # scripts/tests/test-model-format-select.sh — a grep over this file cannot
+    # observe which string reaches `lms get`.
+    # scripts/__tests__/mlx-model-parity.test.ts holds that function's literals
+    # identical to INFERENCE_PROVIDERS.lmstudio.mlxModels.
+    installer_resolve_lmstudio_models
 else
-    echo -e "  Pulling ${LLM_MODEL} (instruct model, ~4.7GB)..."
-    if [ "$OLLAMA_HAS_CLI" = true ]; then
-        ollama pull "$LLM_MODEL"
-    else
-        # Pull via API (works for remote/WSL scenarios)
-        curl -s "${OLLAMA_URL}/api/pull" -d "{\"name\": \"${LLM_MODEL}\"}" | while IFS= read -r line; do
-            STATUS=$(echo "$line" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
-            if [ -n "$STATUS" ]; then
-                printf "\r  %s" "$STATUS"
-            fi
-        done
-        echo ""
-    fi
-    echo -e "  ${GREEN}✓${NC} Model ${LLM_MODEL} pulled"
+    EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:0.6b}"
+    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl:8b}"
+    CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+    # Ollama pulls by the id itself; there is no second name to resolve.
+    EMBEDDING_FETCH="$EMBEDDING_MODEL"
+    LLM_FETCH="$LLM_MODEL"
+    CODE_FETCH="$CODE_MODEL"
 fi
 
-# Pull the code-oriented LLM model (bootstrap seed, reranker, code compression).
-CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
-CODE_EXISTS="$(ollama_model_exists "$CODE_MODEL")"
-
-if [ "$CODE_EXISTS" = "yes" ]; then
-    echo -e "  ${GREEN}✓${NC} Model ${CODE_MODEL} already available"
-else
-    echo -e "  Pulling ${CODE_MODEL} (code-oriented LLM, ~4.7GB)..."
-    if [ "$OLLAMA_HAS_CLI" = true ]; then
-        ollama pull "$CODE_MODEL"
-    else
-        # Pull via API (works for remote/WSL scenarios)
-        curl -s "${OLLAMA_URL}/api/pull" -d "{\"name\": \"${CODE_MODEL}\"}" | while IFS= read -r line; do
-            STATUS=$(echo "$line" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
-            if [ -n "$STATUS" ]; then
-                printf "\r  %s" "$STATUS"
-            fi
-        done
-        echo ""
-    fi
-    echo -e "  ${GREEN}✓${NC} Model ${CODE_MODEL} pulled"
+ensure_inference_model "$EMBEDDING_MODEL" "" "$EMBEDDING_FETCH"
+ensure_inference_model "$LLM_MODEL" " (instruct model)" "$LLM_FETCH"
+if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
+    ensure_inference_model "$CODE_MODEL" " (code-oriented LLM)" "$CODE_FETCH"
 fi
+
+# What was fetched is a repo; what config.json has to record is the catalog id
+# LM Studio assigned to it. Ask LM Studio rather than trusting the literal —
+# five of the six ids in the seam were never measured, and a wrong one writes a
+# config pointing at a model that does not exist, which degrades silently.
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    EMBEDDING_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$EMBEDDING_FETCH" "$EMBEDDING_MODEL")"
+    LLM_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$LLM_FETCH" "$LLM_MODEL")"
+    CODE_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$CODE_FETCH" "$CODE_MODEL")"
+fi
+# PDM-12/design R-08: LM Studio exposes no per-request context length, so the
+# only way to bound a role's context window is to load the model with it.
+# Ollama gets its per-request num_ctx from the runtime seam (T06); this loads
+# each LM Studio model once, at the context its role needs.
+#
+# design R-09: the new trio makes LLM_MODEL and CODE_MODEL distinct LM Studio
+# ids (8B@16k + 7B@32k, beside the 0.6B@8k embedder), so all three can now be
+# asked to load at once — unsized total VRAM/RAM. Resolved by staggering
+# residency rather than sizing it (sizing needs a real box, which this script
+# cannot assume): --ttl evicts an idle model instead of holding all three
+# loaded forever, so peak residency tracks actual usage, not the sum of all
+# three roles.
+# ponytail: one flat 600s TTL for every role, not sized per model footprint.
+# Upgrade path: measure real VRAM per model and pick a role-specific TTL (or
+# an explicit `lms unload` after each role's use) if idle memory pressure is
+# reported.
+LMS_LOAD_TTL_SECONDS=600
+# Evict whatever is already resident before adding three more models to the same
+# RAM/VRAM pool. A machine that has been serving a 32B model all afternoon has
+# no room for the trio below, and LM Studio's failure mode for that is a load
+# error per role rather than anything the wizard could recover from.
+installer_unload_loaded_models "${LMSTUDIO_CLI:-}"
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    # LMSTUDIO_CLI is resolved by setup_lmstudio() (lms_cli_path — checks
+    # ~/.lmstudio/bin before PATH) earlier in this same run; reuse it rather
+    # than a bare `command -v lms`, which misses that exact case.
+    # The embedding role is loaded into LM Studio only when LM Studio is the
+    # one serving it. On the MLX path the sidecar below owns that role, and
+    # loading the same weights here too would hold ~335 MB resident for a model
+    # LM Studio cannot answer an embedding request with — measured on a live
+    # install: dropping exactly that duplicate freed 335 MB with the endpoint
+    # still returning 1024 floats.
+    LMS_LOADS_EMBEDDING=true
+    if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
+        LMS_LOADS_EMBEDDING=false
+    fi
+    if [ -n "${LMSTUDIO_CLI:-}" ]; then
+        if [ "$LMS_LOADS_EMBEDDING" = true ]; then
+            "$LMSTUDIO_CLI" load -c 8192 --ttl "$LMS_LOAD_TTL_SECONDS" "$EMBEDDING_MODEL" || true
+        fi
+        "$LMSTUDIO_CLI" load -c 16384 --ttl "$LMS_LOAD_TTL_SECONDS" "$LLM_MODEL" || true
+        if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
+            "$LMSTUDIO_CLI" load -c 32768 --ttl "$LMS_LOAD_TTL_SECONDS" "$CODE_MODEL" || true
+        fi
+    else
+        echo -e "  ${YELLOW}⚠${NC} lms CLI not found — skipping per-role context load. Load manually:"
+        if [ "$LMS_LOADS_EMBEDDING" = true ]; then
+            echo -e "      lms load -c 8192 --ttl ${LMS_LOAD_TTL_SECONDS} ${EMBEDDING_MODEL}"
+        fi
+        echo -e "      lms load -c 16384 --ttl ${LMS_LOAD_TTL_SECONDS} ${LLM_MODEL}"
+        if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
+            echo -e "      lms load -c 32768 --ttl ${LMS_LOAD_TTL_SECONDS} ${CODE_MODEL}"
+        fi
+    fi
+
+    # The MLX embedding endpoint. `installer_provider_defaults` already points
+    # `embedding.baseURL` here on this path, so without this call the written
+    # config names a port nothing listens on.
+    installer_setup_mlx_embedding_sidecar "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+
 
 # ---- Step 3: Database selection ----
 echo ""
@@ -375,13 +590,13 @@ ENV_FILE="${PROJECT_ROOT}/.env"
 # was never asking again on any machine that had ever run setup. That guard now
 # lives in `installer_feature_flow` as a once-per-install marker, so install.sh
 # asking first suppresses this call rather than the presence of a file.
-# shellcheck source=lib/installer-feature-prompts.sh
-. "${SCRIPT_DIR}/lib/installer-feature-prompts.sh"
+# (installer-feature-prompts.sh is sourced at the top of this file — Step 0
+# needs installer_detect_provider before the Ollama step runs.)
 
-# `ollama_model_exists` echoes yes/no; the prompt only offers the LLM-gated
+# `inference_model_exists` echoes yes/no; the prompt only offers the LLM-gated
 # toggles when the model is genuinely pulled.
 LLM_MODEL_PRESENT=false
-if [ "$(ollama_model_exists "${LLM_MODEL:-qwen2.5:7b-instruct}")" = "yes" ]; then
+if [ "$(inference_model_exists "${LLM_MODEL:-qwen3-vl:8b}")" = "yes" ]; then
     LLM_MODEL_PRESENT=true
 fi
 
@@ -449,8 +664,14 @@ bunx prisma migrate deploy \
 echo ""
 echo -e "${BOLD}[5/6] Verifying setup...${NC}"
 
-# Check Ollama health
-if curl -s "${OLLAMA_URL}/api/tags" > /dev/null 2>&1; then
+# Check the selected provider's health
+if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+    if massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio; then
+        echo -e "  ${GREEN}✓${NC} LM Studio: healthy at ${LMSTUDIO_URL}"
+    else
+        echo -e "  ${RED}✗${NC} LM Studio: not responding"
+    fi
+elif massa_ai_probe_provider "$OLLAMA_URL"; then
     MODELS=$(curl -s "${OLLAMA_URL}/api/tags" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data.get('models',[])))" 2>/dev/null || echo "?")
     echo -e "  ${GREEN}✓${NC} Ollama: healthy at ${OLLAMA_URL} (${MODELS} models)"
 else
@@ -576,6 +797,21 @@ echo -e "    1. ${BLUE}bun install${NC}"
 echo -e "    2. ${BLUE}bun run build${NC}"
 echo -e "    3. ${BLUE}bun run start:api${NC}"
 echo ""
+
+# PDM-13. The MLX embedding role is served by a sidecar, not by LM Studio, and
+# the note saying so is issued at Step 0 — before six steps and several GB of
+# downloads have scrolled it off the screen. It is repeated here, where the eye
+# actually lands, because it is the one piece of this install that is not a
+# process the user already knows about: if it is not running, indexing stops.
+if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ]; then
+    echo -e "  ${BLUE}•  Embedding runs outside LM Studio on the MLX path.${NC}"
+    echo -e "     LM Studio types every safetensors model as an LLM and will not"
+    echo -e "     serve it on /v1/embeddings (upstream bug #808), so massa-ai"
+    echo -e "     serves the same weights at ${BOLD}${EMBEDDING_BASE_URL}${NC}."
+    echo -e "     Check it with: ${BLUE}curl ${EMBEDDING_BASE_URL%/v1}/health${NC}"
+    echo -e "     Restart it with: ${BLUE}launchctl kickstart -k gui/\$(id -u)/ai.massa.mlx-embed${NC}"
+    echo ""
+fi
 
 # ---- Run diagnose to validate the full stack ----
 if command -v bun &> /dev/null && [ -f "${SCRIPT_DIR}/../scripts/diagnose.ts" 2>/dev/null ] || [ -f "${PROJECT_ROOT}/scripts/diagnose.ts" ]; then

@@ -43,11 +43,13 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
     key: "embedding",
     label: "Embedding",
     fields: [
-      { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "mistral", "openai", "google", "cohere"], guide: "Which embedding provider to use. Ollama runs locally; others are cloud APIs." },
-      { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., `qwen3-embedding:4b` for Ollama)." },
-      { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. For Ollama, typically `http://localhost:11434`." },
-      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama. Changing this requires a restart." },
-      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 2560 for `qwen3-embedding:4b`)." },
+      { name: "provider", type: "enum", label: "Provider", enum: ["ollama", "lmstudio", "mistral", "openai", "google", "cohere"], guide: "Which embedding provider to use. Ollama and LM Studio run locally; others are cloud APIs." },
+      { name: "model", type: "text", label: "Model", guide: "The embedding model name (e.g., `qwen3-embedding:0.6b` for Ollama, `text-embedding-qwen3-embedding-0.6b` for LM Studio)." },
+      { name: "baseURL", type: "text", label: "Base URL", guide: "Base URL for the embedding API. Typically `http://localhost:11434` for Ollama, `http://localhost:1234/v1` for LM Studio." },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for cloud providers. Not needed for Ollama or LM Studio. Changing this requires a restart." },
+      { name: "dimensions", type: "number", label: "Dimensions", guide: "Embedding vector dimension. Must match the model's output dimension (e.g., 1024 for `qwen3-embedding:0.6b`)." },
+      { name: "contextWindow", type: "number", label: "Context Window", guide: "Context window sent to the embedding provider when supported (Ollama's `num_ctx`). Defaults to 8192; a value here overrides the built-in default." },
+      { name: "batchSize", type: "number", label: "Batch Size", guide: "Number of texts submitted per embedding provider call. Defaults to 64; a value here overrides the provider's measured default." },
     ],
   },
   compression: {
@@ -120,14 +122,17 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
     label: "LLM",
     fields: [
       { name: "enabled", type: "boolean", label: "Enabled", guide: "When checked, enables LLM-powered features (consolidation, query understanding, compression)." },
-      { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., `http://localhost:11434/v1` for Ollama OpenAI-compatible endpoint)." },
-      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for the LLM provider. Not needed for local Ollama. Changing this requires a restart." },
-      { name: "model", type: "text", label: "Model", guide: "Primary LLM model name (e.g., `qwen2.5:7b-instruct`)." },
-      { name: "codeModel", type: "text", label: "Code Model", guide: "Model used for code-related tasks. When empty, falls back to the primary model." },
+      { name: "baseUrl", type: "text", label: "Base URL", guide: "Base URL for the LLM API (e.g., `http://localhost:11434/v1` for Ollama, `http://localhost:1234/v1` for LM Studio — both OpenAI-compatible endpoints)." },
+      { name: "apiKey", type: "text", label: "API Key", sensitive: true, guide: "API key for the LLM provider. Not needed for local Ollama or LM Studio. Changing this requires a restart." },
+      { name: "model", type: "text", label: "Model", guide: "Primary LLM model name (e.g., `qwen3-vl:8b` for Ollama, `qwen3-vl-8b-instruct` for LM Studio)." },
+      { name: "codeModel", type: "text", label: "Code Model", guide: "Model used for code-related tasks. When empty, falls back to that provider's coding default (e.g., `qwen2.5-coder:7b` for Ollama, `qwen2.5-coder-7b-instruct` for LM Studio), never the primary model." },
       { name: "temperature", type: "number", label: "Temperature", guide: "Sampling temperature (0 = deterministic, 1 = creative). Typically 0.2 for tasks." },
       { name: "maxOutputTokens", type: "number", label: "Max Output Tokens", guide: "Maximum tokens the LLM can generate in a single response." },
       { name: "timeoutMs", type: "number", label: "Timeout (ms)", guide: "Request timeout in milliseconds. Increase for slow models." },
       { name: "disableThink", type: "boolean", label: "Disable Think", guide: "When checked, disables thinking/reasoning mode in models that support it (faster, cheaper)." },
+      { name: "contextWindow", type: "number", label: "Context Window", guide: "Context window sent as `options.num_ctx` for the primary model on providers that support per-request context (Ollama). Defaults to 16384." },
+      { name: "codeContextWindow", type: "number", label: "Code Context Window", guide: "Context window used for the code model. Defaults to 32768." },
+      { name: "codeTemperature", type: "number", label: "Code Temperature", guide: "Sampling temperature for the code model (0 = deterministic). Defaults to 0.0, separate from the primary model's Temperature." },
     ],
   },
   memory: {
@@ -228,6 +233,44 @@ const CONFIG_SECTIONS_BY_KEY: { [K in ConfigSectionKey]: ConfigSection & { key: 
       { name: "jobs.observation-bridge.intervalMs", type: "number", label: "Observation Bridge Interval (ms)", guide: "Interval between observation-bridge runs, in milliseconds. Minimum `60000`." },
       { name: "jobs.checkpoint-purge.enabled", type: "boolean", label: "Checkpoint Purge Enabled", guide: "When checked, the checkpoint-purge job runs on its own schedule." },
       { name: "jobs.checkpoint-purge.intervalMs", type: "number", label: "Checkpoint Purge Interval (ms)", guide: "Interval between checkpoint-purge runs, in milliseconds. Minimum `60000`." },
+    ],
+  },
+  bootstrap: {
+    key: "bootstrap",
+    // Label, not key. The key is the persisted config path `bootstrap.rules`
+    // (spec BST-10 AC-11) and is already written on real machines, so moving
+    // it would need a spec amendment plus a migration; `CONFIG_SECTIONS_BY_KEY`
+    // is a mapped type over `ConfigSectionKey` besides. Display text is where
+    // the collision actually was: `memory.bootstrap` predates this section and
+    // surfaces in the Memory section as "Bootstrap Enabled", "Bootstrap Max
+    // Seeds", "Bootstrap Centrality Limit", "Bootstrap Git Log Limit" and
+    // "Bootstrap Refresh" — memory seeding, unrelated to these rule toggles.
+    // Two "Bootstrap" surfaces in one tab meant neither name identified its
+    // subject.
+    //
+    // "Startup Contract" is not invented here: `config-cli.ts:86` already
+    // describes this exact registry as "every startup-contract rule", and
+    // CLAUDE.md calls `AGENTS.md` "the canonical agent startup contract". So a
+    // user arriving from `massa-ai-config bootstrap list` meets the same words,
+    // and the label shares none with Memory's "Bootstrap …" fields.
+    label: "Startup Contract",
+    fields: [
+      // `json`, not one boolean field per rule id: the nine ids live in
+      // `packages/shared/src/bootstrap/rules.ts`, not here, and this section
+      // would otherwise need to stay hand-synced with that registry every
+      // time a rule is added or removed. `massa-ai-config bootstrap` is the
+      // supported way to flip one rule.
+      //
+      // The field is EDITABLE, and the guide below is the only thing steering
+      // users to the CLI instead (spec A12, amended by T37). It is not marked
+      // read-only because this layer has no read-only mechanism: `ConfigField`
+      // above declares no editability member, `config.ts`'s `renderConfigField`
+      // emits no `readonly`/`disabled` on any of its six input shapes, and
+      // `writeMode` gates only the Save/Restart buttons, never an input. A bare
+      // `readonly` attribute here would also be a lie — `collectConfigSectionFields`
+      // (`config.ts:296`) reads `el.value` regardless of it, so Save would still
+      // collect and write this field.
+      { name: "rules", type: "json", label: "Rule Overrides (JSON)", guide: "Persisted overrides of the bootstrap rule registry's defaults, one boolean per rule id. Manage individual rules with `massa-ai-config bootstrap enable|disable <id>` rather than editing this field directly." },
     ],
   },
 };

@@ -15,19 +15,28 @@
 
 import { promises as fs } from "fs";
 import path from "path";
-import { tmpdir } from "os";
+import { tmpdir, homedir } from "os";
 import {
   hostsSupportedBy,
   loadRegistry,
   loadEffectiveRegistry,
   profileFlagFrom,
-  resolveTier,
+  resolveAgent,
   selectProfile,
   type Registry,
   type Resolved,
 } from "./lib/model-profiles.ts";
 import { HOSTS, capabilitiesFor, type Host } from "./lib/host-capabilities.ts";
 export { HOSTS, type Host };
+// agent-runtime-drift T02: one parser, two consumers — the generator (writer)
+// and the profile-switch doctor (reader). A second parser here would let the
+// writer and the reader disagree about what `model:` means.
+import { parseFrontmatter } from "../packages/shared/src/profile-switch/frontmatter.ts";
+// agent-drift followup T1: the actives' profile rank-3 source — the SAME
+// state file (and the same default path resolution) the switch engine reads,
+// so generator and engine cannot disagree about what "active" means.
+import { readInstallState } from "../packages/shared/src/profile-switch/state.ts";
+import type { InstallState } from "../packages/shared/src/profile-switch/state.ts";
 
 // ── Paths ───────────────────────────────────────────────────────────────────
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -71,65 +80,33 @@ export function profilesSupporting(registry: Registry, host: Host): string[] {
 }
 
 // ── Charter registry (every charter under skills/agents/) ───────────────────
-const SPECIALIST_NAMES = [
-  "investigator",
-  "planner",
-  "builder",
-  "reviewer",
-  "context-curator",
-  "verification-agent",
-  "requirements-analyst",
-  "architecture-specialist",
-  "test-engineer",
-  "documentation-agent",
-  "audit-specialist",
-  "mobile-specialist",
-  "plan-critic",
-  "furps-analyst",
-  "navigator",
-  "meta-judge",
-  "judge",
-  "designer",
-] as const;
-type SpecialistName = (typeof SPECIALIST_NAMES)[number];
+/** A charter name is just its directory name under `skills/agents/` — no compile-time
+ *  enumeration, so adding an agent is a new charter directory, nothing here. */
+export type SpecialistName = string;
 
 // ── Write-permission set (spec AC CLA-03 / design.md) ───────────────────────
-// These five charters declare `permission: write` (test-engineer,
-// documentation-agent, judge, and designer are scoped writers: test files /
-// doc files / the agent's own judge-N report / UI-layer files only, each with
-// a disjoint write set). Charter frontmatter and this set must agree —
+// These four charters declare `permission: write` (designer, judge, and
+// test-engineer are scoped writers: UI-layer files / the agent's own judge-N
+// report in `scorer` mode / test files only, each with a disjoint write set).
+// Charter frontmatter and this set must agree —
 // scripts/__tests__/skills-harness-integrity.test.ts enforces that.
 const WRITE_AGENTS: ReadonlySet<SpecialistName> = new Set<SpecialistName>([
-  "builder",
-  "test-engineer",
-  "documentation-agent",
-  "judge",
+  "senior-engineer",
   "designer",
+  "judge",
+  "test-engineer",
 ]);
 
 // ── Model + effort resolution ───────────────────────────────────────────────
 // The three hard-coded per-host model tables that used to live here are gone.
 // Every model and effort value now comes from `skills/model-profiles.json`,
-// resolved as (charter tier) x host x profile. See
-// .specs/features/model-profile-registry/design.md.
+// resolved per (host, profile, agent) via `resolveAgent` — override-first, falling
+// back to the profile's host default. See .specs/features/model-catalog-revamp/spec.md.
 //
 // The emitters below own only HOST SYNTAX: which key name a host uses, and how it
 // spells "inherit". They never know what a profile is.
 
 // ── Permission -> tool-gating mapping (STI-01/STI-02) ────────────────────────
-// Navigator precedent (apps/claude-plugin/agents/massa-ai-navigator.md) uses
-// JSON-array tools with capital "Glob"; match that convention for the one
-// remaining allowlisted agent.
-
-// Charters whose tool set is not the default inherit/denylist policy. The
-// navigator is index-first: it reaches the massa-ai MCP surface and needs
-// only `pwd` from the shell (charter metadata.tools: mcp-index). This is the
-// only entry point that can still narrow a Claude sub-agent to an allowlist —
-// every other charter is gated by claudeToolPolicyFor below.
-const AGENT_TOOLS_OVERRIDE: Partial<Record<SpecialistName, readonly string[]>> = {
-  navigator: ["mcp__massa-ai__*", "Read", "Grep", "Glob", "Bash(pwd)"],
-};
-
 // The three write-capable built-ins in Claude's documented sub-agent pool
 // (design.md Tech Decisions "Denylist contents"). `Bash` is excluded because it
 // was already granted to read-only agents under the old allowlist — this change
@@ -137,14 +114,12 @@ const AGENT_TOOLS_OVERRIDE: Partial<Record<SpecialistName, readonly string[]>> =
 const READ_ONLY_DISALLOWED = ["Write", "Edit", "NotebookEdit"];
 
 export type ClaudeToolPolicy =
-  | { readonly kind: "allowlist"; readonly tools: readonly string[] }
   | { readonly kind: "denylist"; readonly disallowed: readonly string[] }
   | { readonly kind: "inherit" };
 
 /**
  * Decides which of Claude's two tool-gating mechanisms a charter uses
- * (STI-01/STI-02). An `AGENT_TOOLS_OVERRIDE` entry keeps the deliberate narrow
- * allowlist (navigator). A `WRITE_AGENTS` member inherits every tool the
+ * (STI-01/STI-02). A `WRITE_AGENTS` member inherits every tool the
  * parent session has active, including MCP — Claude documents no cross-server
  * MCP wildcard for `tools`, so an allowlist can never be dynamic, and
  * `disallowedTools` (not `tools`) is the only mechanism that inherits.
@@ -155,19 +130,9 @@ export type ClaudeToolPolicy =
  * `emitCursor`/`emitCodex`/`emitOpenCode`, which already gate on that set.
  */
 export function claudeToolPolicyFor(name: SpecialistName): ClaudeToolPolicy {
-  const override = AGENT_TOOLS_OVERRIDE[name];
-  if (override) return { kind: "allowlist", tools: override };
   if (WRITE_AGENTS.has(name)) return { kind: "inherit" };
   return { kind: "denylist", disallowed: READ_ONLY_DISALLOWED };
 }
-
-// OpenCode bash permission (spec OPC-07 / design.md plan-critic F4).
-// Default: write agents -> bash: allow; planner -> bash: { "*": "ask" };
-// every other read-only agent -> bash: deny. Overrides narrow that further.
-const OPENCODE_BASH_OVERRIDE: Partial<Record<SpecialistName, string>> = {
-  planner: `{ "*": "ask" }`,
-  navigator: `{ "pwd": "allow", "*": "deny" }`,
-};
 
 // ── Types ───────────────────────────────────────────────────────────────────
 // Host is imported from ./lib/host-capabilities.ts (re-exported from
@@ -177,86 +142,44 @@ export type Permission = "read-only" | "write";
 export interface Charter {
   name: SpecialistName;
   description: string;
-  /**
-   * Capability tier from `metadata.model_tier`, resolved against
-   * `skills/model-profiles.json` to a concrete `{model, effort}` per host.
-   * The charter owns this because the tier is a property of the agent's job.
-   */
-  modelTier: string;
   permission: Permission;
   body: string;
-}
-
-// ── YAML frontmatter parser (minimal, charter-shaped) ───────────────────────
-export function parseFrontmatter(raw: string): {
-  frontmatter: Record<string, unknown>;
-  body: string;
-} {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(raw);
-  if (!match) {
-    throw new Error(
-      "charter missing YAML frontmatter (--- ... ---) block"
-    );
-  }
-  const yamlText = match[1] ?? "";
-  const body = (match[2] ?? "").replace(/^\r?\n/, "");
-  const frontmatter = parseSimpleYaml(yamlText);
-  return { frontmatter, body };
-}
-
-export function parseSimpleYaml(text: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const lines = text.split(/\r?\n/);
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i] ?? "";
-    if (line.trim() === "" || line.trim().startsWith("#")) {
-      i++;
-      continue;
-    }
-    const m = /^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/.exec(line);
-    if (!m) {
-      i++;
-      continue;
-    }
-    const key = m[1] as string;
-    const rest = (m[2] ?? "").trim();
-    if (rest !== "") {
-      result[key] = unquoteScalar(rest);
-      i++;
-      continue;
-    }
-    // Nested mapping (e.g. metadata: block). Only one level of nesting is
-    // used by the charters (metadata.model_tier / metadata.permission).
-    const nested: Record<string, unknown> = {};
-    i++;
-    while (i < lines.length) {
-      const nestedLine = lines[i] ?? "";
-      if (/^\s{2,}\S/.test(nestedLine) === false) break;
-      const nm = /^\s{2,}([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/.exec(nestedLine);
-      if (!nm) break;
-      nested[nm[1] as string] = unquoteScalar((nm[2] ?? "").trim());
-      i++;
-    }
-    result[key] = nested;
-  }
-  return result;
-}
-
-export function unquoteScalar(s: string): string {
-  if (
-    (s.startsWith('"') && s.endsWith('"')) ||
-    (s.startsWith("'") && s.endsWith("'"))
-  ) {
-    return s.slice(1, -1);
-  }
-  return s;
 }
 
 // ── Charter loader ──────────────────────────────────────────────────────────
 /** Where charters live. A parameter only so the throws below can be tested against the
  *  real loader instead of a re-implementation of it — production always uses the default. */
 export const CHARTERS_DIR = path.join(SKILLS_DIR, "agents");
+
+/**
+ * Charter directory names under `skills/agents/`, sorted — the inventory this generator
+ * emits, replacing the old hand-maintained `SPECIALIST_NAMES` list. Mirrors the directory
+ * scan `generate-skill-artifacts.ts:155-166` already does: a dir with no `SKILL.md` is
+ * skipped rather than treated as a charter.
+ */
+export async function scanCharterNames(chartersDir: string = CHARTERS_DIR): Promise<string[]> {
+  let entries;
+  try {
+    entries = await fs.readdir(chartersDir, { withFileTypes: true });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
+  }
+  const dirNames = entries
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+  const out: string[] = [];
+  for (const name of dirNames) {
+    try {
+      await fs.access(path.join(chartersDir, name, "SKILL.md"));
+      out.push(name);
+    } catch {
+      // agent dir with no charter is not this generator's problem
+    }
+  }
+  return out;
+}
 
 export async function loadCharter(
   name: SpecialistName,
@@ -266,7 +189,6 @@ export async function loadCharter(
   const raw = await fs.readFile(file, "utf8");
   const { frontmatter, body } = parseFrontmatter(raw);
   const metadata = (frontmatter.metadata ?? {}) as Record<string, unknown>;
-  const modelTier = String(metadata.model_tier ?? "");
   const permissionRaw = String(metadata.permission ?? "read-only");
   const permission: Permission =
     permissionRaw === "write" ? "write" : "read-only";
@@ -274,29 +196,23 @@ export async function loadCharter(
   if (!description) {
     throw new Error(`charter ${name} missing description`);
   }
-  // Never default a tier. A charter with no tier must stop the build, because a
-  // silent default would ship some other model to users without anyone noticing.
-  if (!modelTier) {
-    throw new Error(
-      `charter ${name} missing metadata.model_tier (expected one of the tiers in skills/model-profiles.json)`
-    );
-  }
   // A charter must not name a model. That is the drift this registry removes: the old
   // `metadata.model_hint` was a literal model name that Cursor consumed verbatim, and it
-  // could disagree with the generator's own tables. Fail loudly if one reappears.
+  // could disagree with the generator's own resolution. Fail loudly if one reappears.
   if (metadata.model_hint !== undefined) {
     throw new Error(
-      `charter ${name} still declares metadata.model_hint. Charters declare a tier ` +
-        `(metadata.model_tier), never a model name — see skills/model-profiles.json.`
+      `charter ${name} still declares metadata.model_hint. Models are resolved per ` +
+        `(host, profile, agent) — see skills/model-profiles.json.`
     );
   }
-  return { name, description, modelTier, permission, body };
+  return { name, description, permission, body };
 }
 
-export async function loadAllCharters(): Promise<Charter[]> {
+export async function loadAllCharters(chartersDir: string = CHARTERS_DIR): Promise<Charter[]> {
+  const names = await scanCharterNames(chartersDir);
   const charters: Charter[] = [];
-  for (const name of SPECIALIST_NAMES) {
-    charters.push(await loadCharter(name));
+  for (const name of names) {
+    charters.push(await loadCharter(name, chartersDir));
   }
   return charters;
 }
@@ -311,25 +227,22 @@ export async function loadAllCharters(): Promise<Charter[]> {
  *
  * CLA-04: omit hooks/mcpServers/permissionMode — rejected on plugin-shipped agents.
  *
- * STI-01/STI-02: the gating key is decided by claudeToolPolicyFor and stays in the slot
- * `tools` used to occupy — allowlist emits `tools:` (JSON array, unchanged for navigator),
- * denylist emits `disallowedTools:` (comma-separated, the form Claude's own docs use for
- * that field), and inherit emits neither key so the sub-agent gets every tool the parent
- * session has active, including any MCP server.
+ * STI-01/STI-02: the gating key is decided by claudeToolPolicyFor — denylist emits
+ * `disallowedTools:` (comma-separated, the form Claude's own docs use for that field), and
+ * inherit emits neither key so the sub-agent gets every tool the parent session has active,
+ * including any MCP server.
  */
 export function emitClaude(c: Charter, m: Resolved): string {
-  const agentName = `massa-ai-${c.name}`;
+  const agentName = c.name;
   const policy = claudeToolPolicyFor(c.name);
   const lines = ["---", `name: ${agentName}`, `description: ${c.description}`];
-  if (policy.kind === "allowlist") {
-    lines.push(`tools: ${JSON.stringify(policy.tools)}`);
-  } else if (policy.kind === "denylist") {
+  if (policy.kind === "denylist") {
     lines.push(`disallowedTools: ${policy.disallowed.join(", ")}`);
   }
   lines.push(`model: ${m.model ?? "inherit"}`);
   if (m.effort !== null) lines.push(`effort: ${m.effort}`);
   lines.push("---", "");
-  return lines.join("\n") + c.body + "\n";
+  return lines.join("\n") + OWNED_MARKER_MD + "\n" + c.body + "\n";
 }
 
 /**
@@ -352,13 +265,13 @@ export function emitClaude(c: Charter, m: Resolved): string {
  * already its default.
  */
 export function emitCursor(c: Charter, m: Resolved): string {
-  const agentName = `massa-ai-${c.name}`;
+  const agentName = c.name;
   const model =
     m.model === null ? "inherit" : m.effort === null ? m.model : `${m.model}[effort=${m.effort}]`;
   const lines = ["---", `name: ${agentName}`, `description: ${c.description}`, `model: ${model}`];
   if (!WRITE_AGENTS.has(c.name)) lines.push(`readonly: true`);
   lines.push("---", "");
-  return lines.join("\n") + c.body + "\n";
+  return lines.join("\n") + OWNED_MARKER_MD + "\n" + c.body + "\n";
 }
 
 export function escapeTomlTripleQuote(s: string): string {
@@ -375,7 +288,7 @@ export function escapeTomlTripleQuote(s: string): string {
  * which is how a null registry value is spelled on this host.
  */
 export function emitCodex(c: Charter, m: Resolved): string {
-  const agentName = `massa-ai-${c.name}`;
+  const agentName = c.name;
   const isWrite = WRITE_AGENTS.has(c.name);
   const sandboxMode = isWrite ? "workspace-write" : "read-only";
   const bodyEscaped = escapeTomlTripleQuote(c.body);
@@ -402,10 +315,12 @@ export function tomlQuoted(s: string): string {
 }
 
 /**
- * Marker that scopes `massa-ai-config agents uninstall`. It lives in the BODY, not the
- * frontmatter — see emitOpenCode.
+ * Ownership marker for every generated `.md` agent (Claude, Cursor, OpenCode): the first
+ * body line. Installers and the profile-switch engine identify owned files by it. It lives
+ * in the BODY, not the frontmatter — Cursor's schema forbids extra keys and OpenCode
+ * forwards unknown keys to the provider (see emitOpenCode).
  */
-export const OPENCODE_OWNED_MARKER = "<!-- massa-ai-owned: true -->";
+export const OWNED_MARKER_MD = "<!-- massa-ai-owned: true -->";
 
 /**
  * OpenCode. https://opencode.ai/docs/agents/
@@ -416,54 +331,54 @@ export const OPENCODE_OWNED_MARKER = "<!-- massa-ai-owned: true -->";
  * directly to the provider as model options."
  *
  *   - `name`: not a frontmatter key at all. "The markdown file name becomes the agent
- *     name." The file is already massa-ai-<n>.md, so dropping this is behaviour-preserving.
- *   - `metadata`: not a key either. But it is NOT dead — the literal substring
- *     "massa-ai-owned: true" scopes `agents uninstall` in
- *     apps/opencode-plugin/src/config-cli.ts, which installs real file copies (the
- *     install.sh path installs symlinks and scopes by filename instead). Deleting it would
- *     make uninstall match zero files and orphan 15 installed agents.
+ *     name." The file is already <n>.md, so dropping this is behaviour-preserving.
+ *   - `metadata`: not a key either. It used to carry the ownership marker, which is not
+ *     dead: every installer and `agents install|uninstall` decides what it may overwrite or
+ *     delete by that marker (packages/shared/src/profile-switch/ownership.ts).
  *
- * So the marker MOVES to the first body line as a markdown comment. It is then body text
- * rather than a model option, while still containing the substring config-cli greps — which
- * also keeps uninstall working against agent files an older version installed in the
- * frontmatter form. No config-cli change needed.
+ * So the marker is the first body line as a markdown comment, the same `OWNED_MARKER_MD`
+ * every `.md` host carries: body text rather than a model option.
  */
 export function emitOpenCode(c: Charter, m: Resolved): string {
   const isWrite = WRITE_AGENTS.has(c.name);
-  // OPC-07: permission per-agent bash mapping
-  const bashOverride = OPENCODE_BASH_OVERRIDE[c.name];
-  let permissionBlock: string;
-  if (isWrite) {
-    permissionBlock = `{ edit: allow, bash: allow }`;
-  } else if (bashOverride) {
-    permissionBlock = `{ edit: deny, bash: ${bashOverride} }`;
-  } else {
-    permissionBlock = `{ edit: deny, bash: deny }`;
-  }
+  // OPC-07: write agents get bash; every read-only agent is denied edit and bash.
+  const permissionBlock = isWrite ? `{ edit: allow, bash: allow }` : `{ edit: deny, bash: deny }`;
   const lines = [
     "---",
     `description: ${c.description}`,
     // `all` (not `subagent`): OpenCode's Tab switcher lists primary/all agents
-    // only, so `subagent` made the 12 specialists unselectable by hand. `all`
+    // only, so `subagent` made the specialists unselectable by hand. `all`
     // keeps auto-delegation and @-mention while adding manual selection.
     `mode: all`,
   ];
   if (m.model !== null) lines.push(`model: ${m.model}`);
   if (m.effort !== null) lines.push(`reasoningEffort: ${m.effort}`);
   lines.push(`permission: ${permissionBlock}`, "---", "");
-  return lines.join("\n") + OPENCODE_OWNED_MARKER + "\n" + c.body + "\n";
+  return lines.join("\n") + OWNED_MARKER_MD + "\n" + c.body + "\n";
 }
 
 // ── Emit-all + check ────────────────────────────────────────────────────────
 export interface EmitOptions {
   /** Pre-loaded registry; loaded from disk when omitted. */
   readonly registry?: Registry;
-  /** `--profile=<name>`. Overrides the env var and each host's default. */
+  /** `--profile=<name>`. Overrides the env var, the recorded state profile, and each host's default. */
   readonly profileFlag?: string | null;
   /** Injected for tests; defaults to process.env. */
   readonly env?: Record<string, string | undefined>;
   /**
-   * Dedup set for `warnStaleAgentTiers` (design D-2, plan-critic blocking finding #2). A
+   * Per-host recorded active profile from `install-state.json`
+   * (`platforms.<host>.modelProfile.profile`) — rank 3 of the selection
+   * precedence (agent-drift followup T1). `main()` threads it so a
+   * regeneration re-emits the ACTIVES for the profile the operator switched
+   * to, instead of silently resetting them to `"balanced"`
+   * (measured 2026-09-21: a post-switch regenerate re-emitted claude actives
+   * from `balanced` while the state said `work`; the session-start drift
+   * hook caught the divergence). Absent for a host → that host falls through
+   * to `"balanced"`, exactly as before.
+   */
+  readonly stateProfiles?: Partial<Record<Host, string>>;
+  /**
+   * Dedup set for `warnStaleAgentOverrides`. A
    * real run's `main()` calls both `emitAll` and `emitVariants` against the same registry,
    * so a per-entry warn would print twice without a Set shared across both calls. Defaults
    * to a fresh, call-local `Set` when omitted — safe for a single isolated call, but a
@@ -486,6 +401,38 @@ const EMIT_BY_HOST: Record<Host, EmitFn> = {
   opencode: emitOpenCode,
 };
 
+/**
+ * agent-drift followup T1: the rank-3 selection source, extracted from
+ * `main()` so the state → profiles mapping is unit-testable without touching
+ * a real home. Pure projection of the switch engine's own state shape —
+ * a host with no recorded `modelProfile` contributes nothing and falls
+ * through to `"balanced"` downstream.
+ */
+export function stateProfilesFromInstallState(state: InstallState): Partial<Record<Host, string>> {
+  const out: Partial<Record<Host, string>> = {};
+  for (const host of HOSTS) {
+    const recorded = state.platforms[host]?.modelProfile?.profile;
+    if (recorded) out[host] = recorded;
+  }
+  return out;
+}
+
+/**
+ * A recorded rank-3 profile that no longer exists in the registry (removed,
+ * renamed) or no longer supports this host degrades to "no recorded profile"
+ * instead of throwing — mirroring the tolerant fallback each installer's own
+ * `recorded_profile()` re-apply step already gives an unknown variant
+ * directory. `--profile`/env stay hard errors (an operator's typo right now
+ * should fail loud); only the state-sourced value is stale-tolerant, since it
+ * reflects a historical switch this run did not request.
+ */
+function validStateProfile(registry: Registry, host: Host, profile: string | null | undefined): string | null {
+  if (!profile) return null;
+  const entry = registry.profiles[profile];
+  if (!entry || !(host in entry.hosts)) return null;
+  return profile;
+}
+
 /** Which profile each host resolves against, after the full precedence chain. */
 export function profilesPerHost(
   registry: Registry,
@@ -497,6 +444,7 @@ export function profilesPerHost(
     out[host] = selectProfile(registry, host, {
       flag: opts.profileFlag ?? null,
       env: opts.env,
+      stateProfile: validStateProfile(registry, host, opts.stateProfiles?.[host] ?? null),
     });
   }
   return out;
@@ -523,14 +471,12 @@ async function emitHostProfile(
   await fs.mkdir(dir, { recursive: true });
   const emit = EMIT_BY_HOST[host];
   for (const c of charters) {
-    // Resolution is (charter tier OR its per-agent/per-host override) x host x profile.
-    // `registry.agentTiers[agent][host]` (design D-1/D-2) is opt-in user-overlay data that
-    // wins over the charter's own `metadata.model_tier` when present; a tier the profile
-    // does not define, or a profile that does not support this host, still throws by design.
-    const tierOverride = registry.agentTiers[c.name]?.[host];
-    const resolved = resolveTier(registry, host, profile, tierOverride ?? c.modelTier);
+    // Resolution is override-first: `profile.agents[c.name][host]` wins over
+    // `profile.hosts[host]` when present (registry v2 shape, `resolveAgent`). A profile
+    // that does not support this host still throws by design.
+    const resolved = resolveAgent(registry, host, profile, c.name);
     const ext = capabilitiesFor(host).artifactExtension;
-    const fileName = `massa-ai-${c.name}.${ext}`;
+    const fileName = `${c.name}.${ext}`;
     const filePath = path.join(dir, fileName);
     const content = emit(c, resolved);
     await fs.writeFile(filePath, content, "utf8");
@@ -551,7 +497,7 @@ export async function emitAll(
 ): Promise<Record<Host, string>> {
   const charters = await loadAllCharters();
   const registry = opts.registry ?? loadRegistry();
-  warnStaleAgentTiers(registry, charters, opts.warnedStaleAgents ?? new Set());
+  warnStaleAgentOverrides(registry, charters, opts.warnedStaleAgents ?? new Set());
   const profiles = profilesPerHost(registry, opts, hosts);
   for (const host of hosts) {
     await emitHostProfile(host, profiles[host], targetDirs[host], charters, registry);
@@ -568,29 +514,35 @@ export interface EmitVariantsOptions {
 }
 
 /**
- * `agentTiers` is opt-in USER-OVERLAY data (design D-1) that names agents by bare string —
+ * A profile's `agents` map is opt-in USER-OVERLAY data that names agents by bare string —
  * this lib deliberately does not check agent-name existence at the registry-validation layer
  * (`scripts/lib/model-profiles.ts` knows nothing about which agents exist, see its file
  * header). This generator DOES know the charter set, so it is the layer that warns: a
- * deleted-charter agent name left behind in the overlay must not brick regeneration, but it
- * must not be silent either (spec assumption row).
+ * deleted-charter agent name left behind in a profile's overrides must not brick
+ * regeneration, but it must not be silent either.
  *
  * `warned` is caller-supplied and threaded through `EmitOptions`/`EmitVariantsOptions` so a
  * real run — `main()` calls both `emitAll` and `emitVariants` against the same registry —
- * prints each stale name exactly once total, not once per caller (plan-critic blocking
- * finding #2). An empty `agentTiers` (the shipped default) iterates zero entries, so
- * `--check`'s normal-path output never gains a warn line it did not have before.
+ * prints each stale name exactly once total, not once per caller. The shipped built-in
+ * carries no stale override, so `--check`'s normal-path output never gains a warn line it
+ * did not have before.
  */
-export function warnStaleAgentTiers(
+export function warnStaleAgentOverrides(
   registry: Registry,
   charters: readonly Charter[],
   warned: Set<string>
 ): void {
   const charterNames = new Set(charters.map((c) => c.name));
-  for (const agentName of Object.keys(registry.agentTiers)) {
-    if (charterNames.has(agentName) || warned.has(agentName)) continue;
+  const stale = new Set<string>();
+  for (const profile of Object.values(registry.profiles)) {
+    for (const agentName of Object.keys(profile.agents ?? {})) {
+      if (!charterNames.has(agentName)) stale.add(agentName);
+    }
+  }
+  for (const agentName of stale) {
+    if (warned.has(agentName)) continue;
     warned.add(agentName);
-    console.warn(`[massa-ai] agentTiers names unknown agent "${agentName}" — ignored`);
+    console.warn(`[massa-ai] a profile's agents override names unknown agent "${agentName}" — ignored`);
   }
 }
 
@@ -613,7 +565,7 @@ export async function emitVariants(
 ): Promise<Record<Host, string[]>> {
   const charters = await loadAllCharters();
   const registry = opts.registry ?? loadRegistry();
-  warnStaleAgentTiers(registry, charters, opts.warnedStaleAgents ?? new Set());
+  warnStaleAgentOverrides(registry, charters, opts.warnedStaleAgents ?? new Set());
   const out = {} as Record<Host, string[]>;
   for (const host of hosts) {
     const profiles = profilesSupporting(registry, host);
@@ -645,8 +597,8 @@ export async function emitVariants(
  * rather than checking a fixed known-name set, so a stray leftover file — one
  * this generator no longer produces for either the active `agents/` dir or a
  * variant `agent-profiles/<profile>/` dir — is caught exactly like a missing
- * or changed file, not just a divergence among the currently-known
- * `SPECIALIST_NAMES`. Both directories this function is called against
+ * or changed file, not just a divergence among the currently-scanned charter names
+ * (`scanCharterNames`). Both directories this function is called against
  * (active agent dirs, variant dirs) are flat — no subdirectories — so a
  * single `readdir` per side is the whole inventory; `host` is accepted for
  * call-site symmetry with the rest of this module's per-host API, unused in
@@ -714,9 +666,9 @@ export async function runCheck(opts: EmitOptions = {}): Promise<number> {
       cursor: path.join(tmp, "cursor"),
       opencode: path.join(tmp, "opencode"),
     };
-    // Shared across this function's own emitAll + emitVariants calls (design D-2) so a
-    // stale agentTiers name — were the --check builtin ever to carry one — warns once, not
-    // twice, mirroring main()'s own threading below.
+    // Shared across this function's own emitAll + emitVariants calls so a stale agent
+    // override — were the --check builtin ever to carry one — warns once, not twice,
+    // mirroring main()'s own threading below.
     const warnedStaleAgents = new Set<string>();
     await emitAll(tmpDirs, { ...opts, warnedStaleAgents });
     let drift = false;
@@ -788,9 +740,35 @@ export async function runCheck(opts: EmitOptions = {}): Promise<number> {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
+/**
+ * agent-drift followup T1: the recorded active profile (install-state's
+ * modelProfile) outranks "balanced" so a regeneration re-emits the ACTIVES
+ * for the profile the operator switched to instead of silently resetting
+ * them to the default. Absent/unreadable state → empty map, and every host
+ * falls through to "balanced" exactly as before (fresh installs and CI keep
+ * their behavior). Shared by both `main()`'s real run and its `--check` path
+ * (via `runCheck`) — `--check` must resolve the same rank-3 profile a real
+ * run would, or a machine with a recorded non-"balanced" profile sees
+ * phantom drift comparing a state-aware emit against a state-blind one.
+ */
+export function readStateProfiles(stateFilePath?: string): Partial<Record<Host, string>> {
+  const stateProfiles: Partial<Record<Host, string>> = {};
+  try {
+    // Same default resolution as the switch engine's defaultStatePath.
+    const filePath = stateFilePath ?? path.join(homedir(), ".config", "massa-ai", "install-state.json");
+    const state = readInstallState(filePath);
+    Object.assign(stateProfiles, stateProfilesFromInstallState(state));
+  } catch {
+    // No state / unreadable state → no rank-3 entries. Deliberately silent:
+    // a fresh checkout has no state, and that is the normal path.
+  }
+  return stateProfiles;
+}
+
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const args = argv;
-  const opts: EmitOptions = { profileFlag: profileFlagFrom(args) };
+  const stateProfiles = readStateProfiles();
+  const opts: EmitOptions = { profileFlag: profileFlagFrom(args), stateProfiles };
   const check = args.includes("--check");
   if (check) {
     return runCheck(opts);
@@ -804,22 +782,24 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   if (effective.overlayError) {
     console.warn(`Warning: overlay error — ${effective.overlayError} (using builtin)`);
   }
-  // Created once and threaded through BOTH calls below (design D-2, plan-critic blocking
-  // finding #2) — a real run reaches emitAll then emitVariants against this same registry,
-  // so a shared Set is what keeps a stale agentTiers name warning exactly once.
+  // Created once and threaded through BOTH calls below — a real run reaches emitAll then
+  // emitVariants against this same registry, so a shared Set is what keeps a stale agent
+  // override warning exactly once.
   const warnedStaleAgents = new Set<string>();
   const runtimeOpts: EmitOptions = { ...opts, registry, warnedStaleAgents };
   const profiles = await emitAll(HOST_DIRS, runtimeOpts);
   const hostCount = Object.keys(HOST_DIRS).length;
-  const total = SPECIALIST_NAMES.length * hostCount;
+  const charterCount = (await scanCharterNames()).length;
+  const total = charterCount * hostCount;
   console.log(
-    `Emitted ${total} agent files (${SPECIALIST_NAMES.length} x ${hostCount} hosts).`
+    `Emitted ${total} agent files (${charterCount} x ${hostCount} hosts).`
   );
   // Always report the resolved profile per host. Silence here would make a
   // --profile typo or a stray MASSA_AI_MODEL_PROFILE indistinguishable from a
   // normal run, and the whole point of the registry is that model choice is legible.
   for (const [host, profile] of Object.entries(profiles)) {
-    console.log(`  ${host.padEnd(9)} profile: ${profile}`);
+    const fromState = stateProfiles[host] === profile ? " (from install-state)" : "";
+    console.log(`  ${host.padEnd(9)} profile: ${profile}${fromState}`);
   }
   // Variant trees (design.md Component 1, MPS-01): every profile a host supports,
   // pre-rendered under agent-profiles/<profile>/ — independent of --profile/env,
@@ -827,7 +807,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const variantProfiles = await emitVariants(PLUGIN_ROOT_DIRS, { registry, warnedStaleAgents });
   let variantTotal = 0;
   for (const [host, ps] of Object.entries(variantProfiles)) {
-    variantTotal += ps.length * SPECIALIST_NAMES.length;
+    variantTotal += ps.length * charterCount;
     console.log(`  ${host.padEnd(9)} variants: ${ps.join(", ")}`);
   }
   console.log(`Emitted ${variantTotal} variant agent files.`);

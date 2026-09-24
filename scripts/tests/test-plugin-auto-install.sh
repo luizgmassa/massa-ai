@@ -185,8 +185,9 @@ STUB
 for host in claude codex cursor opencode; do make_plugin_stub "$host"; done
 
 # The scrubbed PATH for harness runs: the runner must stay resolvable (the
-# gate reads state through it), so it is BASE_PATH plus the runner's own dir.
-SAFE_PATH="$(dirname "$RUNNER"):$(dirname "$BUN_BIN"):$BASE_PATH"
+# gate reads state through it) without admitting its whole directory, which on
+# a common dev setup is ~/.local/bin and holds the host CLIs this suite mocks.
+SAFE_PATH="$(runtime_shim_path "$ROOT/runtime-shim")"
 
 run_shadow() { # run_shadow PATH HOME [extra harness args...] → OUT, RC
   local path="$1" home="$2"; shift 2
@@ -218,31 +219,39 @@ seed_state() { # seed_state HOME — writes stdin as the install state
 # asserts the opposite of what it claims. See the sentinel table in
 # scripts/lib/installer-shared.sh, and test-plugin-sentinel-classes.sh for the
 # per-class wipes that pin each member.
+# Agents are seeded marker-owned under unprefixed names: installer ownership
+# is the content marker, never the name (NAM AC-4).
+OWNED_AGENT_MD=$'---\nname: code-explorer\n---\n<!-- massa-ai-owned: true -->\nbody\n'
 seed_installed_artifacts() {
   local h="$1" host="$2"
   case "$host" in
     claude)
       mkdir -p "$h/.claude/agents" "$h/.claude/commands"
-      touch "$h/.claude/agents/massa-ai-navigator.md" "$h/.claude/commands/massa-ai-spec-driven.md"
+      printf '%s' "$OWNED_AGENT_MD" > "$h/.claude/agents/code-explorer.md"
+      touch "$h/.claude/commands/massa-ai-spec-driven.md"
       printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"massa-ai-hook"}]}]}}' > "$h/.claude/settings.json"
       ;;
     codex)
       mkdir -p "$h/.codex/plugins/massa-ai/skills" "$h/.codex/agents"
-      touch "$h/.codex/plugins/massa-ai/skills/spec-driven.md" "$h/.codex/agents/massa-ai-navigator.toml"
+      touch "$h/.codex/plugins/massa-ai/skills/spec-driven.md"
+      printf '# massa-ai-owned\nname = "code-explorer"\n' > "$h/.codex/agents/code-explorer.toml"
       printf '{"hooks":{"SessionStart":[{"hooks":[{"command":"massa-ai-hook"}]}]}}' > "$h/.codex/hooks.json"
       ;;
     cursor)
       mkdir -p "$h/.cursor/plugins/local/massa-ai/skills/spec-driven" "$h/.cursor/agents"
-      touch "$h/.cursor/plugins/local/massa-ai/skills/spec-driven/SKILL.md" \
-            "$h/.cursor/agents/massa-ai-navigator.md"
+      touch "$h/.cursor/plugins/local/massa-ai/skills/spec-driven/SKILL.md"
+      printf '%s' "$OWNED_AGENT_MD" > "$h/.cursor/agents/code-explorer.md"
       printf '{"version":1,"hooks":{"beforeSubmitPrompt":[{"command":"massa-ai-hook"}]}}' > "$h/.cursor/hooks.json"
       ;;
     opencode)
       mkdir -p "$h/.config/opencode/plugins/massa-ai" "$h/.config/opencode/agents" \
                "$h/.config/opencode/command"
       touch "$h/.config/opencode/plugins/massa-ai/index.js" \
-            "$h/.config/opencode/agents/massa-ai-navigator.md" \
             "$h/.config/opencode/command/massa-ai-spec-driven.md"
+      # OpenCode agents are symlinks into the bundle.
+      mkdir -p "$h/bundle/apps/opencode-plugin/agents"
+      printf '%s' "$OWNED_AGENT_MD" > "$h/bundle/apps/opencode-plugin/agents/code-explorer.md"
+      ln -s "$h/bundle/apps/opencode-plugin/agents/code-explorer.md" "$h/.config/opencode/agents/code-explorer.md"
       ;;
   esac
 }
@@ -438,7 +447,7 @@ make_plugin_stub cursor
 echo ""
 echo "2.14 PAI-11: a version-current record with the sentinel wiped reinstalls instead of skipping forever (PAU-05/06)"
 H="$ROOT/m214"; mkdir -p "$H/.cursor"
-# No ~/.cursor/agents/massa-ai-*.md on disk — simulates the observed live
+# No owned ~/.cursor/agents/*.md on disk — simulates the observed live
 # external wipe (2026-08-05): the version record says current, disk says absent.
 seed_state "$H" <<'JSON'
 { "version": 2, "repository": "/x",
@@ -467,7 +476,7 @@ assert_contains "sentinel-present skip → unchanged skip-current log shape" "$O
 
 echo ""
 echo "2.15b PARTIAL install reinstalls: one surviving class is not proof of the rest"
-# The live 2026-08-17 Cursor state: ~/.cursor/agents/massa-ai-*.md intact,
+# The live 2026-08-17 Cursor state: ~/.cursor/agents/*.md intact,
 # plugin directory and hook wiring both gone. The version record said current
 # and the old one-class probe was satisfied by the agents alone, so every
 # re-run of setup-local-first.sh reported skip-current and repaired nothing.
@@ -592,13 +601,13 @@ for host in claude codex cursor; do
   # (external wipe, observed live 2026-08-05) while the version record stays
   # current forces a reinstall on the next run instead of a permanent skip —
   # and the artifacts are genuinely back on disk afterward, not just logged.
-  rm -f "$H/$cfg_dir/agents/"massa-ai-*
+  rm -f "$H/$cfg_dir/agents/"*
   FP_WIPED="$(tree_fingerprint "$H/$cfg_dir")"
   run_harness "$H"
   assert_eq "$host wiped-sentinel reinstall → exit 0" "$RC" "0"
   assert_contains "$host wiped-sentinel reinstall log line" "$OUT" "reinstall ${host}: sentinel missing"
   assert_ne "$host wiped-sentinel reinstall → host config dir changed" "$(tree_fingerprint "$H/$cfg_dir")" "$FP_WIPED"
-  ls "$H/$cfg_dir/agents/"massa-ai-* >/dev/null 2>&1
+  ls "$H/$cfg_dir/agents/"* >/dev/null 2>&1
   check "$host wiped-sentinel reinstall → sentinel artifacts restored on disk" "$?"
   assert_eq "$host record still current after reinstall" \
     "$(state_plugin_field "$STATE" "$host" version)" "$REAL_VERSION"

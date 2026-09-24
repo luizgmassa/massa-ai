@@ -28,18 +28,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - `references/agent-orchestration.md` only for large scopes, explicit parallel/subagent requests, PR subagent invocation, or independent verification of high-impact findings
 3. `recall` -> load project style rules, ADRs, prior quality decisions, accepted extension points, repeated anti-patterns, and accepted exceptions for the target area.
    - Apply the Memory Freshness Gate from `references/audit-scope.md`; recalled exceptions are leads, not proof.
-4. Establish the investigation scope before proceeding:
-   - Modified files scope: use when the user says modified files, changed files, current changes, uncommitted changes, staged changes, or unstaged changes.
-   - Explicit files/globs scope: use when the user names files, directories, or globs.
-   - Commit range scope: use when the user provides commits/ranges or asks for commits made by me, my branch commits, or quality issues introduced by branch commits.
-   - Branch comparison scope: use when the user names base/head branches, refs, or a branch diff.
-   - Codebase area scope: use when the user names a path, module, package, feature area, service layer, or glob.
-   - Symbol/class/function scope: use when the user names public classes, functions, interfaces, helpers, or exported surfaces.
-   - Feature/flow scope: use when the user names a runtime flow or feature area.
-   - Whole-repo scope: use only when the user explicitly asks for a whole-repo code quality audit.
-   - Implementation parent scope: use only when `workflows/implementation/implementation-audit.md` invokes this workflow with a concrete implementation scope packet.
-   - If the target focus is missing, vague, or too broad, ask for a concrete target from the supported scope types in `references/audit-scope.md`.
-   - Build the shared scope packet from `references/audit-scope.md` and carry it into the report.
+4. Establish the investigation scope: select the scope type and build the shared scope packet per `references/audit-scope.md`, which owns the supported scope types, the ask-when-vague rule, and the packet fields. Carry the packet into the report.
 5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Code Quality row of Per-Lens Scope Deltas).
 6. Input rules:
    - SOLID inputs: non-test source files only.
@@ -53,18 +42,16 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - Load it only for large PRs, codebase-wide audits, explicit parallel/subagent requests, or independent verification of judgment-heavy findings.
    - Keep the audit local for small scopes, unresolved user intent, tightly coupled code without clear owners, or platforms that do not permit subagents.
    - The main agent still owns scope, memory recall, static leads, synthesis, final report, persistence, and Evidence Gate.
-    - If delegating, dispatch `audit-specialist` with `lens: code-quality` per `references/agent-orchestration.md`:
+    - If delegating, dispatch `code-reviewer` in `audit` mode with `lens: code-quality` per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: large PR, codebase-wide audit, explicit parallel/subagent request, or independent verification of judgment-heavy finding
 > - scope: bounded read-only slice of the audit target
-> - permissions: read-only
 > - inputs: shared scope packet; `lens: code-quality`; quality dimensions (SOLID, Clean Code, KISS/YAGNI, DRY, maintainability)
 > - sensors: static scans for type-tag branches, concrete construction, half-finished surfaces; source inspection
 > - output: findings with smell category, location, evidence, severity, confidence, and simplest fix direction
 > - firewall: raw diffs/logs/search output summarized, not returned raw
 > - memory: suggest-only; main agent persists reusable code-quality patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
     - Do not delegate every check by default; avoid duplicate source reading when one main-agent pass is cheaper.
     - Subagents may suggest memory content, but the main agent decides what durable knowledge to persist.
@@ -76,7 +63,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - Magic values: repeated strings, event names, timeouts, numeric thresholds, status codes.
    - Generic names: `data`, `info`, `result`, `value`, `temp`, `manager`, `handler`, `helper` without useful qualification, using `references/naming-standards.md` to filter conventional short-scope or framework-required names.
    - Long parameter lists: more than 3-4 positional parameters.
-   - File shape: flag multi-subject files (unrelated exported surfaces bundled together) and any file over ~600 lines, regardless of subject count — it crowds out working context for the rest of the task (see `references/coding-guidelines.md` "File shape for agent readers"). Do NOT flag a single-subject file for line count alone below that bound.
+   - File shape: apply the File Shape rule in `references/code-quality-lens.md`.
    - Needlessly indirect code: pass-through wrappers, one-use abstractions, helper layers with no behavior, factories/builders that only hide one constructor call.
    - Speculative surfaces: unused options, future-oriented hooks, extension points with one implementation, exported APIs with no evidence of use.
    - Complexity without payoff: deep nesting, miniature state machines, or polymorphism where a direct branch or data map would preserve clarity.
@@ -84,26 +71,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - Android/KMP Compose recomposition leads: `@Composable`, `remember`, `rememberSaveable`, `derivedStateOf`, `LaunchedEffect`, `DisposableEffect`, `SideEffect`, `produceState`, `snapshotFlow`, `mutableStateOf`, `SnapshotStateList`, stability annotations/config, Compose compiler reports, Compose UI tests, and screenshot tests.
 9. Investigation pass:
    - Use summary/enriched search, symbol tools, and targeted file reads to inspect target modules, semantic hotspots, public classes, interfaces, functions, and exported API surface.
-   - Apply SOLID checks to non-test source only:
-     - Single Responsibility: flag classes/modules bundling distinct concern groups, such as validation plus persistence or formatting plus dispatch, only when separating them yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk — never on concern-count or size alone.
-     - Open/Closed: flag caller-side switches or if/else chains on type tags where adding a variant requires modifying existing files.
-     - Liskov: flag subtypes that throw where the base does not, ignore required methods, or narrow the base contract.
-     - Interface Segregation: flag interfaces that force implementors to define unused methods.
-     - Dependency Inversion: flag hardcoded `new ConcreteType()` inside class bodies where abstraction or injection would be natural.
-   - Apply Clean Code checks to test and non-test source:
-     - Magic values: meaningful bare literals should be named constants, especially repeated strings, timeouts, thresholds, and event names.
-     - Function does more than one thing: split only when the result yields an externally-findable named unit (locatable by search or grep from outside the file) or measurably reduces change risk; never split on size or "more than one thing" alone.
-     - Unqualified generic names: flag vague names without domain or role qualification.
-     - What-comments: flag comments that restate code; keep only why comments for constraints, workarounds, or non-obvious invariants.
-     - Half-finished surfaces: flag exported TODOs, stubs, placeholder returns, and "implement later" code.
-     - Long parameter lists: flag more than 3-4 positional parameters; suggest an options object.
-   - Apply KISS/YAGNI/DRY checks:
-     - KISS: flag abstractions, layers, indirection, or control flow that raise cognitive load without clearly improving readability, correctness, or constraint handling. Call out premature generalization, deep call chains, excessive configuration, and clever patterns that obscure intent. Prefer straightforward, explicit code a new reader can follow end-to-end: inline trivial abstractions, collapse unnecessary layers, choose boring solutions unless complexity is justified (real variability, hard constraints, or measured bottlenecks). When weighing whether to split instead of inline, apply the same discoverability-or-change-risk criterion used for the split lead above.
-     - YAGNI: flag speculative features, extension points, and generic infrastructure with no concrete caller, requirement, or near-term use. Call out "just in case" hooks, over-parameterization, unused toggles, and frameworks introduced ahead of need. Prefer implementing only what current use cases demand, structured to evolve when real requirements appear. Defer generalization until duplication or constraints force it, and remove dead or unused paths aggressively.
-     - DRY: flag duplicated logic, data transformations, or domain rules repeated without a strong reason (e.g., performance isolation or explicit decoupling). Highlight copy-paste patterns, parallel conditionals, and repeated constants that raise maintenance cost or inconsistency risk. Recommend consolidation into a single source of truth when it improves clarity and reduces bugs, but avoid over-abstraction that harms readability or adds indirection for trivial reuse.
-     - Prefer delete, inline, or merge recommendations over replacement abstractions when simpler code preserves behavior.
-     - Require usage evidence before calling a surface unnecessary; if evidence is incomplete, mark the item `suspect`.
-     - Do not recommend ports, adapters, bounded contexts, new service/module boundaries, or VSA migration from this workflow; hand those to architecture-audit.
+   - Apply the SOLID, Clean Code, KISS/YAGNI/DRY and Standing Rules sections of `references/code-quality-lens.md`. Use their Flag-when column here; the Fix-direction column belongs to `workflows/code-quality/code-quality-fix.md` and is not an audit output. Report only what the lens's Split Criterion supports.
    - For Android Jetpack Compose and KMP Compose Multiplatform code, apply recomposition quality checks from `references/mobile-context.md`:
      - Excessive recomposition risk: unstable parameters, mutable collections or mutable models crossing composable boundaries, expensive work in composition, unremembered lambdas/objects, inappropriate `derivedStateOf`, broad state reads, and backwards writes after state reads.
      - Missing recomposition or stale UI risk: non-observable mutation, missing or wrong `remember`/effect keys, stale captured lambdas that need `rememberUpdatedState`, incorrect stability annotations, and risky stability configuration entries that can make UX updates fail to happen.

@@ -7,12 +7,12 @@
  *
  * ── Profile ────────────────────────────────────────────────────────────────
  *   `llm-on`  —  bash scripts/e2e-stack.sh up --profile llm-on
- *   which sets (scripts/e2e-stack.sh:169-173):
+ *   which sets (scripts/e2e-stack.sh, the llm-on branch of the profile env):
  *     MASSA_AI_LLM_ENABLED=true
  *     MASSA_AI_LLM_BASE_URL=http://127.0.0.1:11435/v1
  *     MASSA_AI_LLM_API_KEY=ollama
- *     MASSA_AI_LLM_MODEL=$LLM_MODEL            (default qwen2.5:7b-instruct, :65)
- *     MASSA_AI_LLM_CODE_MODEL=$LLM_CODE_MODEL  (default qwen2.5-coder:7b,    :66)
+ *     MASSA_AI_LLM_MODEL=$LLM_MODEL            (default qwen3-vl:8b)
+ *     MASSA_AI_LLM_CODE_MODEL=$LLM_CODE_MODEL  (default qwen2.5-coder:7b)
  *   Both are NON-THINKING instruct models on purpose: a thinking model routes
  *   structured output into the reasoning channel and burns the 90 s timeout
  *   (MASSA_AI_LLM_TIMEOUT_MS default 90000, packages/shared/src/config/index.ts:737)
@@ -815,7 +815,7 @@ describe.skipIf(!READY)("EB-LLM-3b — the code role reads MASSA_AI_LLM_CODE_MOD
       // this would prove only "some LLM call failed". Query understanding's own
       // degradation is already asserted absent above; assert here that no
       // failure line names the INSTRUCT model.
-      const instructModel = process.env.MASSA_AI_E2E_LLM_MODEL ?? "qwen2.5:7b-instruct";
+      const instructModel = process.env.MASSA_AI_E2E_LLM_MODEL ?? "qwen3-vl:8b";
       const failureLines = apiLog
         .split("\n")
         .filter((l) => l.includes("llmObject failed") || l.includes("not found"));

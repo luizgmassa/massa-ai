@@ -75,19 +75,19 @@ Keep local when any are true:
 
 ## Plan Challenge Exception
 
-Plan Challenge `plan-critic` is a standing policy exception to the normal dispatch triggers after a concrete plan exists. Always attempt a read-only `massa-ai-plan-critic` for both `depth: lite` and `depth: full` when subagent tooling is available and platform policy permits spawning. Normal base requirements still matter for packet quality: the critique must be bounded, read-only, and concrete, but it does not need to satisfy the ordinary dispatch triggers such as file count, module count, or explicit user delegation.
+The Plan Challenge `judge` dispatch in `plan-critique` mode is a standing policy exception to the normal dispatch triggers after a concrete plan exists. Always attempt it for both `depth: lite` and `depth: full` when subagent tooling is available and platform policy permits spawning. Normal base requirements still matter for packet quality: the critique must be bounded, write nothing, and be concrete, but it does not need to satisfy the ordinary dispatch triggers such as file count, module count, or explicit user delegation.
 
 For all other roles, preserve the normal delegation gates above.
 
 ## Independent Verification Exception (fix workflows + Standard+ light-workflow tiers)
 
-The Independent Verification Mandate in `references/verification-ladder.md` is a second standing policy exception, parallel to the Plan Challenge one: when a `*-fix` workflow closes a finding, or a light workflow (`debug`, `feature`, `general`, `refactor`) completes Standard+ work, always attempt the `massa-ai-verification-agent` dispatch when subagent tooling is available and platform policy permits spawning — it does not need to satisfy the ordinary dispatch triggers (file count, module count, explicit user delegation). Base packet-quality requirements still apply, and the mandate's own tier gates, security-fix unconditional rule, and fresh-eyes fallback live in that ladder section, not here.
+The Independent Verification Mandate in `references/verification-ladder.md` is a second standing policy exception, parallel to the Plan Challenge one: when a `*-fix` workflow closes a finding, or a light workflow (`debug`, `feature`, `refactor`) completes Standard+ work, always attempt the `code-reviewer` dispatch in `verify` mode when subagent tooling is available and platform policy permits spawning — it does not need to satisfy the ordinary dispatch triggers (file count, module count, explicit user delegation). Base packet-quality requirements still apply, and the mandate's own tier gates, security-fix unconditional rule, and fresh-eyes fallback live in that ladder section, not here.
 
 ## Screen Implementation Exception (any workflow that can produce a screen)
 
-A third standing policy exception, parallel to the two above: **when a task creates or modifies a user-facing screen, always attempt the `massa-ai-designer` dispatch** while subagent tooling is available and platform policy permits spawning. Once that condition holds the dispatch is not subject to the ordinary dispatch triggers — not file count, not module count, not explicit user delegation.
+A third standing policy exception, parallel to the two above: **when a task creates or modifies a user-facing screen, always attempt the `designer` dispatch** while subagent tooling is available and platform policy permits spawning. Once that condition holds the dispatch is not subject to the ordinary dispatch triggers — not file count, not module count, not explicit user delegation.
 
-The condition is the whole gate. On a task with no screen surface the dispatch does not fire at all, which is why the seven dispatching workflows can carry it without firing it on every task. "Creates or modifies a user-facing screen" means a change to a screen, view, page, component, layout, style, theme, or design-token file, or any change whose acceptance criteria describe what a user sees.
+The condition is the whole gate. On a task with no screen surface the dispatch does not fire at all, which is why the dispatching workflows can carry it without firing it on every task. The `design`, `mobile-figma-audit`, and `mobile-figma-fix` workflows dispatch it unconditionally, because every task there is screen work. "Creates or modifies a user-facing screen" means a change to a screen, view, page, component, layout, style, theme, or design-token file, or any change whose acceptance criteria describe what a user sees.
 
 Two shape rules follow from the roles involved:
 
@@ -98,16 +98,25 @@ Base packet-quality requirements still apply, and the no-agent fallback below ap
 
 ## Name Resolution
 
-Charters live at `skills/agents/<role>/SKILL.md`. Hosts register every charter
-under the prefixed name `massa-ai-<role>` (Claude, Codex, Cursor, OpenCode all
-use that prefix; `scripts/generate-subagent-artifacts.ts` emits it).
+Charters live at `skills/agents/<role>/SKILL.md`. Every host registers each
+charter under its bare role name (`scripts/generate-subagent-artifacts.ts` emits
+`<role>.md` / `<role>.toml` with `name: <role>`). Installers tell massa-ai's
+agent files apart from a user's by the `massa-ai-owned` content marker, never
+by name, and never overwrite a same-named agent the user owns.
 
-- **Dispatch under the prefixed host name**, never the bare role name. A bare
-  `subagent_type` does not resolve on any supported host.
-- The bare role name is the registry key: use it in memory tags, capability
-  packets, and prose.
-- Every dispatch block in a workflow carries the prefixed name inline so
-  dispatch never depends on this file being loaded.
+- **Claude plugin route: dispatch `massa-ai:<role>`.** Plugin agents live in the
+  plugin namespace (the agent list shows them as `massa-ai:<role>`), so the
+  qualified name reaches massa-ai's agent even when the user or the project
+  defines an agent with the same bare name. The always-loaded router states this
+  rule, so dispatch never depends on this file being loaded.
+- **Claude file route, Codex, Cursor, OpenCode: dispatch the bare `<role>`.**
+  These hosts have no agent namespace. Accepted risk: when an installer skipped
+  a same-named agent the user owns (it warns at install time), that user agent
+  receives the dispatch.
+- Dispatch blocks and prose name the bare role; it is also the registry key in
+  memory tags and capability packets.
+- The pre-rename `massa-ai-<role>` names are retired: installers prune them on
+  upgrade, and no workflow dispatches them.
 
 If the named agent is unavailable for any reason — not registered, plugin not
 installed, spawning forbidden by platform policy, or the host returns an unknown
@@ -117,18 +126,17 @@ delegation with its reason in the Evidence Gate.
 
 ## Model Diversity Fallback
 
-Applies to any charter whose `metadata.model_tier` is a fallback and whose
-dispatching workflow additionally requests per-invocation model diversity at
-dispatch time (e.g. `judge` — 3 parallel slots; `meta-judge` — one slot).
+Applies to any charter whose dispatching workflow requests per-invocation model diversity
+at dispatch time (e.g. `judge` in `scorer` mode — 3 parallel slots; `judge` in `spec-author` mode — one slot).
 
-- The charter's `metadata.model_tier` is the fallback every host runs when
-  dispatch-time model selection is unavailable.
-- The dispatching workflow (e.g. `workflows/judge-with-debate.md`) is the
-  single source for the current slot/model assignment, not the charter file.
-- When dispatch-time selection is unavailable, every affected slot runs the
-  charter default, and the orchestrator records `DIVERSITY DEGRADED`
-  (multi-slot) or an equivalent diversity warning (single-slot) per the
-  dispatching workflow's own contract.
+- Agents without a per-agent model override in the built-in profiles (`code-explorer`,
+  `code-reviewer`, `judge`, `product-manager`) resolve to the profile's per-tool default.
+  By convention, the default is the profile's strongest model.
+- The dispatching workflow (e.g. `workflows/judge-with-debate.md`) is the single source
+  for the current slot/model assignment, not the charter file.
+- When dispatch-time selection is unavailable, every affected slot runs the profile default,
+  and the orchestrator records `DIVERSITY DEGRADED` (multi-slot) or an equivalent diversity
+  warning (single-slot) per the dispatching workflow's own contract.
 
 ## Roles
 
@@ -137,11 +145,9 @@ dispatch.
 
 Before adding a new reusable role, load `references/subagent-design.md` and write a bounded role charter. For one-off tasks, use an existing role plus the prompt contract below instead of inventing a new role.
 
-## Roles
-
 **The roster lives in one place: the Agent Table of `skills/AGENTS.md`**, which names
 every shipped specialist with its purpose, trigger, permission, and charter path. Do not
-restate it here. A second roster in this file is what let `judge` and `meta-judge` go
+restate it here. A second roster in this file is what once let the two debate-panel charters go
 undocumented for a whole release with every gate green — the guard checked that the
 charter paths *mentioned* here resolve, which a charter that is never mentioned cannot
 fail.
@@ -152,22 +158,20 @@ resolves to a current agent.
 
 | Legacy role | Current agent | Note |
 |---|---|---|
-| `implementer` | `massa-ai-builder` | renamed |
-| `verifier` | `massa-ai-verification-agent` | renamed; also centralizes the Verification Ladder |
-| `domain-mapper` | `massa-ai-architecture-specialist` | folded in; `lens: domain` |
-| `coupling-auditor` | `massa-ai-architecture-specialist` | folded in; `lens: coupling` |
-| `deepening-architect` | `massa-ai-architecture-specialist` | folded in; `lens: deepening` |
+| `implementer` | `senior-engineer` | renamed |
+| `verifier` | `code-reviewer` | folded in; `mode: verify`, which centralizes the Verification Ladder |
+| `domain-mapper` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: domain` (packet field defined in the `code-reviewer` charter Inputs) |
+| `coupling-auditor` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: coupling` |
+| `deepening-architect` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: deepening` |
 
-`investigator`, `plan-critic` and `furps-analyst` kept their own names; every other
-specialist is new and never had a legacy one. Workflows dispatch the current
-`massa-ai-<role>` name through a named dispatch block — the legacy column is traceability
-only, never a dispatch target.
+Workflows dispatch the current `<role>` name through a named dispatch block — the
+legacy column is traceability only, never a dispatch target.
 
 ## Capability Packet
 
-**This section is the sole canonical Capability Packet definition.** `references/subagent-design.md` mirrors this list and the root `skills/AGENTS.md` registry points here without restating it. Bespoke packets (judge panel, FURPS analyst, phase-batch worker) are declared specializations that map onto these fields in their own workflow files.
+**This section is the sole canonical Capability Packet definition.** `references/subagent-design.md` and the root `skills/AGENTS.md` registry point here without restating it. Bespoke packets (judge panel, `product-manager` FURPS dispatch, phase-batch worker) are declared specializations that map onto these fields in their own workflow files.
 
-**A subagent inherits nothing from the parent session** — no skills, no personas, no loaded references, no conversation history. Everything the subagent needs is named explicitly in the packet, including the exact reference file paths it must read itself.
+**A subagent inherits nothing from the parent session** — no skills, no loaded references, no conversation history. Everything the subagent needs is named explicitly in the packet, including the exact reference file paths it must read itself.
 
 When dispatching a subagent, send a compact capability packet rather than a loose instruction. Include:
 
@@ -181,11 +185,46 @@ When dispatching a subagent, send a compact capability packet rather than a loos
 - `output`: the exact output contract
 - `firewall`: raw logs, diffs, snapshots, reports, or research that must be summarized
 - `memory`: whether the subagent may suggest memories and who persists them
-- `persona`: optional. The cataloged persona id in effect for the parent conversation, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions. Pass the id alone, never the persona prompt.
 - `next_use`: what the main agent will do with the result
-- `lens`: conditional — `audit-specialist` dispatches only. One of `bugs | architecture | security | requirements | code-quality | performance`.
+- `mode`: conditional — for a charter that declares modes (`code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, `test-engineer`), the `Mode:` section of the charter this dispatch runs; a lazy charter's `### Mode:` stub heading satisfies this field exactly as a full inline section does.
+- `mode_contract`: conditional — for a **lazy charter** (`designer`, `judge`, `test-engineer`) only. The dispatched mode's `Mode:` section in the charter is a stub naming exactly its contract file(s) under `references/agent-modes/<agent>/<mode>.md` (`judge` `plan-critique` splits by `depth` into `plan-critique-lite.md`/`plan-critique-full.md`). Before dispatch, the **main agent** reads that file and inlines its verbatim content here; the subagent reads only this field, never the reference path itself. A lazy-mode packet without `mode_contract` returns `Blocked`.
+- `lens`: conditional — `code-reviewer` `audit` dispatches only. One of `bugs | architecture | security | code-quality | performance | diff`; the requirements lens is `product-manager` `audit` mode and the tests lens is `test-engineer` `audit` mode.
 
-The named dispatch block that workflows embed (the quoted block whose header carries the prefixed agent name and role) is the block projection of this packet: `role` and `purpose` live in the block's header line, and `next_use` defaults to "the main agent synthesizes and continues the workflow" when absent. The remaining eight fields — `trigger, scope, permissions, inputs, sensors, output, firewall, memory` — appear as the block's body lines. The optional `persona` field appears there too.
+The named dispatch block that workflows embed (the quoted block whose header carries the agent name, role, and mode) is the block projection of this packet: `role`, `mode`, and `purpose` live in the block's header line, and `next_use` defaults to "the main agent synthesizes and continues the workflow" when absent. The remaining eight fields — `trigger, scope, permissions, inputs, sensors, output, firewall, memory` — appear as the block's body lines, except where Role Defaults below already fix a field's value.
+
+### Role Defaults
+
+A dispatch block carries only what varies. Every line below is that field's value
+for **every** dispatch of the named role, supplied by this file rather than
+restated per workflow. A block that restates one has forked the contract, which
+is the failure these defaults exist to make impossible — the same field said
+twice is the same field free to disagree.
+
+Reading a workflow's dispatch block therefore means reading this section beside
+it. That is the trade: the block stops being self-contained in exchange for
+having exactly one place a shared value can be wrong.
+
+**`code-reviewer`** (every mode)
+
+- `permissions`: read-only
+
+**`code-reviewer`, `mode: audit`, `lens: diff`**
+
+- `fallback`: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
+
+**`designer`** — its dispatch is mandatory-on-condition, so its trigger is
+fixed here rather than per workflow; a block that reworded it would silently make
+the dispatch advisory in that one file.
+
+- `trigger`: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched, and the `design`, `mobile-figma-audit`, and `mobile-figma-fix` workflows dispatch it unconditionally
+- `sensors`: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
+- `inputs`: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
+- `firewall`: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
+- `memory`: suggest-only; the main agent persists durable screen and design-token conventions
+
+A designer block therefore carries only `scope`, `permissions` and `output` — the
+three fields that genuinely differ between an audit that may not write and an
+implementation workflow that may.
 
 ## Prompt Contract
 
@@ -241,22 +280,22 @@ Do not expose raw subagent prompts, raw logs, private reasoning, or full output 
 Example:
 
 ```md
-🤖 [Agent Started] Verifier is checking the docs-only change set. Scope: massa-ai references and README.
-🤖 [Agent Done] Verifier found no stale references. Skipped checks: none.
+🤖 [Agent Started] Code Reviewer (verify mode), model `<model>`, effort `<effort>`. Scope: massa-ai references and README.
+🤖 [Agent Done] Code Reviewer found no stale references. Skipped checks: none.
 ```
 
 ### Model/Effort Announcement
 
-Every dispatch of any of the 18 massa-ai roster specialists names the agent, its model,
+Every dispatch of any of the 7 massa-ai roster specialists names the agent, its model,
 and its effort in the `Agent Started` line above, inside that line's existing 1-2 line
 budget. No exemption: this covers the three standing dispatch exceptions
-(`plan-critic`, `verification-agent`, `designer`) and spec-driven batch workers exactly
+(`judge` in `plan-critique` mode, `code-reviewer` in `verify` mode, `designer`) and spec-driven batch workers exactly
 like every other dispatch.
 
 - **Source**: the *installed* agent file for the active host — never
   `skills/model-profiles.json`. The installed file reports what the host will actually
   load, including any local profile-switch overlay the registry cannot see.
-- **Read once per session**, for all 18 agents, and cache the result — not once per
+- **Read once per session**, for all 7 agents, and cache the result — not once per
   dispatch.
 - Absent `effort` in the installed file announces `effort: inherit`. Absent `model`, or
   `model: inherit`, announces `model: inherit`.
@@ -264,33 +303,33 @@ like every other dispatch.
   exact attempted path, and the dispatch proceeds — the read never blocks a dispatch.
 
 ```md
-🤖 [Agent Started] Investigator — model opus, effort high. Scope: the four emitters.
+🤖 [Agent Started] Code-explorer — model opus, effort high. Scope: the four emitters.
 🤖 [Agent Started] Designer — model/effort unknown (no installed agent file at
-   ~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents/massa-ai-designer.md). Dispatching anyway.
+   <liveRoot>/agents/designer.md). Dispatching anyway.
 ```
 
 That second line is a measured case, not a hypothetical: on a machine with plugin
-bundle `1.48.0` installed, `massa-ai-designer.md` is absent because `designer` shipped
+bundle `1.48.0` installed, `designer.md` is absent because `designer` shipped
 in `1.50.0` — a live instance of the degraded path above.
 
 Per-host installed-agent path, matching `resolveHostLayout` in
 `packages/shared/src/profile-switch/hosts.ts` — a sensor executes that resolver against
 this table so the two cannot drift silently:
 
-| Host | Installed agents directory | Glob | Model / effort keys |
+| Host | Installed agents directory | Owned files | Model / effort keys |
 | --- | --- | --- | --- |
-| Claude — marketplace route | `<marketplaceRoot>/agents` — a *versioned* bundle root, e.g. `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents` | `massa-ai-*.md` | `model:` / `effort:` |
-| Claude — file route | `~/.claude/agents` | `massa-ai-*.md` | `model:` / `effort:` |
-| Codex | `~/.codex/agents` | `massa-ai-*.toml` | `model` / `model_reasoning_effort` |
-| OpenCode | `~/.config/opencode/agents` | `massa-ai-*.md` | `model:` / `reasoningEffort:` |
+| Claude — marketplace route | `<marketplaceRoot>/agents`, where `<marketplaceRoot>` is `resolveClaudeMarketplaceInstall`'s live root: for a **directory-source** marketplace the host loads the plugin LIVE from the source bundle — e.g. `<repo>/apps/claude-plugin/agents`; for any other kind it is the *versioned* cache snapshot, e.g. `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents` (a stale-able snapshot — never hardcode it; read `profile_list`'s `liveRoot`) | `*.md` whose first body line is `<!-- massa-ai-owned: true -->` | `model:` / `effort:` |
+| Claude — file route | `~/.claude/agents` | `*.md` whose first body line is `<!-- massa-ai-owned: true -->` | `model:` / `effort:` |
+| Codex | `~/.codex/agents` | `*.toml` whose first line is `# massa-ai-owned` | `model` / `model_reasoning_effort` |
+| OpenCode | `~/.config/opencode/agents` | `*.md` symlinks into the massa-ai bundle | `model:` / `reasoningEffort:` |
 | Cursor | no lookup — `resolveHostLayout` returns route `skip` | — | announce `model: inherit, effort: inherit` for every agent; Cursor publishes no resolvable model IDs |
 
 Claude's active route (`marketplace` vs `file`) comes from `install-state.json`'s
 per-platform `installRoute` field, never guessed from directory presence.
 
-## Plan-Critic Contract
+## Plan-Critique Contract
 
-Dispatch `massa-ai-plan-critic` only after a concrete plan exists. Dispatch it with the capability packet above and the standard output contract. The subagent receives the plan, scope, constraints, compact recalled facts/evidence, selected depth, selected The Fool mode only for full gates, known risks, verification recipe, parent identifiers, and context-firewall limits. It never receives full conversation context.
+Dispatch `judge` with `mode: plan-critique` only after a concrete plan exists. Dispatch it with the capability packet above and the standard output contract. The subagent receives the plan, scope, constraints, compact recalled facts/evidence, selected depth, `fool_mode` (the selected The Fool mode: `pre_mortem`, `red_team`, `evidence_audit`, `socratic`, or `dialectic`; distinct from the packet `mode`, which stays `plan-critique`) only for full gates, known risks, verification recipe, parent identifiers, and context-firewall limits. It never receives full conversation context.
 
 For `depth: lite`, the packet uses the low-risk checklist and does not include The Fool mode references. It returns:
 
@@ -301,9 +340,9 @@ For `depth: lite`, the packet uses the low-risk checklist and does not include T
 - `escalate_to_full: true|false`
 - escalation reason
 
-For `depth: full`, or after lite escalation, the main agent selects the mode, loads the relevant The Fool references, and dispatches a full packet. It returns:
+For `depth: full`, or after lite escalation, the main agent selects the The Fool mode, loads the relevant The Fool references, and dispatches a full packet carrying it as `fool_mode`. It returns:
 
-- selected mode
+- selected `fool_mode`
 - steelmanned thesis
 - 3-5 strongest challenges
 - severity: `critical`, `high`, `medium`, or `low`
@@ -313,15 +352,14 @@ For `depth: full`, or after lite escalation, the main agent selects the mode, lo
 - confidence impact
 - exact next step
 
-The main agent owns final synthesis and applies the canonical Plan Challenge
-Policy: the `<!-- massa-ai:bootstrap -->` block installed as `<host>/AGENTS.md`,
-whose single source is `skills/AGENTS.md` in the product repo.
+The main agent owns final synthesis and applies the fixed Plan Challenge Gate
+in `SKILL.md` §Plan Challenge Gate.
 
 ## Memory Rules
 
 - Main agent persists durable conclusions after synthesis.
 - Subagents may suggest memory content but should not create broad project memories unless explicitly assigned.
-- Use tags such as `agent:verifier` or `agent:domain-mapper` only when they improve retrieval.
+- Use tags such as `agent:code-reviewer` or `agent:code-explorer` only when they improve retrieval.
 - Do not persist one-off subagent chatter.
 
 ## Synapse Isolation

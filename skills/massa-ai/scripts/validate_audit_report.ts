@@ -27,7 +27,7 @@
  *
  *   report.md   Path to a saved audit report markdown file.
  *   --family    One of: architecture | bugs | code-quality | security |
- *               requirements | tests | maestro | mobile-figma | implementation
+ *               requirements | tests | mobile-figma | implementation
  *               Auto-detected from the report's `Workflow:` metadata line
  *               when omitted.
  *   --strict    Treat warnings as errors.
@@ -39,7 +39,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 interface FamilyConfig {
   workflow: string;
-  /** Single-lens/MFM/MST prefix, or null for the implementation composite family. */
+  /** Single-lens/MFM prefix, or null for the implementation composite family. */
   prefix: string | null;
   extraMetadata: string[];
 }
@@ -74,11 +74,6 @@ const FAMILIES: Record<string, FamilyConfig> = {
   security: { workflow: "security-audit", prefix: "SEC", extraMetadata: ["Requirements Source"] },
   requirements: { workflow: "requirements-audit", prefix: "REQ", extraMetadata: ["Requirements Source"] },
   tests: { workflow: "tests-audit", prefix: "TST", extraMetadata: ["Requirements Source"] },
-  maestro: {
-    workflow: "maestro-audit",
-    prefix: "MST",
-    extraMetadata: ["Scenario Source", "Maestro CLI", "Device/Emulator Readiness"],
-  },
   "mobile-figma": {
     workflow: "mobile-figma-audit",
     prefix: "MFM",
@@ -158,7 +153,7 @@ interface RawFinding {
 }
 
 const FINDING_HEADER_RE = /^###\s+([^:]+):/;
-/** `<PREFIX>-<N>` (single-lens/MFM/MST) or `<Area>/<PREFIX>-<N>` (implementation composite). */
+/** `<PREFIX>-<N>` (single-lens/MFM) or `<Area>/<PREFIX>-<N>` (implementation composite). */
 const SIMPLE_ID_RE = /^([A-Z][A-Z]*)-(\d+)$/;
 const COMPOSITE_ID_RE = /^([A-Za-z][A-Za-z ]*?)\/([A-Z][A-Z]*)-(\d+)$/;
 

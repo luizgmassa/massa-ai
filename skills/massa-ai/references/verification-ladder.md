@@ -10,6 +10,8 @@ Classify implementation size before editing:
 - Standard: <=10 files or <=500 changed LOC within one ownership area, or shared behavior/public API/test impact that still has clear acceptance criteria and no unresolved architecture decision.
 - Spec-driven: >10 files, >500 changed LOC, multiple ownership areas, unclear acceptance criteria, new dependency, migration, irreversible operation, security/privacy/auth, public compatibility, cross-service contract, or any unresolved architecture/product decision.
 
+Get the file and LOC halves from `bun skills/massa-ai/scripts/size_change.ts` (`--staged` for the index, `--range <a>..<b>` for a range) rather than counting a diff by eye. It reports changed files, changed LOC (added + deleted), and the resulting **size floor**. The qualitative half of each bullet above — acceptance criteria, dependencies, migrations, irreversible operations, security/privacy/auth, public compatibility, cross-service contracts, unresolved decisions — is invisible to a diff, so the script's answer is a lower bound: raise it when any of those applies, never lower it.
+
 Quick tasks can proceed inside the active workflow. Standard tasks need an explicit verification recipe before edits. Spec-driven tasks should route to `workflows/spec-driven.md` or be split into atomic tasks.
 
 ## Shared Reference Trigger Table
@@ -48,10 +50,10 @@ Every `*-fix` workflow must execute this gate for each selected finding or coher
 
 ### Independent Verification Mandate (author ≠ verifier)
 
-- At **Standard+ or Spec-driven size, or for any high/critical-severity finding**, dispatching `massa-ai-verification-agent` is **mandatory** before closure — the author must not be the sole verifier of their own work. At Quick size, the subagent hop may be skipped, but the check itself is never skipped: run a standalone fresh-eyes re-check (re-read the finding/ACs, changed files, tests, and diff from scratch) against the same output contract.
+- At **Standard+ or Spec-driven size, or for any high/critical-severity finding**, dispatching `code-reviewer` in `verify` mode is **mandatory** before closure — the author must not be the sole verifier of their own work. At Quick size, the subagent hop may be skipped, but the check itself is never skipped: run a standalone fresh-eyes re-check (re-read the finding/ACs, changed files, tests, and diff from scratch) against the same output contract.
 - **Exception — `security-fix` dispatches the verifier unconditionally** for every finding closed `fixed`, at every tier.
 - Fallback discipline: when the subagent is unavailable (not registered, spawning forbidden), run the standalone fresh-eyes re-check from scratch and record the skipped-delegation reason in closure evidence.
-- Reviewer + verifier both dispatching at Standard+ is intentional cost, mirroring spec-driven's always-on pair — not accidental duplication.
+- `code-reviewer` in `audit` mode (`lens: diff`) and in `verify` mode both dispatching at Standard+ is intentional cost, mirroring spec-driven's always-on pair — not accidental duplication.
 
 ### Discrimination Sensor
 

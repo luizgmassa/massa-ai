@@ -1,5 +1,5 @@
 /**
- * Config tab — the 15 sectioned forms, per-section save, secret reveal, and the
+ * Config tab — the 17 sectioned forms, per-section save, secret reveal, and the
  * server restart action.
  *
  * `CONFIG_SECTIONS` is the declarative field schema the whole tab is generated
@@ -62,7 +62,11 @@ export interface ResolvedConfigField {
    *  left open. The 5 fields with no shipped default (`embedding.apiKey`,
    *  `compression.prompt`, `logging.file`, `security.apiKey`,
    *  `security.allowedExtensions`) still resolve `value: undefined` here and
-   *  render blank, exactly as before T43. */
+   *  render blank, exactly as before T43. `embedding.contextWindow` and
+   *  `embedding.batchSize` used to be in that list: they stay absent from
+   *  `defaultMassaAiConfig.embedding` (PDM-12 — the role table and the provider
+   *  seam are their default source), but the config route now derives both into
+   *  the `defaults` block, so they render inherited instead of blank. */
   inherited: boolean;
 }
 

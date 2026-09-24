@@ -39,6 +39,7 @@ import {
   llmObject,
   _setLlmEnabledForTesting,
   _setJsonSchemaSupportedForTesting,
+  _setLlmBaseUrlForTesting,
   _checkJsonSchemaSupport,
 } from "../services/memory/llm-client.js";
 import { z } from "zod";
@@ -54,6 +55,7 @@ const sampleSchema = z.object({
 beforeEach(() => {
   _setLlmEnabledForTesting(true);
   _setJsonSchemaSupportedForTesting(null);
+  _setLlmBaseUrlForTesting(null);
   lastCall = null;
   generateObjectShouldThrow = null;
   generateObjectReturn = null;
@@ -62,7 +64,7 @@ beforeEach(() => {
 describe("json_schema constrained decoding (W7-07)", () => {
   test("json_schema supported: passes schemaName, uses default output (schema path)", async () => {
     _setJsonSchemaSupportedForTesting(true);
-    const res = await llmObject("test prompt", sampleSchema);
+    const res = await llmObject("test prompt", sampleSchema, { label: "test" });
     expect(res.ok).toBe(true);
     expect(lastCall.schemaName).toBe("response");
     expect(lastCall.output).toBeUndefined();
@@ -71,7 +73,7 @@ describe("json_schema constrained decoding (W7-07)", () => {
 
   test("json_schema unsupported: uses no-schema output (json_object fallback)", async () => {
     _setJsonSchemaSupportedForTesting(false);
-    const res = await llmObject("test prompt", sampleSchema);
+    const res = await llmObject("test prompt", sampleSchema, { label: "test" });
     expect(res.ok).toBe(true);
     expect(lastCall.output).toBe("no-schema");
     expect(lastCall.schemaName).toBeUndefined();
@@ -80,7 +82,7 @@ describe("json_schema constrained decoding (W7-07)", () => {
   test("json_schema unsupported: validates returned object against schema manually", async () => {
     _setJsonSchemaSupportedForTesting(false);
     generateObjectReturn = { object: { summary: "test", type: "code", level: 3, rationale: "r", sourceIds: ["x", "y"] } };
-    const res = await llmObject("test prompt", sampleSchema);
+    const res = await llmObject("test prompt", sampleSchema, { label: "test" });
     expect(res.ok).toBe(true);
     expect(res.value?.summary).toBe("test");
     expect(res.value?.type).toBe("code");
@@ -90,7 +92,7 @@ describe("json_schema constrained decoding (W7-07)", () => {
   test("json_schema unsupported: returns {ok:false} when returned object fails schema validation", async () => {
     _setJsonSchemaSupportedForTesting(false);
     generateObjectReturn = { object: { summary: "test", type: "invalid_type", level: 1 } };
-    const res = await llmObject("test prompt", sampleSchema);
+    const res = await llmObject("test prompt", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/schema validation failed/);
   });
@@ -98,7 +100,7 @@ describe("json_schema constrained decoding (W7-07)", () => {
   test("graceful degradation: generateObject throw returns {ok:false}", async () => {
     _setJsonSchemaSupportedForTesting(true);
     generateObjectShouldThrow = "AI_NoObjectGeneratedError: schema mismatch";
-    const res = await llmObject("test prompt", sampleSchema);
+    const res = await llmObject("test prompt", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/schema mismatch/);
   });
@@ -106,7 +108,7 @@ describe("json_schema constrained decoding (W7-07)", () => {
   test("json_schema unsupported + generateObject throw: reasoning recovery still applies", async () => {
     _setJsonSchemaSupportedForTesting(false);
     generateObjectShouldThrow = "parse error";
-    const res = await llmObject("test prompt", sampleSchema);
+    const res = await llmObject("test prompt", sampleSchema, { label: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/parse error/);
   });
@@ -117,7 +119,7 @@ describe("json_schema constrained decoding (W7-07)", () => {
     const origFetch = globalThis.fetch;
     (globalThis as any).fetch = async () => { throw new Error("connection refused"); };
     try {
-      const res = await llmObject("test prompt", sampleSchema);
+      const res = await llmObject("test prompt", sampleSchema, { label: "test" });
       expect(res.ok).toBe(true);
       expect(lastCall.output).toBe("no-schema");
     } finally {
@@ -194,6 +196,25 @@ describe("json_schema version parser (discrimination)", () => {
       expect(supported).toBe(false);
     } finally {
       globalThis.fetch = origFetch;
+    }
+  });
+
+  // LIP-07: LM Studio has no /api/version endpoint to probe and implements
+  // response_format:{type:"json_schema"} natively, so the version-parser
+  // path above must not even run against it.
+  test("lmstudio baseUrl → supported without ever reaching the version parser", async () => {
+    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async () => {
+      throw new Error("fetch must not be called for a provider with no version probe");
+    };
+    _setJsonSchemaSupportedForTesting(null);
+    try {
+      const supported = await _checkJsonSchemaSupport();
+      expect(supported).toBe(true);
+    } finally {
+      globalThis.fetch = origFetch;
+      _setLlmBaseUrlForTesting(null);
     }
   });
 });

@@ -8,7 +8,7 @@ metadata:
 
 ### Spec-Driven
 
-Use for explicit spec-driven requests and broad, ambiguous, migration-heavy, cross-boundary, public-contract, or long-running delivery that needs requirements-through-verification control. Ordinary localized fixes and clear small features stay in `debug`, `feature`, `refactor`, or `general` unless the user explicitly requests this workflow.
+Use for explicit spec-driven requests and broad, ambiguous, migration-heavy, cross-boundary, public-contract, or long-running delivery that needs requirements-through-verification control. Ordinary localized fixes and clear small features stay in `debug`, `feature`, or `refactor` unless the user explicitly requests this workflow.
 
 Load `references/project-context.md` (intake sweep) before the first substantive read.
 
@@ -36,7 +36,7 @@ Holds for every task, even if reference files are not opened:
 1. Tests derive from the spec's acceptance criteria and assert spec-defined outcomes — they never mirror the implementation.
 2. The gate must pass (tests pass) before a task is done — the test runner decides, not self-assessment.
 3. One atomic commit per task. Never batch tasks; never weaken, skip, or delete tests to make them pass.
-4. After the last task, a fresh verification-agent always runs automatically (author ≠ verifier) — spec-anchored outcome check plus discrimination sensor. Never optional, never prompted.
+4. After the last task, a fresh `code-reviewer` verifier (`verify` mode) always runs automatically (author ≠ verifier) — spec-anchored outcome check plus discrimination sensor. Never optional, never prompted.
 5. **Blast radius (approval ≠ remote authority):** Approving Execute for this feature authorizes local implementation and local commits, and covers one delivery through PR creation — branch push and `gh pr create` — under one explicit go-ahead given at Execute start. Force-push, deploy, production database changes, merges, and any other remote/externally-visible/destructive operation always require a separate explicit go-ahead, even after that authorization.
 
 ## Auto-Sizing
@@ -96,9 +96,19 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 3. Run `Specify` with `references/spec-driven/specify.md`.
    - Capture stable requirement IDs, testable acceptance criteria, edge cases, and explicit out-of-scope items.
    - Run `references/spec-driven/discuss.md` inside Specify when gray areas, implicit requirements, persistence/state, external calls, auth, payments, concurrency, or state transitions affect behavior.
+
+> **Dispatch: `product-manager`** (role: `product-manager`, mode: `audit`) — charter `skills/agents/product-manager/SKILL.md`
+> - trigger: every Specify run, once `spec.md` is drafted, before the Requirement Closure Gate
+> - scope: the drafted `spec.md`
+> - permissions: read-only
+> - inputs: `lens: requirements`; the drafted spec; recalled requirement decisions
+> - output: findings — ambiguity, gap, contradiction, implicit-requirement, and uncovered-scenario lists — that the main agent resolves with the user or records as an accepted assumption in the Requirement Closure Gate
+> - firewall: raw spec text summarized, not returned raw
+> - memory: suggest-only; main agent persists reusable requirements patterns
+
    - For Android, iOS, or KMP Compose Multiplatform UI work, run the optional design-source intake gate from `references/mobile-context.md` (Design-Source Intake Gate).
    - WHERE one or more Figma links or node IDs are supplied for this work (any platform), lazily load `references/figma-pre-analysis.md`, `references/figma-wiring.md`, and `references/design-implementation.md` before Design/Tasks close; mobile targets additionally keep the Design-Source Intake Gate above.
-   - Apply the Requirement Closure Gate: every open requirement question is resolved with the user or recorded as an accepted assumption before execution begins.
+   - Apply the Requirement Closure Gate: every open requirement question is resolved with the user or recorded as an accepted assumption before execution begins, incorporating the `product-manager` `audit` findings above.
 **Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
 
 4. Decide whether `Design` is required. If yes, run `references/spec-driven/design.md`, including its deterministic validation before presenting `design.md` for confirmation; if no, record why the skip is valid. When Design is skipped and a design concern appears later, stop and create `design.md` before continuing.
@@ -114,50 +124,39 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Use per-task commits when the environment and user permissions allow commits; otherwise record the skipped reason.
    - Keep validation assets protected.
    - Update logical feature artifacts in `.specs/features/<slug>/` and `.specs/project/STATE.md` after meaningful progress.
-    - Finish Execute by running `references/spec-driven/validate.md`. Dispatch `verification-agent` (author ≠ verifier) per `references/agent-orchestration.md`; the verification-agent always runs automatically and writes `.specs/features/<slug>/validation.md`. Without subagents, run the standalone fresh-eyes fallback in `validate.md`.
+    - Finish Execute by running `references/spec-driven/validate.md`. Dispatch `code-reviewer` in `verify` mode (author ≠ verifier) per `references/agent-orchestration.md`; the `code-reviewer` verifier always runs automatically and writes `.specs/features/<slug>/validation.md`. Without subagents, run the standalone fresh-eyes fallback in `validate.md`.
 
-**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
+**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
-> **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
-> - trigger: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched
+> **Dispatch: `designer`** (role: `designer`, mode: `implement`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
-> - inputs: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
-> - sensors: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
-> - firewall: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
-> - memory: suggest-only; the main agent persists durable screen and design-token conventions
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the task's diff surface and its task/AC context
-> - permissions: read-only
-> - inputs: diff, acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: spec-driven Execute final gate; author ≠ verifier independence required
 > - scope: the feature's git diff surface, test files, and spec ACs
-> - permissions: read-only
 > - inputs: `spec.md` (ACs = source of truth), `references/spec-driven/validate.md` as operating checklist, commit range, test files in scope
 > - sensors: (1) spec-anchored outcome check — each test's asserted value matches the spec-defined expected outcome; (2) discrimination sensor — injects behavior-level faults in scratch state, confirms tests kill them, discards mutations; surviving mutants become fix tasks
 > - output: `.specs/features/<slug>/validation.md` (PASS/FAIL, per-AC evidence, sensor result, diff range); compact verdict + ranked gap list; gaps become fix tasks
 > - firewall: raw diffs/logs/test output summarized; mutations run in scratch state only
 > - memory: suggest-only; main agent persists validation outcomes
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-    - The verification-agent re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
+    - The `code-reviewer` verifier re-derives coverage independently using evidence-or-zero and does not inherit the author's mental model.
    - The fix → re-verify loop is bounded by the Bounded Fix→Re-verify Loop rule in `references/verification-ladder.md` (cap reached → `Blocked`).
    - Distill lesson signals through `references/lessons.md` when validation produces grounded reusable failures.
 7. Before the delivery chain's Propose stage (PR creation), write and commit `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` on the branch — not merely "after meaningful progress" during Execute, but committed before `gh pr create`. **Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` — a non-zero exit blocks Propose (see `references/implementation-delivery.md` stage 3.5 and GATE-02). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved). Record decisions, blockers, handoff, and completion evidence per `references/spec-driven/memory.md`'s write triggers.
 8. When the user splits planning and implementation across clean chats, resume from the canonical `.specs/` artifacts — `.specs/project/STATE.md`, `.specs/project/FEATURES.json`, `.specs/HANDOFF.md`, and the feature's phase files. This workflow owns the spec phase contracts on both sides of the split; there is no separate save/load procedure.
-9. Complete the configured Plan Challenge Gate for non-trivial plans and complete `references/evidence-gate.md` before claiming completion.
+9. Complete the Plan Challenge Gate for non-trivial plans and complete `references/evidence-gate.md` before claiming completion.
 
 ## Artifact Ownership
 
@@ -179,7 +178,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
 - Requirement cannot close: keep Specify open and ask the user, or record an explicit accepted assumption before execution.
 - Design or Tasks was skipped incorrectly: stop, create the missing artifact, and resume from the updated contract.
 - Validation command unavailable: record the missing command/tool in `validation.md` and mark `Blocked`.
-- Discrimination sensor cannot be made safely reversible: mark `Blocked` unless the verification-agent can prove equivalent discrimination with an existing deterministic mutation fixture.
+- Discrimination sensor cannot be made safely reversible: mark `Blocked` unless the `code-reviewer` verifier can prove equivalent discrimination with an existing deterministic mutation fixture.
 - Validation conflict: stop for user resolution when a validation asset conflicts with an approved specification.
 - Fix loop reaches the `references/verification-ladder.md` cap: stop with `Blocked`, preserve evidence, and ask for direction.
 
@@ -211,8 +210,8 @@ Memory:
 | Record decision, project-level decision | `references/spec-driven/memory.md` |
 | Pause work, end session, I need to stop | `references/spec-driven/memory.md` |
 | Resume work, continue, pick up where we left off | `references/spec-driven/memory.md` |
-| Load lessons, what have we learned, apply past lessons | `references/spec-driven/lessons.md` |
-| Record lesson, distill lessons (auto-runs after validation) | `references/spec-driven/lessons.md` |
+| Load lessons, what have we learned, apply past lessons | `references/lessons.md` |
+| Record lesson, distill lessons (auto-runs after validation) | `references/lessons.md` |
 
 ## Output Behavior
 
@@ -228,4 +227,3 @@ User asks: "Specify offline draft sync, design it, create tasks, implement it, a
 4. Include Tasks because execution has dependency complexity.
 5. Execute one approved task at a time.
 6. Finish Execute with independent validation, including the discrimination sensor, then write `validation.md`.
-<!-- validator anchors: .specs/ files | current repository source and approved .specs/ artifacts override stale memory | .specs/ directory missing | 3 verification iterations -->

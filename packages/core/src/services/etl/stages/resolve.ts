@@ -210,7 +210,19 @@ export class ResolveStage {
     if (identities.length !== parsed.symbols.length) {
       throw new Error(`structural_identity_projection_mismatch:${filePath}`);
     }
-    const symbols = parsed.symbols.map((symbol, index) => ({ ...symbol, fqn: identities[index]!.fqn }));
+    const symbols = parsed.symbols.map((symbol, index) => ({
+      ...symbol,
+      fqn: identities[index]!.fqn,
+      // The identity's name is the # -escaped form (normalizeSymbolText). The
+      // persisted row must carry the same escaped text as the fqn it's
+      // stored under, or generationDefinitionIdentityColumns rejects the row
+      // with definition_fqn_name_mismatch — reachable for any raw name
+      // containing '#' that isn't pre-escaped at extraction (e.g. a markdown
+      // heading like "Fixes issue #456"). RawSymbol has no qualifiedName
+      // field to keep in sync — resolveStructuralFile's caller-scope/edge
+      // logic below reads the identity's qualifiedName directly.
+      name: identities[index]!.name,
+    }));
     const resolvedEdges: ResolvedEdge[] = (parsed.structure?.edges ?? [])
       .filter((edge) => edge.kind !== "import")
       .map((edge) => {
@@ -472,7 +484,7 @@ export class ResolveStage {
       if (skippedStructural) throw new Error("structural_repository_seed_failed", { cause: err });
       logger.warn("buildSymbolIndex: repo seed failed, in-batch only", {
         projectId,
-        error: (err as Error)?.message,
+        error: err as Error,
       });
     }
 

@@ -21,12 +21,11 @@ audits/tests/2026-06-15 tests-audit.md
 audits/bugs/2026-06-15 bugs-audit.md
 ```
 
-Parent implementation audits, mobile Figma audits, and Maestro audits use dedicated paths:
+Parent implementation audits and mobile Figma audits use dedicated paths:
 
 ```text
 audits/implementation/<YYYY-MM-DD implementation-audit.md>
 audits/mobile-figma/<YYYY-MM-DD mobile-figma-audit.md>
-audits/maestro/<YYYY-MM-DD maestro-audit.md>
 ```
 
 Judge-with-debate evaluation reports use their own family (no `-audit` suffix — recorded
@@ -333,81 +332,6 @@ Verification Suggestion: <deterministic sensor and optional Maestro reproduction
 
 Only `MISMATCH` comparison rows become `MFM-*` findings. `CONSTRAINT DEVIATION` and `NOT EVALUATED` rows are never silently promoted to executable findings.
 
-## Maestro Audit Report Contract
-
-```md
-# Maestro Audit
-
-Date: <YYYY-MM-DD>
-Workflow: maestro-audit
-ProjectId: <projectId>
-WorkflowSessionId: <maestro-audit-[entity]>
-Target: <Maestro target>
-Target Focus: <flow root, suite, tag, app/module, platform, commit range, branch comparison, or modified files>
-Scope: <scope type from audit-scope.md>
-Git Base: <sha/ref or n/a>
-Git Head: <sha/ref, working-tree, or n/a>
-Source Evidence Timestamp: <YYYY-MM-DD HH:MM local time, or unavailable>
-Scenario Source: <Jira/Confluence, local file, prompt text, explored/inferred behavior, or n/a>
-Maestro CLI: <version/help result or unavailable with reason>
-Device/Emulator Readiness: <command/result or unavailable with reason>
-
-## Flow Inventory
-
-| Flow ID | Path | Suite/Tag | Platform | Setup/Teardown | Scenario Source | Status |
-|---|---|---|---|---|---|---|
-
-## Maestro Run Matrix
-
-| Flow ID | Command | Exit Status | Result | JUnit Report | Artifact Directory | Device/Platform | Skipped-Check Reason |
-|---|---|---|---|---|---|---|---|
-
-## Scenario Coverage Matrix
-
-| Scenario ID | Source | Expected Behavior | Covered Flow ID | Evidence | Gap |
-|---|---|---|---|---|---|
-
-## Findings
-
-### MST-<N>: <short title>
-
-Severity: critical | high | medium | low
-Confidence: high | medium | low
-Flow/Subflow: <flow ID and path>
-Scenario Source: <source identifier>
-Location: <path:line or module>
-Evidence: <concrete source, report, or artifact evidence>
-Impacted Journey: <user journey or release smoke path>
-Flake Or Coverage Risk: <risk class and impact>
-Simplest Fix Direction: <smallest sufficient Maestro flow, fixture, setup, teardown, or test-data change>
-Verification Suggestion: <Maestro command, JUnit report check, artifact inspection, or static check>
-
-## Ruled-Out Candidates
-
-<Plausible candidates disproved by evidence, or "None">
-
-## Scope And Evidence
-
-<Flow roots, scenario sources, commands/searches, exit statuses, JUnit reports, artifact directories, skipped checks, validation assets, and residual risk>
-
-## Verification/Test Fidelity Checklist
-
-| Item | Evidence |
-|---|---|
-| Deterministic sensor | <Maestro command, JUnit report, artifact inspection, static YAML/config scan, or not available with reason> |
-| Result | <pass, fail, not run, or not applicable> |
-| Coverage target | <MST ID, no-finding claim, scenario, flow, behavior, file, or validation asset> |
-| Validation assets protected | <flows, subflows, fixtures, setup/teardown, test data, snapshots, CI report consumers, or none> |
-| Skipped-check reason | <none or allowed skipped-check reason> |
-| Execution handoff | <verification command/artifact and validation assets for every actionable MST finding> |
-
-## Execution Handoff
-
-<Ordered MST IDs, dependencies, likely files, protected validation assets, verification commands, artifact expectations, and cautions>
-```
-
-Only executable flow, fixture, setup/teardown, test-data, or directly scoped Maestro CI/report issues become `MST-*` findings. App bugs, product behavior gaps, backend defects, and unclear requirements must route to `debug`, `feature`, or `requirements-audit` instead of `maestro-fix`.
-
 ## Judge With Debate Report Contracts
 
 Reports produced by `workflows/judge-with-debate.md`. This family is **evaluation-scored, not
@@ -439,7 +363,7 @@ Model Requested: <slot pin: deepseek-v4-pro | minimax-m3 | GLM-5.2>
 Model Note: <fallback state or n/a>
 
 ## Evaluation Specification
-<meta-judge YAML, embedded verbatim once>
+<spec-author YAML, embedded verbatim once>
 
 ## Criterion Scores
 ### <criterion id> — <score>/<scale.max> (weight <w>)
@@ -520,7 +444,6 @@ All findings require severity, confidence, location, concrete evidence, impact, 
 | Tests | `Impacted Behavior`, `Regression Risk`, `Simplest Test Direction`, `Deterministic Sensor` |
 | Bugs | `Bug Class`, `Impacted Flow`, `Trigger or Repro Path`, `Root Cause Hypothesis`, `Regression Risk` |
 | Mobile Figma | `Surface ID`, `UI Stack`, `Module/Source Set`, `Element/State`, `Property/Constraint`, `Figma Value`, `Resolved Implementation Value`, `Runtime Evidence`, `Evidence Class`, `Platform Configuration` |
-| Maestro | `Flow/Subflow`, `Scenario Source`, `Impacted Journey`, `Flake Or Coverage Risk` |
 
 If a required field is unknown, write `Unknown` and explain the evidence gap. Execution treats unknown required fields as a stop condition unless the user explicitly accepts the risk after revalidation.
 
@@ -528,7 +451,7 @@ If a required field is unknown, write `Unknown` and explain the evidence gap. Ex
 
 Every report must include project, workflow, target, target focus, scope, git base/head or `n/a`, source evidence timestamp, material files/evidence, commands/searches, skipped checks, and residual risk.
 
-Implementation reports must preserve the exact parent scope packet and source-qualified findings. Mobile Figma reports must also preserve repository classification, Target Surface Matrix, Figma identity/mappings/timestamp, per-surface platform configurations, capability matrix, complete comparison matrix, and optional Maestro reproduction metadata. Maestro reports must preserve scenario source, flow inventory, Maestro run matrix, JUnit report path, artifact directory, device/emulator readiness, and execution handoff for `MST-*` findings.
+Implementation reports must preserve the exact parent scope packet and source-qualified findings. Mobile Figma reports must also preserve repository classification, Target Surface Matrix, Figma identity/mappings/timestamp, per-surface platform configurations, capability matrix, complete comparison matrix, and optional Maestro reproduction metadata.
 
 When implementation-audit uses SonarQube MCP, preserve the MCP availability result, project key or skipped-check reason, quality gate status when available, tool names used, and summarized issue/security-hotspot/measure evidence in Scope And Evidence. Sonar-derived findings are executable only after they are normalized to existing source-qualified IDs for Architecture, Correctness/Bugs, Code Quality, Security, or Tests; unmapped SonarQube output remains evidence only and does not enter Execution Handoff.
 
@@ -540,7 +463,7 @@ Every `*-fix` workflow persists its closure evidence as a Fix Closure Report, a 
 audits/<family>/<YYYY-MM-DD <family>-fix-closure>.md
 ```
 
-`<family>` is the source report's directory (`architecture`, `bugs`, `code-quality`, `security`, `requirements`, `tests`, `maestro`, `mobile-figma`, `implementation`). Same local-date and same-day suffix rules as audit reports. Closure reports are output artifacts, **never** audit-report input: any filename containing `-fix-closure` is excluded from latest-report selection.
+`<family>` is the source report's directory (`architecture`, `bugs`, `code-quality`, `security`, `requirements`, `tests`, `mobile-figma`, `implementation`). Same local-date and same-day suffix rules as audit reports. Closure reports are output artifacts, **never** audit-report input: any filename containing `-fix-closure` is excluded from latest-report selection.
 
 Required header lines (same metadata style as audit reports):
 
@@ -574,7 +497,7 @@ Row rules:
 - **Independent Verifier**: verdict plus dispatch-or-fallback record per the verification-ladder Independent Verification Mandate.
 - **Next Step**: required for `blocked` and `deferred` rows.
 
-Family-specific extras (extra columns, parsed by header name, appended after the standard set): requirements adds `Linked .specs/ Requirement ID`; maestro and mobile-figma add `JUnit Report`, `Artifact Directory`, and `Device/Platform`.
+Family-specific extras (extra columns, parsed by header name, appended after the standard set): requirements adds `Linked .specs/ Requirement ID`; mobile-figma adds `JUnit Report`, `Artifact Directory`, and `Device/Platform`.
 
 Deterministic backing (run it, do not eyeball it): `bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family <family>` — a non-zero exit blocks Propose and the Evidence Gate. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
 
@@ -600,7 +523,6 @@ Specialized selection rules:
 
 - `implementation-fix` selects only `audits/implementation/* implementation-audit.md` with `Workflow: implementation-audit`.
 - `mobile-figma-fix` selects only `audits/mobile-figma/* mobile-figma-audit.md` with `Workflow: mobile-figma-audit`.
-- `maestro-fix` selects only `audits/maestro/* maestro-audit.md` with `Workflow: maestro-audit`.
 - Single-lens execution selects only its matching workflow directory and metadata.
 
 Before editing:
@@ -626,13 +548,12 @@ bun skills/massa-ai/scripts/validate_audit_report.ts <path-to-report.md> --famil
 ```
 
 `--family` is one of `architecture`, `bugs`, `code-quality`, `security`,
-`requirements`, `tests`, `maestro`, `mobile-figma`, or `implementation`
+`requirements`, `tests`, `mobile-figma`, or `implementation`
 (auto-detected from the report's `Workflow:` field when omitted). It checks:
 
 - required freshness-header metadata fields for that family (common fields
   plus family-specific extras — `Requirements Source` for single-lens and
-  implementation reports; `Scenario Source`/`Maestro CLI`/`Device/Emulator
-  Readiness` for Maestro; the mobile Figma identity fields for Mobile Figma)
+  implementation reports; the mobile Figma identity fields for Mobile Figma)
 - finding-ID format (`PREFIX-N`, or `<Area>/<PREFIX>-N` for the
   implementation composite family)
 - Area<->Prefix table membership for implementation reports (rejects an
@@ -642,5 +563,5 @@ bun skills/massa-ai/scripts/validate_audit_report.ts <path-to-report.md> --famil
 
 A non-zero exit blocks editing. The script does **not** re-check drift
 against current source, table-structure presence (Target Surface Matrix,
-Maestro Run Matrix, etc.), or Figma-node freshness — those stay a manual
+etc.), or Figma-node freshness — those stay a manual
 step per the "Before editing" list above.

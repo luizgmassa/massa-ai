@@ -24,9 +24,29 @@ import {
   __resetMigrationForTests,
 } from "../config-loader";
 import { defaultMassaAiConfig } from "../massa-ai-config";
+import { INFERENCE_ROLE_DEFAULTS } from "../inference-providers";
 
 const CONFIG_PATH = getConfigPath();
 const CONFIG_DIR = getConfigDir();
+
+// Captured before any `spyOn(fs, "readFileSync")` runs (beforeEach only fires
+// per-test), so this stays the real implementation for reading a real
+// tracked file — the LIP-02 cross-package "emitted name is read by a named
+// consumer" check below needs the actual embeddings/config.ts source, not
+// the virtual fs the rest of this suite uses.
+const realReadFileSync = fs.readFileSync;
+const CORE_EMBEDDINGS_CONFIG = path.join(
+  import.meta.dir,
+  "..",
+  "..",
+  "..",
+  "..",
+  "core",
+  "src",
+  "services",
+  "embeddings",
+  "config.ts",
+);
 
 let existsSpy: ReturnType<typeof spyOn>;
 let readSpy: ReturnType<typeof spyOn>;
@@ -169,6 +189,31 @@ describe("saveConfig / loadConfig (with file)", () => {
     expect(loaded.embedding.provider).toBe(defaultMassaAiConfig.embedding.provider);
   });
 
+  test("a config naming a non-default provider inherits none of the default block's provider-specific fields", () => {
+    // The default `embedding` block describes ollama — its baseURL is
+    // :11434 and its 2560 is qwen3-embedding:4b's width. Merging it under
+    // every provider leaked both into configs that never asked for them:
+    // a mistral config would carry ollama's URL and a 2560 width for a
+    // 1024-wide model, which is what picks the vector table.
+    const partial: any = { embedding: { provider: "mistral", model: "mistral-embed" } };
+    saveConfig(partial);
+    const loaded = loadConfig();
+    expect(loaded.embedding.provider).toBe("mistral");
+    expect(loaded.embedding.model).toBe("mistral-embed");
+    expect(loaded.embedding.baseURL).toBeUndefined();
+    expect(loaded.embedding.dimensions).toBeUndefined();
+  });
+
+  test("a config naming the default provider still inherits the default block", () => {
+    // The other half of the rule above: dropping the inheritance wholesale
+    // would silently strip baseURL and dimensions from every ollama user.
+    const partial: any = { embedding: { provider: "ollama", model: "qwen3-embedding:4b" } };
+    saveConfig(partial);
+    const loaded = loadConfig();
+    expect(loaded.embedding.baseURL).toBe(defaultMassaAiConfig.embedding.baseURL);
+    expect(loaded.embedding.dimensions).toBe(defaultMassaAiConfig.embedding.dimensions);
+  });
+
   test("loadConfig returns defaults on JSON parse error", () => {
     vfs.set(CONFIG_PATH, "{ invalid json");
     existing.add(CONFIG_PATH);
@@ -180,6 +225,57 @@ describe("saveConfig / loadConfig (with file)", () => {
     vfs.set(CONFIG_PATH, "not json");
     existing.add(CONFIG_PATH);
     expect(loadConfigSafe()).toEqual(defaultMassaAiConfig);
+  });
+});
+
+describe("PDM-12: a config.json value beats the role-table default (T02)", () => {
+  test("the shipped llm defaults are the role-table values, not disconnected literals", () => {
+    const loaded = loadConfig();
+    expect(loaded.llm.contextWindow).toBe(INFERENCE_ROLE_DEFAULTS.instruct.contextWindow);
+    expect(loaded.llm.codeContextWindow).toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+    expect(loaded.llm.codeTemperature).toBe(INFERENCE_ROLE_DEFAULTS.coding.temperature);
+  });
+
+  test("embedding.contextWindow / batchSize are absent when config.json does not set them", () => {
+    // Unlike `llm`, the shipped `embedding` template does not restate the role-table
+    // values — the role table is the default source at the consumption site, not a
+    // second copy in this file (Tech Decision 4).
+    const loaded = loadConfig();
+    expect(loaded.embedding.contextWindow).toBeUndefined();
+    expect(loaded.embedding.batchSize).toBeUndefined();
+  });
+
+  test("a file value beats the role-table default for llm.contextWindow", () => {
+    const partial: any = { llm: { contextWindow: 999 } };
+    saveConfig(partial);
+    expect(loadConfig().llm.contextWindow).toBe(999);
+    expect(loadConfig().llm.contextWindow).not.toBe(INFERENCE_ROLE_DEFAULTS.instruct.contextWindow);
+  });
+
+  test("a file value beats the role-table default for llm.codeContextWindow", () => {
+    const partial: any = { llm: { codeContextWindow: 4242 } };
+    saveConfig(partial);
+    expect(loadConfig().llm.codeContextWindow).toBe(4242);
+    expect(loadConfig().llm.codeContextWindow).not.toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+  });
+
+  test("a file value beats the role-table default for llm.codeTemperature", () => {
+    const partial: any = { llm: { codeTemperature: 0.55 } };
+    saveConfig(partial);
+    expect(loadConfig().llm.codeTemperature).toBe(0.55);
+    expect(loadConfig().llm.codeTemperature).not.toBe(INFERENCE_ROLE_DEFAULTS.coding.temperature);
+  });
+
+  test("a file value beats the absent role-table default for embedding.contextWindow", () => {
+    const partial: any = { embedding: { provider: "ollama", contextWindow: 2048 } };
+    saveConfig(partial);
+    expect(loadConfig().embedding.contextWindow).toBe(2048);
+  });
+
+  test("a file value beats the absent provider default for embedding.batchSize", () => {
+    const partial: any = { embedding: { provider: "ollama", batchSize: 16 } };
+    saveConfig(partial);
+    expect(loadConfig().embedding.batchSize).toBe(16);
   });
 });
 
@@ -362,12 +458,97 @@ describe("getConfigForEnv", () => {
     expect(env.OPENAI_API_KEY).toBe("");
   });
 
-  test("always sets LOG_LEVEL and ENABLE_METRICS", () => {
+  test("always sets MASSA_AI_LOG_LEVEL and ENABLE_METRICS", () => {
     const cfg = { ...defaultMassaAiConfig, logging: { level: "warn", enableMetrics: true } };
     saveConfig(cfg);
     const env = getConfigForEnv();
-    expect(env.LOG_LEVEL).toBe("warn");
+    expect(env.MASSA_AI_LOG_LEVEL).toBe("warn");
     expect(env.ENABLE_METRICS).toBe("true");
+  });
+
+  // LIP-02 — no silent-empty env projection.
+  test("lmstudio provider sets LMSTUDIO_* env vars (with dimensions)", () => {
+    const cfg = { ...defaultMassaAiConfig };
+    cfg.embedding = {
+      provider: "lmstudio",
+      model: "text-embedding-nomic-embed-text-v1.5",
+      baseURL: "http://localhost:1234/v1",
+      dimensions: 768,
+    };
+    saveConfig(cfg);
+    const env = getConfigForEnv();
+    expect(env.LMSTUDIO_EMBEDDING_MODEL).toBe("text-embedding-nomic-embed-text-v1.5");
+    expect(env.LMSTUDIO_BASE_URL).toBe("http://localhost:1234/v1");
+    expect(env.LMSTUDIO_EMBEDDING_DIMENSIONS).toBe("768");
+  });
+
+  test("lmstudio provider without baseURL defaults to localhost:1234/v1", () => {
+    const cfg = { ...defaultMassaAiConfig };
+    cfg.embedding = { provider: "lmstudio", model: "x" };
+    saveConfig(cfg);
+    const env = getConfigForEnv();
+    expect(env.LMSTUDIO_BASE_URL).toBe("http://localhost:1234/v1");
+  });
+
+  test("a provider with no env-projection branch fails by name instead of exporting an empty block", () => {
+    const cfg = { ...defaultMassaAiConfig };
+    cfg.embedding = { provider: "cohere", model: "embed-english-v3.0" };
+    saveConfig(cfg);
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const env = getConfigForEnv();
+      // No embedding-specific env var at all — only the two unconditional ones.
+      expect(Object.keys(env).sort()).toEqual(["ENABLE_METRICS", "MASSA_AI_LOG_LEVEL"]);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(String(errorSpy.mock.calls[0]![0])).toContain('"cohere"');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("every LMSTUDIO_* env name this function emits is read by a named consumer in embeddings/config.ts", () => {
+    // Text-read (not imported): embeddings/config.ts has module-scope side
+    // effects (loadConfigSafe(), env reads across every provider) that have
+    // no place contaminating this shared-package suite's virtual fs. Same
+    // technique scripts/__tests__/embedding-defaults-parity.test.ts already
+    // uses for this exact kind of cross-package/cross-dialect assertion.
+    const text = realReadFileSync(CORE_EMBEDDINGS_CONFIG, "utf8") as string;
+
+    // The NAME LIST is derived from what the function actually emits, never
+    // declared here. A literal list makes this sensor exactly as wide as
+    // whoever last edited it: a fourth LMSTUDIO_* name emitted by
+    // getConfigForEnv and read by nobody would escape both this test and the
+    // emission test, because neither would know to look for it.
+    // Select lmstudio here rather than inheriting whatever the previous test
+    // left saved — the neighbouring case saves `cohere`, which projects no
+    // LMSTUDIO_* key at all. `dimensions` is set because the width is emitted
+    // conditionally (config-loader.ts:490-492), and an unset one would silently
+    // narrow the population to two.
+    const cfg = { ...defaultMassaAiConfig };
+    cfg.embedding = {
+      provider: "lmstudio",
+      model: "text-embedding-nomic-embed-text-v1.5",
+      dimensions: 768,
+    };
+    saveConfig(cfg);
+
+    const emitted = Object.keys(getConfigForEnv()).filter((k) =>
+      k.startsWith("LMSTUDIO_"),
+    );
+
+    // Guard the derivation itself: if the fixture stops selecting lmstudio,
+    // `emitted` goes empty and every assertion below vacuously passes. An
+    // empty population is the failure mode of a derived list, the way a stale
+    // literal is the failure mode of a declared one.
+    expect(emitted.length).toBeGreaterThan(0);
+
+    for (const name of emitted) {
+      // Word-boundary regex, not `.toContain` — a plain substring match
+      // would false-pass `process.env.LMSTUDIO_BASE_URL_TYPO` as "containing"
+      // `process.env.LMSTUDIO_BASE_URL` (observed while proving this sensor;
+      // `_` is a \w character, so `\b` alone correctly rejects that suffix).
+      expect(text).toMatch(new RegExp(`process\\.env\\.${name}\\b`));
+    }
   });
 });
 

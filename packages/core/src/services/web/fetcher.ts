@@ -252,6 +252,7 @@ export async function fetchAndConvertOne(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error("fetch_and_index indexChunk failed", err as Error, {
+        projectId,
         url,
         chunkId: chunk.id,
       });

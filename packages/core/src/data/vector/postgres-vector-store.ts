@@ -24,7 +24,14 @@ import {
   type VectorEmbeddingProviderFactory,
 } from '@massa-ai/shared';
 import { logger } from '@massa-ai/shared';
+import { loadConfigSafe } from '@massa-ai/shared/config';
+import {
+  INFERENCE_PROVIDERS,
+  LOCAL_INFERENCE_IDS,
+  type InferenceProviderId,
+} from '@massa-ai/shared/inference-providers';
 import { installGuardOnTable } from '../../kernel/identity-guard-installer.js';
+import { resolveConnectionTimeoutMs } from '../../kernel/db-connection.js';
 import type { Pool, PoolConfig } from 'pg';
 
 export interface PostgresConfig {
@@ -45,6 +52,33 @@ export interface PostgresConfig {
    * `BaseVectorStore.getEmbeddingProvider`.
    */
   embeddingProviderFactory?: VectorEmbeddingProviderFactory;
+}
+
+/**
+ * Pure resolution of the per-document embed sub-batch size (PDM-11): config's
+ * `embedding.batchSize` wins when set (PDM-12 AC-2), otherwise the resolved
+ * provider's own `embedBatchSize` from the seam (`inference-providers.ts`).
+ * Mirrors `resolveInferenceSpec`'s own provider-id fallback in
+ * `services/memory/llm-client.ts`, duplicated here rather than imported
+ * because that module sits in `services/` and this one in `data/` (one-way
+ * `tools -> services -> data` layering, CLAUDE.md "Architecture").
+ *
+ * Exported as a pure function (config object in, number out) so PDM-12 AC-2
+ * is unit-testable without an `XDG_CONFIG_HOME`/import-order dance — `loadConfigSafe`
+ * freezes its config directory at first import (`config-loader.ts`'s
+ * module-level `CONFIG_DIR`), so a test cannot flip the *file* backing this
+ * value mid-suite.
+ * @internal
+ */
+export function _resolveEmbedBatchSize(
+  embeddingConfig: Partial<{ provider: string; batchSize: number }> | undefined,
+): number {
+  const providerId = embeddingConfig?.provider;
+  const spec =
+    providerId && (LOCAL_INFERENCE_IDS as readonly string[]).includes(providerId)
+      ? INFERENCE_PROVIDERS[providerId as InferenceProviderId]
+      : INFERENCE_PROVIDERS.ollama;
+  return embeddingConfig?.batchSize ?? spec.embedBatchSize;
 }
 
 export class PostgresVectorStore extends BaseVectorStore {
@@ -114,11 +148,16 @@ export class PostgresVectorStore extends BaseVectorStore {
     const pg = await import('pg');
     const PgPool = (pg.default as any)?.Pool ?? (pg as any).Pool;
 
+    // connectionTimeoutMs shares db-connection.ts's DB_CONNECTION_TIMEOUT_MS
+    // knob — a hardcoded 5s here was observed timing out sibling pools'
+    // connections during normal concurrent-reindex load (this pool handles
+    // the vector upserts in the same load stage; see db-connection.ts for
+    // the incident this fixes).
     const poolConfig: PoolConfig = {
       connectionString: this.config.connectionString,
       max: this.config.poolSize,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: resolveConnectionTimeoutMs(),
     };
 
     return new PgPool(poolConfig) as Pool;
@@ -150,7 +189,8 @@ export class PostgresVectorStore extends BaseVectorStore {
       );
 
       if (rows.length === 0) {
-        logger.warn(`Table ${this.tableName} not found. Creating fallback table.`, {
+        logger.warn('PostgresVectorStore: table not found, creating fallback table', {
+          tableName: this.tableName,
           note: 'Run "prisma migrate deploy" to create tables via migrations',
         });
         await this.createFallbackTable(client, providerDimensions);
@@ -213,12 +253,13 @@ export class PostgresVectorStore extends BaseVectorStore {
 
         const otherDim = tablename.match(/_([0-9]+)d$/)?.[1];
         logger.warn(
-          `[vector] Orphaned chunks detected: ${tablename} has data for projects not in ${this.tableName}. ` +
-            `Embedding model likely changed from ${otherDim}d → ${currentDim}d. Reindex required.`,
+          'PostgresVectorStore: orphaned chunks detected, embedding model likely changed, reindex required',
           {
             currentTable: this.tableName,
             currentCount,
+            currentDim,
             orphanedTable: tablename,
+            orphanedDim: otherDim,
             affectedProjects: projects.map((p: any) => ({ projectId: p.project_id, chunks: p.n })),
           },
         );
@@ -417,8 +458,7 @@ export class PostgresVectorStore extends BaseVectorStore {
     if (documents.length === 0) return;
     const pool = await this.ensureInitialized();
 
-    // Match PostgresVectorStore: Ollama bge-m3 crashes on large batches (50+)
-    const EMBED_SUB_BATCH_SIZE = 8;
+    const EMBED_SUB_BATCH_SIZE = _resolveEmbedBatchSize(loadConfigSafe().embedding);
 
     let totalInserted = 0;
     let totalFailed = 0;
@@ -433,7 +473,7 @@ export class PostgresVectorStore extends BaseVectorStore {
         logger.warn('[postgres] Sub-batch embedding failed, falling back per-document', {
           subBatchIndex: Math.floor(i / EMBED_SUB_BATCH_SIZE),
           count: subBatch.length,
-          error: (error as Error).message,
+          error: error as Error,
         });
       }
 
@@ -446,7 +486,7 @@ export class PostgresVectorStore extends BaseVectorStore {
           logger.warn('[postgres] Sub-batch insert failed, falling back per-document', {
             subBatchIndex: Math.floor(i / EMBED_SUB_BATCH_SIZE),
             count: subBatch.length,
-            error: (error as Error).message,
+            error: error as Error,
           });
         }
       }
@@ -461,7 +501,7 @@ export class PostgresVectorStore extends BaseVectorStore {
           totalFailed++;
           logger.warn('[postgres] Skipping document due to embedding/insert error', {
             id: doc.id,
-            error: (singleError as Error).message,
+            error: singleError as Error,
           });
         }
       }

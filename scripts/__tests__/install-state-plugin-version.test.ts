@@ -102,8 +102,17 @@ describe("plugin version record parity (PAI-03, R7, F)", () => {
             cwd: REPO_ROOT,
             timeout: TEST_TIMEOUT,
             // SKIP pins claude/codex to the file route — a real host CLI on a
-            // dev box must never be invoked from a test.
-            env: { ...process.env, HOME: home, MASSA_AI_SKIP_PLUGIN_REGISTRY: "1" },
+            // dev box must never be invoked from a test. ARTIFACT_GENERATION
+            // is skipped too: this test asserts install-state fields only,
+            // and letting install.sh regenerate the real checkout's agent
+            // bundles here leaks stray content into files other suites
+            // (subagent-parity) assert on, byte-identical, in the same run.
+            env: {
+              ...process.env,
+              HOME: home,
+              MASSA_AI_SKIP_PLUGIN_REGISTRY: "1",
+              MASSA_AI_SKIP_ARTIFACT_GENERATION: "1",
+            },
           },
         );
         expect(res.status).toBe(0);
@@ -378,7 +387,17 @@ describe("record_plugin_version() preserves a pre-existing modelProfile (T10, MP
             encoding: "utf8",
             cwd: REPO_ROOT,
             timeout: TEST_TIMEOUT,
-            env: { ...process.env, HOME: home, MASSA_AI_SKIP_PLUGIN_REGISTRY: "1" },
+            // ARTIFACT_GENERATION is skipped: this test round-trips the
+            // recorded modelProfile through install-state.json only, and a
+            // real regenerate here would stamp the checkout's agent bundles
+            // with this scratch state's profile, left behind for whichever
+            // suite runs next in the same process (subagent-parity).
+            env: {
+              ...process.env,
+              HOME: home,
+              MASSA_AI_SKIP_PLUGIN_REGISTRY: "1",
+              MASSA_AI_SKIP_ARTIFACT_GENERATION: "1",
+            },
           },
         );
         expect(res.status).toBe(0);

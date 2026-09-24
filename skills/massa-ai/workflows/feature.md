@@ -26,7 +26,7 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - `references/codebase-investigation.md` when the target area is unfamiliar
    - `references/mobile-context.md` when the feature touches KMP, iOS, Android, native bridges, mobile lifecycle, offline sync, permissions, push/background behavior, local persistence, or backend-mobile contracts
    - `references/verification-ladder.md` before Quick/Standard/Spec-driven sizing or edits
-   - `references/context-firewall.md` when source, logs, docs, or tool output meets its threshold table (a single source/log/doc block >200 lines, >20 KB, or >50 search hits)
+   - `references/context-firewall.md` when source, logs, docs, or tool output meets its threshold table
    - `references/naming-standards.md` before writing or renaming code identifiers, public contract fields, tests, fixtures, or implementation-facing design names
    - `references/pr-task-fix.md` when the verification ladder trigger table applies
    - `references/lessons.md` when `.specs/lessons.json` exists, to load confirmed project lessons before sizing
@@ -54,44 +54,33 @@ Before the first repository mutation, load `references/implementation-delivery.m
    - When every group has a confirmed Jira key, follow the optional stacked branch flow in `references/pr-task-fix.md` (Jira-Key Stacked Branches).
    - All PR groups decomposed under this feature share one feature-level delivery go-ahead: no individual group seeks or receives its own Stage 3 sign-off — see `references/implementation-delivery.md` Stage 3.
 
-**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
+**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
 
-> **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
-> - trigger: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched
+> **Dispatch: `designer`** (role: `designer`, mode: `implement`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
-> - inputs: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
-> - sensors: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
-> - firewall: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
-> - memory: suggest-only; the main agent persists durable screen and design-token conventions
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the feature's diff surface and its task/AC context
-> - permissions: read-only
-> - inputs: diff, acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
-> - trigger: Standard tier or above per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once every implemented PR group has cleared reviewer fix items; Quick tier substitutes the fallback below
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
+> - trigger: Standard tier or above per the Independent Verification Mandate in `references/verification-ladder.md` — mandatory once every implemented PR group has cleared diff-audit fix items; Quick tier substitutes the fallback below
 > - scope: the new code landed across this feature's PR groups from step 12, plus the tests and validation assets those groups touch
-> - permissions: read-only
 > - inputs: the 1-5 acceptance criteria captured in step 11 (or the referenced spec artifact) as the outcome source, the feature's diff surface across all PR groups, and its test suite
 > - sensors: check the diff and tests against each acceptance criterion; discrimination sensor per `references/discrimination-sensor.md` (mutate the feature's new code, one PR group at a time — covering tests must kill each mutant or that group is not verified)
 > - output: a pass/fail verdict per acceptance criterion, any surviving-mutant findings, and an overall verified/blocked verdict per PR group
 > - firewall: summarized per-AC and per-mutant findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists feature verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each AC against the diff and tests, and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-If verification fails, bound the retry with the Bounded Fix→Re-verify Loop cap from `references/verification-ladder.md`: at most 3 fix→re-verify iterations on the same PR group before reporting `Blocked`. This cap governs the post-implementation review/verify cycle and is distinct from the two-consecutive-failed-fixes trigger earlier in this file that loads `references/root-cause-scripts.md`, which fires on repeated failed attempts to fix one symptom during implementation itself.
+If verification fails, bound the retry with the Bounded Fix→Re-verify Loop cap from `references/verification-ladder.md`: at most 3 fix→re-verify iterations on the same PR group before reporting `Blocked`.
 
 13. Run the verification recipe and check outcomes against the captured acceptance criteria from step 11, not only against a generic verification recipe; report skipped checks explicitly. At Standard tier and above, back this with `bun skills/massa-ai/scripts/validate_state.ts <slug>` against the persisted `validation.md` — it must be real, report `PASS`, and cite `file:line` evidence per acceptance criterion. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved). If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
      `bun skills/massa-ai/scripts/lessons.ts --root . add --feature "<slug>" --signal "<signal>" --source "<ref>" --text "<one terse lesson>"`
@@ -100,6 +89,3 @@ If verification fails, bound the retry with the Bounded Fix→Re-verify Loop cap
    - New patterns introduced via `remember` as scored `pattern` memories
    - Trade-offs accepted via `remember` as scored `conversation` memories
 15. Complete the Evidence Gate from `references/evidence-gate.md`
-
-<!-- validator anchors: massa-ai-verification-agent dispatch block; Independent Verification Mandate (Standard tier and above); Bounded Fix→Re-verify Loop cap (3 iterations); validate_state.ts <slug> deterministic backing; graceful degradation preserved; .specs/quick/NNN-slug/TASK.md and SUMMARY.md; .specs/features/<slug>/spec.md and validation.md; one feature-level delivery go-ahead across PR groups -->
-

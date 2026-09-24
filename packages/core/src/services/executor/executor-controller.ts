@@ -264,7 +264,10 @@ export class ExecutorController {
         },
       };
     } catch (error) {
-      logger.error("batch_execute failed", error as Error);
+      logger.error("batch_execute failed", error as Error, {
+        commandCount: commands.length,
+        concurrency: effectiveConcurrency,
+      });
       return {
         success: false,
         error: `batch_execute failed: ${(error as Error).message}`,

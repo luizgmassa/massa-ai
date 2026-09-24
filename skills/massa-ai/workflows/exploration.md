@@ -51,22 +51,19 @@ When researching or resolving any technical question during exploration, follow 
    - per step, state a `verify:` criterion — what concrete evidence confirms that step succeeded (a read signature, a matched call graph, a resolved data path) before moving on
    - define what evidence would be enough to answer the user
    - ask only if the objective or scope cannot be inferred from local context
-6. Recon with progressive disclosure. Dispatch `investigator` per `references/agent-orchestration.md` when the investigation justifies an isolated read-only subagent:
+6. Recon with progressive disclosure. Dispatch `code-explorer` per `references/agent-orchestration.md` when the investigation justifies an isolated read-only subagent:
 
-> **Dispatch: `massa-ai-investigator`** (role: `investigator`) — charter `skills/agents/investigator/SKILL.md`
+> **Dispatch: `code-explorer`** (role: `code-explorer`, mode: `trace`) — charter `skills/agents/code-explorer/SKILL.md`
 > - trigger: isolated read-only investigation justified; large scope, repeated searches, or context-firewall threshold exceeded
 > - scope: the exploration target — symbols, files, routes, commands, docs, or runtime artifacts to inspect
 > - permissions: read-only
 > - inputs: objective, scope, explicit out-of-scope areas, constraints, recalled facts, and the closest entry point
-> - sensors: progressive disclosure (project map → summary search → enriched search → symbol/file tools → optimized context → focused shell); per-step `verify:` criterion
+> - sensors: retrieval order per `references/codebase-investigation.md` §Source Order; per-step `verify:` criterion
 > - output: entry points, core flow, dependencies, data ownership, relevant contracts, exact evidence pointers (path, symbol, line), confirmed facts vs inferences
 > - firewall: raw logs, snapshots, generated reports, and broad search output summarized, not returned raw
 > - memory: suggest-only; main agent persists durable discoveries
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-    - Follow the shared retrieval order: project map, summary search, targeted
-      enriched search, symbol/file tools, optimized context, then focused shell
-      fallback.
+    - Follow the shared retrieval order in `references/codebase-investigation.md` §Source Order.
    - When external documentation, API references, or web content is needed to answer the question, call `fetch_and_index` with `url` (or `requests`[]) to fetch, convert HTML→markdown or extract JSON key-paths, and index the result into the searchable store so it can be retrieved later via `search`. SSRF-guarded, TTL-cached.
    - Follow imports, calls, ownership boundaries, and data paths from entry point outward.
    - For behavior questions, trace input -> transformation -> output.

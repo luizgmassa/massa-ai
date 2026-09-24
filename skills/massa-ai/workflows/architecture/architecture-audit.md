@@ -30,18 +30,7 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - `references/agent-orchestration.md` only for large scopes, explicit parallel/subagent requests, PR subagent invocation, isolated audit slices, or independent verification of high-impact findings
 3. `recall` -> load ADRs, architecture decisions, known boundaries, coupling patterns, accepted exceptions, project constraints, and prior rejected refactors for the target area.
    - Apply the Memory Freshness Gate from `references/audit-scope.md`; recalled exceptions are leads, not proof.
-4. Establish the investigation scope before proceeding:
-   - Modified files scope: use when the user says modified files, changed files, current changes, uncommitted changes, staged changes, or unstaged changes.
-   - Explicit files/globs scope: use when the user names files, directories, or globs.
-   - Commit range scope: use when the user provides commits/ranges or asks for commits made by me, my branch commits, or architecture issues introduced by branch commits.
-   - Branch comparison scope: use when the user names base/head branches, refs, or a branch diff.
-   - Codebase area scope: use when the user names a path, module, package, bounded context, feature area, architecture question, or glob.
-   - Symbol/class/function scope: use when the user names exported surfaces, classes, functions, adapters, interfaces, or dependency edges.
-   - Feature/flow scope: use when the user names a runtime flow or cross-module feature.
-   - Whole-repo scope: use only when the user explicitly asks for a whole-repo architecture audit.
-   - Implementation parent scope: use only when `workflows/implementation/implementation-audit.md` invokes this workflow with a concrete implementation scope packet.
-   - If the target focus is missing, vague, or too broad, ask for a concrete target from the supported scope types in `references/audit-scope.md`.
-   - Build the shared scope packet from `references/audit-scope.md` and carry it into the report.
+4. Establish the investigation scope: select the scope type and build the shared scope packet per `references/audit-scope.md`, which owns the supported scope types, the ask-when-vague rule, and the packet fields. Carry the packet into the report.
 5. Resolve the selected branch's mechanics (modified files, commit range, codebase area, explicit-files/branch/symbol/feature/whole-repo, or implementation parent scope) per `references/audit-scope.md` (Lens Audit Scope Resolution Procedure, Architecture row of Per-Lens Scope Deltas).
 6. Investigation pass:
    - Call `get_architecture` with `id` (projectId) for the architecture-specific deep map: packages, entry points, routes, hotspots, communities, layers, and opt-in cycles (pass `aspects:["cycles"]` for Tarjan SCC over CALL edges). `get_architecture` differs from `project_map` (general overview: PageRank backbone + symbol counts) — use `get_architecture` for architecture-specific structure, `project_map` for the general overview. Both count as evidence only when the index is fresh for the current repository path and commit/worktree state; otherwise fall back to `search`/`get_references` and record reduced retrieval confidence.
@@ -61,30 +50,26 @@ Findings-only: do not edit code unless the user separately asks for fixes.
    - Do not report strong coupling as a defect when strength is local, stable, or cohesive and no change friction is shown.
    - Do not recommend ports/adapters, service extraction, VSA migration, or new seams unless evidence shows real variation, volatility, external dependency pressure, or boundary friction.
    - Drop candidates disproven by evidence, downgrade candidates with partial mitigation, and mark judgment-heavy conclusions as `suspect`.
-   - When you reject a refactor candidate, record its load-bearing reason in ruled-out candidates; if likely to be re-proposed, offer an ADR via `workflows/adr.md` so the rejection is not re-litigated next audit.
+   - When you reject a refactor candidate, record its load-bearing reason in ruled-out candidates; if likely to be re-proposed, offer an ADR via `workflows/create-adr.md` so the rejection is not re-litigated next audit.
 8. Use agent orchestration only when it improves signal. Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-architecture-specialist`** (role: `architecture-specialist`) — charter `skills/agents/architecture-specialist/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: large scope, explicit parallel/subagent request, PR subagent invocation, isolated audit slice, or independent verification of high-impact finding
 > - scope: exact files/modules/boundaries in the audit target
-> - permissions: read-only
-> - inputs: shared scope packet; lens sub-mode (`domain` for bounded-context mapping, `coupling` for dependency-graph/strength/distance/volatility, `deepening` for module-depth opportunities); recalled ADRs and rejected refactors
+> - inputs: shared scope packet; `lens: architecture` with optional `sub-mode` (`domain` for bounded-context mapping, `coupling` for dependency-graph/strength/distance/volatility, `deepening` for module-depth opportunities); recalled ADRs and rejected refactors
 > - sensors: `search_definitions` / `get_references` for exported surfaces and dependency direction; source inspection against current files
 > - output: findings with lens-specific evidence, provisional severity, tradeoff, and what would disprove it
 > - firewall: raw dependency graphs, generated reports, and broad search output summarized, not returned raw
 > - memory: suggest-only; main agent persists accepted constraints/rejected refactors
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: independent verification of a high-impact architecture finding
 > - scope: the specific finding's claimed evidence and affected boundary/module
-> - permissions: read-only
 > - inputs: the candidate finding, its source evidence, ADRs, accepted exceptions, and the verification suggestion
 > - sensors: deterministic command or artifact check that would falsify the finding
 > - output: confirmed/disproven verdict with evidence; skipped-check reason if the sensor cannot run
 > - firewall: raw logs/snapshots summarized
 > - memory: suggest-only; main agent persists reusable verification recipes
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 9. Severity rules (apply the countable threshold first, then the qualitative clause):
    - `critical`: architecture issue likely causes data loss, auth/privacy break, production outage, irreversible corruption, OR affects >10 files; otherwise use the qualitative clause below.
    - `high`: strong coupling with high volatility, boundary violation, dependency inversion break, or shallow module design likely to cause major change friction or regression.

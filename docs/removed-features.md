@@ -47,3 +47,130 @@ The following docs were deleted (~6000 lines total):
 - `docs/path-recovery.md` — Project path recovery (`--recover` flag, Wave 6 N42)
 - `docs/adr/0001-remove-d5-cypher-subset.md` — ADR closing D5 Cypher deferral (Wave 7)
 - `docs/removed-features.md` — This document
+## Agent roster consolidation — personas, 14 sub-agents, 4 workflows
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-consolidation/`
+**Rationale**: The harness had three overlapping layers of role routing — a persona
+catalog with its own router skill and bootstrap rule, 18 sub-agent charters whose
+responsibilities overlapped (three judges, two explorers, five read-only reviewers, two
+requirement analysts), and 40 workflows, some niche (`maestro*`), one a catch-all
+(`general`). Routing now lives in one place: workflows dispatch a roster of 7 agents,
+each merged charter keeping every former output contract behind a capability-packet
+`mode`.
+
+### Removed personas
+
+| Removed | Replacement |
+|---|---|
+| `skills/persona-router/` (router skill) | None — workflows plus sub-agents own role routing |
+| `skills/massa-ai/personas/` (catalog + 5 persona prompts) | None |
+| `persona-router` bootstrap rule (9 → 8 rules) | None; a persisted `bootstrap.rules["persona-router"]` is silently ignored |
+| `persona_router:` policy block, `persona_pin` project contract, `persona` capability-packet field | None |
+| `/persona` prompt prefix as an observation-extractor role signal | `act as` / `you are a` still classify as role |
+
+The red-team "adversary personas" in `skills/massa-ai/references/the-fool/` are a critique
+technique, not this feature, and stay.
+
+### Removed sub-agents
+
+| Retired agent | Now |
+|---|---|
+| `investigator`, `navigator` | `code-explorer` (`trace`, `lookup`) |
+| `reviewer`, `verification-agent`, `audit-specialist`, `architecture-specialist`, `mobile-specialist` | `code-reviewer` (`review`, `verify`, `audit`, `guide`) |
+| `meta-judge`, `plan-critic` | `judge` (`spec-author`, `plan-critique`; `scorer` was `judge`) |
+| `furps-analyst`, `requirements-analyst` | `product-manager` (`furps`, `requirements`; plus the `audit` requirements lens) |
+| `planner` | None — the dispatching workflow's main agent plans |
+| `context-curator` | None — the main agent curates context under the Context Firewall |
+| `documentation-agent` | None — the `create-*` workflows produce their documents |
+
+The `massa-ai-` agent-name prefix went with them: agents ship unprefixed, and ownership
+moved to the `massa-ai-owned` content marker. Installers prune the legacy
+`massa-ai-<name>` files for the 18 pre-consolidation names on upgrade. The old→new
+mapping table that recorded this change was removed from `skills/AGENTS.md` in
+agents-md-bootstrap-trim; `CHANGELOG.md` and git history keep it.
+
+### Removed workflows
+
+| Removed | Reason |
+|---|---|
+| `general` | A catch-all duplicated the router's Core Contract; with no match the router now proceeds without a workflow file |
+| `maestro`, `maestro-audit`, `maestro-fix` (+ `references/maestro.md`, `references/maestro/`, `docs/massa-ai-maestro.md`, the `MST` audit family) | Niche mobile E2E workflows; removed to shrink the workflow surface to what is used |
+
+Six workflows were renamed, not removed, with no aliases: `discovery` →
+`product-discovery`, `adr` → `create-adr`, `to-prd` → `create-prd`, `rfc` → `create-rfc`,
+`tdd` → `create-tdd`, `ticket` → `create-ticket`.
+
+## Agent roster revision — profile skill
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-revision/`
+**Rationale**: The owner no longer wants a dedicated skill front for the model-profile
+switch engine (PRO-01..03).
+
+| Removed | Replacement |
+|---|---|
+| `skills/profile/` (Claude skill front) | None — the MCP tools `profile_list`/`profile_set` and both `massa-ai-config profile` CLIs are the only fronts left |
+
+The switch engine (`packages/shared/src/profile-switch/`), the MCP tools, and the CLIs
+are unchanged; only the skill front is gone.
+
+## Agent roster revision — builder renamed to senior-engineer
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-revision/` (REN-01..05)
+**Rationale**: `builder` named the agent's write permission, not its seniority or scope,
+and read as a build-tool rather than an implementation specialist.
+
+`skills/agents/builder/` moved to `skills/agents/senior-engineer/` with the same one
+output contract, the same disjoint-write-set implementation role, and the same charter
+identity — no behavior changed. Every dispatch block, registry row, model-profile
+override key, and generator constant now names `senior-engineer` (`builder →
+senior-engineer`). A user's model-profile overlay
+still keyed under the pre-rename `builder` name keeps applying: the overlay merge maps it
+onto `senior-engineer` unless the overlay already sets `senior-engineer` directly.
+
+## Agent roster revision — mode changes and lazy-loaded mode contracts
+
+**Date**: 2026-09-23
+**Spec**: `.specs/features/agent-roster-revision/` (REV-01..03, EXP-01, PMG-01..02,
+TST-01..02, DES-01..03, LZY-01..02)
+**Rationale**: The roster carried modes no workflow ever dispatched, two near-duplicate
+mode pairs, and charters whose every dispatch paid for mode contracts it never ran.
+
+| Removed or merged | Now |
+|---|---|
+| `code-reviewer` `guide` mode | Dropped. Architecture findings route to `audit` `lens: architecture`; mobile platform/lifecycle/build/offline-sync guidance is answered by the main agent from `references/mobile-context.md` directly |
+| `code-reviewer` `review` mode | Merged into `audit`; `audit` gained lens `diff` (bugs, regressions, smells, missing edge cases over a diff; ranked findings, blocking vs advisory). All 13 former `review` dispatch blocks became `mode: audit` with `lens: diff` |
+| `code-explorer` `lookup` mode | Dropped. `trace` is the sole mode and the default |
+| `product-manager` `requirements` mode | Merged into `audit`; `audit`'s single lens is `requirements`, run over either a requirement set/spec or an implementation target. spec-driven Specify now dispatches `product-manager` `audit` in every run over the drafted `spec.md` |
+| `test-engineer` `plan` mode | Dropped; `mode` is now a required packet field (no default) |
+
+`designer` gained a new read-only `trace` mode: design-source investigation (Figma MCP
+composition, product context, and a retrieval-partition proposal), the design analogue of
+`code-explorer` `trace`. `references/figma-pre-analysis.md` Stage 1 now dispatches
+`designer` `trace` instead of `code-explorer`.
+
+`designer`, `judge`, and `test-engineer` — the three charters with multiple modes and no
+single dominant one per dispatch — had every mode's output contract moved out of the
+charter file into `skills/massa-ai/references/agent-modes/<agent>/<mode>.md`. Each
+charter keeps one `### Mode: \`<name>\`` stub per mode naming exactly its own contract
+file; the dispatching main agent reads that file and inlines it into the capability
+packet as `mode_contract`. A packet missing `mode_contract` for a lazy mode returns
+`Blocked`. The inline rule and the lazy-charter list are stated once, in the router
+Core Contract (`skills/massa-ai/SKILL.md`) and `references/agent-orchestration.md`;
+individual dispatch blocks do not restate it.
+
+## AGENTS.md bootstrap trim — caveman, plan-challenge, registry sections
+
+**Rationale**: The startup contract carried a compression rule the owner no longer wanted,
+and a Plan Challenge policy whose settings duplicated — and disagreed with — the gate the
+router and each workflow already run. The sub-agent registry carried a retired-agent map
+and two explanatory sections nothing loaded.
+
+| Removed | Replacement |
+|---|---|
+| `caveman` bootstrap rule (8 → 6 rules) | None; a persisted `bootstrap.rules.caveman` is silently ignored and toggling it fails as retired |
+| `plan-challenge` bootstrap rule and its `plan_challenge:` policy block | Fixed gate in `skills/massa-ai/SKILL.md` §Plan Challenge Gate; a persisted `plan-challenge: false` no longer disables it |
+| "Mapping — Retired Agents → Current Agents" in `skills/AGENTS.md` | The "Removed sub-agents" table above, `CHANGELOG.md`, and git history |
+| "How to Add an Agent" and "massa-ai Concepts" in `skills/AGENTS.md` | None; each charter documents its own concepts, and the parity/integrity tests name what a new agent must touch |

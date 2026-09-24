@@ -17,7 +17,7 @@ conflict with the base.
 Use when the user explicitly asks to review a hosted PR (Pull Request, GitHub) or
 MR (Merge Request, GitLab) — "review PR 128", "review this MR", "check pull request
 42". Explicit route only: never auto-trigger during coding. Local working-tree diff
-review stays with the audit workflows and `massa-ai-reviewer`; this workflow exists
+review stays with the audit workflows and `code-reviewer`; this workflow exists
 to **post findings back to the host**.
 
 Load `references/project-context.md` (intake sweep) before the first substantive
@@ -142,37 +142,53 @@ the severity labels, and the reply contract.
 
 | # | Dimension | Agent | Packet delta (lens / scope) | Marker `{type}` |
 | --- | --- | --- | --- | --- |
-| 1 | Security | `massa-ai-audit-specialist` | `lens: security` — secrets, authn/authz on new endpoints, injection, unsafe deserialization, PII in logs, permissive CORS, leaking payload fields | `security` |
-| 2 | Requirements & DoD (Definition of Done) | `massa-ai-audit-specialist` | `lens: requirements` — score merged Track A + Track B criteria against the diff, evidence-or-zero: ✅ implemented (`path:line`) / 🟡 partial / ❌ missing; no source ⇒ report "requirements verification skipped" | `requirements` |
-| 3 | Architecture & conventions | `massa-ai-audit-specialist` | `lens: architecture` — extract every explicit rule from the profile's CONVENTIONS/REVIEW_SKILLS docs into a numbered matrix, grade each changed file PASS/VIOLATION/N/A; no docs ⇒ minimal generic boundary sweep, stated | `architecture` |
-| 4 | Performance | `massa-ai-audit-specialist` | `lens: performance` — only issues clearly visible in the diff: N+1 queries, unbounded fetches, per-row lazy I/O, sequential awaits of independent calls, loop-invariant recomputation, unbatched writes | `performance` |
-| 5 | Test coverage | `massa-ai-audit-specialist` | `lens: tests` (dedicated lens: coverage, regression protection, assertion quality, variation — `tests-audit.md` precedent) — new/changed behavior with no test, wrong level (unit vs integration), placement/naming vs profile TEST row, missing negative case, missing variation beyond the fixture example, assertions that exercise but never assert | `tests` |
-| 6 | Regression & hallucination | `massa-ai-reviewer` | diff review — unrelated deletions, references to symbols absent from the repo, wrong signature/arity, duplicated existing logic, weakened error handling or assertions, leftover TODO/stub, dead code | `regression` |
+| 1 | Security | `code-reviewer` | `lens: security` — secrets, authn/authz on new endpoints, injection, unsafe deserialization, PII in logs, permissive CORS, leaking payload fields | `security` |
+| 2 | Requirements & DoD (Definition of Done) | `product-manager` | `mode: audit` — score merged Track A + Track B criteria against the diff, evidence-or-zero: ✅ implemented (`path:line`) / 🟡 partial / ❌ missing; no source ⇒ report "requirements verification skipped" | `requirements` |
+| 3 | Architecture & conventions | `code-reviewer` | `lens: architecture` — extract every explicit rule from the profile's CONVENTIONS/REVIEW_SKILLS docs into a numbered matrix, grade each changed file PASS/VIOLATION/N/A; no docs ⇒ minimal generic boundary sweep, stated | `architecture` |
+| 4 | Performance | `code-reviewer` | `lens: performance` — only issues clearly visible in the diff: N+1 queries, unbounded fetches, per-row lazy I/O, sequential awaits of independent calls, loop-invariant recomputation, unbatched writes | `performance` |
+| 5 | Test coverage | `test-engineer` | `mode: audit` (dedicated tests lens: coverage, regression protection, assertion quality, variation — `tests-audit.md` precedent) — new/changed behavior with no test, wrong level (unit vs integration), placement/naming vs profile TEST row, missing negative case, missing variation beyond the fixture example, assertions that exercise but never assert | `tests` |
+| 6 | Regression & hallucination | `code-reviewer` | `mode: audit`, `lens: diff` — diff review — unrelated deletions, references to symbols absent from the repo, wrong signature/arity, duplicated existing logic, weakened error handling or assertions, leftover TODO/stub, dead code | `regression` |
 
 Consolidation check (≥ 5 subagents): recorded in the feature design — rows 4 and 5
 share only the lens label, not a knowledge domain; they stay separate dispatches.
 
-> **Dispatch: `massa-ai-audit-specialist`** (role: `audit-specialist`) — charter `skills/agents/audit-specialist/SKILL.md`
-> - trigger: pr-review Step 2, dimension rows 1–5 (one dispatch per row)
-> - scope: the PR/MR diff and surrounding context for one dimension row; never the whole repository
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
+> - trigger: pr-review Step 2, dimension rows 1, 3, and 4 (one dispatch per row)
+> - scope: the PR/MR diff and surrounding context for one dimension row; never the whole repository; no host CLI calls, no posting
+> - inputs: exact `projectId`, parent `workflowSessionId`, dimension row (lens + scope), DISCOVERY MAP, PR/MR intent, trimmed diff, existing-comment inventory, severity labels, reply contract
+> - sensors: second-pass sweep — re-read the full trimmed diff, list every file/hunk not commented on, and state per file why it is clean for this dimension before returning
+> - output: structured reply block — findings rows `{path, head-line, severity, marker type, title, body ≤ 6 lines, recommendation}` + exactly one positive highlight + files-swept-clean list; when uncertain a finding is real, withhold it (the source protocol's high-confidence bar, applied qualitatively)
+> - firewall: raw diff/log/search output summarized, never returned raw
+> - memory: suggest-only; the main agent persists durable outcomes
+
+> **Dispatch: `product-manager`** (role: `product-manager`, mode: `audit`) — charter `skills/agents/product-manager/SKILL.md`
+> - trigger: pr-review Step 2, dimension row 2 (requirements & DoD)
+> - scope: the PR/MR diff and surrounding context for dimension row 2; never the whole repository
 > - permissions: read-only; no host CLI calls, no posting
 > - inputs: exact `projectId`, parent `workflowSessionId`, dimension row (lens + scope), DISCOVERY MAP, PR/MR intent, trimmed diff, existing-comment inventory, severity labels, reply contract
 > - sensors: second-pass sweep — re-read the full trimmed diff, list every file/hunk not commented on, and state per file why it is clean for this dimension before returning
 > - output: structured reply block — findings rows `{path, head-line, severity, marker type, title, body ≤ 6 lines, recommendation}` + exactly one positive highlight + files-swept-clean list; when uncertain a finding is real, withhold it (the source protocol's high-confidence bar, applied qualitatively)
 > - firewall: raw diff/log/search output summarized, never returned raw
 > - memory: suggest-only; the main agent persists durable outcomes
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
-> - trigger: pr-review Step 2, dimension row 6 (regression & hallucination)
-> - scope: the full PR/MR diff against the repository's real symbol surface
+> **Dispatch: `test-engineer`** (role: `test-engineer`, mode: `audit`) — charter `skills/agents/test-engineer/SKILL.md`
+> - trigger: pr-review Step 2, dimension row 5 (test coverage)
+> - scope: the PR/MR diff and surrounding context for dimension row 5; never the whole repository
 > - permissions: read-only; no host CLI calls, no posting
-> - inputs: exact `projectId`, parent `workflowSessionId`, dimension row 6, DISCOVERY MAP, PR/MR intent, full diff, existing-comment inventory, severity labels, reply contract
+> - inputs: exact `projectId`, parent `workflowSessionId`, dimension row (lens + scope), DISCOVERY MAP, PR/MR intent, trimmed diff, existing-comment inventory, severity labels, reply contract
+> - sensors: second-pass sweep — re-read the full trimmed diff, list every file/hunk not commented on, and state per file why it is clean for this dimension before returning
+> - output: structured reply block — findings rows `{path, head-line, severity, marker type, title, body ≤ 6 lines, recommendation}` + exactly one positive highlight + files-swept-clean list; when uncertain a finding is real, withhold it (the source protocol's high-confidence bar, applied qualitatively)
+> - firewall: raw diff/log/search output summarized, never returned raw
+> - memory: suggest-only; the main agent persists durable outcomes
+
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
+> - trigger: pr-review Step 2, dimension row 6 (regression & hallucination)
+> - scope: the full PR/MR diff against the repository's real symbol surface; no host CLI calls, no posting
+> - inputs: `lens: diff`; exact `projectId`, parent `workflowSessionId`, dimension row 6, DISCOVERY MAP, PR/MR intent, full diff, existing-comment inventory, severity labels, reply contract
 > - sensors: verify referenced symbols exist (`search_definitions`/`get_references` when INDEX is fresh, else grep); second-pass sweep as above
 > - output: structured reply block — findings rows tagged `{unrelated-deletion | phantom-reference | wrong-signature | duplicate | weakened-check | dead-code}` + one positive highlight + files-swept-clean list; withhold uncertain findings
 > - firewall: raw diff/log/search output summarized, never returned raw
 > - memory: suggest-only; the main agent persists durable outcomes
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 Severity labels (all dimensions): 🚨 Critical (bugs/logic errors that will fail) ·
 🔒 Security · ⚡ Performance · ⚠️ Warning (smells/maintainability) ·
@@ -243,4 +259,3 @@ with the metadata table intact.
   convention) with the required memory tags; do not fabricate memories.
 - Close with `references/evidence-gate.md`: counts posted vs deduped vs withheld,
   skipped dimensions/sensors with reasons, and the summary URL/reference.
-<!-- validator anchors: comment-only | added (+) diff lines | page to completion | two waves -->

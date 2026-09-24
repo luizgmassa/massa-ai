@@ -98,7 +98,9 @@ export class SearchAnalyticsPg {
   trackSearch(event: SearchEvent): void {
     // Fire and forget async operation
     this.trackSearchAsync(event).catch(err => {
-      logger.error('Failed to track search event', err as Error);
+      logger.error('Failed to track search event', err as Error, {
+        projectId: event.projectId,
+      });
     });
   }
 
@@ -128,7 +130,9 @@ export class SearchAnalyticsPg {
         ]
       );
     } catch (error) {
-      logger.error('Failed to track search event in PostgreSQL', error as Error);
+      logger.error('Failed to track search event in PostgreSQL', error as Error, {
+        projectId: event.projectId,
+      });
     }
   }
 

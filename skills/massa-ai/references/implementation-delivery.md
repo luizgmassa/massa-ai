@@ -18,8 +18,8 @@ human chose to merge it".
 
 | # | Stage | Command | On failure |
 | --- | --- | --- | --- |
-| 0 | Preflight | `git rev-parse --is-inside-work-tree`; `command -v gh`; `gh auth status` | Record which capabilities are absent and select the degraded path below |
-| 1 | Isolate | `git fetch origin <base> && git worktree add -b <type>/<slug> <path> origin/<base>` | Branch name taken → suffix `-2`. Worktree path taken → reuse it only if its branch matches |
+| 0 | Preflight | `bun skills/massa-ai/scripts/ensure_worktree.ts` runs this: `git rev-parse --is-inside-work-tree`; `command -v gh`; `gh auth status` | Record which capabilities are absent and select the degraded path below |
+| 1 | Isolate | `bun skills/massa-ai/scripts/ensure_worktree.ts --branch <type>/<slug> [--base <base>] [--path <path>]`, which runs `git fetch origin <base> && git worktree add -b <type>/<slug> <path> origin/<base>` | Branch name taken → suffix `-2`. Worktree path taken → reuse it only if its branch matches. The script applies both rules and prints the resulting path + branch |
 | 1.5 | Summarize | present the pre-implementation change summary (see Stage 1.5) | Summary skipped → stop and present it before the first mutation; a mutation made without it is a protocol violation to report, not to hide |
 | 2 | Implement | one task → gate → `git commit` | Gate red → fix before committing. Never commit through a failing gate |
 | 3 | Push | `git push -u origin <type>/<slug>` | Rejected non-fast-forward → `git fetch` + rebase, never force-push a shared branch |
@@ -45,7 +45,10 @@ The only two legal skip reasons:
 2. The user explicitly declined isolation for this task.
 
 Record the skip reason verbatim in the completion report. Any other reason is a
-protocol violation, not a shortcut.
+protocol violation, not a shortcut. `ensure_worktree.ts` emits exactly these two
+strings and no third: it detects reason 1 from the tree, and takes reason 2 only
+from an explicit `--skip-declined`, because a script cannot observe a user
+declining anything.
 
 **Record the isolation evidence immediately after creation:** the worktree path
 and branch name go into the session status the moment Stage 1 completes, and
@@ -62,14 +65,14 @@ worktree was never provisioned is an environment failure; say so rather than
 reporting it as a code failure.
 
 **Phased work — one branch per Phase/Wave.** When the work is phased (sourced
-from `workflows/ticket.md`, a spec-driven `tasks.md` with Phases/Waves, a TDD
+from `workflows/create-ticket.md`, a spec-driven `tasks.md` with Phases/Waves, a TDD
 PR-group table, or a `references/pr-task-fix.md` PR-group split), create
 **one branch per Phase/Wave**, not one branch per task
 and not one branch for the whole feature. All Phases/PR groups of one feature
 share that feature's single Stage 3 delivery authorization — one go-ahead
 covers every group's commits, pushes, and PR creation. Name the branch with the phase's Jira
 Task key, e.g. `feat/<PHASE-KEY>-<slug>` (so `feat/SA-100-phase-1-search-split`
-for phase SA-100). The phase key comes from `workflows/ticket.md` or the user.
+for phase SA-100). The phase key comes from `workflows/create-ticket.md` or the user.
 Each Task inside the phase is then one atomic commit on that branch, prefixed
 with its own sub-task key — the commit contract is owned by
 `workflows/commit.md`; do not restate it here. Non-phased work keeps the

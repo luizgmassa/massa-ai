@@ -48,7 +48,6 @@ function listSkillMd(root: string): string[] {
   const out: string[] = [];
   walk(join(root, "skills", "massa-ai"), ".md", out);
   walk(join(root, "skills", "agents"), ".md", out);
-  walk(join(root, "skills", "persona-router"), ".md", out);
   return out;
 }
 

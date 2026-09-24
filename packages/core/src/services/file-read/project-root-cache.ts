@@ -73,7 +73,7 @@ export class ProjectRootCache {
         return workspace.project_path;
       }
     } catch (error) {
-      logger.warn("Failed to look up project root", { projectId, error: (error as Error).message });
+      logger.warn("ProjectRootCache: failed to look up project root", { projectId, error: error as Error });
     }
     return null;
   }

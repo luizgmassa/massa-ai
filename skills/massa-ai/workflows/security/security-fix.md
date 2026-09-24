@@ -68,7 +68,7 @@ Not for findings-only security review — route to `workflows/security/security-
    - Do not weaken existing security assertions to make tests pass.
 10. Use agent orchestration only when it improves signal — except the verifier dispatch below, which is unconditional for every SEC finding closed `fixed`, carved out under `references/agent-orchestration.md`'s Independent Verification Exception as the security-fix unconditional case (other fix families use the tier-gated one). Dispatch per `references/agent-orchestration.md`:
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
 > - trigger: large/high-risk finding, disjoint implementation slice, or explicit subagent request
 > - scope: one isolated security finding with a disjoint write set
 > - permissions: write (disjoint write set)
@@ -77,31 +77,25 @@ Not for findings-only security review — route to `workflows/security/security-
 > - output: implementation summary, commands run, test counts, deviations
 > - firewall: raw diffs/logs summarized
 > - memory: suggest-only; main agent persists reusable security patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
-> - inputs: diff, acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: every SEC finding closed `fixed` — never optional, at every tier (verification-ladder Independent Verification Mandate, security-fix exception)
 > - scope: the fixed SEC finding's guard, exploit path, negative test, and report claim closure
-> - permissions: read-only
 > - inputs: the SEC finding, the applied guard, the verification suggestion, the exploit path, and validation assets
 > - sensors: deterministic command (negative-test re-run, guard/middleware-order inspection, redaction or crypto check) and report claim closure; guard-mutation discrimination sensor per `references/discrimination-sensor.md` (invert the specific guard just added; the negative test must kill it)
 > - output: confirmed/disproven SEC closure verdict with evidence, feeding the Fix Closure Report's Independent Verifier column
 > - firewall: raw exploit transcripts and test/log output summarized
 > - memory: suggest-only; main agent persists security verification outcomes
 > - fallback: if the subagent is unavailable, run a standalone fresh-eyes re-check of each fixed SEC row's guard and negative test, and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
    - Main agent owns report parsing, prioritization, memory writes, final synthesis, and Evidence Gate.
 
 11. Verify each completed finding:
@@ -111,7 +105,7 @@ Not for findings-only security review — route to `workflows/security/security-
    - A finding cannot be marked `fixed` when a target-relevant command or artifact check exists but was not attempted; if verification cannot run, mark it `blocked`, `deferred`, or `skipped` with an allowed skipped-check reason.
    - Run the report's verification suggestion when available.
    - At Standard+ size or high/critical severity, run the guard-mutation discrimination sensor per `references/discrimination-sensor.md`: invert the specific guard just added and confirm the negative test kills it; a surviving mutant marks the finding's Closure Matrix row `blocked` and records the `surviving_mutant` lessons signal even when the exploit-path test is green.
-   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop at 3 iterations; that counter is separate from the two-consecutive-failed-fixes breaker into `references/root-cause-scripts.md` named in this file's preamble, which fires inside a single edit iteration and neither consumes nor resets the loop count.
+   - The fix→re-verify cycle is capped per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop at 3 iterations.
    - Run targeted tests for negative and positive paths, plus lint/type/build checks relevant to touched files.
    - Inspect logs/config/errors when the finding involves data exposure.
    - Record command/artifact, result, skipped reason or `none`, highest Verification Ladder level reached, validation assets protected, and residual risk.
@@ -131,6 +125,3 @@ User asks: "Use security-fix to fix latest audit findings for user routes."
 3. Fix critical/high exploit paths first.
 4. Add negative tests for denied access, invalid input, or redacted output.
 5. Run deterministic tests and report residual security risk.
-
-<!-- validator anchors: every SEC finding closed `fixed` — never optional, at every tier | guard-mutation discrimination sensor | Fix Closure Report Contract | security-fix-closure | consult it before working the finding | append any newly discovered security hotspot | Urgency does not expand delivery authorization | Bounded Fix→Re-verify Loop | graceful degradation preserved -->
-

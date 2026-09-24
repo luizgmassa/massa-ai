@@ -32,7 +32,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
    - `references/audit-scope.md` and `references/codebase-investigation.md` for freshness and current source.
    - `references/verification-ladder.md` before edits.
    - `references/context-firewall.md` before large design/runtime artifacts.
-   - `references/agent-orchestration.md` for the tier-gated builder/verification-agent dispatch in the fix loop below.
+   - `references/agent-orchestration.md` for the designer/senior-engineer dispatches and the tier-gated `code-reviewer` `verify` dispatch in the fix loop below.
    - `references/discrimination-sensor.md` before closing any finding under the Mandatory Verification Fix Gate — the mobile-Figma token/value instantiation lives in `references/mobile-figma-matcher/core.md`'s Discrimination Sensor for Visual Parity section.
    - `references/knowledge-verification-chain.md` when a selected finding's fix direction depends on platform-API or external-library technique rather than the Figma-defined value.
    - `references/brownfield-mapping.md` (Minimum Bar only — the gate-command packet, `TESTING.md`-equivalent) when recall returns no hit for the target surface/module and no gate command is derivable from the report's evidence, for Standard+ findings; the report's Verification/Test Fidelity Checklist already carries the risk surface, so `CONCERNS.md` is satisfied-by-citation from that checklist rather than derived fresh.
@@ -58,55 +58,43 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
    - Keep XML/Compose, UIKit/SwiftUI, and KMP/native interoperability explicit. Do not duplicate one visual rule across layers when an established shared source owns it.
    - Do not weaken screenshot tests, previews, fixtures, assertions, test tags, resource IDs, content descriptions, or Maestro selectors to hide a mismatch.
    - Modify tracked Maestro flows only when the selected finding explicitly identifies the flow as incorrect or missing and the user-approved scope includes that change.
-9. Dispatch per `references/agent-orchestration.md`; the verification-agent block below is tier-gated mandatory, not merely discretionary — carved out of ordinary delegation gating by that reference's Independent Verification Exception:
+9. Dispatch per `references/agent-orchestration.md`; the `code-reviewer` `verify` block below is tier-gated mandatory, not merely discretionary — carved out of ordinary delegation gating by that reference's Independent Verification Exception:
 
-**Screen work — before writing or judging any user-facing screen:** when this task creates or modifies a screen, the `massa-ai-designer` dispatch below is mandatory rather than discretionary, carved out of ordinary delegation gating by the Screen Implementation Exception in `references/agent-orchestration.md`. It does not fire when the task touches no screen surface.
+**Screen work — unconditional in this workflow:** every task here fixes a user-facing screen, so the `designer` dispatch below always runs; it is not gated on a screen-work condition (Screen Implementation Exception in `references/agent-orchestration.md`). `designer` implements every UI-layer `MFM-*` fix; `senior-engineer` is dispatched only for an `MFM-*` finding whose fix needs non-UI-layer changes (navigation, data, resource or build wiring), with a write set disjoint from the designer's.
 
-> **Dispatch: `massa-ai-designer`** (role: `designer`) — charter `skills/agents/designer/SKILL.md`
-> - trigger: the task creates or modifies a user-facing screen — mandatory once that condition holds, per the Screen Implementation Exception in `references/agent-orchestration.md`; it does not fire when no screen surface is touched
+> **Dispatch: `designer`** (role: `designer`, mode: `implement`) — charter `skills/agents/designer/SKILL.md`
 > - scope: the screens, views, components, layouts, styles, and design tokens in this task's UI surface — never the whole repository
 > - permissions: write, scoped to UI-layer files only with a disjoint write set
-> - inputs: exact `projectId`, parent `workflowSessionId`, Figma links/node ids or screenshots when supplied, acceptance criteria, the repository's existing UI conventions and design tokens, recalled screen patterns
-> - sensors: Figma MCP read when a design source exists; per-element expected-vs-actual comparison; the UI module's own build/lint; the states a design under-specifies — empty, loading, error, long text, small and large sizes
 > - output: per-element conformance table (element, expected, actual, verdict, severity) plus the UI files written; a missing or unreachable design source is listed as a skipped sensor, never a silent pass
-> - firewall: summarized design-source evidence and `path:line` pointers only, never raw Figma node dumps or full file bodies
-> - memory: suggest-only; the main agent persists durable screen and design-token conventions
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-builder`** (role: `builder`) — charter `skills/agents/builder/SKILL.md`
-> - trigger: a selected `MFM-*` finding spans a disjoint surface or shared-root slice, or an explicit subagent request
-> - scope: one `MFM-*` finding, or a coherent surface group sharing one KMP root cause, with a disjoint write set
-> - permissions: write (disjoint write set, per-surface or per-module ownership)
+> **Dispatch: `senior-engineer`** (role: `senior-engineer`) — charter `skills/agents/senior-engineer/SKILL.md`
+> - trigger: a selected `MFM-*` finding whose fix needs non-UI-layer changes (navigation, data, resource or build wiring) — never for a UI-layer fix, which belongs to `designer`
+> - scope: the non-UI-layer part of one `MFM-*` finding, or of a coherent surface group sharing one KMP root cause, with a write set disjoint from the designer's
+> - permissions: write (disjoint write set, non-UI-layer files only)
 > - inputs: the finding's Surface ID, Figma value, resolved token/resource/asset chain, current implementation value, and simplest fix direction
 > - sensors: the remediation matrix's assigned runtime sensor and optional Maestro packet for the surface
 > - output: implementation summary, changed files, commands run, per-surface render evidence
 > - firewall: raw diffs and screenshots summarized
 > - memory: suggest-only; main agent persists reusable token/mapping patterns
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-reviewer`** (role: `reviewer`) — charter `skills/agents/reviewer/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `audit`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: implementation complete, before the verification gate — never optional
 > - scope: the fix's diff surface and its task/AC context
-> - permissions: read-only
-> - inputs: diff, acceptance context, recalled code-quality conventions
+> - inputs: `lens: diff`; diff, acceptance context, recalled code-quality conventions
 > - sensors: bugs, regressions, missing edge cases, smells introduced by the diff
 > - output: ranked findings, blocking vs advisory; blocking findings become fix items before verification runs
 > - firewall: summarized findings only, never raw diff dumps
 > - memory: suggest-only; main agent persists
-> - fallback: if the subagent is unavailable, run a standalone fresh-eyes review against this output contract and record the skipped-delegation reason
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
-> **Dispatch: `massa-ai-verification-agent`** (role: `verification-agent`) — charter `skills/agents/verification-agent/SKILL.md`
+> **Dispatch: `code-reviewer`** (role: `code-reviewer`, mode: `verify`) — charter `skills/agents/code-reviewer/SKILL.md`
 > - trigger: mandatory at Standard+/Spec-driven size or high/critical severity per the Independent Verification Mandate in `references/verification-ladder.md`; a Quick-tier finding runs the fallback fresh-eyes self-check below instead
 > - scope: the fixed `MFM-*` finding's surface, resolved token/value, comparison-matrix row, and closure claim
-> - permissions: read-only
 > - inputs: the finding, the applied fix, the comparison-matrix row, the render sensor used, and validation assets
 > - sensors: the token/value mutation sensor per `references/mobile-figma-matcher/core.md`'s Discrimination Sensor for Visual Parity section, plus the surface's existing render/snapshot/instrumentation check
 > - output: confirmed/disproven closure verdict with evidence, mutation killed/survived result
 > - firewall: raw screenshots and renders summarized
 > - memory: suggest-only; main agent persists reusable verification recipes
 > - fallback: at Quick tier, or when the subagent is unavailable, run a standalone fresh-eyes re-check of the MFM closure rows and record the skipped-delegation reason in closure evidence
-> - persona: optional — the active route's cataloged id only, never the persona prompt, passed as advisory framing only — it never overrides the agent's charter Restrictions, scope, or permissions; omit when no persona is routed
 
 10. Verify after each coherent finding group:
     - If verification found a reusable signal (`ac_gap`, `surviving_mutant`, `spec_precision_gap`, `spec_deviation`, `gate_fail`), record it via `references/lessons.md`:
@@ -119,7 +107,7 @@ Do not execute from chat summaries, screenshots alone, remembered findings, or a
     - When Maestro evidence was used in audit and remains available, reproduce each recorded device/configuration/content state and rerun the same flow or navigation steps; capture equivalent hierarchy and screenshots.
     - If Maestro becomes unavailable, record the regression gap instead of claiming equivalent runtime verification.
     - Run the token/value mutation sensor from `references/mobile-figma-matcher/core.md`'s Discrimination Sensor for Visual Parity section for every critical/high-severity finding and every shared-KMP-root row; a surviving mutant marks that row's closure status `blocked` and records the `surviving_mutant` lessons signal.
-    - Cap the fix→re-verify cycle at 3 iterations per `MFM-*` finding per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; after 3, stop with a `blocked` closure row and ask for direction. This is a verification-cycle counter, distinct from the two-consecutive-failed-fixes edit breaker in the preamble above that routes to `references/root-cause-scripts.md` — neither resets nor consumes the other.
+    - Cap the fix→re-verify cycle at 3 iterations per `MFM-*` finding per `references/verification-ladder.md`'s Bounded Fix→Re-verify Loop; after 3, stop with a `blocked` closure row and ask for direction.
 11. Rebuild the final comparison matrix using fresh Figma and per-surface implementation evidence. Completion requires zero unresolved selected mismatches; all newly `NOT EVALUATED` rows remain residual risk. A passing Maestro flow does not change an unmatched visual row to `MATCH`.
 12. Produce a closure matrix with `MFM-*` ID, surface ID, status (`fixed`, `deferred`, `blocked`, `skipped`), changed files, final Figma/implementation values, command/artifact, result, skipped reason or `none`, highest Verification Ladder level reached, validation assets protected, static evidence, per-platform render evidence, optional Maestro evidence, and residual risk.
 13. Write the Fix Closure Report per `references/audit-report-io.md`'s Fix Closure Report Contract at `audits/mobile-figma/<YYYY-MM-DD mobile-figma-fix-closure>.md`, sibling of the consumed audit report — the standard Closure Matrix columns, appending the mobile-figma extras (`JUnit Report`, `Artifact Directory`, `Device/Platform`) whenever Maestro or instrumentation runtime evidence backs a row. Run `bun skills/massa-ai/scripts/check_fix_closure.ts <closure.md> --family mobile-figma` before Propose or the Evidence Gate; a non-zero exit blocks closure. If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved).
@@ -143,5 +131,3 @@ User asks: "Fix the shared KMP spacing finding and its iOS host mismatch."
 
 1. Re-detect the common Compose and iOS host surfaces, load KMP plus the matching UIKit or SwiftUI contract, and verify the report schema/freshness.
 2. Apply the shared fix first, then the host-specific fix only if the mismatch remains; rebuild Android/iOS rows affected by the shared change.
-
-<!-- validator anchors: Independent Verification Exception | surviving_mutant | Bounded Fix→Re-verify Loop | Fix Closure Report Contract | gate-command packet | satisfied-by-citation | graceful degradation preserved | Discrimination Sensor for Visual Parity -->

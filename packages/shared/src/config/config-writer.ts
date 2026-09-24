@@ -7,11 +7,15 @@ import {
   writeFileAtomically,
   mergeSchedulerSection,
 } from "./config-loader";
-import { SCHEDULER_JOB_KINDS, type MassaAiConfig } from "./massa-ai-config";
+import { SCHEDULER_JOB_KINDS, EMBEDDING_PROVIDER_IDS, type MassaAiConfig } from "./massa-ai-config";
 
 const MASK_SENTINEL = "***";
 const RESTART_SECTIONS = ["database", "embedding", "llm", "security", "scheduler"];
-const VALID_EMBEDDING_PROVIDERS = ["ollama", "mistral", "openai", "google", "cohere"];
+// Derived from LOCAL_INFERENCE_IDS ∪ API_PROVIDER_IDS (LIP-01) — adds
+// "lmstudio" to what config.json can validate for `embedding.provider`.
+// Exported so scripts/__tests__/provider-list-parity.test.ts can assert
+// membership equality against the other provider-list consumers.
+export const VALID_EMBEDDING_PROVIDERS: readonly string[] = EMBEDDING_PROVIDER_IDS;
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"];
 /** Keep the 10 most recent `config.json.bak.<ISO>` files; delete older ones (APCR-08.4). No
  *  prior policy existed — 10 covers a normal editing session while bounding a directory
@@ -145,6 +149,10 @@ function validatePartial(partial: Partial<MassaAiConfig>): string[] {
       details.push("embedding.apiKey must be a string");
     if (e.dimensions !== undefined && !checkNumber(e.dimensions, 1))
       details.push("embedding.dimensions must be a positive number");
+    if (e.contextWindow !== undefined && !checkNumber(e.contextWindow, 1))
+      details.push("embedding.contextWindow must be a positive number");
+    if (e.batchSize !== undefined && !checkNumber(e.batchSize, 1))
+      details.push("embedding.batchSize must be a positive number");
   }
 
   if (partial.compression !== undefined) {
@@ -235,6 +243,12 @@ function validatePartial(partial: Partial<MassaAiConfig>): string[] {
       details.push("llm.timeoutMs must be a positive number");
     if (!checkBoolean(l.disableThink))
       details.push("llm.disableThink must be a boolean");
+    if (!checkNumber(l.contextWindow, 1))
+      details.push("llm.contextWindow must be a positive number");
+    if (!checkNumber(l.codeContextWindow, 1))
+      details.push("llm.codeContextWindow must be a positive number");
+    if (!checkNumber(l.codeTemperature))
+      details.push("llm.codeTemperature must be a number");
   }
 
   if (partial.memory !== undefined) {

@@ -2,8 +2,8 @@
 # ================================================================
 # scripts/tests/test-install-skills-apply.sh
 #
-# scripts/install-skills.sh --apply: real-copy creation, idempotence, the
-# AGENTS.md bootstrap block, and the foreign-conflict abort.
+# scripts/install-skills.sh --apply: real-copy creation, idempotence, claude's
+# CLAUDE.md bootstrap wiring, and the foreign-conflict abort.
 #
 # Everything runs against a mktemp fake home; the real $HOME is never touched.
 #
@@ -25,6 +25,15 @@ MOCK_BIN="$(make_mock_agents "$ROOT/bin")"
 export PATH="$MOCK_BIN:$PATH"
 
 BOOTSTRAP_START="$(grep -m1 '^BOOTSTRAP_START=' "$INSTALLER" | cut -d'"' -f2)"
+BOOTSTRAP_END="$(grep -m1 '^BOOTSTRAP_END=' "$INSTALLER" | cut -d'"' -f2)"
+
+# The managed block of FILE, markers included; empty when the file has none.
+# sed rather than the node helper at
+# test-install-skills-bootstrap-file.sh:120-132, because this suite has no
+# $RUNNER; neither marker literal contains a `/`, so the default sed delimiter
+# is safe. Asserting inside the block — not over the whole file — is what keeps
+# "the import is present" from passing on an import a user wrote themselves.
+managed_block() { sed -n "/$BOOTSTRAP_START/,/$BOOTSTRAP_END/p" "$1" 2>/dev/null; }
 
 run_apply() { # run_apply HOME [extra args...]
   local home="$1"; shift
@@ -48,8 +57,16 @@ for d in "$PROJECT_ROOT"/skills/*/; do
   check "ownership marker written for $name" "$([ -f "$H1/.claude/skills/.massa-ai-owned-$name" ] && echo 0 || echo 1)"
 done
 check "at least one skill was discovered" "$([ "$SKILL_COUNT" -gt 0 ] && echo 0 || echo 1)"
-assert_file "AGENTS.md written" "$H1/.claude/AGENTS.md"
-assert_contains "AGENTS.md carries the bootstrap marker" "$(cat "$H1/.claude/AGENTS.md")" "$BOOTSTRAP_START"
+# T13 moved claude's load wiring off AGENTS.md and into ~/.claude/CLAUDE.md
+# (BST-02 AC-3). Both directions of that migration are asserted, per
+# CONTRIBUTING.md Step 6: the delivered import must be present, AND the retired
+# AGENTS.md block must have zero effect (BST-05 AC-8). Asserting only the first
+# would leave the migration itself unsensed. Shapes mirror
+# test-install-skills-bootstrap-file.sh:213-214 and :283-284.
+assert_contains "CLAUDE.md managed block imports the contract (BST-02 AC-3)" \
+  "$(managed_block "$H1/.claude/CLAUDE.md")" "@MASSA-AI.md"
+assert_not_contains "claude AGENTS.md keeps no bootstrap marker pair (BST-05 AC-8)" \
+  "$(cat "$H1/.claude/AGENTS.md" 2>/dev/null)" "$BOOTSTRAP_START"
 
 echo ""
 echo "Scenario 2: re-running is a byte-for-byte no-op"
@@ -67,15 +84,26 @@ run_apply "$H2" >/dev/null
 CONTENT="$(cat "$H2/.claude/AGENTS.md")"
 assert_contains "user heading survives" "$CONTENT" "# My notes"
 assert_contains "user body survives" "$CONTENT" "keep me"
-assert_contains "bootstrap block appended" "$CONTENT" "$BOOTSTRAP_START"
+# The user's AGENTS.md is left entirely to the user now; the wiring this run
+# adds lands in CLAUDE.md instead (BST-02 AC-3). The retired direction for this
+# home is asserted in scenario 4 below, which re-applies against the same $H2.
+assert_contains "an existing home still gets the CLAUDE.md import (BST-02 AC-3)" \
+  "$(managed_block "$H2/.claude/CLAUDE.md")" "@MASSA-AI.md"
 
 echo ""
-echo "Scenario 4: a stale bootstrap block is replaced, not duplicated"
-MARKS="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/AGENTS.md")"
+echo "Scenario 4: a stale managed block is replaced, not duplicated"
+# T13 moved the block to CLAUDE.md, so CLAUDE.md is where duplication can now
+# happen and where the idempotence claim belongs. The AGENTS.md count is the
+# other direction of the same migration: a re-apply must never re-create the
+# retired block there (BST-05 AC-8).
+MARKS="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/CLAUDE.md" 2>/dev/null)"
 run_apply "$H2" >/dev/null
-MARKS2="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/AGENTS.md")"
-assert_eq "exactly one start marker before" "$MARKS" "1"
-assert_eq "exactly one start marker after" "$MARKS2" "1"
+MARKS2="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/CLAUDE.md" 2>/dev/null)"
+AGENTS_MARKS="$(grep -c -- "$BOOTSTRAP_START" "$H2/.claude/AGENTS.md" 2>/dev/null)"
+assert_eq "exactly one start marker in CLAUDE.md, before and after a re-apply" \
+  "${MARKS:-none}/${MARKS2:-none}" "1/1"
+assert_eq "the retired AGENTS.md block is never re-created (BST-05 AC-8)" \
+  "${AGENTS_MARKS:-none}" "0"
 
 echo ""
 echo "Scenario 5: a symlink at a target is replaced with a real copy (migration off symlinks)"
@@ -150,5 +178,44 @@ process.stdout.write(s.platforms.claude.skillsOwner);
 NODE
 )"
 assert_eq "ownership converts to repo after an explicit apply" "$OWNER6" "repo"
+
+echo ""
+echo "Scenario 9: skills/bootstrap is delivered by dynamic discovery, with no installer edit (T20, BST-11)"
+# T20 adds skills/bootstrap/ and touches install-skills.sh not at all. That
+# claim is asserted here rather than left to the diff, in three directions.
+#
+# Direction 1 — the installer names no skill directory anywhere in its source.
+# Discovery is the glob at :216-223 (`for dir in "$SKILLS_ROOT"/*/`), so a
+# literal `skills/<name>` reference would mean some name is special-cased and
+# a new one could be missed. The population is printed beside the verdict: a
+# pattern that resolved to nothing reads exactly like a clean file.
+HARDCODED="$(grep -cE 'skills/(bootstrap|profile|persona-router|massa-ai)[/"[:space:]]' "$INSTALLER" || true)"
+echo "  (installer references to a named skill directory: $HARDCODED)"
+assert_eq "install-skills.sh hardcodes no skill directory name" "$HARDCODED" "0"
+
+# Direction 2 — behavioural. The new skill actually lands, byte-for-byte, with
+# its ownership marker, from an --apply that knows nothing about it. Scenario 1
+# above loops the same glob the installer does, so on its own it would pass
+# vacuously if bootstrap were absent from the repo; this pins the one name.
+H7="$ROOT/h7"; mkdir -p "$H7"
+run_apply "$H7" >/dev/null
+assert_file "skills/bootstrap/SKILL.md exists in the repo to be discovered" \
+  "$PROJECT_ROOT/skills/bootstrap/SKILL.md"
+assert_file "bootstrap SKILL.md was delivered to the host" "$H7/.claude/skills/bootstrap/SKILL.md"
+check "the delivered bootstrap copy matches the source byte-for-byte" \
+  "$(diff -rq "$PROJECT_ROOT/skills/bootstrap" "$H7/.claude/skills/bootstrap" >/dev/null 2>&1; echo $?)"
+assert_file "ownership marker written for bootstrap" \
+  "$H7/.claude/skills/.massa-ai-owned-bootstrap"
+check "the delivered bootstrap copy is a real directory, not a symlink" \
+  "$([ -d "$H7/.claude/skills/bootstrap" ] && [ ! -L "$H7/.claude/skills/bootstrap" ] && echo 0 || echo 1)"
+
+# Direction 3 — the toggle surface the skill drives is a CLI, not an MCP tool
+# (BST-11.5). The delivered copy must carry no MCP tool identifier;
+# scripts/__tests__/bootstrap-skill-contract.test.ts owns the full ban, this is
+# the post-delivery half, on the bytes that actually reached the host.
+assert_not_contains "the delivered bootstrap skill names no mcp__ tool" \
+  "$(cat "$H7/.claude/skills/bootstrap/SKILL.md")" "mcp__"
+assert_contains "the delivered bootstrap skill names the CLI front" \
+  "$(cat "$H7/.claude/skills/bootstrap/SKILL.md")" "massa-ai-config bootstrap list"
 
 summary "install-skills --apply"

@@ -67,8 +67,10 @@ const DEST_VARS = [
  * destination — arguably a better one, since it cannot see a foreign file —
  * so it satisfies D2. Named as its own class rather than folded into
  * "destination" so the distinction stays visible to the next reader.
+ * `state_retired_skills` is the plugin installers' recorded-minus-current
+ * harness skills (agent-roster-consolidation design C4).
  */
-const STATE_DERIVED = ["state_skills_for"];
+const STATE_DERIVED = ["state_skills_for", "state_retired_skills"];
 
 type Loop = {
   file: string;
@@ -116,7 +118,7 @@ function classify(iter: string): Loop["kind"] {
   if (STATE_DERIVED.some((s) => iter.includes(s))) return "state";
   if (vars.some((v) => SOURCE_VARS.includes(v))) return "source";
   if (vars.some((v) => DEST_VARS.includes(v))) return "destination";
-  if (vars.length === 0) return "literal"; // e.g. `for name in massa-ai persona-router profile`
+  if (vars.length === 0) return "literal"; // e.g. `for name in massa-ai bootstrap`
   return "unclassified";
 }
 
@@ -207,8 +209,9 @@ describe("installer prune loops derive their population from the destination", (
    * `uninstall_bundled_skills` loops will not shed it, because the name is no
    * longer in the literal they iterate.
    *
-   * Fixing it is out of scope (IPT-F6) — the four sites are uninstall paths,
-   * not the install paths this feature was scoped to. Pinned exactly rather
+   * IPT-F6 is closed beside them rather than by rewriting them: each plugin
+   * installer also removes the state-derived `state_retired_skills` on install
+   * and uninstall (agent-roster-consolidation C4). Pinned exactly rather
    * than tolerated as a class, so a NEW literal-keyed prune cannot appear
    * without moving this and forcing the decision to be made again. A floor
    * would let the class grow silently.
@@ -251,7 +254,10 @@ describe("plugin installers install exactly the generator's harness skills", () 
 
   test("the constant names a real, non-empty set", () => {
     console.log(`[harness-skills] generator constant = [${expected.join(", ")}]`);
-    expect(expected.length).toBeGreaterThanOrEqual(3);
+    // Floor tracks the real derived count: massa-ai + bootstrap, after the
+    // profile bundle's retirement (PRO-01) dropped it from the generator's
+    // own constant.
+    expect(expected.length).toBeGreaterThanOrEqual(2);
   });
 
   for (const file of INSTALLERS.filter((f) => f.startsWith("apps/"))) {

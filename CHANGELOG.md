@@ -184,12 +184,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   turned the sensor green and left a second projection in place to drift again, so the route
   now delegates to the tool: one projection where there were two, and an unknown status is a
   400 naming every valid value rather than a silent empty result.
-- **The scheduler's only black-box health surface reported every job as never-succeeded and
-  never-failed.** `dashboard.ts` wrote `lastSuccessAt: null` and `consecutiveFailures: 0` as
-  literals, so over HTTP a job failing every tick was indistinguishable from a healthy one.
-  The literals were not the root: `fireJob` maintains and persists four Wave 5 FR-13 fields
-  (`scheduler.ts:489-500`) and `Scheduler.status()` carried none of them outward, leaving the
-  route nothing to read. Measured at one instant with both kinds having fired, HTTP said
+- **The scheduler's only black-box health surface reported every job as never-failed.**
+  1.61.0 stopped hardcoding `lastSuccessAt` and `consecutiveFailures` in `dashboard.ts`, but
+  `fireJob` maintains and persists four Wave 5 FR-13 fields and `Scheduler.status()` still
+  carried only those two outward: `lastFailureAt` and `lastError` never reached HTTP, so the
+  endpoint could say a job was failing but not when or why. Before 1.61.0 all four were
+  literals, and over HTTP a job failing every tick was indistinguishable from a healthy one. Measured at one instant with both kinds having fired, HTTP said
   `"lastSuccessAt":null` while SQL said `last_success_at=1788787737541`. The snapshot now
   projects all four, required rather than optional and normalised with `?? null` / `?? 0`, so
   a consumer never has to tell "field absent" from "never succeeded" — the ambiguity that let
@@ -216,9 +216,774 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   marker present. `CONTRIBUTING.md` Step 3 names this class directly. A single entrypoint now
   forwards argv to every generator by direct call, and runs all of them rather than stopping
   at the first non-zero, so one `--check` reports every drifted subtree instead of the first.
+  `main` independently closed the same gap with an `sh -c '… "$@"' --` wrapper; the
+  entrypoint replaces it, and the tools-api stream route still parses both shapes.
   CI was never exposed — it runs the skill drift gate as its own explicit step and the
   sub-agent half through `subagent-parity.test.ts` — so this removes a trap for the documented
   local form rather than closing a live hole.
+
+## [1.64.0] - 2026-09-24
+
+### Changed
+
+- **The Plan Challenge gate is fixed behavior, no longer a configurable policy.**
+  `skills/massa-ai/SKILL.md` §Plan Challenge Gate is its single source: `feature` and
+  `refactor` start lite; `spec-driven`, `design`, `create-adr`, `create-rfc`, `create-tdd`,
+  explicit challenges, routing rule-5 risk domains, security, data loss, plans over 5
+  files/modules, or a lite escalation take the full gate. The Fool always auto-selects its
+  mode and revises the plan for valid critical/high findings; a prompt-level instruction
+  still overrides that for the current turn. `workflows/design.md` now runs the gate it was
+  listed for, after the Design-To-Code Mapping Matrix and before any edit.
+- **`Agent Started` status lines name the agent's model and effort.** The Conversation
+  Feedback policy in the startup contract now requires it and cites
+  `agent-orchestration.md` §Model/Effort Announcement (read from the installed agent file the
+  active model profile rendered).
+- **Upgrade note: re-render your startup contract.** A plugin-only update does not rewrite
+  the installed `MASSA-AI.md`, which keeps the old eight-rule text — including the
+  Plan Challenge policy that sent `feature`/`refactor` straight to the full gate — until you
+  run `bash scripts/install-harness.sh` or `bash scripts/install-skills.sh --apply` from a
+  repository checkout.
+
+### Removed
+
+- **Breaking: the `caveman` and `plan-challenge` bootstrap rules are retired** (8 → 6
+  rules). `massa-ai-config bootstrap enable|disable caveman|plan-challenge` now fails naming
+  the id as retired, and a persisted `bootstrap.rules` entry for either is skipped silently.
+  A persisted `plan-challenge: false` therefore no longer turns the gate off.
+- **`skills/AGENTS.md` sub-agent registry sections**: the retired-agent → current-agent
+  mapping table, "How to Add an Agent", and "massa-ai Concepts". CHANGELOG and git history
+  keep the old map.
+- **Three dead references**: `references/spec-driven/lessons.md` (a redirect stub),
+  `references/furps/analyst-role.md` (a copy of the `product-manager` charter), and
+  `references/hook-enforcement.md`, which documented six hooks that no longer exist.
+  `references/lessons.md` now matches `lessons.ts`: an unreachable memory write is dropped
+  silently, and no hook feeds the observation buffer.
+- **Duplicated reference prose.** One owner per rule: the retrieval order lives in
+  `codebase-investigation.md` (now the superset of the three lists that disagreed), the
+  STATE precedence chain in `artifact-persistence.md`, and the platform → matcher-contract map
+  in `mobile-figma-matcher/repository-detection.md`, where the mobile-figma audit/fix path
+  now reaches it. `mcp-tools.md`, `code-analysis.md`, `coding-principles.md`,
+  `architecture-lenses.md`, `design-implementation.md`, `pr-task-fix.md`,
+  `decision-engine.md`, `spec-driven/memory.md`, `synapse-policy.md` and
+  `conversation-feedback.md` point to the owner instead of restating it.
+
+## [1.63.1] - 2026-09-24
+
+### Fixed
+
+- **A symbol name/qualifiedName containing `#` (e.g. a markdown heading like `## Fixes issue
+  #456`) no longer aborts the whole project's indexing.** `normalizeSymbolText` escapes every
+  `#` to `%23` instead of throwing on any `#`; the persisted symbol row now carries the same
+  escaped name as its `#`-delimited fqn, closing a downstream `definition_fqn_name_mismatch`
+  the escape alone didn't cover.
+- **Postgres `connectionTimeoutMillis` raised from a hardcoded 5s to 15s (overridable via
+  `DB_CONNECTION_TIMEOUT_MS`) across all three connection pools** — `kernel/db-connection.ts`,
+  `kernel/prisma-client.ts`, and `data/vector/postgres-vector-store.ts`. A shared local
+  Postgres under normal concurrent-reindex load was timing out new connection handshakes and
+  interactive transactions well short of any real outage.
+
+## [1.63.0] - 2026-09-23
+
+### Added
+
+- **`designer` gains a read-only `trace` mode** — design-source investigation (Figma MCP
+  composition, product context, and a retrieval-partition proposal), the design analogue of
+  `code-explorer` `trace`. `references/figma-pre-analysis.md` Stage 1 now dispatches
+  `designer` `trace` instead of `code-explorer` for its Stage 1 pre-analysis.
+- **Lazy-loaded mode contracts for `designer`, `judge`, and `test-engineer`.** Each mode's
+  output contract now lives in its own file under
+  `skills/massa-ai/references/agent-modes/<agent>/<mode>.md` instead of inline in the
+  charter; the charter keeps one `### Mode: \`<name>\`` stub per mode naming exactly its own
+  file, and the dispatching main agent reads and inlines it into the capability packet as
+  the new `mode_contract` field before dispatch. A lazy-mode packet missing `mode_contract`
+  returns `Blocked`. `judge` `plan-critique` splits by `depth` into
+  `plan-critique-lite.md`/`plan-critique-full.md`.
+
+### Changed
+
+- **Breaking: the `builder` agent is renamed to `senior-engineer`.**
+  `skills/agents/builder/` moved to `skills/agents/senior-engineer/` with the same charter
+  identity, output contract, and disjoint-write-set role. Every dispatch block, registry row,
+  model-profile override key, and the `WRITE_AGENTS` generator constant now name
+  `senior-engineer`; `skills/AGENTS.md`'s retired-agent mapping table records
+  `builder → senior-engineer`. A user's model-profile overlay still keyed under the
+  pre-rename `builder` name keeps applying — the overlay merge maps it onto
+  `senior-engineer` unless the overlay already sets `senior-engineer` directly.
+- **The router (`skills/massa-ai/SKILL.md`) is slimmed from 20,254 B to under 13,000 B.**
+  Content already owned elsewhere was dropped from the router body: the Dedupe Guard (owned
+  by the bootstrap block), the tool inventory (`references/mcp-tools.md`), plan-challenge
+  detail (the policy plus `references/the-fool.md`), the retrieval sequence
+  (`references/mcp-tools.md`/`references/codebase-investigation.md`), memory-tag detail
+  (`references/memory-policy.md`), and the Shared References list, replaced by a single
+  statement of the freshness and recall-budget rules. The workflow table and the six
+  deterministic-precedence rules are byte-identical to before.
+- **spec-driven `Specify` now dispatches `product-manager` `audit` in every run**, over the
+  drafted `spec.md`, as a read-only carve-out from the "Planning: do not delegate" rule
+  recorded in `references/spec-driven/sub-agents.md`.
+
+### Removed
+
+- **The `skills/profile/` Claude skill front is retired.** `profile` joins
+  `RETIRED_BUNDLE_ROOTS` and `RETIRED_SKILL_NAMES`, so no generator, installer, or harness
+  verifier ships or expects it, and a stale installed or bundled copy is pruned on upgrade.
+  The MCP tools (`profile_list`/`profile_set`) and both `massa-ai-config profile` CLIs are
+  unchanged and are the only fronts left.
+- **Five near-duplicate or never-dispatched agent modes are gone.** `code-reviewer` `guide`
+  is dropped (architecture findings route to `audit` `lens: architecture`; mobile
+  platform/lifecycle/build/offline-sync guidance is answered by the main agent from
+  `references/mobile-context.md` directly); `code-reviewer` `review` is merged into `audit`,
+  which gains a new `lens: diff` (bugs, regressions, smells, missing edge cases over a diff,
+  ranked findings) — all 13 former `review` dispatch blocks now read `mode: audit` with
+  `lens: diff`; `code-explorer` `lookup` is dropped, leaving `trace` as its sole mode and
+  default; `product-manager` `requirements` is merged into `audit`, whose single lens is
+  `requirements`; `test-engineer` `plan` is dropped and `mode` is now a required packet field
+  with no default.
+
+## [1.62.0] - 2026-09-23
+
+### Changed
+
+- **Breaking: six workflows are renamed, with no aliases.** `discovery` → `product-discovery`,
+  `adr` → `create-adr`, `to-prd` → `create-prd`, `rfc` → `create-rfc`, `tdd` → `create-tdd`,
+  `ticket` → `create-ticket` — the files, frontmatter names, session-id prefixes, `workflow:`
+  tags, and the generated slash commands (`/massa-ai-create-adr`, `/massa-ai:create-adr`, …).
+  The old commands are gone. The owned references and guides follow:
+  `references/{tdd,rfc,ticket}/` → `references/create-{tdd,rfc,ticket}/`,
+  `references/adr-authoring.md` → `references/create-adr.md`, and
+  `docs/massa-ai-{rfc,tdd,ticket}.md` → `docs/massa-ai-create-{rfc,tdd,ticket}.md`. The Plan
+  Challenge policy names `create-adr`, `create-rfc`, `create-tdd`.
+- **Breaking: sub-agents drop the `massa-ai-` name prefix on every host.** Agents are
+  generated and dispatched as `builder`, `code-reviewer`, …; on the Claude plugin route
+  dispatch the plugin-namespaced `massa-ai:<name>`. Slash commands and the `massa-ai-hook`
+  binary keep their prefix.
+- **Agent-file ownership is a content marker, not a filename.** Every generated `.md` agent
+  (Claude, Cursor, OpenCode) carries `<!-- massa-ai-owned: true -->` as its first body line;
+  Codex `.toml` keeps its `# massa-ai-owned` first line. The four plugin installers,
+  `installer-shared.sh`, `verify-harness-install.ts`, `massa-ai-config agents
+  install|uninstall`, and the profile-switch engine and `doctor` select owned files through
+  that marker (`isOwnedAgentFile` in `packages/shared/src/profile-switch/ownership.ts`, inlined
+  by each bash installer). A same-named agent file you own — regular file or symlink — is
+  skipped with a `⚠ … is not massa-ai-owned — skipped` warning and left byte-identical, and a
+  profile switch never overwrites one.
+- **Upgrades prune the old agents and the retired skill.** Installers remove legacy
+  `massa-ai-<name>` agent files for exactly the 18 pre-consolidation names (never an open
+  `massa-ai-*` glob, so a user's own `massa-ai-mine.md` survives). Plugin installers delete a
+  host's installed `persona-router` skill on install and uninstall when `install-state.json`
+  records it among that host's plugin-installed skills, and `install-skills.sh --apply` does
+  the same on a plugin → repo handover; harness skills are now exactly `massa-ai`, `profile`,
+  `bootstrap`.
+- **Workflow dispatch follows the new roster.** The five audits dispatch `code-reviewer` with
+  the matching lens (`implementation-audit` also sends its Requirements lens to
+  `product-manager` and its Tests lens to `test-engineer`); fix workflows dispatch `builder`
+  plus `code-reviewer` for review and verification; `tests-audit`/`tests-fix` dispatch
+  `test-engineer`; `furps-refinement` and `requirements-audit` dispatch `product-manager`;
+  `design` and `mobile-figma-*` dispatch `designer` unconditionally; Plan Challenge and
+  `judge-with-debate` dispatch `judge`. The Claude hook's profile drift check reads
+  `code-reviewer.md`.
+- **Upgrade note: re-render your startup contract.** A plugin-only update
+  (`claude plugin update` and friends) does not rewrite the installed `MASSA-AI.md`, so it keeps
+  the old nine-rule text with the persona router until you run `bash
+  scripts/install-harness.sh` or `bash scripts/install-skills.sh --apply`, or any
+  `massa-ai-config bootstrap enable|disable`.
+
+### Removed
+
+- **Breaking: the persona feature is gone.** `skills/persona-router/`, the persona catalog
+  (`skills/massa-ai/personas/`), the `persona_router:` policy block, the `persona_pin`
+  project contract, and the `persona` capability-packet field no longer exist. Role routing
+  lives in one place: workflows plus the seven sub-agents. Generated plugin bundles no longer
+  carry `skills/persona-router/`, and `bun run generate:artifacts` deletes a stale copy left
+  in a checkout.
+- **Breaking: the `persona-router` bootstrap rule is retired — 9 rules become 8.** The
+  contract now renders `caveman`, `massa-ai-router`, `dedupe-guardrails`, `plan-challenge`,
+  `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`. A persisted
+  `bootstrap.rules["persona-router"]` in `config.json` is silently ignored (no warning, the
+  key is left in place); `massa-ai-config bootstrap enable|disable persona-router` now exits
+  with `bootstrap rule "persona-router" was retired and can no longer be toggled`.
+- **Breaking: 14 sub-agents are retired; the roster is 7.** `planner`, `context-curator`,
+  `documentation-agent`, `investigator`, `navigator`, `meta-judge`, `plan-critic`,
+  `furps-analyst`, `requirements-analyst`, `verification-agent`, `mobile-specialist`,
+  `architecture-specialist`, `audit-specialist`, and `reviewer` are folded into `builder`,
+  `code-explorer`, `code-reviewer`, `designer`, `judge`, `product-manager`, and
+  `test-engineer`, which select a former output contract through the capability packet's
+  `mode` field. The single retired → current mapping table is in `skills/AGENTS.md`
+  (`planner`, `context-curator`, and `documentation-agent` have no successor: the main agent
+  plans and curates context, and the `create-*` workflows write documents). The index-first
+  allowlist exception (`AGENT_TOOLS_OVERRIDE`) and its `pwd`-only OpenCode bash override are
+  gone; every read-only agent uses the ordinary denylist. With `documentation-agent` gone, its
+  light-model per-agent override leaves every built-in profile: the profiles override exactly
+  `builder`, `designer`, and `test-engineer`; `code-explorer`, `code-reviewer`, `judge`, and
+  `product-manager` resolve to the profile default.
+- **Breaking: the `general`, `maestro`, `maestro-audit`, and `maestro-fix` workflows are
+  removed — 40 workflows become 36.** With them go `references/maestro.md`,
+  `references/maestro/`, `docs/massa-ai-maestro.md`, the `maestro` audit-report family and its
+  `MST` prefix. When no route matches, the router now proceeds without loading any workflow
+  file, under its Core Contract; there is no fallback workflow.
+- **The `/persona` prompt prefix is no longer an observation-extractor role signal.** `act as`
+  and `you are a` still are.
+
+## [1.61.0] - 2026-09-23
+
+### Added
+
+- **`massa-ai-config doctor [--fix] [--host <h>] [--target <dir>]`** in both
+  the mcp-client and opencode-plugin CLIs (agent-drift followup T2). Prints
+  the profile-switch doctor's drift report — live-tree vs recorded vs pinned
+  versions, per-role models, variant staleness, and the host env override —
+  and `--fix` is the sanctioned mutation surface the session-start hook
+  deliberately is not: it re-runs the profile switch for the RECORDED active
+  profile (never a flag), then re-reports. Version drift and env overrides
+  stay report-only; their remedies live outside this CLI's write scope.
+- **Web UI Model Catalog: a Models section.** It adds, edits and deletes
+  typed models (name, tool, provider, model, and a 1M-context checkbox for
+  Claude Code). The profile grid and per-agent overrides pick from those models
+  through dropdowns. Edits persist in the user overlay, so they survive restart
+  and upgrade. The Tiers, Default Profile per Tool and Per-Workflow Tier
+  Overrides sections are removed.
+
+### Changed
+
+- **BREAKING: model registry v2 — tiers replaced by profiles and a typed
+  models catalog.** Removed from `skills/model-profiles.json`:
+  `tiers`, `hostDefaults`, `workflowTiers`, `agentTiers` (keys);
+  `metadata.model_tier` (charter field); `resolveTier()` and `workflowTier()`
+  (functions). Each profile now defines per-tool default models and optional
+  per-agent overrides. Adding a specialist = one charter directory (discovered
+  by `skills/agents/*/SKILL.md` directory scan, no SPECIALIST_NAMES list).
+  Built-in profiles ship overrides that preserve today's model spread:
+  14 agents use the profile default, 3 override to standard, 1 to light.
+  Read-only agents carry no override by convention and resolve to the profile
+  default (the strongest model). **User migration:** v1 overlays are detected,
+  backed up to `~/.config/massa-ai/model-profiles.v1.json`, and ignored with
+  one warning; re-enter custom models in the Web UI Model Catalog.
+- **BREAKING: `LOG_LEVEL` renamed to `MASSA_AI_LOG_LEVEL` (AD-010, no dual-read).**
+  Updated in config readers, `.env.example`, `install.sh`, Synapse documentation,
+  and `turbo.json` passThroughEnv.
+- **Logging improvements:** (1) LLM failure lines include `label`, `role`,
+  `model`, `provider`, `timeoutMs`, `elapsedMs`, `timedOut`, and
+  `consecutiveFailures` (per-label streak, resets on success);
+  (2) first success after N ≥ 1 failures logs one INFO `LLM call recovered`
+  with `afterFailures: N`; (3) repeated WARN/ERROR within 15 min get
+  `occurrences` and `firstSeenAgo` added to meta; (4) successful structured
+  calls move to DEBUG and carry `label` and `model`; (5) every production
+  warn/error site was reviewed, and the offenders were fixed to pass the Error object itself (not `.message`), use
+  constant component+operation messages, carry scope identifiers in meta,
+  and follow H1-H4 rules (error serialization preserves `name`, `code`,
+  `cause`; one-level deep only, never spread).
+
+### Fixed
+
+- **Regeneration no longer silently resets the active profile
+  (agent-drift followup T1).** `selectProfile`'s precedence gains rank 3:
+  `--profile` > `MASSA_AI_MODEL_PROFILE` > **install-state's recorded
+  `modelProfile`** > `"balanced"`. Measured 2026-09-21: after an operator
+  switched to `work`, the next `generate:artifacts` re-emitted the claude
+  actives from the registry default models while the state still said `work`
+  — the session-start drift hook caught the divergence its own generator had
+  caused. `main()` now threads the recorded profile through `emitAll`
+  (`stateProfilesFromInstallState`), so a regeneration re-emits the actives
+  for the profile the operator actually switched to; fresh checkouts and CI
+  (no state) keep the old behavior. A stale recorded name (removed, renamed,
+  or no longer supporting the host) now degrades to the `"balanced"`
+  fallback instead of throwing — a historical switch this run did not
+  request should not crash regeneration; `--profile`/`MASSA_AI_MODEL_PROFILE`
+  still throw on an unknown name.
+- **Dashboard scheduler status now reports real `consecutiveFailures` and
+  `lastSuccessAt`.** `GET /api/v1/scheduler/status` stopped hardcoding
+  these fields to 0 and null, and now reflects the job's actual persistence.
+
+## [1.60.1] - 2026-09-21
+
+### Fixed
+
+- **Agent model drift is now visible instead of silent (agent-runtime-drift).**
+  A directory-source marketplace install loads the plugin LIVE from the source
+  directory (measured: session skill base dir = the repo tree, not the versioned
+  cache), yet three surfaces described a stale world: the announcement contract's
+  per-host table taught the **versioned cache** as the marketplace-route root
+  (agents following it announced models from a stale snapshot — glm-5.2/minimax-m3
+  while the live tree carried glm-5.3-flash); `profile_list.bundleVersion` read
+  install-state's stale recording instead of the live tree; and dry runs claimed
+  the real run's terminal `switched` status. The table now names
+  `resolveClaudeMarketplaceInstall`'s route-aware root (directory-source → live
+  bundle root, e.g. `<repo>/apps/claude-plugin/agents`; any other kind → the
+  qualified, stale-able cache snapshot) and the S9 sensor pins both routes plus a
+  negative control on the retired wording. `profile_list` claude rows carry
+  additive `liveRoot`/`sourceVersion`/`envOverride` (the host env var such as
+  `CLAUDE_CODE_SUBAGENT_MODEL` that overrides every per-agent model at runtime —
+  reported, never hidden). New `profile-switch/doctor.ts` is the one-shot offline
+  read-only drift report (three version recordings, per-role frontmatter,
+  variant staleness with no false positives on incomparable pairs); the
+  frontmatter parser is extracted from the generator into
+  `profile-switch/frontmatter.ts` so the writer and the reader share one parser.
+  The session-start hook prints a ≤2-line drift line (version drift, agent drift,
+  env override), silent when healthy — the fix path stays the existing profile
+  switch, never the hook. Dry runs now report `would-switch`, pinned by negative
+  tests in both directions.
+
+## [1.60.0] - 2026-09-21
+
+### Added
+
+- **The installer asks LM Studio users which weight format to pull, ordered by platform.**
+  A new `installer_select_model_format` step offers MLX first on macOS and GGUF first
+  everywhere else, overridable with `MASSA_AI_LMSTUDIO_MODEL_FORMAT` (`gguf` | `mlx`; an
+  unrecognised value is fatal and names itself). Choosing MLX verifies LM Studio's MLX
+  engine and installs it (`lms runtime get mlx-llm`) when absent. `lms get` now always
+  receives an explicit `--gguf`/`--mlx` flag — with neither, it considers "only options
+  supported by your system", which on Apple Silicon can resolve MLX weights for a GGUF
+  install. The non-interactive default stays `gguf` on every platform: a scripted install
+  has nobody there to read the warning below. `INFERENCE_PROVIDERS.lmstudio` gained
+  `mlxModels`, one Hugging Face repo + catalog id per role, held identical to the wizard's
+  copy by `scripts/__tests__/mlx-model-parity.test.ts`.
+- **Measured limitation, surfaced at the point of choice:** MLX covers the instruct and
+  coding roles only. LM Studio types a model by architecture and only prefixes
+  `text-embedding-` onto what it types EMBEDDING; the MLX build of Qwen3-Embedding is
+  `Qwen3ForCausalLM`, so it is typed LLM and `/v1/embeddings` answers
+  `{"error":"No models loaded..."}` for it while the GGUF build returns 1024 floats on the
+  same server in the same second. `lms runtime get -l` lists exactly one MLX engine,
+  `mlx-llm`, with no embedding counterpart. The installer warns and names the GGUF model to
+  switch back to rather than silently substituting it.
+- **The installer evicts resident models before loading its own.** A new
+  `installer_unload_loaded_models` sweeps both runtimes — `lms unload --all` when
+  `lms ps --json` reports anything but `[]`, and `ollama stop` per name in `ollama ps` —
+  before the three per-role `lms load` calls. Both runtimes are swept whichever provider
+  was chosen, because what runs out is one shared pool of RAM/VRAM: a model still resident
+  from an earlier session costs the same gigabytes either way.
+
+### Fixed
+
+- **The MLX path shipped an embedding model that could not produce a vector — and the
+  stated reason for that was wrong.** `mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ` was
+  written into `config.json` pointing at LM Studio, whose `/v1/embeddings` answers HTTP 400
+  `No models loaded` for it. The installer warned and told the user to switch to the GGUF
+  build. That cure was wrong: the model embeds fine — `mlx_embeddings.generate` returns
+  `(n, 1024)`, already L2-normalized, on the identical weights — and it is LM Studio, not
+  MLX, that cannot serve it. Three levers were measured and all failed: its own SDK
+  (`lms.embedding_model(...)` → `Model not found`, `totalModels: 2`, both GGUF); flipping
+  `domain` to `embedding` in its model index (the API kept reporting `llm`, and the next
+  re-index wrote `llm` back); and rewriting the model's `architectures` to `Qwen3Model`
+  (LM Studio re-indexed — its cached dir mtime moved to match — and still typed it `llm`).
+  Upstream: lmstudio-ai/lmstudio-bug-tracker#808, open.
+
+  The MLX path now serves that role itself. `scripts/mlx-embedding-server.py` is an
+  OpenAI-shaped `/v1/embeddings` over `mlx-embeddings` (~40 MB resident, measured), and
+  `installer_setup_mlx_embedding_sidecar` builds its environment with `uv`, registers a
+  launchd agent on macOS, and health-probes the port before reporting success.
+  `embedding.baseURL` points there instead of at LM Studio, and the wizard no longer loads
+  the embedding weights into LM Studio on this path — that duplicate held 335 MB for a
+  model LM Studio could not answer with. Both the redirect and the setup are gated on the
+  same condition, which `mlx-model-parity.test.ts` now asserts along with the four hand
+  copies of the port. Also worth noting for anyone re-measuring: `/v1/embeddings` ignores
+  the request's `model` field, so with a GGUF embedder loaded beside the MLX one it answers
+  **200 with the GGUF's vector** — a passing probe that measures the wrong model.
+- **The GGUF install path could not fetch a model on any machine that did not already have
+  it.** `lms get` cannot resolve a catalog id in *any* format — measured,
+  `lms get text-embedding-qwen3-embedding-0.6b` answers `Error: No staff picks found with
+  the specified search criteria` with `--gguf`, with `--mlx`, and with no flag — and the
+  GGUF branch handed it exactly those ids, so a fresh install died on `LM Studio could not
+  fetch …`. It stayed invisible on developer machines because `inference_model_exists`
+  short-circuits every model already on disk. Both formats now fetch by Hugging Face repo
+  URL; the GGUF repos live in the new `INFERENCE_PROVIDERS.lmstudio.ggufRepos`, gated
+  against the installer's copy by `scripts/__tests__/mlx-model-parity.test.ts`.
+- **Five of the six LM Studio model ids the installer wrote into `config.json` were never
+  measured.** Only the GGUF embedding id was read off a live install; the rest were
+  literals, and a wrong one writes a config pointing at a model LM Studio does not serve —
+  which degrades silently, since every LLM feature already falls back when a call fails.
+  The installer now reconciles each id after the fetch: `installer_lmstudio_model_key`
+  matches the repo it fetched against the `path` field of `lms ls --json` and writes the
+  `modelKey` LM Studio itself reports, falling back to the literal when the CLI, the JS
+  runtime, or the entry is absent. The retracted evidence for those literals is recorded on
+  `mlxModels` — `lms get --mlx <repo>` answering "Model already downloaded" was read as
+  proof that a format change keeps the id, but the builds on that disk were themselves MLX,
+  so the command never touched a GGUF sibling.
+
+- **The Admin Portal's Config tab rendered `embedding.contextWindow` and
+  `embedding.batchSize` blank.** Both are declared fields, but
+  `defaultMassaAiConfig.embedding` deliberately carries neither — the role table and the
+  provider seam are their default source — so the tab's `defaults` fallback had nothing to
+  show. `GET /api/v1/config` now derives the pair into its `defaults` block (display state,
+  never merged back into a config, so the loader contract is unchanged); `batchSize`
+  follows the persisted `embedding.provider`. Unresolved fields on a bare config drop from
+  7 of 110 to 5.
+- **`PgObservationStore.__drain()` was a sleep wearing a flush's name, and it made the
+  coverage gate flaky.** Its docstring said "await in-flight writes"; its body was
+  `setTimeout(10)` against a persist fired as an untracked `void (async () => …)()`, so
+  there was nothing to await. `observation-repository-pg-coverage.test.ts` padded it with a
+  further fixed 120 ms and still failed on a loaded CI runner — a `SELECT … WHERE id = $1`
+  issued right after an insert read zero rows. The persist is now chained per observation
+  id through a `chainWrite` helper (the same `inflight` shape `PgJobStore` and
+  `PgSynapseSessionStore` already use — 4 of the 7 `__drain()` implementations tracked their
+  writes; this was the outlier), and `__drain()` awaits that chain. The test's 120 ms sleep
+  is deleted rather than raised. Chaining per id also closes the same-id commit-order
+  caveat the `insert` comment has carried since 2026-07-12: repeated upserts on one id now
+  land in call order instead of whichever async IIFE committed last. `PgHandoffStore` and
+  `PgProposalStore` were checked and are not affected — they issue no fire-and-forget
+  writes, so their `ensureHydrated()`-only drain is correct for them.
+- **`CHANGELOG.md` carried two stray `>>>>>>> origin/main` lines** in the `[1.40.0]`
+  section, committed by an earlier merge. Removed.
+- **A fresh LM Studio install wrote `llm.disableThink: false`, which silently disabled
+  json_schema constrained decoding on every LM Studio install.** The literal was written on
+  the stated grounds that `think:false` is an Ollama-only request-body key. That is true of
+  the *injection* — `llm-client.ts` gates it on the provider seam's `injectsDisableThink` —
+  but the flag is read at five sites and only that one is gated. The load-bearing ungated
+  read is `const useJsonSchema = llm.disableThink && (await _checkJsonSchemaSupport())`, and
+  `_checkJsonSchemaSupport()` short-circuits to `true` for any provider with no Ollama
+  version probe, LM Studio included and by design (LIP-07: it implements OpenAI-native
+  `response_format: {type: "json_schema"}` directly). So a `false` there sent every
+  structured-output call down the `json_object` + manual-validation fallback instead of the
+  native constrained-decoding path the seam exists to select. Both providers now write the
+  shipped default, restoring that path; three reasoning-channel recovery branches come back
+  with it. `packages/core/src/__tests__/llm-client-disable-think-json-schema.test.ts` pins
+  the coupling from the `false` side so the "it is inert on LM Studio" reading cannot
+  return.
+
+## [1.59.0] - 2026-09-21
+
+### Changed
+
+- **BREAKING — the Ollama embedding default moves from `qwen3-embedding:4b` (2560d) to
+  `qwen3-embedding:0.6b` (1024d); the LM Studio equivalent moves to
+  `text-embedding-qwen3-embedding-0.6b` (1024d).** This invalidates every existing
+  workspace's stored `embedding_fingerprint` and flips `postgres-vector-store.ts` from its
+  `> 2000`-dimension binary-quantization search path to the `<= 2000` direct-HNSW-cosine
+  path — a different algorithm, not just a smaller vector. **Action required: reindex every
+  workspace.** The fingerprint read and write gates fail closed with an actionable message
+  rather than silently mixing vector spaces of different widths; there is no migration —
+  none is built, by design, because there is no way to convert an existing 2560-dimension
+  vector into a 1024-dimension one. **Retrieval quality at the new 1024-dimension width has
+  not been re-measured** against the retired 2560-dimension default; this ships as an
+  accepted, unmeasured risk rather than a validated improvement.
+- **Every inference role — embedding, instruct, coding — now has an explicit per-provider
+  default model, instead of the instruct/coding roles sharing one provider-agnostic pair.**
+  Ollama: `qwen3-vl:8b` (instruct, was `qwen2.5:7b-instruct`) and `qwen2.5-coder:7b`
+  (coding, unchanged). LM Studio: `qwen3-vl-8b-instruct` and `qwen2.5-coder-7b-instruct`.
+  `packages/shared/src/config/inference-providers.ts` gained `InferenceRole` and
+  `INFERENCE_ROLE_DEFAULTS` (per-role context window + temperature); every installer,
+  config writer, and the Admin Portal Config tab derive from this one seam rather than
+  restating literals.
+- **Five new runtime-tunable config fields, exposed in `config.json` and the Admin Portal
+  Config tab, with a configured value always beating the code default:** `llm.contextWindow`,
+  `llm.codeContextWindow`, `llm.codeTemperature`, `embedding.contextWindow`,
+  `embedding.batchSize`. A new field-level parity gate
+  (`apps/tools-api/src/routes/config-section-coverage.test.ts`) fails if a schema field is
+  ever added to the config without a matching Admin Portal field — the previous gate only
+  checked section names, so a missing field passed silently.
+
+### Fixed
+
+- **`bun run test:scripts` no longer skips its shell half when the bun half fails.** The script
+  joined the two halves with `&&`, so one failing TypeScript test short-circuited all 39
+  `scripts/tests/*.sh` suites away and the gate reported a single failure where there could be
+  many. Both halves now always run, through the new `scripts/run-shell-suites.sh`, which also
+  reports every failing suite together instead of aborting at the first one — and prints its
+  population on success, so a passing run is distinguishable from a run that executed nothing.
+- **Three installer shell suites could not prove their "no host CLI installed" branch on a
+  developer machine.** `test-install-skills-cli.sh`, `test-plugin-auto-install.sh` and
+  `test-plugin-registry-registration.sh` each built a scrubbed PATH by *subtracting* a host
+  CLI's directory from the live PATH, which leaks two ways: the JS runtime and the host CLI
+  commonly share one bin directory (`~/.local/bin`), and `command -v` reports only the first of
+  two installs. The suites then exercised the CLI route while asserting the fallback route,
+  producing 22 failures that were repeatedly recorded as "pre-existing and host-specific". CI
+  never saw it, because with no host CLI installed the subtraction is a no-op on an already
+  clean PATH. Replaced with `runtime_shim_path`, a positive list of runtime symlinks:
+  43/4 → 47/0, 44/2 → 46/0, 194/16 → 210/0.
+
+## [1.58.0] - 2026-09-20
+
+### Added
+
+- **LM Studio as a second local inference provider, behind a shared seam rather than a
+  second copy of Ollama's literals.** `packages/shared/src/config/inference-providers.ts`
+  holds one spec per provider — base URL, env names, known embedding widths, probe shape —
+  and the provider lists that config, the CLIs, the installers and the Web UI read are now
+  *derived* from it instead of hand-maintained in six places. That derivation closed a
+  pre-existing gap on the way past: `cohere` was a valid embedding provider the lists never
+  offered. `EMBEDDING_PROVIDER=lmstudio` selects it; `LMSTUDIO_BASE_URL`,
+  `LMSTUDIO_EMBEDDING_MODEL` and `LMSTUDIO_EMBEDDING_DIMENSIONS` project through the same
+  env precedence every other provider uses, and all three were added to `turbo.json`'s
+  `passThroughEnv` (AD-010) — without which they arrive `undefined` under `bun run test`
+  while appearing to work under a direct `bun test`. `MASSA_AI_INFERENCE_PROVIDER` joins
+  them there and in `.env.example`; it is read only from bash, so the guard that derives
+  its read-set from `process.env` accessors cannot see it and pins it by name instead.
+  **Measured caveat, because it affects what you get, not just how it is configured.** The
+  LM Studio embedding model this ships against is 768-dimensional, which puts the vector
+  store on its direct-HNSW-cosine path instead of the two-phase binary-quantization path
+  that widths above 2000 take. Measured end to end on a 743-file corpus, retrieval is
+  materially worse: hit@1 0.5000 → 0.1429 and MRR 0.5893 → 0.2116 against Ollama's
+  2560-dimensional `qwen3-embedding:4b`. Indexing, in exchange, is roughly 20x faster
+  (about 3 minutes versus 1h 12m for the same corpus). Pick accordingly; this is inherent
+  to the model's width, not a defect in the integration.
+- **Provider probing by response body, not HTTP status.** Both the TypeScript probe
+  (`packages/core/src/kernel/inference-probe.ts`) and its bash mirror in the installers
+  treat a `200` carrying an error body as unreachable. A status-only probe reported a
+  wedged server as healthy; `scripts/__tests__/probe-dialect-parity.test.ts` now pins the
+  two dialects to the same verdict on the same fixture bodies.
+- **Provider-aware embedding width resolution.** `text-embedding-nomic-embed-text-v1.5`
+  resolves to 768 from the seam's table. On the installer path specifically —
+  `resolveModelDimensions`, reached from `scripts/lib/installer-api-key.sh` — a model that
+  is both unknown to the table *and* unreachable for probing now throws instead of
+  defaulting to a width that would corrupt an index. The runtime paths are unchanged and
+  still fall back to 768 for an unknown LM Studio model (`embeddings/config.ts`, both
+  `config-cli.ts` copies), so `massa-ai-config use lmstudio --model <unknown>` still
+  writes 768 without complaint.
+- **An `embedding_fingerprint` read gate and write gate on `workspaces`.** A workspace
+  indexed under one provider/model/width is no longer silently queried or appended to under
+  another — the failure it prevents is a vector space quietly mixed with a different one.
+  Migration included. Note the qualifier: every install that predates this ships a
+  legacy/`NULL` fingerprint and is unprotected until its first full reindex.
+- **Provider detection and a restricted menu in `scripts/setup-local-first.sh`.** It
+  detects which provider is already installed, offers the other, installs the `lms` CLI
+  when missing, and honours `MASSA_AI_INFERENCE_PROVIDER=ollama|lmstudio` non-interactively
+  — an unrecognised value exits non-zero naming the bad value rather than defaulting.
+- **Both config CLIs widened from 3 providers to the full writable set** — `ollama`,
+  `lmstudio`, `mistral`, `openai`, `google`, `cohere` — plus `init --lmstudio`. Keeping
+  them at 3 was drift, not a decision.
+- **`bun run diagnose` validates whichever local provider is configured.** Steps 1–4 were
+  hardcoded to Ollama's endpoint, `/api/tags`, `response.ok` and a substring model match;
+  they now dispatch on `EMBEDDING_PROVIDER` / `config.json`'s `embedding.provider`, probe
+  through the shared `probeProvider` seam, and match the model name exactly. An LM Studio
+  user finishing `scripts/setup-local-first.sh` used to watch the stack-validation step
+  report Ollama unreachable. Measured both ways: LM Studio up → exit 0,
+  `dimensions=768`; down → `API not responding` naming every candidate it tried.
+- **Docs**: `README.md`, `FEATURES.md` and `docs/CHEATSHEET.md` no longer present Ollama as
+  the only local option. 20 of the 23 surfaces the spec enumerated changed. The 3 left
+  unchanged are genuinely Ollama-scoped and not exclusivity claims — `OLLAMA_EMBED_DELAY_MS`,
+  the `OLLAMA_BASE_URL` endpoint row, and `run-deterministic.ts`'s "no Postgres, Ollama, or
+  native tree-sitter" comment. Three further surfaces described `bun run diagnose` and were
+  left alone only while diagnose was Ollama-only; that stopped being true, so they changed
+  too.
+
+### Changed
+
+- **The two Ollama-only LLM behaviours are now gated by provider.** The `/api/version`
+  probe and the `think` key injection are Ollama dialect, not general local-LLM dialect;
+  under LM Studio they are skipped and JSON-schema structured output is used instead.
+- **The embedding-defaults parity gate is re-keyed provider-neutrally.** Every extractor
+  was anchored on the literal token `OLLAMA_EMBEDDING_`, and the completeness scan skipped
+  any file that did not contain it — so an `LMSTUDIO_*` model/width pair was invisible to
+  every scan in the file and the gate would have reported clean over a second unchecked
+  pair. That is the going-green failure mode the file exists to prevent, not a going-red
+  one. Tier 3 now keys on `*_EMBEDDING_(MODEL|DIMENSIONS)` with any prefix, and the
+  width-writer membership gained the new seam module.
+
+- **The E2E availability gate is provider-neutral.** Fifteen E2E files gate on a single
+  "can we embed?" flag that was resolved from `/system/ollama`, so under any other
+  configured provider the whole suite skipped and reported no failures — a silent pass.
+  It now resolves from `/system/inference`, falling back to the Ollama route only against
+  a server that predates it. `14.needles.test.ts` additionally keys its regression floors
+  per provider, because a floor calibrated on one embedding stack says nothing about
+  another, and asserting it anyway would invent a number.
+
+### Fixed
+
+- **Selecting LM Studio through either config CLI left `llm.baseUrl` on Ollama's `:11434`.**
+  `init --lmstudio` and `use lmstudio` wrote only the `embedding` block, and
+  `resolveInferenceSpec` matches host:port *first* — so the LLM client kept resolving to the
+  ollama spec and silently re-enabled the `/api/version` probe and `think:false` injection
+  that provider gating exists to suppress. The guarding test asserted the LM Studio URL
+  appeared *somewhere* in `show`'s output, which `embedding.baseURL` already satisfied, so
+  it passed throughout.
+
+## [1.57.0] - 2026-09-18
+
+### Added
+
+- **Three deterministic harness scripts, replacing arithmetic and shell transcription the
+  workflows used to spell out in prose.** All Bun builtins, zero dependencies, same shape as
+  `check_commit.ts`. `size_change.ts` reads `git diff --numstat` and reports changed files,
+  changed LOC (added + deleted — a 100-line rewrite is 200, not 0) and the Verification
+  Ladder's **size floor**; it is deliberately a floor, since the ladder's other half
+  (migrations, auth, public compatibility, unresolved decisions) is invisible to a diff.
+  `resolve_scope.ts --scope modified|range|branch|files|whole` emits the shared audit scope
+  packet as JSON — type, target focus, resolution method, base, head, resolved files, applied
+  exclusions, freshness — and refuses rather than inventing a base when none resolves.
+  `ensure_worktree.ts` runs Stage 0–1 of the Implementation Delivery Protocol and prints the
+  worktree path and branch, applying the Stage 1 table's own failure rules: a taken branch
+  name is suffixed, and a taken worktree path is reused only when its branch matches. It can
+  emit exactly the two legal skip reasons and no third. Each is wired in from the one
+  reference that owns its rule, and covered by `scripts/__tests__/massa-ai-harness-scripts.test.ts`
+  (29 tests, boundaries probed on both sides).
+- **A gate on the `massa-ai-reviewer` dispatch trigger, in both directions.** AEH-06 pinned
+  that block's header, `scope`, `fallback` and `persona` bullets verbatim across all 14
+  implementing/fix workflows and never touched `trigger:` — the bullet that states the
+  dispatch is mandatory. A change tiering the reviewer by Verification Ladder size would have
+  landed in 14 source workflows and 48 generated bundle copies with every gate green. The new
+  group asserts that all 14 triggers end in `— never optional` and match one of the two
+  sanctioned wordings (12 generic, 2 finding-scoped and enumerated as deliberate), plus a
+  negative control: `pr-review.md`'s reviewer dispatch is a different trigger and must stay
+  one, so a mutation pasting the mandatory wording everywhere fails instead of passing.
+- **`workflow-anchors.json`, a fixture that makes the validator anchors mean something.** The
+  16 inline `<!-- validator anchors: ... -->` comments shipped in the agent-loaded workflow
+  bodies and nothing ever read them, so they went stale silently — two were already describing
+  prose that had been deleted. They move to `scripts/__tests__/workflow-anchors.json`, split
+  into 100 `present` entries (a literal substring, now asserted per file) and 34 `notes`
+  (paraphrases and claims of absence, which a substring check cannot express and which are
+  therefore carried, not asserted). Re-adding an inline comment fails the gate.
+
+### Changed
+
+- **Dispatch blocks carry only what varies; fields fixed for a role move to Role Defaults.**
+  `references/agent-orchestration.md` gains a Role Defaults section, and the 57 dispatch
+  blocks stop restating the values it fixes: the universal `persona` bullet (57 copies), the
+  reviewer's `fallback` (15), the verification-agent's `permissions` (15), and the designer's
+  `trigger`, `sensors`, `inputs`, `firewall` and `memory` (5 × 7). Dispatch-block lines go
+  597 → 476. This is the trade it looks like: a block is no longer self-contained, and
+  reading one means reading the defaults beside it — in exchange, a shared value has exactly
+  one place it can be wrong. Three gates are rewritten to match: per-block `persona` emission
+  becomes "the default exists, claims universality, and no block restates it"; the designer's
+  byte-identical trigger becomes "the canonical trigger keeps its mandatory clause, and no
+  workflow re-inlines it"; and a new negative control asserts a designer block still carries
+  the three fields the defaults do not fix, so "no block restates a default" cannot be
+  satisfied by emptying the blocks. `EXCESS_CEILING` drops to 456, retiring the AEH-06 and
+  DSG-05/06 rationale — a value stated once cannot be non-uniform.
+- **The code quality lens moves out of the two workflows that each carried a copy.**
+  `code-quality-audit.md` held ~20 lines of SOLID / Clean Code / KISS / YAGNI / DRY detection
+  rules and `code-quality-fix.md` held the matching fix directions, stating one split
+  criterion in three different phrasings. Both now load
+  `references/code-quality-lens.md`, which states that criterion once and splits each rule
+  into a Flag-when column (the audit's) and a Fix-direction column (the fix's) — the same
+  shape `architecture-audit.md` already used for its three lenses. The verbatim content
+  sensors in `agent-era-guidance-content.test.ts` are repointed to the new file phrase by
+  phrase, and gain two assertions a straight relocation would have lost: each workflow must
+  still load the lens, and neither may re-inline the criterion.
+- **`workflows/skill-architect.md` moves its non-procedural prose to
+  `references/skill-architect/authoring-principles.md`** — the five-point Core Philosophy, the
+  phase-sequence diagram, and the Conversation Style block, read once before Phase 1. The five
+  phases, their exit criteria, the frontmatter hard rules, the Important Boundaries and the
+  CC-BY-4.0 attribution stay in the workflow. 373 → 341 lines.
+- **`workflows/commit.md` now runs `check_commit.ts` instead of describing what it checks.**
+  The script existed and was documented as implementing `commit.md` §8, but `commit.md` never
+  invoked it — its only caller was `references/spec-driven/execute.md`. Message shape, allowed
+  type, description casing, trailing period, the `[<KEY>] ` Jira prefix and the
+  `!`/`BREAKING CHANGE:` pairing are now a non-zero exit that blocks the commit. The rules the
+  script cannot decide (type precedence between two defensible types, the 50-character target,
+  body requirements, attribution) stay in prose, and one silent contradiction is resolved:
+  `commit.md` listed `revert` in its type precedence order while the script rejected it.
+
+- **The workflow corpus stops restating what its references already own.** Three families of
+  per-workflow prose are deleted and resolved through the reference that is the single source:
+  the two-counters disambiguation clause (13 workflows → `references/verification-ladder.md`,
+  which already names all three counters), the 11-bullet "Establish the investigation scope"
+  enumeration (the 6 audit workflows → `references/audit-scope.md`, whose Lens Audit Scope
+  Resolution Procedure the very next step already loads), and the inline
+  `>200 lines, >20 KB, >50 search hits` threshold triple (`feature.md`, `debug.md`,
+  `refactor.md` → `references/context-firewall.md`). `skills/massa-ai/workflows/` goes from
+  4870 to 4802 lines; the duplication metric's excess drops from 494 to 474 at window 4,
+  measured differentially against a temp worktree of `main`. `EXCESS_CEILING` is lowered to
+  474 — the first time that ceiling moves down rather than up. Every earlier raise recorded
+  mandated uniformity and is untouched.
+
+### Fixed
+
+- **`check_commit.ts` rejected `revert`**, a type `workflows/commit.md` §8 tells the agent to
+  pick from. Wiring the script in as a blocking gate would have made the workflow instruct a
+  message it then refused.
+
+- **Three dead references in `workflows/skill-architect.md`.** The validator invocation named
+  `bun scripts/validate_skill.ts`, which resolves nowhere — every other scripted command in
+  the corpus carries the `skills/massa-ai/` prefix, and this one now does too. The Deliver
+  phase called a `present_files` tool that does not exist in any supported harness, and two
+  routes pointed at a `skill-creator` skill that is not in this repository
+  (`skills/` holds `agents`, `bootstrap`, `massa-ai`, `persona-router`, `profile`); both are
+  replaced with instructions that resolve against what actually ships.
+- **A duplicated `## Roles` heading in `references/agent-orchestration.md`**, which split the
+  role vocabulary across two sections carrying the same name.
+
+## [1.56.0] - 2026-09-08
+
+### Added
+
+- **The startup contract is now its own file, `MASSA-AI.md`, and every host is wired to load
+  it.** `scripts/install-skills.sh --apply` writes the rendered contract to
+  `~/.claude/MASSA-AI.md`, `$CODEX_HOME/MASSA-AI.md`, `~/.cursor/MASSA-AI.md` and
+  `~/.config/opencode/MASSA-AI.md`, then adds each host's own load wiring: a managed block
+  holding `@MASSA-AI.md` in `~/.claude/CLAUDE.md`, the absolute path in OpenCode's
+  `instructions` array, and a pointer block of at most 10 lines — carrying no policy text of
+  its own — in Codex's and Cursor's `AGENTS.md`. Uninstall reverses all of it, unlinking
+  rather than leaving an empty file behind where the managed block was the whole content.
+- **All nine bootstrap rules are individually switchable**, with no protected id:
+  `caveman`, `massa-ai-router`, `persona-router`, `dedupe-guardrails`, `plan-challenge`,
+  `conversation-feedback`, `indexing-hygiene`, `english-code` and `code-comments`. Disabling
+  a rule omits its block from the next render; state persists under `bootstrap.rules` in
+  `~/.config/massa-ai/config.json`, and only non-default entries need to be present.
+- **A `bootstrap` command surface in all four hosts** — `massa-ai-config bootstrap
+  list|show|enable <id>|disable <id>`, in both the mcp-client and opencode-plugin CLIs, plus
+  a `bootstrap` skill shipped into every plugin bundle. The CLI is deliberately the
+  always-reachable front: it works with the massa-ai MCP server unreachable, which is the
+  recovery path for a user who has just disabled `massa-ai-router`. Applying a toggle
+  re-renders every host recorded in `install-state.json` and reports each one as `written`,
+  `written-not-wired`, `skipped` or `failed`. A host whose contract file was written but
+  which has no artifact that loads it is reported `written-not-wired` and names
+  `scripts/install-skills.sh --apply` as the remedy, rather than being silently counted as
+  delivered. An unknown rule id exits non-zero, names the id, lists the nine valid ones and
+  changes no state.
+- **`--check` reports drift on the bootstrap surface.** It previously never consulted the
+  bootstrap block at all, so its clean exit proved nothing about the contract.
+
+### Changed
+
+- **The bootstrap contract had never loaded on Claude Code at all, and now does.** Claude
+  documents reading `CLAUDE.md` and not `AGENTS.md`, and no installer in this repository
+  wrote `~/.claude/CLAUDE.md` — so unless a user had hand-added the import themselves, every
+  policy in that block was inert on Claude. That is the measured premise behind this whole
+  change, not a side effect of it.
+- **`code-comments` defaults to off, which is a behaviour change**: generated code no longer
+  gets API doc blocks or rationale comments unless you enable the rule. Because
+  `references/code-annotation.md` mandates both on its own, omission alone would have left
+  the reference winning and the toggle reading as broken, so the rendered contract carries an
+  explicit negative directive while the rule is disabled. Its §3 (Tests) is unconditional and
+  unaffected in every toggle state.
+- **The contract no longer carries RTK.** The `Conditional RTK Rules` section and its command
+  examples are gone from the source and from every rendered output.
+- **A new `english-code` rule** states that generated code, identifiers, comments and code
+  documentation are written in English regardless of the language you write in — and states
+  explicitly that it does not change the language of conversational replies.
+  `references/naming-standards.md` §Language now cites that rule for the wider class instead
+  of restating it.
+- **Migration is automatic**: an `--apply` against a host whose `AGENTS.md` still carries the
+  pre-migration full bootstrap block replaces it with that host's new shape, leaving no
+  bootstrap marker pair holding policy text in `AGENTS.md` on `claude` or `opencode`, and
+  every line outside the managed markers byte-identical.
+- **A host session restart is required** before a toggle takes effect; the command says so
+  rather than implying the change is live.
+
+### Fixed
+
+- **The installer no longer writes a managed block carrying a duplicated marker.** Its
+  duplicate-marker guard counted markers in the *existing target file* only, never in the
+  block being written, so on a fresh home the first `--apply` wrote such a block and exited
+  0 — only the second run refused, with `Managed markers are incomplete or duplicated`. The
+  block was therefore detected after delivery rather than instead of it: a machine installed
+  once carried it, while every later run for that host hard-failed. The engine now validates
+  the block it is about to write as well as the file it is writing into.
+- **`bun run test:scripts` now reaches the shell battery, and CI enforces it.** The script
+  chains `bun test … && for f in scripts/tests/*.sh`, and two golden cases in
+  `pyts-golden.test.ts` had rotted on a calendar — the lessons fixture carries absolute
+  `last_seen` dates while `autoPrune` measures them against `window_days` (45) and
+  `Date.now()`, so entries aged out and the goldens went red around 2026-09-06, aborting the
+  chain before any `.sh` suite ran. The fixture is now anchored to the run instead of the
+  calendar. Two further defects surfaced once the battery was reachable: the fixture dates
+  must omit milliseconds, because `parseDate` matches `…:SSZ` exactly and **returns the
+  current time when it does not match**, which silently disables the pruning the fixture
+  exists to exercise; and a `TMPDIR` ending in `/` produced `…/T//name` scratch roots, which
+  `path.join` normalises away inside rendered output, reddening every assertion that
+  compares a path literally. `TMPDIR` is normalised once in the shared test helper.
+- **A home directory whose own path contains a massa-ai marker no longer corrupts the
+  contract.** `renderHeader` and the pointer template both interpolate the target home after
+  the renderer's marker sweep, which runs on the rule body — so such a path was carried
+  straight into the emitted text, and `massa-ai-config bootstrap enable|disable` wrote a
+  `MASSA-AI.md` with unbalanced markers. The installer then refused in *both* directions,
+  leaving no way to uninstall out of it. The renderer now refuses up front with
+  `MarkerInInterpolatedPathError`, which covers both writers.
+
+Two limits worth knowing. Rendering requires `bun` on `PATH`: the installer's fallback to a
+built `packages/shared/dist` cannot load under plain Node, so a machine without `bun` now
+aborts each host with a named error instead of rendering, where the installer previously
+needed neither `bun` nor a build. And `--target` scopes the render only — the persisted
+preference is always written to `~/.config/massa-ai/config.json`, which is where the spec
+places it; when the two differ the CLI names both paths rather than rendering from a state
+the toggle never touched.
 
 ## [1.55.0] - 2026-08-20
 
@@ -1358,8 +2123,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prints the parsed population (files scanned, rows parsed) beside the
   verdict, and exits non-zero when any Number row is unwired or when the
   figma directory exists but zero rows were parsed.
->>>>>>> origin/main
->>>>>>> origin/main
 
 ## [1.39.0] - 2026-08-07
 

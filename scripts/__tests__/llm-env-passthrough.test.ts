@@ -33,11 +33,14 @@ function knobsReadBySource(): string[] {
 }
 
 describe("turbo passThroughEnv covers every LLM env knob", () => {
-  test("config/index.ts reads exactly the ten AD-010 knobs", () => {
+  test("config/index.ts reads exactly the eleven AD-010 knobs", () => {
     expect(knobsReadBySource()).toEqual([
       "MASSA_AI_LLM_API_KEY",
       "MASSA_AI_LLM_BASE_URL",
       "MASSA_AI_LLM_CODE_MODEL",
+      // The 11th knob (T04, PDM-12/R-08): contextWindow and codeContextWindow
+      // are new config.json fields too but take no env var of their own.
+      "MASSA_AI_LLM_CODE_TEMPERATURE",
       "MASSA_AI_LLM_DISABLE_THINK",
       "MASSA_AI_LLM_ENABLED",
       "MASSA_AI_LLM_MAX_OUTPUT_TOKENS",

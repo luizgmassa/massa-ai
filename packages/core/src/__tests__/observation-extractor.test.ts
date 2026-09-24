@@ -153,10 +153,14 @@ describe("extractCategory — user-prompt classifier", () => {
     expect(extractCategory("user-prompt", payload({ prompt: "stuck on deploy" }))).toBe("blocked-on");
   });
 
-  test("role/persona signals → role", () => {
-    expect(extractCategory("user-prompt", payload({ prompt: "/persona senior-engineer" }))).toBe("role");
+  test("role signals → role", () => {
     expect(extractCategory("user-prompt", payload({ prompt: "act as a reviewer" }))).toBe("role");
     expect(extractCategory("user-prompt", payload({ prompt: "you are a QA engineer" }))).toBe("role");
+  });
+
+  test("a /persona prefix alone is not a role signal (PER AC-8)", () => {
+    expect(extractCategory("user-prompt", payload({ prompt: "/persona x" }))).toBe("user-prompts");
+    expect(extractCategory("user-prompt", payload({ prompt: "act as x" }))).toBe("role");
   });
 
   test("plain prompt → user-prompts", () => {

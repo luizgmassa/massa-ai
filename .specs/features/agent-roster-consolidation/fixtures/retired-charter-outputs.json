@@ -1,0 +1,83 @@
+{
+  "sourceRef": "f582b602",
+  "description": "Role-specific output fields of the charters merged or retired by agent-roster-consolidation, read from `git show f582b602:skills/agents/<source>/SKILL.md`. Generic wrapper fields (Status, Scope, Evidence, Exact next step) are excluded. `absorbedBy` names the roster charter and mode section that must carry the field after the roster swap; null means the role is dropped with no absorbing charter (design C1).",
+  "fields": [
+    { "source": "navigator", "field": "index tools called and files read", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
+    { "source": "navigator", "field": "compact, cited answer", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
+    { "source": "navigator", "field": "index staleness, zero-result searches, unresolved symbols", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
+
+    { "source": "investigator", "field": "architecture summary", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
+    { "source": "investigator", "field": "flow trace", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
+    { "source": "investigator", "field": "dependency map", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
+    { "source": "investigator", "field": "impact estimate", "absorbedBy": { "agent": "code-explorer", "mode": "trace" } },
+
+    { "source": "meta-judge", "field": "criteria:", "absorbedBy": { "agent": "judge", "mode": "spec-author" } },
+    { "source": "meta-judge", "field": "weight: <0..1>", "absorbedBy": { "agent": "judge", "mode": "spec-author" } },
+    { "source": "meta-judge", "field": "scale: { min: 1, max: 5 }", "absorbedBy": { "agent": "judge", "mode": "spec-author" } },
+    { "source": "meta-judge", "field": "rubric:", "absorbedBy": { "agent": "judge", "mode": "spec-author" } },
+    { "source": "meta-judge", "field": "checklist:", "absorbedBy": { "agent": "judge", "mode": "spec-author" } },
+    { "source": "meta-judge", "field": "overall: weighted-mean", "absorbedBy": { "agent": "judge", "mode": "spec-author" } },
+
+    { "source": "judge", "field": "judge: 1 | 2 | 3", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "round: 0 | 1 | 2 | 3", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "overall: <weighted score>", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "criteria: { <id>: <score>, ... }", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "agreement: accept-consensus | contest", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "strengths: [<≤3 items>]", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "weaknesses: [<≤3 items>]", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "revisions: [<criterion: old→new, evidence pointer>]", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "risks_and_skips: <string>", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "next_step: <string>", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+    { "source": "judge", "field": "## Debate Round {R}", "absorbedBy": { "agent": "judge", "mode": "scorer" } },
+
+    { "source": "plan-critic", "field": "Assumption most likely to fail", "absorbedBy": { "agent": "judge", "mode": "plan-critique" } },
+    { "source": "plan-critic", "field": "Deterministic check that would falsify success", "absorbedBy": { "agent": "judge", "mode": "plan-critique" } },
+    { "source": "plan-critic", "field": "`escalate_to_full: true|false`", "absorbedBy": { "agent": "judge", "mode": "plan-critique" } },
+    { "source": "plan-critic", "field": "Escalation reason", "absorbedBy": { "agent": "judge", "mode": "plan-critique" } },
+    { "source": "plan-critic", "field": "Steelmanned thesis", "absorbedBy": { "agent": "judge", "mode": "plan-critique" } },
+    { "source": "plan-critic", "field": "3-5 strongest challenges", "absorbedBy": { "agent": "judge", "mode": "plan-critique" } },
+    { "source": "plan-critic", "field": "severity (`critical` | `high` | `medium` | `low`)", "absorbedBy": { "agent": "judge", "mode": "plan-critique" } },
+    { "source": "plan-critic", "field": "Confidence impact", "absorbedBy": { "agent": "judge", "mode": "plan-critique" } },
+
+    { "source": "furps-analyst", "field": "`FR-<letter>-<N>`", "absorbedBy": { "agent": "product-manager", "mode": "furps" } },
+    { "source": "furps-analyst", "field": "`covered` | `partial` | `missing` | `unclear`", "absorbedBy": { "agent": "product-manager", "mode": "furps" } },
+    { "source": "furps-analyst", "field": "quote plus section ID per check item", "absorbedBy": { "agent": "product-manager", "mode": "furps" } },
+    { "source": "furps-analyst", "field": "severity, confidence, status, impact, simplest fix direction, verification suggestion", "absorbedBy": { "agent": "product-manager", "mode": "furps" } },
+    { "source": "furps-analyst", "field": "open questions / suggestions / insights / risks / DoR gaps", "absorbedBy": { "agent": "product-manager", "mode": "furps" } },
+
+    { "source": "requirements-analyst", "field": "ambiguity list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "requirements-analyst", "field": "gap list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "requirements-analyst", "field": "contradiction list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "requirements-analyst", "field": "implicit-requirement list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "requirements-analyst", "field": "uncovered-scenario list", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+
+    { "source": "audit-specialist", "field": "area audited + lens used", "absorbedBy": { "agent": "code-reviewer", "mode": "audit" } },
+    { "source": "audit-specialist", "field": "ranked list (severity, location, problem, suggestion)", "absorbedBy": { "agent": "code-reviewer", "mode": "audit" } },
+    { "source": "audit-specialist", "field": "references/audit-report-io.md", "absorbedBy": { "agent": "code-reviewer", "mode": "audit" } },
+    { "source": "audit-specialist", "field": "ranked list (severity, location, problem, suggestion)", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "audit-specialist", "field": "references/audit-report-io.md", "absorbedBy": { "agent": "product-manager", "mode": "audit" } },
+    { "source": "audit-specialist", "field": "ranked list (severity, location, problem, suggestion)", "absorbedBy": { "agent": "test-engineer", "mode": "audit" } },
+    { "source": "audit-specialist", "field": "references/audit-report-io.md", "absorbedBy": { "agent": "test-engineer", "mode": "audit" } },
+
+    { "source": "verification-agent", "field": "PASS/FAIL per criterion", "absorbedBy": { "agent": "code-reviewer", "mode": "verify" } },
+    { "source": "verification-agent", "field": "gap list", "absorbedBy": { "agent": "code-reviewer", "mode": "verify" } },
+    { "source": "verification-agent", "field": "highest ladder level reached", "absorbedBy": { "agent": "code-reviewer", "mode": "verify" } },
+
+    { "source": "reviewer", "field": "files and lines reviewed", "absorbedBy": { "agent": "code-reviewer", "mode": "audit" } },
+    { "source": "reviewer", "field": "ranked list of issues (severity, location, problem, fix)", "absorbedBy": { "agent": "code-reviewer", "mode": "audit" } },
+
+    { "source": "architecture-specialist", "field": "boundary suggestions", "absorbedBy": null, "dropReason": "guide mode removed (agent-roster-revision D3)" },
+    { "source": "architecture-specialist", "field": "abstraction recommendations", "absorbedBy": null, "dropReason": "guide mode removed (agent-roster-revision D3)" },
+    { "source": "architecture-specialist", "field": "trade-off analysis", "absorbedBy": null, "dropReason": "guide mode removed (agent-roster-revision D3)" },
+    { "source": "architecture-specialist", "field": "modularization plan", "absorbedBy": null, "dropReason": "guide mode removed (agent-roster-revision D3)" },
+
+    { "source": "mobile-specialist", "field": "mobile-specific guidance", "absorbedBy": null, "dropReason": "guide mode removed (agent-roster-revision D3)" },
+    { "source": "mobile-specialist", "field": "platform constraints", "absorbedBy": null, "dropReason": "guide mode removed (agent-roster-revision D3)" },
+    { "source": "mobile-specialist", "field": "lifecycle/sync recommendations", "absorbedBy": null, "dropReason": "guide mode removed (agent-roster-revision D3)" },
+    { "source": "mobile-specialist", "field": "Non-mobile target.", "absorbedBy": null, "dropReason": "guide mode removed (agent-roster-revision D3)" },
+
+    { "source": "planner", "field": "the implementation plan (steps, dependencies, risks, order)", "absorbedBy": null, "dropReason": "Design C1 names no absorbing charter; the dispatching workflow's main agent owns planning." },
+    { "source": "context-curator", "field": "the Context Packet (file list, reference list, memory IDs, constraints, exclusions)", "absorbedBy": null, "dropReason": "Design C1 names no absorbing charter; the main agent curates context under the Context Firewall." },
+    { "source": "documentation-agent", "field": "documentation draft or update summary", "absorbedBy": null, "dropReason": "Design C1 names no absorbing charter; the create-* workflows produce their documents in the main agent." }
+  ]
+}

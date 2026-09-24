@@ -103,6 +103,30 @@ detect_os() {
   esac
 }
 
+# massa_ai_probe_provider <base_url> [provider]
+#
+# Bash mirror of probeProvider() in packages/core/src/kernel/inference-probe.ts:
+# discriminates by response BODY SHAPE, never by HTTP status. LM Studio answers
+# 200 with {"error":...} for every endpoint it does not implement, so a status
+# check reports a live Ollama that is not there. Byte-identical in install.sh,
+# scripts/setup-local-first.sh, scripts/ensure-ollama.sh and
+# scripts/validate-vscode-integration.sh; scripts/__tests__/probe-dialect-parity.test.ts
+# holds the copies identical and asserts both halves agree on every fixture body.
+massa_ai_probe_provider() {
+  local base_url="$1" provider="${2:-ollama}" path key origin body
+  case "$provider" in
+    ollama)   path="/api/tags"  ; key="models" ;;
+    lmstudio) path="/v1/models" ; key="data"   ;;
+    *) return 1 ;;
+  esac
+  # probeProvider resolves with new URL(<absolute path>, baseUrl), which drops
+  # any path prefix on baseUrl; keep scheme://authority only so that
+  # http://localhost:1234/v1 does not become .../v1/v1/models.
+  origin="$(printf '%s' "$base_url" | sed -E 's#^([a-zA-Z][a-zA-Z0-9+.-]*://[^/]*).*#\1#')"
+  body="$(curl -s --max-time 3 "${origin}${path}" 2>/dev/null)" || return 1
+  printf '%s' "$body" | grep -Eq "\"${key}\"[[:space:]]*:[[:space:]]*\["
+}
+
 detect_ollama_url() {
   # Already set via env
   [ -n "$OLLAMA_URL" ] && { echo "$OLLAMA_URL"; return; }
@@ -135,7 +159,7 @@ detect_ollama_url() {
   candidates+=("http://localhost:11434")
 
   for url in "${candidates[@]}"; do
-    if curl -sf --connect-timeout 2 "${url}/api/tags" &>/dev/null; then
+    if massa_ai_probe_provider "$url"; then
       echo "$url"; return
     fi
   done
@@ -240,7 +264,7 @@ preflight_git() {
 
 check_ollama() {
   local url="$1"
-  if curl -sf --connect-timeout 2 "${url}/api/tags" &>/dev/null; then
+  if massa_ai_probe_provider "$url"; then
     ok "Ollama reachable at ${url}"
     return 0
   else
@@ -352,7 +376,7 @@ write_env() {
   # auto-importance call a 404 instead of taking the rule-based silent-degrade
   # path (which only applies when the flag is false). Search rerank and query
   # understanding stay off — they're latency-sensitive and a separate opt-in.
-  local llm_model="qwen2.5:7b-instruct"
+  local llm_model="qwen3-vl:8b"
   local llm_code_model="qwen2.5-coder:7b"
   local llm_enabled=false
   if ollama_has_model "$llm_model" "$ollama_url"; then
@@ -392,8 +416,8 @@ DATABASE_URL=${db_url}
 
 # ── Embeddings (Ollama - local, free) ────────────────────────
 OLLAMA_BASE_URL=${ollama_url}
-OLLAMA_EMBEDDING_MODEL=qwen3-embedding:4b
-OLLAMA_EMBEDDING_DIMENSIONS=2560
+OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
+OLLAMA_EMBEDDING_DIMENSIONS=1024
 
 # ── Optional: Cloud embedding providers ─────────────────────
 #EMBEDDING_PROVIDER=google
@@ -401,11 +425,11 @@ OLLAMA_EMBEDDING_DIMENSIONS=2560
 #MISTRAL_API_KEY=your_key_here
 
 # ── Logging ──────────────────────────────────────────────────
-LOG_LEVEL=info
+MASSA_AI_LOG_LEVEL=info
 ENABLE_METRICS=true
 
 # ── Local-first LLM (Ollama); default OFF, silent degrade ──
-# Auto-set ON by install.sh only when qwen2.5:7b-instruct is pulled in Ollama.
+# Auto-set ON by install.sh only when qwen3-vl:8b is pulled in Ollama.
 MASSA_AI_LLM_ENABLED=${llm_enabled}
 MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
 MASSA_AI_LLM_API_KEY=ollama
@@ -445,7 +469,7 @@ AUTO_IMPROVE_MIN_FILE_HITS=3
 AUTO_IMPROVE_MIN_FIX_HITS=2
 
 # ── Auto importance/salience (LLM) ────────────────────────────
-# Auto-set ON by install.sh only when qwen2.5:7b-instruct is pulled in Ollama.
+# Auto-set ON by install.sh only when qwen3-vl:8b is pulled in Ollama.
 AUTO_IMPORTANCE_ENABLED=${llm_enabled}
 
 # ── Search quality knobs ──────────────────────────────────────
@@ -739,11 +763,11 @@ install_plugins_menu() {
 
   while true; do
     echo ""
-    echo -e "${BOLD}Install massa-ai plugins (skills + hooks + MCP + 18 subagent specialists):${NC}"
-    echo -e "  ${CYAN}1)${NC} Claude Code plugin (skills + commands + 18 subagent specialists + hooks auto-write)"
-    echo -e "  ${CYAN}2)${NC} Codex plugin (6 skills, 6 hook events, MCP, 18 subagent specialists)"
-    echo -e "  ${CYAN}3)${NC} Cursor plugin (6 skills, 7 hook events, MCP, 18 subagent specialists)"
-    echo -e "  ${CYAN}4)${NC} OpenCode plugin (npm install + 18 subagent specialists via config CLI)"
+    echo -e "${BOLD}Install massa-ai plugins (skills + hooks + MCP + 7 subagent specialists):${NC}"
+    echo -e "  ${CYAN}1)${NC} Claude Code plugin (skills + commands + 7 subagent specialists + hooks auto-write)"
+    echo -e "  ${CYAN}2)${NC} Codex plugin (6 skills, 6 hook events, MCP, 7 subagent specialists)"
+    echo -e "  ${CYAN}3)${NC} Cursor plugin (6 skills, 7 hook events, MCP, 7 subagent specialists)"
+    echo -e "  ${CYAN}4)${NC} OpenCode plugin (npm install + 7 subagent specialists via config CLI)"
     echo -e "  ${CYAN}5)${NC} All four (Claude, Codex, Cursor, OpenCode)"
     echo -e "  ${CYAN}s)${NC} Back"
     echo ""
@@ -824,9 +848,9 @@ print_opencode_plugin_instructions() {
   echo -e "  OpenCode hooks are in-process (no hooks.json to merge)."
   echo -e "  Prerequisite: the Tools API must be running (bun run dev:api)."
   echo ""
-  echo -e "  ${CYAN}3. Install the 18 subagent specialists:${NC}"
+  echo -e "  ${CYAN}3. Install the 7 subagent specialists:${NC}"
   echo -e "     ${CYAN}massa-ai-config agents install --user${NC}"
-  echo -e "     (writes 12 massa-ai-*.md to ~/.config/opencode/agents/)"
+  echo -e "     (writes the massa-ai-owned agents to ~/.config/opencode/agents/)"
 }
 
 # ── Show MCP integration instructions ────────────────────────

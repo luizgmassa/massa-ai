@@ -2,7 +2,9 @@
 
 Use in every implementation workflow, before writing or editing
 source. Defines the three things every created or updated unit of code owes
-the next reader: an API doc block, a rationale comment, and a test.
+the next reader: an API doc block, a rationale comment, and a test. The first
+two are gated by a bootstrap toggle; the test is not — read Toggle Scope below
+before applying any of them.
 
 ## Principle
 
@@ -11,6 +13,19 @@ session's context — must be able to answer three questions from the file alone
 what does it do, why does it exist in this shape, and how do I prove it still
 works. Doc blocks answer the first, rationale comments the second, tests the
 third. None substitutes for another.
+
+## Toggle Scope
+
+§1 (API Doc Block) and §2 (Rationale Comment) apply only while the
+`code-comments` bootstrap rule is enabled, and `code-comments` defaults to
+**off** — so on a fresh install neither section is in force, and generated code
+carries no API doc blocks and no rationale comments.
+
+§3 (Tests) sits outside that gate and applies unconditionally: no toggle state
+weakens, narrows, or removes the test-coverage requirement.
+
+Read the current state with `massa-ai-config bootstrap list`; the rendered
+`MASSA-AI.md` startup contract is what states it for the running session.
 
 ## 1. API Doc Block
 

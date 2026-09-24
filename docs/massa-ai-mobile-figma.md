@@ -10,7 +10,7 @@ Use mobile Figma workflows for production UI work backed by a readable Figma nod
 
 Flutter, React Native, web UI, generic Figma exploration, variable-only queries, and MCP troubleshooting are outside these routes.
 
-When a broader `feature`, `rfc`, `adr`, or `tdd` request touches supported mobile UI, that parent workflow can use optional Figma links, nodes, desktop selections, screenshots, or explicit `none`. Supplied sources route only the affected Android, iOS, or KMP Compose Multiplatform UI slice or design context into `design`; the parent workflow keeps requirements, decision, document, task, and completion ownership.
+When a broader `feature`, `create-rfc`, `create-adr`, or `create-tdd` request touches supported mobile UI, that parent workflow can use optional Figma links, nodes, desktop selections, screenshots, or explicit `none`. Supplied sources route only the affected Android, iOS, or KMP Compose Multiplatform UI slice or design context into `design`; the parent workflow keeps requirements, decision, document, task, and completion ownership.
 
 ## Required Inputs
 

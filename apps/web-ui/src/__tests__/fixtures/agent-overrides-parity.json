@@ -1,0 +1,38 @@
+{
+  "$comment": [
+    "Regression fixture for the per-agent model-override merge delta (model-catalog-revamp",
+    "AC6, D1). The client's `mergeRegistryForDisplay` (apps/web-ui/src/static/views/",
+    "registry-state.ts, `mergeAgentsForDisplay`) mirrors the SHAPE of the server's",
+    "`mergeAgents` (scripts/lib/model-profiles.ts) two-level leaf merge, now over",
+    "`{model, effort}` cells instead of a bare tier string. It is exercised only from the",
+    "apps/web-ui suite (admin-handlers.test.ts) — the server side no longer shares this",
+    "literal fixture (its own `model-profiles.test.ts` covers the same merge with its own",
+    "cases) — but the case shape below stays a documented contract for what a correct",
+    "two-level leaf merge must do.",
+    "",
+    "Cases covered, one per agent key:",
+    "  builder   — inherit one host's cell (claude), override another's whole cell (opencode)",
+    "  navigator — whole-agent null tombstone: removed entirely from the merged result",
+    "  reviewer  — host-level null tombstone: its only host key is removed, agent entry",
+    "              survives as an empty object (deletion is scoped to the host key, not the",
+    "              agent — mirrors mergeFlatMap's per-key tombstone semantics one level up)",
+    "  planner   — a genuinely new agent the builtin never named, added wholesale by the",
+    "              overlay (no agent list in the registry principle — this is opt-in data)"
+  ],
+  "builtinAgentCells": {
+    "builder": { "claude": { "model": "claude-sonnet-5", "effort": "high" }, "opencode": { "model": "opencode-go/glm-5.2", "effort": "high" } },
+    "navigator": { "claude": { "model": "claude-haiku-4-5", "effort": "low" } },
+    "reviewer": { "claude": { "model": "claude-haiku-4-5", "effort": "low" } }
+  },
+  "overlayAgentCells": {
+    "builder": { "opencode": { "model": "claude-opus-5-5", "effort": "max" } },
+    "navigator": null,
+    "reviewer": { "claude": null },
+    "planner": { "cursor": { "model": "opencode-go/glm-5.2", "effort": "max" } }
+  },
+  "expectedMergedAgentCells": {
+    "builder": { "claude": { "model": "claude-sonnet-5", "effort": "high" }, "opencode": { "model": "claude-opus-5-5", "effort": "max" } },
+    "reviewer": {},
+    "planner": { "cursor": { "model": "opencode-go/glm-5.2", "effort": "max" } }
+  }
+}
