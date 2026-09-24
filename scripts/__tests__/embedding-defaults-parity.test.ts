@@ -187,8 +187,8 @@ const PAIR_SURFACES: Array<{ file: string; model: RegExp; dims: RegExp }> = [
     // `OLLAMA_EMBEDDING_*` assignments further down expand these variables,
     // so the extractors anchor on the definitions, not the exports.
     file: "scripts/e2e-stack.sh",
-    model: /\$\{MASSA_AI_E2E_EMBED_MODEL:-([^}]+)\}/g,
-    dims: /\$\{MASSA_AI_E2E_EMBED_DIMS:-(\d+)\}/g,
+    model: /^\s*ollama\)\n\s*EMBED_MODEL="\$\{MASSA_AI_E2E_EMBED_MODEL:-([^}]+)\}"/gm,
+    dims: /^\s*ollama\)\n.*\n\s*EMBED_DIMS="\$\{MASSA_AI_E2E_EMBED_DIMS:-(\d+)\}"/gm,
   },
 ];
 
@@ -234,6 +234,12 @@ const LMSTUDIO_PAIR_SURFACES: Array<{ file: string; label?: string; model: RegEx
     file: ".env.example",
     model: /^#LMSTUDIO_EMBEDDING_MODEL=(\S+)/gm,
     dims: /^#LMSTUDIO_EMBEDDING_DIMENSIONS=(\d+)/gm,
+  },
+  {
+    file: "scripts/e2e-stack.sh",
+    label: "scripts/e2e-stack.sh (lmstudio)",
+    model: /^\s*lmstudio\)\n\s*EMBED_MODEL="\$\{MASSA_AI_E2E_EMBED_MODEL:-([^}]+)\}"/gm,
+    dims: /^\s*lmstudio\)\n.*\n\s*EMBED_DIMS="\$\{MASSA_AI_E2E_EMBED_DIMS:-(\d+)\}"/gm,
   },
   // `packages/core/src/services/embeddings/config.ts`'s lmstudio branch used
   // to carry a quoted literal model and a `768` last-resort dims fallback
@@ -385,13 +391,13 @@ const INSTRUCT_CODING_SURFACES: MultiMatchRow[] = [
     file: "scripts/e2e-stack.sh",
     label: "e2e-stack.sh (instruct)",
     pattern: /\$\{MASSA_AI_E2E_LLM_MODEL:-([^}]+)\}/g,
-    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.instruct],
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.instruct, INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct],
   },
   {
     file: "scripts/e2e-stack.sh",
     label: "e2e-stack.sh (coding)",
     pattern: /\$\{MASSA_AI_E2E_LLM_CODE_MODEL:-([^}]+)\}/g,
-    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.coding],
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.coding, INFERENCE_PROVIDERS.lmstudio.defaultModels.coding],
   },
   {
     file: "install.sh",

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`scripts/e2e-stack.sh` runs against LM Studio as well as Ollama.**
+  `MASSA_AI_E2E_PROVIDER=lmstudio` points the dedicated stack at an LM Studio server that is
+  already running (`MASSA_AI_E2E_LMSTUDIO_URL`, default `http://127.0.0.1:1234`) instead of
+  spawning `ollama serve` on :11435. LM Studio is probed and never started or stopped, and its
+  port joins the shared-stack attestation printed before and after every mutating command.
+  The provider is recorded by `up` and reused by `env`, `status` and `restart-api`; changing
+  it forces an API restart the same way a profile change does. The width probe, the
+  isolation check (now read from the provider-neutral `/api/v1/system/inference`) and the
+  `llm-on` profile follow the provider, and each provider's defaults are held equal to
+  `INFERENCE_PROVIDERS` by the parity test. `env` now also exports
+  `MASSA_AI_E2E_LLM_MODEL`/`MASSA_AI_E2E_LLM_CODE_MODEL`, so `30.llm-features` checks the
+  model the stack actually serves.
 - **Tier D of the E2E battery: the Claude Code CLI, credential-free
   (`apps/claude-plugin/__tests__/claude-cli-e2e.test.ts`).** Runs whenever `claude` is on
   `PATH`, under a scratch `HOME` and `CLAUDE_CONFIG_DIR`, with `ANTHROPIC_BASE_URL` pointed at

@@ -39,6 +39,13 @@
 #                   MASSA_AI_E2E_SCHED_TICK_MS / MASSA_AI_E2E_SCHED_INTERVAL_MS.
 #   llm-on        MASSA_AI_LLM_ENABLED=true with the locally installed models
 #
+# Inference providers (MASSA_AI_E2E_PROVIDER, recorded by `up` and reused by
+# every later command until the next `up` names another):
+#   ollama    a dedicated `ollama serve` on :11435, started and stopped here
+#   lmstudio  an LM Studio server that is already running
+#             (MASSA_AI_E2E_LMSTUDIO_URL, default http://127.0.0.1:1234);
+#             probed, never started or stopped
+#
 # Exit codes: 0 success; 1 runtime failure or a refused unsafe action;
 #             2 unknown flag, command or profile; 3 a required binary is absent.
 
@@ -60,16 +67,9 @@ API_ORIGIN="http://127.0.0.1:${API_PORT}"
 DB_URL="postgresql://test:test@127.0.0.1:${PG_PORT}/massa_ai_test"
 OLLAMA_ORIGIN="http://127.0.0.1:${OLLAMA_PORT}"
 
-# The product's own Ollama defaults (INFERENCE_PROVIDERS.ollama.defaultModels),
-# held equal to them by scripts/__tests__/embedding-defaults-parity.test.ts. The
-# historical runbook pinned qwen3-embedding:8b at 4096 and this script later
-# pinned qwen3-embedding:4b at 2560; a dimension mismatch degrades silently to a
-# different vector table rather than failing, so the pin follows the default
-# instead of being inherited.
-EMBED_MODEL="${MASSA_AI_E2E_EMBED_MODEL:-qwen3-embedding:0.6b}"
-EMBED_DIMS="${MASSA_AI_E2E_EMBED_DIMS:-1024}"
-LLM_MODEL="${MASSA_AI_E2E_LLM_MODEL:-qwen3-vl:8b}"
-LLM_CODE_MODEL="${MASSA_AI_E2E_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+LMSTUDIO_ORIGIN="${MASSA_AI_E2E_LMSTUDIO_URL:-http://127.0.0.1:1234}"
+LMSTUDIO_ORIGIN="${LMSTUDIO_ORIGIN%/}"
+LMSTUDIO_PORT="${LMSTUDIO_ORIGIN##*:}"
 
 FIXTURE_PATH="${MASSA_AI_E2E_PROJECT_PATH:-/tmp/massa-ai-e2e-fixture}"
 
@@ -96,7 +96,9 @@ require_bins() {
   CREATEDB_BIN="$(resolve_bin createdb /opt/homebrew/bin/createdb)" || die "createdb not found" 3
   PSQL_BIN="$(resolve_bin psql /opt/homebrew/bin/psql)" || die "psql not found" 3
   PG_CTL_BIN="$(resolve_bin pg_ctl /opt/homebrew/bin/pg_ctl)" || die "pg_ctl not found" 3
-  OLLAMA_BIN="$(resolve_bin ollama /usr/local/bin/ollama)" || die "ollama not found" 3
+  if [[ "$PROVIDER" == ollama ]]; then
+    OLLAMA_BIN="$(resolve_bin ollama /usr/local/bin/ollama)" || die "ollama not found" 3
+  fi
   BUN_BIN="$(resolve_bin bun "$HOME/.bun/bin/bun")" || die "bun not found" 3
 }
 
@@ -144,6 +146,37 @@ state_set() {
 }
 
 # ── profile → Tools API environment ─────────────────────────────────────────
+# The product's own defaults per provider (INFERENCE_PROVIDERS.<id>.defaultModels),
+# held equal to them by scripts/__tests__/embedding-defaults-parity.test.ts. The
+# historical runbook pinned qwen3-embedding:8b at 4096 and this script later
+# pinned qwen3-embedding:4b at 2560; a dimension mismatch degrades silently to a
+# different vector table rather than failing, so the pin follows the default
+# instead of being inherited.
+select_provider() {
+  PROVIDER="${MASSA_AI_E2E_PROVIDER:-$(state_get provider)}"
+  PROVIDER="${PROVIDER:-ollama}"
+  case "$PROVIDER" in
+    ollama)
+      EMBED_MODEL="${MASSA_AI_E2E_EMBED_MODEL:-qwen3-embedding:0.6b}"
+      EMBED_DIMS="${MASSA_AI_E2E_EMBED_DIMS:-1024}"
+      LLM_MODEL="${MASSA_AI_E2E_LLM_MODEL:-qwen3-vl:8b}"
+      LLM_CODE_MODEL="${MASSA_AI_E2E_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+      INFERENCE_ORIGIN="$OLLAMA_ORIGIN"
+      INFERENCE_PORT="$OLLAMA_PORT"
+      ;;
+    lmstudio)
+      EMBED_MODEL="${MASSA_AI_E2E_EMBED_MODEL:-text-embedding-qwen3-embedding-0.6b}"
+      EMBED_DIMS="${MASSA_AI_E2E_EMBED_DIMS:-1024}"
+      LLM_MODEL="${MASSA_AI_E2E_LLM_MODEL:-qwen3-vl-8b-instruct}"
+      LLM_CODE_MODEL="${MASSA_AI_E2E_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
+      INFERENCE_ORIGIN="$LMSTUDIO_ORIGIN"
+      INFERENCE_PORT="$LMSTUDIO_PORT"
+      SHARED_PORTS+=("$LMSTUDIO_PORT")
+      ;;
+    *) die "unknown provider: ${PROVIDER} (expected ollama or lmstudio)" 2 ;;
+  esac
+}
+
 profile_is_known() {
   case "$1" in default|auth|hooks-off|scheduler-on|scheduler-fast|llm-on) return 0 ;; *) return 1 ;; esac
 }
@@ -239,7 +272,7 @@ profile_env() {
       ;;
     llm-on)
       printf 'MASSA_AI_API_KEY=\nMASSA_AI_LLM_ENABLED=true\n'
-      printf 'MASSA_AI_LLM_BASE_URL=%s/v1\nMASSA_AI_LLM_API_KEY=ollama\n' "$OLLAMA_ORIGIN"
+      printf 'MASSA_AI_LLM_BASE_URL=%s/v1\nMASSA_AI_LLM_API_KEY=%s\n' "$INFERENCE_ORIGIN" "$PROVIDER"
       printf 'MASSA_AI_LLM_MODEL=%s\nMASSA_AI_LLM_CODE_MODEL=%s\n' "$LLM_MODEL" "$LLM_CODE_MODEL"
       ;;
   esac
@@ -265,10 +298,21 @@ MASSA_AI_JOB_REAPER_INTERVAL_MS=60000
 OLLAMA_BASE_URL=${OLLAMA_ORIGIN}
 OLLAMA_HOST=127.0.0.1:${OLLAMA_PORT}
 OLLAMA_MODELS=${HOME}/.ollama/models
-EMBEDDING_PROVIDER=ollama
-OLLAMA_EMBEDDING_MODEL=${EMBED_MODEL}
-OLLAMA_EMBEDDING_DIMENSIONS=${EMBED_DIMS}
+EMBEDDING_PROVIDER=${PROVIDER}
 EOF
+  provider_embedding_env
+}
+
+provider_embedding_env() {
+  case "$PROVIDER" in
+    ollama)
+      printf 'OLLAMA_EMBEDDING_MODEL=%s\nOLLAMA_EMBEDDING_DIMENSIONS=%s\n' "$EMBED_MODEL" "$EMBED_DIMS"
+      ;;
+    lmstudio)
+      printf 'LMSTUDIO_BASE_URL=%s/v1\nLMSTUDIO_EMBEDDING_MODEL=%s\nLMSTUDIO_EMBEDDING_DIMENSIONS=%s\n' \
+        "$LMSTUDIO_ORIGIN" "$EMBED_MODEL" "$EMBED_DIMS"
+      ;;
+  esac
 }
 
 write_config_json() {
@@ -281,13 +325,13 @@ write_config_json() {
   [[ -n "$runtime" ]] || die "neither bun nor node on PATH" 3
   "$runtime" -e '
     const fs = require("node:fs");
-    const [, , target, dbUrl, model, dims, base] = process.argv;
+    const [, , target, dbUrl, provider, model, dims, base] = process.argv;
     fs.writeFileSync(target, JSON.stringify({
       database: { url: dbUrl },
-      embedding: { provider: "ollama", model, dimensions: Number(dims), baseURL: base },
+      embedding: { provider, model, dimensions: Number(dims), baseURL: base },
       llm: { enabled: false },
     }, null, 2) + "\n");
-  ' "$target" "$DB_URL" "$EMBED_MODEL" "$EMBED_DIMS" "$OLLAMA_ORIGIN"
+  ' "$target" "$DB_URL" "$PROVIDER" "$EMBED_MODEL" "$EMBED_DIMS" "$(embedding_base_url)"
 }
 
 # ── waiting ─────────────────────────────────────────────────────────────────
@@ -303,6 +347,14 @@ wait_for() {
 
 api_healthy() { curl -fsS -m 3 "${API_ORIGIN}/health" >/dev/null; }
 ollama_healthy() { curl -fsS -m 3 "${OLLAMA_ORIGIN}/api/tags" >/dev/null; }
+lmstudio_healthy() { curl -fsS -m 3 "${LMSTUDIO_ORIGIN}/v1/models" >/dev/null; }
+inference_healthy() { "${PROVIDER}_healthy"; }
+embedding_base_url() {
+  case "$PROVIDER" in
+    ollama) printf '%s' "$OLLAMA_ORIGIN" ;;
+    lmstudio) printf '%s/v1' "$LMSTUDIO_ORIGIN" ;;
+  esac
+}
 pg_healthy() { "$PSQL_BIN" "$DB_URL" -c 'SELECT 1' >/dev/null 2>&1; }
 
 # ── service start ───────────────────────────────────────────────────────────
@@ -387,6 +439,18 @@ start_ollama() {
   wait_for "ollama :${OLLAMA_PORT}" 60 ollama_healthy
 }
 
+check_lmstudio() {
+  lmstudio_healthy || die "LM Studio is not answering at ${LMSTUDIO_ORIGIN} — start its server first; this script never starts or stops it"
+  log "lmstudio answering at ${LMSTUDIO_ORIGIN} (external, not owned)"
+}
+
+start_inference() {
+  case "$PROVIDER" in
+    ollama) start_ollama ;;
+    lmstudio) check_lmstudio ;;
+  esac
+}
+
 # The embedding provider must be PROVEN to answer at the pinned width before the
 # API boots, and the reason is a measured silent-degradation path rather than
 # caution.
@@ -411,15 +475,25 @@ start_ollama() {
 # that would have degraded silently now refuses loudly instead.
 embedding_width_ok() {
   local got
-  got="$(curl -fsS -m 120 "${OLLAMA_ORIGIN}/api/embeddings" \
-    -H 'content-type: application/json' \
-    -d "{\"model\":\"${EMBED_MODEL}\",\"prompt\":\"e2e-stack embedding width probe\"}" \
-    | "$BUN_BIN" -e 'const j=await Bun.stdin.json();process.stdout.write(String((j.embedding||[]).length));' 2>/dev/null)" || return 1
+  case "$PROVIDER" in
+    ollama)
+      got="$(curl -fsS -m 120 "${OLLAMA_ORIGIN}/api/embeddings" \
+        -H 'content-type: application/json' \
+        -d "{\"model\":\"${EMBED_MODEL}\",\"prompt\":\"e2e-stack embedding width probe\"}" \
+        | "$BUN_BIN" -e 'const j=await Bun.stdin.json();process.stdout.write(String((j.embedding||[]).length));' 2>/dev/null)" || return 1
+      ;;
+    lmstudio)
+      got="$(curl -fsS -m 120 "${LMSTUDIO_ORIGIN}/v1/embeddings" \
+        -H 'content-type: application/json' \
+        -d "{\"model\":\"${EMBED_MODEL}\",\"input\":\"e2e-stack embedding width probe\"}" \
+        | "$BUN_BIN" -e 'const j=await Bun.stdin.json();process.stdout.write(String((j.data?.[0]?.embedding||[]).length));' 2>/dev/null)" || return 1
+      ;;
+  esac
   [[ "$got" == "$EMBED_DIMS" ]]
 }
 
 assert_embedding_width() {
-  wait_for "${EMBED_MODEL} to answer at ${EMBED_DIMS}d on :${OLLAMA_PORT}" 300 embedding_width_ok
+  wait_for "${EMBED_MODEL} to answer at ${EMBED_DIMS}d on :${INFERENCE_PORT}" 300 embedding_width_ok
   log "embedding width verified: ${EMBED_MODEL} → ${EMBED_DIMS}d"
 }
 
@@ -442,11 +516,12 @@ start_api() {
   # a process that is already running.
   if [[ -n "$(listener_pid "$API_PORT")" ]]; then
     local running_profile; running_profile="$(state_get profile)"
-    if [[ "$running_profile" == "$profile" && $# -eq 0 ]]; then
+    local running_provider; running_provider="$(state_get api_provider)"
+    if [[ "$running_profile" == "$profile" && "$running_provider" == "$PROVIDER" && $# -eq 0 ]]; then
       log "api already up (profile: ${profile})"
       return 0
     fi
-    log "api is up under profile '${running_profile:-unknown}'; restarting into '${profile}'"
+    log "api is up under profile '${running_profile:-unknown}' on '${running_provider:-unknown}'; restarting into '${profile}' on '${PROVIDER}'"
     stop_one api "$API_PORT"
   fi
 
@@ -465,6 +540,7 @@ start_api() {
     >"${LOG_DIR}/api.log" 2>&1 &
   state_set api_pid "$!"
   state_set profile "$profile"
+  state_set api_provider "$PROVIDER"
   wait_for "tools-api :${API_PORT}" 90 api_healthy
   capture_api_key
   assert_isolation
@@ -501,17 +577,18 @@ capture_api_key() {
 # "dedicated" API at :11434 while every other signal still looks right.
 assert_isolation() {
   local key; key="$(state_get api_key)"
-  local ollama_view info_view
-  ollama_view="$(curl -fsS -m 5 -H "x-api-key: ${key}" "${API_ORIGIN}/api/v1/system/ollama" || true)"
+  local inference_view info_view
+  inference_view="$(curl -fsS -m 5 -H "x-api-key: ${key}" "${API_ORIGIN}/api/v1/system/inference" || true)"
   info_view="$(curl -fsS -m 5 -H "x-api-key: ${key}" "${API_ORIGIN}/api/v1/system/info" || true)"
 
-  [[ "$ollama_view" == *"127.0.0.1:${OLLAMA_PORT}"* ]] || die \
-    "isolation check failed: the dedicated API is not pointed at Ollama :${OLLAMA_PORT}
-  /api/v1/system/ollama said: ${ollama_view:0:200}"
+  [[ "$inference_view" == *"\"provider\":\"${PROVIDER}\""* \
+    && "$inference_view" == *"127.0.0.1:${INFERENCE_PORT}"* ]] || die \
+    "isolation check failed: the dedicated API is not pointed at ${PROVIDER} :${INFERENCE_PORT}
+  /api/v1/system/inference said: ${inference_view:0:200}"
   [[ "$info_view" == *"\"port\":${PG_PORT}"* && "$info_view" == *"massa_ai_test"* ]] || die \
     "isolation check failed: the dedicated API is not pointed at massa_ai_test on :${PG_PORT}
   /api/v1/system/info said: ${info_view:0:200}"
-  log "isolation verified: ollama :${OLLAMA_PORT}, postgres :${PG_PORT}/massa_ai_test"
+  log "isolation verified: ${PROVIDER} :${INFERENCE_PORT}, postgres :${PG_PORT}/massa_ai_test"
 }
 
 # ── service stop ────────────────────────────────────────────────────────────
@@ -559,15 +636,16 @@ cmd_up() {
     "fixture is missing or is not a git repository: ${FIXTURE_PATH}
   Build it first:  bun scripts/prepare-e2e-fixture.ts --out ${FIXTURE_PATH}"
 
+  state_set provider "$PROVIDER"
   log "shared stack before: $(assert_shared_untouched | tr '\n' ' ')"
   write_config_json
   start_postgres
-  start_ollama
+  start_inference
   assert_embedding_width
   start_api "$profile"
   log "shared stack after:  $(assert_shared_untouched | tr '\n' ' ')"
 
-  printf 'e2e-stack up (profile: %s)\n' "$profile"
+  printf 'e2e-stack up (profile: %s, provider: %s)\n' "$profile" "$PROVIDER"
   cmd_status
 
   # A stack that reports "up" while a service is unhealthy is worse than one
@@ -575,7 +653,7 @@ cmd_up() {
   # reads like a product bug.
   local unhealthy=()
   pg_healthy || unhealthy+=("postgres")
-  ollama_healthy || unhealthy+=("ollama")
+  inference_healthy || unhealthy+=("$PROVIDER")
   api_healthy || unhealthy+=("api")
   (( ${#unhealthy[@]} == 0 )) || die "stack came up unhealthy: ${unhealthy[*]} — see ${LOG_DIR}/"
 }
@@ -584,18 +662,20 @@ cmd_status() {
   require_bins
   local name port pid
   printf '%-10s %-8s %-10s %s\n' SERVICE PORT PID HEALTH
-  for entry in "postgres ${PG_PORT}" "ollama ${OLLAMA_PORT}" "api ${API_PORT}"; do
+  for entry in "postgres ${PG_PORT}" "${PROVIDER} ${INFERENCE_PORT}" "api ${API_PORT}"; do
     read -r name port <<<"$entry"
     pid="$(listener_pid "$port")"
     local health="down"
     case "$name" in
       postgres) pg_healthy && health="ok" ;;
       ollama)   ollama_healthy && health="ok" ;;
+      lmstudio) lmstudio_healthy && health="ok (external)" ;;
       api)      api_healthy && health="ok" ;;
     esac
     printf '%-10s %-8s %-10s %s\n' "$name" "$port" "${pid:-–}" "$health"
   done
   printf 'profile    %s\n' "$(state_get profile)"
+  printf 'provider   %s\n' "$PROVIDER"
   printf 'fixture    %s\n' "$FIXTURE_PATH"
 }
 
@@ -632,10 +712,11 @@ export POSTGRES_VECTOR_URL=${DB_URL}
 export VECTOR_STORE_TYPE=postgres
 export XDG_CONFIG_HOME=${CONFIG_HOME}
 export OLLAMA_BASE_URL=${OLLAMA_ORIGIN}
-export EMBEDDING_PROVIDER=ollama
-export OLLAMA_EMBEDDING_MODEL=${EMBED_MODEL}
-export OLLAMA_EMBEDDING_DIMENSIONS=${EMBED_DIMS}
+export EMBEDDING_PROVIDER=${PROVIDER}
+export MASSA_AI_E2E_LLM_MODEL=${LLM_MODEL}
+export MASSA_AI_E2E_LLM_CODE_MODEL=${LLM_CODE_MODEL}
 EOF
+  provider_embedding_env | sed 's/^/export /'
   # Always export a key. Auth is mandatory under AD-011, so even the "default"
   # profile runs authenticated — against a key the API provisioned into the
   # scratch config on first boot. Exporting an empty value here would 401 every
@@ -663,6 +744,7 @@ main() {
   local command="${1:-}"
   [[ -n "$command" ]] || die "usage: e2e-stack.sh up|status|restart-api|env|down" 2
   shift
+  select_provider
   case "$command" in
     up) cmd_up "$@" ;;
     status) cmd_status "$@" ;;
