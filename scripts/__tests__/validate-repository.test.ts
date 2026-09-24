@@ -327,6 +327,26 @@ describe("legacy persona catalog", () => {
   });
 });
 
+// ── Mobile Figma platform contracts are reachable ──────────────────────────
+// agents-md-bootstrap-trim C3: the platform→contract map used to live only in
+// design-implementation.md, so the mobile-figma-audit/fix path (which loads
+// repository-detection.md, not design-implementation.md) never named the
+// platform files. The orphan gate cannot see this: a directory mention marks
+// every member reachable. The population is read from disk, not listed here.
+
+describe("mobile figma platform contracts", () => {
+  const dir = path.join(SKILLS_DIR, "massa-ai", "references", "mobile-figma-matcher");
+  const NON_PLATFORM = new Set(["core.md", "repository-detection.md", "ATTRIBUTION.md"]);
+
+  test("repository-detection.md names every platform contract by path", async () => {
+    const platforms = (await fs.readdir(dir)).filter((f) => f.endsWith(".md") && !NON_PLATFORM.has(f)).sort();
+    expect(platforms.length).toBeGreaterThanOrEqual(5); // guard the guard
+    const detection = await readFile(path.join(dir, "repository-detection.md"));
+    const missing = platforms.filter((f) => !detection.includes(`references/mobile-figma-matcher/${f}`));
+    expect(missing).toEqual([]);
+  });
+});
+
 // ── Lesson memory contract ─────────────────────────────────────────────────
 // These assertions used to read references/hook-enforcement.md, which
 // documented a hook graph (stop_evidence_gate, gateguard, observe_runner, ...)

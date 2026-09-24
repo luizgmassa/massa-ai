@@ -25,7 +25,19 @@ Excluded Surfaces: <found but out of scope, with reason>
 2. Locate candidate modules using build configuration, manifests/projects, source sets, and ownership boundaries.
 3. Classify each target surface using at least one build/configuration signal and one source/resource signal when available.
 4. Map each selected surface to its Figma node. A single node may map to several surfaces; separate platform frames require explicit mappings.
-5. Load only the references required by selected surface IDs.
+5. Load only the Matcher Contracts references required by selected surface IDs.
+
+## Matcher Contracts
+
+Load only the contract file for each classified surface:
+
+- Android Views XML -> `references/mobile-figma-matcher/android-views.md`.
+- Android Jetpack Compose -> `references/mobile-figma-matcher/android-compose.md`.
+- iOS UIKit -> `references/mobile-figma-matcher/ios-uikit.md`.
+- iOS SwiftUI -> `references/mobile-figma-matcher/ios-swiftui.md`.
+- Shared KMP Compose Multiplatform -> `references/mobile-figma-matcher/kmp-compose-multiplatform.md`
+  plus native contracts only for selected native source sets, hosts,
+  wrappers, or runtime targets.
 
 ## Stack Signals
 

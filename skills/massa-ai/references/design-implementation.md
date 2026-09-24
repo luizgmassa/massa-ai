@@ -1,26 +1,23 @@
 # Design-To-Code Implementation Direction
 
-The single normative copy of the mobile UI implementation direction set:
-Target Surface Packet, Figma Evidence / Screenshot Context Packet, the
-Design-To-Code Mapping Matrix, coherent-slice implementation rules, and
-per-slice verification/completion criteria.
+The single normative copy of the design-route direction set on top of the
+mobile-figma-matcher packets: coherent-slice implementation rules and
+per-slice verification/completion criteria. Target Surface Packet
+construction is owned by `references/mobile-figma-matcher/repository-detection.md`;
+the Figma Evidence Packet and the Design-To-Code Mapping Matrix are owned by
+`references/mobile-figma-matcher/core.md`.
 
 Loaded by `workflows/design.md` for its direct route (behavior unchanged),
 and by `spec-driven`/`feature` when Figma ingestion is enabled, so those
 workflows absorb this direction set by reference instead of restating it.
+Load `references/mobile-figma-matcher/repository-detection.md` and
+`references/mobile-figma-matcher/core.md` alongside this file.
 
 ## Target Surface Packet
 
-Build the immutable Target Surface Packet before loading stack guidance.
-Classify each selected surface and load only its contracts:
-
-- Android Views XML -> `references/mobile-figma-matcher/android-views.md`.
-- Android Jetpack Compose -> `references/mobile-figma-matcher/android-compose.md`.
-- iOS UIKit -> `references/mobile-figma-matcher/ios-uikit.md`.
-- iOS SwiftUI -> `references/mobile-figma-matcher/ios-swiftui.md`.
-- Shared KMP Compose Multiplatform -> `references/mobile-figma-matcher/kmp-compose-multiplatform.md`
-  plus native contracts only for selected native source sets, hosts,
-  wrappers, or runtime targets.
+Load `references/mobile-figma-matcher/repository-detection.md` and build its
+immutable Target Surface Packet before loading stack guidance; that
+reference also owns the platform -> matcher-contract file map.
 
 Non-mobile targets under Figma ingestion do not have a matcher contract to
 classify against; proceed with the wiring recorded in `references/figma-wiring.md`
@@ -28,22 +25,26 @@ and a best-effort implementation contract, and record that class explicitly.
 
 ## Figma Evidence / Screenshot Context Packet
 
-Build the Figma Evidence Packet with metadata when needed, design context,
-screenshot, variables, current Code Connect mappings, variants/states,
-annotations, and asset inventory. For screenshot-only sources, build a
-Screenshot Context Packet with provenance, target state, visible constraints,
-uncertainty, and `Design Evidence Class: screenshot-context-only`; do not
-infer exact Figma tokens, dimensions, variables, variants, or parity from
-screenshots alone. Stop if neither structured Figma evidence nor supplied
-screenshot context is available.
+Load `references/mobile-figma-matcher/core.md` and build its Figma Evidence
+Packet: metadata when needed, design context, screenshot, variables, current
+Code Connect mappings, variants/states, annotations, and asset inventory.
+
+Unlike the audit/fix route (`core.md` Boundaries: "A screenshot or pasted
+description alone is not a design contract"), the design route additionally
+accepts screenshot-only sources: build a Screenshot Context Packet with
+provenance, target state, visible constraints, uncertainty, and `Design
+Evidence Class: screenshot-context-only`; do not infer exact Figma tokens,
+dimensions, variables, variants, or parity from screenshots alone. Stop if
+neither structured Figma evidence nor supplied screenshot context is
+available.
 
 ## Design-To-Code Mapping Matrix
 
 Resolve current components, tokens, resources, assets, source-set ownership,
-platform adapters, requirements, and existing validation sensors. Create the
-Design-To-Code Mapping Matrix and one comparison configuration per selected
-runtime surface; screenshot-only rows use inferred visual intent, not
-`Figma Value`.
+platform adapters, requirements, and existing validation sensors, then build
+`references/mobile-figma-matcher/core.md`'s Design-To-Code Mapping Matrix and
+one comparison configuration per selected runtime surface; screenshot-only
+rows use inferred visual intent, not `Figma Value`.
 
 ## Sizing And Verification Recipe
 

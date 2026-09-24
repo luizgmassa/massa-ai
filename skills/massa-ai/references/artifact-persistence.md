@@ -13,6 +13,8 @@ Use before any workflow reads or writes durable `.specs/` artifacts. This file o
 
 Artifact reads resolve conflicts in this strict order (first match wins): fresh user instruction > approved `.specs/` artifact > STATE/HANDOFF > massa-ai memory. massa-ai memory and external summaries are discovery, not authority. In a repository with no `.specs/project/STATE.md`/`.specs/HANDOFF.md`, the chain simply has fewer links — the ordering is unchanged.
 
+If a higher source is silent, the next source decides; if a lower source contradicts a higher one, the higher source wins and the lower one is corrected. Record the resolution in STATE so the chain stays auditable.
+
 ## Quick Artifact Templates
 
 Quick-sized tasks persist under `.specs/quick/NNN-slug/` — `NNN` zero-padded and sequential per project, `slug` the short kebab-case intent. Exactly two files:
