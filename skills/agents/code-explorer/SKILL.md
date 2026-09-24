@@ -74,7 +74,7 @@ Output:
 - The work is tightly coupled without a clear owner.
 
 ## massa-ai Integration
-- Retrieval order: `list_projects` freshness -> `project_map` -> `search(summary)` -> `search(enriched)` -> symbol tools -> `read_file` -> focused shell fallback.
+- Retrieval order: index-first. This charter inherits no other context, so read `skills/massa-ai/references/codebase-investigation.md` §Source Order in full rather than assume the sequence.
 - Freshness gating: `project_map`, `get_architecture`, `trace_path`, and `impact_analysis` count as evidence only when the index is fresh for the current path and commit/worktree state; otherwise fall back to `search`/`get_references` and record reduced retrieval confidence.
 - Orphaned-dims recovery: if a vector `search` returns 0 results while other dim tables hold chunks for the project, report to the parent agent that `index` with `forceReindex=true` is required. Do not run it.
 - Context Firewall: summarize search output, logs, and source reads; return only `path:line` pointers and findings.

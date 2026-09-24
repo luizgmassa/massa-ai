@@ -347,6 +347,38 @@ describe("mobile figma platform contracts", () => {
   });
 });
 
+// ── One retrieval order ────────────────────────────────────────────────────
+// agents-md-bootstrap-trim AC7: mcp-tools.md and spec-driven/code-analysis.md
+// each carried their own numbered retrieval order, and they disagreed. The
+// shape sensed here is a numbered list whose items name four or more distinct
+// retrieval tools; a workflow that merely runs two of them as its own steps
+// (onboarding: list_projects, project_map) is not an order.
+
+describe("retrieval order has one owner", () => {
+  const TOOLS = [
+    "list_projects", "project_map", "get_architecture", "search_definitions",
+    "optimized_context", "symbol_snippet", "trace_path", "impact_analysis",
+  ];
+  const OWNER = "skills/massa-ai/references/codebase-investigation.md";
+
+  function distinctToolsInNumberedItems(text: string): number {
+    const items = text.split("\n").filter((l) => /^\s*\d+\.\s/.test(l));
+    return new Set(TOOLS.filter((t) => items.some((l) => l.includes(t)))).size;
+  }
+
+  test("only codebase-investigation.md carries a numbered retrieval order", async () => {
+    const files = (await fs.readdir(path.join(REPO_ROOT, "skills"), { recursive: true }))
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => path.join("skills", f));
+    expect(files.length).toBeGreaterThan(100); // guard the guard: the walk saw the tree
+    const offenders = files
+      .filter((rel) => rel !== OWNER && distinctToolsInNumberedItems(readFileSync(path.join(REPO_ROOT, rel), "utf8")) >= 4);
+    expect(offenders).toEqual([]);
+    // Guard the guard: the owner itself must still register as an order.
+    expect(distinctToolsInNumberedItems(readFileSync(path.join(REPO_ROOT, OWNER), "utf8"))).toBeGreaterThanOrEqual(4);
+  });
+});
+
 // ── Lesson memory contract ─────────────────────────────────────────────────
 // These assertions used to read references/hook-enforcement.md, which
 // documented a hook graph (stop_evidence_gate, gateguard, observe_runner, ...)

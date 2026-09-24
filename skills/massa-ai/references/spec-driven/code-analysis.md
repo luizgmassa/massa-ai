@@ -6,13 +6,16 @@ Use when Specify, Design, Tasks, Execute, or Validate needs source inspection or
 
 ## Tool Priority
 
-Use graceful degradation, starting from massa-ai indexed tooling and falling back to structural, then text, search:
+Use graceful degradation: base retrieval sequence is
+`references/codebase-investigation.md` §Source Order — that file owns the
+ordered list; do not restate it here. Prefer `search_definitions`,
+`get_references`, or `optimized_context` for symbol- and reference-shaped
+queries within that sequence.
 
-1. `list_projects` (or equivalent index metadata) before indexed reads, to verify project ID, path, status, and freshness.
-2. `search` (or indexed symbol reads) when available and fresh for the current repository path and worktree state. Prefer `search_definitions`, `get_references`, or `optimized_context` for symbol- and reference-shaped queries.
-3. `sg` / ast-grep for structural pattern-based search when installed.
-4. `rg` (ripgrep) for fast context-aware text and file search.
-5. `grep` or direct file reads as the final, always-available fallback.
+Spec-driven code analysis adds one tier between semantic/symbol search and
+the shell fallback: try `sg` / ast-grep for structural pattern-based search
+when installed, then fall back to `rg` (ripgrep), then `grep` or direct file
+reads as the final, always-available fallback.
 
 ## Freshness And Source Precedence
 

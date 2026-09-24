@@ -148,32 +148,19 @@ depends on exact content.
 
 ## Retrieval Order
 
-1. `list_projects` or equivalent index metadata to verify project ID,
-   path, status, and `lastIndexedAt` before treating indexed context as current.
-2. `project_map` for general architecture orientation when the index is fresh for the current repository path and worktree state.
-3. `get_architecture` for architecture-specific deep maps (packages, routes, hotspots, communities, cycles) when the index is fresh.
-4. `search(responseMode="summary", maxResults=10)` for broad discovery.
-5. `search(responseMode="enriched", maxResults=3)` for targeted deep reads with `fileImports`, `parentSymbol`, and chunk navigation metadata; raise to `maxResults=5` only when 4-5 exact files, symbols, or report finding IDs are already named.
-6. Symbol tools (`search_definitions`, `get_references`, `go_to_definition`) and `read_file` for exact source evidence.
-7. `symbol_snippet` for raw code snippets by file + line range.
-8. `trace_path` for typed-edge BFS call/data-flow path tracing (fresh index only).
-9. `impact_analysis` for git-diff centrality-ranked impact (fresh index only).
-10. `optimized_context` for compact synthesized context when available.
-11. Focused `rg`/file reads when massa-ai is unavailable, stale, incomplete, or misses obvious local truth.
+The ordered retrieval list is owned by `references/codebase-investigation.md`
+§Source Order — follow it end to end; it is not restated here. This section
+is the MCP parameter/budget schema delta for tools in that order:
 
-Do not use `full` or `enriched` for broad whole-project sweeps. Attempt REST fallback exactly once after a documented MCP schema, adapter, or missing-operation failure; if REST also fails, continue with MCP/local fallback and record the skipped reason.
-
-Graph tools (`trace_path`, `impact_analysis`, `get_architecture`) only count as
-evidence when the index is fresh for the current repository path and
-commit/worktree state. When the index is stale, incomplete, missing the target
-path, or older than relevant local changes, fall back to `search`/`get_references`
-and record the reduced retrieval confidence.
+- `list_projects`: verify project ID, path, status, and `lastIndexedAt` before treating indexed context as current.
+- `search(responseMode="summary", maxResults=10)` for broad discovery; `search(responseMode="enriched", maxResults=3)` for targeted deep reads with `fileImports`, `parentSymbol`, and chunk navigation metadata; raise to `maxResults=5` only when 4-5 exact files, symbols, or report finding IDs are already named. Do not use `full` or `enriched` for broad whole-project sweeps.
+- `symbol_snippet`: raw code snippets by exact file + line range (see the Capability Matrix above for required fields).
+- Graph tools (`trace_path`, `impact_analysis`, `get_architecture`) only count as evidence when the index is fresh for the current repository path and commit/worktree state; when stale, incomplete, missing the target path, or older than relevant local changes, fall back to `search`/`get_references` and record the reduced retrieval confidence.
+- Attempt REST fallback exactly once after a documented MCP schema, adapter, or missing-operation failure; if REST also fails, continue with MCP/local fallback and record the skipped reason.
 
 Project maps, search hits, and optimized context are discovery leads until
-confirmed against source files read in the current session or returned with
-freshness evidence for the current worktree. When index status is stale,
-incomplete, missing the target path, or older than relevant local changes, use
-focused source reads as proof and record the reduced retrieval confidence.
+confirmed against source — see `references/codebase-investigation.md`
+§Source Order for the canonical statement of that rule.
 
 ## Common MCP Calls
 

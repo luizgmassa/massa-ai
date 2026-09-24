@@ -27,25 +27,45 @@ For exploration-only work, Recon and Debrief are the main deliverables.
 
 ## Source Order
 
+This is the single ordered retrieval list for massa-ai workflows and agents.
+Every other reference (`mcp-tools.md`, `spec-driven/code-analysis.md`,
+`synapse-policy.md`, workflow files, agent charters) points here instead of
+restating it; where a file adds tool-specific parameters, budgets, or a
+tier not listed below, it says so as an explicit delta on top of this order.
+
 Prefer sources in this order:
 
 1. `recall` for prior decisions, patterns, failed attempts, and handoffs.
 2. `list_projects` or equivalent index metadata to verify project ID,
-   path, status, and freshness.
-3. `project_map` for indexed-project architecture orientation when the
+   path, status, and freshness (`lastIndexedAt`).
+3. `project_map` for indexed-project general architecture orientation when the
    index is fresh for the current repository path and worktree state.
-4. Summary search, then targeted enriched search.
-5. Symbol tools and `read_file` for exact definitions, usages, and ranges.
-6. `optimized_context` when synthesized compact context is available and more useful
-   than exact source.
-7. Local `.notebook/INDEX.md` only if the project already uses `.notebook/`.
-8. Focused shell search/read fallback when massa-ai is unavailable, stale, incomplete, or unindexed.
-9. External sources only when current external library/API behavior matters — and then strictly through the ordered chain in `references/knowledge-verification-chain.md` (project docs → Context7 MCP → web search → flag-as-uncertain, unavailable steps recorded as skipped sensors).
+4. `get_architecture` for architecture-specific deep maps (packages, routes,
+   hotspots, communities, cycles) when the index is fresh.
+5. Summary search, then targeted enriched search. Parameters and default
+   budgets for these two modes are a schema delta owned by `mcp-tools.md`
+   §Retrieval Order.
+6. Symbol tools (`search_definitions`, `get_references`, `go_to_definition`)
+   and `read_file` for exact definitions, usages, and ranges.
+7. `symbol_snippet` for raw code snippets by exact file + line range.
+8. `trace_path` for typed-edge call/data-flow path tracing (fresh index only).
+9. `impact_analysis` for git-diff centrality-ranked impact (fresh index only).
+10. `optimized_context` when synthesized compact context is available and more useful
+    than exact source.
+11. Local `.notebook/INDEX.md` only if the project already uses `.notebook/`.
+12. Focused shell search/read fallback (`rg`, `grep`) when massa-ai is
+    unavailable, stale, incomplete, or unindexed. Spec-driven code analysis
+    adds one tier here — `sg`/ast-grep for structural pattern search when
+    installed, tried before `rg`/`grep`; see
+    `references/spec-driven/code-analysis.md` §Tool Priority.
+13. External sources only when current external library/API behavior matters — and then strictly through the ordered chain in `references/knowledge-verification-chain.md` (project docs → Context7 MCP → web search → flag-as-uncertain, unavailable steps recorded as skipped sensors).
 
 Project maps, search results, and optimized context are leads until confirmed
 against source files read in the current session or returned with current
 freshness evidence. Current repository source and approved `.specs/` artifacts
 override indexed context, memories, external summaries, and old handoff notes.
+This is the canonical statement of that rule; other references point here
+instead of restating it.
 
 For multi-search investigations, load `references/synapse-policy.md`. Keep the
 durable `workflowSessionId` separate from the ephemeral Synapse session.
