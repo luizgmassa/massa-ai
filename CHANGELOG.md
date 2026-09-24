@@ -84,6 +84,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The MCP server crashed at startup whenever `DATABASE_URL` was unset — in HTTP-proxy mode
+  too, where it never touches PostgreSQL.** `observationConsolidationJob` and
+  `autoImproveJob` are module-level singletons, and their constructors resolved their
+  PostgreSQL stores eagerly; `requirePostgresDatabaseUrl` throws without the URL, so the
+  import itself failed and a host saw only `Connection closed`. Found by the E2E battery's
+  Tier D probe, which registers the server under a scratch `HOME` as a fresh install would.
+  The stores now resolve on first use. `mcp-stdout-clean.test.ts` could not see this: it
+  inherits the runner's `DATABASE_URL`, and a crashed server's stdout is as empty as a
+  healthy one's. The new guard sends a real `initialize` with the variable removed.
 - **Indexing a fresh project could fail outright on a lost race for its own `workspaces`
   row.** `EtlPipeline` reaches `graphGenerations.begin()` as soon as the Discover stage
   returns; `begin()` reaches `lockWorkspace`, which does

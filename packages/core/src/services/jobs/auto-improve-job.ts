@@ -55,8 +55,8 @@ export interface AutoImproveJobOptions {
 // ── Job (facade with 1-line delegates) ─────────────────────────────────────
 export class AutoImproveJob {
   public readonly llm: LlmSurface;
-  public readonly observationStore: ObservationStore;
-  public readonly proposalStore: ProposalStore;
+  private readonly injectedObservationStore: ObservationStore | undefined;
+  private readonly injectedProposalStore: ProposalStore | undefined;
   public readonly memoryRepo: MemoryApplySeam;
   public readonly thresholds: PatternThresholds;
   public readonly minObservations: number;
@@ -68,10 +68,13 @@ export class AutoImproveJob {
   private newSinceRun = 0;
   public runCalls = 0;
 
+  get observationStore(): ObservationStore { return this.injectedObservationStore ?? getObservationStore(); }
+  get proposalStore(): ProposalStore { return this.injectedProposalStore ?? getProposalStore(); }
+
   constructor(opts: AutoImproveJobOptions = {}) {
     this.llm = opts.llm ?? defaultLlmSurface;
-    this.observationStore = opts.observationStore ?? getObservationStore();
-    this.proposalStore = opts.proposalStore ?? getProposalStore();
+    this.injectedObservationStore = opts.observationStore;
+    this.injectedProposalStore = opts.proposalStore;
     this.thresholds = { ...DEFAULT_THRESHOLDS, ...opts.thresholds };
     this.reviewGateOverride = opts.reviewGate;
     this.idFactory = opts.idFactory ?? (() => newProposalId());
