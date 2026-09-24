@@ -14,11 +14,34 @@ const SKIP_DIRS = new Set([
   "node_modules", ".git", "dist", "build", "coverage",
   "__pycache__", ".next", ".nuxt", "out", ".turbo",
   "generated", ".cache", "vendor", ".svn", ".hg",
+  // CocoaPods checkouts: vendored binaries/licenses burn the MAX_FILES budget
+  // before the walk reaches the repo's real source dirs (app/ sorts before
+  // features/, so a Pods-heavy iOS tree once crowded out every Kotlin module).
+  "Pods",
 ]);
 
 const MAX_FILE_BYTES = 512 * 1024;    // 512 KB per file
-const MAX_TOTAL_BYTES = 50 * 1024 * 1024; // 50 MB total
-const MAX_FILES = 3000;
+// ponytail: caps sized for the driver-app-mobile repo after Pods exclusion —
+// 3000 files/50MB silently truncated alphabetically-lucky dirs (promotion in,
+// driver_get_driver out) because readdir order is filesystem order, not
+// alphabetical. Raise further only if upload/index time becomes a problem.
+const MAX_TOTAL_BYTES = 150 * 1024 * 1024; // 150 MB total
+const MAX_FILES = 15000;
+
+// ponytail: opt-in allow-list of top-level dirs to index. Default empty (walk
+// everything under SKIP_DIRS exclusions); set via MASSA_AI_INDEX_INCLUDE=app,
+// features/promotion,features/driver_get_driver to keep reindex time and RAM
+// bounded for very large repos. Comma-separated, slash-prefixed entries match
+// top-level dirs only; without it, any repo bigger than MAX_FILES would lose
+// non-alphabetically-first modules to silent truncation.
+function getIncludeDirs(): string[] {
+  const raw = process.env.MASSA_AI_INDEX_INCLUDE;
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim().replace(/^\/+|\/+$/g, ""))
+    .filter(Boolean);
+}
 
 /**
  * Resolve the allow-list from the shared config (single source of truth).
@@ -38,7 +61,15 @@ export async function collectFiles(projectPath: string): Promise<CollectedFile[]
   const files: CollectedFile[] = [];
   const state = { totalBytes: 0 };
   const allowed = getAllowedExtensions();
-  await walk(projectPath, projectPath, files, state, allowed);
+  const includeDirs = getIncludeDirs();
+  if (includeDirs.length === 0) {
+    await walk(projectPath, projectPath, files, state, allowed);
+  } else {
+    for (const top of includeDirs) {
+      if (files.length >= MAX_FILES || state.totalBytes >= MAX_TOTAL_BYTES) break;
+      await walk(projectPath, path.join(projectPath, top), files, state, allowed);
+    }
+  }
   return files;
 }
 
@@ -62,6 +93,8 @@ async function walk(
     if (files.length >= MAX_FILES || state.totalBytes >= MAX_TOTAL_BYTES) break;
 
     if (entry.isDirectory()) {
+      // Top-level include-list enforcement lives in collectFiles(): walks only
+      // enter an allowed top dir. Below the top, SKIP_DIRS gates descent.
       if (!SKIP_DIRS.has(entry.name) && !entry.name.startsWith(".")) {
         await walk(root, path.join(dir, entry.name), files, state, allowed);
       }
