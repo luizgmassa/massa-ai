@@ -162,7 +162,6 @@ describe("reference files exist", () => {
     "references/memory-policy.md",
     "references/decision-engine.md",
     "references/lessons.md",
-    "references/hook-enforcement.md",
     "references/naming-standards.md",
     "references/conversation-feedback.md",
   ];
@@ -328,59 +327,33 @@ describe("legacy persona catalog", () => {
   });
 });
 
-// ── Hook enforcement reference (ported from legacy hook-graph tests) ──────
-// The legacy suite asserted the hook graph maps to references and enforces the
-// massa-ai dual-write/tag contract. These check the hook-enforcement reference
-// still documents that mapping and the procedural-is-tag rule.
+// ── Lesson memory contract ─────────────────────────────────────────────────
+// These assertions used to read references/hook-enforcement.md, which
+// documented a hook graph (stop_evidence_gate, gateguard, observe_runner, ...)
+// that no longer exists; agents-md-bootstrap-trim deleted it. The contracts
+// that are still true are sensed where they are owned now.
 
-describe("hook enforcement reference", () => {
-  const hookRef = path.join(SKILLS_DIR, "massa-ai", "references", "hook-enforcement.md");
-
-  test("hook-enforcement.md exists", async () => {
-    expect(await fileExists(hookRef)).toBe(true);
-  });
-
-  test("documents the hooks-to-enforced-reference mapping table", async () => {
-    const content = await readFile(hookRef);
-    // Each enforcing hook should be named somewhere in the mapping.
-    expect(content).toContain("stop_evidence_gate");
-    expect(content).toContain("continuous_learning_evaluate");
-    expect(content).toContain("precompact_save_state");
-    expect(content).toContain("gateguard");
-    expect(content).toContain("config_protection");
-    expect(content).toContain("observe_runner");
-  });
-
-  test("documents the workflow-aware stop gate reading from .specs/project/STATE.md", async () => {
-    const content = await readFile(hookRef);
-    expect(content).toContain("stop_evidence_gate");
-    expect(content).toMatch(/\.specs\/project\/STATE\.md/);
-  });
+describe("lesson memory contract", () => {
+  const lessonsRef = path.join(SKILLS_DIR, "massa-ai", "references", "lessons.md");
+  const memoryPolicyRef = path.join(SKILLS_DIR, "massa-ai", "references", "memory-policy.md");
 
   test("documents the massa-ai dual-write/tag contract (procedural is a tag, never a type)", async () => {
-    const content = await readFile(hookRef);
-    // The phrase spans newlines ("`procedural`\nis a **tag**, never a\ntype"), so
-    // assert the key tokens are all present rather than a single-line regex.
-    expect(content).toContain("procedural");
-    expect(content).toContain("tag");
-    // "never a\ntype" — allow a newline between "never" and "type".
-    expect(content).toMatch(/never[\s\S]*type/i);
+    const content = await readFile(lessonsRef);
+    expect(content).toMatch(/`procedural`\s+is a \*\*tag\*\*, never a type/);
     expect(content).toContain("memory:procedural");
   });
 
   test("lists supported massa-ai types (critical|conversation|code|decision|pattern only)", async () => {
-    const content = await readFile(hookRef);
-    expect(content).toMatch(/critical\s*\|\s*conversation\s*\|\s*code\s*\|\s*decision\s*\|\s*pattern/);
+    const content = await readFile(memoryPolicyRef);
+    expect(content).toContain(
+      "Supported massa-ai types are only `critical`, `conversation`, `code`, `decision`, and `pattern`.",
+    );
   });
 
-  test("documents graceful degradation (REST unavailable → file fallback)", async () => {
-    const content = await readFile(hookRef);
-    expect(content).toMatch(/graceful|fallback|REST unavailable/i);
-  });
-
-  test("no SessionStart recall duplication (router owns recall, not hooks)", async () => {
-    const content = await readFile(hookRef);
-    expect(content).toMatch(/SessionStart recall|no competing SessionStart|router already runs.*recall/i);
+  test("documents graceful degradation: REST unavailable drops the memory write silently", async () => {
+    const content = (await readFile(lessonsRef)).replace(/\s+/g, " ");
+    expect(content).toContain("the lesson still lands in `lessons.json` and the memory write is dropped silently");
+    expect(content).not.toContain("the skipped memory write is logged");
   });
 });
 

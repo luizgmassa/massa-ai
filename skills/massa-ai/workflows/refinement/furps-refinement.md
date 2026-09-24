@@ -21,7 +21,7 @@ Findings-only: do not edit the PRD/ADR unless the user separately asks.
    - `references/furps/intake.md` before intake and sub-agent dispatch
    - `references/furps/checklist.md` for the per-dimension check items
    - `references/furps/report-contract.md` before writing the report
-   - `references/furps/analyst-role.md` and `skills/agents/product-manager/SKILL.md` before dispatching `product-manager` in `furps` mode
+   - `skills/agents/product-manager/SKILL.md` before dispatching `product-manager` in `furps` mode
    - `references/agent-orchestration.md` and `references/context-firewall.md` before dispatch
    - `references/audit-report-io.md` before writing the final report
    - `references/synapse-policy.md` when repeated massa-ai searches are expected

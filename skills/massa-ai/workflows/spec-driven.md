@@ -210,8 +210,8 @@ Memory:
 | Record decision, project-level decision | `references/spec-driven/memory.md` |
 | Pause work, end session, I need to stop | `references/spec-driven/memory.md` |
 | Resume work, continue, pick up where we left off | `references/spec-driven/memory.md` |
-| Load lessons, what have we learned, apply past lessons | `references/spec-driven/lessons.md` |
-| Record lesson, distill lessons (auto-runs after validation) | `references/spec-driven/lessons.md` |
+| Load lessons, what have we learned, apply past lessons | `references/lessons.md` |
+| Record lesson, distill lessons (auto-runs after validation) | `references/lessons.md` |
 
 ## Output Behavior
 

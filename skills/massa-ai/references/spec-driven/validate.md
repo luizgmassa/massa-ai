@@ -187,7 +187,7 @@ After all checks complete, the Verifier MUST:
 
 ### 10. Distill Lessons (MANDATORY when validation.md has signal)
 
-This is the closing action of validation — not a separate phase. Immediately after the report is written, turn its grounded failures into reusable, project-local guidance by following [references/lessons.md](../lessons.md) and the stub at [references/spec-driven/lessons.md](lessons.md). In short: for each surviving mutant, spec-precision gap, failed/uncovered AC, or `// SPEC_DEVIATION`, record one terse general lesson via:
+This is the closing action of validation — not a separate phase. Immediately after the report is written, turn its grounded failures into reusable, project-local guidance by following [references/lessons.md](../lessons.md). In short: for each surviving mutant, spec-precision gap, failed/uncovered AC, or `// SPEC_DEVIATION`, record one terse general lesson via:
 
 ```bash
 bun skills/massa-ai/scripts/lessons.ts --root . add --feature <slug> --signal "<signal>" --source "<source>" --text "<lesson>" --scope "<scope>"
