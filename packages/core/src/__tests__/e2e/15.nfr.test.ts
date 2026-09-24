@@ -599,7 +599,7 @@ describe.skipIf(!READY)("T9 N15 — vector dimension and index integrity", () =>
   });
 
   test(
-    "indexed vectors live in exactly one dimension table, with binary HNSW and valid distance operators",
+    "indexed vectors live in exactly one dimension table, with the HNSW index its width selects",
     async () => {
       const ir = await indexTinyAndWait(pid);
       expect(ir.status).toBe("completed");
@@ -646,24 +646,28 @@ describe.skipIf(!READY)("T9 N15 — vector dimension and index integrity", () =>
         expect(occupied).toHaveLength(1);
 
         const { table, dimensions } = occupied[0]!;
+        const binaryQuantized = dimensions > 2000;
 
         // Every indexed project carries exactly one `_metadata:<projectId>` row
         // in this table. It is a sentinel, not a document: its embedding is a
         // zero vector, so `embedding <=> embedding` is NaN for it and any
         // whole-project cosine assertion fails on that row alone. Separate the
         // two populations rather than loosening the assertion.
+        const binaryColumns = binaryQuantized
+          ? `bit_length(embedding_bq)::int AS binary_dimensions,
+             (embedding_bq <~> embedding_bq)::float8 AS hamming_self_distance`
+          : `NULL::int AS binary_dimensions, NULL::float8 AS hamming_self_distance`;
         const vectors = await pool.query<{
           id: string;
           dimensions: number;
-          binary_dimensions: number;
+          binary_dimensions: number | null;
           cosine_self_distance: number;
-          hamming_self_distance: number;
+          hamming_self_distance: number | null;
         }>(
           `SELECT id,
                   vector_dims(embedding)::int AS dimensions,
-                  bit_length(embedding_bq)::int AS binary_dimensions,
                   (embedding <=> embedding)::float8 AS cosine_self_distance,
-                  (embedding_bq <~> embedding_bq)::float8 AS hamming_self_distance
+                  ${binaryColumns}
              FROM ${table}
             WHERE project_id = $1`,
           [pid],
@@ -682,9 +686,8 @@ describe.skipIf(!READY)("T9 N15 — vector dimension and index integrity", () =>
         // claims — the cross-check the hardcoded constant used to stand in for.
         const offenders = documents.filter((row) =>
           row.dimensions !== dimensions ||
-          row.binary_dimensions !== dimensions ||
           row.cosine_self_distance !== 0 ||
-          row.hamming_self_distance !== 0
+          (binaryQuantized && (row.binary_dimensions !== dimensions || row.hamming_self_distance !== 0))
         );
         if (offenders.length > 0) {
           console.log(`[N15] offending rows: ${JSON.stringify(offenders.slice(0, 3))}`);
@@ -694,18 +697,19 @@ describe.skipIf(!READY)("T9 N15 — vector dimension and index integrity", () =>
         // The sentinel's own contract: right width, but a zero vector, which is
         // why it cannot be asserted alongside the documents.
         expect(sentinels[0]!.dimensions).toBe(dimensions);
-        expect(sentinels[0]!.binary_dimensions).toBe(dimensions);
+        if (binaryQuantized) expect(sentinels[0]!.binary_dimensions).toBe(dimensions);
 
         const index = await pool.query<{ indexdef: string }>(
           `SELECT indexdef
              FROM pg_indexes
             WHERE tablename = $1
               AND indexname = $2`,
-          [table, `idx_${table}_embedding_bq`],
+          [table, binaryQuantized ? `idx_${table}_embedding_bq` : `idx_${table}_embedding`],
         );
+        console.log(`[N15] ${table}: ${binaryQuantized ? "binary-quantized" : "direct"} index → ${index.rows[0]?.indexdef ?? "none"}`);
         expect(index.rows).toHaveLength(1);
         expect(index.rows[0]!.indexdef).toContain("USING hnsw");
-        expect(index.rows[0]!.indexdef).toContain("bit_hamming_ops");
+        expect(index.rows[0]!.indexdef).toContain(binaryQuantized ? "bit_hamming_ops" : "vector_cosine_ops");
       } finally {
         await pool.end();
       }

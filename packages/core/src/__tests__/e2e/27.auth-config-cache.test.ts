@@ -935,22 +935,25 @@ describe.skipIf(!READY)("EB-CFG-3 — a concurrent cold start elects exactly one
       const provisioners = reports.filter((r) => r.provisioned);
       const generated = reports.filter((r) => r.source === "generated");
       const fromConfig = reports.filter((r) => r.source === "config");
+      const seededFromConfig = reports.filter((r) => r.source === "env");
 
       console.log(
         `[EB-CFG-3] ${N} concurrent cold starts → distinctKeys=${keys.size} ` +
-          `provisioned=${provisioners.length} generated=${generated.length} config=${fromConfig.length}`,
+          `provisioned=${provisioners.length} generated=${generated.length} config=${fromConfig.length} ` +
+          `env=${seededFromConfig.length}`,
       );
 
       // api-key.ts:112-162 — `open(…, "wx")` is an atomic exclusive create, so
-      // exactly one process becomes the provisioner and the losers take the
-      // ordinary config.json path. Two winners is the corruption the lock
+      // exactly one process becomes the provisioner and the losers read the key
+      // it wrote — from config.json, or from the env var src/env.ts seeds out of
+      // config.json when a loser imports after the write (reported as "env"). Two winners is the corruption the lock
       // exists to prevent: operators are told to read the key out of
       // config.json, so a process holding a different one rejects every
       // request they then make.
       expect(keys.size).toBe(1);
       expect(provisioners).toHaveLength(1);
       expect(generated).toHaveLength(1);
-      expect(fromConfig).toHaveLength(N - 1);
+      expect(fromConfig.length + seededFromConfig.length).toBe(N - 1);
 
       // The one key everybody agreed on is the one on disk.
       expect(await readStoredKey(home)).toBe([...keys][0]);

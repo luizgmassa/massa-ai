@@ -107,6 +107,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Two live-stack E2E assertions failed on the new 1024d default for reasons unrelated to
+  the product.** `15.nfr` N15 queried `embedding_bq`, a column only the `> 2000`-width tables
+  carry; at 1024d the store takes its direct HNSW branch (`vector_cosine_ops` on `embedding`),
+  so the query itself errored. N15 now follows the store's own width threshold and checks the
+  index that branch builds — red under `POSTGRES_VECTOR_INDEX=ivfflat`, green on `hnsw`.
+  `27.auth-config-cache` EB-CFG-3 required every losing process in a concurrent cold start to
+  report `source: "config"`, but a loser that imports `@massa-ai/shared/config` after the
+  winner has written the key gets it seeded into `MASSA_AI_API_KEY` by `src/env.ts` and
+  reports `"env"` — 4 of 4 runs red on this tree, same key every time. The single-key,
+  single-provisioner assertions are unchanged; the losers may carry either label.
 - **The MCP server crashed at startup whenever `DATABASE_URL` was unset — in HTTP-proxy mode
   too, where it never touches PostgreSQL.** `observationConsolidationJob` and
   `autoImproveJob` are module-level singletons, and their constructors resolved their
