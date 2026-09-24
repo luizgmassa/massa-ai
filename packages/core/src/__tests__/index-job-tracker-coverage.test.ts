@@ -163,6 +163,42 @@ describe("IndexJobTracker — store-backed coverage", () => {
     expect(tracker.reapStaleJobs(300_000)).toBe(1);
   });
 
+  test("reapStaleJobs trusts a fresh in-memory heartbeat over a lagging store row", () => {
+    const store = new FakeRunningStore();
+    const tracker = new IndexJobTracker(store);
+    const live = tracker.createJob("proj-cov", "/tmp/cov");
+    tracker.updateStatus(live.jobId, "running");
+    tracker.heartbeat(live.jobId);
+    store.running = [
+      makeJob({
+        jobId: live.jobId,
+        status: "running",
+        heartbeatAt: new Date(Date.now() - 600_000),
+        startedAt: new Date(Date.now() - 600_000),
+      }),
+    ];
+    expect(tracker.reapStaleJobs(300_000)).toBe(0);
+    expect(tracker.getJob(live.jobId)!.status).toBe("running");
+  });
+
+  test("reapStaleJobs reaps when the in-memory heartbeat is stale too", () => {
+    const store = new FakeRunningStore();
+    const tracker = new IndexJobTracker(store);
+    const live = tracker.createJob("proj-cov", "/tmp/cov");
+    tracker.updateStatus(live.jobId, "running");
+    live.heartbeatAt = new Date(Date.now() - 600_000);
+    store.running = [
+      makeJob({
+        jobId: live.jobId,
+        status: "running",
+        heartbeatAt: new Date(Date.now() - 600_000),
+        startedAt: new Date(Date.now() - 600_000),
+      }),
+    ];
+    expect(tracker.reapStaleJobs(300_000)).toBe(1);
+    expect(tracker.getJob(live.jobId)!.status).toBe("failed");
+  });
+
   test("reapStaleJobs returns 0 when store.listRunning throws", () => {
     const failingStore: JobStore = {
       ...new MemoryJobStore(),
