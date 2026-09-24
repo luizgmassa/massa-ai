@@ -160,3 +160,17 @@ packet as `mode_contract`. A packet missing `mode_contract` for a lazy mode retu
 `Blocked`. The inline rule and the lazy-charter list are stated once, in the router
 Core Contract (`skills/massa-ai/SKILL.md`) and `references/agent-orchestration.md`;
 individual dispatch blocks do not restate it.
+
+## AGENTS.md bootstrap trim — caveman, plan-challenge, registry sections
+
+**Rationale**: The startup contract carried a compression rule the owner no longer wanted,
+and a Plan Challenge policy whose settings duplicated — and disagreed with — the gate the
+router and each workflow already run. The sub-agent registry carried a retired-agent map
+and two explanatory sections nothing loaded.
+
+| Removed | Replacement |
+|---|---|
+| `caveman` bootstrap rule (8 → 6 rules) | None; a persisted `bootstrap.rules.caveman` is silently ignored and toggling it fails as retired |
+| `plan-challenge` bootstrap rule and its `plan_challenge:` policy block | Fixed gate in `skills/massa-ai/SKILL.md` §Plan Challenge Gate; a persisted `plan-challenge: false` no longer disables it |
+| "Mapping — Retired Agents → Current Agents" in `skills/AGENTS.md` | `CHANGELOG.md` and git history |
+| "How to Add an Agent" and "massa-ai Concepts" in `skills/AGENTS.md` | `CLAUDE.md` Agent-harness surface; each charter documents its own concepts |

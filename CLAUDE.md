@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Startup contract
 
 `AGENTS.md` (repo root) is the canonical agent startup contract: `projectId`, session-id
-convention, workflow routing, `.specs/` artifacts, plan-challenge policy, conversation
+convention, workflow routing, `.specs/` artifacts, conversation
 feedback. Read it once per session. Do not duplicate its rules here.
 
 `CONTRIBUTING.md` defines the mandatory 7-step managed-harness protocol (contract →

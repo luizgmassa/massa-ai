@@ -95,18 +95,19 @@ Thumbs.db
 
 ## Agent Policies (single source elsewhere)
 
-The Plan Challenge and Conversation Feedback policies are
-defined **once**, in the `<!-- massa-ai:bootstrap -->` block of
-[`skills/AGENTS.md`](./skills/AGENTS.md). `scripts/install-skills.sh` copies that
+The Conversation Feedback policy is defined **once**, in the
+`<!-- massa-ai:bootstrap -->` block of [`skills/AGENTS.md`](./skills/AGENTS.md). `scripts/install-skills.sh` copies that
 block to `<host>/AGENTS.md` (for example `~/.claude/AGENTS.md`), which is the
 copy an agent reads at runtime.
 
-Edit the policies in `skills/AGENTS.md`. Do not restate them here or in a host
+The Plan Challenge gate is not a policy block: it is fixed behavior defined once in
+[`skills/massa-ai/SKILL.md`](./skills/massa-ai/SKILL.md) §Plan Challenge Gate.
+
+Edit the policy in `skills/AGENTS.md`. Do not restate it here or in a host
 copy — a second copy is how the repo previously ended up shipping two
 contradicting Plan Challenge gates.
 `scripts/__tests__/skills-harness-integrity.test.ts` fails if a
-`plan_challenge:` / `conversation_feedback:` block reappears
-in this file.
+`conversation_feedback:` block reappears in this file.
 
 ## Runtime Contract
 
