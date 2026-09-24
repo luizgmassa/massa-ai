@@ -382,9 +382,6 @@ const DERIVED_SURFACES: StructuralSurface[] = [
 // an explicit expected two-element array instead of an `extractOne` throw.
 const INSTRUCT_CODING_SURFACES: MultiMatchRow[] = [
   {
-    // The dedicated E2E stack's `llm-on` profile. Same silent-degradation
-    // argument as its embedding pair above: a stale pin runs the battery
-    // against a model the product no longer ships as its default.
     file: "scripts/e2e-stack.sh",
     label: "e2e-stack.sh (instruct)",
     pattern: /\$\{MASSA_AI_E2E_LLM_MODEL:-([^}]+)\}/g,
