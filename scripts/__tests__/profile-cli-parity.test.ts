@@ -52,7 +52,7 @@ const resolveBootstrapState = mock((..._args: unknown[]): unknown => ({
   ignoredStateKeys: [],
 }));
 const setBootstrapRuleEnabled = mock((..._args: unknown[]): unknown => ({
-  id: "caveman",
+  id: "dedupe-guardrails",
   enabled: false,
   changed: true,
   state: {},
@@ -220,7 +220,7 @@ describe("bootstrap subcommand — cross-CLI parity (T19, BST-11/BST-12)", () =>
   });
 
   test("every registry id persists identically through both CLIs", async () => {
-    expect(RULE_IDS.length).toBe(8);
+    expect(RULE_IDS.length).toBe(6);
     for (const id of RULE_IDS) {
       const { mcp, oc } = await bothFootprints(["bootstrap", "enable", id]);
       expect(mcp.persistCalls).toEqual([[id, true]]);
@@ -229,7 +229,7 @@ describe("bootstrap subcommand — cross-CLI parity (T19, BST-11/BST-12)", () =>
   });
 
   test("both CLIs hand the delivery engine the same options for the same argv", async () => {
-    const { mcp, oc } = await bothFootprints(["bootstrap", "enable", "caveman"]);
+    const { mcp, oc } = await bothFootprints(["bootstrap", "enable", "dedupe-guardrails"]);
     expect(mcp.applyCalls.length).toBe(1);
     expect(oc.applyCalls.length).toBe(1);
 
@@ -244,7 +244,7 @@ describe("bootstrap subcommand — cross-CLI parity (T19, BST-11/BST-12)", () =>
   });
 
   test("--dry-run persists nothing in BOTH CLIs, and still plans the same delivery", async () => {
-    const { mcp, oc } = await bothFootprints(["bootstrap", "enable", "caveman", "--dry-run"]);
+    const { mcp, oc } = await bothFootprints(["bootstrap", "enable", "dedupe-guardrails", "--dry-run"]);
     // The inverse direction of the persistence assertion: a CLI that dropped
     // the dry-run guard writes `config.json` here while its exit code and
     // report stay identical to the compliant one.
@@ -267,9 +267,24 @@ describe("bootstrap subcommand — cross-CLI parity (T19, BST-11/BST-12)", () =>
     expect(oc.err).toBe(mcp.err);
   });
 
+  for (const retired of ["caveman", "plan-challenge"]) {
+    test(`retired "${retired}" reaches neither writer and is named as retired, in either CLI`, async () => {
+      for (const verb of ["enable", "disable"]) {
+        const { mcp, oc } = await bothFootprints(["bootstrap", verb, retired]);
+        for (const f of [mcp, oc]) {
+          expect(f.code).not.toBe(0);
+          expect(f.persistCalls).toEqual([]);
+          expect(f.applyCalls).toEqual([]);
+          expect(f.err).toContain(`bootstrap rule "${retired}" was retired`);
+        }
+        expect(oc.err).toBe(mcp.err);
+      }
+    });
+  }
+
   test("a redirected --target without --yes reaches neither writer, in either CLI", async () => {
     const { mcp, oc } = await bothFootprints([
-      "bootstrap", "disable", "caveman", "--target", "/tmp/massa-ai-parity-scratch-home",
+      "bootstrap", "disable", "dedupe-guardrails", "--target", "/tmp/massa-ai-parity-scratch-home",
     ]);
     for (const f of [mcp, oc]) {
       expect(f.code).toBe(1);
@@ -282,10 +297,10 @@ describe("bootstrap subcommand — cross-CLI parity (T19, BST-11/BST-12)", () =>
 
   test("a redirected --target with --yes scopes delivery identically in both CLIs", async () => {
     const { mcp, oc } = await bothFootprints([
-      "bootstrap", "disable", "caveman", "--target", "/tmp/massa-ai-parity-scratch-home", "--yes",
+      "bootstrap", "disable", "dedupe-guardrails", "--target", "/tmp/massa-ai-parity-scratch-home", "--yes",
     ]);
     for (const f of [mcp, oc]) {
-      expect(f.persistCalls).toEqual([["caveman", false]]);
+      expect(f.persistCalls).toEqual([["dedupe-guardrails", false]]);
       expect((f.applyCalls[0]![0] as Record<string, unknown>).targetHome).toBe(
         "/tmp/massa-ai-parity-scratch-home",
       );

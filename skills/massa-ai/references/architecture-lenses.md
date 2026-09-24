@@ -47,27 +47,7 @@ Do not flag strong local coupling as bad when the modules change together and lo
 
 ## Deepening Lens
 
-Use these terms exactly:
-
-- Module: anything with an interface and implementation.
-- Interface: everything a caller must know, including invariants, ordering, errors, config, and performance.
-- Seam: where an interface lives.
-- Adapter: concrete thing satisfying an interface at a seam.
-- Depth: leverage at the interface.
-- Leverage: capability callers get per unit of interface learned.
-- Locality: change, bugs, and verification concentrated in one place.
-
-Load `references/architecture-deepening-lens.md` when the audit target includes shallow modules, pass-through abstractions, seams, adapters, tests that reach past interfaces, or AI-navigability concerns.
-
-Check:
-
-- shallow modules whose interface is nearly as complex as implementation
-- pass-through wrappers
-- seams with only one adapter and no actual variation
-- test-only extraction that loses locality
-- concepts split across many files without leverage
-
-Deletion test: full detail in `references/architecture-deepening-lens.md`.
+Load `references/architecture-deepening-lens.md` when the audit target includes shallow modules, pass-through abstractions, seams, adapters, tests that reach past interfaces, or AI-navigability concerns. That reference owns the vocabulary (Module, Interface, Seam, Adapter, Depth, Leverage, Locality), the Deepening Signals checklist, and the Deletion Test.
 
 Only recommend a new seam when variation, dependency direction, external I/O, or test substitution is real.
 

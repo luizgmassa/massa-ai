@@ -164,14 +164,12 @@ resolves to a current agent.
 | `coupling-auditor` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: coupling` |
 | `deepening-architect` | `code-reviewer` | folded in; `mode: audit`, `lens: architecture`, `sub-mode: deepening` |
 
-The charter names retired by the roster consolidation map to current agents in the
-single old→new table of `skills/AGENTS.md`; this file does not repeat it. Workflows
-dispatch the current `<role>` name through a named dispatch block — the legacy column
-is traceability only, never a dispatch target.
+Workflows dispatch the current `<role>` name through a named dispatch block — the
+legacy column is traceability only, never a dispatch target.
 
 ## Capability Packet
 
-**This section is the sole canonical Capability Packet definition.** `references/subagent-design.md` mirrors this list and the root `skills/AGENTS.md` registry points here without restating it. Bespoke packets (judge panel, `product-manager` FURPS dispatch, phase-batch worker) are declared specializations that map onto these fields in their own workflow files.
+**This section is the sole canonical Capability Packet definition.** `references/subagent-design.md` and the root `skills/AGENTS.md` registry point here without restating it. Bespoke packets (judge panel, `product-manager` FURPS dispatch, phase-batch worker) are declared specializations that map onto these fields in their own workflow files.
 
 **A subagent inherits nothing from the parent session** — no skills, no loaded references, no conversation history. Everything the subagent needs is named explicitly in the packet, including the exact reference file paths it must read itself.
 
@@ -282,8 +280,8 @@ Do not expose raw subagent prompts, raw logs, private reasoning, or full output 
 Example:
 
 ```md
-🤖 [Agent Started] Verifier is checking the docs-only change set. Scope: massa-ai references and README.
-🤖 [Agent Done] Verifier found no stale references. Skipped checks: none.
+🤖 [Agent Started] Code Reviewer (verify mode), model `<model>`, effort `<effort>`. Scope: massa-ai references and README.
+🤖 [Agent Done] Code Reviewer found no stale references. Skipped checks: none.
 ```
 
 ### Model/Effort Announcement
@@ -354,9 +352,8 @@ For `depth: full`, or after lite escalation, the main agent selects the The Fool
 - confidence impact
 - exact next step
 
-The main agent owns final synthesis and applies the canonical Plan Challenge
-Policy: the `<!-- massa-ai:bootstrap -->` block installed as `<host>/AGENTS.md`,
-whose single source is `skills/AGENTS.md` in the product repo.
+The main agent owns final synthesis and applies the fixed Plan Challenge Gate
+in `SKILL.md` §Plan Challenge Gate.
 
 ## Memory Rules
 

@@ -368,7 +368,7 @@ Earlier versions copied a plugin-local `.mcp.json` / `mcp.json` into `~/.codex/p
 
 **What:** massa-ai defines 7 reusable sub-agent specialists in `skills/agents/*/SKILL.md` (charter files). These ship as host-native subagent definitions across all four plugins so the massa-ai workflow router's delegation model works inside Claude Code, Codex, Cursor, and OpenCode.
 
-**The 7 specialists:** senior-engineer, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer. A charter that owns several output contracts selects one per dispatch through the capability packet's `mode` field (for example `code-reviewer` in `verify` or `audit` mode, the latter with a `lens` including `diff` for diff review); the modes per agent and the retired-agent → current-agent mapping live in `skills/AGENTS.md`.
+**The 7 specialists:** senior-engineer, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer. A charter that owns several output contracts selects one per dispatch through the capability packet's `mode` field (for example `code-reviewer` in `verify` or `audit` mode, the latter with a `lens` including `diff` for diff review); the modes per agent live in `skills/AGENTS.md`.
 
 Workflows dispatch these agents by their bare charter name (for example `code-explorer`) — no `massa-ai-` prefix on any host. On the Claude plugin route the host namespaces them as `massa-ai:<name>`, which is the name to dispatch there. Installers identify massa-ai's agent files by the `massa-ai-owned` content marker, never by name: a same-named agent the user owns is skipped with a warning and never overwritten or deleted, and the pre-consolidation `massa-ai-<name>` files are pruned on upgrade.
 
@@ -1317,7 +1317,7 @@ massa-ai-config use lmstudio --model text-embedding-qwen3-embedding-0.6b
 massa-ai-config set embedding.dimensions 1024
 massa-ai-config recover my-project --path /home/user/renamed-dir
 massa-ai-config profile set work --dry-run
-massa-ai-config bootstrap disable caveman
+massa-ai-config bootstrap enable code-comments
 ```
 
 Both `profile set` and `bootstrap enable|disable` require a host session restart
@@ -1333,9 +1333,9 @@ The repo ships repo-local skills plus a unified bash installer that copies them 
 
 `skills/AGENTS.md` contains two sections:
 
-1. **Bootstrap contract** (top, between `<!-- massa-ai:bootstrap:start -->` and `<!-- massa-ai:bootstrap:end -->` markers): the coding session startup contract that activates the skill stack. Eight individually-toggleable rules — `caveman`, `massa-ai-router`, `dedupe-guardrails`, `plan-challenge`, `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`.
+1. **Bootstrap contract** (top, between `<!-- massa-ai:bootstrap:start -->` and `<!-- massa-ai:bootstrap:end -->` markers): the coding session startup contract that activates the skill stack. Six individually-toggleable rules — `massa-ai-router`, `dedupe-guardrails`, `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`. The Plan Challenge gate is not a rule: it is fixed router behavior in `skills/massa-ai/SKILL.md` §Plan Challenge Gate.
 
-2. **Sub-agent registry** (bottom): the 7 reusable sub-agent specialist registry (senior-engineer, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer) plus the single retired-agent → current-agent mapping table, with capability packet and output contract definitions.
+2. **Sub-agent registry** (bottom): the 7 reusable sub-agent specialist registry (senior-engineer, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer), pointing to the capability packet and output contract definitions in `agent-orchestration.md`.
 
 **The contract body is delivered as a file, not inlined into `AGENTS.md`.** It is rendered to a first-class per-host `MASSA-AI.md` at that host's config root, and each host is then wired to load it through its own real mechanism:
 
@@ -1352,8 +1352,8 @@ The sub-agent registry is not written — it is consumed by workflows that dispa
 
 | Skill | Location | Description |
 |-------|----------|-------------|
-| `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 36 workflow files under `workflows/` and 43 top-level references under `references/` (evidence gate, context firewall, verification ladder, agent orchestration, etc.), plus 47 more in per-workflow reference subdirectories (`furps/`, `spec-driven/`, `create-tdd/`, `the-fool/`, `create-ticket/`, `create-rfc/`, `skill-architect/`, `mobile-figma-matcher/`) — 90 reference files in all. Counted 2026-09-23. |
-| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the eight startup-contract rules delivered by `MASSA-AI.md`. Drives `massa-ai-config bootstrap`, never a hand-edited file. |
+| `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 36 workflow files under `workflows/` and 42 top-level references under `references/` (evidence gate, context firewall, verification ladder, agent orchestration, etc.), plus 45 more in per-workflow reference subdirectories (`furps/`, `spec-driven/`, `create-tdd/`, `the-fool/`, `create-ticket/`, `create-rfc/`, `skill-architect/`, `mobile-figma-matcher/`) — 87 reference files in all. Counted 2026-09-24. |
+| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the six startup-contract rules delivered by `MASSA-AI.md`. Drives `massa-ai-config bootstrap`, never a hand-edited file. |
 | `agents/<n>` | `skills/agents/` | The 7 sub-agent specialist charters, emitted per host by `generate-subagent-artifacts.ts`. |
 
 All three roots are bundled per host by `scripts/generate-skill-artifacts.ts` into `apps/<host>-plugin/skills/`, as gitignored build output (AD-016).

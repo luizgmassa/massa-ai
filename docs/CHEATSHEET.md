@@ -171,7 +171,7 @@ massa-ai-config use lmstudio --model text-embedding-qwen3-embedding-0.6b
 massa-ai-config set embedding.dimensions 1024
 massa-ai-config recover my-project --path /home/user/renamed-dir
 massa-ai-config profile set work --dry-run
-massa-ai-config bootstrap disable caveman
+massa-ai-config bootstrap enable code-comments
 ```
 
 Precedence: env > `~/.config/massa-ai/config.json` > literal defaults. Secrets,
@@ -223,11 +223,11 @@ Toggle blocks of the startup contract rendered into each host's `MASSA-AI.md`:
 
 ```bash
 massa-ai-config bootstrap list
-massa-ai-config bootstrap disable caveman --dry-run
+massa-ai-config bootstrap enable code-comments --dry-run
 ```
 
-Rule ids: `caveman`, `massa-ai-router`, `dedupe-guardrails`, `plan-challenge`,
-`conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`.
+Rule ids: `massa-ai-router`, `dedupe-guardrails`, `conversation-feedback`,
+`indexing-hygiene`, `english-code`, `code-comments`.
 
 The contract body lives in a per-host `MASSA-AI.md` at that host's config root
 (`~/.claude/MASSA-AI.md`, `$CODEX_HOME/MASSA-AI.md`, `~/.cursor/MASSA-AI.md`,
@@ -308,10 +308,11 @@ Repo-local skills live in `skills/`; generated per-host bundles land in
 | Skill | Purpose |
 |---|---|
 | `massa-ai` | Default memory-backed workflow router — load once per coding session |
-| `bootstrap` | Inspect or toggle the eight startup-contract rules |
+| `bootstrap` | Inspect or toggle the six startup-contract rules |
 | `agents/<name>` | The 7 sub-agent charters |
 
-Registry and policies (Plan Challenge, Conversation Feedback):
+Registry and Conversation Feedback policy (the Plan Challenge gate lives in
+`skills/massa-ai/SKILL.md` §Plan Challenge Gate):
 `skills/AGENTS.md`.
 
 Regenerate bundles after touching anything under `skills/`:
@@ -388,7 +389,7 @@ per dispatch through the capability packet's `mode` field.
 | `product-manager` | Hold requirements to a clear, complete, consistent standard | `furps`, `audit` | read-only |
 | `test-engineer` | Audit and fix tests | `audit`, `fix` | read-only (test-write when scoped) |
 
-Retired agents and where their work went: the mapping table in `skills/AGENTS.md`.
+Retired agents and where their work went: [`docs/removed-features.md`](removed-features.md).
 
 Tool gating differs per host — only Claude needed a fix. Read-only Claude charters get
 `disallowedTools: Write, Edit, NotebookEdit` (a denylist that keeps MCP tools reachable);

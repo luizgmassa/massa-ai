@@ -3,7 +3,7 @@
  *
  * `skills/AGENTS.md` is the single source `renderBootstrap` reads. This suite
  * guards its raw markup, independent of the renderer that does not exist yet:
- * exactly the 8 registry rule ids, each wrapped in a well-formed
+ * exactly the 6 registry rule ids, each wrapped in a well-formed
  * `<!-- massa-ai:rule:<id>:start|end -->` pair nested inside the existing
  * `<!-- massa-ai:bootstrap:start|end -->` pair, in registry render order; the
  * `code-comments` rule additionally carries a nested
@@ -45,12 +45,10 @@ const NAMING_STANDARDS_MD = path.join(
   "naming-standards.md",
 );
 
-/** The 8 registry rule ids, in fixed render order (design.md § Rule registry). */
+/** The 6 registry rule ids, in fixed render order (design.md § Rule registry). */
 const RULE_IDS = [
-  "caveman",
   "massa-ai-router",
   "dedupe-guardrails",
-  "plan-challenge",
   "conversation-feedback",
   "indexing-hygiene",
   "english-code",
@@ -89,7 +87,7 @@ function collectRuleMarkers(content: string): Map<string, MarkerInfo> {
 }
 
 describe("bootstrap source contract: skills/AGENTS.md rule markers", () => {
-  test("declares exactly the 8 registry rule ids, each with a well-formed marker pair", async () => {
+  test("declares exactly the 6 registry rule ids, each with a well-formed marker pair", async () => {
     const content = await read(AGENTS_MD);
     const markers = collectRuleMarkers(content);
 
@@ -204,7 +202,7 @@ function stripAllRuleSpans(content: string): string {
 
 describe("bootstrap source contract: no rule leaks outside every span", () => {
   // Scope note: this checks the always-rendered residue — content outside
-  // EVERY rule span — for the 8 registry ids and the 3 literal
+  // EVERY rule span — for the 6 registry ids and the 3 literal
   // activation-stack names. It deliberately does not flag a rule's name
   // appearing inside a *different* rule's own span (e.g. dedupe-guardrails
   // or conversation-feedback prose mentioning `massa-ai` while describing

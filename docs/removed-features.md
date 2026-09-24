@@ -86,8 +86,9 @@ technique, not this feature, and stay.
 
 The `massa-ai-` agent-name prefix went with them: agents ship unprefixed, and ownership
 moved to the `massa-ai-owned` content marker. Installers prune the legacy
-`massa-ai-<name>` files for the 18 pre-consolidation names on upgrade. The mapping table
-in `skills/AGENTS.md` is the single current-tense record of this change.
+`massa-ai-<name>` files for the 18 pre-consolidation names on upgrade. The old→new
+mapping table that recorded this change was removed from `skills/AGENTS.md` in
+agents-md-bootstrap-trim; `CHANGELOG.md` and git history keep it.
 
 ### Removed workflows
 
@@ -124,8 +125,8 @@ and read as a build-tool rather than an implementation specialist.
 `skills/agents/builder/` moved to `skills/agents/senior-engineer/` with the same one
 output contract, the same disjoint-write-set implementation role, and the same charter
 identity — no behavior changed. Every dispatch block, registry row, model-profile
-override key, and generator constant now names `senior-engineer`. The mapping table in
-`skills/AGENTS.md` records `builder → senior-engineer`. A user's model-profile overlay
+override key, and generator constant now names `senior-engineer` (`builder →
+senior-engineer`). A user's model-profile overlay
 still keyed under the pre-rename `builder` name keeps applying: the overlay merge maps it
 onto `senior-engineer` unless the overlay already sets `senior-engineer` directly.
 
@@ -159,3 +160,17 @@ packet as `mode_contract`. A packet missing `mode_contract` for a lazy mode retu
 `Blocked`. The inline rule and the lazy-charter list are stated once, in the router
 Core Contract (`skills/massa-ai/SKILL.md`) and `references/agent-orchestration.md`;
 individual dispatch blocks do not restate it.
+
+## AGENTS.md bootstrap trim — caveman, plan-challenge, registry sections
+
+**Rationale**: The startup contract carried a compression rule the owner no longer wanted,
+and a Plan Challenge policy whose settings duplicated — and disagreed with — the gate the
+router and each workflow already run. The sub-agent registry carried a retired-agent map
+and two explanatory sections nothing loaded.
+
+| Removed | Replacement |
+|---|---|
+| `caveman` bootstrap rule (8 → 6 rules) | None; a persisted `bootstrap.rules.caveman` is silently ignored and toggling it fails as retired |
+| `plan-challenge` bootstrap rule and its `plan_challenge:` policy block | Fixed gate in `skills/massa-ai/SKILL.md` §Plan Challenge Gate; a persisted `plan-challenge: false` no longer disables it |
+| "Mapping — Retired Agents → Current Agents" in `skills/AGENTS.md` | The "Removed sub-agents" table above, `CHANGELOG.md`, and git history |
+| "How to Add an Agent" and "massa-ai Concepts" in `skills/AGENTS.md` | None; each charter documents its own concepts, and the parity/integrity tests name what a new agent must touch |

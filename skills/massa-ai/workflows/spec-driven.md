@@ -156,7 +156,7 @@ Quick artifacts live under `.specs/quick/NNN-slug/` with a `TASK.md` (one-line i
    - Distill lesson signals through `references/lessons.md` when validation produces grounded reusable failures.
 7. Before the delivery chain's Propose stage (PR creation), write and commit `.specs/project/STATE.md`, `.specs/HANDOFF.md`, and `.specs/project/FEATURES.json` on the branch — not merely "after meaningful progress" during Execute, but committed before `gh pr create`. **Deterministic backing (run it, do not eyeball it):** `bun skills/massa-ai/scripts/check_specs_delivered.ts <feature> [--root .]` — a non-zero exit blocks Propose (see `references/implementation-delivery.md` stage 3.5 and GATE-02). If no code-execution tool is available, run the same checks by reading the artifact (graceful degradation preserved). Record decisions, blockers, handoff, and completion evidence per `references/spec-driven/memory.md`'s write triggers.
 8. When the user splits planning and implementation across clean chats, resume from the canonical `.specs/` artifacts — `.specs/project/STATE.md`, `.specs/project/FEATURES.json`, `.specs/HANDOFF.md`, and the feature's phase files. This workflow owns the spec phase contracts on both sides of the split; there is no separate save/load procedure.
-9. Complete the configured Plan Challenge Gate for non-trivial plans and complete `references/evidence-gate.md` before claiming completion.
+9. Complete the Plan Challenge Gate for non-trivial plans and complete `references/evidence-gate.md` before claiming completion.
 
 ## Artifact Ownership
 
@@ -210,8 +210,8 @@ Memory:
 | Record decision, project-level decision | `references/spec-driven/memory.md` |
 | Pause work, end session, I need to stop | `references/spec-driven/memory.md` |
 | Resume work, continue, pick up where we left off | `references/spec-driven/memory.md` |
-| Load lessons, what have we learned, apply past lessons | `references/spec-driven/lessons.md` |
-| Record lesson, distill lessons (auto-runs after validation) | `references/spec-driven/lessons.md` |
+| Load lessons, what have we learned, apply past lessons | `references/lessons.md` |
+| Record lesson, distill lessons (auto-runs after validation) | `references/lessons.md` |
 
 ## Output Behavior
 

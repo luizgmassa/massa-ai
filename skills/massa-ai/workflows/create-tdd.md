@@ -48,7 +48,7 @@ Load `references/project-context.md` (intake sweep) before the first substantive
 6. Choose the artifact path from an explicit user path or an existing project convention. Otherwise default to `docs/design/<entity>.md`.
    - If the target exists, treat the request as an update only when the user explicitly requested one; otherwise ask before overwriting it.
    - When file mutation is unavailable or the user requested plan-only output, present the complete draft and intended path without writing.
-7. Run the configured Plan Challenge Gate. TDD plans require the full gate under the default policy; revise valid critical or high findings before finalization.
+7. Run the Plan Challenge Gate. TDD plans require the full gate; revise valid critical or high findings before finalization.
 8. Load `references/create-tdd/quality-and-lifecycle.md`, validate the document, and resolve blocking gaps. Keep non-blocking unknowns explicit with owners or decision points when known.
 9. If the implementation task table is stable and validated, discover whether Atlassian MCP has readable Jira project metadata and issue-creation capability.
    - If Atlassian MCP is unavailable or read-only, leave the table's `Jira Key` values as `Unavailable` and report that ticket creation was skipped.

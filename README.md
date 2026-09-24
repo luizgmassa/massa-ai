@@ -341,7 +341,7 @@ The repo ships a set of repo-local skills plus a unified installer that copies t
 | Skill | Location | Purpose |
 |-------|----------|---------|
 | `massa-ai` | `skills/massa-ai/` | Workflow router (36 workflows: spec-driven, debug, feature, refactor, audits, ADR/RFC/TDD, etc.) |
-| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the eight startup-contract rules delivered by `MASSA-AI.md` |
+| `bootstrap` | `skills/bootstrap/` | Inspect or toggle the six startup-contract rules delivered by `MASSA-AI.md` |
 | `agents/<n>` | `skills/agents/` | The 7 sub-agent specialist charters |
 
 ### Unified skills installer
@@ -376,9 +376,8 @@ load it through its own real mechanism:
 | Cursor | `~/.cursor/skills/<name>` | `~/.cursor/MASSA-AI.md` | pointer block in `AGENTS.md` |
 | OpenCode | `~/.config/opencode/skills/<name>` | `~/.config/opencode/MASSA-AI.md` | absolute path in the config's `instructions` array |
 
-Eight contract rules ship (`caveman`, `massa-ai-router`, `dedupe-guardrails`,
-`plan-challenge`, `conversation-feedback`, `indexing-hygiene`, `english-code`,
-`code-comments`), each individually
+Six contract rules ship (`massa-ai-router`, `dedupe-guardrails`,
+`conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`), each individually
 toggleable at runtime — `massa-ai-config bootstrap list|enable|disable`.
 
 **State:** `~/.config/massa-ai/install-state.json` (v2 format; v1 auto-migrates).
@@ -1016,8 +1015,8 @@ massa-ai-config set embedding.dimensions 1024
 massa-ai-config recover my-project --path /new/path   # re-associate a moved index
 massa-ai-config profile list                      # shipped profiles + per-host active one
 massa-ai-config profile set work --dry-run
-massa-ai-config bootstrap list                    # the eight startup-contract rules
-massa-ai-config bootstrap disable caveman
+massa-ai-config bootstrap list                    # the six startup-contract rules
+massa-ai-config bootstrap enable code-comments
 ```
 
 The two bins differ slightly: `recover` ships only on the `mcp-client` bin, and

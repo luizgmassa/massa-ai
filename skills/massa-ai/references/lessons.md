@@ -34,8 +34,8 @@ bun skills/massa-ai/scripts/lessons.ts --root . add \
 
 `--project`/`--session`/`--workflow`/`--entity` carry the active massa-ai
 context onto the lesson so the file store and massa-ai memory stay in the same
-recall namespace. They are optional for manual runs but supplied by the
-continuous-learning hook loop.
+recall namespace. They are optional for manual runs; pass them whenever the
+active context is known.
 
 Do not record one-off tool failures, transient environment issues, methodology opinions, or chat summaries as lessons.
 
@@ -122,20 +122,12 @@ oldest-first followed by `trend: improving|stable|degrading`, or
 
 If `lessons.ts` is unavailable or cannot run, record `Lessons: skipped - script unavailable` in the validation report or evidence gate, keep the raw signal in the report, and do not hand-edit `lessons.json`. A future run with the script can import the validated signal.
 
-## Continuous-Learning Loop (hook-fed)
+## Observation Buffer
 
-The lessons layer is a closed loop, not manual-only. Two runtime hooks
-(`apps/claude-plugin/hooks/`, installed for Claude Code by the plugin installer) feed it:
-
-1. **observe** — `observe_runner.py` (PostToolUse) captures raw tool-use
-   observations into the gitignored `.specs/observations.json` buffer. Grounding
-   is NOT assigned here.
-2. **evaluate** — `continuous_learning_evaluate.py` (Stop) reads the active
-   massa-ai context from `.specs/project/STATE.md` and the observations
-   buffer. For each observation that already carries grounded fields
-   (`signal`, `text`, `source`, `feature`), it calls `lessons.ts add` with the
-   `--project`/`--session`/`--workflow`/`--entity` context. Ungrounded
-   observations are left in the buffer for agent input and logged as skipped.
+`lessons.ts observe` appends one raw JSON observation to the gitignored
+`.specs/observations.json` buffer. No host hook feeds or drains it today: the
+former hook-fed observe/evaluate loop was removed, so a lesson exists only once
+the agent records it with `lessons.ts add` from a grounded verification signal.
 
 ### massa-ai Dual-Write
 
@@ -149,9 +141,10 @@ and durable memory stay consistent:
   `memory:procedural`. This puts lessons in the same recall namespace as
   massa-ai decisions/patterns, so future `recall` surfaces them at
   Specify/Design.
-- massa-ai MCP is agent-side only; the hook/CLI subprocess writes via REST
-  (`MASSA_AI_API_URL`). When REST is unavailable, the lesson still lands in
-  `lessons.json` and the skipped memory write is logged (graceful degradation).
+- massa-ai MCP is agent-side only; the CLI subprocess writes via REST
+  (`MASSA_AI_API_URL`, 1.5 s timeout). When REST is unset or unavailable, the
+  lesson still lands in `lessons.json` and the memory write is dropped silently —
+  nothing is logged and the exit code is unchanged (graceful degradation).
 
 ### Round-Trip
 
@@ -166,5 +159,5 @@ best-effort. An ungrounded lesson is refused by both `add` and the massa-ai writ
 ### Self-Check
 
 After verification: if a reusable signal was found but no lesson was recorded,
-state the skipped reason. Nothing else records it — the hook loop keeps no skip
-log on disk, so your stated reason is the only record.
+state the skipped reason. Nothing else records it — no skip log exists on disk,
+so your stated reason is the only record.

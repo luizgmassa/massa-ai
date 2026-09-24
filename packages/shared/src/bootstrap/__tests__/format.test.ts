@@ -30,7 +30,7 @@ function row(host: Host, status: BootstrapRenderResult["status"], reason?: strin
 }
 
 describe("formatBootstrapInventory — BST-11 AC-3", () => {
-  test("names every one of the eight rule ids", () => {
+  test("names every one of the six rule ids", () => {
     const lines = formatBootstrapInventory(state()).split("\n");
     for (const id of BOOTSTRAP_RULE_IDS) {
       expect(lines.some((line) => line.startsWith(`  ${id}: `))).toBe(true);
@@ -50,10 +50,10 @@ describe("formatBootstrapInventory — BST-11 AC-3", () => {
   });
 
   test("a rule whose default is enabled and whose state is off reads disabled with default: enabled", () => {
-    const lines = formatBootstrapInventory(state({ "plan-challenge": false })).split("\n");
-    const line = lines.find((l) => l.startsWith("  plan-challenge: "));
+    const lines = formatBootstrapInventory(state({ "conversation-feedback": false })).split("\n");
+    const line = lines.find((l) => l.startsWith("  conversation-feedback: "));
     expect(line).toBe(
-      "  plan-challenge: disabled (default: enabled) — Run The Fool as a post-plan challenge gate per the configured policy.",
+      "  conversation-feedback: disabled (default: enabled) — Emit chat-visible status updates for massa-ai workflow progress.",
     );
   });
 

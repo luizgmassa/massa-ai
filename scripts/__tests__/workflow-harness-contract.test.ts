@@ -712,8 +712,9 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
 //
 // .specs/features/designer-agent/ — ADRG-01, ADRG-02.
 //
-// `skills/AGENTS.md` names the workflows that take the full Plan Challenge
-// Gate. `workflows/create-adr.md` was named there and carried no gate step at all,
+// `SKILL.md` §Plan Challenge Gate names the workflows that take the lite or
+// full Plan Challenge Gate (until agents-md-bootstrap-trim the full list lived
+// in the `skills/AGENTS.md` policy). `workflows/create-adr.md` was named there and carried no gate step at all,
 // and `workflows/refactor.md` carried none either — the policy reached both
 // only if the orchestrator recalled the bootstrap list unaided. Every other
 // workflow-side contract in this repo is inline in its own file for exactly
@@ -721,35 +722,42 @@ describe("hook-chain ordering (guarded — activates when Phase 2 hook markers l
 // workflow carries the prefixed name inline so dispatch never depends on this
 // file being loaded").
 //
-// The list is PARSED from the policy sentence, never hardcoded here. A
+// The list is PARSED from the gate section, never hardcoded here. A
 // hardcoded copy would need the same edit the workflow needs, by the same
 // person, in the same commit — so it could not catch the next omission. The
-// policy line is the population.
+// gate section is the population.
 
-describe("plan challenge: every full-gate workflow carries the gate step", () => {
-  const REGISTRY = path.join(REPO_ROOT, "skills", "AGENTS.md");
-  const MARKER = "Load full `workflows/the-fool.md` when the workflow is";
+describe("plan challenge: every gated workflow carries the gate step", () => {
+  const ROUTER = path.join(REPO_ROOT, "skills", "massa-ai", "SKILL.md");
 
   /**
-   * Backtick-quoted workflow names from the policy sentence, up to its first
-   * `;` (after which the sentence lists risk domains, not workflows).
-   * Newline-tolerant: the sentence wraps across lines in the source.
+   * Backtick-quoted workflow names from the Lite and Full bullets of
+   * SKILL.md §Plan Challenge Gate — each bullet's first parenthetical, which
+   * lists workflows before any risk trigger. Newline-tolerant: the Full
+   * parenthetical wraps across lines in the source.
    */
   async function fullGateWorkflows(): Promise<string[]> {
-    const body = await fs.readFile(REGISTRY, "utf8");
-    const start = body.indexOf(MARKER);
-    expect(start, `policy sentence not found in skills/AGENTS.md — marker: ${MARKER}`).toBeGreaterThan(-1);
-    const rest = body.slice(start + MARKER.length);
-    const clause = rest.slice(0, rest.indexOf(";")).replace(/\s+/g, " ");
-    return [...clause.matchAll(/`([a-z-]+)`/g)].map((m) => m[1]!);
+    const body = await fs.readFile(ROUTER, "utf8");
+    const start = body.indexOf("## Plan Challenge Gate");
+    expect(start, "SKILL.md has no §Plan Challenge Gate").toBeGreaterThan(-1);
+    const section = body.slice(start, body.indexOf("\n## ", start + 1));
+    const names: string[] = [];
+    for (const bullet of ["- **Lite** (", "- **Full** ("]) {
+      const at = section.indexOf(bullet);
+      expect(at, `SKILL.md §Plan Challenge Gate lost its ${bullet} bullet`).toBeGreaterThan(-1);
+      const rest = section.slice(at + bullet.length);
+      const clause = rest.slice(0, rest.indexOf(")")).replace(/\s+/g, " ");
+      names.push(...[...clause.matchAll(/`([a-z-]+)`/g)].map((m) => m[1]!));
+    }
+    return names;
   }
 
   test("the parsed population is real, not a vacuous empty list", async () => {
-    // Guard the guard. A reworded policy sentence that yields [] or a partial
+    // Guard the guard. A reworded gate section that yields [] or a partial
     // parse would make every assertion below pass by matching nothing.
     const names = await fullGateWorkflows();
-    expect(names.length).toBeGreaterThanOrEqual(6);
-    expect(names).toContain("refactor");
+    expect(names.length).toBeGreaterThanOrEqual(7);
+    for (const name of ["feature", "refactor", "spec-driven", "design"]) expect(names).toContain(name);
     // agent-roster-consolidation WFL-03 (Inventory AC-5): the renamed stems.
     for (const stem of ["create-adr", "create-rfc", "create-tdd"]) expect(names).toContain(stem);
     for (const old of ["adr", "rfc", "tdd"]) expect(names).not.toContain(old);
@@ -943,6 +951,33 @@ describe("nesting prohibition retirement: references carry no spawn prohibition"
 // here would let the test and the doc rot together while both stayed green,
 // which is exactly what Approach A's mitigation exists to prevent, so this
 // group imports and calls the real function rather than re-deriving paths.
+
+// agents-md-bootstrap-trim AC4: the always-in-context Conversation Feedback
+// Policy must require model/effort on `Agent Started`, show it in its worked
+// example, and cite the canonical definition instead of restating it (S8).
+describe("conversation feedback policy announces model and effort (AC4)", () => {
+  async function feedbackSpan(): Promise<string> {
+    const body = await fs.readFile(path.join(REPO_ROOT, "skills", "AGENTS.md"), "utf8");
+    const start = body.indexOf("<!-- massa-ai:rule:conversation-feedback:start -->");
+    const end = body.indexOf("<!-- massa-ai:rule:conversation-feedback:end -->");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    return body.slice(start, end);
+  }
+
+  test("the worked example has an Agent Started line naming a model and an effort", async () => {
+    const lines = (await feedbackSpan()).split("\n").filter((l) => l.includes("[Agent Started]"));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) expect(line).toMatch(/\bmodel \S+.*\beffort \S+/);
+  });
+
+  test("a rule requires model and effort and cites the canonical Model/Effort Announcement", async () => {
+    const span = (await feedbackSpan()).replace(/\s+/g, " ");
+    expect(span).toContain("Every `Agent Started` line names the agent, its model, and its effort");
+    expect(span).toContain("§Model/Effort Announcement");
+    for (const marker of ["effort: inherit", "model: inherit"]) expect(span).not.toContain(marker);
+  });
+});
 
 describe("dispatch announcement contract: single canonical shape (S8)", () => {
   /**

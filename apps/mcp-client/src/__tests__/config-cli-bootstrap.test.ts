@@ -28,7 +28,7 @@ const resolveBootstrapState = mock((..._args: unknown[]): unknown => ({
   ignoredStateKeys: [],
 }));
 const setBootstrapRuleEnabled = mock((..._args: unknown[]): unknown => ({
-  id: "caveman",
+  id: "dedupe-guardrails",
   enabled: false,
   changed: true,
   state: {},
@@ -92,7 +92,7 @@ beforeEach(() => {
 describe("bootstrap list / bootstrap show (BST-11 AC-2, AC-3)", () => {
   test("names every rule id, its current state, its default and a description", async () => {
     resolveBootstrapState.mockImplementationOnce(() => ({
-      state: fullState({ "plan-challenge": false, "code-comments": true }),
+      state: fullState({ "conversation-feedback": false, "code-comments": true }),
       ignoredStateKeys: [],
     }));
     const r = await captureConsole(() => runCli(["bootstrap", "list"]));
@@ -101,7 +101,7 @@ describe("bootstrap list / bootstrap show (BST-11 AC-2, AC-3)", () => {
     // A rule switched off against an on default, and one switched on against
     // the off default (BST-08 AC-2) — both columns are read, not just one.
     expect(r.out).toContain(
-      "  plan-challenge: disabled (default: enabled) — Run The Fool as a post-plan challenge gate per the configured policy.",
+      "  conversation-feedback: disabled (default: enabled) — Emit chat-visible status updates for massa-ai workflow progress.",
     );
     expect(r.out).toContain(
       "  code-comments: enabled (default: disabled) — Require API doc blocks and rationale comments on generated code, per code-annotation.md §1/§2.",
@@ -129,7 +129,7 @@ describe("bootstrap list / bootstrap show (BST-11 AC-2, AC-3)", () => {
 
 describe("unknown rule id (BST-09 AC-8)", () => {
   test.each(["enable", "disable"])(
-    "bootstrap %s <unknown> exits non-zero, names the id, lists the eight valid ids and changes no state",
+    "bootstrap %s <unknown> exits non-zero, names the id, lists the six valid ids and changes no state",
     async (verb) => {
       const r = await captureConsole(() => runCli(["bootstrap", verb, "not-a-rule"]));
       expect(r.code).not.toBe(0);
@@ -145,22 +145,27 @@ describe("unknown rule id (BST-09 AC-8)", () => {
     },
   );
 
-  test.each(["enable", "disable"])(
-    "bootstrap %s persona-router says the rule is retired and changes no state",
-    async (verb) => {
-      const r = await captureConsole(() => runCli(["bootstrap", verb, "persona-router"]));
+  test.each(
+    ["persona-router", "caveman", "plan-challenge"].flatMap((id) => [
+      ["enable", id],
+      ["disable", id],
+    ]),
+  )(
+    "bootstrap %s %s says the rule is retired and changes no state",
+    async (verb, id) => {
+      const r = await captureConsole(() => runCli(["bootstrap", verb, id]));
       expect(r.code).not.toBe(0);
-      expect(r.err).toContain('bootstrap rule "persona-router" was retired');
+      expect(r.err).toContain(`bootstrap rule "${id}" was retired`);
       expect(setBootstrapRuleEnabled.mock.calls.length).toBe(0);
       expect(applyBootstrapState.mock.calls.length).toBe(0);
     },
   );
 
-  test("the listed ids are exactly the eight in the registry", async () => {
+  test("the listed ids are exactly the six in the registry", async () => {
     const r = await captureConsole(() => runCli(["bootstrap", "enable", "nope"]));
     const listed = (r.err.split("valid ids: ")[1] ?? "").trim().split(", ");
     expect(listed).toEqual([...RULE_IDS]);
-    expect(listed.length).toBe(8);
+    expect(listed.length).toBe(6);
   });
 });
 
@@ -205,7 +210,7 @@ describe("bootstrap enable / disable (BST-09 AC-3, BST-11 AC-5)", () => {
       dryRun: false,
       ignoredStateKeys: [],
     }));
-    const r = await captureConsole(() => runCli(["bootstrap", "disable", "caveman"]));
+    const r = await captureConsole(() => runCli(["bootstrap", "disable", "dedupe-guardrails"]));
     expect(r.code).toBe(1);
     expect(r.out).toContain(
       "  codex: written-not-wired: nothing loads it — run scripts/install-skills.sh --apply",
@@ -219,7 +224,7 @@ describe("bootstrap enable / disable (BST-09 AC-3, BST-11 AC-5)", () => {
       dryRun: false,
       ignoredStateKeys: [],
     }));
-    const r = await captureConsole(() => runCli(["bootstrap", "enable", "caveman"]));
+    const r = await captureConsole(() => runCli(["bootstrap", "enable", "dedupe-guardrails"]));
     expect(r.code).toBe(0);
     expect(r.out).toContain("bootstrap: no host installed");
     expect(r.out).not.toContain("restart is required");
@@ -232,7 +237,7 @@ describe("bootstrap enable / disable (BST-09 AC-3, BST-11 AC-5)", () => {
       dryRun: false,
       ignoredStateKeys: ["rtk", "legacy-rule"],
     }));
-    const r = await captureConsole(() => runCli(["bootstrap", "enable", "caveman"]));
+    const r = await captureConsole(() => runCli(["bootstrap", "enable", "dedupe-guardrails"]));
     expect(r.out).toContain(
       "Ignored persisted rule state: rtk, legacy-rule — not a known rule id with a boolean value.",
     );
@@ -242,13 +247,13 @@ describe("bootstrap enable / disable (BST-09 AC-3, BST-11 AC-5)", () => {
     applyBootstrapState.mockImplementationOnce(() => {
       throw new Error("no bootstrap source given — pass `source` or `sourcePath`");
     });
-    const r = await captureConsole(() => runCli(["bootstrap", "enable", "caveman"]));
+    const r = await captureConsole(() => runCli(["bootstrap", "enable", "dedupe-guardrails"]));
     expect(r.code).toBe(1);
     expect(r.err).toContain("no bootstrap source given");
   });
 
   test("the engine is handed the marked-up source in the checkout", async () => {
-    await captureConsole(() => runCli(["bootstrap", "enable", "caveman"]));
+    await captureConsole(() => runCli(["bootstrap", "enable", "dedupe-guardrails"]));
     expect(String(lastApplyOptions()?.sourcePath)).toEndWith("/skills/AGENTS.md");
   });
 });
@@ -256,7 +261,7 @@ describe("bootstrap enable / disable (BST-09 AC-3, BST-11 AC-5)", () => {
 describe("--target and --dry-run", () => {
   test("--target with --yes scopes the render, leaving the real home untouched", async () => {
     const r = await captureConsole(() =>
-      runCli(["bootstrap", "disable", "caveman", "--target", "/tmp/massa-ai-scratch-home", "--yes"]),
+      runCli(["bootstrap", "disable", "dedupe-guardrails", "--target", "/tmp/massa-ai-scratch-home", "--yes"]),
     );
     expect(r.code).toBe(0);
     expect(lastApplyOptions()).toMatchObject({
@@ -267,7 +272,7 @@ describe("--target and --dry-run", () => {
 
   test("--target without --yes changes no state (consent gate, design.md:358-363)", async () => {
     const r = await captureConsole(() =>
-      runCli(["bootstrap", "disable", "caveman", "--target", "/tmp/massa-ai-scratch-home"]),
+      runCli(["bootstrap", "disable", "dedupe-guardrails", "--target", "/tmp/massa-ai-scratch-home"]),
     );
     expect(r.code).toBe(1);
     expect(r.err).toContain("--yes");
@@ -277,7 +282,7 @@ describe("--target and --dry-run", () => {
 
   test("--target names both state paths when the persisted file is not the rendered one", async () => {
     const r = await captureConsole(() =>
-      runCli(["bootstrap", "enable", "caveman", "--target", "/tmp/massa-ai-scratch-home", "--yes"]),
+      runCli(["bootstrap", "enable", "dedupe-guardrails", "--target", "/tmp/massa-ai-scratch-home", "--yes"]),
     );
     expect(r.err).toContain("/tmp/massa-ai-scratch-home/.config/massa-ai/config.json");
     expect(r.err).toContain(actualShared_getConfigPath());
@@ -290,7 +295,7 @@ describe("--target and --dry-run", () => {
       dryRun: true,
       ignoredStateKeys: [],
     }));
-    const r = await captureConsole(() => runCli(["bootstrap", "enable", "caveman", "--dry-run"]));
+    const r = await captureConsole(() => runCli(["bootstrap", "enable", "dedupe-guardrails", "--dry-run"]));
     expect(r.code).toBe(0);
     expect(setBootstrapRuleEnabled.mock.calls.length).toBe(0);
     expect(lastApplyOptions()).toMatchObject({ dryRun: true });
@@ -347,7 +352,7 @@ describe("dispatch, help and argument validation", () => {
     expect(r.out).toContain("bootstrap enable <rule-id>");
     expect(r.out).toContain("bootstrap disable <rule-id>");
     expect(r.out).toContain("--target");
-    expect(r.out).toContain("massa-ai-config bootstrap disable caveman");
+    expect(r.out).toContain("massa-ai-config bootstrap enable code-comments");
   });
 
   test("an unknown bootstrap subcommand exits 1 with the usage line", async () => {

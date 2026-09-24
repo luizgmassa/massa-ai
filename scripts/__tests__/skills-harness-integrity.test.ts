@@ -263,7 +263,6 @@ describe("no phantom roles: every orchestration role has a real charter", () => 
 
 describe("policy single-source: one copy of each agent policy", () => {
   const POLICY_KEYS = [
-    "plan_challenge:",
     "conversation_feedback:",
   ];
 

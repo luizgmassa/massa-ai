@@ -252,12 +252,12 @@ describe("rule state resolution and the BST-10 AC-10b degrade", () => {
     const home = scratch("state-honoured");
     const configPath = writeConfig(
       home,
-      JSON.stringify({ bootstrap: { rules: { "plan-challenge": false } } }),
+      JSON.stringify({ bootstrap: { rules: { "conversation-feedback": false } } }),
     );
     const resolved = resolveRuleStateForRender(api, configPath, () => {});
     expect(resolved.degraded).toBe(false);
-    expect(resolved.state["plan-challenge"]).toBe(false);
-    expect(resolved.state["caveman"]).toBe(true);
+    expect(resolved.state["conversation-feedback"]).toBe(false);
+    expect(resolved.state["dedupe-guardrails"]).toBe(true);
   });
 
   test("an unregistered persisted id is reported, not fatal (BST-10 AC-12)", () => {
@@ -302,12 +302,12 @@ describe("rendering for the installer", () => {
     expect(result.pointer.split("\n")[0]).toBe(BOOTSTRAP_START);
     expect(result.pointer.trimEnd().split("\n").length).toBeLessThanOrEqual(10);
     expect(result.pointer).toContain(path.join(home, ".codex", "MASSA-AI.md"));
-    expect(result.pointer).not.toContain("Plan Challenge Policy");
+    expect(result.pointer).not.toContain("Conversation Feedback Policy");
   });
 
   test("a disabled rule disappears from the rendered contract", async () => {
     const home = scratch("render-disabled");
-    writeConfig(home, JSON.stringify({ bootstrap: { rules: { "plan-challenge": false } } }));
+    writeConfig(home, JSON.stringify({ bootstrap: { rules: { "conversation-feedback": false } } }));
     const result = await renderBootstrapForInstaller({
       repoRoot: REPO_ROOT,
       targetHome: home,
@@ -316,7 +316,7 @@ describe("rendering for the installer", () => {
       hasBun: true,
       onWarning: () => {},
     });
-    expect(result.contract).not.toContain("## Plan Challenge Policy");
+    expect(result.contract).not.toContain("## Conversation Feedback Policy");
   });
 
   // T26 / BST-04 AC-6. `install-skills.sh` writes the contract to
@@ -464,7 +464,7 @@ describe("export surface (PC-B1)", () => {
     expect(typeof bootstrapBarrel.resolveBootstrapState).toBe("function");
     expect(typeof bootstrapBarrel.applyBootstrapState).toBe("function");
     expect(typeof bootstrapBarrel.setBootstrapRuleEnabled).toBe("function");
-    expect(bootstrapBarrel.BOOTSTRAP_RULE_IDS.length).toBe(8);
+    expect(bootstrapBarrel.BOOTSTRAP_RULE_IDS.length).toBe(6);
   });
 
   test("the package root barrel re-exports them, the way profile-switch is exported", () => {

@@ -312,10 +312,10 @@ describe("rtk count is 0 in every toggle state (BST-06 AC-2)", () => {
     // renderer that removes nothing. This one plants the literal inside a span
     // and asserts both directions, which that renderer fails.
     const source = syntheticSource({
-      "plan-challenge": ["## Conditional RTK Rules", "", "Prefix shell commands with `rtk`."],
+      "conversation-feedback": ["## Conditional RTK Rules", "", "Prefix shell commands with `rtk`."],
     });
     expect(
-      render(stateOf(true, { "plan-challenge": false }), "codex", source).contract.toLowerCase(),
+      render(stateOf(true, { "conversation-feedback": false }), "codex", source).contract.toLowerCase(),
     ).not.toContain("rtk");
     expect(render(ALL_ON, "codex", source).contract.toLowerCase()).toContain("rtk");
   });
@@ -476,7 +476,7 @@ describe("pointer template (BST-04 AC-6, AC-7)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-6 — all eight rules switchable both ways (BST-10 AC-4, BST-09 AC-3)
+// AC-6 — all six rules switchable both ways (BST-10 AC-4, BST-09 AC-3)
 // ---------------------------------------------------------------------------
 
 describe("every rule is individually switchable in both directions (BST-10 AC-4)", () => {
@@ -592,7 +592,7 @@ describe("no marker comment survives into the render", () => {
   // removal. Closing this needs a contract-only interpolation site to exist
   // first; there is none, so the case cannot be written honestly today.
   describe("an interpolated path cannot carry a marker into the output (T45)", () => {
-    for (const marker of [BOOTSTRAP_BLOCK_START, BOOTSTRAP_BLOCK_END, ruleMarker("caveman", "start")]) {
+    for (const marker of [BOOTSTRAP_BLOCK_START, BOOTSTRAP_BLOCK_END, ruleMarker("dedupe-guardrails", "start")]) {
       // Named for the pointer, because that is the half this exercises — see the
       // T46 note above. The injection site is `targetHome`, the sensing site is
       // the pointer.
@@ -682,11 +682,11 @@ describe("output shape", () => {
   }
 
   test("fenced block contents are passed through byte-for-byte", () => {
-    // The source's policy fences (two yaml, one path list) carry contract data;
+    // The source's policy fences (one yaml, one path list) carry contract data;
     // a layout normalizer that reformatted them would be editing the contract.
     const fence = REAL_SOURCE.slice(
-      REAL_SOURCE.indexOf("```yaml\nplan_challenge:"),
-      REAL_SOURCE.indexOf("```", REAL_SOURCE.indexOf("```yaml\nplan_challenge:") + 8) + 3,
+      REAL_SOURCE.indexOf("```yaml\nconversation_feedback:"),
+      REAL_SOURCE.indexOf("```", REAL_SOURCE.indexOf("```yaml\nconversation_feedback:") + 8) + 3,
     );
     expect(fence.length).toBeGreaterThan(20);
     expect(render(ALL_ON).contract).toContain(fence);
@@ -845,11 +845,11 @@ describe("refusals", () => {
 
   test("a state missing a registry id is refused, naming every missing id", () => {
     const partial = { ...DEFAULTS } as Record<string, boolean>;
-    delete partial["plan-challenge"];
+    delete partial["conversation-feedback"];
     delete partial["english-code"];
     const error = caught(() => render(partial as BootstrapState));
     expect(error.name).toBe("IncompleteBootstrapStateError");
-    expect(new Set(error.details)).toEqual(new Set(["plan-challenge", "english-code"]));
+    expect(new Set(error.details)).toEqual(new Set(["conversation-feedback", "english-code"]));
   });
 
   test("a source with no bootstrap block is refused", () => {
@@ -863,16 +863,16 @@ describe("refusals", () => {
   });
 
   test("a registry rule with no span in the source is refused, naming it", () => {
-    const source = syntheticSource().replace(`${ruleMarker("caveman", "start")}\n`, "");
+    const source = syntheticSource().replace(`${ruleMarker("dedupe-guardrails", "start")}\n`, "");
     const error = caught(() => render(DEFAULTS, "codex", source));
     expect(error.name).toBe("MissingRuleSpanError");
-    expect(error.details).toEqual(["caveman"]);
+    expect(error.details).toEqual(["dedupe-guardrails"]);
   });
 
   test("a marker for an id the registry does not carry is refused, not stripped", () => {
     const source = syntheticSource().replace(
-      ruleMarker("caveman", "start"),
-      `${ruleMarker("caveman", "start")}\n${ruleMarker("not-a-rule", "start")}`,
+      ruleMarker("dedupe-guardrails", "start"),
+      `${ruleMarker("dedupe-guardrails", "start")}\n${ruleMarker("not-a-rule", "start")}`,
     );
     const error = caught(() => render(DEFAULTS, "codex", source));
     expect(error.name).toBe("UnknownRuleMarkerError");
@@ -880,13 +880,13 @@ describe("refusals", () => {
   });
 
   test("an off-span with no closing marker is refused", () => {
-    const source = syntheticSource({}, { offText: { caveman: ["off text"] } }).replace(
-      `${ruleMarker("caveman", "off-end")}\n`,
+    const source = syntheticSource({}, { offText: { "dedupe-guardrails": ["off text"] } }).replace(
+      `${ruleMarker("dedupe-guardrails", "off-end")}\n`,
       "",
     );
     const error = caught(() => render(DEFAULTS, "codex", source));
     expect(error.name).toBe("MalformedOffSpanError");
-    expect(error.details).toEqual(["caveman"]);
+    expect(error.details).toEqual(["dedupe-guardrails"]);
   });
 
   test("bootstrapContractPath and bootstrapStateFilePath refuse a relative home too", () => {

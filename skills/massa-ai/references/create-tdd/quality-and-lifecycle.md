@@ -31,7 +31,7 @@ If a blocking item fails, revise the draft or ask the user. Non-blocking gaps re
 
 ## Challenge Gate
 
-Run the configured Plan Challenge Gate after the draft exists. For the default full TDD gate, prefer pre-mortem mode unless security/adversarial risk calls for red-team or source claims call for evidence audit.
+Run the Plan Challenge Gate after the draft exists. For the full TDD gate, prefer pre-mortem mode unless security/adversarial risk calls for red-team or source claims call for evidence audit.
 
 Challenge at least:
 

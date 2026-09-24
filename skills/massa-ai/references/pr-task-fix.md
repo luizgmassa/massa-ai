@@ -12,23 +12,15 @@ Use ADR/TDD input as implementation context, not as permission to bypass the act
 
 ## PR Task Grouping
 
-Decompose work into reviewable PR groups before editing. Reuse the TDD task-planning contract:
-
-- Prefer Small PRs: `1-200 LOC / 1-3 files`, with a practical sweet spot under `50-100 LOC`.
-- Use Medium PRs: `201-500 LOC / 3-10 files` only when splitting further would break buildability, testability, UI coherence, or implementation dependency order.
-- Treat Large PRs: `500+ LOC / 10+ files` as exceptions requiring a split, stacked PR, feature-flag, or containment rationale before execution.
+Decompose work into reviewable PR groups before editing. Reuse the TDD
+task-planning contract in `references/create-tdd/document-contract.md`
+§Implementation Task Table for the PR-size bands (Small/Medium/Large) and the
+layer order (Data, then Domain, then Presentation/Navigation, mapped to
+repository terms when boundaries differ).
 
 Every PR group must be independently buildable and testable. It must not leave an intermediate state that breaks tests, UI, migrations, public contracts, required runtime behavior, or the active workflow's verification recipe.
 
 If a group is too large, split it into two or more groups. If tasks are too small, merge related small work only when the merged group remains independent, reviewable, buildable, and testable.
-
-Order non-breaking groups by layer when applicable:
-
-1. `Data`: DTOs, DAOs, data sources, repositories, analytics, persistence, and data-layer interfaces.
-2. `Domain`: use cases, models, mappers, configs, exceptions, monitoring, and business rules.
-3. `Presentation/Navigation`: screens, views, view models, actions, states, routes, and navigation.
-
-When the target project uses different boundaries, map these labels to the closest repository terms and state the mapping before execution.
 
 ## Commit Per Group
 

@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Plan Challenge gate is fixed behavior, no longer a configurable policy.**
+  `skills/massa-ai/SKILL.md` §Plan Challenge Gate is its single source: `feature` and
+  `refactor` start lite; `spec-driven`, `design`, `create-adr`, `create-rfc`, `create-tdd`,
+  explicit challenges, routing rule-5 risk domains, security, data loss, plans over 5
+  files/modules, or a lite escalation take the full gate. The Fool always auto-selects its
+  mode and revises the plan for valid critical/high findings; a prompt-level instruction
+  still overrides that for the current turn. `workflows/design.md` now runs the gate it was
+  listed for, after the Design-To-Code Mapping Matrix and before any edit.
+- **`Agent Started` status lines name the agent's model and effort.** The Conversation
+  Feedback policy in the startup contract now requires it and cites
+  `agent-orchestration.md` §Model/Effort Announcement (read from the installed agent file the
+  active model profile rendered).
+- **Upgrade note: re-render your startup contract.** A plugin-only update does not rewrite
+  the installed `MASSA-AI.md`, which keeps the old eight-rule text — including the
+  Plan Challenge policy that sent `feature`/`refactor` straight to the full gate — until you
+  run `bash scripts/install-harness.sh` or `bash scripts/install-skills.sh --apply` from a
+  repository checkout.
+
+### Removed
+
+- **Breaking: the `caveman` and `plan-challenge` bootstrap rules are retired** (8 → 6
+  rules). `massa-ai-config bootstrap enable|disable caveman|plan-challenge` now fails naming
+  the id as retired, and a persisted `bootstrap.rules` entry for either is skipped silently.
+  A persisted `plan-challenge: false` therefore no longer turns the gate off.
+- **`skills/AGENTS.md` sub-agent registry sections**: the retired-agent → current-agent
+  mapping table, "How to Add an Agent", and "massa-ai Concepts". CHANGELOG and git history
+  keep the old map.
+- **Three dead references**: `references/spec-driven/lessons.md` (a redirect stub),
+  `references/furps/analyst-role.md` (a copy of the `product-manager` charter), and
+  `references/hook-enforcement.md`, which documented six hooks that no longer exist.
+  `references/lessons.md` now matches `lessons.ts`: an unreachable memory write is dropped
+  silently, and no hook feeds the observation buffer.
+- **Duplicated reference prose.** One owner per rule: the retrieval order lives in
+  `codebase-investigation.md` (now the superset of the three lists that disagreed), the
+  STATE precedence chain in `artifact-persistence.md`, and the platform → matcher-contract map
+  in `mobile-figma-matcher/repository-detection.md`, where the mobile-figma audit/fix path
+  now reaches it. `mcp-tools.md`, `code-analysis.md`, `coding-principles.md`,
+  `architecture-lenses.md`, `design-implementation.md`, `pr-task-fix.md`,
+  `decision-engine.md`, `spec-driven/memory.md`, `synapse-policy.md` and
+  `conversation-feedback.md` point to the owner instead of restating it.
+
 ## [1.63.1] - 2026-09-24
 
 ### Fixed

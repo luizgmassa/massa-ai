@@ -23,11 +23,10 @@ resumed handoff reuses `workflowSessionId` and opens a fresh Synapse session.
 - Major focus shift: update task context through REST when available; otherwise
   create a fresh Synapse session and let the prior session expire.
 
-Default search budget inside a Synapse session:
+Default search budget inside a Synapse session follows
+`references/mcp-tools.md` §Retrieval Order; this file does not restate the
+numbers.
 
-- Summary discovery: `responseMode="summary"`, `maxResults=10`.
-- Targeted deep reads: `responseMode="enriched"`, `maxResults=3`.
-- Expanded deep reads: `maxResults=5` only when 4-5 exact files, symbols, or report finding IDs are already named.
 - Do not use Synapse for a single recall, project map, exact file read, or one symbol lookup.
 
 Server-side bounds that constrain the budget:

@@ -2,7 +2,7 @@
  * Bootstrap rule registry unit tests (T4 / TASK-004, BST-08, BST-09).
  *
  * Every assertion here is deliberately set/id-shaped rather than
- * count-shaped: a count assertion (`expect(ids).toHaveLength(8)`) passes
+ * count-shaped: a count assertion (`expect(ids).toHaveLength(6)`) passes
  * unchanged if one id is swapped for another, which is exactly the class of
  * regression this registry exists to prevent (see the task's "Done when":
  * "asserted as a set, so adding or removing one reddens").
@@ -25,10 +25,8 @@ import {
 } from "../rules";
 
 const EXPECTED_IDS: readonly string[] = [
-  "caveman",
   "massa-ai-router",
   "dedupe-guardrails",
-  "plan-challenge",
   "conversation-feedback",
   "indexing-hygiene",
   "english-code",
@@ -36,7 +34,7 @@ const EXPECTED_IDS: readonly string[] = [
 ];
 
 describe("BOOTSTRAP_RULE_IDS — id set", () => {
-  test("is exactly the eight spec ids, as a set", () => {
+  test("is exactly the six spec ids, as a set", () => {
     expect(new Set(BOOTSTRAP_RULE_IDS)).toEqual(new Set(EXPECTED_IDS));
   });
 
@@ -56,11 +54,16 @@ describe("BOOTSTRAP_RULE_IDS — id set", () => {
 });
 
 describe("retired rule ids (PER AC-2)", () => {
-  test("persona-router is retired and is not a registry id", () => {
-    expect([...RETIRED_RULE_IDS]).toEqual(["persona-router"]);
-    expect(isBootstrapRuleId("persona-router")).toBe(false);
-    expect(() => assertKnownRuleId("persona-router")).toThrow(BootstrapRuleError);
+  test("the retired set is exactly persona-router, caveman and plan-challenge", () => {
+    expect([...RETIRED_RULE_IDS]).toEqual(["persona-router", "caveman", "plan-challenge"]);
   });
+
+  for (const id of ["persona-router", "caveman", "plan-challenge"]) {
+    test(`${id} is retired and is not a registry id`, () => {
+      expect(isBootstrapRuleId(id)).toBe(false);
+      expect(() => assertKnownRuleId(id)).toThrow(BootstrapRuleError);
+    });
+  }
 });
 
 describe("isBootstrapRuleId", () => {
@@ -85,14 +88,12 @@ describe("isBootstrapRuleId", () => {
 describe("defaults — every rule enabled except code-comments (BST-08 AC-2)", () => {
   const defaults = bootstrapRuleDefaults();
 
-  // Asserted per id, not by count: this table would still be 8 entries long
+  // Asserted per id, not by count: this table would still be 6 entries long
   // if `code-comments` accidentally defaulted true and some other rule
   // defaulted false instead.
   const expectedDefaults: Record<string, boolean> = {
-    caveman: true,
     "massa-ai-router": true,
     "dedupe-guardrails": true,
-    "plan-challenge": true,
     "conversation-feedback": true,
     "indexing-hygiene": true,
     "english-code": true,
@@ -128,7 +129,7 @@ describe("getBootstrapRuleDefinition", () => {
 });
 
 describe("UnknownRuleError / assertKnownRuleId (BST-09 AC-8)", () => {
-  test("UnknownRuleError names the bad id and lists all eight valid ids", () => {
+  test("UnknownRuleError names the bad id and lists all six valid ids", () => {
     const err = UnknownRuleError("bogus-rule");
     expect(err.name).toBe("UnknownRuleError");
     expect(err.message).toContain("bogus-rule");
@@ -137,12 +138,14 @@ describe("UnknownRuleError / assertKnownRuleId (BST-09 AC-8)", () => {
     }
   });
 
-  test("UnknownRuleError names a retired id as retired, not unknown", () => {
-    const err = UnknownRuleError("persona-router");
-    expect(err.name).toBe("UnknownRuleError");
-    expect(err.message).toContain('bootstrap rule "persona-router" was retired');
-    expect(err.message).not.toContain("unknown bootstrap rule");
-  });
+  for (const id of ["persona-router", "caveman", "plan-challenge"]) {
+    test(`UnknownRuleError names retired "${id}" as retired, not unknown`, () => {
+      const err = UnknownRuleError(id);
+      expect(err.name).toBe("UnknownRuleError");
+      expect(err.message).toContain(`bootstrap rule "${id}" was retired`);
+      expect(err.message).not.toContain("unknown bootstrap rule");
+    });
+  }
 
   test("UnknownRuleError is a BootstrapRuleError", () => {
     expect(UnknownRuleError("bogus-rule")).toBeInstanceOf(BootstrapRuleError);
@@ -159,7 +162,7 @@ describe("UnknownRuleError / assertKnownRuleId (BST-09 AC-8)", () => {
     expect((caught as Error).name).toBe("UnknownRuleError");
   });
 
-  test("assertKnownRuleId does not throw for any of the eight real ids", () => {
+  test("assertKnownRuleId does not throw for any of the six real ids", () => {
     for (const id of BOOTSTRAP_RULE_IDS) {
       expect(() => assertKnownRuleId(id)).not.toThrow();
     }
@@ -170,7 +173,7 @@ describe("both enable and disable accept every id — no protected id (BST-09 AC
   // There is no separate "enable" vs "disable" gate in this registry module;
   // both operations are expected to route through the same
   // assertKnownRuleId/isBootstrapRuleId checks, so proving those checks are
-  // symmetric across all eight ids is what BST-09 AC-3 requires at this layer.
+  // symmetric across all six ids is what BST-09 AC-3 requires at this layer.
   for (const id of BOOTSTRAP_RULE_IDS) {
     test(`"${id}" is accepted identically regardless of intended direction`, () => {
       expect(isBootstrapRuleId(id)).toBe(true);
@@ -197,7 +200,7 @@ describe("validateRuleIds — accumulate-then-throw-once", () => {
   test("reports every unknown id in one throw, not just the first", () => {
     let caught: unknown;
     try {
-      validateRuleIds(["caveman", "typo-one", "typo-two", "english-code"]);
+      validateRuleIds(["dedupe-guardrails", "typo-one", "typo-two", "english-code"]);
     } catch (err) {
       caught = err;
     }
@@ -207,6 +210,6 @@ describe("validateRuleIds — accumulate-then-throw-once", () => {
     expect(err.message).toContain("typo-one");
     expect(err.message).toContain("typo-two");
     // The known-good ids in the same batch must not appear as violations.
-    expect(err.message).not.toContain("unknown bootstrap rule id(s): caveman");
+    expect(err.message).not.toContain("unknown bootstrap rule id(s): dedupe-guardrails");
   });
 });

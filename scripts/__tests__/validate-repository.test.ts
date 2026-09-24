@@ -80,7 +80,7 @@ describe("skills/AGENTS.md bootstrap contract", () => {
       content.indexOf(BOOTSTRAP_START),
       content.indexOf(BOOTSTRAP_END) + BOOTSTRAP_END.length
     );
-    expect(block).toContain("caveman full");
+    expect(block).not.toContain("caveman");
     expect(block).toContain("coding-guidelines");
     expect(block).toContain("massa-ai");
     expect(block).not.toContain("persona-router");
@@ -94,7 +94,9 @@ describe("skills/AGENTS.md bootstrap contract", () => {
     );
     expect(block).not.toContain("persona_router");
     expect(block).not.toContain("persona_pin");
-    expect(block).toContain("plan_challenge");
+    // plan_challenge retired with its rule: the gate is fixed router behavior now.
+    expect(block).not.toContain("plan_challenge");
+    expect(block).not.toContain("Plan Challenge Policy");
     expect(block).toContain("conversation_feedback");
   });
 
@@ -160,7 +162,6 @@ describe("reference files exist", () => {
     "references/memory-policy.md",
     "references/decision-engine.md",
     "references/lessons.md",
-    "references/hook-enforcement.md",
     "references/naming-standards.md",
     "references/conversation-feedback.md",
   ];
@@ -326,59 +327,87 @@ describe("legacy persona catalog", () => {
   });
 });
 
-// ── Hook enforcement reference (ported from legacy hook-graph tests) ──────
-// The legacy suite asserted the hook graph maps to references and enforces the
-// massa-ai dual-write/tag contract. These check the hook-enforcement reference
-// still documents that mapping and the procedural-is-tag rule.
+// ── Mobile Figma platform contracts are reachable ──────────────────────────
+// agents-md-bootstrap-trim C3: the platform→contract map used to live only in
+// design-implementation.md, so the mobile-figma-audit/fix path (which loads
+// repository-detection.md, not design-implementation.md) never named the
+// platform files. The orphan gate cannot see this: a directory mention marks
+// every member reachable. The population is read from disk, not listed here.
 
-describe("hook enforcement reference", () => {
-  const hookRef = path.join(SKILLS_DIR, "massa-ai", "references", "hook-enforcement.md");
+describe("mobile figma platform contracts", () => {
+  const dir = path.join(SKILLS_DIR, "massa-ai", "references", "mobile-figma-matcher");
+  const NON_PLATFORM = new Set(["core.md", "repository-detection.md", "ATTRIBUTION.md"]);
 
-  test("hook-enforcement.md exists", async () => {
-    expect(await fileExists(hookRef)).toBe(true);
+  test("repository-detection.md names every platform contract by path", async () => {
+    const platforms = (await fs.readdir(dir)).filter((f) => f.endsWith(".md") && !NON_PLATFORM.has(f)).sort();
+    expect(platforms.length).toBeGreaterThanOrEqual(5); // guard the guard
+    const detection = await readFile(path.join(dir, "repository-detection.md"));
+    const missing = platforms.filter((f) => !detection.includes(`references/mobile-figma-matcher/${f}`));
+    expect(missing).toEqual([]);
   });
+});
 
-  test("documents the hooks-to-enforced-reference mapping table", async () => {
-    const content = await readFile(hookRef);
-    // Each enforcing hook should be named somewhere in the mapping.
-    expect(content).toContain("stop_evidence_gate");
-    expect(content).toContain("continuous_learning_evaluate");
-    expect(content).toContain("precompact_save_state");
-    expect(content).toContain("gateguard");
-    expect(content).toContain("config_protection");
-    expect(content).toContain("observe_runner");
-  });
+// ── One retrieval order ────────────────────────────────────────────────────
+// agents-md-bootstrap-trim AC7: mcp-tools.md and spec-driven/code-analysis.md
+// each carried their own numbered retrieval order, and they disagreed. The
+// shape sensed here is a numbered list whose items name three or more distinct
+// retrieval tools; a workflow that merely runs two of them as its own steps
+// (onboarding: list_projects, project_map) is not an order. Three, not four:
+// the old code-analysis.md list named exactly three of these tools.
 
-  test("documents the workflow-aware stop gate reading from .specs/project/STATE.md", async () => {
-    const content = await readFile(hookRef);
-    expect(content).toContain("stop_evidence_gate");
-    expect(content).toMatch(/\.specs\/project\/STATE\.md/);
+describe("retrieval order has one owner", () => {
+  const TOOLS = [
+    "list_projects", "project_map", "get_architecture", "search_definitions",
+    "optimized_context", "symbol_snippet", "trace_path", "impact_analysis",
+    "get_references", "go_to_definition",
+  ];
+  const OWNER = "skills/massa-ai/references/codebase-investigation.md";
+
+  function distinctToolsInNumberedItems(text: string): number {
+    const items = text.split("\n").filter((l) => /^\s*\d+\.\s/.test(l));
+    return new Set(TOOLS.filter((t) => items.some((l) => l.includes(t)))).size;
+  }
+
+  test("only codebase-investigation.md carries a numbered retrieval order", async () => {
+    const files = (await fs.readdir(path.join(REPO_ROOT, "skills"), { recursive: true }))
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => path.join("skills", f));
+    expect(files.length).toBeGreaterThan(100); // guard the guard: the walk saw the tree
+    const offenders = files
+      .filter((rel) => rel !== OWNER && distinctToolsInNumberedItems(readFileSync(path.join(REPO_ROOT, rel), "utf8")) >= 3);
+    expect(offenders).toEqual([]);
+    // Guard the guard: the owner itself must still register as an order.
+    expect(distinctToolsInNumberedItems(readFileSync(path.join(REPO_ROOT, OWNER), "utf8"))).toBeGreaterThanOrEqual(3);
   });
+});
+
+// ── Lesson memory contract ─────────────────────────────────────────────────
+// These assertions used to read references/hook-enforcement.md, which
+// documented a hook graph (stop_evidence_gate, gateguard, observe_runner, ...)
+// that no longer exists; agents-md-bootstrap-trim deleted it. The contracts
+// that are still true are sensed where they are owned now.
+
+describe("lesson memory contract", () => {
+  const lessonsRef = path.join(SKILLS_DIR, "massa-ai", "references", "lessons.md");
+  const memoryPolicyRef = path.join(SKILLS_DIR, "massa-ai", "references", "memory-policy.md");
 
   test("documents the massa-ai dual-write/tag contract (procedural is a tag, never a type)", async () => {
-    const content = await readFile(hookRef);
-    // The phrase spans newlines ("`procedural`\nis a **tag**, never a\ntype"), so
-    // assert the key tokens are all present rather than a single-line regex.
-    expect(content).toContain("procedural");
-    expect(content).toContain("tag");
-    // "never a\ntype" — allow a newline between "never" and "type".
-    expect(content).toMatch(/never[\s\S]*type/i);
+    const content = await readFile(lessonsRef);
+    expect(content).toMatch(/`procedural`\s+is a \*\*tag\*\*, never a type/);
     expect(content).toContain("memory:procedural");
   });
 
   test("lists supported massa-ai types (critical|conversation|code|decision|pattern only)", async () => {
-    const content = await readFile(hookRef);
-    expect(content).toMatch(/critical\s*\|\s*conversation\s*\|\s*code\s*\|\s*decision\s*\|\s*pattern/);
+    const content = await readFile(memoryPolicyRef);
+    expect(content).toContain(
+      "Supported massa-ai types are only `critical`, `conversation`, `code`, `decision`, and `pattern`.",
+    );
   });
 
-  test("documents graceful degradation (REST unavailable → file fallback)", async () => {
-    const content = await readFile(hookRef);
-    expect(content).toMatch(/graceful|fallback|REST unavailable/i);
-  });
-
-  test("no SessionStart recall duplication (router owns recall, not hooks)", async () => {
-    const content = await readFile(hookRef);
-    expect(content).toMatch(/SessionStart recall|no competing SessionStart|router already runs.*recall/i);
+  test("documents graceful degradation: REST unavailable drops the memory write silently", async () => {
+    const content = (await readFile(lessonsRef)).replace(/\s+/g, " ");
+    expect(content).toContain("the lesson still lands in `lessons.json` and the memory write is dropped silently");
+    expect(content).not.toContain("the skipped memory write is logged");
   });
 });
 
