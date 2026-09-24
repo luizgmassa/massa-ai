@@ -145,12 +145,17 @@ describe("unknown rule id (BST-09 AC-8)", () => {
     },
   );
 
-  test.each(["enable", "disable"])(
-    "bootstrap %s persona-router says the rule is retired and changes no state",
-    async (verb) => {
-      const r = await captureConsole(() => runCli(["bootstrap", verb, "persona-router"]));
+  test.each(
+    ["persona-router", "caveman", "plan-challenge"].flatMap((id) => [
+      ["enable", id],
+      ["disable", id],
+    ]),
+  )(
+    "bootstrap %s %s says the rule is retired and changes no state",
+    async (verb, id) => {
+      const r = await captureConsole(() => runCli(["bootstrap", verb, id]));
       expect(r.code).not.toBe(0);
-      expect(r.err).toContain('bootstrap rule "persona-router" was retired');
+      expect(r.err).toContain(`bootstrap rule "${id}" was retired`);
       expect(setBootstrapRuleEnabled.mock.calls.length).toBe(0);
       expect(applyBootstrapState.mock.calls.length).toBe(0);
     },
