@@ -87,6 +87,7 @@ Use this shape:
 🔵 [Start] Planning visual feedback for massa-ai. Workflow: Spec Driven. Session: Visual Feedback.
 🔄 [Loading] Reading AGENTS.md and massa-ai router guidance before planning.
 🧠 [Context] Found 8 relevant massa-ai memories and queried the requested NotebookLM source.
+🤖 [Agent Started] Judge (plan-critique mode), model opus, effort high. Scope: the proposed design.
 🤖 [Agent Running] Judge (plan-critique mode) is checking failure modes for the proposed design.
 ⚠️ [Divergence] Expected the legacy router path, but this checkout uses skills/massa-ai/SKILL.md.
 ✅ [Verified] Stale-reference checks and skill validation passed.
@@ -98,6 +99,10 @@ Rules:
 - Keep each status update to 1-2 lines.
 - Use capitalized labels and human-readable sentences.
 - Avoid `=` syntax, tiny abbreviations, and ultra-compressed words.
+- Every `Agent Started` line names the agent, its model, and its effort, as
+  resolved by the active model profile into the installed agent file; the one
+  canonical definition is `skills/massa-ai/references/agent-orchestration.md`
+  §Model/Effort Announcement.
 - Never expose chain-of-thought, raw tool output, raw logs, secrets, or raw
   subagent prompts.
 - Load `skills/massa-ai/references/conversation-feedback.md` only when

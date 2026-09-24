@@ -952,6 +952,33 @@ describe("nesting prohibition retirement: references carry no spawn prohibition"
 // which is exactly what Approach A's mitigation exists to prevent, so this
 // group imports and calls the real function rather than re-deriving paths.
 
+// agents-md-bootstrap-trim AC4: the always-in-context Conversation Feedback
+// Policy must require model/effort on `Agent Started`, show it in its worked
+// example, and cite the canonical definition instead of restating it (S8).
+describe("conversation feedback policy announces model and effort (AC4)", () => {
+  async function feedbackSpan(): Promise<string> {
+    const body = await fs.readFile(path.join(REPO_ROOT, "skills", "AGENTS.md"), "utf8");
+    const start = body.indexOf("<!-- massa-ai:rule:conversation-feedback:start -->");
+    const end = body.indexOf("<!-- massa-ai:rule:conversation-feedback:end -->");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    return body.slice(start, end);
+  }
+
+  test("the worked example has an Agent Started line naming a model and an effort", async () => {
+    const lines = (await feedbackSpan()).split("\n").filter((l) => l.includes("[Agent Started]"));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) expect(line).toMatch(/\bmodel \S+.*\beffort \S+/);
+  });
+
+  test("a rule requires model and effort and cites the canonical Model/Effort Announcement", async () => {
+    const span = (await feedbackSpan()).replace(/\s+/g, " ");
+    expect(span).toContain("Every `Agent Started` line names the agent, its model, and its effort");
+    expect(span).toContain("§Model/Effort Announcement");
+    for (const marker of ["effort: inherit", "model: inherit"]) expect(span).not.toContain(marker);
+  });
+});
+
 describe("dispatch announcement contract: single canonical shape (S8)", () => {
   /**
    * Substrings that together identify "a rule telling the orchestrator how

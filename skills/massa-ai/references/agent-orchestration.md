@@ -169,7 +169,7 @@ legacy column is traceability only, never a dispatch target.
 
 ## Capability Packet
 
-**This section is the sole canonical Capability Packet definition.** `references/subagent-design.md` mirrors this list and the root `skills/AGENTS.md` registry points here without restating it. Bespoke packets (judge panel, `product-manager` FURPS dispatch, phase-batch worker) are declared specializations that map onto these fields in their own workflow files.
+**This section is the sole canonical Capability Packet definition.** `references/subagent-design.md` and the root `skills/AGENTS.md` registry point here without restating it. Bespoke packets (judge panel, `product-manager` FURPS dispatch, phase-batch worker) are declared specializations that map onto these fields in their own workflow files.
 
 **A subagent inherits nothing from the parent session** — no skills, no loaded references, no conversation history. Everything the subagent needs is named explicitly in the packet, including the exact reference file paths it must read itself.
 
@@ -280,8 +280,8 @@ Do not expose raw subagent prompts, raw logs, private reasoning, or full output 
 Example:
 
 ```md
-🤖 [Agent Started] Verifier is checking the docs-only change set. Scope: massa-ai references and README.
-🤖 [Agent Done] Verifier found no stale references. Skipped checks: none.
+🤖 [Agent Started] Code Reviewer (verify mode), model sonnet, effort medium. Scope: massa-ai references and README.
+🤖 [Agent Done] Code Reviewer found no stale references. Skipped checks: none.
 ```
 
 ### Model/Effort Announcement

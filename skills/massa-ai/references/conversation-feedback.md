@@ -8,42 +8,20 @@ Conversation feedback is a user-facing progress layer, not a log system. Keep ea
 
 ## Policy Source
 
-Read the canonical Conversation Feedback Policy from the installed `AGENTS.md`
-bootstrap block (`<!-- massa-ai:bootstrap -->`), whose single source is
-`skills/AGENTS.md` in the product repo. If that
-file is unavailable, emit concise transition updates automatically, keep each
-update to 1-2 lines, and suppress chain-of-thought, raw logs, secrets, and
-repeated micro-events.
+The canonical Conversation Feedback Policy — settings, supported labels, line
+shape, worked example, and base rules — is the installed `AGENTS.md` bootstrap
+block (`<!-- massa-ai:bootstrap -->`), whose single source is `skills/AGENTS.md`
+in the product repo. It is always in context, so this file does not repeat it.
+If that block is unavailable, emit concise transition updates automatically,
+keep each update to 1-2 lines, and suppress chain-of-thought, raw logs,
+secrets, and repeated micro-events.
 
-## Line Shape
-
-Each status update must be 1-2 lines. Use an emoji, a capitalized label in square brackets, and one or two plain sentences. The worked example is not repeated here — it lives in the canonical policy block named under Policy Source above, which is always in context.
-
-Avoid terse machine-shaped status lines, lowercase labels, equals-sign syntax, and tiny abbreviations.
+## What To Surface
 
 When relevant, compactly surface phase, loaded context, context pressure,
 checks, risk, handoff state, queue/delegation state, sync outcome, memory
 outcome, skipped checks, and residual risk. Omit fields that do not affect the
 next user decision.
-
-## Supported Labels
-
-| Label | Use When |
-|---|---|
-| `Start` | A coding, planning, audit, debug, handoff, ADR, RFC, or TDD workflow begins. |
-| `Routing` | The workflow, entity, project, or session is selected. |
-| `Loading` | Reading a rule, skill, workflow, reference, document, NotebookLM source, or other context source. |
-| `Context` | Reporting memory, search, NotebookLM, source, or repo context that was found or unavailable. |
-| `Decision` | A meaningful tradeoff, scope decision, workflow choice, or default has been chosen. |
-| `Agent Started` | A subagent or delegated role is launched. |
-| `Agent Running` | A subagent is active, waiting, or doing a bounded task. |
-| `Agent Done` | A subagent returns usable evidence, findings, implementation, or verification. |
-| `Agent Blocked` | A subagent cannot complete its assigned scope or needs main-thread/user action. |
-| `Divergence` | Expected context, paths, plan details, user claims, or repo reality disagree. |
-| `Warning` | Work can continue, but confidence or verification is limited. |
-| `Error` | A command, tool, workflow, or required check failed and needs recovery. |
-| `Verified` | Deterministic checks, source inspection, or artifact validation produced evidence. |
-| `Finished` | The workflow closes with changed artifacts, memory outcome, and residual risk. |
 
 ## When To Emit
 
@@ -71,24 +49,8 @@ Use `references/context-firewall.md` when raw output is verbose. Feedback should
 
 ## Subagent Feedback
 
-When a subagent is used, the main agent reports only the role, scope, permission mode, current task, and status. Do not expose raw subagent prompts or internal deliberation.
-
-The `Agent Started` line's model/effort component has one canonical definition — `references/agent-orchestration.md`'s Model/Effort Announcement — not restated here.
-
-Examples:
-
-```md
-🤖 [Agent Started] Verifier is checking the docs-only change set. Scope: massa-ai references and README.
-🤖 [Agent Done] Verifier found no stale references. Skipped checks: none.
-```
+When a subagent is used, the main agent reports only the role, scope, permission mode, current task, and status. Do not expose raw subagent prompts or internal deliberation. The delegated-work labels and the `Agent Started` model/effort component are defined once in `references/agent-orchestration.md` (its delegated-work label list and Model/Effort Announcement), not restated here.
 
 ## Completion Feedback
 
 Use `Verified` after checks pass or when the strongest available evidence is inspected. Use `Finished` only after the Evidence Gate summary is ready.
-
-Example:
-
-```md
-✅ [Verified] Skill validation and stale-reference scans passed.
-🏁 [Finished] Updated conversation feedback docs. Memory outcome: durable decision stored. Remaining risk: none found.
-```
