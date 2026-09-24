@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Tier D of the E2E battery: the Claude Code CLI, credential-free
+  (`apps/claude-plugin/__tests__/claude-cli-e2e.test.ts`).** Runs whenever `claude` is on
+  `PATH`, under a scratch `HOME` and `CLAUDE_CONFIG_DIR`, with `ANTHROPIC_BASE_URL` pointed at
+  an unreachable port so no request can spend credits — and asserts `total_cost_usd` is 0.
+  Covers manifest validation (EB-CB-1), plugin load (EB-CB-2), a real MCP connection
+  (EB-CB-3), the installed inventory against the bundle (EB-CB-4) and agent visibility
+  (EB-CB-5). A print-mode session emits its `system/init` event before authentication, so
+  the plugin list, `plugin_errors`, MCP server status and agent list are all readable at
+  zero cost — which moved EB-CB-2, 3 and 5 out of the credentialed group. Expected sets are
+  derived from the charter directories, the bundled commands and `hooks.json`, and each
+  error assertion has a control that plants the error.
 - **`scripts/prepare-e2e-fixture.ts` — the sparse E2E corpus generator that was documented
   but never committed.** `.specs/features/close-maintenance-next-steps-2026-07-13/final-verification-evidence.md`
   invokes `scripts/prepare-qwen-e2e-fixture.ts`; that file has no history in any revision,
