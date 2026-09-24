@@ -280,7 +280,7 @@ Do not expose raw subagent prompts, raw logs, private reasoning, or full output 
 Example:
 
 ```md
-🤖 [Agent Started] Code Reviewer (verify mode), model sonnet, effort medium. Scope: massa-ai references and README.
+🤖 [Agent Started] Code Reviewer (verify mode), model `<model>`, effort `<effort>`. Scope: massa-ai references and README.
 🤖 [Agent Done] Code Reviewer found no stale references. Skipped checks: none.
 ```
 

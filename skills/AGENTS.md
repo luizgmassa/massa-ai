@@ -87,7 +87,7 @@ Use this shape:
 🔵 [Start] Planning visual feedback for massa-ai. Workflow: Spec Driven. Session: Visual Feedback.
 🔄 [Loading] Reading AGENTS.md and massa-ai router guidance before planning.
 🧠 [Context] Found 8 relevant massa-ai memories and queried the requested NotebookLM source.
-🤖 [Agent Started] Judge (plan-critique mode), model opus, effort high. Scope: the proposed design.
+🤖 [Agent Started] Judge (plan-critique mode), model `<model>`, effort `<effort>`. Scope: the proposed design.
 🤖 [Agent Running] Judge (plan-critique mode) is checking failure modes for the proposed design.
 ⚠️ [Divergence] Expected the legacy router path, but this checkout uses skills/massa-ai/SKILL.md.
 ✅ [Verified] Stale-reference checks and skill validation passed.
