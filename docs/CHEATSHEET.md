@@ -311,7 +311,8 @@ Repo-local skills live in `skills/`; generated per-host bundles land in
 | `bootstrap` | Inspect or toggle the six startup-contract rules |
 | `agents/<name>` | The 7 sub-agent charters |
 
-Registry and policies (Plan Challenge, Conversation Feedback):
+Registry and Conversation Feedback policy (the Plan Challenge gate lives in
+`skills/massa-ai/SKILL.md` §Plan Challenge Gate):
 `skills/AGENTS.md`.
 
 Regenerate bundles after touching anything under `skills/`:

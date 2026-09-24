@@ -8,13 +8,31 @@ Conversation feedback is a user-facing progress layer, not a log system. Keep ea
 
 ## Policy Source
 
-The canonical Conversation Feedback Policy — settings, supported labels, line
-shape, worked example, and base rules — is the installed `AGENTS.md` bootstrap
+The canonical Conversation Feedback Policy — settings, supported label names,
+line shape, worked example, and base rules — is the installed `AGENTS.md` bootstrap
 block (`<!-- massa-ai:bootstrap -->`), whose single source is `skills/AGENTS.md`
 in the product repo. It is always in context, so this file does not repeat it.
 If that block is unavailable, emit concise transition updates automatically,
 keep each update to 1-2 lines, and suppress chain-of-thought, raw logs,
 secrets, and repeated micro-events.
+
+## Label Meanings
+
+The policy lists the label names; this is when each non-agent label applies. The four
+`Agent *` labels are defined in `references/agent-orchestration.md`.
+
+| Label | Use When |
+|---|---|
+| `Start` | A coding, planning, audit, debug, handoff, ADR, RFC, or TDD workflow begins. |
+| `Routing` | The workflow, entity, project, or session is selected. |
+| `Loading` | Reading a rule, skill, workflow, reference, document, NotebookLM source, or other context source. |
+| `Context` | Reporting memory, search, NotebookLM, source, or repo context that was found or unavailable. |
+| `Decision` | A meaningful tradeoff, scope decision, workflow choice, or default has been chosen. |
+| `Divergence` | Expected context, paths, plan details, user claims, or repo reality disagree. |
+| `Warning` | Work can continue, but confidence or verification is limited. |
+| `Error` | A command, tool, workflow, or required check failed and needs recovery. |
+| `Verified` | Deterministic checks, source inspection, or artifact validation produced evidence. |
+| `Finished` | The workflow closes with changed artifacts, memory outcome, and residual risk. |
 
 ## What To Surface
 

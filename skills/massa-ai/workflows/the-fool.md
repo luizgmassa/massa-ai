@@ -19,7 +19,10 @@ Not to build the initial plan, make the decision, or execute implementation work
 The gate is fixed behavior, defined once in `SKILL.md` §Plan Challenge Gate
 (which workflows run lite or full, and what escalates). There is no policy file
 to read: the mode is always auto-selected, and valid `critical` or `high`
-findings always revise the parent plan.
+findings always revise the parent plan. The gate runs where a workflow carries a
+Plan Challenge step — the workflows named in those Lite and Full bullets; the
+risk and size triggers escalate a plan inside them to full, and a direct
+challenge request runs it anywhere.
 
 User prompt overrides take precedence for the current turn only, such as "skip the Fool gate", "use red-team mode", or "append critique without revising the plan".
 
@@ -32,13 +35,13 @@ User prompt overrides take precedence for the current turn only, such as "skip t
 2. `recall` -> load prior decisions, rejected approaches, constraints, accepted risks, and relevant evidence for the target entity.
 3. Require a concrete proposed plan before critique. If there is no plan, return to the parent workflow and construct the plan first. After a concrete plan exists, always attempt a `judge` subagent in `plan-critique` mode (it writes nothing in that mode) when subagent tooling is available. If that agent is unavailable, follow the no-agent fallback in `references/agent-orchestration.md` (Name Resolution): run the critique locally against the same output contract and report the skipped delegation.
 4. Resolve gate depth:
-   - Post-plan lite gate: keep parent identifiers and dispatch a bounded lite checklist packet without loading The Fool mode references.
+   - Post-plan lite gate: keep parent identifiers and dispatch the bounded packet the Lite bullet of `SKILL.md` §Plan Challenge Gate defines, without loading The Fool mode references.
    - Post-plan full gate or direct challenge: continue to mode selection and full critique.
    - Direct challenge requests use `workflowSessionId=fool-[entity]`; post-plan gates keep the parent identifiers and send only a bounded packet.
 5. Lite `judge` `plan-critique` packet:
-   - Inputs: proposed plan, scope, constraints, parent workflow, compact recalled facts/evidence, known risks, verification recipe, context-firewall limits, and lite checklist.
+   - Inputs: proposed plan, scope, constraints, parent workflow, compact recalled facts/evidence, known risks, verification recipe, context-firewall limits, and that Lite bullet's checklist (failing assumption, falsifying check, risk/size check).
    - Output must include the strongest low-risk challenges plus `escalate_to_full: true|false` and reason.
-   - If `escalate_to_full: false`, synthesize the lite critique, revise valid critical/high findings or record the accepted risk, and complete the gate without loading The Fool mode references.
+   - If `escalate_to_full: false`, synthesize the lite critique, revise the plan for each challenge judged valid or record the accepted risk, and complete the gate without loading The Fool mode references.
    - If `escalate_to_full: true`, the main agent selects full mode, loads the relevant references, and dispatches a full `judge` `plan-critique` pass.
 6. Select The Fool mode for full gates:
    - Read `references/the-fool/mode-selection-guide.md` and choose the best mode from plan content and domain, unless the user named a mode for this turn.

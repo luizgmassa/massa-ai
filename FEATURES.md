@@ -1352,7 +1352,7 @@ The sub-agent registry is not written — it is consumed by workflows that dispa
 
 | Skill | Location | Description |
 |-------|----------|-------------|
-| `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 36 workflow files under `workflows/` and 43 top-level references under `references/` (evidence gate, context firewall, verification ladder, agent orchestration, etc.), plus 47 more in per-workflow reference subdirectories (`furps/`, `spec-driven/`, `create-tdd/`, `the-fool/`, `create-ticket/`, `create-rfc/`, `skill-architect/`, `mobile-figma-matcher/`) — 90 reference files in all. Counted 2026-09-23. |
+| `massa-ai` | `skills/massa-ai/` | Default memory-backed workflow router for every coding session. 36 workflow files under `workflows/` and 42 top-level references under `references/` (evidence gate, context firewall, verification ladder, agent orchestration, etc.), plus 45 more in per-workflow reference subdirectories (`furps/`, `spec-driven/`, `create-tdd/`, `the-fool/`, `create-ticket/`, `create-rfc/`, `skill-architect/`, `mobile-figma-matcher/`) — 87 reference files in all. Counted 2026-09-24. |
 | `bootstrap` | `skills/bootstrap/` | Inspect or toggle the six startup-contract rules delivered by `MASSA-AI.md`. Drives `massa-ai-config bootstrap`, never a hand-edited file. |
 | `agents/<n>` | `skills/agents/` | The 7 sub-agent specialist charters, emitted per host by `generate-subagent-artifacts.ts`. |
 

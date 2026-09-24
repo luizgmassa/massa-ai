@@ -476,7 +476,7 @@ describe("pointer template (BST-04 AC-6, AC-7)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-6 — all eight rules switchable both ways (BST-10 AC-4, BST-09 AC-3)
+// AC-6 — all six rules switchable both ways (BST-10 AC-4, BST-09 AC-3)
 // ---------------------------------------------------------------------------
 
 describe("every rule is individually switchable in both directions (BST-10 AC-4)", () => {

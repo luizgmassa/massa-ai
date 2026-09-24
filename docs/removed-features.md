@@ -172,5 +172,5 @@ and two explanatory sections nothing loaded.
 |---|---|
 | `caveman` bootstrap rule (8 → 6 rules) | None; a persisted `bootstrap.rules.caveman` is silently ignored and toggling it fails as retired |
 | `plan-challenge` bootstrap rule and its `plan_challenge:` policy block | Fixed gate in `skills/massa-ai/SKILL.md` §Plan Challenge Gate; a persisted `plan-challenge: false` no longer disables it |
-| "Mapping — Retired Agents → Current Agents" in `skills/AGENTS.md` | `CHANGELOG.md` and git history |
-| "How to Add an Agent" and "massa-ai Concepts" in `skills/AGENTS.md` | `CLAUDE.md` Agent-harness surface; each charter documents its own concepts |
+| "Mapping — Retired Agents → Current Agents" in `skills/AGENTS.md` | The "Removed sub-agents" table above, `CHANGELOG.md`, and git history |
+| "How to Add an Agent" and "massa-ai Concepts" in `skills/AGENTS.md` | None; each charter documents its own concepts, and the parity/integrity tests name what a new agent must touch |

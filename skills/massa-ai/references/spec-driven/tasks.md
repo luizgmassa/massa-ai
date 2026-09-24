@@ -503,7 +503,7 @@ When Tasks runs, always generate these sections before listing implementation ta
 
 Before sampling tests manually, prefer massa-ai tooling to read the codebase:
 
-1. **Code analysis priority.** Run `list_projects`, then `project_map` and `search` / `optimized_context` to discover test files, test config, and layer structure BEFORE falling back to `ast-grep` / `rg` / `grep`. If the index is stale or missing, current source always overrides the index or a stored memory; reindex only when freshness blocks the decision.
+1. **Code analysis priority.** Discover test files, test config, and layer structure through the massa-ai index first, in the order of `references/codebase-investigation.md` §Source Order (plus the `ast-grep` tier in `references/spec-driven/code-analysis.md` §Tool Priority), BEFORE falling back to `ast-grep` / `rg` / `grep`. If the index is stale or missing, current source always overrides the index or a stored memory; reindex only when freshness blocks the decision.
 2. **Durable memory.** Tag confirmed planning artifacts with `remember` using `project:<id>`, `session:<id>`, `workflow:spec-driven`, `entity:<slug>`, and `memory:working|episodic|semantic|procedural`.
 3. **Validation: evidence-or-zero.** Every coverage claim and gate command must be confirmed against current source. No evidence → no claim.
 

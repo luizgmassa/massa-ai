@@ -194,7 +194,11 @@ describe("Plan Challenge dispatches judge in plan-critique mode (Dispatch AC-6)"
 
   test("SKILL.md §Plan Challenge Gate names judge in plan-critique mode", () => {
     const text = read(path.join(SKILLS, "massa-ai", "SKILL.md"));
-    const span = text.slice(text.indexOf("## Plan Challenge Gate"), text.indexOf("## Retrieval And Synapse"));
+    const start = text.indexOf("## Plan Challenge Gate");
+    expect(start).toBeGreaterThan(-1);
+    const end = text.indexOf("\n## ", start + 1);
+    expect(end).toBeGreaterThan(start);
+    const span = text.slice(start, end);
     expect(span).toContain("dispatch `judge` in `plan-critique` mode");
     expect([...span.matchAll(RETIRED)].map((m) => m[0])).toEqual([]);
   });
@@ -324,7 +328,7 @@ describe("no retired agent name in skills prose, backticked or not, any case, hy
     expect(bad).toEqual([]);
   });
 
-  test("the sweep sees every retired name, in every spelling it claims (guard the guard)", () => {
+  test("the sweep sees every retired name its regex claims, in each spelling (guard the guard)", () => {
     // The old→new mapping table in skills/AGENTS.md was the live subject this
     // guard counted; agents-md-bootstrap-trim deleted it (D9), so the live tree
     // may legitimately hold zero retired names. A synthetic fixture keeps the

@@ -54,7 +54,7 @@ Prefer sources in this order:
     than exact source.
 11. Local `.notebook/INDEX.md` only if the project already uses `.notebook/`.
 12. Focused shell search/read fallback (`rg`, `grep`) when massa-ai is
-    unavailable, stale, incomplete, or unindexed. Spec-driven code analysis
+    unavailable, stale, incomplete, unindexed, or misses obvious local truth. Spec-driven code analysis
     adds one tier here — `sg`/ast-grep for structural pattern search when
     installed, tried before `rg`/`grep`; see
     `references/spec-driven/code-analysis.md` §Tool Priority.
