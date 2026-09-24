@@ -1,8 +1,14 @@
 # E2E Feature Battery — Tasks
 
-**7 Phases = 21 active Tasks, plus 4 Tasks deferred.** Phases 0 and 1 are delivered.
-Phase 1b is new scope, added 2026-09-07. Phase 3 is deferred in full; Phase 4 is reduced
-to its credential-free half.
+**8 Phases = 23 active Tasks, plus 4 Tasks deferred.** Phases 0, 1, 1b, 2, 4 and 4b are
+delivered. Phase 1b is new scope, added 2026-09-07 and extended 2026-09-24 (T1b.4). Phase 4b
+is new scope, added 2026-09-24. Phase 3 is deferred in full; Phase 4 is reduced to its
+credential-free half, which on 2026-09-24 grew to include EB-CB-2, 3 and 5.
+
+**Merged with `main` at v1.64.0 on 2026-09-24 (`802b1185`).** Main moved the Ollama defaults
+to `qwen3-embedding:0.6b`/1024 and `qwen3-vl:8b`; `e2e-stack.sh` follows them. The fixture
+built from the merged tree is `4bbba3b4235d9395d4922111ed75b3c7a9308487` (71 files); the
+`788facbd…` identity pinned below describes the pre-merge tree and no longer reproduces.
 
 Amended 2026-09-07 after a read-only feasibility sweep falsified several premises this
 plan had recorded as fact. Every amendment below names the evidence that forced it.
@@ -61,6 +67,14 @@ defects and fixed none of them.
 | T1b.1 | `EB-MCP-3` | `GET /api/v1/workspace/list` hand-rolls a projection that diverges from `ListProjectsTool` on three axes. The route delegates to the tool instead. | first |
 | T1b.2 | `EB-SCH-3b` | `Scheduler.status()` drops four fields `fireJob` maintains; `dashboard.ts` then writes `lastSuccessAt: null` / `consecutiveFailures: 0` as literals. Projection only. | second |
 | T1b.3 | `EB-SCH-6` | `nextRunAt` is recomputed as `now + intervalMs` across an API restart, because `PgScheduledJobStore.get()` answers from an unhydrated mirror before `registerDefaultJobs` runs. | third, after T1b.2 |
+| T1b.4 | `EB-MCP-4` | The MCP server crashes at module load when `DATABASE_URL` is unset, HTTP-proxy mode included: `observationConsolidationJob` and `autoImproveJob` resolve their PostgreSQL stores in their constructors. Stores resolve on first use instead. **Done 2026-09-24 (`dc55da1f`).** | added 2026-09-24 |
+
+**T1b.4 — Resolved (user, 2026-09-24): fix in this branch.** Found by the Tier D probe
+(EB-CB-3), which registers the server under a scratch `HOME` as a fresh install would. The
+options offered were to record it and fix separately, fix it here, or treat it as not a
+defect because real installs carry `database.url`; the user chose to fix it here. Sensor:
+`apps/mcp-client/src/__tests__/mcp-startup-without-database-url.test.ts`, red before the fix
+on `DATABASE_URL is required`, green after; EB-CB-3 also goes red when the fix is reverted.
 
 **T1b.2 and T1b.3 cannot be parallelised.** They collide in the product
 (`scheduler.ts:535-561` vs `:210-229`) and in the test (`26.scheduler.test.ts:768-795` vs
@@ -191,12 +205,27 @@ What a later session must handle, measured 2026-09-07:
   real `confirm()` semantics, and real navigation. T3.2 and T3.3 must say so per scenario, or
   they buy 26 slow tests for coverage that exists.
 
-## Phase 4 — Tier D, Claude Code (1 Task active, 1 deferred) — NOT STARTED
+## Phase 4 — Tier D, Claude Code (1 Task active, 1 deferred) — T4.1 DELIVERED 2026-09-24
 
 | Task | Subject | Scenario IDs | Status |
 | --- | --- | --- | --- |
-| T4.1 | `claude-cli-e2e` credential-free group — runs whenever the binary is present; scratch `CLAUDE_CONFIG_DIR` **and** scratch `HOME` throughout | `EB-CB-1..4` | active |
-| T4.2 | The credentialed group and `apps/claude-plugin/evals/` | `EB-CB-5..7` | **deferred 2026-09-07** |
+| T4.1 | `claude-cli-e2e` credential-free group — runs whenever the binary is present; scratch `CLAUDE_CONFIG_DIR` **and** scratch `HOME` throughout | `EB-CB-1..5` | **done (`7be3e1f2`)** |
+| T4.2 | The credentialed group and `apps/claude-plugin/evals/` | `EB-CB-6..7` | **deferred 2026-09-07** |
+
+**Re-scoped 2026-09-24 on a falsified premise.** The plan put EB-CB-2, 3 and 5 in the
+credentialed group because they need a print-mode session, and said subagent visibility had
+no JSON form. Measured on `claude` 2.1.280: `claude -p --output-format stream-json
+--verbose` emits `system/init` **before** authentication, with `plugins`, `plugin_errors`
+(present only when non-empty), `mcp_servers` with status, `tools` and `agents` — then ends
+`Not logged in` at `total_cost_usd: 0`. EB-CB-2 and 3 were already in T4.1 by the 2026-09-07
+table; EB-CB-5 moved in by **Resolved (user, 2026-09-24): include EB-CB-5.** Two traps the
+suite encodes: `--bare` hides plugin agents from `init.agents` (5 built-ins instead of 12),
+so the session runs without it; and without `--bare` the keychain is readable, so
+`ANTHROPIC_BASE_URL` points at an unreachable port and the suite asserts zero cost rather
+than trusting the scratch config dir alone. Each error assertion has a control that plants
+the error (corrupt manifest; corrupt `hooks.json` in a copy). Mutations observed red:
+dropping `agents/judge.md` fails EB-CB-4 agents and EB-CB-5 (11/2); reverting T1b.4 fails
+EB-CB-3 (12/1). Suite 13/0 in 1.7 s; `test:plugins` 196/0.
 
 Reduced by the user's decision of 2026-09-07 to the credential-free half. Measured on
 `claude` 2.1.258:
@@ -222,7 +251,25 @@ Reduced by the user's decision of 2026-09-07 to the credential-free half. Measur
   (`test-plugin-registry-registration.sh:127`, `:165`) pins `HOME` alongside it; treat scratch
   `HOME` as required.
 
-## Phase 5 — execution and report (2 Tasks) — NOT STARTED
+## Phase 4b — Tier A on LM Studio (1 Task) — NEW 2026-09-24, DELIVERED
+
+| Task | Subject | Status |
+| --- | --- | --- |
+| T4b.1 | `e2e-stack.sh` gains `MASSA_AI_E2E_PROVIDER=lmstudio`: an already-running LM Studio server replaces the dedicated `ollama serve`, probed and never started or stopped | **done (`1e058454`)** |
+
+**Resolved (user, 2026-09-24): port the stack to LM Studio.** This machine has no Ollama
+models (`~/.ollama/models` empty) and runs LM Studio on :1234. The options offered were to
+pull ~11 GB of Ollama models, port the stack, or defer Phase 5. Ollama stays the default
+provider. The provider is recorded in `state.env` by `up`, forces an API restart when it
+changes, and `OLLAMA_BASE_URL` stays pinned to the dedicated :11435 so a fallback cannot reach
+the shared :11434. Verified live: width probe 1024d, isolation read from
+`/api/v1/system/inference`, shared-stack PIDs identical before and after, `00.harness.smoke`
+4/0/0.
+
+## Phase 5 — execution and report (2 Tasks) — IN PROGRESS 2026-09-24
+
+First full matrix run on the LM Studio stack; results, load disclaimer and the three open
+`llm-on` reds are in `validation.md` § "Third session".
 
 | Task | Subject |
 | --- | --- |

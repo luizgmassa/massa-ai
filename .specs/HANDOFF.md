@@ -1,4 +1,43 @@
-# Handoff — e2e-feature-battery (PHASES 0/1/1b/2 DELIVERED 2026-09-07 — 15 commits; independent validation returned FAIL, its five findings are closed, RE-VERIFICATION IS OWED; unpushed, no PR)
+# Handoff — e2e-feature-battery (MERGED v1.64.0 + T1b.4, T4.1, T4b.1 DELIVERED 2026-09-24; Tier A matrix run on LM Studio, 3 `llm-on` reds open; unpushed, no PR)
+
+**Branch:** `test/e2e-feature-battery`, worktree `~/Projects/massa-ai-wt-e2e-battery`, merged
+with `main` at v1.64.0 (`802b1185`). 10 commits this session on top of the merge.
+
+**Read `.specs/features/e2e-feature-battery/validation.md` § "Third session" first.**
+
+**What shipped.**
+- Merge: 12 conflicts; e2e-stack pins follow main's new Ollama defaults (0.6b/1024, qwen3-vl:8b).
+- T1b.4 (`dc55da1f`): MCP server no longer crashes at load without `DATABASE_URL`.
+- T4.1 (`7be3e1f2`): `apps/claude-plugin/__tests__/claude-cli-e2e.test.ts`, EB-CB-1..5, zero cost.
+- T4b.1 (`1e058454`): `MASSA_AI_E2E_PROVIDER=lmstudio` for the live stack.
+- Test repairs: N15 width branch, EB-CFG-3 seeded-key label (`6dd33714`), EB-LLM-3b log literal (`603056b8`).
+
+**Decisions (user, 2026-09-24):** EB-CB-5 moved into T4.1; fix the MCP crash here; port the
+stack to LM Studio rather than pull Ollama models; stop the orphaned coverage Postgres on
+:5433 (`/tmp/massa-ai-cov-pg`, stopped with `pg_ctl`, data dir left on disk).
+
+**Exact next step.** Settle the three `llm-on` reds (EB-LLM-3, 4, 6). Leading hypothesis: LM
+Studio JIT auto-evict keeps only one model resident, so `llm-on` reloads a model on every
+role switch. Check LM Studio's auto-evict setting, pre-load all three models, re-run
+`RUN_E2E_LLM=1` suite 30 under `llm-on`. Then an independent verifier, then push/PR (user's call).
+
+**State left running.** The dedicated stack is up (`bash scripts/e2e-stack.sh status`),
+profile `llm-on`, provider `lmstudio`. `bash scripts/e2e-stack.sh down` stops Postgres :5433
+and the API :3334 and never touches LM Studio.
+
+**Traps this session paid for.**
+- Local `bun run test` needs `DATABASE_URL` exported — the isolation runner's scratch config
+  hides `config.json`'s URL (50 fast reds otherwise).
+- `--bare` hides plugin agents from `init.agents`; without it the keychain is readable, so
+  Tier D pins `ANTHROPIC_BASE_URL` to an unreachable port and asserts zero cost.
+- A dropped index is re-created by the test's own indexing — that mutation resolves to nothing.
+- zsh does not word-split `$VAR`; two probes silently ran the wrong command.
+
+**Unowned working-tree change, unchanged.** `.gitignore` (`.ralphy/`) and `.specs/lessons.json`
+(removes L-002..L-005). This session briefly restored `lessons.json` from HEAD during the
+merge, then re-applied the same 76-line removal; both remain uncommitted for the user.
+
+# Previous handoff — e2e-feature-battery (PHASES 0/1/1b/2 DELIVERED 2026-09-07 — 15 commits; independent validation returned FAIL, its five findings are closed, RE-VERIFICATION IS OWED; unpushed, no PR)
 
 **Branch:** `test/e2e-feature-battery`, off `main@d32fce58` (main has not moved). Worktree
 `~/Projects/massa-ai-wt-e2e-battery`.

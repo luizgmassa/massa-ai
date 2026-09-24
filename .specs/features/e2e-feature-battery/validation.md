@@ -566,3 +566,65 @@ listed the eight fields the dashboard route projects, now twelve; and two docblo
 - The five `main`-red suites (3 shell + 2 `pyts golden`) still have no traced root cause,
   though the ANSI-leak finding above is a strong lead for the three shell ones.
 - AC-03's 16-file sequence, AC-01 and AC-04 remain carried from Phase 0.
+
+# Third session, 2026-09-24 — merge, Tier D, LM Studio, first Tier A matrix on the new stack
+
+Written by the implementer, not a verifier. Nothing below upgrades the FAIL verdicts above.
+
+## Merge with `main` (v1.64.0, `802b1185`)
+
+12 conflicts resolved. Gates on the merged tree: build 6/6, type-check 6/6, lint clean,
+`test:scripts` 2207 pass / 10 fail with all 10 green (253/0) under an empty
+`XDG_CONFIG_HOME` (the developer's `model-profiles.json` overlay), shell suites 42/42.
+`bun run test` cannot complete locally: Bun 1.3.14's exit panic (SIGTRAP after all tests
+pass) aborts the isolation runner. Per-file loop over core + mcp-client instead: **292 files,
+4300 pass, 0 fail**; the 9 non-zero exits are exactly the 9 files with the known panic, each 0
+fail. The five `main`-red suites recorded under F6 are no longer red: shell suites 42/42.
+
+## Tier A matrix — LM Studio provider, 2026-09-24
+
+Stack: `MASSA_AI_E2E_PROVIDER=lmstudio`, `text-embedding-qwen3-embedding-0.6b` at 1024d
+(direct HNSW branch), fixture `4bbba3b4…` (71 files). Gate vector common to every row:
+`RUN_E2E=1`, `MASSA_AI_DEDICATED=1`, owned stack, `[T1] backend=postgres ollama=true
+auth=true`, `[EB:29] owned=true ollama=true mcpBin=true config=true`.
+
+**Load disclaimer.** A Gradle build in another project held the 1-minute load at 5–25 during
+the first pass. Per `spec.md` Out of Scope, figures above load 6 are not quotable as
+measurements; they are reported for their failure content only, and every red was re-run.
+
+| Profile | Suite | pass / fail / skip | Notes |
+| --- | --- | --- | --- |
+| default | 00,02,05,06,08,09,10,11,13,14,18,19,20,22,24 | all 0 fail | skips: 10 → 1, 11 → 2 |
+| default | 15.nfr | 13/1/0 → **14/0/0** | N15 fixed, see below |
+| default | 25.observability | 17/0/0 | |
+| default | 28.hooks-handoffs-proposals | 17/0/5 | |
+| default | 29.audit-repairs ×2 | 15/0/0, 15/0/0 | stability check: identical |
+| auth | 27.auth-config-cache | 33/1/0 → **34/0/0 ×3** | EB-CFG-3 fixed, see below |
+| hooks-off | 28.hooks-handoffs-proposals | 16/0/6 | |
+| scheduler-on | 26.scheduler | 9/0/6 | identical to the 2026-09-07 after-fix figure |
+| scheduler-fast | 26.scheduler | 8/0/7 | identical to the 2026-09-07 after-fix figure |
+| llm-on (`RUN_E2E_LLM=1`) | 30.llm-features | 5/4/0 → **6/3/0** at load 3–4 | 3 open, see below |
+| default | 17.cleanup-verify | 2/0/0 | |
+
+**N15 (`15.nfr`)** queried `embedding_bq`, which only `> 2000`-width tables carry; at 1024d
+the query itself errored. It now follows the store's threshold and checks the index that
+branch builds. Observed red: `POSTGRES_VECTOR_INDEX=ivfflat` → 0/1; restored → 1/0. A first
+mutation (dropping the index) resolved to nothing — the test's own indexing run re-created
+it — and is not counted.
+
+**EB-CFG-3 (`27`)** — the product is correct (one key, one provisioner, one `generated` in
+every run). Losers that import `@massa-ai/shared/config` after the winner's write get the key
+seeded into `MASSA_AI_API_KEY` by `src/env.ts` and report `source: "env"`. Measured 4 of 4
+red before the change; after it, one of three runs showed the mechanism live
+(`config=2 env=2`).
+
+**EB-LLM-3b** asserted a log literal `1692bfc2` renamed; its instruct-model check filtered on
+the same literal and matched zero lines, so it passed vacuously. Fixed in `603056b8`.
+
+**Open — EB-LLM-3, EB-LLM-4, EB-LLM-6, identical at load 25 and at load 3–4.** EB-LLM-4's
+bootstrap burns the 90 s budget and falls back to rule-based; EB-LLM-3 expects rerank to
+reorder and gets fusion order; EB-LLM-6 expects fusion order under a 1 ms budget and gets a
+reordered list. Leading hypothesis, not yet proven: LM Studio JIT auto-evict. After one chat
+call per role, `/api/v0/models` reported only `qwen3-vl-8b-instruct` loaded — the code model
+and the stack's own embedding model were `not-loaded` — so `llm-on` swaps models on every
+role change. Direct calls answer in 4.9 s (coder) and 6.3 s (instruct) when warm.

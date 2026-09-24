@@ -88,6 +88,9 @@ whole repository as its corpus. Three consequences, all measured rather than inf
   credential-free group; the credentialed group and the eval harness are deferred. The
   original wording assumed a `--max-cost-usd` ceiling that does not exist outside
   `claude plugin eval`, leaving the credentialed group with no cost bound at all.
+  **Widened 2026-09-24** to EB-CB-1..5: a print-mode session's `system/init` event arrives
+  before authentication and carries plugin, MCP and agent state at zero cost (user decision,
+  `tasks.md` Phase 4).
 - **FR-10** Tier A is executed as a **profile matrix**, not a single run. The report is per
   tier and per profile: measured pass / fail / skip and duration, plus an explicit list of
   what was left out and why.
@@ -136,8 +139,8 @@ whole repository as its corpus. Three consequences, all measured rather than inf
 - Any figure sourced from `COVERAGE.md` or `.specs/` rather than from a run in this feature.
 - CI execution of the live-stack suite. It stays a local, opt-in gate.
 - Tier C in this delivery (deferred 2026-09-07, specified in `tasks.md` Phase 3).
-- Tier D's credentialed group and eval harness (deferred 2026-09-07). No task in this
-  delivery spends API credits.
+- Tier D's credentialed group and eval harness (deferred 2026-09-07; EB-CB-6..7 since
+  2026-09-24). No task in this delivery spends API credits.
 - Rebuilding profile-switch coverage that `test-model-profile-installer-*.sh` and the seven
   `profile-switch/__tests__/` suites already provide.
 - The two uncommitted working-tree changes that predate every session on this branch —

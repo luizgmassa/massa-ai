@@ -1,4 +1,13 @@
-## Current — E2E feature battery, Phases 0/1/1b/2 (**2026-09-07** — 15 commits in worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR; independent validation returned FAIL, its five findings are closed, re-verification is owed)
+## Current — E2E feature battery, merged v1.64.0; T1b.4, T4.1, T4b.1 delivered (**2026-09-24** — worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR)
+
+8 Phases = 23 active Tasks plus 4 deferred. Delivered: Phases 0, 1, 1b (now 4 Tasks), 2, 4
+(T4.1, EB-CB-1..5) and 4b (LM Studio provider). Phase 5 in progress: the first Tier A matrix
+on the LM Studio stack is recorded in `validation.md` § "Third session" — every profile green
+except three `llm-on` cases (EB-LLM-3, 4, 6), suspected LM Studio JIT auto-evict. Phase 3 and
+T4.2 stay deferred. Next: settle the `llm-on` reds, then independent verification, then
+push/PR (user's call). Full account in `.specs/HANDOFF.md`.
+
+## Previous — E2E feature battery, Phases 0/1/1b/2 (**2026-09-07** — 15 commits in worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR; independent validation returned FAIL, its five findings are closed, re-verification is owed)
 
 Goal: cover the features in `FEATURES.md` with an executable E2E battery in four tiers.
 Re-specified 2026-09-07 to **7 Phases = 21 active Tasks plus 4 deferred**. Phases 0, 1, 1b
