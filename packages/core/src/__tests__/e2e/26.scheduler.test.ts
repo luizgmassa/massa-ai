@@ -640,6 +640,7 @@ describe.skipIf(!SCHEDULER_FAST)("EB-SCH-3 concurrency cap", () => {
 
   let samples: Sample[] = [];
   let collectError: Error | null = null;
+  let freshSince = 0;
 
   beforeAll(async () => {
     if (!SCHEDULER_FAST) return;
@@ -653,6 +654,7 @@ describe.skipIf(!SCHEDULER_FAST)("EB-SCH-3 concurrency cap", () => {
       // that, not a relaxation of the floor.
       const windowMs = FAST_INTERVAL_MS * 4 + EXPECTED_TICK_MS["scheduler-fast"] * 2;
       const started = Date.now();
+      freshSince = started - FAST_INTERVAL_MS - EXPECTED_TICK_MS["scheduler-fast"];
       const collected: Sample[] = [];
       while (Date.now() - started < windowMs) {
         const snapshot = await readSchedulerStatus();
@@ -684,7 +686,7 @@ describe.skipIf(!SCHEDULER_FAST)("EB-SCH-3 concurrency cap", () => {
       expect(samples[0]!.tickIntervalMs).toBe(EXPECTED_TICK_MS["scheduler-fast"]);
 
       for (const id of FAST_KIND_IDS) {
-        const distinct = [...new Set(samples.map((s) => s.lastRunAt[id]).filter((v) => v && v > 0))];
+        const distinct = [...new Set(samples.map((s) => s.lastRunAt[id]).filter((v) => v && v >= freshSince))];
         console.log(`[EB-SCH-3] ${id}: ${distinct.length} distinct lastRunAt over the window`);
         // Three whole intervals were polled, so at least two fires must land in
         // the window. One would be consistent with a job that fired once at
@@ -709,10 +711,11 @@ describe.skipIf(!SCHEDULER_FAST)("EB-SCH-3 concurrency cap", () => {
       const tick = EXPECTED_TICK_MS["scheduler-fast"];
       const [a, b] = FAST_KIND_IDS;
 
-      // Only samples in which BOTH kinds have already fired at least once can
-      // carry the comparison; a `lastRunAt` of 0 is "never fired", not a time.
+      // Only samples in which BOTH kinds have fired since the window opened can
+      // carry the comparison; a `lastRunAt` of 0 is "never fired", and one from
+      // before the restart is not this boot's schedule.
       const comparable = samples.filter(
-        (s) => (s.lastRunAt[a] ?? 0) > 0 && (s.lastRunAt[b] ?? 0) > 0,
+        (s) => (s.lastRunAt[a] ?? 0) >= freshSince && (s.lastRunAt[b] ?? 0) >= freshSince,
       );
       const deltas = [...new Set(comparable.map((s) => Math.abs(s.lastRunAt[a]! - s.lastRunAt[b]!)))];
       console.log(
