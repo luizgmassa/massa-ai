@@ -268,8 +268,12 @@ the shared :11434. Verified live: width probe 1024d, isolation read from
 
 ## Phase 5 — execution and report (2 Tasks) — IN PROGRESS 2026-09-24
 
-First full matrix run on the LM Studio stack; results, load disclaimer and the three open
-`llm-on` reds are in `validation.md` § "Third session".
+First full matrix run on the LM Studio stack; results, load disclaimer and the resolution of
+the three `llm-on` reds are in `validation.md` § "Tier A matrix — LM Studio provider".
+
+**Resolved (user, 2026-09-25): fix the bootstrap-seed schema in this branch.** The MLX coder
+stall traced to `summary.max(512)` nested in `memories.max(8)`. The options offered were to fix
+it here, record it only, or fix it on a separate branch. Fixed in `8aa2a51f`.
 
 | Task | Subject |
 | --- | --- |

@@ -1,4 +1,4 @@
-# Handoff — e2e-feature-battery (MERGED v1.64.0 + T1b.4, T4.1, T4b.1 DELIVERED 2026-09-24; Tier A matrix run on LM Studio, 3 `llm-on` reds open; unpushed, no PR)
+# Handoff — e2e-feature-battery (MERGED v1.64.0 + T1b.4, T4.1, T4b.1 DELIVERED 2026-09-24; Tier A matrix run on LM Studio, all green after the bootstrap-schema fix 2026-09-25; unpushed, no PR)
 
 **Branch:** `test/e2e-feature-battery`, worktree `~/Projects/massa-ai-wt-e2e-battery`, merged
 with `main` at v1.64.0 (`802b1185`). 10 commits this session on top of the merge.
@@ -11,15 +11,18 @@ with `main` at v1.64.0 (`802b1185`). 10 commits this session on top of the merge
 - T4.1 (`7be3e1f2`): `apps/claude-plugin/__tests__/claude-cli-e2e.test.ts`, EB-CB-1..5, zero cost.
 - T4b.1 (`1e058454`): `MASSA_AI_E2E_PROVIDER=lmstudio` for the live stack.
 - Test repairs: N15 width branch, EB-CFG-3 seeded-key label (`6dd33714`), EB-LLM-3b log literal (`603056b8`).
+- EB-LLM-3/6 read the reranker's own log lines (`b719d1b7`); bootstrap seed schema drops
+  `summary.max(512)`, which stalled LM Studio's MLX grammar engine (`8aa2a51f`). `llm-on`
+  suite 30 is 9/0/0 twice on the default coder model.
 
 **Decisions (user, 2026-09-24):** EB-CB-5 moved into T4.1; fix the MCP crash here; port the
 stack to LM Studio rather than pull Ollama models; stop the orphaned coverage Postgres on
 :5433 (`/tmp/massa-ai-cov-pg`, stopped with `pg_ctl`, data dir left on disk).
+**Decision (user, 2026-09-25):** fix the bootstrap-seed schema in this branch.
 
-**Exact next step.** Settle the three `llm-on` reds (EB-LLM-3, 4, 6). Leading hypothesis: LM
-Studio JIT auto-evict keeps only one model resident, so `llm-on` reloads a model on every
-role switch. Check LM Studio's auto-evict setting, pre-load all three models, re-run
-`RUN_E2E_LLM=1` suite 30 under `llm-on`. Then an independent verifier, then push/PR (user's call).
+**Exact next step.** Independent verifier over the branch (the eviction hypothesis was
+falsified; the reds were two test defects and one product defect, see validation.md
+§ "Tier A matrix — LM Studio provider"), then push/PR (user's call).
 
 **State left running.** The dedicated stack is up (`bash scripts/e2e-stack.sh status`),
 profile `llm-on`, provider `lmstudio`. `bash scripts/e2e-stack.sh down` stops Postgres :5433

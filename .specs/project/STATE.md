@@ -2,10 +2,10 @@
 
 8 Phases = 23 active Tasks plus 4 deferred. Delivered: Phases 0, 1, 1b (now 4 Tasks), 2, 4
 (T4.1, EB-CB-1..5) and 4b (LM Studio provider). Phase 5 in progress: the first Tier A matrix
-on the LM Studio stack is recorded in `validation.md` § "Third session" — every profile green
-except three `llm-on` cases (EB-LLM-3, 4, 6), suspected LM Studio JIT auto-evict. Phase 3 and
-T4.2 stay deferred. Next: settle the `llm-on` reds, then independent verification, then
-push/PR (user's call). Full account in `.specs/HANDOFF.md`.
+on the LM Studio stack is recorded in `validation.md` § "Third session" — every profile green;
+the three `llm-on` reds (EB-LLM-3, 4, 6) resolved 2026-09-25 as two test defects (`b719d1b7`)
+and a bootstrap-schema stall in LM Studio's MLX engine (`8aa2a51f`). Phase 3 and T4.2 stay
+deferred. Next: independent verification, then push/PR (user's call). Full account in `.specs/HANDOFF.md`.
 
 ## Previous — E2E feature battery, Phases 0/1/1b/2 (**2026-09-07** — 15 commits in worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR; independent validation returned FAIL, its five findings are closed, re-verification is owed)
 

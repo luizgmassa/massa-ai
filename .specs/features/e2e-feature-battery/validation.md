@@ -603,7 +603,7 @@ measurements; they are reported for their failure content only, and every red wa
 | hooks-off | 28.hooks-handoffs-proposals | 16/0/6 | |
 | scheduler-on | 26.scheduler | 9/0/6 | identical to the 2026-09-07 after-fix figure |
 | scheduler-fast | 26.scheduler | 8/0/7 | identical to the 2026-09-07 after-fix figure |
-| llm-on (`RUN_E2E_LLM=1`) | 30.llm-features | 5/4/0 → **6/3/0** at load 3–4 | 3 open, see below |
+| llm-on (`RUN_E2E_LLM=1`) | 30.llm-features | 5/4/0 → 6/3/0 at load 3–4 → **9/0/0 ×2** on the default coder model, 2026-09-25 | resolved, see below |
 | default | 17.cleanup-verify | 2/0/0 | |
 
 **N15 (`15.nfr`)** queried `embedding_bq`, which only `> 2000`-width tables carry; at 1024d
@@ -621,10 +621,48 @@ red before the change; after it, one of three runs showed the mechanism live
 **EB-LLM-3b** asserted a log literal `1692bfc2` renamed; its instruct-model check filtered on
 the same literal and matched zero lines, so it passed vacuously. Fixed in `603056b8`.
 
-**Open — EB-LLM-3, EB-LLM-4, EB-LLM-6, identical at load 25 and at load 3–4.** EB-LLM-4's
-bootstrap burns the 90 s budget and falls back to rule-based; EB-LLM-3 expects rerank to
-reorder and gets fusion order; EB-LLM-6 expects fusion order under a 1 ms budget and gets a
-reordered list. Leading hypothesis, not yet proven: LM Studio JIT auto-evict. After one chat
-call per role, `/api/v0/models` reported only `qwen3-vl-8b-instruct` loaded — the code model
-and the stack's own embedding model were `not-loaded` — so `llm-on` swaps models on every
-role change. Direct calls answer in 4.9 s (coder) and 6.3 s (instruct) when warm.
+**EB-LLM-3, EB-LLM-4, EB-LLM-6 — resolved 2026-09-25; two test defects and one product
+defect.** At load 25 and at load 3–4 the result was the same: EB-LLM-4's bootstrap burned the 90 s budget, EB-LLM-3
+expected rerank to reorder, and EB-LLM-6 expected fusion order under a 1 ms budget.
+
+1. *Eviction hypothesis — falsified.* With LM Studio JIT auto-evict turned off by the user and
+   every model resident, the reds persisted on the coder model, and the suite was 9/0/0 in 44 s
+   with the instruct model in the code role.
+2. *EB-LLM-3 and 6 — test defects (`b719d1b7`).* Proximity rerank and the centrality boost
+   reorder results after fusion, so `combinedRank` order was never the reranker's contract.
+   Both now read the reranker's own log lines from their own call.
+3. *EB-LLM-4 — product defect: the bootstrap-seed schema stalls LM Studio's MLX engine.*
+   Captured through a logging proxy, the request carried `summary: {maxLength: 512}` inside
+   `memories: {maxItems: 8}`. Replayed against `qwen2.5-coder-7b-instruct` (MLX 4-bit,
+   `batched_model_kit`, outlines-core), that schema emits zero tokens in 60 s and in 150 s even
+   with a one-line prompt and `max_tokens: 40`; without `response_format` the same request
+   streams in 28.7 s. The only keyword that mattered, each on a freshly loaded model:
+
+   | Schema | Time |
+   | --- | --- |
+   | all bounds removed | 3.6 s |
+   | `maxLength: 512` alone | 28.4 s |
+   | `anyOf` const, `minimum`/`maximum`, `maxItems` alone | 1.4 s, 1.5 s, 2.2 s |
+   | product schema minus `maxLength` | 6.6 s |
+   | product schema minus `maxItems` | 43.5 s |
+   | product schema | stall > 60 s |
+
+   `sample` of the LM Studio worker showed one thread in a pure-Python loop (`set_issubset`,
+   `list_index`) at 100% CPU for 17 minutes, holding the GIL while request threads waited in
+   `take_gil`, and cancels logged `Could not cancel request_id … (id not found)`. With one
+   abandoned build a reranker call still answered in 1.6 s; after about four, even an
+   unconstrained "Say hi" timed out. So the reranker timeouts seen earlier were collateral.
+   The reranker schema alone answers in 0.6–1.6 s. `qwen3-vl-8b-instruct` runs on the VLM
+   engine and completed the full schema in 21 s.
+
+   Fix (`8aa2a51f`): `SeedMemorySchema.summary` drops `.max(512)`; `summarizeWithLlm` already truncates to
+   512 at insert. Sensor: `bootstrap-service.test.ts` asserts the schema accepts a 600-char
+   summary and its JSON Schema carries no `maxLength` (red 16/1 with the bound restored), plus
+   a truncate-at-insert guard. Real bootstrap prompt without the bound: 13.2 s and 11.4 s, 8
+   memories. Live: `30.llm-features` on the default coder **9/0/0 in 70 s and 59 s**, load 3–4.
+   The API imports `@massa-ai/core` from `dist`, so the first live re-run still sent
+   `maxLength` until core was rebuilt.
+
+   Not changed: `handoff-summary` keeps a top-level `.max(1024)` string. It runs in the NL role,
+   whose default here is the VLM-engine model, and it is not nested in a bounded array.
+   Measured on this machine only; LM Studio's engine and backend versions were not pinned.
