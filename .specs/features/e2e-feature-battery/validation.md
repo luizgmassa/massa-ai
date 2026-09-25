@@ -685,3 +685,34 @@ Findings, and what was done about each:
 | 6 | `handoff-summary` keeps `.max(1024)` | Kept, as recorded above; unmeasured on an MLX NL-role model |
 | 7 | FEATURES.json notes opened with "7 Phases = 21"; N15 duplicates the `> 2000` literal; the N15 ivfflat red depends on the index not pre-existing | Count fixed. The literal and the ivfflat precondition are left as recorded |
 | 8 | The MCP startup test runs against `dist` | Kept: `turbo.json` builds before `test`; a direct run needs `bun run build` |
+
+## Merged with `main` after #130, 2026-09-25
+
+#130 (heavy-work gate, async boot catch-up) merged to `main` first, by the user's call.
+Merge `a0b0b08d`: 2 conflicts, `apps/tools-api/src/index.ts` resolved to #130's async boot block
+with this branch's `await scheduler.ready()` ahead of `registerDefaultJobs`, CHANGELOG
+`[Unreleased]` sections unioned. The tree is byte-identical to a rehearsal merge tested before
+#130 landed: build, type-check, lint green; 44 interaction-area files 458/0; Tier A matrix equal
+to this branch's baseline except `26.scheduler` under `scheduler-fast`.
+
+**Two defects that `26.scheduler` EB-SCH-3 exposed in the merged tree:**
+
+1. *Product — overlapping ticks fire a job twice.* #130's `tick()` awaits the heavy-work probe
+   before its fire loop; `setInterval` keeps starting ticks, and each resumed tick fired from a
+   job list read before the await. Unit reproduction on #130's code: two overlapping `tick()`
+   calls with a 50 ms probe fired `["a","a"]`. Live signature: deltas of 14 ms and a 10019 ms
+   gap. Fixed: one evaluation at a time, a tick arriving mid-evaluation coalesces into one
+   follow-up (discarding it instead shifted the live cadence to 2000/3000 ms), the job list is
+   re-read after the probe, catch-up shares the guard, `stop()` drops a pending follow-up. Six
+   new cases in `scheduler-heavy-work.test.ts`; four mutations (no guard, no coalescing, no
+   re-read, `stop()` keeping the follow-up) each red on their own cases (11/3, 12/2, 13/1, 13/1).
+2. *Test — EB-SCH-3 sampled pre-restart `lastRunAt`.* Boot catch-up now awaits the probe, so the
+   first samples can predate this boot's first fire (observed 15.4 h and 20 min deltas). Samples
+   older than one interval plus one tick before the window are no longer counted; a job that
+   never fires after boot still fails the floor of two fresh values.
+
+Live, `scheduler-fast` ×6 after both fixes: 3 green; 3 red on a single late fire each (1803,
+4885, 1909 ms against a 500 ms tolerance) at load 5.7, 20.2 and 10.3. That is the class this
+branch alone showed before the merge (4643 and 4955 ms at load 12–20, 2 of 3 runs red), and none
+of the defect signatures above recurred. `scheduler-on` 9/0/6. Load was above 6 for most runs
+(an external source held it at 5–20), so the pass rate is not quotable; the delta classes are.
