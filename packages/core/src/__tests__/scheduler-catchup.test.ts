@@ -20,6 +20,8 @@ import type {
   JobKind,
 } from "../services/scheduler/index.js";
 
+const idleHeavyWork = async () => ({ busy: false });
+
 // ── In-memory store ──────────────────────────────────────────────────────────
 
 function makeInMemoryStore(): ScheduledJobStore & {
@@ -71,10 +73,11 @@ function makeJob(overrides: Partial<ScheduledJob> = {}): ScheduledJob {
 // ── catchUpMissedJobs ─────────────────────────────────────────────────────────
 
 describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
-  test("fires one tick per missed job (overdue > tick)", () => {
+  test("fires one tick per missed job (overdue > tick)", async () => {
     const store = makeInMemoryStore();
     let fireCount = 0;
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -89,16 +92,17 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
     const job = makeJob({ nextRunAt: now - 300_000 });
     store.save(job);
 
-    const result = scheduler.catchUpMissedJobs(now);
+    const result = await scheduler.catchUpMissedJobs(now);
     expect(result.caughtUp).toBe(1);
     expect(result.skipped).toBe(0);
     expect(fireCount).toBe(1);
   });
 
-  test("does not fire jobs due within the current tick window", () => {
+  test("does not fire jobs due within the current tick window", async () => {
     const store = makeInMemoryStore();
     let fireCount = 0;
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -113,7 +117,7 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
     const job = makeJob({ nextRunAt: now - 30_000 });
     store.save(job);
 
-    const result = scheduler.catchUpMissedJobs(now);
+    const result = await scheduler.catchUpMissedJobs(now);
     expect(result.caughtUp).toBe(0);
     expect(fireCount).toBe(0);
   });
@@ -121,6 +125,7 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
   test("non-overlapping per kind — skips if jobKind already running", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 5,
@@ -141,14 +146,14 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
     store.save(job);
 
     // First catch-up fires the job (async, handler pending).
-    const result1 = scheduler.catchUpMissedJobs(now);
+    const result1 = await scheduler.catchUpMissedJobs(now);
     expect(result1.caughtUp).toBe(1);
 
     // Wait a tick for the async handler to register in the running set.
     await new Promise((r) => setTimeout(r, 10));
 
     // Second catch-up — same kind is running, must skip.
-    const result2 = scheduler.catchUpMissedJobs(now);
+    const result2 = await scheduler.catchUpMissedJobs(now);
     expect(result2.caughtUp).toBe(0);
     expect(result2.skipped).toBe(1);
 
@@ -157,10 +162,11 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
     await new Promise((r) => setTimeout(r, 10));
   });
 
-  test("does not fire disabled jobs", () => {
+  test("does not fire disabled jobs", async () => {
     const store = makeInMemoryStore();
     let fireCount = 0;
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -174,14 +180,15 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
     const job = makeJob({ nextRunAt: now - 300_000, enabled: false });
     store.save(job);
 
-    const result = scheduler.catchUpMissedJobs(now);
+    const result = await scheduler.catchUpMissedJobs(now);
     expect(result.caughtUp).toBe(0);
     expect(fireCount).toBe(0);
   });
 
-  test("catch-up advances nextRunAt after firing (no repeat)", () => {
+  test("catch-up advances nextRunAt after firing (no repeat)", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -193,7 +200,7 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
     const job = makeJob({ nextRunAt: now - 300_000 });
     store.save(job);
 
-    scheduler.catchUpMissedJobs(now);
+    await scheduler.catchUpMissedJobs(now);
     // Wait for async fireJob to settle.
     return new Promise<void>((resolve) => {
       setTimeout(() => {
@@ -205,9 +212,10 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
     });
   });
 
-  test("catch-up is no-op when scheduler disabled", () => {
+  test("catch-up is no-op when scheduler disabled", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -218,7 +226,7 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
     const job = makeJob({ nextRunAt: now - 300_000 });
     store.save(job);
 
-    const result = scheduler.catchUpMissedJobs(now);
+    const result = await scheduler.catchUpMissedJobs(now);
     expect(result.caughtUp).toBe(0);
     expect(result.skipped).toBe(0);
   });
@@ -227,9 +235,10 @@ describe("Scheduler catchUpMissedJobs (T20 / FR-13 / AC-11)", () => {
 // ── success/failure split (FR-13) ─────────────────────────────────────────────
 
 describe("Scheduler success/failure split (T20 / FR-13)", () => {
-  test("success updates last_success_at + resets consecutive_failures", () => {
+  test("success updates last_success_at + resets consecutive_failures", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -246,7 +255,7 @@ describe("Scheduler success/failure split (T20 / FR-13)", () => {
     });
     store.save(job);
 
-    scheduler.catchUpMissedJobs(now);
+    await scheduler.catchUpMissedJobs(now);
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         const updated = store.get(job.id)!;
@@ -258,9 +267,10 @@ describe("Scheduler success/failure split (T20 / FR-13)", () => {
     });
   });
 
-  test("failure updates last_failure_at + increments consecutive_failures + last_error", () => {
+  test("failure updates last_failure_at + increments consecutive_failures + last_error", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -278,7 +288,7 @@ describe("Scheduler success/failure split (T20 / FR-13)", () => {
     });
     store.save(job);
 
-    scheduler.catchUpMissedJobs(now);
+    await scheduler.catchUpMissedJobs(now);
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         const updated = store.get(job.id)!;
@@ -290,9 +300,10 @@ describe("Scheduler success/failure split (T20 / FR-13)", () => {
     });
   });
 
-  test("last_error is truncated to 2000 chars", () => {
+  test("last_error is truncated to 2000 chars", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -307,7 +318,7 @@ describe("Scheduler success/failure split (T20 / FR-13)", () => {
     const job = makeJob({ nextRunAt: now - 300_000 });
     store.save(job);
 
-    scheduler.catchUpMissedJobs(now);
+    await scheduler.catchUpMissedJobs(now);
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         const updated = store.get(job.id)!;
@@ -318,9 +329,10 @@ describe("Scheduler success/failure split (T20 / FR-13)", () => {
     });
   });
 
-  test("last_success_at is null until first success", () => {
+  test("last_success_at is null until first success", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -340,7 +352,7 @@ describe("Scheduler success/failure split (T20 / FR-13)", () => {
     });
     store.save(job);
 
-    scheduler.catchUpMissedJobs(now);
+    await scheduler.catchUpMissedJobs(now);
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         const updated = store.get(job.id)!;

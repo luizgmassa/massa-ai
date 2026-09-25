@@ -18,6 +18,8 @@ import {
 import { registerDefaultJobs } from "../services/scheduler/scheduler-defaults.js";
 import type { ScheduledJobStore, ScheduledJob } from "../services/scheduler/index.js";
 
+const idleHeavyWork = async () => ({ busy: false });
+
 // Mock the heavy job modules so the handler bodies can execute without a DB.
 let consolidationCalls = 0;
 let autoImproveCalls = 0;
@@ -130,7 +132,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     // that the preset does not bypass the master switch for job registration:
     // jobs are registered but the scheduler is not enabled.
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: false });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: false });
     registerDefaultJobs(scheduler);
     const status = scheduler.status();
     // Scheduler not running (master switch off)
@@ -143,7 +145,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_SAFE_DEFAULTS = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["memory-consolidation"]?.enabled).toBe(true);
@@ -159,7 +161,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_SAFE_DEFAULTS = "true";
     process.env.MASSA_AI_SCHEDULER_AUTO_IMPROVE_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["memory-consolidation"]?.enabled).toBe(true);
@@ -178,7 +180,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_SAFE_DEFAULTS = "true";
     // NO per-kind env vars set
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     // Consolidation enabled by the preset alone (no per-kind env)
@@ -189,7 +191,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     // Preset NOT set
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["memory-consolidation"]?.enabled).toBe(false);
@@ -204,7 +206,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     // Explicitly disable consolidation via env → overrides preset
     process.env.MASSA_AI_SCHEDULER_CONSOLIDATION_ENABLED = "false";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["memory-consolidation"]?.enabled).toBe(false);
@@ -217,7 +219,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_CONSOLIDATION_INTERVAL_MS = "120000"; // 2 min
     process.env.MASSA_AI_SCHEDULER_DECAY_INTERVAL_MS = "300000"; // 5 min
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["memory-consolidation"]?.schedule.intervalMs).toBe(120000);
@@ -228,7 +230,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_CONSOLIDATION_INTERVAL_MS = "not-a-number";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     // Falls back to the default 30-min interval.
@@ -239,7 +241,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_DECAY_INTERVAL_MS = "0";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     // 0 is not > 0 → falls back to default 60-min interval.
@@ -250,7 +252,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_AUTO_IMPROVE_INTERVAL_MS = "";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["auto-improve"]?.schedule.intervalMs).toBe(30 * 60 * 1000);
@@ -260,7 +262,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_DECAY_ENABLED = "1";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["decay-sweep"]?.enabled).toBe(true);
@@ -270,7 +272,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_DECAY_ENABLED = "yes";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["decay-sweep"]?.enabled).toBe(false);
@@ -278,7 +280,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
 
   test("registerDefaultJobs registers all four handlers", () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: false });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: false });
     registerDefaultJobs(scheduler);
     const kinds = scheduler.registeredKinds();
     expect(kinds).toContain("memory-consolidation");
@@ -293,7 +295,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_SAFE_DEFAULTS = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["memory-consolidation"]?.schedule.intervalMs).toBeGreaterThanOrEqual(30 * 60 * 1000);
@@ -307,7 +309,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_CONSOLIDATION_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true, tickIntervalMs: 60000 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true, tickIntervalMs: 60000 });
     registerDefaultJobs(scheduler);
     const jobs = store._dump();
     const consolidation = jobs.find((j) => j.jobKind === "memory-consolidation");
@@ -327,7 +329,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_AUTO_IMPROVE_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true, tickIntervalMs: 60000 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true, tickIntervalMs: 60000 });
     registerDefaultJobs(scheduler);
     const jobs = store._dump();
     const autoImprove = jobs.find((j) => j.jobKind === "auto-improve");
@@ -349,7 +351,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_AUTO_IMPROVE_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true, tickIntervalMs: 60000 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true, tickIntervalMs: 60000 });
     registerDefaultJobs(scheduler);
     const jobs = store._dump();
     const autoImprove = jobs.find((j) => j.jobKind === "auto-improve");
@@ -369,7 +371,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_OBSERVATION_BRIDGE_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true, tickIntervalMs: 60000 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true, tickIntervalMs: 60000 });
     registerDefaultJobs(scheduler);
     const jobs = store._dump();
     const obs = jobs.find((j) => j.jobKind === "observation-bridge");
@@ -391,7 +393,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_OBSERVATION_BRIDGE_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true, tickIntervalMs: 60000 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true, tickIntervalMs: 60000 });
     registerDefaultJobs(scheduler);
     const jobs = store._dump();
     const obs = jobs.find((j) => j.jobKind === "observation-bridge");
@@ -410,7 +412,7 @@ describe("T29: Scheduler safe-defaults preset", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_DECAY_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true, tickIntervalMs: 60000 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true, tickIntervalMs: 60000 });
     registerDefaultJobs(scheduler);
     const jobs = store._dump();
     const decay = jobs.find((j) => j.jobKind === "decay-sweep");
@@ -494,7 +496,7 @@ describe("SCH-02 per-kind config.json resolution (T5)", () => {
   test("config.json enables a job when no env is set", () => {
     mockFileSchedulerJobs({ "auto-improve": { enabled: true, intervalMs: 45_000 } });
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["auto-improve"]?.enabled).toBe(true);
@@ -508,7 +510,7 @@ describe("SCH-02 per-kind config.json resolution (T5)", () => {
     process.env.MASSA_AI_SCHEDULER_AUTO_IMPROVE_ENABLED = "true";
     mockFileSchedulerJobs({ "auto-improve": { enabled: false, intervalMs: 999 } });
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     // enabled: env (true) wins over config.json (false).
@@ -520,7 +522,7 @@ describe("SCH-02 per-kind config.json resolution (T5)", () => {
   test("config.json's intervalMs beats the core-only literal default", () => {
     mockFileSchedulerJobs({ "decay-sweep": { intervalMs: 111_111 } });
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["decay-sweep"]?.schedule.intervalMs).toBe(111_111);
@@ -532,7 +534,7 @@ describe("SCH-02 per-kind config.json resolution (T5)", () => {
     process.env.MASSA_AI_SCHEDULER_SAFE_DEFAULTS = "true";
     mockFileSchedulerJobs({ "memory-consolidation": { enabled: false } });
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     // The preset alone would enable consolidation; config.json's explicit
@@ -550,7 +552,7 @@ describe("SCH-02 per-kind config.json resolution (T5)", () => {
     process.env.MASSA_AI_SCHEDULER_CONSOLIDATION_ENABLED = "false";
     mockFileSchedulerJobs({ "memory-consolidation": { enabled: true } });
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     // env (false) beats both config.json (true) and the preset (true).
@@ -560,7 +562,7 @@ describe("SCH-02 per-kind config.json resolution (T5)", () => {
   test("no config.json scheduler block: behavior unchanged from the literal/preset chain", () => {
     mockFileSchedulerJobs(undefined);
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["memory-consolidation"]?.enabled).toBe(false);

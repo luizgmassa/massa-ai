@@ -67,6 +67,7 @@ export interface TickResult {
   fired: number;
   skipped: number;
   errors: number;
+  deferred: number;
 }
 
 /** Scheduler status snapshot (for an optional debug endpoint). */
@@ -85,5 +86,10 @@ export interface SchedulerStatus {
     consecutiveFailures: number;
     due: boolean;
     currentlyRunning: boolean;
+    deferred: boolean;
   }>;
+  heavyWork: {
+    lastProbeError: string | null;
+    consecutiveProbeFailures: number;
+  };
 }

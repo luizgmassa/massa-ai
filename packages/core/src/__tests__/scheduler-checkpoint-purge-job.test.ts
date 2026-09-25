@@ -16,6 +16,8 @@ import {
 import { DEFAULT_SCHEDULED_JOBS, registerDefaultJobs } from "../services/scheduler/scheduler-defaults.js";
 import type { ScheduledJobStore, ScheduledJob } from "../services/scheduler/index.js";
 
+const idleHeavyWork = async () => ({ busy: false });
+
 // Mock the checkpoint manager so the handler body can execute without a DB.
 let purgeExpiredCalls = 0;
 
@@ -104,7 +106,7 @@ describe("Track 5: checkpoint-purge default scheduled job", () => {
 
   test("registerDefaultJobs registers the checkpoint-purge handler", () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: false });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: false });
     registerDefaultJobs(scheduler);
     expect(scheduler.registeredKinds()).toContain("checkpoint-purge");
   });
@@ -112,7 +114,7 @@ describe("Track 5: checkpoint-purge default scheduled job", () => {
   test("checkpoint-purge job is disabled by default (no env set)", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["checkpoint-purge"]?.enabled).toBe(false);
@@ -122,7 +124,7 @@ describe("Track 5: checkpoint-purge default scheduled job", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["checkpoint-purge"]?.enabled).toBe(true);
@@ -132,7 +134,7 @@ describe("Track 5: checkpoint-purge default scheduled job", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_INTERVAL_MS = "120000"; // 2 min
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     registerDefaultJobs(scheduler);
     const jobs = jobByName(scheduler);
     expect(jobs["checkpoint-purge"]?.schedule.intervalMs).toBe(120000);
@@ -142,7 +144,7 @@ describe("Track 5: checkpoint-purge default scheduled job", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     process.env.MASSA_AI_SCHEDULER_CHECKPOINT_PURGE_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true, tickIntervalMs: 60000 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true, tickIntervalMs: 60000 });
     registerDefaultJobs(scheduler);
     const jobs = store._dump();
     const purge = jobs.find((j) => j.jobKind === "checkpoint-purge");
