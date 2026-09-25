@@ -20,7 +20,14 @@ import {
   modelIsAvailable,
   parseEmbeddingResponse,
   detectProviderUrl,
+  assessLmStudioContext,
+  readLmStudioSavedContext,
+  readLmStudioGlobalDefault,
+  lmStudioHome,
 } from "../diagnose";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { INFERENCE_PROVIDERS } from "../../packages/shared/src/config/inference-providers";
 
 describe("maskDatabaseUrl", () => {
@@ -289,5 +296,106 @@ describe("detectProviderUrl — body shape, never HTTP status (discriminating ch
       url: "http://127.0.0.1:11434",
       models: ["qwen3-embedding:4b"],
     });
+  });
+});
+
+describe("assessLmStudioContext", () => {
+  test("ok when the loaded instance and the saved default both meet the role", () => {
+    expect(assessLmStudioContext(32768, { loaded: [32768], saved: 32768, globalDefault: 8192 }))
+      .toEqual({ level: "ok", findings: [] });
+  });
+
+  test("warns when the loaded instance is below the role", () => {
+    const verdict = assessLmStudioContext(32768, { loaded: [8192], saved: 32768 });
+    expect(verdict.level).toBe("warn");
+    expect(verdict.findings).toEqual(["loaded now with 8192 tokens"]);
+  });
+
+  test("the smallest of several loaded instances decides", () => {
+    expect(assessLmStudioContext(16384, { loaded: [32768, 8192], saved: 16384 }).level).toBe("warn");
+  });
+
+  test("warns about the next load when the saved default is low even while the loaded one is fine", () => {
+    const verdict = assessLmStudioContext(32768, { loaded: [32768], saved: 8192 });
+    expect(verdict.findings).toEqual(["its saved per-model default is 8192"]);
+  });
+
+  test("a saved default overrides a low global default", () => {
+    expect(assessLmStudioContext(32768, { loaded: [], saved: 32768, globalDefault: 8192 }).level).toBe("ok");
+  });
+
+  test("falls back to the global default only when nothing is saved", () => {
+    const verdict = assessLmStudioContext(16384, { loaded: [], globalDefault: 8192 });
+    expect(verdict.level).toBe("warn");
+    expect(verdict.findings[0]).toContain("global 8192");
+    expect(assessLmStudioContext(8192, { loaded: [], globalDefault: 8192 }).level).toBe("ok");
+  });
+
+  test("an unrecognized saved format is a warning, not a pass", () => {
+    expect(assessLmStudioContext(16384, { loaded: [16384], saved: "unrecognized" }).level).toBe("warn");
+  });
+
+  test("nothing known is unknown, never ok", () => {
+    expect(assessLmStudioContext(16384, { loaded: [] })).toEqual({ level: "unknown", findings: [] });
+  });
+});
+
+describe("LM Studio defaults readers", () => {
+  let home: string;
+  const saveFor = (id: string, body: string) => {
+    const file = join(home, ".internal", "user-concrete-model-default-config", `${id}.json`);
+    mkdirSync(join(file, ".."), { recursive: true });
+    writeFileSync(file, body);
+  };
+
+  afterEach(() => {
+    if (home) rmSync(home, { recursive: true, force: true });
+  });
+
+  test("reads the context LM Studio saved for an MLX model", () => {
+    home = mkdtempSync(join(tmpdir(), "lms-home-"));
+    saveFor(
+      "mlx-community/Coder-4bit",
+      JSON.stringify({ preset: "", operation: { fields: [] }, load: { fields: [{ key: "llm.load.contextLength", value: 32768 }] } }),
+    );
+    expect(readLmStudioSavedContext(home, "mlx-community/Coder-4bit")).toBe(32768);
+  });
+
+  test("reads a GGUF model's file keyed by its weight-file path", () => {
+    home = mkdtempSync(join(tmpdir(), "lms-home-"));
+    saveFor("pub/Repo-GGUF/model-Q8_0.gguf", JSON.stringify({ load: { fields: [{ key: "llm.load.contextLength", value: 16384 }] } }));
+    expect(readLmStudioSavedContext(home, "pub/Repo-GGUF/model-Q8_0.gguf")).toBe(16384);
+  });
+
+  test("no file, or a file without the field, is undefined", () => {
+    home = mkdtempSync(join(tmpdir(), "lms-home-"));
+    expect(readLmStudioSavedContext(home, "pub/absent")).toBeUndefined();
+    saveFor("pub/other", JSON.stringify({ load: { fields: [{ key: "llm.load.flashAttention", value: true }] } }));
+    expect(readLmStudioSavedContext(home, "pub/other")).toBeUndefined();
+  });
+
+  test("unparsable JSON or an unknown shape is unrecognized", () => {
+    home = mkdtempSync(join(tmpdir(), "lms-home-"));
+    saveFor("pub/broken", "{ not json");
+    saveFor("pub/weird", JSON.stringify({ load: { fields: "weird" } }));
+    saveFor("pub/text", JSON.stringify({ load: { fields: [{ key: "llm.load.contextLength", value: "big" }] } }));
+    expect(readLmStudioSavedContext(home, "pub/broken")).toBe("unrecognized");
+    expect(readLmStudioSavedContext(home, "pub/weird")).toBe("unrecognized");
+    expect(readLmStudioSavedContext(home, "pub/text")).toBe("unrecognized");
+  });
+
+  test("reads LM Studio's global default context from settings.json", () => {
+    home = mkdtempSync(join(tmpdir(), "lms-home-"));
+    writeFileSync(join(home, "settings.json"), JSON.stringify({ defaultContextLength: { type: "custom", value: 8192 } }));
+    expect(readLmStudioGlobalDefault(home)).toBe(8192);
+    writeFileSync(join(home, "settings.json"), JSON.stringify({}));
+    expect(readLmStudioGlobalDefault(home)).toBeUndefined();
+  });
+
+  test("the home pointer is honoured, and ~/.lmstudio is the fallback", () => {
+    home = mkdtempSync(join(tmpdir(), "user-home-"));
+    expect(lmStudioHome(home)).toBe(join(home, ".lmstudio"));
+    writeFileSync(join(home, ".lmstudio-home-pointer"), "/elsewhere/lmstudio\n");
+    expect(lmStudioHome(home)).toBe("/elsewhere/lmstudio");
   });
 });
