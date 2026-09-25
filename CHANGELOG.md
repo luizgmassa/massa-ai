@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.65.0] - 2026-09-25
+
 ### Added
 
 - **`scripts/e2e-stack.sh` runs against LM Studio as well as Ollama.**
