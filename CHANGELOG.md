@@ -116,7 +116,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lines appended during their own call (`LLMJudgeReranker … degrading to input order` and the
   `"label":"reranker"` failure), and window slicing stays with `reranker.test.ts`. On LM
   Studio with every model resident the suite is 9/0/0 with the instruct model in the code
-  role; with the default MLX coder model EB-LLM-3 and 4 fail on its real timeouts.
+  role, and — after the bootstrap schema fix below — 9/0/0 on the default MLX coder model.
+- **LLM bootstrap seeding timed out on every call against LM Studio's MLX coder model.** The
+  seed schema bounded `summary` to 512 characters inside an array bounded to 8 items; LM
+  Studio's MLX grammar engine never finished compiling that combination (no token in 150 s,
+  one CPU core pinned for 17 minutes) and, holding Python's GIL, stalled every later request
+  to the same model — the reranker's timeouts were collateral. The schema no longer bounds
+  `summary`; the existing truncation to 512 characters at insert still applies. The same
+  request now completes in 11–13 s.
 - **Two live-stack E2E assertions failed on the new 1024d default for reasons unrelated to
   the product.** `15.nfr` N15 queried `embedding_bq`, a column only the `> 2000`-width tables
   carry; at 1024d the store takes its direct HNSW branch (`vector_cosine_ops` on `embedding`),
