@@ -39,11 +39,11 @@
  *  1. EB-LLM-3c "the reranker demonstrably CHANGES the top-K order" — SKIPPED,
  *     non-deterministic. The judge may legitimately agree with the RRF order,
  *     so "the order differs" is not a contract and asserting it would be a
- *     coin-flip. What IS a contract is asserted instead: set preservation
- *     (rerank must be a permutation) and window honouring (everything past
- *     `SEARCH_RERANK_WINDOW` keeps the pre-rerank order verbatim —
- *     packages/core/src/services/search/reranker.ts:84-86 + :110,
- *     `[...reorderedHead, ...tail]`). The observed order IS logged.
+ *     coin-flip. What IS asserted instead: set preservation (no rank
+ *     repeats) and that the reranker's own call logged neither a failure nor
+ *     a degrade. Window honouring is not observable here, because proximity
+ *     rerank and the centrality boost reorder results after fusion; it is
+ *     asserted by reranker.test.ts. The observed order IS logged.
  *
  *  1b. EB-LLM-3b, rerank half — CLOSED (was a declared skip). The old skip left
  *     an open question between two readings of a non-ascending `combinedRank`
@@ -638,20 +638,14 @@ describe.skipIf(!READY)("EB-LLM-2..5 — query understanding, rerank, bootstrap,
   );
 
   test(
-    "EB-LLM-3: rerank preserves the result set and honours SEARCH_RERANK_WINDOW",
+    "EB-LLM-3: rerank preserves the result set and completes without a failure or degrade",
     async () => {
-      // reranker.ts:84-86 slices `head = results.slice(0, k)` /
-      // `tail = results.slice(k)` with `k = min(window, length)`, and returns
-      // `[...reorderedHead, ...tail]` at :110. So with window=2:
-      //   - the whole list is a PERMUTATION of the LLM-off baseline;
-      //   - indices 2.. are byte-identical to the baseline's indices 2..;
-      //   - indices 0..1 are a permutation of the baseline's indices 0..1.
-      // Whether the judge actually changed the order is NOT asserted (declared
-      // skip #1 in the header) — it is logged.
-      // Read from `combinedRank` inside THIS response rather than by comparing
-      // ids against a separate baseline call — see combinedRanks() above for the
-      // measured reason that comparison is unsound here.
+      // Whether the judge changed the order is NOT asserted (declared skip #1
+      // in the header) — it is logged. A successful rerank logs nothing, so
+      // the log must be readable and non-empty first, or the absence checks
+      // below would pass on a wrong path.
       const logOffset = readStackApiLog().length;
+      expect(logOffset).toBeGreaterThan(0);
       const res = await searchProject({
         query: LLM_QUERY,
         projectId: SHARED_PID,
@@ -669,7 +663,7 @@ describe.skipIf(!READY)("EB-LLM-2..5 — query understanding, rerank, bootstrap,
       const callLog = readStackApiLog().slice(logOffset);
       expect(callLog).not.toContain('LLM call failed — using non-LLM fallback {"label":"reranker"');
       expect(rerankerFailureLines(callLog, LLM_QUERY)).toEqual([]);
-      console.log(`[EB-LLM-3] reranker returned a verdict for "${LLM_QUERY}" (no failure or degrade line).`);
+      console.log(`[EB-LLM-3] no reranker failure or degrade line for "${LLM_QUERY}".`);
     },
     600_000,
   );
