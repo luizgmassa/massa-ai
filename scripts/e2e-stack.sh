@@ -40,7 +40,8 @@
 #   llm-on        MASSA_AI_LLM_ENABLED=true with the locally installed models
 #
 # Inference providers (MASSA_AI_E2E_PROVIDER, recorded by `up` and reused by
-# every later command until the next `up` names another):
+# every later command; `restart-api` and `env` refuse a different one until the
+# next `up` switches it):
 #   ollama    a dedicated `ollama serve` on :11435, started and stopped here
 #   lmstudio  an LM Studio server that is already running
 #             (MASSA_AI_E2E_LMSTUDIO_URL, default http://127.0.0.1:1234);
@@ -69,6 +70,7 @@ OLLAMA_ORIGIN="http://127.0.0.1:${OLLAMA_PORT}"
 
 LMSTUDIO_ORIGIN="${MASSA_AI_E2E_LMSTUDIO_URL:-http://127.0.0.1:1234}"
 LMSTUDIO_ORIGIN="${LMSTUDIO_ORIGIN%/}"
+LMSTUDIO_ORIGIN="${LMSTUDIO_ORIGIN%/v1}"
 LMSTUDIO_PORT="${LMSTUDIO_ORIGIN##*:}"
 
 FIXTURE_PATH="${MASSA_AI_E2E_PROJECT_PATH:-/tmp/massa-ai-e2e-fixture}"
@@ -175,6 +177,12 @@ select_provider() {
       ;;
     *) die "unknown provider: ${PROVIDER} (expected ollama or lmstudio)" 2 ;;
   esac
+}
+
+require_recorded_provider() {
+  local recorded; recorded="$(state_get provider)"
+  [[ -z "$recorded" || "$recorded" == "$PROVIDER" ]] && return 0
+  die "the stack runs provider ${recorded}; switching to ${PROVIDER} needs \`up\` (it re-probes the embedding width)" 2
 }
 
 profile_is_known() {
@@ -692,14 +700,18 @@ cmd_restart_api() {
   [[ -n "$profile" ]] || profile="default"
   profile_is_known "$profile" || die "unknown profile: ${profile}" 2
 
+  require_recorded_provider
   require_bins
+  log "shared stack before: $(assert_shared_untouched | tr '\n' ' ')"
   stop_one api "$API_PORT"
   start_api "$profile" "${overrides[@]+"${overrides[@]}"}"
+  log "shared stack after:  $(assert_shared_untouched | tr '\n' ' ')"
   printf 'tools-api restarted (profile: %s)\n' "$profile"
 }
 
 cmd_env() {
   # All four pins together. A subset makes assertSafeE2eEnvironment throw.
+  require_recorded_provider
   local key; key="$(state_get api_key)"
   local profile; profile="$(state_get profile)"
   cat <<EOF
