@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The walk follows filesystem order, so a repo over the old cap silently lost whichever
   modules the walk reached last.
 - **Turborepo bumped to 2.11.3** (`turbo.json` `$schema` pinned to the matching version).
+- **The scheduler no longer fires jobs while heavy database work runs.** Before firing, a
+  tick checks `managed_runs` for any live lease in any project and any process: an index or
+  reindex (`indexing` lease), plus reset, rename/merge, workspace delete and incremental
+  auto-reindex, which now hold a short advisory lease (kind `maintenance` or `reindex`) keyed
+  on a per-call sentinel id that project rename/merge cannot repoint. The row is deleted when
+  the operation ends, and a lease that cannot be taken never blocks the operation. A job that
+  falls due during the work is deferred, not dropped as missed, and runs once on the first
+  idle tick; boot catch-up waits the same way. If the check itself fails or takes longer
+  than 5 s, jobs stay deferred and `GET /api/v1/scheduler/status` reports `heavyWork.lastProbeError`
+  and each job's `deferred` flag. The check covers every project, so a long index of one
+  project holds every scheduled job until it finishes. A job already running when heavy work
+  starts is not interrupted. `Scheduler.catchUpMissedJobs()` now returns a promise.
 
 ### Fixed
 
