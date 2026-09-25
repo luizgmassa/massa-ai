@@ -9,11 +9,20 @@ const calls = {
   memory: [] as string[],
   // M8 audit-log captures
   audit: [] as Record<string, unknown>[],
+  // Heavy-work lease wrap calls (kind + label), recorded as a transparent
+  // passthrough — the mock has no real ManagedRunRepositoryPg to hand
+  // withHeavyWorkLease, so this is the only seam available to this file for
+  // proving the wrap site calls it.
+  heavyWork: [] as Array<{ kind: string; label: string }>,
 };
 
 mock.module("@massa-ai/core", () => ({
   IndexProjectTool: class { handle() {} },
   GetIndexStatusTool: class { handle() {} },
+  withHeavyWorkLease: async (kind: string, label: string, fn: () => Promise<unknown>) => {
+    calls.heavyWork.push({ kind, label });
+    return fn();
+  },
   getVectorStore: async () => ({
     deleteByProject: async (projectId: string) => {
       calls.vector.push(projectId);
@@ -113,6 +122,20 @@ describe("project reset lexical lifecycle", () => {
     expect(calls.cache).toEqual([]);
     expect(calls.symbol).toEqual(["partial-project"]);
     expect(calls.memory).toEqual(["partial-project"]);
+  });
+});
+
+describe("project reset heavy-work lease", () => {
+  test("wraps the destructive work in a maintenance lease labelled project-reset:<projectId>", async () => {
+    const response = await reset({
+      projectId: "lease-project",
+      clearVectors: true,
+      clearSymbols: true,
+      clearMemories: true,
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls.heavyWork).toEqual([{ kind: "maintenance", label: "project-reset:lease-project" }]);
   });
 });
 

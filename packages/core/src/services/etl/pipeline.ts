@@ -325,6 +325,22 @@ export class EtlPipeline {
       })();
     }
 
+    // ── Job heartbeat, independent of progress emits. Slow phases (resolve
+    // under memory pressure, embedding backlogs) can go minutes without a
+    // progress event, and the stale-job reaper (default 5 min) then flips a
+    // healthy run to failed — observed live as "heartbeat stale (possible
+    // crash/OOM)" on a process that never died. Tick every 30s until the run
+    // settles; its own controller keeps it beating through activation, which
+    // the graph heartbeat's controller stops short of.
+    const jobHeartbeatController = new AbortController();
+    (async () => {
+      while (true) {
+        try { await delay(30_000, undefined, { signal: jobHeartbeatController.signal }); }
+        catch { return; }
+        try { indexJobTracker.heartbeat(jobId); } catch { /* best-effort */ }
+      }
+    })();
+
     try {
       // ── Stage 1: Discover ─────────────────────────────────────────────────
       const st1 = performance.now();
@@ -375,6 +391,7 @@ export class EtlPipeline {
           // catch, so there is nothing of its own to tear down.
           stopManagedRunHeartbeat = true;
           managedRunTimerController.abort();
+          jobHeartbeatController.abort();
           if (managedRunHeartbeat) await managedRunHeartbeat;
           return this.runInternal(input, generationRetry + 1);
         }
@@ -612,6 +629,7 @@ export class EtlPipeline {
       });
 
       await this.graphGenerations.cleanup(graphGenerationLease);
+      jobHeartbeatController.abort();
       stopGraphHeartbeat = true;
       heartbeatTimerController.abort();
       await graphHeartbeat;
@@ -645,6 +663,7 @@ export class EtlPipeline {
           logger.error("EtlPipeline: pending generation abort failed", abortError as Error, { projectId, jobId });
         }
       }
+      jobHeartbeatController.abort();
       stopGraphHeartbeat = true;
       heartbeatTimerController.abort();
       graphAbortController.abort();

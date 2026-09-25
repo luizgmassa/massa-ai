@@ -108,6 +108,8 @@ export type {
 // Jobs (async indexing job tracker + stale-job reaper)
 export { IndexJobTracker, indexJobTracker } from "./jobs/index-job-tracker.js";
 export type { IndexJob } from "./jobs/index-job-tracker.js";
+export { withHeavyWorkLease, probeHeavyWork } from "./jobs/heavy-work-lease.js";
+export type { HeavyWorkKind, HeavyWorkState } from "./jobs/heavy-work-lease.js";
 
 // Scheduler (in-process cron-like scheduler for clock-triggered jobs)
 export {

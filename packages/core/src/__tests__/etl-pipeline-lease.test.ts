@@ -361,6 +361,134 @@ describe.skipIf(!DB_AVAILABLE)("EtlPipeline managed_runs lease (T13 / AC-7)", ()
     await cleanupProject(currentProjectId);
   });
 
+  function countJobHeartbeats(jobId: () => string | undefined): { count: () => number; restore: () => void } {
+    const original = indexJobTracker.heartbeat.bind(indexJobTracker);
+    let count = 0;
+    (indexJobTracker as any).heartbeat = (id: string) => {
+      if (id === jobId()) count++;
+      return original(id);
+    };
+    return { count: () => count, restore: () => { (indexJobTracker as any).heartbeat = original; } };
+  }
+
+  function deferred(): { promise: Promise<void>; resolve: () => void } {
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => { resolve = r; });
+    return { promise, resolve };
+  }
+
+  function stubEmptyStages(): void {
+    (pipeline as any).discover.run = async () => [];
+    (pipeline as any).parse.run = async () => [];
+    (pipeline as any).resolve.run = async () => [];
+    (pipeline as any).load.run = async () => ({ filesLoaded: 0, chunksLoaded: 0, symbolsLoaded: 0, errors: 0 });
+  }
+
+  test("job heartbeat ticks through a silent stage and activation, then stops", async () => {
+    stubEmptyStages();
+    const resolveStarted = deferred();
+    const resolveRelease = deferred();
+    (pipeline as any).resolve.run = async () => {
+      resolveStarted.resolve();
+      await resolveRelease.promise;
+      return [];
+    };
+    const activateStarted = deferred();
+    const activateRelease = deferred();
+    const activate = (pipeline as any).graphGenerations.activate;
+    (pipeline as any).graphGenerations.activate = async (...args: unknown[]) => {
+      activateStarted.resolve();
+      await activateRelease.promise;
+      return activate(...args);
+    };
+
+    const { getVectorStore } = await import("../services/vector/vector-store-factory.js");
+    await getVectorStore();
+
+    let jobId: string | undefined;
+    const heartbeats = countJobHeartbeats(() => jobId);
+    jest.useFakeTimers();
+    try {
+      const job = indexJobTracker.createJob(currentProjectId, "/tmp");
+      jobId = job.jobId;
+      const run = pipeline.run({ projectId: currentProjectId, projectPath: "/tmp", jobId: job.jobId });
+
+      await resolveStarted.promise;
+      await advancePastHeartbeats();
+      const duringResolve = heartbeats.count();
+      expect(duringResolve).toBeGreaterThanOrEqual(1);
+      resolveRelease.resolve();
+
+      await activateStarted.promise;
+      await advancePastHeartbeats();
+      expect(heartbeats.count()).toBeGreaterThan(duringResolve);
+      activateRelease.resolve();
+
+      await run;
+      const afterRun = heartbeats.count();
+      await advancePastHeartbeats();
+      expect(heartbeats.count()).toBe(afterRun);
+    } finally {
+      jest.useRealTimers();
+      heartbeats.restore();
+    }
+    await cleanupProject(currentProjectId);
+  }, 60_000);
+
+  test("stale-generation retry does not leak the job heartbeat", async () => {
+    stubEmptyStages();
+    let beginCalls = 0;
+    const succeedingBegin = (pipeline as any).graphGenerations.begin;
+    (pipeline as any).graphGenerations.begin = async (...args: unknown[]) => {
+      beginCalls++;
+      if (beginCalls === 1) throw new Error("graph_generation_stale_active:g0");
+      return succeedingBegin(...args);
+    };
+
+    const { getVectorStore } = await import("../services/vector/vector-store-factory.js");
+    await getVectorStore();
+
+    let jobId: string | undefined;
+    const heartbeats = countJobHeartbeats(() => jobId);
+    jest.useFakeTimers();
+    try {
+      const job = indexJobTracker.createJob(currentProjectId, "/tmp");
+      jobId = job.jobId;
+      await pipeline.run({ projectId: currentProjectId, projectPath: "/tmp", jobId: job.jobId });
+      expect(beginCalls).toBe(2);
+
+      await advancePastHeartbeats();
+      expect(heartbeats.count()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+      heartbeats.restore();
+    }
+    await cleanupProject(currentProjectId);
+  }, 60_000);
+
+  test("failed run stops the job heartbeat", async () => {
+    stubEmptyStages();
+    (pipeline as any).resolve.run = async () => { throw new Error("resolve exploded"); };
+
+    let jobId: string | undefined;
+    const heartbeats = countJobHeartbeats(() => jobId);
+    jest.useFakeTimers();
+    try {
+      const job = indexJobTracker.createJob(currentProjectId, "/tmp");
+      jobId = job.jobId;
+      await expect(
+        pipeline.run({ projectId: currentProjectId, projectPath: "/tmp", jobId: job.jobId }),
+      ).rejects.toThrow("resolve exploded");
+
+      await advancePastHeartbeats();
+      expect(heartbeats.count()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+      heartbeats.restore();
+    }
+    await cleanupProject(currentProjectId);
+  });
+
   test("pipeline without a managedRunLease still runs (lease wiring is opt-in)", async () => {
     // Regression guard: callers that don't pass managedRunLease (legacy path,
     // tests) must still work — the heartbeat/complete/abort branches are

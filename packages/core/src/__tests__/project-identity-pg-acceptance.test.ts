@@ -210,7 +210,7 @@ async function clearAll(): Promise<void> {
     await pool.query(`DELETE FROM ${table} WHERE true`).catch(() => { /* absent table */ });
   }
   await pool.query(
-    `DELETE FROM workspaces WHERE project_id IN ($1, $2, 't6-other-root', 't6-boom', 't6-fresh', 't6-fresh-2', 't6-race-t', 't6-chain-b', 't6-source-2')`,
+    `DELETE FROM workspaces WHERE project_id IN ($1, $2, 't6-other-root', 't6-boom', 't6-fresh', 't6-fresh-2', 't6-race-t', 't6-chain-b', 't6-source-2', 't6-c1-rename')`,
     [SOURCE, TARGET],
   );
   await pool.query(`DROP TABLE IF EXISTS t6_unknown_store`).catch(() => { /* noop */ });
@@ -664,5 +664,51 @@ describe.skipIf(!URL)("T6 PostgreSQL acceptance — transactional project identi
       [SOURCE],
     );
     expect(alias.rows).toEqual([{ target_project_id: TARGET }]);
+  }, 30_000);
+
+  // C1: managed_runs is registered as an identity-mutable store (kernel/
+  // registry.ts). A heavy-work lease acquired under the sentinel project id
+  // `heavy-work:<label>:<uuid>` (never a real project id) must not be caught
+  // by an unrelated identity rewrite running concurrently under the same
+  // lease.
+  test("C1: apply does not repoint a concurrent heavy-work sentinel lease", async () => {
+    const { withHeavyWorkLease } = await import("../services/jobs/heavy-work-lease.js");
+    const RENAME_TARGET = "t6-c1-rename";
+    let sentinelProjectId = "";
+    let sentinelProjectIdAfterApply = "";
+
+    const result = await withHeavyWorkLease("maintenance", "project-identity", async () => {
+      const before = await pool.query(
+        `SELECT project_id FROM managed_runs
+         WHERE run_kind = 'maintenance' AND project_id LIKE 'heavy-work:project-identity:%'
+         ORDER BY created_at DESC LIMIT 1`,
+      );
+      sentinelProjectId = before.rows[0]?.project_id;
+      expect(sentinelProjectId).toBeTruthy();
+
+      const renamed = await applyRename(serviceFor(), uniqueOp(), RENAME_TARGET);
+
+      // Still inside the lease — capture the sentinel row again before
+      // withHeavyWorkLease's `finally` releases (deletes) it. The identity
+      // rewrite for SOURCE -> RENAME_TARGET must never have touched this row.
+      const after = await pool.query(
+        `SELECT project_id FROM managed_runs WHERE project_id = $1`,
+        [sentinelProjectId],
+      );
+      sentinelProjectIdAfterApply = after.rows[0]?.project_id;
+      return renamed;
+    });
+
+    expect(result.mode).toBe("rename");
+    expect(sentinelProjectIdAfterApply).toBe(sentinelProjectId);
+    expect(sentinelProjectIdAfterApply.startsWith("heavy-work:")).toBe(true);
+
+    // withHeavyWorkLease released (deleted) its own lease row once the
+    // wrapped fn returned — no row created by this test remains.
+    const afterRelease = await pool.query(
+      `SELECT project_id FROM managed_runs WHERE project_id = $1`,
+      [sentinelProjectId],
+    );
+    expect(afterRelease.rows).toHaveLength(0);
   }, 30_000);
 });

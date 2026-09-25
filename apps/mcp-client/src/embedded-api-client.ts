@@ -60,6 +60,7 @@ import {
   getVectorStore,
   getKeywordSearch,
   getMemoryRepository,
+  withHeavyWorkLease,
 } from "@massa-ai/core";
 import type { PrefetchEntry } from "@massa-ai/core/services";
 import type { ProposalKind, ProposalPayload } from "@massa-ai/core";
@@ -861,37 +862,39 @@ export class EmbeddedApiClient implements ToolProxyApiClient {
     const result: Record<string, number | string> = {};
     const errors: string[] = [];
 
-    if (clearVectors) {
-      try {
-        const vectorStore = await getVectorStore();
-        const keywordSearch = getKeywordSearch();
-        const [vectorsDeleted, keywordsDeleted] = await Promise.all([
-          vectorStore.deleteByProject(projectId),
-          keywordSearch.deleteByProject(projectId),
-        ]);
-        result.vectorsDeleted = vectorsDeleted;
-        result.keywordsDeleted = keywordsDeleted;
-      } catch (e) {
-        errors.push(`vectors: ${(e as Error).message}`);
+    await withHeavyWorkLease("maintenance", `project-reset:${projectId}`, async () => {
+      if (clearVectors) {
+        try {
+          const vectorStore = await getVectorStore();
+          const keywordSearch = getKeywordSearch();
+          const [vectorsDeleted, keywordsDeleted] = await Promise.all([
+            vectorStore.deleteByProject(projectId),
+            keywordSearch.deleteByProject(projectId),
+          ]);
+          result.vectorsDeleted = vectorsDeleted;
+          result.keywordsDeleted = keywordsDeleted;
+        } catch (e) {
+          errors.push(`vectors: ${(e as Error).message}`);
+        }
       }
-    }
-    if (clearSymbols) {
-      try {
-        await workspaceManager.removeWorkspace(projectId);
-        result.symbolsDeleted = "ok";
-      } catch (e) {
-        errors.push(`symbols: ${(e as Error).message}`);
+      if (clearSymbols) {
+        try {
+          await workspaceManager.removeWorkspace(projectId);
+          result.symbolsDeleted = "ok";
+        } catch (e) {
+          errors.push(`symbols: ${(e as Error).message}`);
+        }
       }
-    }
-    if (clearMemories) {
-      try {
-        const repo = getMemoryRepository() as any;
-        const deleted = await repo.deleteByProject(projectId);
-        result.memoriesDeleted = deleted;
-      } catch (e) {
-        errors.push(`memories: ${(e as Error).message}`);
+      if (clearMemories) {
+        try {
+          const repo = getMemoryRepository() as any;
+          const deleted = await repo.deleteByProject(projectId);
+          result.memoriesDeleted = deleted;
+        } catch (e) {
+          errors.push(`memories: ${(e as Error).message}`);
+        }
       }
-    }
+    });
 
     return {
       success: errors.length === 0,

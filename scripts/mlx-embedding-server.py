@@ -37,11 +37,13 @@ Environment:
                               the installer writes into config.json)
     MASSA_AI_MLX_EMBED_PORT   default 1235, one past LM Studio's 1234
     MASSA_AI_MLX_EMBED_HOST   default 127.0.0.1
+    MASSA_AI_MLX_EMBED_MAX_TEXTS  request-size ceiling (default 256)
 """
 
 import json
 import os
 import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DEFAULT_WEIGHTS = os.path.expanduser(
@@ -58,6 +60,18 @@ HOST = os.environ.get("MASSA_AI_MLX_EMBED_HOST") or "127.0.0.1"
 # hand a much larger list, and one oversized MLX graph is an OOM rather than a
 # slow request.
 CHUNK = int(os.environ.get("MASSA_AI_MLX_EMBED_CHUNK") or "32")
+
+# Hard ceiling on texts per request: CHUNK bounds the MLX graph, but a runaway
+# client batch would still own the serialized inference queue for minutes.
+# massa-ai's largest batches are 64 texts; anything larger is a caller bug.
+MAX_TEXTS = int(os.environ.get("MASSA_AI_MLX_EMBED_MAX_TEXTS") or "256")
+
+# Inference is serialized on purpose: concurrent generate() calls multiply MLX
+# graphs in unified memory, and a batch that outlives the client timeout must
+# queue behind its own retries instead of racing them. Racing is what ballooned
+# a 3000-file index to 50GB on 2026-09-24 (the client aborts -> BrokenPipeError
+# in the log while the aborted work kept running -> retry graphs stack on top).
+_INFERENCE_LOCK = threading.Lock()
 
 _model = None
 _tokenizer = None
@@ -79,14 +93,30 @@ def _ensure_loaded():
 
 
 def embed(texts):
-    """Embed a list of strings, returning a list of float lists."""
+    """Embed a list of strings, returning a list of float lists.
+
+    Serialized: one generate() at a time, model load included. Concurrent MLX
+    graphs multiply wired-memory usage, and a batch that outlives the client
+    timeout has to queue behind its own retries rather than race them.
+    """
+    import mlx.core as mx
     from mlx_embeddings import generate
 
-    model, tokenizer = _ensure_loaded()
-    out = []
-    for start in range(0, len(texts), CHUNK):
-        result = generate(model, tokenizer, texts=texts[start : start + CHUNK])
-        out.extend(result.text_embeds.tolist())
+    with _INFERENCE_LOCK:
+        model, tokenizer = _ensure_loaded()
+        out = []
+        for start in range(0, len(texts), CHUNK):
+            result = generate(
+                model, tokenizer, texts=texts[start : start + CHUNK]
+            )
+            out.extend(result.text_embeds.tolist())
+        # Hand cached Metal buffers back: the allocator keeps them for reuse,
+        # and batch shapes vary (the tail chunk is len % CHUNK), so without an
+        # explicit clear the cache grows for the life of the server. The
+        # clear_cache helper moved off the metal submodule in newer MLX; use
+        # whichever this install ships.
+        clear_cache = getattr(mx, "clear_cache", None) or mx.metal.clear_cache
+        clear_cache()
     return out
 
 
@@ -146,6 +176,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not texts:
             self._error(400, "`input` must not be empty")
+            return
+        if len(texts) > MAX_TEXTS:
+            self._error(
+                400,
+                f"`input` accepts at most {MAX_TEXTS} texts, got {len(texts)}",
+            )
             return
 
         try:

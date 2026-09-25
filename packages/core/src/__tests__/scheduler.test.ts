@@ -30,6 +30,8 @@ import type {
   JobKind,
 } from "../services/scheduler/index.js";
 
+const idleHeavyWork = async () => ({ busy: false });
+
 // ── In-memory store (test fixture) ───────────────────────────────────────────
 
 function makeInMemoryStore(): ScheduledJobStore & {
@@ -203,6 +205,7 @@ describe("Scheduler.computeNextRun (interval)", () => {
   test("interval adds intervalMs to the anchor", () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -219,6 +222,7 @@ describe("Scheduler.computeNextRun (interval)", () => {
   test("interval with missing intervalMs falls back to tick", () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 5000,
       maxConcurrent: 2,
@@ -236,6 +240,7 @@ describe("Scheduler.computeNextRun (cron)", () => {
   test("computes next cron run from now", () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -258,6 +263,7 @@ describe("job registry dispatch", () => {
   test("handler is invoked with the job when due", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -290,6 +296,7 @@ describe("job registry dispatch", () => {
   test("no handler → job is still rescheduled (no spin)", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -320,6 +327,7 @@ describe("status()", () => {
   test("reports the real per-job consecutiveFailures, reset by a following success", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -371,6 +379,7 @@ describe("concurrent-execution guard", () => {
   test("same jobKind not run twice concurrently", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 5,
@@ -419,6 +428,7 @@ describe("concurrent-execution guard", () => {
   test("different jobKinds can run concurrently up to maxConcurrent", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -479,6 +489,7 @@ describe("missed-run skip policy", () => {
   test("overdue job (> tick) is skipped + rescheduled, not fired", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000, // 1 min tick
       maxConcurrent: 2,
@@ -514,6 +525,7 @@ describe("missed-run skip policy", () => {
   test("barely-due job (within tick) fires normally", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 2,
@@ -548,6 +560,7 @@ describe("enable/disable", () => {
   test("disabled jobs never fire", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -578,6 +591,7 @@ describe("enable/disable", () => {
   test("setEnabled re-enables a disabled job and reschedules if past due", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -606,6 +620,7 @@ describe("enable/disable", () => {
   test("setEnabled on a non-existent job logs a warning and is a no-op", () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -638,6 +653,7 @@ describe("persistence across simulated restart", () => {
     };
 
     const scheduler1 = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store: store1,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -683,6 +699,7 @@ describe("persistence across simulated restart", () => {
     };
 
     const scheduler2 = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store: store2,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -720,6 +737,7 @@ describe("persistence across simulated restart", () => {
     };
 
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -765,6 +783,7 @@ describe("lifecycle", () => {
   test("start/stop: timer is created and cleared", () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 100,
       maxConcurrent: 2,
@@ -781,6 +800,7 @@ describe("lifecycle", () => {
   test("start when disabled does not create a timer", () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 100,
       maxConcurrent: 2,
@@ -794,6 +814,7 @@ describe("lifecycle", () => {
   test("double start is a no-op", () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 100,
       maxConcurrent: 2,
@@ -813,6 +834,7 @@ describe("status", () => {
   test("returns a snapshot of registered handlers + jobs", () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -845,6 +867,7 @@ describe("disabled master switch", () => {
   test("tick is a no-op when master switch is off", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 1000,
       maxConcurrent: 2,
@@ -878,7 +901,7 @@ describe("readEnabled (env-based construction)", () => {
   test("enabled defaults to false when env not set", () => {
     delete process.env.MASSA_AI_SCHEDULER_ENABLED;
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store });
     expect(scheduler.status().running).toBe(false);
     scheduler.start();
     expect(scheduler.isRunning()).toBe(false);
@@ -888,7 +911,7 @@ describe("readEnabled (env-based construction)", () => {
   test("enabled=true when MASSA_AI_SCHEDULER_ENABLED=true", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "true";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, tickIntervalMs: 60000 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, tickIntervalMs: 60000 });
     scheduler.start();
     expect(scheduler.isRunning()).toBe(true);
     scheduler.stop();
@@ -898,7 +921,7 @@ describe("readEnabled (env-based construction)", () => {
   test("enabled=true when MASSA_AI_SCHEDULER_ENABLED=1", () => {
     process.env.MASSA_AI_SCHEDULER_ENABLED = "1";
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, tickIntervalMs: 60000 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, tickIntervalMs: 60000 });
     scheduler.start();
     expect(scheduler.isRunning()).toBe(true);
     scheduler.stop();
@@ -911,7 +934,7 @@ describe("readEnabled (env-based construction)", () => {
 describe("unregisterHandler", () => {
   test("unregisterHandler removes a handler", async () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     scheduler.registerHandler("unreg-kind" as JobKind, async () => {});
     expect(scheduler.registeredKinds()).toContain("unreg-kind");
     scheduler.unregisterHandler("unreg-kind" as JobKind);
@@ -924,7 +947,7 @@ describe("unregisterHandler", () => {
 describe("registerJob", () => {
   test("registerJob creates a new job with computed nextRunAt", () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     const job = scheduler.registerJob({
       id: "rj-1",
       name: "Register Job Test",
@@ -939,7 +962,7 @@ describe("registerJob", () => {
 
   test("registerJob preserves lastRunAt from existing job", () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     // Seed an existing job with lastRunAt.
     const existing = makeJob({
       id: "rj-2",
@@ -961,7 +984,7 @@ describe("registerJob", () => {
 
   test("registerJob recomputes nextRunAt when schedule changes", () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     // Seed an existing job.
     store.save(makeJob({
       id: "rj-3",
@@ -985,7 +1008,7 @@ describe("registerJob", () => {
 
   test("registerJob preserves nextRunAt when schedule unchanged and nextRunAt != 0", () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     const futureNext = Date.now() + 300_000;
     store.save(makeJob({
       id: "rj-4",
@@ -1010,7 +1033,7 @@ describe("registerJob", () => {
 describe("removeJob", () => {
   test("removeJob deletes a job from the store", () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     store.save(makeJob({ id: "rm-1" }));
     expect(store.get("rm-1")).not.toBeNull();
     scheduler.removeJob("rm-1");
@@ -1024,6 +1047,7 @@ describe("start() with real timer", () => {
   test("start creates a timer that ticks", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 50,
       maxConcurrent: 2,
@@ -1051,6 +1075,7 @@ describe("catchUpMissedJobs", () => {
   test("catchUpMissedJobs fires one tick per missed job", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 5,
@@ -1071,16 +1096,17 @@ describe("catchUpMissedJobs", () => {
       nextRunAt: now - 3 * 60_000,
       schedule: { type: "interval", intervalMs: 60_000 },
     }));
-    const result = scheduler.catchUpMissedJobs(now);
+    const result = await scheduler.catchUpMissedJobs(now);
     // Both are missed (> tickIntervalMs overdue). But same jobKind →
     // concurrency guard: the first fires, the second is skipped (running).
     expect(result.caughtUp + result.skipped).toBe(2);
     await new Promise((r) => setTimeout(r, 50));
   });
 
-  test("catchUpMissedJobs is a no-op when disabled", () => {
+  test("catchUpMissedJobs is a no-op when disabled", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       enabled: false,
@@ -1089,14 +1115,15 @@ describe("catchUpMissedJobs", () => {
       id: "catchup-disabled",
       nextRunAt: Date.now() - 5 * 60_000,
     }));
-    const result = scheduler.catchUpMissedJobs();
+    const result = await scheduler.catchUpMissedJobs();
     expect(result.caughtUp).toBe(0);
     expect(result.skipped).toBe(0);
   });
 
-  test("catchUpMissedJobs skips jobs not yet missed (within tick window)", () => {
+  test("catchUpMissedJobs skips jobs not yet missed (within tick window)", async () => {
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 60_000,
       maxConcurrent: 5,
@@ -1110,7 +1137,7 @@ describe("catchUpMissedJobs", () => {
       nextRunAt: Date.now() - 10_000,
       schedule: { type: "interval", intervalMs: 60_000 },
     }));
-    const result = scheduler.catchUpMissedJobs();
+    const result = await scheduler.catchUpMissedJobs();
     expect(result.caughtUp).toBe(0);
   });
 });
@@ -1120,13 +1147,13 @@ describe("catchUpMissedJobs", () => {
 describe("isJobRunning", () => {
   test("isJobRunning returns false when no handler is running", () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true });
     expect(scheduler.isJobRunning("test-kind" as JobKind)).toBe(false);
   });
 
   test("isJobRunning returns true while a handler is executing", async () => {
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store, enabled: true, maxConcurrent: 5 });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store, enabled: true, maxConcurrent: 5 });
     const runningCheck = new Promise<void>((resolve) => {
       scheduler.registerHandler("running-kind" as JobKind, async () => {
         // While this handler runs, isJobRunning should return true.
@@ -1171,7 +1198,7 @@ describe("singleton", () => {
 // ── SCH-02: ctor resolution chain (T6) ──────────────────────────────────────
 //
 // opts.X ?? env ?? config ?? literal. The `SchedulerOptions` test seams above
-// (every `new Scheduler({ store, tickIntervalMs, maxConcurrent, enabled })`
+// (every `new Scheduler({ heavyWorkProbe: idleHeavyWork, store, tickIntervalMs, maxConcurrent, enabled })`
 // call in this file) stay first in precedence and are unchanged by T6 — they
 // never reach the config layer at all, which the "existing seam-based cases
 // stay green" run above (49 pass, pre-existing DATABASE_URL-gated failures
@@ -1249,6 +1276,7 @@ describe("SCH-02 ctor resolution chain (T6)", () => {
 
     const store = makeInMemoryStore();
     const scheduler = new Scheduler({
+  heavyWorkProbe: idleHeavyWork,
       store,
       tickIntervalMs: 555,
       maxConcurrent: 3,
@@ -1267,7 +1295,7 @@ describe("SCH-02 ctor resolution chain (T6)", () => {
     mockSchedulerConfig({ enabled: false, tickMs: 1111, maxConcurrent: 1 });
 
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store });
     const fields = privateFields(scheduler);
     expect(fields.tickIntervalMs).toBe(4242);
     expect(fields.maxConcurrent).toBe(6);
@@ -1278,7 +1306,7 @@ describe("SCH-02 ctor resolution chain (T6)", () => {
     mockSchedulerConfig({ enabled: true, tickMs: 12345, maxConcurrent: 7 });
 
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store });
     const fields = privateFields(scheduler);
     expect(fields.tickIntervalMs).toBe(12345);
     expect(fields.maxConcurrent).toBe(7);
@@ -1291,7 +1319,7 @@ describe("SCH-02 ctor resolution chain (T6)", () => {
     mockSchedulerConfig({ tickMs: 7000 });
 
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store });
     const fields = privateFields(scheduler);
     expect(fields.tickIntervalMs).toBe(7000);
     expect(fields.maxConcurrent).toBe(2);
@@ -1302,7 +1330,7 @@ describe("SCH-02 ctor resolution chain (T6)", () => {
     mockSchedulerConfig(undefined);
 
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store });
     const fields = privateFields(scheduler);
     expect(fields.tickIntervalMs).toBe(60_000);
     expect(fields.maxConcurrent).toBe(2);
@@ -1317,7 +1345,7 @@ describe("SCH-02 ctor resolution chain (T6)", () => {
     mockSchedulerConfig({ enabled: true });
 
     const store = makeInMemoryStore();
-    const scheduler = new Scheduler({ store });
+    const scheduler = new Scheduler({ heavyWorkProbe: idleHeavyWork, store });
     expect(privateFields(scheduler).enabled).toBe(false);
   });
 });

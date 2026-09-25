@@ -47,7 +47,9 @@ export const dashboardRoutes = new Elysia({ prefix: "/api/v1" })
             lastError: j.lastError,
             due: j.due,
             currentlyRunning: j.currentlyRunning,
+            deferred: j.deferred,
           })),
+          heavyWork: status.heavyWork,
         };
       } catch (e) {
         const err = e as Error;

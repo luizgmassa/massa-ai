@@ -17,6 +17,7 @@ import {
   getSearchCache,
   getVectorStore,
   workspaceManager,
+  withHeavyWorkLease,
   type ActorContext,
   type ProjectIdentityService,
   UNKNOWN_ACTOR,
@@ -225,45 +226,47 @@ export const projectRoutes = new Elysia({ prefix: "/api/v1/project" })
       const result: Record<string, number | string> = {};
       const errors: string[] = [];
 
-      if (clearVectors) {
-        try {
-          const vectorStore = await getVectorStore();
-          const keywordSearch = getKeywordSearch();
-          const [vectorsDeleted, keywordsDeleted] = await Promise.all([
-            vectorStore.deleteByProject(projectId),
-            keywordSearch.deleteByProject(projectId),
-          ]);
-          result.vectorsDeleted = vectorsDeleted;
-          // Lexical rows are another representation of the indexed chunks,
-          // so clearVectors governs both semantic and lexical search data.
-          result.keywordsDeleted = keywordsDeleted;
-          // Invalidate the in-process search cache (L1 + L2). Without this,
-          // queries served from L1 keep returning stale chunk metadata
-          // (file/lineStart/lineEnd) until the process restarts.
-          await getSearchCache().invalidateProject(projectId);
-        } catch (e) {
-          errors.push(`vectors: ${(e as Error).message}`);
+      await withHeavyWorkLease("maintenance", `project-reset:${projectId}`, async () => {
+        if (clearVectors) {
+          try {
+            const vectorStore = await getVectorStore();
+            const keywordSearch = getKeywordSearch();
+            const [vectorsDeleted, keywordsDeleted] = await Promise.all([
+              vectorStore.deleteByProject(projectId),
+              keywordSearch.deleteByProject(projectId),
+            ]);
+            result.vectorsDeleted = vectorsDeleted;
+            // Lexical rows are another representation of the indexed chunks,
+            // so clearVectors governs both semantic and lexical search data.
+            result.keywordsDeleted = keywordsDeleted;
+            // Invalidate the in-process search cache (L1 + L2). Without this,
+            // queries served from L1 keep returning stale chunk metadata
+            // (file/lineStart/lineEnd) until the process restarts.
+            await getSearchCache().invalidateProject(projectId);
+          } catch (e) {
+            errors.push(`vectors: ${(e as Error).message}`);
+          }
         }
-      }
 
-      if (clearSymbols) {
-        try {
-          await workspaceManager.removeWorkspace(projectId);
-          result.symbolsCleared = 1;
-        } catch {
-          // workspace may not exist — treat as success
-          result.symbolsCleared = 0;
+        if (clearSymbols) {
+          try {
+            await workspaceManager.removeWorkspace(projectId);
+            result.symbolsCleared = 1;
+          } catch {
+            // workspace may not exist — treat as success
+            result.symbolsCleared = 0;
+          }
         }
-      }
 
-      if (clearMemories) {
-        try {
-          result.memoriesDeleted =
-            await getMemoryRepository().deleteByProject(projectId);
-        } catch (e) {
-          errors.push(`memories: ${(e as Error).message}`);
+        if (clearMemories) {
+          try {
+            result.memoriesDeleted =
+              await getMemoryRepository().deleteByProject(projectId);
+          } catch (e) {
+            errors.push(`memories: ${(e as Error).message}`);
+          }
         }
-      }
+      });
 
       const outcome = errors.length > 0
         ? (errors.length >= 3 ? ("failure" as const) : ("partial" as const))

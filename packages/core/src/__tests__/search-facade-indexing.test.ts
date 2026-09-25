@@ -125,6 +125,7 @@ mock.module("@massa-ai/shared", () => {
 
 import { ContextualSearchRLM } from "../services/search/contextual-search-rlm.js";
 import { runWithIndexLock } from "../services/search/project-indexer.js";
+import { _setHeavyWorkRepositoryForTesting } from "../services/jobs/heavy-work-lease.js";
 
 // ── runWithIndexLock ────────────────────────────────────────────────────────
 
@@ -418,6 +419,60 @@ describe("ensureFreshIndex", () => {
     };
     const result = await rlm.ensureFreshIndex("proj", "/path");
     expect(result.reindexed).toBe(true);
+  });
+});
+
+describe("ensureFreshIndex — incremental reindex heavy-work lease", () => {
+  afterEach(() => {
+    _setHeavyWorkRepositoryForTesting(null);
+  });
+
+  test("takes a reindex lease labelled incremental-reindex:<projectId> and releases it", async () => {
+    const beginCalls: Array<{ projectId: string; runKind: string; eventId: string }> = [];
+    let released = false;
+    _setHeavyWorkRepositoryForTesting({
+      begin: async (input: any) => {
+        beginCalls.push({ projectId: input.projectId, runKind: input.runKind, eventId: input.eventId });
+        return {
+          status: "acquired",
+          lease: {
+            runId: "1",
+            projectId: input.projectId,
+            runKind: input.runKind,
+            leaseToken: "t",
+            leaseExpiresAt: Date.now() + 90_000,
+            eventId: input.eventId,
+          },
+        };
+      },
+      heartbeat: async () => ({ status: "renewed", leaseExpiresAt: Date.now() + 90_000 }),
+      release: async () => { released = true; return { status: "aborted", runId: "1" }; },
+      getAnyActive: async () => null,
+    } as any);
+
+    const rlm = new ContextualSearchRLM({
+      vectorStore: {} as any, keywordSearch: {} as any,
+      searchCache: { invalidateProject: async () => {} } as any,
+      symbolRepo: { getCentrality: async () => new Map() } as any,
+    } as any);
+    (rlm as any).initialized = true;
+    (rlm as any).searchCache = { invalidateProject: async () => {} };
+    (rlm as any).symbolRepo = { getCentrality: async () => new Map() };
+    (rlm as any).indexManager = {
+      isIndexStale: async () => ({ isStale: true, reason: "files_changed" }),
+      getFilesToReindex: async () => ["a.ts"],
+      updateIndexMetadata: async () => {},
+    };
+    rlm.indexFile = async () => ({ chunks: 1 });
+
+    const result = await rlm.ensureFreshIndex("lease-proj", "/path");
+
+    expect(result.reindexed).toBe(true);
+    expect(beginCalls).toHaveLength(1);
+    expect(beginCalls[0]!.runKind).toBe("reindex");
+    expect(beginCalls[0]!.projectId.startsWith("heavy-work:incremental-reindex:lease-proj:")).toBe(true);
+    expect(beginCalls[0]!.eventId).toBe("heavy-work:incremental-reindex:lease-proj");
+    expect(released).toBe(true);
   });
 });
 

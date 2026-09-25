@@ -57,6 +57,7 @@ import type { getKeywordSearch } from "../../data/keyword/keyword-search-factory
 import type { getVectorStore } from "../vector/vector-store-factory.js";
 import type { getSearchCache } from "./cache-factory.js";
 import type { getSymbolRepository } from "../../data/symbol/symbol-repository-factory.js";
+import { runIncrementalReindex } from "./incremental-reindex.js";
 
 const globAsync = glob;
 
@@ -530,39 +531,7 @@ export async function ensureFreshIndex(
     fileCount: filesToReindex.length,
   });
 
-  // Load centrality map so chunks carry PageRank scores. Alias-resolved for
-  // the same reason as the full-index path above (BUG-05).
-  const centralityMap = await deps.symbolRepo.getCentrality(
-    await getProjectIdentityAliasResolver().resolve(projectId),
-  );
-
-  let filesIndexed = 0;
-  let chunksIndexed = 0;
-  let errors = 0;
-
-  for (const relativeFilePath of filesToReindex) {
-    try {
-      const fullPath = path.join(projectPath, relativeFilePath);
-      const result = await deps.indexFile(fullPath, projectId, projectPath, centralityMap);
-      filesIndexed++;
-      chunksIndexed += result.chunks;
-    } catch (error) {
-      logger.error("Failed to reindex file", error as Error, {
-        file: relativeFilePath,
-      });
-      errors++;
-    }
-  }
-
-  // Update metadata
-  await deps.indexManager.updateIndexMetadata(
-    projectId,
-    projectPath,
-    filesToReindex,
-  );
-
-  // Invalidate cache after incremental reindex
-  await deps.searchCache.invalidateProject(projectId);
+  const { filesIndexed, chunksIndexed, errors } = await runIncrementalReindex(deps, projectId, projectPath, filesToReindex);
 
   logger.info("Incremental reindex completed", {
     projectId,

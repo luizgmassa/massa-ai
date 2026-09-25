@@ -278,4 +278,86 @@ describe.skipIf(!DB_AVAILABLE)("ManagedRunRepository (PostgreSQL)", () => {
     expect(outcome.status).toBe("lease_lost");
     await cleanupProject(currentProjectId);
   });
+
+  // ── getAnyActive / release (heavy-work sentinel lease support) ───────────
+
+  test("getAnyActive() sees a live row right after begin(), and the row is ours by id", async () => {
+    const acquired = await repository.begin({
+      projectId: currentProjectId,
+      runKind: "maintenance",
+      eventId: `evt-${randomUUID()}`,
+    });
+    if (acquired.status !== "acquired") throw new Error("expected acquired");
+    // Shared DB may hold other live rows from concurrent tests — assert only
+    // that SOME live row is visible, then confirm OURS specifically via the
+    // project/kind-scoped getActive() (safe under a shared DB).
+    const any = await repository.getAnyActive();
+    expect(any).not.toBeNull();
+    const ours = await repository.getActive(currentProjectId, "maintenance");
+    expect(ours).not.toBeNull();
+    expect(ours!.runId).toBe(acquired.lease.runId);
+    await cleanupProject(currentProjectId);
+  });
+
+  test("getAnyActive() never surfaces our own expired row (checked by row id, not global state)", async () => {
+    const acquired = await repository.begin({
+      projectId: currentProjectId,
+      runKind: "maintenance",
+      eventId: `evt-${randomUUID()}`,
+      leaseTtlMs: 1_000,
+    });
+    if (acquired.status !== "acquired") throw new Error("expected acquired");
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    const any = await repository.getAnyActive();
+    // Whatever getAnyActive() returns (possibly another live row from a
+    // concurrent test, possibly null) it must not be our now-expired row.
+    expect(any?.runId).not.toBe(acquired.lease.runId);
+    // Compare against the DB's own clock (not host Date.now()), matching the
+    // "begin() acquires a lease" test above — the two clocks are not assumed
+    // to agree.
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
+    const rows = await getPrismaClient().$queryRaw<Array<{ status: string; lease_expires_at: Date }>>`
+      SELECT status, lease_expires_at FROM managed_runs WHERE id = ${BigInt(acquired.lease.runId)}
+    `;
+    const dbNowRows = await getPrismaClient().$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`;
+    expect(rows[0]?.status).toBe("active");
+    expect(rows[0]!.lease_expires_at.getTime()).toBeLessThan(dbNowRows[0]!.now.getTime());
+    await cleanupProject(currentProjectId);
+  });
+
+  test("getAnyActive() never surfaces a row we already released (checked by row id, not global state)", async () => {
+    const acquired = await repository.begin({
+      projectId: currentProjectId,
+      runKind: "maintenance",
+      eventId: `evt-${randomUUID()}`,
+    });
+    if (acquired.status !== "acquired") throw new Error("expected acquired");
+    const released = await repository.release(acquired.lease);
+    expect(released.status).toBe("aborted");
+    const any = await repository.getAnyActive();
+    expect(any?.runId).not.toBe(acquired.lease.runId);
+  });
+
+  test("release() deletes the row by id and returns lease_lost for a wrong token", async () => {
+    const acquired = await repository.begin({
+      projectId: currentProjectId,
+      runKind: "maintenance",
+      eventId: `evt-${randomUUID()}`,
+    });
+    if (acquired.status !== "acquired") throw new Error("expected acquired");
+    const wrong = { ...acquired.lease, leaseToken: `wrong-${acquired.lease.leaseToken}` };
+    const wrongOutcome = await repository.release(wrong);
+    expect(wrongOutcome.status).toBe("lease_lost");
+
+    const released = await repository.release(acquired.lease);
+    expect(released.status).toBe("aborted");
+    if (released.status !== "aborted") throw new Error("expected aborted");
+    expect(released.runId).toBe(acquired.lease.runId);
+
+    const { getPrismaClient } = await import("../kernel/prisma-client.js");
+    const rows = await getPrismaClient().$queryRaw<Array<{ id: bigint }>>`
+      SELECT id FROM managed_runs WHERE id = ${BigInt(acquired.lease.runId)}
+    `;
+    expect(rows).toHaveLength(0);
+  });
 });

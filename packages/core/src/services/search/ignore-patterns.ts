@@ -79,6 +79,11 @@ export const DEFAULT_IGNORES = [
   "**/package-lock.json",
   "**/bun.lockb",
   "**/yarn.lock",
+  // CocoaPods checkouts: vendored dependencies and binary frameworks whose
+  // LICENSE.md/.swiftmodule files parse as junk symbols (a Pod LICENSE.md
+  // once aborted graph activation with an FQN-suffix error, leaving
+  // filesLoaded one short of discovery and tripping file_count_mismatch).
+  "**/Pods/**",
 ];
 
 /**
