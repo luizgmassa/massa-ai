@@ -35,30 +35,39 @@ function bundledSkills(): string[] {
 
 const scratchRoots: string[] = [];
 
-function newScratch(label: string): { root: string; home: string; config: string } {
+type Scratch = { root: string; home: string; config: string; tmp: string };
+
+function newScratch(label: string): Scratch {
   const root = mkdtempSync(path.join(tmpdir(), `massa-ai-claude-e2e-${label}-`));
   scratchRoots.push(root);
   const home = path.join(root, "home");
   const config = path.join(root, "config");
+  const tmp = path.join(root, "tmp");
   mkdirSync(home);
   mkdirSync(config);
-  return { root, home, config };
+  mkdirSync(tmp);
+  return { root, home, config, tmp };
 }
 
-function isolatedEnv(scratch: { home: string; config: string }): Record<string, string> {
-  const env: Record<string, string | undefined> = {
-    ...process.env,
-    HOME: scratch.home,
-    CLAUDE_CONFIG_DIR: scratch.config,
-    ANTHROPIC_BASE_URL: UNREACHABLE_API,
-  };
-  for (const key of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "DATABASE_URL"]) {
+function isolatedEnv(scratch: Scratch): Record<string, string> {
+  const env: Record<string, string | undefined> = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (/^(MASSA_AI_|CLAUDE_CODE_)/.test(key)) delete env[key];
+  }
+  for (const key of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDECODE", "DATABASE_URL", "XDG_CONFIG_HOME"]) {
     delete env[key];
   }
-  return env as Record<string, string>;
+  return {
+    ...env,
+    HOME: scratch.home,
+    TMPDIR: scratch.tmp,
+    CLAUDE_CONFIG_DIR: scratch.config,
+    ANTHROPIC_BASE_URL: UNREACHABLE_API,
+    MASSA_AI_API_BASE: UNREACHABLE_API,
+  } as Record<string, string>;
 }
 
-function claude(args: string[], scratch: { home: string; config: string }) {
+function claude(args: string[], scratch: Scratch) {
   const proc = Bun.spawnSync([CLAUDE_BIN as string, ...args], {
     cwd: REPO_ROOT,
     env: isolatedEnv(scratch),
@@ -71,7 +80,10 @@ function claude(args: string[], scratch: { home: string; config: string }) {
 
 type StreamEvent = Record<string, any>;
 
-function printSession(pluginDir: string, extraArgs: string[] = []): { init: StreamEvent; result: StreamEvent } {
+function printSession(
+  pluginDir: string,
+  extraArgs: string[] = [],
+): { init: StreamEvent; result: StreamEvent; scratch: Scratch } {
   const scratch = newScratch("session");
   const run = claude(
     ["-p", "--output-format", "stream-json", "--verbose", "--plugin-dir", pluginDir, ...extraArgs, "noop"],
@@ -86,7 +98,7 @@ function printSession(pluginDir: string, extraArgs: string[] = []): { init: Stre
   if (!init || !result) {
     throw new Error(`no init/result event (exit ${run.code}): ${run.stderr.slice(0, 500)}`);
   }
-  return { init, result };
+  return { init, result, scratch };
 }
 
 function detailsSection(details: string, heading: string): string[] {
@@ -165,6 +177,7 @@ describe.skipIf(!CLAUDE_BIN)("Tier D — claude CLI, credential-free (EB-CB-1..5
   describe("EB-CB-2/3/5 a print-mode session loads plugin, MCP server and agents", () => {
     let init: StreamEvent;
     let result: StreamEvent;
+    let session: Scratch;
 
     beforeAll(() => {
       if (!existsSync(MCP_BIN)) throw new Error(`${MCP_BIN} is missing — run \`bun run build\` first`);
@@ -176,12 +189,16 @@ describe.skipIf(!CLAUDE_BIN)("Tier D — claude CLI, credential-free (EB-CB-1..5
           mcpServers: { "massa-ai-e2e": { type: "stdio", command: process.execPath, args: [MCP_BIN] } },
         }),
       );
-      ({ init, result } = printSession(PLUGIN_ROOT, ["--mcp-config", mcpConfig, "--strict-mcp-config"]));
+      ({ init, result, scratch: session } = printSession(PLUGIN_ROOT, ["--mcp-config", mcpConfig, "--strict-mcp-config"]));
     }, 60_000);
 
     test("the session spends nothing: no credential, zero cost", () => {
       expect(init.apiKeySource).toBe("none");
       expect(result.total_cost_usd).toBe(0);
+    });
+
+    test("the plugin's hooks ran and wrote only inside the scratch TMPDIR", () => {
+      expect(readdirSync(path.join(session.tmp, "massa-ai-hooks")).length).toBeGreaterThan(0);
     });
 
     test("EB-CB-2 the plugin loads at this checkout's version with no plugin errors", () => {
