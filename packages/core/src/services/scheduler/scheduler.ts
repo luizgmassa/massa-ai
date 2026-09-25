@@ -123,6 +123,8 @@ export class Scheduler {
   private heavyWorkReason: string | null = null;
   private lastProbeError: string | null = null;
   private consecutiveProbeFailures = 0;
+  private evaluating = false;
+  private pendingTickAt: number | null = null;
 
   private timer: ReturnType<typeof setInterval> | null = null;
   private started = false;
@@ -349,7 +351,16 @@ export class Scheduler {
   async catchUpMissedJobs(
     now: number = Date.now(),
   ): Promise<{ caughtUp: number; skipped: number; deferred: number }> {
-    if (!this.enabled) return { caughtUp: 0, skipped: 0, deferred: 0 };
+    if (!this.enabled || this.evaluating) return { caughtUp: 0, skipped: 0, deferred: 0 };
+    this.evaluating = true;
+    try {
+      return await this.catchUpOnce(now);
+    } finally {
+      this.evaluating = false;
+    }
+  }
+
+  private async catchUpOnce(now: number): Promise<{ caughtUp: number; skipped: number; deferred: number }> {
     const jobs = this.store.listEnabled();
     let skipped = 0;
     const missed: ScheduledJob[] = [];
@@ -389,6 +400,7 @@ export class Scheduler {
       this.timer = null;
     }
     this.started = false;
+    this.pendingTickAt = null;
     logger.info("Scheduler stopped");
   }
 
@@ -405,15 +417,37 @@ export class Scheduler {
   async tick(now: number = Date.now()): Promise<TickResult> {
     const result: TickResult = { evaluated: 0, fired: 0, skipped: 0, errors: 0, deferred: 0 };
     if (!this.enabled) return result;
+    if (this.evaluating) {
+      this.pendingTickAt = now;
+      return result;
+    }
+    this.evaluating = true;
+    try {
+      return await this.tickOnce(now, result);
+    } finally {
+      this.evaluating = false;
+      const pending = this.pendingTickAt;
+      this.pendingTickAt = null;
+      if (pending !== null) {
+        void this.tick(pending).catch((e) => {
+          logger.warn("Scheduler tick failed (swallowed)", { error: e as Error });
+        });
+      }
+    }
+  }
 
-    const jobs = this.store.listEnabled();
+  private async tickOnce(now: number, result: TickResult): Promise<TickResult> {
+    let jobs = this.store.listEnabled();
     result.evaluated = jobs.length;
 
     const due = jobs.filter((job) => !this.running.has(job.jobKind) && job.nextRunAt <= now);
-    if (due.length > 0 && (await this.heavyWorkBusy())) {
-      for (const job of due) this.deferred.add(job.id);
-      result.deferred = due.length;
-      return result;
+    if (due.length > 0) {
+      if (await this.heavyWorkBusy()) {
+        for (const job of due) this.deferred.add(job.id);
+        result.deferred = due.length;
+        return result;
+      }
+      jobs = this.store.listEnabled();
     }
 
     for (const job of jobs) {
@@ -570,6 +604,22 @@ export class Scheduler {
     })();
   }
 
+  /**
+   * Resolve once the store's synchronous reads reflect persisted state.
+   *
+   * EB-SCH-6: `registerOrResumeJob` decides whether to preserve or recompute
+   * `nextRunAt` by comparing against `store.get(id)`. On a PostgreSQL-backed
+   * store that read is served from a mirror hydrated asynchronously, so calling
+   * it at boot before hydration made every persisted job look new and silently
+   * restarted the schedule. Await this before registering; the tick loop must
+   * not, and does not.
+   *
+   * A store with no `ready()` is authoritative in memory and already ready.
+   */
+  async ready(): Promise<void> {
+    await this.store.ready?.();
+  }
+
   // ── Status (optional debug endpoint) ──────────────────────────────────────
 
   status(now: number = Date.now()): SchedulerStatus {
@@ -585,8 +635,15 @@ export class Scheduler {
         enabled: j.enabled,
         nextRunAt: j.nextRunAt,
         lastRunAt: j.lastRunAt,
+        // EB-SCH-3b. `fireJob` maintains and persists all four of these; until
+        // they were carried here the only HTTP health surface reported every
+        // job as never-succeeded and never-failed. `?? null` / `?? 0` normalise
+        // the optional persisted shape, so a snapshot consumer never has to
+        // tell "field absent" from "never succeeded".
         lastSuccessAt: j.lastSuccessAt ?? null,
+        lastFailureAt: j.lastFailureAt ?? null,
         consecutiveFailures: j.consecutiveFailures ?? 0,
+        lastError: j.lastError ?? null,
         due: j.enabled && j.nextRunAt <= now,
         currentlyRunning: this.running.has(j.jobKind),
         deferred: this.deferred.has(j.id),

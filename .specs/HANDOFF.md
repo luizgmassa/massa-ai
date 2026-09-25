@@ -1,4 +1,174 @@
-# Handoff — agent-roster-consolidation (COMPLETE 2026-09-23 — T1–T13 across 5 Phases; independent validation PASS at 49/49 ACs, 9/9 mutations killed)
+# Handoff — e2e-feature-battery (MERGED v1.64.0 + T1b.4, T4.1, T4b.1 DELIVERED 2026-09-24; Tier A matrix run on LM Studio, all green after the bootstrap-schema fix 2026-09-25; unpushed, no PR)
+
+**Branch:** `test/e2e-feature-battery`, worktree `~/Projects/massa-ai-wt-e2e-battery`, merged
+with `main` at v1.64.0 (`802b1185`). 10 commits this session on top of the merge.
+
+**Read `.specs/features/e2e-feature-battery/validation.md` § "Third session" first.**
+
+**What shipped.**
+- Merge: 12 conflicts; e2e-stack pins follow main's new Ollama defaults (0.6b/1024, qwen3-vl:8b).
+- T1b.4 (`dc55da1f`): MCP server no longer crashes at load without `DATABASE_URL`.
+- T4.1 (`7be3e1f2`): `apps/claude-plugin/__tests__/claude-cli-e2e.test.ts`, EB-CB-1..5, zero cost.
+- T4b.1 (`1e058454`): `MASSA_AI_E2E_PROVIDER=lmstudio` for the live stack.
+- Test repairs: N15 width branch, EB-CFG-3 seeded-key label (`6dd33714`), EB-LLM-3b log literal (`603056b8`).
+- EB-LLM-3/6 read the reranker's own log lines (`b719d1b7`); bootstrap seed schema drops
+  `summary.max(512)`, which stalled LM Studio's MLX grammar engine (`8aa2a51f`). `llm-on`
+  suite 30 is 9/0/0 twice on the default coder model.
+
+**Decisions (user, 2026-09-24):** EB-CB-5 moved into T4.1; fix the MCP crash here; port the
+stack to LM Studio rather than pull Ollama models; stop the orphaned coverage Postgres on
+:5433 (`/tmp/massa-ai-cov-pg`, stopped with `pg_ctl`, data dir left on disk).
+**Decision (user, 2026-09-25):** fix the bootstrap-seed schema in this branch.
+
+**Exact next step.** Push and open the PR — the user's call. The independent verification
+ran 2026-09-25 (validation.md § "Independent verification"); its findings 1–5 are fixed and
+6–8 are recorded as kept.
+
+**State left running.** The dedicated stack is up (`bash scripts/e2e-stack.sh status`),
+profile `default` (suite 30 restores it on exit), provider `lmstudio`. `bash scripts/e2e-stack.sh down` stops Postgres :5433
+and the API :3334 and never touches LM Studio.
+
+**Traps this session paid for.**
+- Local `bun run test` needs `DATABASE_URL` exported — the isolation runner's scratch config
+  hides `config.json`'s URL (50 fast reds otherwise).
+- `--bare` hides plugin agents from `init.agents`; without it the keychain is readable, so
+  Tier D pins `ANTHROPIC_BASE_URL` to an unreachable port and asserts zero cost.
+- A dropped index is re-created by the test's own indexing — that mutation resolves to nothing.
+- zsh does not word-split `$VAR`; two probes silently ran the wrong command.
+
+**Unowned working-tree change, unchanged.** `.gitignore` (`.ralphy/`) and `.specs/lessons.json`
+(removes L-002..L-005). This session briefly restored `lessons.json` from HEAD during the
+merge, then re-applied the same 76-line removal; both remain uncommitted for the user.
+
+# Previous handoff — e2e-feature-battery (PHASES 0/1/1b/2 DELIVERED 2026-09-07 — 15 commits; independent validation returned FAIL, its five findings are closed, RE-VERIFICATION IS OWED; unpushed, no PR)
+
+**Branch:** `test/e2e-feature-battery`, off `main@d32fce58` (main has not moved). Worktree
+`~/Projects/massa-ai-wt-e2e-battery`.
+
+**Read `.specs/features/e2e-feature-battery/validation.md` first.** It carries the verifier's
+own report unedited — including its FAIL verdict — followed by a separately-marked
+implementer section recording what closed each finding. The verdict was deliberately not
+overwritten by the person it was returned to.
+
+**What shipped this session.** The tracking artifacts were re-specified to the measured truth
+(they claimed Phase 1 was not started while ten commits had delivered it); the three product
+defects the battery had found and nobody had fixed were fixed; Tier B was re-specified around
+two falsified premises and delivered; and five regressions found by independent validation
+were repaired.
+
+**Measured.** `bun run test --force --continue` **12 of 12 tasks, 0 cached, exit 0**.
+type-check 6/6, lint clean, `check-core-layering` PASS (0 violations, 998 edges, 1100 files).
+Tier A per profile with skip populations held constant: `29.audit-repairs` 14/1/0 →
+**15/0/0**; `26.scheduler` `scheduler-on` 8/1/6 → **9/0/6**; `scheduler-fast` 7/1/7 →
+**8/0/7**. Every other cell identical to baseline.
+
+**Exact next step — three, in order.**
+
+1. **Re-verify.** The FAIL verdict stands on the record until someone who did not write the
+   repairs confirms them. That is the only thing between this branch and a PR.
+2. Push and open the PR (the user's call). `[Unreleased]` carries both `### Added` and
+   `### Fixed`, so this cuts a **minor** bump.
+3. `bun skills/massa-ai/scripts/check_specs_delivered.ts e2e-feature-battery --root .` exits
+   **1**, and it cannot exit 0 while `.specs/lessons.json` stays uncommitted. All seven
+   required paths exist; both errors are the unowned working-tree files below.
+
+**Traps this session paid for.**
+
+- **A truncated sweep is not a population.** `git grep … | head -20` was used to enumerate the
+  consumers of `generate:artifacts`; the code consumer that *parses* that script
+  (`model-registry-stream.ts:130`) was below the cut, and the change broke two endpoints at
+  runtime. The aggregate went to 11 of 12 and only independent validation caught it.
+- **A load reading is not a reading.** The same file, same commit, same stack gave
+  `6 pass / 2 fail / 7 skip` at 1-minute load 11.05 and `8 pass / 0 fail / 7 skip` at load
+  3.36. `spec.md` puts anything above load 6 out of scope; that clause is load-bearing.
+- **A test can assert the defect as the contract.** `dashboard.test.ts` asserted
+  `lastSuccessAt: null` against a stub carrying no such field — it passed only because the
+  route hardcoded it, and would have gone red at the fix rather than before it.
+- **A mutation that leaves an equivalent path is not a mutation.** The dropped pty coverage of
+  `install.sh`'s menus failed because `s|S|"") return` gives an answered `s` and an unread
+  prompt the same branch, so the sensor could not fail for its own reason.
+- **`test:scripts` skipped all 38 shell suites** whenever its bun half failed. Fixed; the exit
+  code is unchanged either way, only the coverage grew.
+
+**Open, not ours to close.** Five suites are red on `main` with identical counts here and
+there: `cursor-bridge-delivery` 13/3, `plugin-registry-registration` 43/4,
+`hook-ownership-orphans` 12/10, plus the two `pyts golden: lessons` cases. Root cause untraced.
+Three of them were invisible until the `test:scripts` repair above.
+
+**Unowned working-tree change, unchanged across three sessions now.**
+`.specs/lessons.json` removes L-002 through L-005 and `.gitignore` adds `.ralphy/`. Neither
+was written by any session that worked this branch; both are left for the user. L-004 is stale
+regardless — it describes a SQLite fallback removed in `5d43a96f`.
+
+**Deferred, specified, not built.** Tier C (Playwright Admin Portal, 3 Tasks) — it needs
+`@playwright/test` plus edits to two shared blocking-gate surfaces (`bunfig.toml` `testMatch`,
+`check-coverage.ts`'s unscoped web-ui group), and 15 fake-DOM suites already cover most of what
+it would assert. Tier D's credentialed group and eval harness (1 Task) — `--max-cost-usd`
+exists only on `claude plugin eval`, so the group as originally specified had no cost ceiling.
+
+# Previous handoff — e2e-feature-battery (PHASE 0 COMPLETE 2026-09-06 — 3 commits, 5 of 21 Tasks; gates green except the unverified workspace aggregate; unpushed, no PR)
+
+**Branch:** `test/e2e-feature-battery`, off `main@d32fce58`. Worktree
+`~/Projects/massa-ai-wt-e2e-battery`. Primary checkout is back on `main` and clean.
+
+**Read `.specs/features/e2e-feature-battery/validation.md` first.** It carries the
+isolation evidence, both measured runs, the product defect's root cause, and the
+mutation record for every new sensor.
+
+**What shipped.** `scripts/prepare-e2e-fixture.ts` and `scripts/e2e-stack.sh` make the
+live-stack suite startable from the repository for the first time. Six E2E tests that
+asserted removed contracts were repaired. One product defect the battery exposed — a lost
+race for a project's own `workspaces` row — was fixed in `services/etl/pipeline.ts` and
+guarded by `packages/core/src/__tests__/etl-workspace-row-ordering.test.ts`.
+
+**Measured.** 223 pass / 5 fail / 4 skip → 231/1/3 after the test repairs → **232 pass /
+0 fail / 3 skip, 235 tests across 16 files, 361.14 s, exit 0**. `17.cleanup-verify` 2/0.
+`graph_generation_workspace_missing`: 3 distinct projects before the fix, **0** across the
+full post-fix suite. `type-check` 6/6, `check-core-layering` PASS (0 violations, 998
+edges), `lint` clean, `build` 6/6, `turbo-passthrough-env` 3/3.
+
+**Exact next step.** Re-run `bun run test` with the dedicated-stack variables UNSET. The
+only attempt was polluted by them: `apps/tools-api/src/routes/system.test.ts` asserts the
+default `http://localhost:11434` and saw `http://127.0.0.1:11435`. That suite alone
+re-measured 9 pass / 0 fail clean; the aggregate was never re-run, so it is unverified,
+not green.
+
+```bash
+cd ~/Projects/massa-ai-wt-e2e-battery
+env -u OLLAMA_BASE_URL -u MASSA_AI_API_URL -u MASSA_AI_DEDICATED \
+    -u MASSA_AI_E2E_PROJECT_PATH -u RUN_E2E -u XDG_CONFIG_HOME \
+    -u OLLAMA_EMBEDDING_MODEL -u OLLAMA_EMBEDDING_DIMENSIONS \
+    MASSA_AI_EXECUTOR_SANDBOX=none bun run test
+```
+
+**Then Phases 1-5**, unstarted, in `tasks.md` order. Phase 1 is five new Tier-A suites
+(observability — which recovers the deleted `12.observability.test.ts` scope — scheduler,
+auth/config/cache, hooks/handoffs/proposals, and an LLM-gated suite behind `RUN_E2E_LLM`).
+Phase 2 is the host harness against a scratch HOME, using the orphaned
+`scripts/verify-harness-install.ts` as its oracle but asserting per host rather than on its
+exit code, because a scratch HOME skips undetected hosts. Phase 3 is Playwright against the
+Admin Portal. Phase 4 drives the real `claude` binary.
+
+**Bringing the stack back up.**
+
+```bash
+cd ~/Projects/massa-ai-wt-e2e-battery
+bun scripts/prepare-e2e-fixture.ts --out /tmp/massa-ai-e2e-fixture
+bash scripts/e2e-stack.sh up --profile default
+eval "$(bash scripts/e2e-stack.sh env)"      # all four pins + the provisioned API key
+```
+
+Never start it from the primary checkout while the worktree holds the branch — the API
+serves whichever tree launched it, and a second session's `22.path-identity` `beforeAll`
+force-reindexes the shared index onto a wrong root, which invalidates every number measured
+in that window. Two figures were withdrawn during this work for exactly that reason.
+
+**Open, not ours to close.** `.specs/lessons.json` removes L-002 through L-005 and
+`.gitignore` adds `.ralphy/`; both predate every session that worked this branch and are
+left uncommitted for the user. L-004 is stale regardless — it describes a SQLite fallback
+removed in `5d43a96f`.
+
+# Previous handoff — agent-roster-consolidation (COMPLETE 2026-09-23 — T1–T13 across 5 Phases; independent validation PASS at 49/49 ACs, 9/9 mutations killed)
 
 - **Feature**: `.specs/features/agent-roster-consolidation/` (spec, design, tasks, `fixtures/`)
 - **Phase / Task**: Phase 5 / T13 done — Execute and validation complete

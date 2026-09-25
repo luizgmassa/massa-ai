@@ -70,7 +70,20 @@ export interface TickResult {
   deferred: number;
 }
 
-/** Scheduler status snapshot (for an optional debug endpoint). */
+/**
+ * Scheduler status snapshot — the only black-box view of scheduler health.
+ *
+ * EB-SCH-3b: the four Wave 5 FR-13 health fields below are maintained and
+ * persisted by `fireJob`, but were never projected here, so
+ * `GET /api/v1/scheduler/status` had nothing to read and emitted `null` / `0`
+ * as literals. Over HTTP a job failing every tick was then indistinguishable
+ * from a healthy one, while SQL held the truth. They belong in the snapshot
+ * because a health surface that cannot express failure is not one.
+ *
+ * They are required, not optional, unlike their `ScheduledJob` counterparts:
+ * a consumer of a *snapshot* must not have to distinguish "absent" from
+ * "never succeeded", which is the ambiguity that let the literals pass review.
+ */
 export interface SchedulerStatus {
   running: boolean;
   tickIntervalMs: number;
@@ -82,8 +95,14 @@ export interface SchedulerStatus {
     enabled: boolean;
     nextRunAt: number;
     lastRunAt: number;
+    /** ms-epoch of the last successful run; null until the first success. */
     lastSuccessAt: number | null;
+    /** ms-epoch of the last failed run; null until the first failure. */
+    lastFailureAt: number | null;
+    /** Failure streak: 0 after a success, incremented on each failure. */
     consecutiveFailures: number;
+    /** Truncated message from the last failure; null after a success. */
+    lastError: string | null;
     due: boolean;
     currentlyRunning: boolean;
     deferred: boolean;

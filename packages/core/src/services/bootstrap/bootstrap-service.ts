@@ -154,7 +154,7 @@ const MAX_SUMMARY_CHARS = 512;
 // ── LLM schema ───────────────────────────────────────────────────────────────
 
 const SeedMemorySchema = z.object({
-  summary: z.string().min(1).max(MAX_SUMMARY_CHARS),
+  summary: z.string().min(1),
   type: z.enum(["pattern", "code", "decision"]),
   level: z.union([z.literal(0), z.literal(1), z.literal(2)]),
   importance: z.number().min(0).max(1),

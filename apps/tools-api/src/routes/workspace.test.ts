@@ -23,6 +23,12 @@ const getTopCentralFiles = mock(async () => [] as any[]);
 const tracePath = mock(async () => ({ found: false, symbol: "s", projectId: "p", hint: "h" } as any));
 const analyzeImpact = mock(async () => ({ impactedCount: 0 } as any));
 const indexHandle = mock((): unknown => ({ success: true, data: { jobId: "j" } }));
+const listProjectsHandle = mock(
+  async (_p?: unknown): Promise<unknown> => ({
+    success: true,
+    data: { workspaces: [], total: 0, filter: "all" },
+  }),
+);
 const getActiveGeneration = mock(async () => "gen-1");
 const assertGenerationNotStale = mock((ifNoneMatch?: string, active?: string) => {
   if (ifNoneMatch && ifNoneMatch !== active) throw new Error("stale generation");
@@ -34,6 +40,15 @@ mock.module("@massa-ai/core", () => {
     ...actual,
     IndexProjectTool: class {
       handle = indexHandle;
+    },
+    // `ListProjectsTool` reaches `workspaceManager` through a path-relative
+    // import inside `packages/core`, not through this barrel, so the
+    // `workspaceManager` stub below cannot reach it. Stubbing the tool itself
+    // is what keeps this file's "no DB" contract true. The tool's own
+    // projection is covered where it lives, in
+    // `packages/core/src/__tests__/list-projects-tool.test.ts`.
+    ListProjectsTool: class {
+      handle = listProjectsHandle;
     },
     GraphController: Object.assign(
       class {
@@ -103,21 +118,58 @@ function wsRow(over: any = {}): any {
 }
 
 describe("GET /api/v1/workspace/list", () => {
-  test("maps each workspace row", async () => {
-    wsList.mockImplementationOnce(async () => [wsRow({ project_id: "a" }), wsRow({ project_id: "b", last_indexed_at: null })]);
+  test("returns the tool's envelope verbatim, including filter (EB-MCP-3)", async () => {
+    // The route used to hand-roll a second projection beside the tool's, and
+    // the two drifted — the route emitted neither `filter` nor per-workspace
+    // createdAt/updatedAt. Passing the envelope through unchanged is what makes
+    // the HTTP and embedded MCP transports one shape.
+    listProjectsHandle.mockImplementationOnce(async () => ({
+      success: true,
+      data: {
+        workspaces: [{ projectId: "a", filesCount: 3, createdAt: "T0", updatedAt: "T1" }],
+        total: 1,
+        filter: "all",
+      },
+    }));
     const res = await get("/api/v1/workspace/list");
     expect(res.status).toBe(200);
-    expect(res.json.data.total).toBe(2);
-    expect(res.json.data.workspaces[0]).toMatchObject({ projectId: "a", filesCount: 3 });
-    expect(res.json.data.workspaces[1].lastIndexedAt).toBeNull();
+    expect(res.json).toEqual({
+      success: true,
+      data: {
+        workspaces: [{ projectId: "a", filesCount: 3, createdAt: "T0", updatedAt: "T1" }],
+        total: 1,
+        filter: "all",
+      },
+    });
   });
 
-  test("returns failure envelope on error", async () => {
-    wsList.mockImplementationOnce(async () => {
+  test("forwards the status query parameter to the tool", async () => {
+    listProjectsHandle.mockClear();
+    await get("/api/v1/workspace/list?status=error");
+    expect(listProjectsHandle).toHaveBeenCalledWith({ status: "error" });
+  });
+
+  test("maps a ToolError to its own statusCode, not a 500", async () => {
+    // Without the `instanceof ToolError` branch an invalid `?status=` would
+    // surface as a 500. `kernel/enum-validation.ts` states the contract the
+    // other way round: "the HTTP layer maps it to the matching HTTP status".
+    const { ToolError } = require("@massa-ai/core");
+    listProjectsHandle.mockImplementationOnce(async () => {
+      throw new ToolError("Invalid status value: bogus. Valid values: a, b.");
+    });
+    const res = await get("/api/v1/workspace/list?status=bogus");
+    expect(res.status).toBe(400);
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toContain("Valid values");
+  });
+
+  test("returns failure envelope on a non-ToolError throw", async () => {
+    listProjectsHandle.mockImplementationOnce(async () => {
       throw new Error("db");
     });
     const res = await get("/api/v1/workspace/list");
     expect(res.json.success).toBe(false);
+    expect(res.status).toBe(200);
   });
 });
 

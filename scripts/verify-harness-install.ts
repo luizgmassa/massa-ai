@@ -24,6 +24,17 @@
  *
  * Exit 0 when every expected artifact is present, 1 otherwise. "n/a" never
  * fails: it marks a class the host genuinely does not have.
+ *
+ * Each row in the --json array also carries `detected: boolean` — the same
+ * dir-or-binary rule install-harness.sh uses to decide whether a host is even
+ * a candidate to install (mirrored from installer_host_detected in
+ * scripts/lib/installer-shared.sh; see the comment above HOST_CONFIG_DIRS
+ * below). That distinguishes "this host isn't on the machine" (six benign
+ * `missing` rows) from "this host is present and its install is broken" (six
+ * `missing` rows that indicate a real problem) — the exit code itself does
+ * NOT make this distinction (see the comment beside process.exit at the
+ * bottom of this file); a caller that wants host-aware pass/fail filters the
+ * JSON on `detected` itself.
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -35,11 +46,74 @@ const HOME = args.includes("--home") ? args[args.indexOf("--home") + 1]! : proce
 const AS_JSON = args.includes("--json");
 
 type Status = "ok" | "missing" | "partial" | "n/a";
-type Check = { host: string; artifact: string; status: Status; detail: string };
+// `detected` is additive: every existing consumer that destructures
+// {host, artifact, status} (or reads `detail`) keeps working unchanged. The
+// 24-row array shape (4 hosts × 6 artifacts) is unchanged too — this only
+// widens each row, it does not add, remove, or nest rows.
+type Check = { host: string; artifact: string; status: Status; detail: string; detected: boolean };
 
 const results: Check[] = [];
 const add = (host: string, artifact: string, status: Status, detail: string) =>
-  results.push({ host, artifact, status, detail });
+  results.push({ host, artifact, status, detail, detected: HOST_DETECTION[host]?.detected ?? false });
+
+// ── Host detection ───────────────────────────────────────────────────────────
+// Distinguishes "this host is not installed on the machine" (six expected
+// `missing` rows, benign) from "this host is installed and its harness install
+// is broken" (six expected `missing` rows, a real problem) — the two were
+// previously indistinguishable in this tool's output.
+//
+// This MIRRORS installer_host_detected in scripts/lib/installer-shared.sh:225-241
+// rather than sharing its code: config dir exists under --home OR a binary is
+// on PATH, same as install-harness.sh's own detection gate, so a host this
+// script calls "not detected" is exactly a host install-harness.sh would skip.
+// It is a replica, not a shared implementation, because that function is bash
+// and this file is a standalone TS script with no bash-execution dependency
+// otherwise — if installer_host_detected's rule changes, this block and the two
+// tables below must be updated to match. The tables mirror
+// installer_host_config_dir (installer-shared.sh:192-200) and
+// installer_host_binaries (:207-215); the latter's own header records why
+// cursor probes two binaries — it "MUST mirror install-skills.sh's
+// platform_executables exactly … plugin detection and skills detection must
+// never disagree about the same machine." Diff all three cited ranges to check
+// for drift.
+//
+// Like installer_host_detected, an empty HOME never dir-detects, and the
+// binary probe is a bare existence check (Bun.which, the same PATH-scan
+// primitive scripts/verify-tree-sitter-package-artifact.ts already uses here)
+// — never runs the binary. Honours --home exactly like the artifact checks
+// below, because HOME is the same module-level const both read.
+const HOST_CONFIG_DIRS: Record<string, string> = {
+  claude: ".claude",
+  codex: ".codex",
+  cursor: ".cursor",
+  opencode: join(".config", "opencode"),
+};
+const HOST_BINARIES: Record<string, string[]> = {
+  claude: ["claude"],
+  codex: ["codex"],
+  cursor: ["cursor-agent", "cursor"],
+  opencode: ["opencode"],
+};
+
+type DetectionSignal = "dir" | "binary" | "none";
+
+function detectHost(host: string): { detected: boolean; signal: DetectionSignal } {
+  const configDir = HOST_CONFIG_DIRS[host];
+  if (HOME && configDir && existsSync(join(HOME, configDir))) {
+    return { detected: true, signal: "dir" };
+  }
+  for (const bin of HOST_BINARIES[host] ?? []) {
+    if (Bun.which(bin)) {
+      return { detected: true, signal: "binary" };
+    }
+  }
+  return { detected: false, signal: "none" };
+}
+
+const HOST_DETECTION: Record<string, { detected: boolean; signal: DetectionSignal }> = {};
+for (const h of ["claude", "cursor", "codex", "opencode"]) {
+  HOST_DETECTION[h] = detectHost(h);
+}
 
 /** Command files matching `massa-ai-*.<ext>` directly inside dir. */
 function ownedFiles(dir: string, ext: string): string[] {
@@ -336,6 +410,9 @@ if (AS_JSON) {
   const mark = (s: Status) => (s === "ok" ? "  ok  " : s === "n/a" ? " n/a  " : s === "partial" ? "PARTIAL" : "MISSING");
 
   console.log(`\nmassa-ai harness install — HOME=${HOME}\n`);
+  console.log(
+    `host detection: ${HOSTS.map((h) => `${h}=${HOST_DETECTION[h]?.detected ? HOST_DETECTION[h]!.signal : "not detected"}`).join(", ")}\n`,
+  );
   console.log(`${"artifact".padEnd(11)}${HOSTS.map((h) => h.padEnd(10)).join("")}`);
   console.log("-".repeat(11 + HOSTS.length * 10));
   for (const a of ARTIFACTS) {
@@ -363,4 +440,15 @@ if (AS_JSON) {
   console.log();
 }
 
+// Exit-code decision: unchanged. A `missing`/`partial` row still fails the
+// exit code REGARDLESS of `detected` — including for an undetected host. This
+// tool reports "what is actually installed", not "should this host be
+// installed here", and folding the latter policy in here would mean every
+// caller inherits one fixed opinion about which hosts it cares about. A
+// caller that wants host-aware pass/fail (e.g. an E2E battery that only
+// expects hosts it deliberately provisioned) now can, using the new
+// `detected` field the JSON output carries per row —
+// e.g. `results.filter(r => r.detected && (r.status === "missing" || r.status === "partial"))`
+// — without this script guessing that policy for every consumer. Documented
+// here per the requirement to never silently redefine what the exit code means.
 process.exit(results.some((r) => r.status === "missing" || r.status === "partial") ? 1 : 0);

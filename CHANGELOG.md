@@ -9,6 +9,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`scripts/e2e-stack.sh` runs against LM Studio as well as Ollama.**
+  `MASSA_AI_E2E_PROVIDER=lmstudio` points the dedicated stack at an LM Studio server that is
+  already running (`MASSA_AI_E2E_LMSTUDIO_URL`, default `http://127.0.0.1:1234`) instead of
+  spawning `ollama serve` on :11435. LM Studio is probed and never started or stopped, and its
+  port joins the shared-stack attestation printed before and after every mutating command.
+  The provider is recorded by `up` and reused by `env`, `status` and `restart-api`; the
+  latter two refuse a different `MASSA_AI_E2E_PROVIDER` until the next `up`, which re-probes
+  the embedding width and restarts the API the same way a profile change does. The width probe, the
+  isolation check (now read from the provider-neutral `/api/v1/system/inference`) and the
+  `llm-on` profile follow the provider, and each provider's defaults are held equal to
+  `INFERENCE_PROVIDERS` by the parity test. `env` now also exports
+  `MASSA_AI_E2E_LLM_MODEL`/`MASSA_AI_E2E_LLM_CODE_MODEL`, so `30.llm-features` checks the
+  model the stack actually serves.
+- **Tier D of the E2E battery: the Claude Code CLI, credential-free
+  (`apps/claude-plugin/__tests__/claude-cli-e2e.test.ts`).** Runs whenever `claude` is on
+  `PATH`, under a scratch `HOME` and `CLAUDE_CONFIG_DIR`, with `ANTHROPIC_BASE_URL` pointed at
+  an unreachable port so no request can spend credits — and asserts `total_cost_usd` is 0.
+  The plugin's own hooks run too, so the session also gets a scratch `TMPDIR`, an unreachable
+  `MASSA_AI_API_BASE` and no inherited `MASSA_AI_*`, `CLAUDE_CODE_*` or `XDG_CONFIG_HOME`;
+  a developer's running massa-ai API never receives its events.
+  Covers manifest validation (EB-CB-1), plugin load (EB-CB-2), a real MCP connection
+  (EB-CB-3), the installed inventory against the bundle (EB-CB-4) and agent visibility
+  (EB-CB-5). A print-mode session emits its `system/init` event before authentication, so
+  the plugin list, `plugin_errors`, MCP server status and agent list are all readable at
+  zero cost — which moved EB-CB-2, 3 and 5 out of the credentialed group. Expected sets are
+  derived from the charter directories, the bundled commands and `hooks.json`, and each
+  error assertion has a control that plants the error.
+- **`scripts/prepare-e2e-fixture.ts` — the sparse E2E corpus generator that was documented
+  but never committed.** `.specs/features/close-maintenance-next-steps-2026-07-13/final-verification-evidence.md`
+  invokes `scripts/prepare-qwen-e2e-fixture.ts`; that file has no history in any revision,
+  which is why the commit-locked fixture the runbook depends on was not reproducible. The
+  replacement builds a git repository from a declared manifest, commits it with a fixed
+  identity so the SHA is a pure function of content (the live-stack suite mixes that SHA
+  into its shared-index identity), and fails closed on two self-checks: every path a suite
+  addresses by name must exist, and every needle anchor must resolve to exactly one location
+  — the resolver throws on both zero and two-or-more matches, so a fixture that drops or
+  duplicates an anchor file fails the relevance gate for a reason unrelated to retrieval.
+- **`scripts/e2e-stack.sh` — the dedicated live-stack environment, as an executable runbook.**
+  The only automated provisioning of PostgreSQL :5433 / Ollama :11435 / Tools API :3334 lived
+  inside `packages/core/src/__tests__/e2e/23.owned-destructive.test.ts`, reachable only by
+  running that one suite; every other E2E file assumed a stack started by hand. `up`,
+  `down`, `status`, `restart-api` and `env` now own it, with six profiles (`default`,
+  `auth`, `hooks-off`, `scheduler-on`, `scheduler-fast`, `llm-on`) because a suite attached to
+  a process it did not start cannot test restart or an environment swap. `env` emits all four pins the
+  suite's fail-closed guard requires together — emitting a subset makes every guarded suite
+  throw before its first HTTP call. Three behaviours are load-bearing rather than
+  defensive: it refuses to touch a port whose listener it does not own, it re-runs database
+  provisioning on every `up` (a run that created the cluster and died before `createdb`
+  otherwise stays half-provisioned forever), and it asserts after startup that the dedicated
+  API is really pointed at :11435 and `massa_ai_test` on :5433 rather than at the
+  developer's own stack.
+- **Six new Tier-A live-stack suites, covering the surfaces the battery could not reach.**
+  `25.observability` recovers the scope of `12.observability.test.ts`, deleted in `5d43a96f`
+  and unowned since; `26.scheduler` runs as a two-profile matrix; `27.auth-config-cache`
+  closes the declared skip at `15.nfr.test.ts:716`; `28.hooks-handoffs-proposals` runs under
+  both `default` and `hooks-off`; `29.audit-repairs` covers scenarios an audit found missing
+  behind rows already marked OK; and `30.llm-features` sits behind its own `RUN_E2E_LLM=1`
+  gate on top of `RUN_E2E`, so it never enters the default aggregate — proven rather than
+  asserted, by observing 0 pass / 13 skip with the gate unset. Every declared skip in the six
+  carries a stated reason, and each reason names either a measurement or a source location;
+  none is a silent pass.
+- **A sixth stack profile, `scheduler-fast`, so a scheduled job actually fires inside a suite
+  run.** The scheduler's concurrency cap had been a permanent `describe.skipIf(true)` whose
+  stated reason — that no profile could configure a short enough interval — was wrong about
+  the product: `MASSA_AI_SCHEDULER_<KIND>_INTERVAL_MS` sits at the top of the precedence
+  chain (`scheduler-defaults.ts:297-301`), outranking the ≥30 min clamp in `applySafeDefaults`,
+  which only supplies the fallback. The objection underneath it was sound, and is answered by
+  choosing which kinds shorten rather than shortening everything: `checkpoint-purge` is a
+  bounded DELETE of already-expired rows and `observation-bridge` returns `noop` at its first
+  gate with the LLM off, while consolidation and decay stay off because both run the full
+  decay-prune-merge cycle over every memory in `massa_ai_test`.
+- **`scripts/verify-harness-install.ts` can tell an absent host from a broken install.** It
+  emitted 24 rows — 4 hosts × 6 artifacts — with no detection concept, so a host simply not
+  present on the machine produced six `missing` rows indistinguishable from a host whose
+  install had failed. Every row now carries `detected`, mirroring `installer_host_detected`
+  (`installer-shared.sh:225-241`) so a host this tool calls undetected is exactly one
+  `install-harness.sh` would skip. Additive: the same scratch `--home` gives 24 rows and
+  identical `{host, artifact, status}` triples before and after. The exit code is deliberately
+  unchanged — this tool reports what is installed, not what ought to be — so a caller wanting
+  host-aware pass/fail filters on `detected` itself. It also gains its first test; it had
+  none, and no CI reference either.
+- **Tier B: `scripts/__tests__/harness-e2e.test.ts` grades a real harness install per host.**
+  Runs the shipping `install-harness.sh --all` into a scratch HOME and reads the oracle's
+  JSON, never the installer's exit code — the plugin phase acts only on detected hosts, so
+  that code moves for reasons unrelated to the subject. It seeds the four config directories
+  rather than relying on `command -v`, because under a scratch HOME detection otherwise finds
+  three or four hosts on a dev box and zero in CI, inverting the same assertion between them.
+  Measured: 1796 files installed, 24 of 24 rows `ok`, 18 of 18 sub-agents on every host.
+- **Root `install.sh` is executed rather than only grepped.** The two suites that named it
+  read it as text. `scripts/tests/test-root-install-live-exec.sh` runs it behind recording
+  `git`/`curl`/`bun` stubs shadowing PATH, and the evidence that it stops at the network
+  boundary is the exit code itself: 17, the git-clone stub's deliberate sentinel. It covers
+  the three `/dev/tty` reads that have environment seams, and guards the read count so a
+  seventh prompt fails a test instead of appearing unnoticed. The three unseamed post-install
+  menu reads are recorded as not covered, with the measured reason in-file.
+- **`ToolError` is on `@massa-ai/core`'s public surface**, for the same reason
+  `ProposalPayloadValidationError` already was: a transport has to tell an invalid-parameter
+  rejection from a server fault with `instanceof` rather than by comparing `error.name`.
+  Without it, any route delegating to a tool turned a 400 into a 500.
 - **A `.massa-ai-collect` file limits the MCP client's upload walk to listed directories.**
   One path per line, relative to the project root (for example `app` and
   `features/promotion`); `#` comments and surrounding slashes are ignored, and an absent or
@@ -37,6 +136,189 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`30.llm-features` read the reranker's effect from `combinedRank` order, which two non-LLM
+  stages reorder.** Proximity rerank (`hybrid-search.ts`) and the centrality boost
+  (`search-controller.ts`) both reorder results after fusion, so neither "a degraded rerank
+  returns fusion order" (EB-LLM-6) nor "a working rerank breaks fusion order" (EB-LLM-3)
+  was a product contract — either could pass or fail whatever the reranker did, and on the
+  1024d stack EB-LLM-6 failed while the reranker degraded exactly as it should. Both now
+  read the reranker's own outcome from the API log lines appended during their own call
+  (`LLMJudgeReranker … degrading to input order` and the
+  `"label":"reranker"` failure), and window slicing stays with `reranker.test.ts`. On LM
+  Studio with every model resident the suite is 9/0/0 with the instruct model in the code
+  role, and — after the bootstrap schema fix below — 9/0/0 on the default MLX coder model.
+- **A scheduled job could run twice when the heavy-work check was slower than the tick.**
+  `Scheduler.tick()` awaits the heavy-work probe before firing, and the interval kept starting
+  new ticks meanwhile; overlapping ticks each fired from the job list read before the await, so
+  a job ran again as soon as its first run finished, and two capped jobs fired 14 ms apart.
+  Only one evaluation now runs at a time: a tick arriving mid-evaluation runs once right after
+  it instead of overlapping, the job list is re-read after the probe, and catch-up shares the
+  same guard. With the default 60 s tick and the probe's 5 s ceiling this needed a
+  `MASSA_AI_SCHEDULER_TICK_MS` below the probe latency; the e2e `scheduler-fast` profile (1 s)
+  hit it under load.
+- **LLM bootstrap seeding timed out on every call against LM Studio's MLX coder model.** The
+  seed schema bounded `summary` to 512 characters inside an array bounded to 8 items; LM
+  Studio's MLX grammar engine never finished compiling that combination (no token in 150 s,
+  one CPU core pinned for 17 minutes) and, holding Python's GIL, stalled every later request
+  to the same model — the reranker's timeouts were collateral. The schema no longer bounds
+  `summary`; the existing truncation to 512 characters at insert still applies. The same
+  request now completes in 11–13 s.
+- **Two live-stack E2E assertions failed on the new 1024d default for reasons unrelated to
+  the product.** `15.nfr` N15 queried `embedding_bq`, a column only the `> 2000`-width tables
+  carry; at 1024d the store takes its direct HNSW branch (`vector_cosine_ops` on `embedding`),
+  so the query itself errored. N15 now follows the store's own width threshold and checks the
+  index that branch builds — red under `POSTGRES_VECTOR_INDEX=ivfflat`, green on `hnsw`.
+  `27.auth-config-cache` EB-CFG-3 required every losing process in a concurrent cold start to
+  report `source: "config"`, but a loser that imports `@massa-ai/shared/config` after the
+  winner has written the key gets it seeded into `MASSA_AI_API_KEY` by `src/env.ts` and
+  reports `"env"` — 4 of 4 runs red on this tree, same key every time. The single-key,
+  single-provisioner assertions are unchanged; the losers may carry either label.
+- **The MCP server crashed at startup whenever `DATABASE_URL` was unset — in HTTP-proxy mode
+  too, where it never touches PostgreSQL.** `observationConsolidationJob` and
+  `autoImproveJob` are module-level singletons, and their constructors resolved their
+  PostgreSQL stores eagerly; `requirePostgresDatabaseUrl` throws without the URL, so the
+  import itself failed and a host saw only `Connection closed`. Found by the E2E battery's
+  Tier D probe, which registers the server under a scratch `HOME` as a fresh install would.
+  The stores now resolve on first use. `mcp-stdout-clean.test.ts` could not see this: it
+  inherits the runner's `DATABASE_URL`, and a crashed server's stdout is as empty as a
+  healthy one's. The new guard sends a real `initialize` with the variable removed.
+- **Indexing a fresh project could fail outright on a lost race for its own `workspaces`
+  row.** `EtlPipeline` reaches `graphGenerations.begin()` as soon as the Discover stage
+  returns; `begin()` reaches `lockWorkspace`, which does
+  `SELECT … FROM workspaces WHERE project_id = $1 FOR UPDATE` and throws
+  `graph_generation_workspace_missing:<projectId>` when that row does not exist. On a fresh
+  projectId the row is created by `WorkspaceManager.markIndexing`, invoked from an
+  **unawaited** `indexing:started` subscriber (`workspace-manager.ts:155-158`,
+  fire-and-forget, `.catch`-logged only) that itself costs two round-trips — a
+  `getWorkspace` read followed by an `upsertWorkspace`. Nothing ordered that write against
+  the read, so a Discover stage faster than the upsert commits killed the whole run with no
+  user-visible cause and left the workspace marked `error`.
+
+  The pipeline now establishes the row itself, awaited, before opening the generation. It is
+  the component with the dependency, so it is the component that should guarantee it;
+  `markIndexing` is an idempotent upsert, so the subscriber still running is harmless, and
+  the event stays a notification for `project-root-cache` and `read-file.service`.
+
+  Load-dependent and therefore invisible until the battery ran a full sequential suite:
+  three distinct projects hit it in one loaded run (`e2e-ai-nfr-*-6-a`, `-6-c`, and
+  `e2e-ai-merge-tgt-*`, the last tolerated by a test that does not assert on job status),
+  the failing runs dying at durationMs 9 and 14 — while eight concurrent fresh projects on
+  an idle stack reproduced it zero times. Evidence for the fix is the absence, measured the
+  same way it was found: **zero** occurrences across the full post-fix suite, against three
+  before. `etl-workspace-row-ordering.test.ts` is the deterministic guard, verified red
+  against three separate mutations (guard deleted, `await` dropped, guard moved after
+  `begin()`); it asserts the ordering *and* that the unawaited subscriber that makes the
+  guard necessary still exists, so the guard cannot outlive its reason unnoticed.
+- **Six live-stack E2E tests asserted contracts the product no longer has.** They were
+  invisible because the suite had only ever been run against one embedding profile with auth
+  off, on the whole repository as its corpus. Measured on the scripted stack in an isolated
+  worktree, with no other session holding the checkout or the stack: 223 pass / 5 fail
+  before, then 231 pass / 1 fail / 3 skip once the six were repaired, and
+  **232 pass / 0 fail / 3 skip** (235 tests, 361.14 s, exit 0) once the product defect that
+  the last failure exposed was fixed — see the `workspaces` row race below. `17.cleanup-verify`
+  passes 2/0 as its own final command.
+  - `N19` asserted `AUTH_REQUIRED === false` and `N18` was a static skip whose text said
+    exercising 401 "would require restarting tools-api with a key (destructive)". AD-011
+    deleted the no-key pass-through and made auth non-configurable, so no supported
+    configuration could satisfy N19. Both are now real: 401 without a key, 401 with a
+    whitespace-only key (HTTP strips it to empty), 200 with the configured key, and `/health`
+    public.
+  - `N5` asserted that three concurrent `index()` calls on one projectId all reach
+    `completed`, citing a queue mutex that a `managed_runs` lease has since replaced — the
+    lease *refuses* the losers with `indexing_busy:<runId>` (FR-09 / AC-7). It now asserts
+    the property that actually matters and is stronger than the old one: exactly one winner,
+    every loser refused **for that documented reason**, every job terminal, final state
+    searchable.
+  - `N15` named `vector_documents_4096d` literally, so it only passed under
+    `qwen3-embedding:8b`; under any other profile it read an empty table. It now discovers
+    which dimension table holds the project, asserts exactly one does — which also catches a
+    project split across two profiles, something naming one table never could — and
+    cross-checks each row's real width against the width its table name claims. It also
+    separates the per-project `_metadata:<projectId>` sentinel, whose embedding is a zero
+    vector, so `embedding <=> embedding` is NaN for it and no whole-project cosine assertion
+    can hold.
+  - `D4` opened each of the six additive architecture fields with
+    `expect(Array.isArray(map.X)).toBe(true)` and then iterated `map.X ?? []` — the `?? []`
+    conceding what the line above denied. `symbol-graph.service.ts:521-527` sets all six to
+    `undefined` when empty and the response type declares them optional, so the assertion
+    contradicted the product contract and passed only because the full repository filled all
+    six.
+  - `D2` seeded `trace_path` on a class under the comment "a central class has callees".
+    Call edges are attributed to the symbol containing the call site, so a class resolves as
+    a seed and then walks to nothing: measured seeds=1, nodeCount=1, edgeCount=0. It now
+    seeds a method with a real 13-node / 26-edge walk, and the class behaviour is asserted
+    explicitly rather than left as a silent premise.
+  - `T15` seeded the shared index at a deliberately wrong root and then asserted warmth with
+    the *canonical* corpus's probe queries, none of whose symbols exist in the corpus it had
+    just indexed. It could only pass when the reindex failed to clear the previous corpus —
+    green for the opposite of the reason it claimed.
+- **`turbo.json` `passThroughEnv` was missing three E2E variables.** `RUN_OWNED_DESTRUCTIVE`
+  and `MASSA_AI_E2E_PROJECT_PATH` are read by the live-stack suites but were absent, so they
+  arrived `undefined` under `bun run test` while working under a direct `bun test` (AD-010).
+  `RUN_E2E_LLM` is added with them for the LLM-gated suite.
+- **`packages/core/src/__tests__/e2e/COVERAGE.md` listed two files that do not exist.**
+  `12.observability.test.ts` and `backend-attestation.test.ts` were deleted in commit
+  `5d43a96f`; their rows survived, including inside the runnable command block, so the
+  documented standard sequence could not execute as written. The tool count in that file
+  also still said 52 where `00.harness.smoke.test.ts` asserts 59.
+- **`FEATURES.md` documented web write-mode as a server environment variable.** It is
+  resolved in the browser (`apps/web-ui/src/static/lib/api-client.ts:49-65`), and the
+  injected API-key meta tag turns it on — so a page loaded from loopback is already in write
+  mode with nothing configured. `MASSA_AI_WEB_WRITE_MODE` is read off `globalThis`, never
+  `process.env`, and is deliberately absent from `.env.example`; the server-side gate is the
+  separate `MASSA_AI_READ_ONLY_MODE`. The same section still described the Admin Portal as
+  read-only and named SQLite's `FTS5` in a PostgreSQL-only product, and the table of contents
+  omitted the Subagent Skills section entirely.
+- **`list_projects` answered two different shapes depending on transport.** REST returned
+  `{"total":N}` and the embedded MCP client `{"total":N,"filter":"all"}`, contradicting the
+  contract stated at `embedded-api-client.ts:10-16` — that the mapping "mirrors the tools-api
+  REST routes exactly so a tool call yields the same result shape in both modes". The embedded
+  path delegates to the core tool while `GET /api/v1/workspace/list` hand-rolled a second
+  projection beside it, and the two drifted. The divergence was wider than the live-stack
+  sensor could see: it compares with `dropKeys: ["workspaces"]`, so it caught only the missing
+  `filter`, while the route also dropped per-workspace `createdAt`/`updatedAt` and performed
+  no validation of `status` at all — `?status=bogus` reached `listWorkspaces`, which filters
+  on equality, and answered 200 with an empty list. Adding `filter` to the route would have
+  turned the sensor green and left a second projection in place to drift again, so the route
+  now delegates to the tool: one projection where there were two, and an unknown status is a
+  400 naming every valid value rather than a silent empty result.
+- **The scheduler's only black-box health surface reported every job as never-failed.**
+  1.61.0 stopped hardcoding `lastSuccessAt` and `consecutiveFailures` in `dashboard.ts`, but
+  `fireJob` maintains and persists four Wave 5 FR-13 fields and `Scheduler.status()` still
+  carried only those two outward: `lastFailureAt` and `lastError` never reached HTTP, so the
+  endpoint could say a job was failing but not when or why. Before 1.61.0 all four were
+  literals, and over HTTP a job failing every tick was indistinguishable from a healthy one. Measured at one instant with both kinds having fired, HTTP said
+  `"lastSuccessAt":null` while SQL said `last_success_at=1788787737541`. The snapshot now
+  projects all four, required rather than optional and normalised with `?? null` / `?? 0`, so
+  a consumer never has to tell "field absent" from "never succeeded" — the ambiguity that let
+  the literals read as reasonable.
+- **`nextRunAt` did not survive an API restart**, despite `index.ts` claiming since the
+  scheduler landed that registration "preserves nextRunAt/lastRunAt across restarts so the
+  schedule resumes on boot". It came back recomputed as `now + intervalMs`, and the measured
+  drift equalled the restart duration itself, 20702 ms. `registerOrResumeJob` is correct — it
+  preserves the persisted value whenever the schedule is unchanged — but it decides by
+  comparing against a *synchronous* `store.get()`, and `PgScheduledJobStore` serves that read
+  from a mirror it hydrates asynchronously (`scheduler-store-pg.ts:262-265` kicks hydration
+  off fire-and-forget). At boot the mirror is empty, so every persisted job looked new. That
+  is the same shape as the `workspaces`-row race fixed earlier in this release: an unawaited
+  promise beside a synchronous requirement. The store gains an optional `ready()`, implemented
+  only by the PostgreSQL backend, and the boot sequence awaits it before registering — inside
+  the existing guard, so a hydration failure still degrades to serving without a scheduler
+  rather than taking the process down. Reads stay synchronous: the tick loop must not await
+  inside a scheduling decision.
+- **`bun run generate:artifacts --check` checked only half of what it claimed to.** The script
+  was `bun a.ts && bun b.ts`, and a package script appends the caller's arguments to the end
+  of the whole string, so `--check` reached only the second generator while the skill-artifacts
+  half ran in write mode — a drift gate regenerating its own subject cannot fail on it.
+  Measured on the old form: the skill-bundle "No drift" marker absent, its "Emitted N files"
+  marker present. `CONTRIBUTING.md` Step 3 names this class directly. A single entrypoint now
+  forwards argv to every generator by direct call, and runs all of them rather than stopping
+  at the first non-zero, so one `--check` reports every drifted subtree instead of the first.
+  `main` independently closed the same gap with an `sh -c '… "$@"' --` wrapper; the
+  entrypoint replaces it, and the tools-api stream route still parses both shapes.
+  CI was never exposed — it runs the skill drift gate as its own explicit step and the
+  sub-agent half through `subagent-parity.test.ts` — so this removes a trap for the documented
+  local form rather than closing a live hole.
 - **CocoaPods checkouts (`Pods/`) are no longer indexed.** Both the MCP client's collector
   and core discovery skip them; vendored Pod files burned the file cap before the walk
   reached real source, and a Pod `LICENSE.md` once aborted graph activation with a

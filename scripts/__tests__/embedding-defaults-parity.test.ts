@@ -178,6 +178,18 @@ const PAIR_SURFACES: Array<{ file: string; model: RegExp; dims: RegExp }> = [
   // replaced it with `INFERENCE_PROVIDERS.ollama.defaultModels.embedding` — a
   // property-access expression, not a literal — so those two surfaces moved
   // to the structural `DERIVED_SURFACES` tier below (T13).
+  {
+    // The dedicated E2E stack pins its own embedding profile, and a mismatch
+    // here is invisible rather than loud: a wrong width does not fail, it
+    // silently routes the run into a different `vector_documents_<n>d` table
+    // (.specs/features/e2e-feature-battery/design.md). The two `${VAR:-…}`
+    // defaults at the top of the script are the only literals; the
+    // `OLLAMA_EMBEDDING_*` assignments further down expand these variables,
+    // so the extractors anchor on the definitions, not the exports.
+    file: "scripts/e2e-stack.sh",
+    model: /^\s*ollama\)\n\s*EMBED_MODEL="\$\{MASSA_AI_E2E_EMBED_MODEL:-([^}]+)\}"/gm,
+    dims: /^\s*ollama\)\n.*\n\s*EMBED_DIMS="\$\{MASSA_AI_E2E_EMBED_DIMS:-(\d+)\}"/gm,
+  },
 ];
 
 const MODEL_ONLY_SURFACES: Array<{ file: string; model: RegExp }> = [
@@ -222,6 +234,12 @@ const LMSTUDIO_PAIR_SURFACES: Array<{ file: string; label?: string; model: RegEx
     file: ".env.example",
     model: /^#LMSTUDIO_EMBEDDING_MODEL=(\S+)/gm,
     dims: /^#LMSTUDIO_EMBEDDING_DIMENSIONS=(\d+)/gm,
+  },
+  {
+    file: "scripts/e2e-stack.sh",
+    label: "scripts/e2e-stack.sh (lmstudio)",
+    model: /^\s*lmstudio\)\n\s*EMBED_MODEL="\$\{MASSA_AI_E2E_EMBED_MODEL:-([^}]+)\}"/gm,
+    dims: /^\s*lmstudio\)\n.*\n\s*EMBED_DIMS="\$\{MASSA_AI_E2E_EMBED_DIMS:-(\d+)\}"/gm,
   },
   // `packages/core/src/services/embeddings/config.ts`'s lmstudio branch used
   // to carry a quoted literal model and a `768` last-resort dims fallback
@@ -370,6 +388,18 @@ const DERIVED_SURFACES: StructuralSurface[] = [
 // an explicit expected two-element array instead of an `extractOne` throw.
 const INSTRUCT_CODING_SURFACES: MultiMatchRow[] = [
   {
+    file: "scripts/e2e-stack.sh",
+    label: "e2e-stack.sh (instruct)",
+    pattern: /\$\{MASSA_AI_E2E_LLM_MODEL:-([^}]+)\}/g,
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.instruct, INFERENCE_PROVIDERS.lmstudio.defaultModels.instruct],
+  },
+  {
+    file: "scripts/e2e-stack.sh",
+    label: "e2e-stack.sh (coding)",
+    pattern: /\$\{MASSA_AI_E2E_LLM_CODE_MODEL:-([^}]+)\}/g,
+    expected: [INFERENCE_PROVIDERS.ollama.defaultModels.coding, INFERENCE_PROVIDERS.lmstudio.defaultModels.coding],
+  },
+  {
     file: "install.sh",
     label: "install.sh (instruct)",
     pattern: /local llm_model="([^"]+)"/g,
@@ -462,6 +492,7 @@ const KNOWN_MARKDOWN_SURFACES = [
   "apps/tools-api/OLLAMA_WSL_SETUP.md",
   "benchmarks/llm-judge/README.md",
   "benchmarks/needles/README.md",
+  "packages/core/src/__tests__/e2e/COVERAGE.md",
 ];
 const MARKDOWN_ALLOWED_PREFIXES = [".specs/", "CHANGELOG.md"];
 // Dated benchmark run outputs, not default declarations — same historical

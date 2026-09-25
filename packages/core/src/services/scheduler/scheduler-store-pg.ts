@@ -244,6 +244,22 @@ export class PgScheduledJobStore implements ScheduledJobStore {
     void this.ensureHydrated();
   }
 
+  /**
+   * Resolve once the mirror reflects PostgreSQL, so a synchronous `get()` after
+   * this point answers from persisted state rather than from an empty map.
+   *
+   * EB-SCH-6: every read below kicks hydration off fire-and-forget and then
+   * answers immediately, which is correct for the tick loop and wrong for
+   * boot-time registration — `registerOrResumeJob` compares against `get()` to
+   * decide whether a schedule already exists, and a cold mirror made every job
+   * look new. Best-effort, exactly like `ensureHydrated`: a PostgreSQL failure
+   * resolves with an empty mirror rather than rejecting, so a boot that cannot
+   * reach the database still registers its jobs in memory.
+   */
+  async ready(): Promise<void> {
+    await this.ensureHydrated();
+  }
+
   get(id: string): ScheduledJob | null {
     void this.ensureHydrated();
     return this.mirror.get(id) ?? null;

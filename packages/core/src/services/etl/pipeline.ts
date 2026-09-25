@@ -45,6 +45,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import type { DiscoveredFile } from "./stage-context.js";
 import type { HeaderLanguageEvidence } from "../structural/language-manifest.js";
+import { workspaceManager } from "../workspace/workspace-manager.js";
 
 /**
  * Error raised by {@link EtlPipeline.runInternal} when a `managed_runs` lease
@@ -349,6 +350,28 @@ export class EtlPipeline {
       const discoveredSnapshot = await this.discover.run(ctx, { forceReindex, includeTests: include_tests });
       ctx.structuralHeaderEvidenceByFile = buildHeaderLanguageEvidence(discoveredSnapshot);
       stageTimings.discover = Math.round(performance.now() - st1);
+
+      // `begin()` below reaches `lockWorkspace`, which does
+      // `SELECT … FROM workspaces WHERE project_id = $1 FOR UPDATE` and throws
+      // `graph_generation_workspace_missing:<projectId>` when that row does not
+      // exist yet. On a fresh projectId the row is created by
+      // `WorkspaceManager.markIndexing`, which runs from an UNAWAITED
+      // `indexing:started` subscriber (`workspace-manager.ts:155-158`,
+      // fire-and-forget, `.catch`-logged only) and itself costs two round-trips
+      // — a read followed by an upsert. Nothing ordered that write against this
+      // read, so a Discover stage that finishes faster than the upsert commits
+      // loses the race and the whole index run fails with no user-visible
+      // cause. Measured on a small fixture: the failing runs died at
+      // durationMs 9 and 14, and three distinct projects hit it in one loaded
+      // sequential E2E run (`e2e-ai-nfr-*-6-a`, `-6-c`, `e2e-ai-merge-tgt-*`).
+      //
+      // Establishing the row here rather than hoping the subscriber won makes
+      // the dependency explicit at the point that has it. `markIndexing` is an
+      // idempotent upsert that preserves existing counts, so the subscriber
+      // running as well is harmless. The event stays a notification, which is
+      // what an event should be — `project-root-cache` and `read-file.service`
+      // still consume it.
+      await workspaceManager.markIndexing(projectId, projectPath);
 
       const activeGraph = await getSymbolRepository().getActiveGraphSnapshot(projectId);
       try {

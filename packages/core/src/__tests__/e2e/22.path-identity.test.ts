@@ -13,7 +13,7 @@ import {
   httpPost,
   indexAndAwait,
   isOwnedDedicatedE2eEnvironment,
-  isSharedIndexWarm,
+  isSearchable,
   probeAvailability,
 } from "./_helpers.js";
 
@@ -41,7 +41,16 @@ describe.skipIf(!READY)("T15 dedicated shared-index identity and path hygiene", 
     if (seeded.status !== "completed" && seeded.status !== "indexed") {
       throw new Error(`wrong-root seed failed: ${JSON.stringify(seeded.raw)}`);
     }
-    expect(await isSharedIndexWarm(SHARED_PID)).toBe(true);
+    // Warmth must be probed against the corpus that was just indexed. This
+    // line used to call `isSharedIndexWarm`, whose three probe queries name
+    // symbols in the canonical repository corpus — `ContextualSearchRLM`,
+    // `computePageRank`, `postgres vector store addDocuments`. None of them
+    // exists in the polyglot fixture that was copied to the wrong root, so
+    // after a successful `forceReindex` of SHARED_PID onto that root the
+    // canonical probes must miss. The assertion could only pass when the
+    // reindex failed to clear the previous corpus — i.e. it was green for the
+    // opposite of the reason it claimed.
+    expect(await isSearchable(SHARED_PID, "polyglot")).toBe(true);
   }, 700_000);
 
   afterAll(async () => {

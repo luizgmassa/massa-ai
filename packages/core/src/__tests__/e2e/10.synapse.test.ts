@@ -421,18 +421,40 @@ describe.skipIf(!READY)("T7 — Schema drift (E28) + best-effort edges", () => {
     expect(after).toBeGreaterThan(before);
   });
 
-  // E20 — matchThreshold/hitBoost are internal buffer config; not observable via
-  // the synapse HTTP surface. Skip with a reason.
-  test.skip("E20: matchThreshold/hitBoost effect on buffer hits (internal — not observable)", () => {
-    // These config fields live on WorkingMemoryBufferConfig and influence the
-    // post-retrieval pipeline (SynapseManager.process), not the synapse HTTP
-    // routes. No HTTP endpoint exposes the boosted score or the match decision
-    // directly — only search-with-session would surface it, and even there the
-    // boost is folded into the final score with no separate flag. Asserting it
-    // would require isolating a single buffer hit against a controlled query
-    // embedding, which is not isolatable without waiting on slow embeddings and
-    // a stable index. Skipping per the brief's best-effort guidance.
-  });
+  // E20 — DECLARED SKIP (AC-05). Blocked on OBSERVABILITY, not on
+  // configurability, and the distinction is worth stating because the obvious
+  // rebuttal — "just change the values" — does not unblock it.
+  //
+  // The values ARE reachable. `synapse.buffer.hitBoost` (default 1.3) and
+  // `synapse.buffer.matchThreshold` (default 0.4) are real config fields
+  // (packages/shared/src/config/index.ts:1063-1069,
+  // packages/shared/src/config/massa-ai-config.ts:485-486) and the Web UI even
+  // exposes them as editable (apps/web-ui/src/static/views/config-sections.ts:196-197),
+  // so `PUT /api/v1/config` could move them. What is missing is a READ-BACK.
+  //
+  // The effect is applied at working-memory-buffer.ts:112-116 —
+  // `if (sim >= matchThreshold) … score: min(1, baselineScore * hitBoost)` —
+  // inside `SynapseManager.process`, and the boosted score is folded into the
+  // final result score with no separate flag, no `bufferHit` marker and no
+  // explanation field. No synapse route returns it, and `search`'s
+  // `explainScores` block has no buffer component either. So the only way to
+  // infer a boost is to diff two result scores across a config change — and
+  // this stack's own measurement forbids that inference: repeating a query
+  // returns different members and different orders, and a search repeated
+  // across a knob-changing restart is answered from the pre-change cache entry
+  // for the full 3600 s TTL (see 29.audit-repairs.test.ts's cache-key notes).
+  //
+  // WHAT IT NEEDS: a per-result `bufferHit` / pre-boost-score field on the
+  // search response, or an explanation component for the buffer. Neither
+  // exists. Owner of the logic in the meantime: the buffer's own unit tests.
+  test.skip(
+    "E20: matchThreshold/hitBoost effect on buffer hits — SKIPPED: the config fields are " +
+      "settable but the boost has NO read-back surface (folded into the final score at " +
+      "working-memory-buffer.ts:112-116 with no flag, no explanation component), and score " +
+      "diffing is invalid here because repeat queries are neither order-stable nor " +
+      "cache-key-separated. Needs a bufferHit/pre-boost field on the search response.",
+    () => {},
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

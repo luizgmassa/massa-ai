@@ -179,7 +179,7 @@ function makePid(n: number, suffix?: string): string {
 // Concurrency
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe.skipIf(!READY)("T9 N5 — concurrent index SAME projectId serializes", () => {
+describe.skipIf(!READY)("T9 N5 — concurrent index SAME projectId is lease-guarded", () => {
   const pid = makePid(5);
 
   afterAll(async () => {
@@ -187,15 +187,22 @@ describe.skipIf(!READY)("T9 N5 — concurrent index SAME projectId serializes", 
   });
 
   test(
-    "3 concurrent index() calls on the SAME tiny projectId all resolve to a searchable index",
+    "3 concurrent index() calls on the SAME projectId: one wins the lease, the rest are refused busy",
     async () => {
-      // Fire 3 concurrent index calls for the SAME tiny projectId. The queue
-      // mutex (contextual-search-rlm.ts#indexProject) chains them: A → B → C.
-      // The data-plane contract is that all 3 resolve without interleaved
-      // clearProject corruption and the final state is searchable.
-      // Fire 3 concurrent index kick-offs for the SAME projectId. Capture the
-      // jobIds so we can poll each to completion (the queue mutex serializes
-      // them: A → B → C). postLong avoids the shared helper's 120s cap.
+      // The contract changed and this test did not follow it. It used to assert
+      // that all three calls reach `completed`, citing "the queue mutex
+      // (contextual-search-rlm.ts#indexProject) chains them: A → B → C". That
+      // mutex was superseded by a `managed_runs` lease on
+      // `(projectId, "indexing")` — FR-09 / AC-7, see `EtlPipelineBusyError` in
+      // `services/etl/pipeline.ts:47-62` — which *refuses* a second concurrent
+      // run with `indexing_busy:<activeRunId>` rather than queueing it, so the
+      // caller can poll the active run instead. Measured here before the
+      // repair: `failed, completed, failed`.
+      //
+      // The load-bearing property is unchanged and still asserted: exactly one
+      // run mutates the project, and the final state is coherent and
+      // searchable. What changed is that the losers are refused rather than
+      // chained — and refusing must be visible, not silent.
       const fires = Array.from({ length: 3 }, () =>
         postLong("/api/v1/project/index", {
           projectPath: POLY_FIXTURE_PATH,
@@ -233,22 +240,49 @@ describe.skipIf(!READY)("T9 N5 — concurrent index SAME projectId serializes", 
             { timeoutMs: 300_000, intervalMs: 3_000 },
           ).then(async (ok) => {
             const s = await getLong(`/api/v1/project/index/status/${jid}`);
-            return { ok, status: s.json?.data?.status ?? "unknown", errors: s.json?.data?.errors };
+            // `data.error` is the terminal failure reason (a string, e.g.
+            // "indexing_busy:31"). `data.result.errors` is a *count* of
+            // per-file errors on a successful run — a different subject with a
+            // near-identical name, and reading it here made a refused job look
+            // reasonless.
+            return {
+              ok,
+              status: s.json?.data?.status ?? "unknown",
+              error: s.json?.data?.error ?? null,
+            };
           }),
         ),
       );
       console.log(
         `[N5] ${jobIds.length} jobs fired; final statuses: ` +
-          finals.map((f) => `${f.status}${f.errors ? `(${f.errors} errs)` : ""}`).join(", "),
+          finals.map((f) => `${f.status}${f.error ? `(${f.error})` : ""}`).join(", "),
       );
-      for (const f of finals) {
-        expect(f.ok).toBe(true);
-        expect(f.status).toBe("completed");
+
+      // Every job must reach a terminal status — a lease refusal that leaves a
+      // job non-terminal forever is the failure mode `acquire-indexing-lease.ts`
+      // exists to prevent.
+      for (const f of finals) expect(f.ok).toBe(true);
+
+      const winners = finals.filter((f) => f.status === "completed" || f.status === "indexed");
+      const refused = finals.filter((f) => f.status === "failed");
+      expect(winners.length + refused.length).toBe(finals.length);
+
+      // Exactly one run may mutate the project. Two winners would mean two
+      // concurrent pipelines wrote the same project — the corruption the lease
+      // exists to prevent, and the one outcome this test must never accept.
+      expect(winners).toHaveLength(1);
+
+      // Every loser must be refused *for the documented reason*. Without this,
+      // the test would pass on a run that failed for any reason at all.
+      for (const f of refused) {
+        expect(String(f.error ?? "")).toContain("indexing_busy");
       }
 
-      // Data-plane: final state must be searchable (LAST writer wins, coherent).
+      // Data-plane: the surviving run leaves a coherent, searchable index.
       const ok = await pollSearchable(pid, "polyglot", 120_000);
-      console.log(`[N5] 3 concurrent same-project index calls → final searchable: ${ok}`);
+      console.log(
+        `[N5] winners=${winners.length} refused-busy=${refused.length} → final searchable: ${ok}`,
+      );
       expect(ok).toBe(true);
     },
     900_000,
@@ -565,7 +599,7 @@ describe.skipIf(!READY)("T9 N15 — vector dimension and index integrity", () =>
   });
 
   test(
-    "indexed vectors are exactly 4096d with binary HNSW and valid distance operators",
+    "indexed vectors live in exactly one dimension table, with the HNSW index its width selects",
     async () => {
       const ir = await indexTinyAndWait(pid);
       expect(ir.status).toBe("completed");
@@ -574,37 +608,108 @@ describe.skipIf(!READY)("T9 N15 — vector dimension and index integrity", () =>
 
       const pool = new Pool({ connectionString: process.env.DATABASE_URL });
       try {
+        // The dimension is a property of the configured embedding provider, not
+        // a constant. This test used to name `vector_documents_4096d` directly
+        // and so passed only under qwen3-embedding:8b; under any other profile
+        // it read an empty table and failed on row count, which reads like a
+        // vector-integrity regression rather than a hardcoded assumption.
+        //
+        // Discovering the table instead makes the assertion strictly stronger:
+        // "exactly one dimension table holds this project" also catches a
+        // project whose rows are split across two profiles, which naming one
+        // table could never see.
+        const tables = await pool.query<{ table_name: string; rows: string }>(
+          `SELECT c.relname AS table_name,
+                  (SELECT count(*) FROM pg_catalog.pg_class WHERE oid = c.oid) AS rows
+             FROM pg_catalog.pg_class c
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+              AND c.relkind = 'r'
+              AND c.relname ~ '^vector_documents_[0-9]+d$'`,
+        );
+
+        const occupied: { table: string; dimensions: number; count: number }[] = [];
+        for (const row of tables.rows) {
+          const dimensions = Number(/^vector_documents_(\d+)d$/.exec(row.table_name)![1]);
+          const counted = await pool.query<{ n: string }>(
+            `SELECT count(*)::text AS n FROM ${row.table_name} WHERE project_id = $1`,
+            [pid],
+          );
+          const count = Number(counted.rows[0]!.n);
+          if (count > 0) occupied.push({ table: row.table_name, dimensions, count });
+        }
+
+        console.log(
+          `[N15] dimension tables present: ${tables.rows.length}; occupied by ${pid}: ` +
+            (occupied.map((o) => `${o.table}(${o.count})`).join(", ") || "none"),
+        );
+        expect(occupied).toHaveLength(1);
+
+        const { table, dimensions } = occupied[0]!;
+        const binaryQuantized = dimensions > 2000;
+
+        // Every indexed project carries exactly one `_metadata:<projectId>` row
+        // in this table. It is a sentinel, not a document: its embedding is a
+        // zero vector, so `embedding <=> embedding` is NaN for it and any
+        // whole-project cosine assertion fails on that row alone. Separate the
+        // two populations rather than loosening the assertion.
+        const binaryColumns = binaryQuantized
+          ? `bit_length(embedding_bq)::int AS binary_dimensions,
+             (embedding_bq <~> embedding_bq)::float8 AS hamming_self_distance`
+          : `NULL::int AS binary_dimensions, NULL::float8 AS hamming_self_distance`;
         const vectors = await pool.query<{
+          id: string;
           dimensions: number;
-          binary_dimensions: number;
+          binary_dimensions: number | null;
           cosine_self_distance: number;
-          hamming_self_distance: number;
+          hamming_self_distance: number | null;
         }>(
-          `SELECT vector_dims(embedding)::int AS dimensions,
-                  bit_length(embedding_bq)::int AS binary_dimensions,
+          `SELECT id,
+                  vector_dims(embedding)::int AS dimensions,
                   (embedding <=> embedding)::float8 AS cosine_self_distance,
-                  (embedding_bq <~> embedding_bq)::float8 AS hamming_self_distance
-             FROM vector_documents_4096d
+                  ${binaryColumns}
+             FROM ${table}
             WHERE project_id = $1`,
           [pid],
         );
-        expect(vectors.rows.length).toBeGreaterThan(0);
-        expect(vectors.rows.every((row) =>
-          row.dimensions === 4096 &&
-          row.binary_dimensions === 4096 &&
-          row.cosine_self_distance === 0 &&
-          row.hamming_self_distance === 0
-        )).toBe(true);
+
+        const sentinelId = `_metadata:${pid}`;
+        const sentinels = vectors.rows.filter((row) => row.id === sentinelId);
+        const documents = vectors.rows.filter((row) => row.id !== sentinelId);
+        console.log(
+          `[N15] ${table}: ${documents.length} document row(s), ${sentinels.length} metadata sentinel(s)`,
+        );
+        expect(sentinels).toHaveLength(1);
+        expect(documents.length).toBeGreaterThan(0);
+
+        // Every document row's real width must equal the width its table name
+        // claims — the cross-check the hardcoded constant used to stand in for.
+        const offenders = documents.filter((row) =>
+          row.dimensions !== dimensions ||
+          row.cosine_self_distance !== 0 ||
+          (binaryQuantized && (row.binary_dimensions !== dimensions || row.hamming_self_distance !== 0))
+        );
+        if (offenders.length > 0) {
+          console.log(`[N15] offending rows: ${JSON.stringify(offenders.slice(0, 3))}`);
+        }
+        expect(offenders).toHaveLength(0);
+
+        // The sentinel's own contract: right width, but a zero vector, which is
+        // why it cannot be asserted alongside the documents.
+        expect(sentinels[0]!.dimensions).toBe(dimensions);
+        if (binaryQuantized) expect(sentinels[0]!.binary_dimensions).toBe(dimensions);
 
         const index = await pool.query<{ indexdef: string }>(
           `SELECT indexdef
              FROM pg_indexes
-            WHERE tablename = 'vector_documents_4096d'
-              AND indexname = 'idx_vector_documents_4096d_embedding_bq'`,
+            WHERE tablename = $1
+              AND indexname = $2`,
+          [table, binaryQuantized ? `idx_${table}_embedding_bq` : `idx_${table}_embedding`],
         );
+        console.log(`[N15] ${table}: ${binaryQuantized ? "binary-quantized" : "direct"} index → ${index.rows[0]?.indexdef ?? "none"}`);
         expect(index.rows).toHaveLength(1);
         expect(index.rows[0]!.indexdef).toContain("USING hnsw");
-        expect(index.rows[0]!.indexdef).toContain("bit_hamming_ops");
+        expect(index.rows[0]!.indexdef).toContain(binaryQuantized ? "bit_hamming_ops" : "vector_cosine_ops");
       } finally {
         await pool.end();
       }
@@ -707,23 +812,61 @@ describe.skipIf(!READY)("T9 N17 — memory hard-delete leaves no tombstone", () 
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Auth (AUTH_REQUIRED is currently FALSE — no key configured on the server)
+// Auth. AD-011 made the key mandatory and deleted the no-key pass-through; it
+// is not configurable, and the API provisions a key on first start when none
+// exists. These two cases used to encode the opposite world: N18 was a static
+// skip whose text said exercising 401 "would require restarting tools-api with
+// a key (destructive — deferred to T13)", and N19 asserted AUTH_REQUIRED ===
+// false. Both were unreachable-by-construction rather than true: no supported
+// configuration produces an open API, so N19 could only pass against a server
+// running deleted behaviour. Restarting with a key is also no longer
+// destructive — `scripts/e2e-stack.sh restart-api` owns that.
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe.skipIf(!READY)("T9 N18 — auth-on 401 without key", () => {
-  test.skip(
-    "N18: cannot exercise the 401 path — server has no MASSA_AI_API_KEY set (no key configured). " +
-      "Exercising it would require restarting tools-api with a key (destructive — deferred to T13).",
-    () => {},
-  );
+describe.skipIf(!READY)("T9 N18 — auth is mandatory: no key is 401", () => {
+  test("GET /api/v1/workspace/list with NO x-api-key is rejected", async () => {
+    AVAIL = AVAIL ?? (await probeAvailability());
+    expect(AVAIL.AUTH_REQUIRED).toBe(true);
+
+    // httpRaw attaches the configured key, so the unauthenticated request is
+    // issued directly. A bare fetch is the only way to observe the header's
+    // absence on the wire.
+    const api = process.env.MASSA_AI_API_URL ?? "http://localhost:3333";
+    const res = await fetch(`${api}/api/v1/workspace/list`, {
+      method: "GET",
+      signal: AbortSignal.timeout(30_000),
+    });
+    console.log(`[N18] GET /workspace/list with no key → ${res.status} (expect 401)`);
+    expect(res.status).toBe(401);
+  });
+
+  test("a whitespace-only key is treated as absent, not as a key", async () => {
+    // HTTP strips whitespace from header values, so "   " arrives as "". The
+    // guard must not read that as a supplied credential.
+    const api = process.env.MASSA_AI_API_URL ?? "http://localhost:3333";
+    const res = await fetch(`${api}/api/v1/workspace/list`, {
+      method: "GET",
+      headers: { "x-api-key": "   " },
+      signal: AbortSignal.timeout(30_000),
+    });
+    console.log(`[N18] GET /workspace/list with a blank key → ${res.status} (expect 401)`);
+    expect(res.status).toBe(401);
+  });
 });
 
-describe.skipIf(!READY)("T9 N19 — auth-off (dev mode) returns 200 with no key", () => {
-  test("GET /api/v1/workspace/list with NO X-API-Key returns 200 (dev mode, auth off)", async () => {
-    AVAIL = AVAIL ?? (await probeAvailability());
-    expect(AVAIL.AUTH_REQUIRED).toBe(false);
+describe.skipIf(!READY)("T9 N19 — the configured key is accepted, and /health stays public", () => {
+  test("GET /api/v1/workspace/list WITH the configured key returns 200", async () => {
+    const key = process.env.MASSA_AI_API_KEY ?? "";
+    expect(key.length).toBeGreaterThan(0);
     const res = await httpRaw("/api/v1/workspace/list", { method: "GET" });
-    console.log(`[N19] GET /workspace/list with no key → ${res.status} (expect 200 in dev mode)`);
+    console.log(`[N19] GET /workspace/list with the configured key → ${res.status}`);
+    expect(res.status).toBe(200);
+  });
+
+  test("GET /health needs no key — it is in PUBLIC_PATHS", async () => {
+    const api = process.env.MASSA_AI_API_URL ?? "http://localhost:3333";
+    const res = await fetch(`${api}/health`, { signal: AbortSignal.timeout(30_000) });
+    console.log(`[N19] GET /health with no key → ${res.status} (expect 200)`);
     expect(res.status).toBe(200);
   });
 });

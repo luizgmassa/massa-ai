@@ -322,13 +322,59 @@ describe.skipIf(!READY)("T8 — Lifecycle", () => {
       if (Array.isArray(ids)) expect(ids).toHaveLength(3);
     }, 60_000);
 
-    // F87 / F88 are shared-infra DESTRUCTIVE scenarios on this live stack.
-    // Saturating the hook queue (→429) or toggling HOOKS_ENABLED (→423) mutates
-    // global singletons and would break every other client. They MUST NOT run
-    // here — they belong in the DEDICATED destructive suite (T13). Declared as
-    // static test.skip with a printed reason.
-    test.skip("F87 saturate→429 — SKIPPED: shared-infra destructive (saturates global hook queue singleton; run in T13 dedicated destructive suite)", () => {});
-    test.skip("F88 disabled hooks→423 — SKIPPED: shared-infra destructive (toggles HOOKS_ENABLED global config singleton; run in T13 dedicated destructive suite)", () => {});
+    // F87 / F88 — both reasons below were re-derived 2026-09-07 against the
+    // DEDICATED stack (scripts/e2e-stack.sh). The original reason on both was
+    // "shared-infra destructive … run in T13 dedicated destructive suite", and
+    // it is now stale in two ways: this tier no longer runs against shared
+    // infrastructure, and 16.destructive.test.ts does NOT cover either scenario
+    // (its F87 entry, 16.destructive.test.ts:402, is itself a static
+    // `test.skip` carrying a manual runbook). Pointing at it was a dead
+    // forward-reference.
+
+    // F88 — CLOSED ELSEWHERE, kept here only to avoid duplicating a profile
+    // restart this file must not perform. `HOOKS_ENABLED=false` is a boot-time
+    // config read (packages/shared/src/config/index.ts:833) with no request-
+    // scoped override, so observing 423 requires restarting the API into the
+    // `hooks-off` profile. That is exactly what
+    // `28.hooks-handoffs-proposals.test.ts` EB-HOOK-1 does, and it is stricter
+    // than this placeholder ever was: measured under
+    // `e2e-stack.sh restart-api --profile hooks-off`, all six lifecycle kinds
+    // plus `/hook/batch` returned 423 (7 assertions). Nothing is uncovered.
+    test.skip(
+      "F88 disabled hooks→423 — SKIPPED: needs an API restart into the `hooks-off` profile, " +
+        "which this file must not perform. Covered instead by 28.hooks-handoffs-proposals.test.ts " +
+        "EB-HOOK-1 (7 assertions, all 423, measured under `e2e-stack.sh restart-api --profile hooks-off`).",
+      () => {},
+    );
+
+    // F87 — STILL OPEN, and the blocker is a product one rather than a stack
+    // one. The saturation threshold IS configurable
+    // (`HOOKS_QUEUE_MAX_PENDING`, packages/shared/src/config/index.ts:840-843),
+    // and dropping it to the minimum is verifiably in effect — with the API
+    // booted at `HOOKS_QUEUE_MAX_PENDING=1`, `GET /api/v1/hooks/queue-status`
+    // (routes/dashboard.ts:66-75) answered `{"pendingCount":0,"maxPending":1,
+    // "saturated":false}`. And yet the 429 could not be produced. Measured
+    // 2026-09-07 against that boot:
+    //     POST /api/v1/hook/batch with 2, 10 and 50 events  → 202, 202, 202
+    //     400 concurrent POST /api/v1/hook                  → 202 x400, 429 x0
+    // `WriterQueue.enqueue` (services/hooks/writer-queue.ts:47-63) raises
+    // `QueueSaturatedError` only while `pending >= maxPending`, and `pending`
+    // is observed at 0 both before and after every burst, so the guard is never
+    // consulted in a saturated state from the HTTP path at ANY threshold. The
+    // 429 branches at routes/hooks.ts:58-62 and :103-107 therefore have no
+    // live-stack sensor; their only coverage is the unit tier's injected throw
+    // (apps/tools-api/src/routes/hooks.test.ts:74, :131).
+    // WHAT IT NEEDS: either a product surface that holds the writer chain open
+    // across requests (nothing today does), or a fix that makes `pending`
+    // reflect in-flight work across request boundaries. Not a test defect and
+    // not closable from this suite.
+    test.skip(
+      "F87 saturate→429 — SKIPPED: the 429 saturation envelope is not reachable from the HTTP " +
+        "surface at any configured threshold. With HOOKS_QUEUE_MAX_PENDING=1 confirmed live via " +
+        "/api/v1/hooks/queue-status, a 50-event batch and 400 concurrent single posts returned " +
+        "202 with zero 429s (measured 2026-09-07). Needs a product change, not a stack knob.",
+      () => {},
+    );
 
     test("F89 oversized payload (>65536 bytes) rejected, no crash", async () => {
       // Build a payload whose JSON serialization exceeds maxPayloadBytes (65536).

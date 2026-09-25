@@ -205,5 +205,13 @@ export type {
   ProposalEnrichment,
 } from "./services/jobs/auto-improve-job.js";
 
+// Exported for the same reason `ProposalPayloadValidationError` above is: a
+// transport has to tell an invalid-parameter rejection from a genuine server
+// fault with `instanceof`, not by comparing `error.name`. `enum-validation.ts`
+// states the contract — "the HTTP layer maps it to the matching HTTP status" —
+// and until this export existed there was no way for `apps/tools-api` to honour
+// it, so any route delegating to a tool turned a 400 into a 500.
+export { ToolError, validateEnum } from "./kernel/enum-validation.js";
+
 // Re-export types from shared for convenience
 export type { ToolResponse, IToolHandler } from "@massa-ai/shared";

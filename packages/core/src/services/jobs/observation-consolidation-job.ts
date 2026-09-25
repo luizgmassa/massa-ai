@@ -76,7 +76,7 @@ function readBridgeConfig() {
 
 export class ObservationConsolidationJob {
   private readonly llm: LlmSurface;
-  private readonly store: ObservationStore;
+  private readonly injectedStore: ObservationStore | undefined;
   private readonly memoryRepo: { insert(input: unknown): void | Promise<void> };
   private readonly minObservations: number;
   private readonly minIntervalMs: number;
@@ -87,9 +87,13 @@ export class ObservationConsolidationJob {
   /** Calls observed by tests. */
   public runCalls = 0;
 
+  private get store(): ObservationStore {
+    return this.injectedStore ?? getObservationStore();
+  }
+
   constructor(opts: ObservationConsolidationJobOptions = {}) {
     this.llm = opts.llm ?? defaultLlmSurface;
-    this.store = opts.store ?? getObservationStore();
+    this.injectedStore = opts.store;
     // Lazy getter so the repo is resolved at run-time (not ctor time), unless
     // a test injects one. This avoids touching the process-wide singleton
     // during construction (test isolation).

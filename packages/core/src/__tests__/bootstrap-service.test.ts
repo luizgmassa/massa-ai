@@ -18,7 +18,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { setTimeout as sleep } from "timers/promises";
-import type { z } from "zod";
+import { toJSONSchema, type z } from "zod";
 
 import {
   BootstrapService,
@@ -499,6 +499,30 @@ describe("BootstrapService — scan, seed, idempotency, degradation, event", () 
         memories: [{ summary: "x", type: "code", level: 1, importance: 1.5 }],
       };
       expect(SeedMemoriesSchema.safeParse(invalid).success).toBe(false);
+    });
+
+    it("accepts an over-long summary and sends the model no string length bound", () => {
+      const long = {
+        memories: [{ summary: "x".repeat(600), type: "code", level: 1, importance: 0.5 }],
+      };
+      expect(SeedMemoriesSchema.safeParse(long).success).toBe(true);
+      expect(JSON.stringify(toJSONSchema(SeedMemoriesSchema))).not.toContain("maxLength");
+    });
+
+    it("truncates an over-long LLM summary to 512 chars at insert", async () => {
+      const memRepo = makeFakeMemoryRepo();
+      const [first, ...rest] = defaultLLMSeeds();
+      const service = new BootstrapService({
+        llm: enabledSurface([{ ...first!, summary: "y".repeat(600) }, ...rest]),
+        memoryRepo: memRepo,
+        symbolGraph: fakeSymbolGraph([]),
+        gitRunner: fakeGitRunner(),
+      });
+      const res = await service.bootstrap("proj-long", { projectPath: fixtureRoot });
+
+      expect(res.source).toBe("llm");
+      const inserted = memRepo.inserted.find((i) => i.content.startsWith("y"));
+      expect(inserted?.content.length).toBe(512);
     });
   });
 });
