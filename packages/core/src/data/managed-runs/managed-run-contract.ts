@@ -191,4 +191,8 @@ export interface ManagedRunRepository {
    * one live active run, or `null` if none.
    */
   getActive(projectId: string, runKind: ManagedRunKind): Promise<ActiveManagedRun | null>;
+
+  getAnyActive(): Promise<ActiveManagedRun | null>;
+
+  release(lease: ManagedRunLease): Promise<AbortManagedRunOutcome>;
 }
