@@ -5,13 +5,14 @@
  * are covered in project-identity-apply.test.ts; these pin the COMPOSITION.
  */
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 
 import {
   ProjectIdentityError,
   createProjectIdentityService,
   type ProjectIdentityTransactionClient,
 } from "../services/project-identity/index.js";
+import { _setHeavyWorkRepositoryForTesting } from "../services/jobs/heavy-work-lease.js";
 
 type Row = Record<string, unknown>;
 
@@ -354,5 +355,63 @@ describe("createProjectIdentityService", () => {
     expect(received).not.toBeNull();
     expect((received as { operationId: string }).operationId).toBe("op-test");
     unsubscribe();
+  });
+});
+
+describe("createProjectIdentityService — apply takes a maintenance heavy-work lease", () => {
+  afterEach(() => {
+    _setHeavyWorkRepositoryForTesting(null);
+  });
+
+  test("apply wraps every attempt in a maintenance lease labelled project-identity, even when apply fails", async () => {
+    const beginCalls: Array<{ projectId: string; runKind: string; eventId: string }> = [];
+    let released = false;
+    _setHeavyWorkRepositoryForTesting({
+      begin: async (input: any) => {
+        beginCalls.push({ projectId: input.projectId, runKind: input.runKind, eventId: input.eventId });
+        return {
+          status: "acquired",
+          lease: {
+            runId: "1",
+            projectId: input.projectId,
+            runKind: input.runKind,
+            leaseToken: "t",
+            leaseExpiresAt: Date.now() + 90_000,
+            eventId: input.eventId,
+          },
+        };
+      },
+      heartbeat: async () => ({ status: "renewed", leaseExpiresAt: Date.now() + 90_000 }),
+      release: async () => { released = true; return { status: "aborted", runId: "1" }; },
+      getAnyActive: async () => null,
+    } as any);
+
+    const service = createProjectIdentityService({
+      acquireClient: async () => ({
+        async query(): Promise<{ rows: Row[] }> {
+          throw new Error("pg: connection to /secret-db lost");
+        },
+        async beginTransaction(): Promise<void> { /* noop */ },
+        async commitTransaction(): Promise<void> { /* noop */ },
+        async rollbackTransaction(): Promise<void> { /* noop */ },
+      }),
+      releaseClient: async () => { /* noop */ },
+    });
+
+    await expect(service.apply({
+      mode: "rename",
+      sourceProjectId: "source",
+      targetProjectId: "target",
+      dryRun: false,
+      operationId: "op-heavy-work",
+      expectedPlanHash: "0".repeat(64),
+    })).rejects.toBeInstanceOf(ProjectIdentityError);
+
+    expect(beginCalls).toHaveLength(1);
+    expect(beginCalls[0]!.runKind).toBe("maintenance");
+    expect(beginCalls[0]!.projectId.startsWith("heavy-work:project-identity:")).toBe(true);
+    expect(beginCalls[0]!.eventId).toBe("heavy-work:project-identity");
+    // The lease is released even though the wrapped apply() rejected.
+    expect(released).toBe(true);
   });
 });

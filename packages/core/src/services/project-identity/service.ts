@@ -10,6 +10,7 @@
  */
 
 import { getPgPool } from "../../kernel/db-connection.js";
+import { withHeavyWorkLease } from "../jobs/heavy-work-lease.js";
 import {
   createProjectIdentityApplyService,
   type ProjectIdentityChangedPublisher,
@@ -111,7 +112,7 @@ export function createProjectIdentityService(
       }
     },
     apply(input: ProjectIdentityApplyInput): Promise<ProjectIdentityApplyResult> {
-      return applyService.apply(input);
+      return withHeavyWorkLease("maintenance", "project-identity", () => applyService.apply(input));
     },
   };
 }

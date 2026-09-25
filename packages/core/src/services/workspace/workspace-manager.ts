@@ -13,6 +13,7 @@ import { getSymbolRepository } from "../../data/symbol/symbol-repository-factory
 import type { WorkspaceRow, WorkspaceStatus } from "../../data/symbol/symbol-repository-pg.js";
 import { eventBus } from "../events/event-bus.js";
 import { symbolGraphService } from "../symbol/symbol-graph.service.js";
+import { withHeavyWorkLease } from "../jobs/heavy-work-lease.js";
 
 export type { WorkspaceRow, WorkspaceStatus };
 
@@ -145,7 +146,9 @@ export class WorkspaceManager {
    * Does NOT clear the vector store — caller is responsible for that.
    */
   async removeWorkspace(projectId: string): Promise<void> {
-    await getSymbolRepository().clearProject(projectId);
+    await withHeavyWorkLease("maintenance", `workspace-remove:${projectId}`, () =>
+      getSymbolRepository().clearProject(projectId),
+    );
     logger.info("WorkspaceManager: workspace removed", { projectId });
   }
 

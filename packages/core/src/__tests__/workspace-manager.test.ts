@@ -7,6 +7,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { workspaceManager, WorkspaceManager } from "../services/workspace/workspace-manager.js";
+import { _setHeavyWorkRepositoryForTesting } from "../services/jobs/heavy-work-lease.js";
 
 const DB_AVAILABLE = (process.env.DATABASE_URL ?? "").startsWith("postgres");
 const TEST_PREFIX = "cov-ws-";
@@ -160,6 +161,44 @@ describe.skipIf(!DB_AVAILABLE)("WorkspaceManager (PostgreSQL)", () => {
     expect(await workspaceManager.getWorkspace(projectId)).not.toBeNull();
     await workspaceManager.removeWorkspace(projectId);
     expect(await workspaceManager.getWorkspace(projectId)).toBeNull();
+  });
+
+  test("removeWorkspace takes a maintenance heavy-work lease labelled workspace-remove:<projectId>", async () => {
+    const projectId = testProjectId();
+    await workspaceManager.markIndexing(projectId, "/tmp/lease-remove-project");
+
+    const beginCalls: Array<{ projectId: string; runKind: string; eventId: string }> = [];
+    let released = false;
+    _setHeavyWorkRepositoryForTesting({
+      begin: async (input: any) => {
+        beginCalls.push({ projectId: input.projectId, runKind: input.runKind, eventId: input.eventId });
+        return {
+          status: "acquired",
+          lease: {
+            runId: "1",
+            projectId: input.projectId,
+            runKind: input.runKind,
+            leaseToken: "t",
+            leaseExpiresAt: Date.now() + 90_000,
+            eventId: input.eventId,
+          },
+        };
+      },
+      heartbeat: async () => ({ status: "renewed", leaseExpiresAt: Date.now() + 90_000 }),
+      release: async () => { released = true; return { status: "aborted", runId: "1" }; },
+      getAnyActive: async () => null,
+    } as any);
+    try {
+      await workspaceManager.removeWorkspace(projectId);
+    } finally {
+      _setHeavyWorkRepositoryForTesting(null);
+    }
+
+    expect(beginCalls).toHaveLength(1);
+    expect(beginCalls[0]!.runKind).toBe("maintenance");
+    expect(beginCalls[0]!.projectId.startsWith(`heavy-work:workspace-remove:${projectId}:`)).toBe(true);
+    expect(beginCalls[0]!.eventId).toBe(`heavy-work:workspace-remove:${projectId}`);
+    expect(released).toBe(true);
   });
 
   test("getInstance returns a singleton", () => {
