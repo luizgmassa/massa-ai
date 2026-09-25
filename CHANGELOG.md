@@ -147,6 +147,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"label":"reranker"` failure), and window slicing stays with `reranker.test.ts`. On LM
   Studio with every model resident the suite is 9/0/0 with the instruct model in the code
   role, and — after the bootstrap schema fix below — 9/0/0 on the default MLX coder model.
+- **A scheduled job could run twice when the heavy-work check was slower than the tick.**
+  `Scheduler.tick()` awaits the heavy-work probe before firing, and the interval kept starting
+  new ticks meanwhile; overlapping ticks each fired from the job list read before the await, so
+  a job ran again as soon as its first run finished, and two capped jobs fired 14 ms apart.
+  Only one evaluation now runs at a time: a tick arriving mid-evaluation runs once right after
+  it instead of overlapping, the job list is re-read after the probe, and catch-up shares the
+  same guard. With the default 60 s tick and the probe's 5 s ceiling this needed a
+  `MASSA_AI_SCHEDULER_TICK_MS` below the probe latency; the e2e `scheduler-fast` profile (1 s)
+  hit it under load.
 - **LLM bootstrap seeding timed out on every call against LM Studio's MLX coder model.** The
   seed schema bounded `summary` to 512 characters inside an array bounded to 8 items; LM
   Studio's MLX grammar engine never finished compiling that combination (no token in 150 s,

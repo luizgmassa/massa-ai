@@ -182,3 +182,116 @@ describe("Scheduler heavy-work gate", () => {
     expect(t.fired).toEqual(["a"]);
   });
 });
+
+describe("Scheduler heavy-work gate — overlapping evaluations", () => {
+  function slowProbeSetup(onProbe: () => void = () => {}) {
+    const store = makeStore();
+    const fired: string[] = [];
+    const scheduler = new Scheduler({
+      store,
+      enabled: true,
+      tickIntervalMs: 1_000,
+      maxConcurrent: 1,
+      heavyWorkProbe: () => {
+        onProbe();
+        return new Promise((resolve) => setTimeout(() => resolve({ busy: false }), 30));
+      },
+    });
+    for (const kind of ["kind-a", "kind-b"]) {
+      scheduler.registerHandler(kind as JobKind, (job) => { fired.push(job.id); });
+    }
+    return { store, scheduler, fired };
+  }
+
+  test("a tick started while another awaits the probe does not fire the same job again", async () => {
+    const t = slowProbeSetup();
+    const now = Date.now();
+    t.store.save(makeJob("a", "kind-a", now - 10));
+
+    const [first, second] = await Promise.all([t.scheduler.tick(now), t.scheduler.tick(now + 1)]);
+    await Bun.sleep(100);
+
+    expect(t.fired).toEqual(["a"]);
+    expect(first.fired).toBe(1);
+    expect(second).toMatchObject({ evaluated: 0, fired: 0 });
+  });
+
+  test("ticks overlapping one evaluation coalesce into one follow-up, so two capped jobs each fire once", async () => {
+    const t = slowProbeSetup();
+    const now = Date.now();
+    t.store.save(makeJob("a", "kind-a", now - 10));
+    t.store.save(makeJob("b", "kind-b", now - 10));
+
+    await Promise.all([t.scheduler.tick(now), t.scheduler.tick(now + 1), t.scheduler.tick(now + 2)]);
+    expect(t.fired).toEqual(["a"]);
+    await Bun.sleep(100);
+
+    expect(t.fired).toEqual(["a", "b"]);
+  });
+
+  test("a tick arriving mid-evaluation is not dropped: a job due only at its time still fires", async () => {
+    const t = slowProbeSetup();
+    const now = Date.now();
+    t.store.save(makeJob("a", "kind-a", now - 10));
+    t.store.save(makeJob("b", "kind-b", now + 500));
+
+    await Promise.all([t.scheduler.tick(now), t.scheduler.tick(now + 500)]);
+    await Bun.sleep(100);
+
+    expect(t.fired).toEqual(["a", "b"]);
+  });
+
+  test("stop() discards a pending follow-up tick", async () => {
+    const t = slowProbeSetup();
+    const now = Date.now();
+    t.store.save(makeJob("a", "kind-a", now - 10));
+    t.store.save(makeJob("b", "kind-b", now + 500));
+
+    const first = t.scheduler.tick(now);
+    void t.scheduler.tick(now + 500);
+    t.scheduler.stop();
+    await first;
+    await Bun.sleep(100);
+
+    expect(t.fired).toEqual(["a"]);
+  });
+
+  test("catch-up and a tick overlapping on the probe fire a missed job once", async () => {
+    const t = slowProbeSetup();
+    const now = Date.now();
+    t.store.save(makeJob("a", "kind-a", now - 5_000));
+
+    await Promise.all([t.scheduler.catchUpMissedJobs(now), t.scheduler.tick(now - 4_500)]);
+    await settle();
+
+    expect(t.fired).toEqual(["a"]);
+  });
+
+  test("a job disabled while the tick awaits the probe does not fire", async () => {
+    let scheduler: Scheduler | undefined;
+    const t = slowProbeSetup(() => scheduler?.setEnabled("a", false));
+    scheduler = t.scheduler;
+    const now = Date.now();
+    t.store.save(makeJob("a", "kind-a", now - 10));
+
+    await t.scheduler.tick(now);
+    await settle();
+
+    expect(t.fired).toEqual([]);
+  });
+
+  test("the guard is released after each evaluation, so the next tick fires", async () => {
+    const t = slowProbeSetup();
+    const now = Date.now();
+    t.store.save(makeJob("a", "kind-a", now - 10));
+    await t.scheduler.tick(now);
+    await settle();
+    t.store.save(makeJob("b", "kind-b", now - 10));
+
+    const next = await t.scheduler.tick(now + 1);
+    await settle();
+
+    expect(next.fired).toBe(1);
+    expect(t.fired).toEqual(["a", "b"]);
+  });
+});

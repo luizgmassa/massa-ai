@@ -123,6 +123,8 @@ export class Scheduler {
   private heavyWorkReason: string | null = null;
   private lastProbeError: string | null = null;
   private consecutiveProbeFailures = 0;
+  private evaluating = false;
+  private pendingTickAt: number | null = null;
 
   private timer: ReturnType<typeof setInterval> | null = null;
   private started = false;
@@ -349,7 +351,16 @@ export class Scheduler {
   async catchUpMissedJobs(
     now: number = Date.now(),
   ): Promise<{ caughtUp: number; skipped: number; deferred: number }> {
-    if (!this.enabled) return { caughtUp: 0, skipped: 0, deferred: 0 };
+    if (!this.enabled || this.evaluating) return { caughtUp: 0, skipped: 0, deferred: 0 };
+    this.evaluating = true;
+    try {
+      return await this.catchUpOnce(now);
+    } finally {
+      this.evaluating = false;
+    }
+  }
+
+  private async catchUpOnce(now: number): Promise<{ caughtUp: number; skipped: number; deferred: number }> {
     const jobs = this.store.listEnabled();
     let skipped = 0;
     const missed: ScheduledJob[] = [];
@@ -389,6 +400,7 @@ export class Scheduler {
       this.timer = null;
     }
     this.started = false;
+    this.pendingTickAt = null;
     logger.info("Scheduler stopped");
   }
 
@@ -405,15 +417,37 @@ export class Scheduler {
   async tick(now: number = Date.now()): Promise<TickResult> {
     const result: TickResult = { evaluated: 0, fired: 0, skipped: 0, errors: 0, deferred: 0 };
     if (!this.enabled) return result;
+    if (this.evaluating) {
+      this.pendingTickAt = now;
+      return result;
+    }
+    this.evaluating = true;
+    try {
+      return await this.tickOnce(now, result);
+    } finally {
+      this.evaluating = false;
+      const pending = this.pendingTickAt;
+      this.pendingTickAt = null;
+      if (pending !== null) {
+        void this.tick(pending).catch((e) => {
+          logger.warn("Scheduler tick failed (swallowed)", { error: e as Error });
+        });
+      }
+    }
+  }
 
-    const jobs = this.store.listEnabled();
+  private async tickOnce(now: number, result: TickResult): Promise<TickResult> {
+    let jobs = this.store.listEnabled();
     result.evaluated = jobs.length;
 
     const due = jobs.filter((job) => !this.running.has(job.jobKind) && job.nextRunAt <= now);
-    if (due.length > 0 && (await this.heavyWorkBusy())) {
-      for (const job of due) this.deferred.add(job.id);
-      result.deferred = due.length;
-      return result;
+    if (due.length > 0) {
+      if (await this.heavyWorkBusy()) {
+        for (const job of due) this.deferred.add(job.id);
+        result.deferred = due.length;
+        return result;
+      }
+      jobs = this.store.listEnabled();
     }
 
     for (const job of jobs) {
