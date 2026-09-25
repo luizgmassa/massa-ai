@@ -989,4 +989,25 @@ describe("setup-local-first.sh lms load -c values (PDM-10 AC-3, G5)", () => {
       expect(Number(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
     });
   }
+
+  const DEFAULT_WRITE_ROLES = LMS_LOAD_ROLES.filter(({ role }) => role !== "embedding");
+
+  for (const { role, varName } of DEFAULT_WRITE_ROLES) {
+    test(`the LM Studio per-model default written for the ${role} role matches INFERENCE_ROLE_DEFAULTS.${role}.contextWindow`, () => {
+      const match = SETUP_SCRIPT.match(
+        new RegExp(`installer_set_lmstudio_context_default "\\$LMSTUDIO_CLI" "\\$${varName}" (\\d+)`),
+      );
+      expect(match).not.toBeNull();
+      expect(Number(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
+    });
+  }
+
+  test("the manual hint names each chat role's INFERENCE_ROLE_DEFAULTS context", () => {
+    const match = SETUP_SCRIPT.match(
+      /set Context Length: \$\{LLM_MODEL\} (\d+), \$\{CODE_MODEL\} (\d+)/,
+    );
+    expect(match).not.toBeNull();
+    expect(Number(match![1])).toBe(INFERENCE_ROLE_DEFAULTS.instruct.contextWindow);
+    expect(Number(match![2])).toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+  });
 });

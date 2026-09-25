@@ -383,10 +383,10 @@ if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
     LLM_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$LLM_FETCH" "$LLM_MODEL")"
     CODE_MODEL="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$CODE_FETCH" "$CODE_MODEL")"
 fi
-# PDM-12/design R-08: LM Studio exposes no per-request context length, so the
-# only way to bound a role's context window is to load the model with it.
-# Ollama gets its per-request num_ctx from the runtime seam (T06); this loads
-# each LM Studio model once, at the context its role needs.
+# PDM-12/design R-08: LM Studio exposes no per-request context length. Ollama
+# gets its per-request num_ctx from the runtime seam (T06). LM Studio gets each
+# chat role's context twice: as the model's per-model default, which every later
+# load reuses (JIT reloads after the TTL included), and on the one load below.
 #
 # design R-09: the new trio makes LLM_MODEL and CODE_MODEL distinct LM Studio
 # ids (8B@16k + 7B@32k, beside the 0.6B@8k embedder), so all three can now be
@@ -420,6 +420,8 @@ if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
         LMS_LOADS_EMBEDDING=false
     fi
     if [ -n "${LMSTUDIO_CLI:-}" ]; then
+        installer_set_lmstudio_context_default "$LMSTUDIO_CLI" "$LLM_MODEL" 16384
+        installer_set_lmstudio_context_default "$LMSTUDIO_CLI" "$CODE_MODEL" 32768
         if [ "$LMS_LOADS_EMBEDDING" = true ]; then
             "$LMSTUDIO_CLI" load -c 8192 --ttl "$LMS_LOAD_TTL_SECONDS" "$EMBEDDING_MODEL" || true
         fi
@@ -436,6 +438,7 @@ if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
         if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
             echo -e "      lms load -c 32768 --ttl ${LMS_LOAD_TTL_SECONDS} ${CODE_MODEL}"
         fi
+        echo -e "      and in LM Studio → My Models → ⚙️, set Context Length: ${LLM_MODEL} 16384, ${CODE_MODEL} 32768"
     fi
 
     # The MLX embedding endpoint. `installer_provider_defaults` already points
