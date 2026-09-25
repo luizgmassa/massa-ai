@@ -360,4 +360,32 @@ export class ManagedRunRepositoryPg implements ManagedRunRepository {
     `;
     return rows[0] ? toActive(rows[0]) : null;
   }
+
+  async getAnyActive(): Promise<ActiveManagedRun | null> {
+    const rows = await getPrismaClient().$queryRaw<ManagedRunRow[]>`
+      SELECT id, project_id, run_kind, event_id, content_hash, file_cursor,
+             status, lease_token, lease_expires_at, heartbeat_at,
+             created_at, completed_at
+      FROM managed_runs
+      WHERE status = 'active'
+        AND lease_expires_at > clock_timestamp()
+      ORDER BY lease_expires_at DESC
+      LIMIT 1
+    `;
+    return rows[0] ? toActive(rows[0]) : null;
+  }
+
+  async release(lease: ManagedRunLease): Promise<AbortManagedRunOutcome> {
+    const leaseToken = boundedText(lease.leaseToken, "leaseToken", MAX_LEASE_TOKEN);
+    const deleted = await getPrismaClient().$queryRaw<Array<{ id: bigint }>>`
+      DELETE FROM managed_runs
+      WHERE id = ${BigInt(lease.runId)}
+        AND project_id = ${lease.projectId}
+        AND run_kind = ${lease.runKind}
+        AND lease_token = ${leaseToken}
+      RETURNING id
+    `;
+    if (!deleted[0]) return { status: "lease_lost" };
+    return { status: "aborted", runId: deleted[0].id.toString() };
+  }
 }

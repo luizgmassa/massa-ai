@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A `.massa-ai-collect` file limits the MCP client's upload walk to listed directories.**
+  One path per line, relative to the project root (for example `app` and
+  `features/promotion`); `#` comments and surrounding slashes are ignored, and an absent or
+  empty file keeps the full walk. It is read on every collection, so the working set can
+  change without restarting the client. Use it to bound reindex time and memory on repos
+  larger than the collector's file cap.
+
+### Changed
+
+- **The MCP client's file collector caps rose to 15000 files / 150 MB** (from 3000 / 50 MB).
+  The walk follows filesystem order, so a repo over the old cap silently lost whichever
+  modules the walk reached last.
+- **Turborepo bumped to 2.11.3** (`turbo.json` `$schema` pinned to the matching version).
+- **The scheduler no longer fires jobs while heavy database work runs.** Before firing, a
+  tick checks `managed_runs` for any live lease in any project and any process: an index or
+  reindex (`indexing` lease), plus reset, rename/merge, workspace delete and incremental
+  auto-reindex, which now hold a short advisory lease (kind `maintenance` or `reindex`) keyed
+  on a per-call sentinel id that project rename/merge cannot repoint. The row is deleted when
+  the operation ends, and a lease that cannot be taken never blocks the operation. A job that
+  falls due during the work is deferred, not dropped as missed, and runs once on the first
+  idle tick; boot catch-up waits the same way. If the check itself fails or takes longer
+  than 5 s, jobs stay deferred and `GET /api/v1/scheduler/status` reports `heavyWork.lastProbeError`
+  and each job's `deferred` flag. The check covers every project, so a long index of one
+  project holds every scheduled job until it finishes. A job already running when heavy work
+  starts is not interrupted. `Scheduler.catchUpMissedJobs()` now returns a promise.
+
+### Fixed
+
+- **CocoaPods checkouts (`Pods/`) are no longer indexed.** Both the MCP client's collector
+  and core discovery skip them; vendored Pod files burned the file cap before the walk
+  reached real source, and a Pod `LICENSE.md` once aborted graph activation with a
+  `file_count_mismatch`.
+- **The stale-job reaper no longer kills a healthy index job whose persisted heartbeat
+  lags.** `reapStaleJobs` now reads the in-process heartbeat before the PostgreSQL row, which
+  can trail the live job by 30 s or more when the write chain is contended. The ETL pipeline
+  also ticks the job heartbeat every 30 s on its own, so a slow resolve or embedding phase
+  that emits no progress for minutes is no longer reaped as a crash.
+- **The MLX embedding server serializes inference and releases Metal buffers.** Concurrent
+  requests used to run parallel MLX graphs, and a client that timed out and retried stacked
+  new graphs on top of the abandoned ones (a 3000-file index reached 50 GB). Each batch now
+  clears the MLX cache afterwards, and requests above `MASSA_AI_MLX_EMBED_MAX_TEXTS`
+  (default 256) are rejected with a 400.
+
 ## [1.64.0] - 2026-09-24
 
 ### Changed

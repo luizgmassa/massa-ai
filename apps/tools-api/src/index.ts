@@ -284,20 +284,25 @@ jobReaperTimer.unref?.(); // never keep the event loop alive solely for the reap
 // indexing jobs — OOM risk). registerDefaultJobs is idempotent and preserves
 // nextRunAt/lastRunAt across restarts so the schedule resumes on boot.
 const scheduler = getScheduler();
-try {
-  registerDefaultJobs(scheduler);
-  // Wave 5 FR-13: catch-up missed jobs at boot. Fires ONE tick per missed job
-  // (next_run_at < now() AND enabled=true), non-overlapping per kind. Not a
-  // full backfill. Called after registerDefaultJobs (jobs are persisted) and
-  // before start() (the tick loop takes over from here).
-  const catchUp = scheduler.catchUpMissedJobs();
-  if (catchUp.caughtUp > 0) {
-    console.log(`[scheduler] catch-up: ${catchUp.caughtUp} missed job(s) fired`);
+void (async () => {
+  try {
+    registerDefaultJobs(scheduler);
+    // Wave 5 FR-13: catch-up missed jobs at boot. Fires ONE tick per missed job
+    // (next_run_at < now() AND enabled=true), non-overlapping per kind. Not a
+    // full backfill. Called after registerDefaultJobs (jobs are persisted) and
+    // before start() (the tick loop takes over from here).
+    const catchUp = await scheduler.catchUpMissedJobs();
+    if (catchUp.caughtUp > 0) {
+      console.log(`[scheduler] catch-up: ${catchUp.caughtUp} missed job(s) fired`);
+    }
+    if (catchUp.deferred > 0) {
+      console.log(`[scheduler] catch-up: ${catchUp.deferred} missed job(s) deferred until heavy database work finishes`);
+    }
+    scheduler.start();
+  } catch (err) {
+    console.error(`[scheduler] init error:`, err instanceof Error ? err.message : err);
   }
-  scheduler.start();
-} catch (err) {
-  console.error(`[scheduler] init error:`, err instanceof Error ? err.message : err);
-}
+})();
 
 // Graceful shutdown — same drain implementation the restart route uses
 // (lifecycle.ts): stop listener, stop jobs, disconnect Prisma, exit.

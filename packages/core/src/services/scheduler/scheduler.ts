@@ -51,6 +51,7 @@ import {
   resetScheduledJobStore,
 } from "./scheduler-store-factory.js";
 import type { ScheduledJobStore } from "./scheduler-store.js";
+import { probeHeavyWork, type HeavyWorkState } from "../jobs/heavy-work-lease.js";
 import type {
   JobHandler,
   JobKind,
@@ -69,12 +70,15 @@ export interface SchedulerOptions {
   maxConcurrent?: number;
   /** Override the master switch (tests). Defaults to env or false. */
   enabled?: boolean;
+  heavyWorkProbe?: () => Promise<HeavyWorkState>;
 }
 
 const DEFAULTS = {
   tickMs: 60_000,
   maxConcurrent: 2,
 } as const;
+
+const PROBE_FAILURE_WARN_EVERY = 5;
 
 /**
  * `MASSA_AI_SCHEDULER_ENABLED` read as a tri-state: `undefined` only when the
@@ -114,12 +118,18 @@ export class Scheduler {
   private cronCache: Map<string, ParsedCron> = new Map();
   /** Currently-running jobKinds (concurrency guard). */
   private running: Set<JobKind> = new Set();
+  private readonly heavyWorkProbe: () => Promise<HeavyWorkState>;
+  private deferred: Set<string> = new Set();
+  private heavyWorkReason: string | null = null;
+  private lastProbeError: string | null = null;
+  private consecutiveProbeFailures = 0;
 
   private timer: ReturnType<typeof setInterval> | null = null;
   private started = false;
 
   constructor(opts: SchedulerOptions = {}) {
     this.store = opts.store ?? getScheduledJobStore();
+    this.heavyWorkProbe = opts.heavyWorkProbe ?? probeHeavyWork;
 
     // SCH-02: opts.X ?? env ?? config ?? literal. The `SchedulerOptions` test
     // seams (`opts.*`) stay first in precedence, unchanged. `config.get`
@@ -336,11 +346,13 @@ export class Scheduler {
    * fireJob). Jobs that are already due-but-not-missed (overdue < tick) are
    * left for the normal tick to pick up.
    */
-  catchUpMissedJobs(now: number = Date.now()): { caughtUp: number; skipped: number } {
-    if (!this.enabled) return { caughtUp: 0, skipped: 0 };
+  async catchUpMissedJobs(
+    now: number = Date.now(),
+  ): Promise<{ caughtUp: number; skipped: number; deferred: number }> {
+    if (!this.enabled) return { caughtUp: 0, skipped: 0, deferred: 0 };
     const jobs = this.store.listEnabled();
-    let caughtUp = 0;
     let skipped = 0;
+    const missed: ScheduledJob[] = [];
     for (const job of jobs) {
       // Non-overlapping per kind: skip if this jobKind is already running.
       if (this.running.has(job.jobKind)) {
@@ -349,22 +361,23 @@ export class Scheduler {
       }
       // Missed = nextRunAt is in the past (overdue by more than one tick).
       // The normal tick handles jobs due within the current tick window.
-      const overdueMs = now - job.nextRunAt;
-      if (overdueMs <= this.tickIntervalMs) {
-        // Not missed — the normal tick will fire it.
-        continue;
-      }
+      if (now - job.nextRunAt > this.tickIntervalMs) missed.push(job);
+    }
+    if (missed.length > 0 && (await this.heavyWorkBusy())) {
+      for (const job of missed) this.deferred.add(job.id);
+      return { caughtUp: 0, skipped, deferred: missed.length };
+    }
+    for (const job of missed) {
       // Fire one catch-up tick for this missed job.
       logger.info("Scheduler: catch-up tick for missed job", {
         id: job.id,
         name: job.name,
         jobKind: job.jobKind,
-        overdueMs,
+        overdueMs: now - job.nextRunAt,
       });
       this.fireJob(job, now);
-      caughtUp++;
     }
-    return { caughtUp, skipped };
+    return { caughtUp: missed.length, skipped, deferred: 0 };
   }
 
   /**
@@ -390,11 +403,18 @@ export class Scheduler {
    * missed runs with a warning, and reschedules. Returns a summary for logging.
    */
   async tick(now: number = Date.now()): Promise<TickResult> {
-    const result: TickResult = { evaluated: 0, fired: 0, skipped: 0, errors: 0 };
+    const result: TickResult = { evaluated: 0, fired: 0, skipped: 0, errors: 0, deferred: 0 };
     if (!this.enabled) return result;
 
     const jobs = this.store.listEnabled();
     result.evaluated = jobs.length;
+
+    const due = jobs.filter((job) => !this.running.has(job.jobKind) && job.nextRunAt <= now);
+    if (due.length > 0 && (await this.heavyWorkBusy())) {
+      for (const job of due) this.deferred.add(job.id);
+      result.deferred = due.length;
+      return result;
+    }
 
     for (const job of jobs) {
       // Concurrency guard: skip if this jobKind is already running.
@@ -411,7 +431,7 @@ export class Scheduler {
       // Missed-run policy: if the job is overdue by more than one tick, we
       // SKIP (don't stampede) and reschedule from now. We log the skip.
       const overdueMs = now - job.nextRunAt;
-      const isMissed = overdueMs > this.tickIntervalMs;
+      const isMissed = overdueMs > this.tickIntervalMs && !this.deferred.has(job.id);
       if (isMissed) {
         logger.warn("Scheduler: missed run (skipping, rescheduling)", {
           id: job.id,
@@ -439,11 +459,47 @@ export class Scheduler {
     return result;
   }
 
+  private async heavyWorkBusy(): Promise<boolean> {
+    let state: HeavyWorkState;
+    try {
+      state = await this.heavyWorkProbe();
+    } catch (e) {
+      this.consecutiveProbeFailures++;
+      this.lastProbeError = (e as Error).message;
+      if (this.consecutiveProbeFailures === 1 || this.consecutiveProbeFailures % PROBE_FAILURE_WARN_EVERY === 0) {
+        logger.warn("Scheduler: heavy-work probe failed; deferring due jobs", {
+          consecutiveFailures: this.consecutiveProbeFailures,
+          error: e as Error,
+        });
+      }
+      return true;
+    }
+    this.consecutiveProbeFailures = 0;
+    this.lastProbeError = null;
+    if (state.busy) {
+      if (this.heavyWorkReason === null) {
+        logger.info("Scheduler: heavy database work in progress; deferring due jobs", {
+          reason: state.reason ?? "unknown",
+        });
+      }
+      this.heavyWorkReason = state.reason ?? "unknown";
+      return true;
+    }
+    if (this.heavyWorkReason !== null) {
+      logger.info("Scheduler: heavy database work finished; running deferred jobs", {
+        deferred: this.deferred.size,
+      });
+      this.heavyWorkReason = null;
+    }
+    return false;
+  }
+
   /**
    * Fire a single job: invoke its handler, update lastRunAt + nextRunAt,
    * persist. Never throws — all errors are caught and logged.
    */
   private fireJob(job: ScheduledJob, firedAt: number): void {
+    this.deferred.delete(job.id);
     const handler = this.handlers.get(job.jobKind);
     if (!handler) {
       logger.warn("Scheduler: no handler registered for jobKind", {
@@ -533,7 +589,12 @@ export class Scheduler {
         consecutiveFailures: j.consecutiveFailures ?? 0,
         due: j.enabled && j.nextRunAt <= now,
         currentlyRunning: this.running.has(j.jobKind),
+        deferred: this.deferred.has(j.id),
       })),
+      heavyWork: {
+        lastProbeError: this.lastProbeError,
+        consecutiveProbeFailures: this.consecutiveProbeFailures,
+      },
     };
   }
 

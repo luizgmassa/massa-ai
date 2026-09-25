@@ -200,7 +200,14 @@ export class IndexJobTracker {
     const cutoff = now - staleMs;
     let reaped = 0;
     for (const job of running) {
-      const hbMs = job.heartbeatAt?.getTime();
+      // Cross-check the in-memory mirror before trusting the PG row: the PG
+      // heartbeat can lag the live process by 30+ s when the write-chain is
+      // contended (long resolve stages saturate the per-jobId chain), and
+      // killing a healthy job because its last persisted heartbeat is older
+      // than `staleMs` is exactly the bug this guard fixes.
+      const live = this.jobs.get(job.jobId);
+      const liveHb = live?.heartbeatAt?.getTime();
+      const hbMs = liveHb ?? job.heartbeatAt?.getTime();
       const startedMs = job.startedAt?.getTime();
       // Stale if heartbeat is older than the cutoff. Fallback for jobs with no
       // heartbeat yet: stale if startedAt is older than the cutoff (covers the

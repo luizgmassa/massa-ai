@@ -45,10 +45,19 @@ const bootstrapRun = mock((..._args: unknown[]): unknown => ({}));
 const handoffBegin = mock((..._args: unknown[]): unknown => ({ ok: true }));
 const handoffListPending = mock((..._args: unknown[]): unknown => []);
 const autoImproveListPending = mock((..._args: unknown[]): unknown => []);
+const heavyWorkCalls: Array<{ kind: string; label: string }> = [];
 
 const actualCore = require("@massa-ai/core");
 mock.module("@massa-ai/core", () => ({
   ...actualCore,
+  // Transparent passthrough recorder: no test seam exists to inject a fake
+  // ManagedRunRepositoryPg from this app package (_setHeavyWorkRepositoryForTesting
+  // is not re-exported through @massa-ai/core), so this override is the only
+  // way to prove the wrap site calls withHeavyWorkLease.
+  withHeavyWorkLease: async (kind: string, label: string, fn: () => Promise<unknown>) => {
+    heavyWorkCalls.push({ kind, label });
+    return fn();
+  },
   getMemoryRepository: () => ({
     search: (...args: unknown[]) => memorySearch(...args),
     deleteByProject: (...args: unknown[]) => memoryDeleteByProject(...args),
@@ -105,6 +114,7 @@ beforeEach(() => {
   handoffBegin.mockClear();
   handoffListPending.mockClear();
   autoImproveListPending.mockClear();
+  heavyWorkCalls.length = 0;
 });
 
 /** Call a method; return { result } on success or { err } on failure. */
@@ -145,6 +155,14 @@ describe("EmbeddedApiClient handleProjectReset error mapping", () => {
     expect(result.data.errors.join(" | ")).toContain("vectors: vector store down");
     expect(result.data.errors.join(" | ")).toContain("symbols: symbol repo down");
     expect(result.data.errors.join(" | ")).toContain("memories: memory repo down");
+  });
+});
+
+describe("EmbeddedApiClient handleProjectReset heavy-work lease", () => {
+  test("wraps the destructive work in a maintenance lease labelled project-reset:<projectId>", async () => {
+    const result = (await client.post("/api/v1/project/reset", { projectId: "lease-p" })) as any;
+    expect(result.success).toBe(true);
+    expect(heavyWorkCalls).toEqual([{ kind: "maintenance", label: "project-reset:lease-p" }]);
   });
 });
 
