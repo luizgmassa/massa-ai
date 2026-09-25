@@ -107,6 +107,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`30.llm-features` read the reranker's effect from `combinedRank` order, which two non-LLM
+  stages reorder.** Proximity rerank (`hybrid-search.ts`) and the centrality boost
+  (`search-controller.ts`) both reorder results after fusion, so neither "a degraded rerank
+  returns fusion order" (EB-LLM-6) nor "a working rerank breaks fusion order" (EB-LLM-3)
+  was a product contract — the first failed and the second passed on the 1024d stack for
+  reasons unrelated to the LLM. Both now read the reranker's own outcome from the API log
+  lines appended during their own call (`LLMJudgeReranker … degrading to input order` and the
+  `"label":"reranker"` failure), and window slicing stays with `reranker.test.ts`. On LM
+  Studio with every model resident the suite is 9/0/0 with the instruct model in the code
+  role; with the default MLX coder model EB-LLM-3 and 4 fail on its real timeouts.
 - **Two live-stack E2E assertions failed on the new 1024d default for reasons unrelated to
   the product.** `15.nfr` N15 queried `embedding_bq`, a column only the `> 2000`-width tables
   carry; at 1024d the store takes its direct HNSW branch (`vector_cosine_ops` on `embedding`),
