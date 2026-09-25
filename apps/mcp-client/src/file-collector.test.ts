@@ -104,9 +104,9 @@ describe("collectFiles", () => {
   });
 });
 
-describe("collectFiles — MASSA_AI_INDEX_INCLUDE", () => {
+describe("collectFiles — .massa-ai-collect", () => {
   let includeRoot: string;
-  const saved = process.env.MASSA_AI_INDEX_INCLUDE;
+  const manifest = () => path.join(includeRoot, ".massa-ai-collect");
 
   beforeAll(async () => {
     includeRoot = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-collector-include-"));
@@ -119,35 +119,33 @@ describe("collectFiles — MASSA_AI_INDEX_INCLUDE", () => {
     await fs.writeFile(path.join(includeRoot, "features", "other", "other.kt"), "class Other");
   });
 
-  afterEach(() => {
-    if (saved === undefined) delete process.env.MASSA_AI_INDEX_INCLUDE;
-    else process.env.MASSA_AI_INDEX_INCLUDE = saved;
+  afterEach(async () => {
+    await fs.rm(manifest(), { force: true });
   });
 
   afterAll(async () => {
     await fs.rm(includeRoot, { recursive: true, force: true });
   });
 
-  it("walks the whole tree when unset", async () => {
-    delete process.env.MASSA_AI_INDEX_INCLUDE;
+  it("walks the whole tree when the file is absent", async () => {
     const paths = (await collectFiles(includeRoot)).map((f) => f.relativePath).sort();
     expect(paths).toEqual(["app/src/main.kt", "features/other/other.kt", "features/promotion/promo.kt", "root.ts"]);
   });
 
-  it("walks the whole tree when set to an empty list", async () => {
-    process.env.MASSA_AI_INDEX_INCLUDE = " , ,";
+  it("walks the whole tree when the file lists nothing", async () => {
+    await fs.writeFile(manifest(), "# only comments\n\n   \n");
     const paths = (await collectFiles(includeRoot)).map((f) => f.relativePath).sort();
     expect(paths).toEqual(["app/src/main.kt", "features/other/other.kt", "features/promotion/promo.kt", "root.ts"]);
   });
 
   it("walks only the listed dirs, keeping paths relative to the project root", async () => {
-    process.env.MASSA_AI_INDEX_INCLUDE = " /app/ ,features/promotion";
+    await fs.writeFile(manifest(), "# working set\n /app/ \nfeatures/promotion\n");
     const paths = (await collectFiles(includeRoot)).map((f) => f.relativePath).sort();
     expect(paths).toEqual(["app/src/main.kt", "features/promotion/promo.kt"]);
   });
 
   it("ignores listed dirs that do not exist", async () => {
-    process.env.MASSA_AI_INDEX_INCLUDE = "missing,app";
+    await fs.writeFile(manifest(), "missing\napp\n");
     const paths = (await collectFiles(includeRoot)).map((f) => f.relativePath);
     expect(paths).toEqual(["app/src/main.kt"]);
   });

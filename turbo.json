@@ -36,7 +36,6 @@
         "MASSA_AI_API_KEY",
         "MASSA_AI_DEDICATED",
         "MASSA_AI_EXECUTOR_SANDBOX",
-        "MASSA_AI_INDEX_INCLUDE",
         "LLM_JUDGE_PROBE_URL",
         "OLLAMA_BASE_URL",
         "LMSTUDIO_BASE_URL",
