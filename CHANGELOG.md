@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already running (`MASSA_AI_E2E_LMSTUDIO_URL`, default `http://127.0.0.1:1234`) instead of
   spawning `ollama serve` on :11435. LM Studio is probed and never started or stopped, and its
   port joins the shared-stack attestation printed before and after every mutating command.
-  The provider is recorded by `up` and reused by `env`, `status` and `restart-api`; changing
-  it forces an API restart the same way a profile change does. The width probe, the
+  The provider is recorded by `up` and reused by `env`, `status` and `restart-api`; the
+  latter two refuse a different `MASSA_AI_E2E_PROVIDER` until the next `up`, which re-probes
+  the embedding width and restarts the API the same way a profile change does. The width probe, the
   isolation check (now read from the provider-neutral `/api/v1/system/inference`) and the
   `llm-on` profile follow the provider, and each provider's defaults are held equal to
   `INFERENCE_PROVIDERS` by the parity test. `env` now also exports
@@ -25,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`apps/claude-plugin/__tests__/claude-cli-e2e.test.ts`).** Runs whenever `claude` is on
   `PATH`, under a scratch `HOME` and `CLAUDE_CONFIG_DIR`, with `ANTHROPIC_BASE_URL` pointed at
   an unreachable port so no request can spend credits — and asserts `total_cost_usd` is 0.
+  The plugin's own hooks run too, so the session also gets a scratch `TMPDIR`, an unreachable
+  `MASSA_AI_API_BASE` and no inherited `MASSA_AI_*`, `CLAUDE_CODE_*` or `XDG_CONFIG_HOME`;
+  a developer's running massa-ai API never receives its events.
   Covers manifest validation (EB-CB-1), plugin load (EB-CB-2), a real MCP connection
   (EB-CB-3), the installed inventory against the bundle (EB-CB-4) and agent visibility
   (EB-CB-5). A print-mode session emits its `system/init` event before authentication, so
@@ -111,9 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stages reorder.** Proximity rerank (`hybrid-search.ts`) and the centrality boost
   (`search-controller.ts`) both reorder results after fusion, so neither "a degraded rerank
   returns fusion order" (EB-LLM-6) nor "a working rerank breaks fusion order" (EB-LLM-3)
-  was a product contract — the first failed and the second passed on the 1024d stack for
-  reasons unrelated to the LLM. Both now read the reranker's own outcome from the API log
-  lines appended during their own call (`LLMJudgeReranker … degrading to input order` and the
+  was a product contract — either could pass or fail whatever the reranker did, and on the
+  1024d stack EB-LLM-6 failed while the reranker degraded exactly as it should. Both now
+  read the reranker's own outcome from the API log lines appended during their own call
+  (`LLMJudgeReranker … degrading to input order` and the
   `"label":"reranker"` failure), and window slicing stays with `reranker.test.ts`. On LM
   Studio with every model resident the suite is 9/0/0 with the instruct model in the code
   role, and — after the bootstrap schema fix below — 9/0/0 on the default MLX coder model.

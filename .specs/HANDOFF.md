@@ -20,12 +20,12 @@ stack to LM Studio rather than pull Ollama models; stop the orphaned coverage Po
 :5433 (`/tmp/massa-ai-cov-pg`, stopped with `pg_ctl`, data dir left on disk).
 **Decision (user, 2026-09-25):** fix the bootstrap-seed schema in this branch.
 
-**Exact next step.** Independent verifier over the branch (the eviction hypothesis was
-falsified; the reds were two test defects and one product defect, see validation.md
-§ "Tier A matrix — LM Studio provider"), then push/PR (user's call).
+**Exact next step.** Push and open the PR — the user's call. The independent verification
+ran 2026-09-25 (validation.md § "Independent verification"); its findings 1–5 are fixed and
+6–8 are recorded as kept.
 
 **State left running.** The dedicated stack is up (`bash scripts/e2e-stack.sh status`),
-profile `llm-on`, provider `lmstudio`. `bash scripts/e2e-stack.sh down` stops Postgres :5433
+profile `default` (suite 30 restores it on exit), provider `lmstudio`. `bash scripts/e2e-stack.sh down` stops Postgres :5433
 and the API :3334 and never touches LM Studio.
 
 **Traps this session paid for.**

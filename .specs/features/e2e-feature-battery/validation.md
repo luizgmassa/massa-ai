@@ -666,3 +666,22 @@ expected rerank to reorder, and EB-LLM-6 expected fusion order under a 1 ms budg
    Not changed: `handoff-summary` keeps a top-level `.max(1024)` string. It runs in the NL role,
    whose default here is the VLM-engine model, and it is not nested in a bounded array.
    Measured on this machine only; LM Studio's engine and backend versions were not pinned.
+
+## Independent verification, 2026-09-25
+
+A read-only `code-reviewer` pass over `802b1185..fde01d90` and the merge itself found nothing
+that blocks the branch. Every product fix it mutated went red: the lazy stores (0/1 per job;
+EB-CB-3 `connected` → `failed`), the parity rows (20/1 each), and the bootstrap schema and
+truncation (16/1 each). The merge reproduces exactly 12 conflicts with no dropped content.
+Findings, and what was done about each:
+
+| # | Finding | Outcome |
+| --- | --- | --- |
+| 1 | Tier D sessions ran the plugin's real hooks against the developer's `$TMPDIR`, `MASSA_AI_*` env and :3333 | Fixed: scratch `TMPDIR`, unreachable `MASSA_AI_API_BASE`, and no inherited `MASSA_AI_*`/`CLAUDE_CODE_*`/`CLAUDECODE`/`XDG_CONFIG_HOME`. New case asserts hook pins land in the scratch `TMPDIR`: 14/0, red 13/1 without the `TMPDIR` override. 12 residue pin files naming the worktree were removed from the real `$TMPDIR/massa-ai-hooks` |
+| 2 | EB-LLM-3 could pass vacuously on an unreadable log; its title and header still claimed window checks | Fixed: asserts the API log is non-empty before the call; title, comment and header skip #1 corrected. Log filename mutated → red on exactly that check (`Expected > 0, Received 0`). Live suite 9/0/0 in 102 s, 5-minute load 6.5 at start |
+| 3 | `restart-api` or `env` under a different `MASSA_AI_E2E_PROVIDER` skipped the width probe and split the recorded state | Fixed: both refuse with exit 2 until `up`; `restart-api` now prints the shared-stack attestation; a `/v1` LM Studio URL is normalized. New `scripts/__tests__/e2e-stack-provider-guard.test.ts` 3/0, red 1/2 with the guard disabled |
+| 4 | HANDOFF recorded profile `llm-on`; suite 30 restores `default` on exit | Fixed |
+| 5 | CHANGELOG said EB-LLM-3 passed on the 1024d stack; the matrix recorded it red | Fixed: the entry now says either outcome was independent of the reranker |
+| 6 | `handoff-summary` keeps `.max(1024)` | Kept, as recorded above; unmeasured on an MLX NL-role model |
+| 7 | FEATURES.json notes opened with "7 Phases = 21"; N15 duplicates the `> 2000` literal; the N15 ivfflat red depends on the index not pre-existing | Count fixed. The literal and the ivfflat precondition are left as recorded |
+| 8 | The MCP startup test runs against `dist` | Kept: `turbo.json` builds before `test`; a direct run needs `bun run build` |
