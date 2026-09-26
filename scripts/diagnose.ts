@@ -22,13 +22,14 @@
  *   LMSTUDIO_EMBEDDING_MODEL  - LM Studio model to test (default: text-embedding-qwen3-embedding-0.6b)
  *   DATABASE_URL              - Required PostgreSQL connection string
  */
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import os from "os";
 import path from "path";
 import { spawn } from "bun";
 import { loadConfigSafe, requirePostgresDatabaseUrl } from "../packages/shared/src/config/index.js";
 import {
   INFERENCE_PROVIDERS,
+  INFERENCE_ROLE_DEFAULTS,
   type InferenceProviderId,
   type InferenceProviderSpec,
 } from "../packages/shared/src/config/inference-providers.js";
@@ -378,6 +379,139 @@ async function checkProvider(): Promise<boolean> {
   return ok;
 }
 
+// ─── LM Studio chat-model context ─────────────────────────────────────
+
+export const LMSTUDIO_CONTEXT_FIELD = "llm.load.contextLength";
+
+export function lmStudioHome(homeDir: string = os.homedir()): string {
+  const pointer = path.join(homeDir, ".lmstudio-home-pointer");
+  try {
+    const target = readFileSync(pointer, "utf8").split("\n")[0]!.trim();
+    if (target) return target;
+  } catch {}
+  return path.join(homeDir, ".lmstudio");
+}
+
+export function readLmStudioSavedContext(
+  home: string,
+  indexedModelIdentifier: string,
+): number | "unrecognized" | undefined {
+  const file = path.join(home, ".internal", "user-concrete-model-default-config", `${indexedModelIdentifier}.json`);
+  if (!existsSync(file)) return undefined;
+  try {
+    const doc = JSON.parse(readFileSync(file, "utf8"));
+    const fields = doc?.load?.fields;
+    if (fields === undefined) return undefined;
+    if (!Array.isArray(fields)) return "unrecognized";
+    const field = fields.find((f: { key?: unknown }) => f?.key === LMSTUDIO_CONTEXT_FIELD);
+    if (!field) return undefined;
+    return typeof field.value === "number" ? field.value : "unrecognized";
+  } catch {
+    return "unrecognized";
+  }
+}
+
+export function readLmStudioGlobalDefault(home: string): number | undefined {
+  try {
+    const value = JSON.parse(readFileSync(path.join(home, "settings.json"), "utf8"))?.defaultContextLength?.value;
+    return typeof value === "number" ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export interface LmStudioContextFacts {
+  loaded: number[];
+  saved?: number | "unrecognized";
+  globalDefault?: number;
+}
+
+export function assessLmStudioContext(
+  required: number,
+  facts: LmStudioContextFacts,
+): { level: "ok" | "warn" | "unknown"; findings: string[] } {
+  const findings: string[] = [];
+  const now = facts.loaded.length > 0 ? Math.min(...facts.loaded) : undefined;
+  if (now !== undefined && now < required) findings.push(`loaded now with ${now} tokens`);
+  if (facts.saved === "unrecognized") {
+    findings.push("its saved per-model defaults are in a format this check does not recognize");
+  } else if (facts.saved !== undefined) {
+    if (facts.saved < required) findings.push(`its saved per-model default is ${facts.saved}`);
+  } else if (facts.globalDefault !== undefined) {
+    if (facts.globalDefault < required) {
+      findings.push(`it has no per-model default, so the next load is configured with LM Studio's global ${facts.globalDefault}`);
+    }
+  }
+  if (findings.length > 0) return { level: "warn", findings };
+  const known = now !== undefined || typeof facts.saved === "number" || facts.globalDefault !== undefined;
+  return { level: known ? "ok" : "unknown", findings };
+}
+
+async function lmStudioIndexedIds(): Promise<Map<string, string>> {
+  const ids = new Map<string, string>();
+  const cli = await findProviderCli("lmstudio");
+  if (!cli) return ids;
+  try {
+    const proc = spawn([cli, "ls", "--json"], { stdout: "pipe", stderr: "ignore" });
+    const models = JSON.parse(await new Response(proc.stdout).text());
+    for (const m of Array.isArray(models) ? models : []) {
+      const id = m?.indexedModelIdentifier ?? m?.path;
+      if (typeof m?.modelKey === "string" && typeof id === "string") ids.set(m.modelKey, id);
+    }
+  } catch {}
+  return ids;
+}
+
+async function checkLmStudioContext(): Promise<"ok" | "warn" | "skipped"> {
+  let llm: ReturnType<typeof loadConfigSafe>["llm"] | undefined;
+  try {
+    llm = loadConfigSafe().llm;
+  } catch {
+    llm = undefined;
+  }
+  if (!llm?.enabled || !llm.baseUrl) return "skipped";
+
+  let listing: Array<{ key?: string; loaded_instances?: Array<{ config?: { context_length?: number } }> }>;
+  try {
+    const res = await fetch(`${new URL(llm.baseUrl).origin}/api/v1/models`, { signal: AbortSignal.timeout(3000) });
+    const body = (await res.json()) as { models?: unknown };
+    if (!res.ok || !Array.isArray(body.models)) return "skipped";
+    listing = body.models as typeof listing;
+  } catch {
+    return "skipped";
+  }
+
+  console.log(`\n${BOLD}LM Studio chat-model context (advisory)...${NC}`);
+  const home = lmStudioHome();
+  const ids = await lmStudioIndexedIds();
+  const globalDefault = readLmStudioGlobalDefault(home);
+  const roles = [
+    { name: "instruct", model: llm.model, required: llm.contextWindow ?? INFERENCE_ROLE_DEFAULTS.instruct.contextWindow },
+    { name: "code", model: llm.codeModel, required: llm.codeContextWindow ?? INFERENCE_ROLE_DEFAULTS.coding.contextWindow },
+  ];
+  let result: "ok" | "warn" = "ok";
+  for (const role of roles) {
+    if (!role.model) continue;
+    const entry = listing.find((m) => m.key === role.model);
+    const loaded = (entry?.loaded_instances ?? [])
+      .map((i) => i.config?.context_length)
+      .filter((n): n is number => typeof n === "number");
+    const id = ids.get(role.model);
+    const saved = id ? readLmStudioSavedContext(home, id) : undefined;
+    const verdict = assessLmStudioContext(role.required, { loaded, saved, globalDefault });
+    if (verdict.level === "ok") {
+      console.log(`  ${GREEN}✓${NC} ${role.model} (${role.name}): context meets ${role.required}`);
+    } else if (verdict.level === "unknown") {
+      console.log(`  ${DIM}  ${role.model} (${role.name}): context not determinable — needs ${role.required}${NC}`);
+    } else {
+      result = "warn";
+      console.log(`  ${YELLOW}!${NC} ${role.model} (${role.name}) needs ${role.required} tokens, but ${verdict.findings.join("; ")}`);
+      console.log(`  ${YELLOW}!${NC} Fix: re-run ${BOLD}bash scripts/setup-local-first.sh${NC}, or LM Studio → My Models → ⚙️ → Context Length ${role.required}`);
+    }
+  }
+  return result;
+}
+
 // ─── PostgreSQL Checks ───────────────────────────────────────────────
 
 async function checkPostgres(): Promise<boolean> {
@@ -515,6 +649,7 @@ async function checkPostgres(): Promise<boolean> {
 if (import.meta.main) {
   const providerOk = await checkProvider();
   const pgOk = await checkPostgres();
+  const lmContext = await checkLmStudioContext();
 
   // Summary
   console.log(
@@ -532,6 +667,11 @@ if (import.meta.main) {
   console.log(
     `  PostgreSQL: ${pgOk ? `${GREEN}OK${NC}` : `${RED}FAILED${NC}`}`,
   );
+  if (lmContext !== "skipped") {
+    console.log(
+      `  LM Studio context: ${lmContext === "ok" ? `${GREEN}OK${NC}` : `${YELLOW}WARN${NC}`}`,
+    );
+  }
   console.log("");
 
   const allOk = providerOk && pgOk;

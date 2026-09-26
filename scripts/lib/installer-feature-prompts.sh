@@ -666,6 +666,83 @@ installer_lmstudio_model_key() {
   if [ -n "$key" ]; then echo "$key"; else echo "$fallback"; fi
 }
 
+installer_lmstudio_home() {
+  local pointer="${HOME}/.lmstudio-home-pointer" home=""
+  if [ -f "$pointer" ]; then
+    home="$(head -n 1 "$pointer" | tr -d '\r')"
+  fi
+  [ -n "$home" ] || home="${HOME}/.lmstudio"
+  printf '%s' "$home"
+}
+
+installer_set_lmstudio_context_default() {
+  local cli="${1:-}" key="${2:-}" ctx="${3:-}" runner home
+
+  [ -n "$cli" ] && [ -n "$key" ] && [ -n "$ctx" ] || return 0
+  runner="$(installer_detect_runner)" || {
+    echo "  ⚠  No node or bun on PATH — LM Studio default context for ${key} not written."
+    return 0
+  }
+  home="$(installer_lmstudio_home)"
+  if [ ! -d "${home}/.internal" ]; then
+    echo "  ⚠  No LM Studio home at ${home} — default context for ${key} not written."
+    return 0
+  fi
+
+  "$cli" ls --json 2>/dev/null | "$runner" -e '
+    const fs = require("fs");
+    const path = require("path");
+    const [key, ctxRaw, dir] = process.argv.slice(1);
+    const ctx = Number(ctxRaw);
+    const FIELD = "llm.load.contextLength";
+    const warn = (msg) => process.stdout.write(`  ⚠  ${msg}\n`);
+    let raw = "";
+    process.stdin.on("data", (chunk) => { raw += chunk; });
+    process.stdin.on("end", () => {
+      let models;
+      try { models = JSON.parse(raw); } catch { models = null; }
+      const hit = Array.isArray(models) ? models.find((m) => m && m.modelKey === key) : undefined;
+      const id = hit && (hit.indexedModelIdentifier || hit.path);
+      if (typeof id !== "string" || !id) {
+        warn(`LM Studio does not list ${key} — default context not written.`);
+        return;
+      }
+      if (path.isAbsolute(id) || id.split("/").includes("..")) {
+        warn(`Unexpected LM Studio model path ${id} — default context not written.`);
+        return;
+      }
+      const file = path.join(dir, `${id}.json`);
+      let doc = { preset: "", operation: { fields: [] }, load: { fields: [] } };
+      if (fs.existsSync(file)) {
+        try { doc = JSON.parse(fs.readFileSync(file, "utf8")); } catch { doc = null; }
+        if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
+          warn(`Unreadable LM Studio defaults for ${key} (${file}) — left unchanged.`);
+          return;
+        }
+        if (doc.load === undefined) doc.load = { fields: [] };
+        if (!doc.load || typeof doc.load !== "object" || !Array.isArray(doc.load.fields)) {
+          warn(`Unrecognized LM Studio defaults format for ${key} (${file}) — left unchanged.`);
+          return;
+        }
+      }
+      const field = doc.load.fields.find((f) => f && f.key === FIELD);
+      const current = field && typeof field.value === "number" ? field.value : undefined;
+      if (current !== undefined && current >= ctx) {
+        process.stdout.write(`  LM Studio default context for ${key}: ${current} (kept, needs ${ctx})\n`);
+        return;
+      }
+      if (field) field.value = ctx;
+      else doc.load.fields.push({ key: FIELD, value: ctx });
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const tmp = `${file}.massa-ai-${process.pid}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(doc, null, 2) + "\n");
+      fs.renameSync(tmp, file);
+      process.stdout.write(`  LM Studio default context for ${key}: ${ctx} (was ${current ?? "unset"})\n`);
+    });
+  ' "$key" "$ctx" "${home}/.internal/user-concrete-model-default-config" || true
+  return 0
+}
+
 # installer_unload_loaded_models <lms_cli>
 #
 # Evicts every model already resident in LM Studio and Ollama before the

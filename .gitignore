@@ -115,3 +115,5 @@ apps/cursor-plugin/skills/*/SKILL.md
 !apps/cursor-plugin/skills/map/SKILL.md
 !apps/cursor-plugin/skills/status/SKILL.md
 apps/opencode-plugin/command/
+# Ralphy run artifacts (scratch, logs, per-run plans)
+.ralphy/

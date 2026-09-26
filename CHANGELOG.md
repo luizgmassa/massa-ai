@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`bun run diagnose` checks the context LM Studio gives the chat models.** When the LLM is
+  on and its base URL answers LM Studio's `/api/v1/models`, an advisory step compares each
+  role's required context (`llm.contextWindow` / `llm.codeContextWindow`, default 16384 /
+  32768) with the loaded instance, the model's saved per-model default and LM Studio's global
+  default, and names the fix. It never changes the exit code.
+
+### Fixed
+
+- **LM Studio chat models lost their context size after the first unload.** The setup only
+  passed it to one `lms load -c`, and LM Studio exposes no per-request context length, so every
+  later load — JIT reloads after the 600 s TTL included — fell back to LM Studio's global
+  default (8192 out of the box): the code model ran at 8192 instead of 32768, below its own
+  8000-token output budget plus prompt. `setup-local-first.sh` now also writes each chat
+  model's per-model default (`llm.load.contextLength`, the file LM Studio's My Models ⚙️ panel
+  saves), which every load reuses. It only raises a smaller value, keeps every other saved
+  setting, and leaves a file it cannot parse untouched. The embedding role is unchanged: it
+  needs 8192, LM Studio's shipped default, and on MLX installs the sidecar serves it.
+
 ## [1.65.0] - 2026-09-25
 
 ### Added
