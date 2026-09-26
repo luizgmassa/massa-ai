@@ -261,6 +261,22 @@ async function findProviderCli(id: InferenceProviderId): Promise<string | null> 
   return run(["which", "ollama"]);
 }
 
+export function providerStartHint(
+  id: InferenceProviderId,
+  embeddingUrl: string,
+  env: Record<string, string | undefined>,
+): string {
+  if (id !== "lmstudio") return "ollama serve  or  bash scripts/ensure-ollama.sh";
+  let port = "";
+  try {
+    port = new URL(embeddingUrl).port;
+  } catch { /* unparseable URL: fall through to the LM Studio hint */ }
+  if (port && port === (env.MASSA_AI_MLX_EMBED_PORT || "1235")) {
+    return "launchctl kickstart -k gui/$(id -u)/ai.massa.mlx-embed  (MLX embedding sidecar; log: ~/.config/massa-ai/mlx-embed.log)";
+  }
+  return "lms server start";
+}
+
 // ─── Provider checks ──────────────────────────────────────────────────
 
 async function checkProvider(): Promise<boolean> {
@@ -276,9 +292,7 @@ async function checkProvider(): Promise<boolean> {
   const installHint = providerId === "lmstudio"
     ? "curl -fsSL https://lmstudio.ai/install.sh | bash"
     : "curl -fsSL https://ollama.com/install.sh | sh";
-  const startHint = providerId === "lmstudio"
-    ? "lms daemon up"
-    : "ollama serve  or  bash scripts/ensure-ollama.sh";
+  const startHint = providerStartHint(providerId, configuredUrl, env);
   const pullHint = providerId === "lmstudio"
     ? `lms get -y ${modelName}`
     : `ollama pull ${modelName}`;

@@ -116,6 +116,41 @@ lms_cli_path() {
     command -v lms 2>/dev/null
 }
 
+lmstudio_ensure_server() {
+    local cli="$1" url="$2" port waited=0
+    massa_ai_probe_provider "$url" lmstudio && return 0
+    [ -n "$cli" ] || return 1
+    port="$(printf '%s' "$url" | sed -nE 's#^[a-zA-Z][a-zA-Z0-9+.-]*://[^/]*:([0-9]+).*#\1#p')"
+    echo -e "  ${YELLOW}⚠${NC} LM Studio server not responding. Starting: lms server start"
+    if [ -n "$port" ]; then
+        "$cli" server start --port "$port" >/dev/null 2>&1 || true
+    else
+        "$cli" server start >/dev/null 2>&1 || true
+    fi
+    while [ "$waited" -lt "${LMS_SERVER_START_WAIT_SECONDS:-15}" ]; do
+        massa_ai_probe_provider "$url" lmstudio && return 0
+        sleep 1
+        waited=$((waited + 1))
+    done
+    massa_ai_probe_provider "$url" lmstudio
+}
+
+mlx_sidecar_ensure_running() {
+    local base_url="$1" health waited=0
+    health="${base_url%/}"
+    health="${health%/v1}/health"
+    curl -s --max-time 2 "$health" 2>/dev/null | grep -q '"status"' && return 0
+    command -v launchctl >/dev/null 2>&1 || return 1
+    echo -e "  ${YELLOW}⚠${NC} MLX embedding sidecar not responding. Restarting: launchctl kickstart -k gui/$(id -u)/ai.massa.mlx-embed"
+    launchctl kickstart -k "gui/$(id -u)/ai.massa.mlx-embed" >/dev/null 2>&1 || return 1
+    while [ "$waited" -lt "${MLX_SIDECAR_START_WAIT_SECONDS:-15}" ]; do
+        curl -s --max-time 2 "$health" 2>/dev/null | grep -q '"status"' && return 0
+        sleep 1
+        waited=$((waited + 1))
+    done
+    return 1
+}
+
 setup_lmstudio() {
     echo -e "${BOLD}[1/6] Checking LM Studio...${NC}"
     LMSTUDIO_CLI="$(lms_cli_path)"
@@ -130,16 +165,8 @@ setup_lmstudio() {
     fi
     echo -e "  ${GREEN}✓${NC} LM Studio CLI: ${LMSTUDIO_CLI}"
 
-    if ! massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio; then
-        echo -e "  ${YELLOW}⚠${NC} LM Studio server not responding. Starting..."
-        "$LMSTUDIO_CLI" daemon up >/dev/null 2>&1 || true
-        sleep 2
-    fi
-
-    # Body-shape probe, never the status code: LM Studio answers 200 with
-    # {"error":...} for endpoints it does not implement.
-    massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio \
-        || die "LM Studio API not reachable at ${LMSTUDIO_URL}. Start it: ${LMSTUDIO_CLI} daemon up"
+    lmstudio_ensure_server "$LMSTUDIO_CLI" "$LMSTUDIO_URL" \
+        || die "LM Studio API not reachable at ${LMSTUDIO_URL}. Start it: ${LMSTUDIO_CLI} server start"
     echo -e "  ${GREEN}✓${NC} LM Studio API reachable at ${LMSTUDIO_URL}"
 
     # PDM-13: MLX weights need LM Studio's MLX engine, which is a separate
@@ -669,10 +696,17 @@ echo -e "${BOLD}[5/6] Verifying setup...${NC}"
 
 # Check the selected provider's health
 if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
-    if massa_ai_probe_provider "$LMSTUDIO_URL" lmstudio; then
+    if lmstudio_ensure_server "${LMSTUDIO_CLI:-}" "$LMSTUDIO_URL"; then
         echo -e "  ${GREEN}✓${NC} LM Studio: healthy at ${LMSTUDIO_URL}"
     else
-        echo -e "  ${RED}✗${NC} LM Studio: not responding"
+        echo -e "  ${RED}✗${NC} LM Studio: not responding — start it with: lms server start"
+    fi
+    if [ "${LMSTUDIO_MODEL_FORMAT:-gguf}" = "mlx" ] && [ -z "${LMSTUDIO_EMBEDDING_MODEL:-}" ] && [ -n "${EMBEDDING_BASE_URL:-}" ]; then
+        if mlx_sidecar_ensure_running "$EMBEDDING_BASE_URL"; then
+            echo -e "  ${GREEN}✓${NC} MLX embedding sidecar: healthy at ${EMBEDDING_BASE_URL}"
+        else
+            echo -e "  ${RED}✗${NC} MLX embedding sidecar: not responding — see ~/.config/massa-ai/mlx-embed.log"
+        fi
     fi
 elif massa_ai_probe_provider "$OLLAMA_URL"; then
     MODELS=$(curl -s "${OLLAMA_URL}/api/tags" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data.get('models',[])))" 2>/dev/null || echo "?")
