@@ -21,6 +21,7 @@ import {
 } from "../services/index.js";
 import { StructuralRuntime } from "../services/structural/structural-runtime.js";
 import { loadNativeGrammarSet } from "../services/structural/grammar-loaders.js";
+import { cachedDialectScope, normalizedKnownFiles } from "../services/structural/resolvers/typescript.js";
 
 const SPAN = Object.freeze({
   startByte: 0,
@@ -1287,5 +1288,94 @@ describeNative("TS/JS structural resolver", () => {
       [seedDef],
     );
     expect(session.identitiesFor("src/lib.ts").length).toBe(1);
+  });
+});
+
+describe("resolver definition index caches", () => {
+  test("cachedDialectScope reuses one scoped array per definitions array and key", () => {
+    const definitions = [
+      definition("src/a.ts", "a"),
+      definition("src/b.py", "b", { identity: { language: "Python", dialect: "python" } }),
+    ];
+    let predicateCalls = 0;
+    const predicate = (item: StructuralResolverDefinition) => {
+      predicateCalls++;
+      return item.identity.dialect === "python";
+    };
+    const first = cachedDialectScope(definitions, "python", predicate);
+    const second = cachedDialectScope(definitions, "python", predicate);
+    expect(second).toBe(first);
+    expect(first.map((item) => item.identity.name)).toEqual(["b"]);
+    expect(predicateCalls).toBe(2);
+
+    const other = cachedDialectScope(definitions, "typescript", (item) => item.identity.dialect === "typescript");
+    expect(other).not.toBe(first);
+    expect(other.map((item) => item.identity.name)).toEqual(["a"]);
+
+    const copy = [...definitions];
+    expect(cachedDialectScope(copy, "python", predicate)).not.toBe(first);
+  });
+
+  test("normalizedKnownFiles memoizes the NFC-normalized set per array", () => {
+    const decomposed = "src/café.ts";
+    const knownFiles = Object.freeze([decomposed, "src/lib.ts"]);
+    const first = normalizedKnownFiles(knownFiles);
+    expect(normalizedKnownFiles(knownFiles)).toBe(first);
+    expect(first.has("src/café.ts")).toBe(true);
+    expect(first.has("src/lib.ts")).toBe(true);
+    expect(normalizedKnownFiles([...knownFiles])).not.toBe(first);
+  });
+
+  test("repeated resolves over one definitions array stay identical", () => {
+    const definitions = Object.freeze([definition("src/lib.ts", "run"), definition("src/main.ts", "local")]);
+    const current = file([imported("./lib", [{ imported: "run", local: "execute" }])]);
+    const first = TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("execute"), definitions, BUILD);
+    const second = TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("execute"), definitions, BUILD);
+    expect(first).toMatchObject({ status: "resolved", source: "import" });
+    expect(second).toEqual(first);
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("local"), definitions, BUILD))
+      .toMatchObject({ status: "resolved", source: "same_file" });
+  });
+
+  test("a different definitions array is never served from another array's index", () => {
+    const current = file([imported("./lib", [{ imported: "run", local: "execute" }])]);
+    const withRun = Object.freeze([definition("src/lib.ts", "run")]);
+    const withoutRun = Object.freeze([definition("src/lib.ts", "other")]);
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("execute"), withRun, BUILD))
+      .toMatchObject({ status: "resolved" });
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("execute"), withoutRun, BUILD).status)
+      .not.toBe("resolved");
+  });
+
+  test("reference kinds only see their own definition partition", () => {
+    const definitions = Object.freeze([
+      definition("src/lib.ts", "Shape", { identity: { kind: "interface" } }),
+      definition("src/lib.ts", "draw"),
+    ]);
+    const current = file();
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("Shape", { kind: "type_ref" }), definitions, BUILD))
+      .toMatchObject({ status: "resolved", source: "global" });
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("Shape", { kind: "call" }), definitions, BUILD))
+      .toEqual({ status: "unresolved", name: "Shape" });
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("draw", { kind: "type_ref" }), definitions, BUILD))
+      .toEqual({ status: "unresolved", name: "draw" });
+  });
+
+  test("global lookups keep exported-only and top-level-only semantics", () => {
+    const definitions = Object.freeze([
+      definition("src/a.ts", "run"),
+      definition("src/b.ts", "run"),
+      definition("src/c.ts", "hidden", { exported: false }),
+      definition("src/d.ts", "method", { identity: { qualifiedName: "Owner.method", scope: "nested", kind: "method" } }),
+    ]);
+    const current = file();
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("run"), definitions, BUILD))
+      .toMatchObject({ status: "ambiguous", name: "run" });
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("hidden"), definitions, BUILD))
+      .toEqual({ status: "unresolved", name: "hidden" });
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("method"), definitions, BUILD))
+      .toEqual({ status: "unresolved", name: "method" });
+    expect(TYPESCRIPT_LANGUAGE_RESOLVER.resolve(current, reference("method", { qualifier: "Owner" }), definitions, BUILD))
+      .toMatchObject({ status: "resolved", source: "global" });
   });
 });

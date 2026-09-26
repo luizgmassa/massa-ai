@@ -2,7 +2,7 @@ import type {
   StructuralBuildMetadata, StructuralLanguageResolver, StructuralReference,
   StructuralResolverDefinition, StructuralResolverFile,
 } from "../resolver.js";
-import { TYPESCRIPT_LANGUAGE_RESOLVER } from "./typescript.js";
+import { TYPESCRIPT_LANGUAGE_RESOLVER, cachedDialectScope } from "./typescript.js";
 
 export const MANAGED_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.freeze({
   ...TYPESCRIPT_LANGUAGE_RESOLVER,
@@ -42,10 +42,11 @@ export const MANAGED_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.free
       ) };
     }) } : file;
     return TYPESCRIPT_LANGUAGE_RESOLVER.resolve(
-      resolverFile, reference, definitions.filter((item) =>
-        file.dialect === "kotlin" || file.dialect === "kotlin-script"
+      resolverFile, reference, cachedDialectScope(definitions,
+        file.dialect === "kotlin" || file.dialect === "kotlin-script" ? "kotlin" : file.dialect,
+        (item) => file.dialect === "kotlin" || file.dialect === "kotlin-script"
           ? item.identity.dialect === "kotlin" || item.identity.dialect === "kotlin-script"
-          : item.identity.dialect === file.dialect
+          : item.identity.dialect === file.dialect,
       ), build,
     );
   },

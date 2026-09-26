@@ -38,6 +38,19 @@ import type {
   ResolvedEdge,
 } from "../stage-context.js";
 
+// The known-rel-paths Set is built once per resolve.run and referenced by
+// every per-file build metadata object; spread it once per Set instead of
+// once per file (a fresh 6210-entry array per file for identical content).
+const KNOWN_REL_PATHS_LISTS = new WeakMap<ReadonlySet<string>, readonly string[]>();
+
+function knownRelPathsList(knownRelPaths: ReadonlySet<string>): readonly string[] {
+  const existing = KNOWN_REL_PATHS_LISTS.get(knownRelPaths);
+  if (existing) return existing;
+  const built = Object.freeze([...knownRelPaths]);
+  KNOWN_REL_PATHS_LISTS.set(knownRelPaths, built);
+  return built;
+}
+
 const TS_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.js"];
 const STRUCTURAL_SEED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".rb", ".php", ".lua", ".c", ".h", ".cpp", ".hpp", ".go", ".rs", ".zig", ".java", ".kt", ".kts", ".scala", ".cs", ".swift", ".dart", ".ex", ".exs", ".erl", ".clj", ".ml", ".hs", ".vue", ".md", ".json", ".yaml", ".yml"]);
 
@@ -197,7 +210,10 @@ export class ResolveStage {
   ): ResolvedFile {
     const filePath = parsed.file.relativePath;
     const structuralAliases = this.structuralAliasesFor(filePath, rootAliases, monorepoPackages);
-    const build = { knownFiles: [...knownRelPaths], pathAliasesByFile: { [filePath]: structuralAliases } };
+    // knownRelPaths is the same Set for every file of a run; spreading it per
+    // file handed the resolver a fresh knownFiles array each time (defeating
+    // its Set memoization) for zero content change. Spread once per Set.
+    const build = { knownFiles: knownRelPathsList(knownRelPaths), pathAliasesByFile: { [filePath]: structuralAliases } };
     const resolvedImports: ResolvedImport[] = parsed.rawImports.map((raw) => {
       const resolvedPath = resolveStructuralSpecifier(raw.specifier, filePath, build) ?? null;
       return {

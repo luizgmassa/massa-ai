@@ -1,5 +1,5 @@
 import type { StructuralBuildMetadata, StructuralLanguageResolver, StructuralReference, StructuralResolverDefinition, StructuralResolverFile } from "../resolver.js";
-import { TYPESCRIPT_LANGUAGE_RESOLVER } from "./typescript.js";
+import { TYPESCRIPT_LANGUAGE_RESOLVER, cachedDialectScope } from "./typescript.js";
 
 export const FUNCTIONAL_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.freeze({
   ...TYPESCRIPT_LANGUAGE_RESOLVER,
@@ -20,10 +20,11 @@ export const FUNCTIONAL_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.f
           ? { ...binding, imported: `${owner}.${unresolved.name}`, local: unresolved.name }
           : binding.imported.startsWith("!") ? binding : { ...binding, imported: `${owner}.${binding.imported}` }) };
     }) } : file;
-    return TYPESCRIPT_LANGUAGE_RESOLVER.resolve(resolverFile, reference, definitions.filter((item) =>
-      file.dialect === "elixir" || file.dialect === "elixir-script"
+    return TYPESCRIPT_LANGUAGE_RESOLVER.resolve(resolverFile, reference, cachedDialectScope(definitions,
+      file.dialect === "elixir" || file.dialect === "elixir-script" ? "elixir" : file.dialect,
+      (item) => file.dialect === "elixir" || file.dialect === "elixir-script"
         ? item.identity.dialect === "elixir" || item.identity.dialect === "elixir-script"
-        : item.identity.dialect === file.dialect
+        : item.identity.dialect === file.dialect,
     ), build);
   },
 });

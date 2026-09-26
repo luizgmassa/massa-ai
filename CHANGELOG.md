@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Indexing a large project stalled for hours in the resolve stage.** The structural resolver
+  re-indexed and re-filtered every project definition on every edge — O(edges × definitions),
+  5.5 h for a 6210-file project, with enough allocation churn to starve the embedding and
+  database stacks. The definition index is now built once per (definitions, dialect scope)
+  and each lookup is a map hit; the delegating resolvers reuse one scoped array per dialect,
+  and the known-files list and its normalized set are built once per run instead of per file
+  and per import. Resolution results are unchanged.
+- **A saturated connection pool aborted the load after the resolve stage.** Prisma's P2024
+  family ("Unable to start a transaction in the given time", "Timed out fetching a new
+  connection") is now retried by `withDeadlockRetry` on its own budget — at least 10
+  attempts with a linear 30 s backoff — instead of failing the run.
+- **`setup-local-first.sh` left a stopped LM Studio server stopped.** It ran `lms daemon up`,
+  which wakes the headless daemon but not the HTTP API, so the wizard and the closing
+  `bun run diagnose` both reported the API unreachable. It now runs `lms server start` (on the
+  configured port) and waits for `/v1/models`, again before the final verification, and on the
+  MLX path restarts the embedding sidecar with `launchctl kickstart` when its `/health` does
+  not answer. `bun run diagnose` now suggests `lms server start`, or the sidecar restart when
+  the embedding URL is the sidecar's port.
+
 ## [1.66.0] - 2026-09-26
 
 ### Added

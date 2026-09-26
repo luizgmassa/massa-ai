@@ -24,6 +24,7 @@ import {
   readLmStudioSavedContext,
   readLmStudioGlobalDefault,
   lmStudioHome,
+  providerStartHint,
 } from "../diagnose";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
@@ -181,6 +182,35 @@ describe("resolveModelName", () => {
     expect(resolveModelName("ollama", {}, undefined)).toBe("qwen3-embedding:0.6b");
     expect(resolveModelName("lmstudio", {}, undefined)).toBe(
       "text-embedding-qwen3-embedding-0.6b",
+    );
+  });
+});
+
+describe("providerStartHint", () => {
+  test("LM Studio's own server is started with lms server start", () => {
+    expect(providerStartHint("lmstudio", "http://localhost:1234/v1", {})).toBe("lms server start");
+  });
+
+  test("the MLX embedding sidecar port points at the launchd agent", () => {
+    expect(providerStartHint("lmstudio", "http://127.0.0.1:1235/v1", {})).toContain(
+      "launchctl kickstart -k gui/$(id -u)/ai.massa.mlx-embed",
+    );
+  });
+
+  test("MASSA_AI_MLX_EMBED_PORT moves the sidecar port", () => {
+    expect(providerStartHint("lmstudio", "http://127.0.0.1:1235/v1", { MASSA_AI_MLX_EMBED_PORT: "4000" }))
+      .toBe("lms server start");
+    expect(providerStartHint("lmstudio", "http://127.0.0.1:4000/v1", { MASSA_AI_MLX_EMBED_PORT: "4000" }))
+      .toContain("ai.massa.mlx-embed");
+  });
+
+  test("an unparseable URL falls back to the LM Studio hint", () => {
+    expect(providerStartHint("lmstudio", "not a url", {})).toBe("lms server start");
+  });
+
+  test("Ollama keeps its own hint", () => {
+    expect(providerStartHint("ollama", "http://localhost:11434", {})).toBe(
+      "ollama serve  or  bash scripts/ensure-ollama.sh",
     );
   });
 });

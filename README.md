@@ -631,7 +631,7 @@ consolidation, polish, rerank, and query rewrite.
 # Install Ollama (if missing)
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Start the daemon
+# Start the API server
 ollama serve
 
 # Pull models
@@ -646,8 +646,8 @@ ollama pull qwen2.5-coder:7b      # code-oriented LLM sites (bootstrap seed, rer
 # Install LM Studio's CLI (if missing)
 curl -fsSL https://lmstudio.ai/install.sh | bash
 
-# Start the daemon
-lms daemon up
+# Start the API server
+lms server start
 
 # Download and load models (pick any instruct + embedding model you prefer)
 lms get -y text-embedding-qwen3-embedding-0.6b    # embeddings (1024 dims)

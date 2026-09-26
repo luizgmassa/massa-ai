@@ -28,13 +28,38 @@ import { logger } from "@massa-ai/shared";
 const RETRIABLE_SQLSTATES = new Set(["40P01", "40001", "40P02"]);
 
 /**
+ * True when the error is a Prisma connection-pool acquisition failure
+ * (P2024 family): the interactive transaction could not BEGIN within its
+ * maxWait because the pool was saturated or its connections were being
+ * re-established. Observed live at the tail of a 5.5h resolve under system
+ * memory pressure, where the query engine churned connections for ~12
+ * minutes before the run's first post-resolve transaction. Not a lock
+ * anomaly and not a data problem — retrying with a much slower backoff is
+ * safe (every Load write is idempotent) and rides out the churn.
+ */
+export function isConnectionPoolAcquisitionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  if (code === "P2024") return true;
+  const message = (error as { message?: unknown }).message;
+  if (typeof message !== "string") return false;
+  return (
+    message.includes("Unable to start a transaction in the given time") ||
+    message.includes("Timed out fetching a new connection from the connection pool")
+  );
+}
+
+/**
  * True when an error is a PostgreSQL lock cycle / serialization anomaly that
  * the application may safely retry. Prisma surfaces raw-query failures with
  * the SQLSTATE embedded in the message ("Raw query failed. Code: `40P01`…"),
  * so both the structured `.code` and the message text are inspected.
+ * Connection-pool acquisition failures (P2024 family) are retriable too,
+ * with their own backoff ladder in {@link withDeadlockRetry}.
  */
 export function isRetriableTransactionError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
+  if (isConnectionPoolAcquisitionError(error)) return true;
   const code = (error as { code?: unknown }).code;
   if (typeof code === "string" && RETRIABLE_SQLSTATES.has(code)) return true;
   const message = (error as { message?: unknown }).message;
@@ -49,6 +74,9 @@ export interface DeadlockRetryOptions {
   maxAttempts?: number;
   /** Base backoff in ms; doubled each retry (default 75). */
   baseDelayMs?: number;
+  /** Linear backoff step in ms for connection-pool acquisition retries
+   * (default 30_000; tests pass a small value to keep them fast). */
+  connectionDelayMs?: number;
   /** Label included in the retry log for traceability. */
   operation?: string;
 }
@@ -63,16 +91,28 @@ export async function withDeadlockRetry<T>(
 ): Promise<T> {
   const maxAttempts = options.maxAttempts ?? 5;
   const baseDelayMs = options.baseDelayMs ?? 75;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  const connectionDelayMs = options.connectionDelayMs ?? 30_000;
+  // Connection-pool acquisition failures get their own attempt budget (see
+  // the catch below); the loop bound must allow for it even though the
+  // common path throws at maxAttempts and never reaches the extension.
+  const loopBound = Math.max(maxAttempts, 10);
+  for (let attempt = 1; attempt <= loopBound; attempt++) {
     try {
       return await operation();
     } catch (error) {
-      if (!isRetriableTransactionError(error) || attempt === maxAttempts) throw error;
-      const delayMs = baseDelayMs * 2 ** (attempt - 1);
-      logger.warn("Retriable DB lock cycle; retrying operation", {
+      if (!isRetriableTransactionError(error)) throw error;
+      // Connection-pool acquisition churn runs on a slower clock than lock
+      // cycles (minutes, not milliseconds) and gets its own budget: at least
+      // 10 attempts with a linear 30s-step backoff (~22 min of coverage)
+      // instead of the 75ms exponential ladder.
+      const isConn = isConnectionPoolAcquisitionError(error);
+      const effectiveMax = isConn ? Math.max(maxAttempts, 10) : maxAttempts;
+      if (attempt >= effectiveMax) throw error;
+      const delayMs = isConn ? connectionDelayMs * attempt : baseDelayMs * 2 ** (attempt - 1);
+      logger.warn("Retriable DB failure; retrying operation", {
         operation: options.operation ?? "unknown",
         attempt,
-        maxAttempts,
+        maxAttempts: effectiveMax,
         delayMs,
         error: error as Error,
       });

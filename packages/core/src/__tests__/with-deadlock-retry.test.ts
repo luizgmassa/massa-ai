@@ -59,6 +59,23 @@ describe("isRetriableTransactionError", () => {
     expect(isRetriableTransactionError({ code: 404 })).toBe(false);
     expect(isRetriableTransactionError({ code: null })).toBe(false);
   });
+
+  test("detects Prisma P2024 pool acquisition failure via .code", () => {
+    expect(isRetriableTransactionError({ code: "P2024" })).toBe(true);
+  });
+
+  test("detects P2024 family via Prisma message text", () => {
+    expect(
+      isRetriableTransactionError(
+        new Error("Transaction API error: Unable to start a transaction in the given time."),
+      ),
+    ).toBe(true);
+    expect(
+      isRetriableTransactionError(
+        new Error("Timed out fetching a new connection from the connection pool."),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("withDeadlockRetry", () => {
@@ -136,5 +153,27 @@ describe("withDeadlockRetry", () => {
       }, { operation: "test", baseDelayMs: 1 }),
     ).rejects.toMatchObject({ code: "40P01" });
     expect(calls).toBe(5);
+  });
+
+  test("extends the attempt budget to 10 for persistent P2024 errors", async () => {
+    let calls = 0;
+    await expect(
+      withDeadlockRetry(async () => {
+        calls++;
+        throw { code: "P2024", message: "Transaction API error: Unable to start a transaction in the given time." };
+      }, { operation: "test", connectionDelayMs: 1 }),
+    ).rejects.toMatchObject({ code: "P2024" });
+    expect(calls).toBe(10);
+  });
+
+  test("recovers from a transient P2024 after several slow retries", async () => {
+    let calls = 0;
+    const result = await withDeadlockRetry(async () => {
+      calls++;
+      if (calls < 4) throw { code: "P2024" };
+      return "pool-recovered";
+    }, { operation: "test", connectionDelayMs: 1 });
+    expect(result).toBe("pool-recovered");
+    expect(calls).toBe(4);
   });
 });
