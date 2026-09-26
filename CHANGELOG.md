@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.66.0] - 2026-09-26
+
 ### Added
 
 - **`bun run diagnose` checks the context LM Studio gives the chat models.** When the LLM is
