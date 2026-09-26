@@ -5,7 +5,7 @@ import type {
   StructuralResolverDefinition,
   StructuralResolverFile,
 } from "../resolver.js";
-import { TYPESCRIPT_LANGUAGE_RESOLVER } from "./typescript.js";
+import { TYPESCRIPT_LANGUAGE_RESOLVER, cachedDialectScope } from "./typescript.js";
 
 /** Syntax-independent identity/import/global resolution for the scripting cohort. */
 export const SCRIPTING_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.freeze({
@@ -20,7 +20,7 @@ export const SCRIPTING_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.fr
     return TYPESCRIPT_LANGUAGE_RESOLVER.resolve(
       file,
       reference,
-      definitions.filter((definition) => definition.identity.dialect === file.dialect),
+      cachedDialectScope(definitions, file.dialect, (definition) => definition.identity.dialect === file.dialect),
       build,
     );
   },

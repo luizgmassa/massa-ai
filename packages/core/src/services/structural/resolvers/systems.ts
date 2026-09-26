@@ -2,7 +2,7 @@ import type {
   StructuralBuildMetadata, StructuralLanguageResolver, StructuralReference,
   StructuralResolverDefinition, StructuralResolverFile,
 } from "../resolver.js";
-import { TYPESCRIPT_LANGUAGE_RESOLVER } from "./typescript.js";
+import { TYPESCRIPT_LANGUAGE_RESOLVER, cachedDialectScope } from "./typescript.js";
 import path from "node:path";
 
 const DIALECTS = Object.freeze(["c", "header-default-c", "cpp", "header", "header-cpp", "go", "rust", "zig"]);
@@ -13,6 +13,7 @@ export const SYSTEMS_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.free
   resolve(file: StructuralResolverFile, reference: StructuralReference, definitions: readonly StructuralResolverDefinition[], build: StructuralBuildMetadata) {
     const compatible = file.dialect === "header-default-c" ? ["c", "header-default-c"]
       : file.dialect === "header-cpp" || file.dialect === "header" ? ["cpp", "header", "header-cpp"] : [file.dialect];
+    const compatibleKey = compatible.join(",");
     const unresolvedTarget = reference.target.status === "unresolved" ? reference.target : undefined;
     const resolverFile = file.dialect === "rust" ? {
       ...file,
@@ -32,6 +33,6 @@ export const SYSTEMS_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.free
         return { ...item, bindings };
       }),
     } : file;
-    return TYPESCRIPT_LANGUAGE_RESOLVER.resolve(resolverFile, reference, definitions.filter((item) => compatible.includes(item.identity.dialect)), build);
+    return TYPESCRIPT_LANGUAGE_RESOLVER.resolve(resolverFile, reference, cachedDialectScope(definitions, compatibleKey, (item) => compatible.includes(item.identity.dialect)), build);
   },
 });

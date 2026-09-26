@@ -132,14 +132,159 @@ function indexDefinitions(
   return { registry, definitions: Object.freeze(indexed) };
 }
 
-function candidateKind(reference: NormalizedReference, definition: ResolvableDefinition): boolean {
-  if (reference.kind === "type_ref" || reference.kind === "extend" || reference.kind === "implement") {
-    return ["class", "interface", "trait", "enum", "type", "type_parameter"].includes(definition.identity.kind);
+// ── Definition index (R1). The resolver session hands the SAME frozen
+// definitions array to every edge, yet the resolve path used to re-run
+// indexDefinitions + a cascade of full-array filters over all ~80k project
+// definitions on EVERY edge — an O(edges × projectDefinitions) blow-up that
+// cost a 5.5h resolve for 6210 files (~5B transient allocations), starved
+// the machine's memory under GC pressure and stalled the embedding/DB
+// stacks. The index below is built once per (definitions array, dialect
+// scope) pair, WeakMap-keyed on the array identity, and each per-edge
+// filter becomes a Map lookup. Buckets are built in source-array order so
+// the first-match semantics of the previous `.filter`/`.find` chain and the
+// `outcome()`/`candidates()` ordering are preserved exactly.
+
+interface ResolvablePartition {
+  list: readonly ResolvableDefinition[];
+  byFqn: ReadonlyMap<string, ResolvableDefinition>;
+  byFile: ReadonlyMap<string, readonly ResolvableDefinition[]>;
+  byFileQualifiedName: ReadonlyMap<string, readonly ResolvableDefinition[]>;
+  byQualifiedName: ReadonlyMap<string, readonly ResolvableDefinition[]>;
+}
+
+interface ScopedDefinitionIndex {
+  registry: StructuralFqnRegistry;
+  /** candidateKind(type_ref|extend|implement) partition. */
+  typeRefs: ResolvablePartition;
+  /** candidateKind(call|data_flow|http_call) partition. */
+  calls: ResolvablePartition;
+  /** The full scoped list (unpartitioned) — resolveLegacy materialization. */
+  all: ResolvablePartition;
+}
+
+const TYPE_REF_KINDS = new Set(["class", "interface", "trait", "enum", "type", "type_parameter"]);
+const CALL_KINDS = new Set(["function", "method", "constructor", "class", "field", "variable", "constant", "export"]);
+const FAMILY_DIALECTS = new Set(["typescript", "tsx", "javascript", "jsx", "sfc"]);
+
+const REFERENCE_PARTITION: Readonly<Partial<Record<StructuralReference["kind"], "typeRefs" | "calls">>> = Object.freeze({
+  type_ref: "typeRefs",
+  extend: "typeRefs",
+  implement: "typeRefs",
+  call: "calls",
+  data_flow: "calls",
+  http_call: "calls",
+});
+
+const EMPTY_PARTITION: ResolvablePartition = Object.freeze({
+  list: Object.freeze([]),
+  byFqn: new Map(),
+  byFile: new Map(),
+  byFileQualifiedName: new Map(),
+  byQualifiedName: new Map(),
+});
+
+function buildPartition(list: readonly ResolvableDefinition[]): ResolvablePartition {
+  const byFqn = new Map<string, ResolvableDefinition>();
+  const byFile = new Map<string, ResolvableDefinition[]>();
+  const byFileQualifiedName = new Map<string, ResolvableDefinition[]>();
+  const byQualifiedName = new Map<string, ResolvableDefinition[]>();
+  for (const definition of list) {
+    const identity = definition.identity;
+    if (!byFqn.has(identity.fqn)) byFqn.set(identity.fqn, definition);
+    const fileBucket = byFile.get(identity.file);
+    if (fileBucket) fileBucket.push(definition);
+    else byFile.set(identity.file, [definition]);
+    const fileQualifiedNameKey = `${identity.file}\0${identity.qualifiedName}`;
+    const fileQualifiedNameBucket = byFileQualifiedName.get(fileQualifiedNameKey);
+    if (fileQualifiedNameBucket) fileQualifiedNameBucket.push(definition);
+    else byFileQualifiedName.set(fileQualifiedNameKey, [definition]);
+    const qualifiedNameBucket = byQualifiedName.get(identity.qualifiedName);
+    if (qualifiedNameBucket) qualifiedNameBucket.push(definition);
+    else byQualifiedName.set(identity.qualifiedName, [definition]);
   }
-  if (reference.kind === "call" || reference.kind === "data_flow" || reference.kind === "http_call") {
-    return ["function", "method", "constructor", "class", "field", "variable", "constant", "export"].includes(definition.identity.kind);
+  return { list, byFqn, byFile, byFileQualifiedName, byQualifiedName };
+}
+
+function buildScopedIndex(
+  rawDefinitions: readonly StructuralResolverDefinition[],
+  familyOnly: boolean,
+): ScopedDefinitionIndex {
+  const scoped = familyOnly
+    ? rawDefinitions.filter((definition) => FAMILY_DIALECTS.has(definition.identity.dialect))
+    : rawDefinitions;
+  const { registry, definitions: all } = indexDefinitions(scoped);
+  const typeRefs: ResolvableDefinition[] = [];
+  const calls: ResolvableDefinition[] = [];
+  for (const definition of all) {
+    if (TYPE_REF_KINDS.has(definition.identity.kind)) typeRefs.push(definition);
+    if (CALL_KINDS.has(definition.identity.kind)) calls.push(definition);
   }
-  return false;
+  return { registry, typeRefs: buildPartition(typeRefs), calls: buildPartition(calls), all: buildPartition(all) };
+}
+
+const RESOLVE_INDEX_CACHE = new WeakMap<
+  readonly StructuralResolverDefinition[],
+  Map<boolean, ScopedDefinitionIndex>
+>();
+
+function definitionIndex(
+  rawDefinitions: readonly StructuralResolverDefinition[],
+  familyOnly: boolean,
+): ScopedDefinitionIndex {
+  let byScope = RESOLVE_INDEX_CACHE.get(rawDefinitions);
+  if (!byScope) {
+    byScope = new Map();
+    RESOLVE_INDEX_CACHE.set(rawDefinitions, byScope);
+  }
+  const existing = byScope.get(familyOnly);
+  if (existing) return existing;
+  const built = buildScopedIndex(rawDefinitions, familyOnly);
+  byScope.set(familyOnly, built);
+  return built;
+}
+
+/**
+ * Cache a dialect-scoped view of the raw definitions array. The delegating
+ * resolvers (managed/scripting/systems/functional) used to `filter` the full
+ * project definitions on every edge, producing a fresh array that defeated
+ * the resolve index memoization; scoping through here keeps one stable
+ * scoped array per (definitions, dialectKey) pair instead.
+ */
+const DIALECT_SCOPE_CACHE = new WeakMap<
+  readonly StructuralResolverDefinition[],
+  Map<string, readonly StructuralResolverDefinition[]>
+>();
+
+export function cachedDialectScope(
+  definitions: readonly StructuralResolverDefinition[],
+  dialectKey: string,
+  predicate: (definition: StructuralResolverDefinition) => boolean,
+): readonly StructuralResolverDefinition[] {
+  let byKey = DIALECT_SCOPE_CACHE.get(definitions);
+  if (!byKey) {
+    byKey = new Map();
+    DIALECT_SCOPE_CACHE.set(definitions, byKey);
+  }
+  const existing = byKey.get(dialectKey);
+  if (existing) return existing;
+  const scoped = definitions.filter((definition) => predicate(definition));
+  byKey.set(dialectKey, scoped);
+  return scoped;
+}
+
+/**
+ * Memoize the normalized known-files Set built from a build.knownFiles
+ * array. Callers used to rebuild it (NFC-normalizing every entry) per import
+ * specifier — ~62k Set constructions per index run.
+ */
+const KNOWN_FILES_CACHE = new WeakMap<readonly string[], ReadonlySet<string>>();
+
+export function normalizedKnownFiles(knownFiles: readonly string[]): ReadonlySet<string> {
+  const existing = KNOWN_FILES_CACHE.get(knownFiles);
+  if (existing) return existing;
+  const built = new Set(knownFiles.map(normalizeStructuralFile));
+  KNOWN_FILES_CACHE.set(knownFiles, built);
+  return built;
 }
 
 function probe(base: string, known: ReadonlySet<string>, dialect = "typescript"): string | undefined {
@@ -159,7 +304,7 @@ export function resolveStructuralSpecifier(
   build: StructuralBuildMetadata,
   dialect = "typescript",
 ): string | undefined {
-  const known = new Set(build.knownFiles.map(normalizeStructuralFile));
+  const known = normalizedKnownFiles(build.knownFiles);
   if (specifier.startsWith("./") || specifier.startsWith("../")) {
     return probe(path.posix.join(path.posix.dirname(fromFile), specifier), known, dialect);
   }
@@ -202,15 +347,15 @@ function exportedMatches(
   file: string,
   sought: string,
   defaultOnly: boolean,
-  definitions: readonly ResolvableDefinition[],
+  partition: ResolvablePartition,
   build: StructuralBuildMetadata,
   visited = new Set<string>(),
 ): ResolvableDefinition[] {
   const key = `${file}\0${sought}\0${defaultOnly}`;
   if (visited.has(key)) return [];
   visited.add(key);
-  const direct = definitions.filter((definition) =>
-    definition.identity.file === file && definition.exported && (defaultOnly
+  const direct = (partition.byFile.get(file) ?? []).filter((definition) =>
+    definition.exported && (defaultOnly
       ? definition.defaultExport
       : definition.identity.qualifiedName === sought)
   );
@@ -231,7 +376,7 @@ function exportedMatches(
         targetFile,
         binding.imported === "*" ? sought : binding.imported,
         defaultOnly || binding.imported === "default",
-        definitions,
+        partition,
         build,
         visited,
       ));
@@ -256,7 +401,7 @@ const REQUIRE_IMPORT_FORMS = new Set(["commonjs_require", "dynamic_import", "rub
 function importedMatches(
   file: StructuralResolverFile,
   reference: NormalizedReference,
-  definitions: readonly ResolvableDefinition[],
+  partition: ResolvablePartition,
   build: StructuralBuildMetadata,
 ): { matches: ResolvableDefinition[]; claimed: boolean } {
   const matches: ResolvableDefinition[] = [];
@@ -299,25 +444,23 @@ function importedMatches(
       if ((imported.typeOnly || binding.typeOnly) && !typeEdge) continue;
       const importedFile = resolveStructuralSpecifier(imported.specifier, file.file, build, file.dialect) ??
         (["python_import", "ruby_require", "php_use", "lua_require", "c_include", "cpp_include", "go_import", "rust_use", "zig_import", "java_import", "java_static_import", "kotlin_import", "scala_import", "dart_import", "elixir_alias", "elixir_import", "elixir_require", "elixir_use", "erlang_import", "clojure_require", "clojure_import", "ocaml_open", "ocaml_include", "ocaml_module_alias", "haskell_import"].includes(imported.form)
-          ? probe(imported.specifier.replace(/^\.\//u, ""), new Set(build.knownFiles.map(normalizeStructuralFile)), file.dialect)
+          ? probe(imported.specifier.replace(/^\.\//u, ""), normalizedKnownFiles(build.knownFiles), file.dialect)
           : undefined);
       if (!importedFile) continue;
       const esmDefaultMember = imported.form === "esm_import" &&
         binding.imported === "default" && qualifier[0] === binding.local;
       if (esmDefaultMember && sought !== undefined) {
-        const owners = exportedMatches(importedFile, "default", true, definitions, build);
+        const owners = exportedMatches(importedFile, "default", true, partition, build);
         for (const owner of owners) {
           const ownerMember = `${owner.identity.qualifiedName}.${sought}`;
-          matches.push(...definitions.filter((definition) =>
-            definition.identity.file === owner.identity.file &&
-            definition.exported &&
-            definition.identity.qualifiedName === ownerMember
+          matches.push(...(partition.byFileQualifiedName.get(`${owner.identity.file}\0${ownerMember}`) ?? []).filter((definition) =>
+            definition.exported
           ));
         }
         continue;
       }
-      if (defaultOnly) matches.push(...exportedMatches(importedFile, "default", true, definitions, build));
-      else if (sought !== undefined) matches.push(...exportedMatches(importedFile, sought, false, definitions, build).filter((definition) =>
+      if (defaultOnly) matches.push(...exportedMatches(importedFile, "default", true, partition, build));
+      else if (sought !== undefined) matches.push(...exportedMatches(importedFile, sought, false, partition, build).filter((definition) =>
         binding.arity === undefined || definition.arity === binding.arity
       ));
     }
@@ -328,19 +471,18 @@ function importedMatches(
 function sameFileMatches(
   file: string,
   reference: NormalizedReference,
-  definitions: readonly ResolvableDefinition[],
+  partition: ResolvablePartition,
 ): readonly ResolvableDefinition[] {
-  const local = definitions.filter((definition) => definition.identity.file === file);
   if (reference.qualifier && reference.qualifier !== "this") {
     const exact = `${reference.qualifier}.${reference.name}`;
-    return local.filter((definition) => definition.identity.qualifiedName === exact);
+    return partition.byFileQualifiedName.get(`${file}\0${exact}`) ?? [];
   }
   const lexical = reference.lexicalScope?.split(".").filter(Boolean) ?? [];
   if (lexical.length > 0) lexical.pop();
   for (let length = lexical.length; length >= 0; length -= 1) {
     const prefix = lexical.slice(0, length).join(".");
     const exact = prefix ? `${prefix}.${reference.name}` : reference.name;
-    const matches = local.filter((definition) => definition.identity.qualifiedName === exact);
+    const matches = partition.byFileQualifiedName.get(`${file}\0${exact}`) ?? [];
     if (matches.length > 0) return matches;
     if (reference.qualifier === "this") break;
   }
@@ -358,26 +500,24 @@ export const TYPESCRIPT_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.f
   ) {
     const normalizedFile = normalizeStructuralFile(file.file);
     const reference = normalizedReference(rawReference);
-    const familyDialects = ["typescript", "tsx", "javascript", "jsx", "sfc"];
-    const scopedDefinitions = familyDialects.includes(file.dialect)
-      ? rawDefinitions.filter((definition) => familyDialects.includes(definition.identity.dialect))
-      : rawDefinitions;
-    const { registry, definitions: allDefinitions } = indexDefinitions(scopedDefinitions);
-    const definitions = allDefinitions.filter((definition) => candidateKind(reference, definition));
+    const index = definitionIndex(rawDefinitions, FAMILY_DIALECTS.has(file.dialect));
+    const partition = (reference.kind && REFERENCE_PARTITION[reference.kind])
+      ? index[REFERENCE_PARTITION[reference.kind]!]
+      : EMPTY_PARTITION;
     if (reference.existingFqn) {
-      const prepared = definitions.find((definition) => definition.identity.fqn === reference.existingFqn)?.identity;
-      const exact = prepared ? { found: true as const, identity: prepared } : registry.resolveModern(reference.existingFqn);
+      const prepared = partition.byFqn.get(reference.existingFqn)?.identity;
+      const exact = prepared ? { found: true as const, identity: prepared } : index.registry.resolveModern(reference.existingFqn);
       return exact.found
         ? Object.freeze({ status: "resolved", fqn: exact.identity.fqn, identity: exact.identity, source: "exact" })
         : Object.freeze({ status: "unresolved", name: reference.existingFqn });
     }
     const soughtQualified = reference.qualifier ? `${reference.qualifier}.${reference.name}` : reference.name;
 
-    const local = sameFileMatches(normalizedFile, reference, definitions);
+    const local = sameFileMatches(normalizedFile, reference, partition);
     const localOutcome = outcome(reference, local, "same_file");
     if (localOutcome) return localOutcome;
 
-    const imported = importedMatches({ ...file, file: normalizedFile }, reference, definitions, build);
+    const imported = importedMatches({ ...file, file: normalizedFile }, reference, partition, build);
     const importOutcome = outcome(reference, imported.matches, "import");
     if (importOutcome) return importOutcome;
     if (imported.claimed) return Object.freeze({
@@ -386,21 +526,20 @@ export const TYPESCRIPT_LANGUAGE_RESOLVER: StructuralLanguageResolver = Object.f
       ...(reference.qualifier ? { qualifier: reference.qualifier } : {}),
     });
 
-    const global = definitions.filter((definition) =>
-      definition.exported && (reference.qualifier
-        ? definition.identity.qualifiedName === soughtQualified
-        : definition.identity.name === reference.name &&
-          definition.identity.qualifiedName === definition.identity.name)
-    );
-    return outcome(reference, global, "global") ?? Object.freeze({
+    const globalBucket = reference.qualifier
+      ? (partition.byQualifiedName.get(soughtQualified) ?? []).filter((definition) => definition.exported)
+      : (partition.byQualifiedName.get(reference.name) ?? []).filter((definition) =>
+          definition.exported && definition.identity.qualifiedName === definition.identity.name
+        );
+    return outcome(reference, globalBucket, "global") ?? Object.freeze({
       status: "unresolved",
       name: reference.name,
       ...(reference.qualifier ? { qualifier: reference.qualifier } : {}),
     });
   },
   resolveLegacy(legacyFqn: string, rawDefinitions: readonly StructuralResolverDefinition[]) {
-    const { registry, definitions } = indexDefinitions(rawDefinitions);
-    const materialized = definitions.filter((definition) => definition.identity.legacyFqn === legacyFqn);
+    const { registry, all } = definitionIndex(rawDefinitions, false);
+    const materialized = all.list.filter((definition) => definition.identity.legacyFqn === legacyFqn);
     const materializedOutcome = outcome(
       { kind: "call", span: { startByte: 0, endByte: 0, start: { row: 0, column: 0 }, end: { row: 0, column: 0 } }, name: legacyFqn },
       materialized,
