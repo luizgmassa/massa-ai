@@ -7,16 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.66.0] - 2026-09-26
-
-### Added
-
-- **`bun run diagnose` checks the context LM Studio gives the chat models.** When the LLM is
-  on and its base URL answers LM Studio's `/api/v1/models`, an advisory step compares each
-  role's required context (`llm.contextWindow` / `llm.codeContextWindow`, default 16384 /
-  32768) with the loaded instance, the model's saved per-model default and LM Studio's global
-  default, and names the fix. It never changes the exit code.
-
 ### Fixed
 
 - **Indexing a large project stalled for hours in the resolve stage.** The structural resolver
@@ -37,6 +27,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   MLX path restarts the embedding sidecar with `launchctl kickstart` when its `/health` does
   not answer. `bun run diagnose` now suggests `lms server start`, or the sidecar restart when
   the embedding URL is the sidecar's port.
+
+## [1.66.0] - 2026-09-26
+
+### Added
+
+- **`bun run diagnose` checks the context LM Studio gives the chat models.** When the LLM is
+  on and its base URL answers LM Studio's `/api/v1/models`, an advisory step compares each
+  role's required context (`llm.contextWindow` / `llm.codeContextWindow`, default 16384 /
+  32768) with the loaded instance, the model's saved per-model default and LM Studio's global
+  default, and names the fix. It never changes the exit code.
+
+### Fixed
+
 - **LM Studio chat models lost their context size after the first unload.** The setup only
   passed it to one `lms load -c`, and LM Studio exposes no per-request context length, so every
   later load — JIT reloads after the 600 s TTL included — fell back to LM Studio's global
