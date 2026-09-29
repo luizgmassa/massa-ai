@@ -8,6 +8,9 @@ set -e
 # with no dependency on external services.
 #
 # Usage: ./scripts/setup-local-first.sh
+#        ./scripts/setup-local-first.sh --uninstall-services
+#          removes the ai.massa.mlx-embed and ai.massa.lmstudio-server
+#          launchd agents (macOS); keeps logs and ~/.config/massa-ai
 # ========================================
 
 # shellcheck source=scripts/banner.sh
@@ -23,6 +26,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-api-key.sh"
 # function-only with no side effects at source time.
 # shellcheck source=scripts/lib/installer-feature-prompts.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-feature-prompts.sh"
+
+if [ "${1:-}" = "--uninstall-services" ]; then
+    installer_remove_launchd_agents
+    exit 0
+fi
+
 massa_ai_banner
 
 # Back up an existing config file to <file>.bak before it gets regenerated.

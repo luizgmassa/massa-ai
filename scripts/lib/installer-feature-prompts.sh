@@ -476,7 +476,12 @@ installer_start_mlx_embedding_sidecar() {
   local plist="${HOME}/Library/LaunchAgents/ai.massa.mlx-embed.plist"
   local log="${HOME}/.config/massa-ai/mlx-embed.log"
 
-  if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && [ -d "${HOME}/Library/LaunchAgents" ]; then
+  if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && [ -d "${HOME}/Library/LaunchAgents" ] \
+    && ! { mkdir -p "${HOME}/.config/massa-ai" 2>/dev/null && : > "$plist" 2>/dev/null; }; then
+    echo "  ⚠  could not write ${plist} — starting the sidecar directly."
+    echo "     It will not come back after a reboot."
+    nohup "${venv}/bin/python" "$script" >> "$log" 2>&1 &
+  elif [ "$(uname -s 2>/dev/null)" = "Darwin" ] && [ -d "${HOME}/Library/LaunchAgents" ]; then
     cat > "$plist" <<PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -609,6 +614,24 @@ PLISTEOF
     echo "     start after a reboot. Register by hand with:"
     echo "         launchctl bootstrap ${domain} ${plist}"
   fi
+  return 0
+}
+
+installer_remove_launchd_agents() {
+  local label plist domain
+
+  [ "$(uname -s 2>/dev/null)" = "Darwin" ] || return 0
+  domain="gui/$(id -u)"
+  for label in ai.massa.mlx-embed ai.massa.lmstudio-server; do
+    plist="${HOME}/Library/LaunchAgents/${label}.plist"
+    launchctl bootout "${domain}/${label}" >/dev/null 2>&1 || true
+    [ -e "$plist" ] || [ -L "$plist" ] || continue
+    if rm -f "$plist" 2>/dev/null; then
+      echo "  ✓ launchd agent removed: ${label}"
+    else
+      echo "  ⚠  could not remove ${plist} — delete it by hand."
+    fi
+  done
   return 0
 }
 

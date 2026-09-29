@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It is skipped off macOS and when `LMSTUDIO_URL` points at a remote host, and a failed
   registration only prints the manual `launchctl bootstrap` command — it never aborts the
   wizard.
+- **`setup-local-first.sh --uninstall-services` removes the two login agents.** Nothing used to
+  remove `ai.massa.mlx-embed` or `ai.massa.lmstudio-server`, so an uninstalled LM Studio left
+  launchd retrying `lms server start` every 30 s forever. The flag runs
+  `launchctl bootout gui/<uid>/<label>` for each (tolerating "not loaded") and deletes exactly
+  those two plists — never another `ai.massa.*` file, never the logs or `~/.config/massa-ai`.
+  It is idempotent, a no-op off macOS, and runs none of the install steps.
+
+### Fixed
+
+- **An unwritable `~/Library/LaunchAgents` no longer aborts the wizard at step 1/6 on the MLX
+  path.** `installer_start_mlx_embedding_sidecar` wrote its plist unguarded under `set -e`.
+  It now warns, skips `launchctl`, and starts the sidecar directly — the same fallback a
+  refused registration already took — so embeddings still answer for this session.
 
 ## [1.66.2] - 2026-09-29
 
