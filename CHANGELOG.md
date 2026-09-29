@@ -7,31 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.67.0] - 2026-09-29
-
 ### Added
 
-- **Agent dispatches are announced by a hook, with model and effort.** Dispatching a massa-ai
-  specialist now prints one line such as
-  `🤖 [massa-ai] Agent dispatch: code-reviewer — model claude-opus-5-5[1m], effort high`, read
-  from the installed agent file the host loads. Claude Code gets a `PreToolUse` hook on the
-  `Agent` tool (new `agent-start` subcommand, shown as a `systemMessage`, which also flags a
-  `model` passed on the call or `CLAUDE_CODE_SUBAGENT_MODEL` as a runtime override). Codex gets
-  a `SubagentStart` hook (`agent-start codex`) that reads `~/.codex/agents/<name>.toml`.
-  OpenCode shows a TUI toast from `tool.execute.before` on the `task` tool. None of these posts
-  an observation. Cursor gets no announcement: its hooks show `user_message` only when they deny
-  the action. Re-run the plugin installer, or update the plugin, to wire the new hook.
-- **The LM Studio server now comes back after a reboot.** LM Studio restores its app at login
-  but not its HTTP server, so after a restart every LLM call fell back to the non-LLM path
-  (`Cannot connect to API`) until someone ran `lms server start` by hand. On macOS,
-  `setup-local-first.sh` now registers a launchd agent, `ai.massa.lmstudio-server`
-  (`~/Library/LaunchAgents/ai.massa.lmstudio-server.plist`), that runs
-  `lms server start --port <configured port>` at login and lets launchd retry a failed start
-  every 30 s. The run is logged to `~/.config/massa-ai/lmstudio-server.log`. It is registered
-  with `launchctl bootstrap`, falling back to `load -w`, like the MLX embedding sidecar.
-  It is skipped off macOS and when `LMSTUDIO_URL` points at a remote host, and a failed
-  registration only prints the manual `launchctl bootstrap` command — it never aborts the
-  wizard.
 - **`setup-local-first.sh --uninstall-services` removes the two login agents.** Nothing used to
   remove `ai.massa.mlx-embed` or `ai.massa.lmstudio-server`, so an uninstalled LM Studio left
   launchd retrying `lms server start` every 30 s forever. The flag runs
@@ -68,6 +45,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path.** `installer_start_mlx_embedding_sidecar` wrote its plist unguarded under `set -e`.
   It now warns, skips `launchctl`, and starts the sidecar directly — the same fallback a
   refused registration already took — so embeddings still answer for this session.
+
+## [1.67.0] - 2026-09-29
+
+### Added
+
+- **Agent dispatches are announced by a hook, with model and effort.** Dispatching a massa-ai
+  specialist now prints one line such as
+  `🤖 [massa-ai] Agent dispatch: code-reviewer — model claude-opus-5-5[1m], effort high`, read
+  from the installed agent file the host loads. Claude Code gets a `PreToolUse` hook on the
+  `Agent` tool (new `agent-start` subcommand, shown as a `systemMessage`, which also flags a
+  `model` passed on the call or `CLAUDE_CODE_SUBAGENT_MODEL` as a runtime override). Codex gets
+  a `SubagentStart` hook (`agent-start codex`) that reads `~/.codex/agents/<name>.toml`.
+  OpenCode shows a TUI toast from `tool.execute.before` on the `task` tool. None of these posts
+  an observation. Cursor gets no announcement: its hooks show `user_message` only when they deny
+  the action. Re-run the plugin installer, or update the plugin, to wire the new hook.
+- **The LM Studio server now comes back after a reboot.** LM Studio restores its app at login
+  but not its HTTP server, so after a restart every LLM call fell back to the non-LLM path
+  (`Cannot connect to API`) until someone ran `lms server start` by hand. On macOS,
+  `setup-local-first.sh` now registers a launchd agent, `ai.massa.lmstudio-server`
+  (`~/Library/LaunchAgents/ai.massa.lmstudio-server.plist`), that runs
+  `lms server start --port <configured port>` at login and lets launchd retry a failed start
+  every 30 s. The run is logged to `~/.config/massa-ai/lmstudio-server.log`. It is registered
+  with `launchctl bootstrap`, falling back to `load -w`, like the MLX embedding sidecar.
+  It is skipped off macOS and when `LMSTUDIO_URL` points at a remote host, and a failed
+  registration only prints the manual `launchctl bootstrap` command — it never aborts the
+  wizard.
 
 ### Removed
 
