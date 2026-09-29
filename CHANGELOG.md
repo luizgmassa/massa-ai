@@ -16,8 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`~/Library/LaunchAgents/ai.massa.lmstudio-server.plist`), that runs
   `lms server start --port <configured port>` at login and lets launchd retry a failed start
   every 30 s. The run is logged to `~/.config/massa-ai/lmstudio-server.log`. It is registered
-  with `launchctl bootstrap`, falling back to `load -w`, like the MLX embedding sidecar;
-  off macOS the step is a no-op.
+  with `launchctl bootstrap`, falling back to `load -w`, like the MLX embedding sidecar.
+  It is skipped off macOS and when `LMSTUDIO_URL` points at a remote host, and a failed
+  registration only prints the manual `launchctl bootstrap` command — it never aborts the
+  wizard.
 
 ## [1.66.2] - 2026-09-29
 
