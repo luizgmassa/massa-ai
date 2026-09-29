@@ -67,7 +67,7 @@ Use `references/context-firewall.md` when raw output is verbose. Feedback should
 
 ## Subagent Feedback
 
-When a subagent is used, the main agent reports only the role, scope, permission mode, current task, and status. Do not expose raw subagent prompts or internal deliberation. The delegated-work labels and the `Agent Started` model/effort component are defined once in `references/agent-orchestration.md` (its delegated-work label list and Model/Effort Announcement), not restated here.
+When a subagent is used, the main agent reports only the role, scope, permission mode, current task, and status. Do not expose raw subagent prompts or internal deliberation. The delegated-work labels are defined once in `references/agent-orchestration.md` (its delegated-work label list), not restated here; model and effort are printed by the host hook, never by a status update.
 
 ## Completion Feedback
 
