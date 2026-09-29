@@ -513,6 +513,19 @@ export function _isAbortOrTimeoutError(err: unknown): boolean {
   return false;
 }
 
+export function _isConnectionError(err: unknown): boolean {
+  let cur: any = err;
+  for (let hops = 0; cur && hops < 5; hops++, cur = cur.lastError ?? cur.cause) {
+    const code = typeof cur.code === "string" ? cur.code : "";
+    if (/^(ECONNREFUSED|ECONNRESET|ENOTFOUND|EHOSTUNREACH|ConnectionRefused|ConnectionClosed|FailedToOpenSocket)$/.test(code)) {
+      return true;
+    }
+    const message = typeof cur.message === "string" ? cur.message : "";
+    if (/Cannot connect to API|Unable to connect|ECONNREFUSED|fetch failed/i.test(message)) return true;
+  }
+  return false;
+}
+
 /**
  * Compact `path: message` summary of the first few zod issues, capped so a
  * validation failure with dozens of issues never blows up a log line — the
@@ -539,6 +552,34 @@ const llmFailureStreaks = new Map<string, number>();
  */
 export function _resetLlmFailureStreaksForTesting(): void {
   llmFailureStreaks.clear();
+  endpointCircuits.clear();
+}
+
+const ENDPOINT_FAILURE_THRESHOLD = 3;
+const ENDPOINT_COOLDOWN_MS = 60_000;
+const endpointCircuits = new Map<string, { failures: number; openUntil: number }>();
+
+function isEndpointCircuitOpen(baseUrl: string): boolean {
+  const circuit = endpointCircuits.get(baseUrl);
+  return circuit !== undefined && Date.now() < circuit.openUntil;
+}
+
+function recordEndpointOutcome(baseUrl: string, err: Error | null): void {
+  if (!err || !_isConnectionError(err)) {
+    endpointCircuits.delete(baseUrl);
+    return;
+  }
+  const circuit = endpointCircuits.get(baseUrl) ?? { failures: 0, openUntil: 0 };
+  circuit.failures++;
+  if (circuit.failures >= ENDPOINT_FAILURE_THRESHOLD) {
+    circuit.openUntil = Date.now() + ENDPOINT_COOLDOWN_MS;
+    logger.warn("LLM endpoint unreachable — pausing LLM calls", {
+      provider: resolveProviderIdForLogging(baseUrl),
+      consecutiveConnectionFailures: circuit.failures,
+      cooldownMs: ENDPOINT_COOLDOWN_MS,
+    });
+  }
+  endpointCircuits.set(baseUrl, circuit);
 }
 
 /**
@@ -558,6 +599,7 @@ function recordLlmFailure(
 ): number {
   const consecutiveFailures = (llmFailureStreaks.get(label) ?? 0) + 1;
   llmFailureStreaks.set(label, consecutiveFailures);
+  recordEndpointOutcome(baseUrl, err);
   logger.warn("LLM call failed — using non-LLM fallback", {
     label,
     role,
@@ -577,7 +619,8 @@ function recordLlmFailure(
  * streak being reset was non-zero, logs one INFO recovery line.
  * @internal
  */
-function recordLlmSuccess(label: string, model: string): void {
+function recordLlmSuccess(label: string, model: string, baseUrl: string): void {
+  recordEndpointOutcome(baseUrl, null);
   const priorFailures = llmFailureStreaks.get(label) ?? 0;
   if (priorFailures > 0) {
     logger.info("LLM call recovered", { label, model, afterFailures: priorFailures });
@@ -599,6 +642,9 @@ export async function llmComplete(
     return { ok: false, error: "llm disabled" };
   }
   const llm = getLlmConfig({ modelRole: opts.modelRole });
+  if (isEndpointCircuitOpen(llm.baseUrl)) {
+    return { ok: false, error: "llm endpoint unreachable (circuit open)" };
+  }
   const role: LlmModelRole = opts.modelRole ?? "instruct";
   const timeoutMs = opts.timeoutMs ?? llm.timeoutMs;
   const startedAt = Date.now();
@@ -613,7 +659,7 @@ export async function llmComplete(
     });
     const text = (result as any).text ?? "";
     if (text.length > 0) {
-      recordLlmSuccess(opts.label, llm.model);
+      recordLlmSuccess(opts.label, llm.model, llm.baseUrl);
       return { ok: true, value: text };
     }
     // Empty content — try to recover from the reasoning channel.
@@ -623,7 +669,7 @@ export async function llmComplete(
         logger.warn("llmComplete: empty content — recovered from reasoning channel", {
           reasoningLen: reasoning.length,
         });
-        recordLlmSuccess(opts.label, llm.model);
+        recordLlmSuccess(opts.label, llm.model, llm.baseUrl);
         return { ok: true, value: reasoning };
       }
       // #7 safety net: reasoning recovery yielded nothing. With the pure-instruct
@@ -659,6 +705,9 @@ export async function llmObject<T>(
     return { ok: false, error: "llm disabled" };
   }
   const llm = getLlmConfig({ modelRole: opts.modelRole });
+  if (isEndpointCircuitOpen(llm.baseUrl)) {
+    return { ok: false, error: "llm endpoint unreachable (circuit open)" };
+  }
   const role: LlmModelRole = opts.modelRole ?? "instruct";
   const timeoutMs = opts.timeoutMs ?? llm.timeoutMs;
   const startedAt = Date.now();
@@ -685,7 +734,7 @@ export async function llmObject<T>(
         abortSignal: timeoutSignal(timeoutMs),
       });
       logger.debug("json_schema: constrained decoding used", { label: opts.label, model: llm.model });
-      recordLlmSuccess(opts.label, llm.model);
+      recordLlmSuccess(opts.label, llm.model, llm.baseUrl);
       return { ok: true, value: result.object };
     }
 
@@ -704,7 +753,7 @@ export async function llmObject<T>(
     const validated = schema.safeParse(result.object);
     if (validated.success) {
       logger.debug("json_schema: fallback to json_object — validated", { label: opts.label, model: llm.model });
-      recordLlmSuccess(opts.label, llm.model);
+      recordLlmSuccess(opts.label, llm.model, llm.baseUrl);
       return { ok: true, value: validated.data };
     }
     // Manual validation failed — try reasoning-channel recovery before degrading.
@@ -718,7 +767,7 @@ export async function llmObject<T>(
             logger.warn("llmObject: recovered object from reasoning channel (fallback path)", {
               reasoningLen: reasoning.length,
             });
-            recordLlmSuccess(opts.label, llm.model);
+            recordLlmSuccess(opts.label, llm.model, llm.baseUrl);
             return { ok: true, value: recovered.data };
           }
         }
@@ -736,7 +785,7 @@ export async function llmObject<T>(
     // the error itself before degrading. Aborts/timeouts carry no response at
     // all — skip recovery and the safety net for them, or every slow-backend
     // timeout logs a misleading "reasoning-recovery empty" pair.
-    if (llm.disableThink && !_isAbortOrTimeoutError(e)) {
+    if (llm.disableThink && !_isAbortOrTimeoutError(e) && !_isConnectionError(e)) {
       const reasoning =
         _reasoningToText(result).length > 0 ? _reasoningToText(result) : _reasoningToText(e);
       if (reasoning.length > 0) {
@@ -747,7 +796,7 @@ export async function llmObject<T>(
             logger.warn("llmObject: recovered object from reasoning channel", {
               reasoningLen: reasoning.length,
             });
-            recordLlmSuccess(opts.label, llm.model);
+            recordLlmSuccess(opts.label, llm.model, llm.baseUrl);
             return { ok: true, value: validated.data };
           }
         }

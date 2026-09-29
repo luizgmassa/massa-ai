@@ -81,6 +81,7 @@ import {
   _wrapFetchDisableThink,
   _wrapFetchContextWindow,
   _isAbortOrTimeoutError,
+  _isConnectionError,
   resolveInferenceSpec,
   _resolveLlmConfig,
   _resetLlmFailureStreaksForTesting,
@@ -769,6 +770,101 @@ describe("llm-client — abort/timeout skips reasoning recovery (#7 noise fix)",
     } finally {
       warnSpy.mockRestore();
     }
+  });
+});
+
+describe("llm-client — unreachable endpoint circuit breaker", () => {
+  const connectionRefused = "Cannot connect to API: Unable to connect. Is the computer able to access the url?";
+
+  beforeEach(() => {
+    _setLlmEnabledForTesting(true);
+    _setJsonSchemaSupportedForTesting(false);
+  });
+
+  test("_isConnectionError classifies connection failures through retry and cause chains", () => {
+    expect(_isConnectionError(new Error(connectionRefused))).toBe(true);
+    const refused = Object.assign(new Error("connect failed"), { code: "ECONNREFUSED" });
+    expect(_isConnectionError(refused)).toBe(true);
+    const retry = Object.assign(new Error("Failed after 3 attempts."), { lastError: new Error(connectionRefused) });
+    expect(_isConnectionError(retry)).toBe(true);
+    const wrapped = new Error("request failed");
+    (wrapped as any).cause = Object.assign(new Error("socket"), { code: "ConnectionRefused" });
+    expect(_isConnectionError(wrapped)).toBe(true);
+    expect(_isConnectionError(new Error("Bad Request"))).toBe(false);
+    expect(_isConnectionError(new DOMException("The operation timed out.", "TimeoutError"))).toBe(false);
+    expect(_isConnectionError(undefined)).toBe(false);
+  });
+
+  test("a connection failure degrades WITHOUT the reasoning-recovery warning", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    try {
+      generateObjectShouldThrow = connectionRefused;
+      const res = await llmObject("hello", sampleSchema, { label: "test" });
+      expect(res.ok).toBe(false);
+      const warned = warnSpy.mock.calls.map((c) => String(c[0]));
+      expect(warned).not.toContain("llm reasoning-recovery empty");
+      expect(warned).toContain("LLM call failed — using non-LLM fallback");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("three consecutive connection failures stop further calls until the cooldown ends", async () => {
+    generateObjectShouldThrow = connectionRefused;
+    for (let i = 0; i < 3; i++) {
+      expect((await llmObject("hello", sampleSchema, { label: "a" })).ok).toBe(false);
+    }
+    generateObjectShouldThrow = null;
+    lastCall = null;
+    const blockedObject = await llmObject("hello", sampleSchema, { label: "b" });
+    const blockedText = await llmComplete("hello", { label: "c" });
+    expect(blockedObject.ok).toBe(false);
+    expect(blockedObject.error).toMatch(/unreachable/);
+    expect(blockedText.ok).toBe(false);
+    expect(lastCall).toBeNull();
+
+    const now = Date.now();
+    const clock = spyOn(Date, "now").mockReturnValue(now + 61_000);
+    try {
+      const probe = await llmObject("hello", sampleSchema, { label: "b" });
+      expect(probe.ok).toBe(true);
+      expect(lastCall).not.toBeNull();
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  test("a failed probe after the cooldown reopens the breaker immediately", async () => {
+    generateObjectShouldThrow = connectionRefused;
+    for (let i = 0; i < 3; i++) await llmObject("hello", sampleSchema, { label: "a" });
+    const now = Date.now();
+    const clock = spyOn(Date, "now").mockReturnValue(now + 61_000);
+    try {
+      expect((await llmObject("hello", sampleSchema, { label: "a" })).ok).toBe(false);
+      generateObjectShouldThrow = null;
+      lastCall = null;
+      expect((await llmObject("hello", sampleSchema, { label: "a" })).error).toMatch(/unreachable/);
+      expect(lastCall).toBeNull();
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  test("non-connection failures and successes never open the breaker", async () => {
+    generateObjectShouldThrow = "Bad Request";
+    for (let i = 0; i < 5; i++) await llmObject("hello", sampleSchema, { label: "a" });
+    generateObjectShouldThrow = connectionRefused;
+    await llmObject("hello", sampleSchema, { label: "a" });
+    await llmObject("hello", sampleSchema, { label: "a" });
+    generateObjectShouldThrow = null;
+    expect((await llmObject("hello", sampleSchema, { label: "a" })).ok).toBe(true);
+    generateObjectShouldThrow = connectionRefused;
+    await llmObject("hello", sampleSchema, { label: "a" });
+    await llmObject("hello", sampleSchema, { label: "a" });
+    generateObjectShouldThrow = null;
+    lastCall = null;
+    expect((await llmObject("hello", sampleSchema, { label: "a" })).ok).toBe(true);
+    expect(lastCall).not.toBeNull();
   });
 });
 
