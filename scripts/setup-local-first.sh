@@ -27,10 +27,17 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-api-key.sh"
 # shellcheck source=scripts/lib/installer-feature-prompts.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/installer-feature-prompts.sh"
 
-if [ "${1:-}" = "--uninstall-services" ]; then
-    installer_remove_launchd_agents
-    exit 0
-fi
+case "${1:-}" in
+    "") ;;
+    --uninstall-services)
+        installer_remove_launchd_agents
+        exit 0
+        ;;
+    *)
+        echo "Unknown option: $1 (supported: --uninstall-services)" >&2
+        exit 2
+        ;;
+esac
 
 massa_ai_banner
 
@@ -425,9 +432,9 @@ fi
 # chat role's context twice: as the model's per-model default, which every later
 # load reuses (JIT reloads after the TTL included), and on the one load below.
 #
-# design R-09: the new trio makes LLM_MODEL and CODE_MODEL distinct LM Studio
-# ids (8B@16k + 7B@32k, beside the 0.6B@8k embedder), so all three can now be
-# asked to load at once — unsized total VRAM/RAM. Resolved by staggering
+# design R-09: when LLM_MODEL and CODE_MODEL are distinct LM Studio ids
+# (16k + 32k, beside the 8k embedder), all three can be asked to load at
+# once — unsized total VRAM/RAM. Resolved by staggering
 # residency rather than sizing it (sizing needs a real box, which this script
 # cannot assume): --ttl evicts an idle model instead of holding all three
 # loaded forever, so peak residency tracks actual usage, not the sum of all
@@ -461,8 +468,10 @@ if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
         LMS_LOADS_EMBEDDING=false
     fi
     if [ -n "${LMSTUDIO_CLI:-}" ]; then
-        installer_set_lmstudio_context_default "$LMSTUDIO_CLI" "$LLM_MODEL" 16384
-        installer_set_lmstudio_context_default "$LMSTUDIO_CLI" "$CODE_MODEL" 32768
+        installer_set_lmstudio_context_default "$LMSTUDIO_CLI" "$LLM_MODEL" "$LLM_LOAD_CTX"
+        if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
+            installer_set_lmstudio_context_default "$LMSTUDIO_CLI" "$CODE_MODEL" 32768
+        fi
         if [ "$LMS_LOADS_EMBEDDING" = true ]; then
             "$LMSTUDIO_CLI" load -c 8192 --ttl "$LMS_LOAD_TTL_SECONDS" "$EMBEDDING_MODEL" || true
         fi
@@ -479,7 +488,11 @@ if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
         if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
             echo -e "      lms load -c 32768 --ttl ${LMS_LOAD_TTL_SECONDS} ${CODE_MODEL}"
         fi
-        echo -e "      and in LM Studio → My Models → ⚙️, set Context Length: ${LLM_MODEL} 16384, ${CODE_MODEL} 32768"
+        if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
+            echo -e "      and in LM Studio → My Models → ⚙️, set Context Length: ${LLM_MODEL} 16384, ${CODE_MODEL} 32768"
+        else
+            echo -e "      and in LM Studio → My Models → ⚙️, set Context Length: ${LLM_MODEL} ${LLM_LOAD_CTX}"
+        fi
     fi
 
     # The MLX embedding endpoint. `installer_provider_defaults` already points

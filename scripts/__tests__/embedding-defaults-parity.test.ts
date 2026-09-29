@@ -1006,10 +1006,10 @@ describe("setup-local-first.sh lms load -c values (PDM-10 AC-3, G5)", () => {
   for (const { role, varName } of DEFAULT_WRITE_ROLES) {
     test(`the LM Studio per-model default written for the ${role} role matches INFERENCE_ROLE_DEFAULTS.${role}.contextWindow`, () => {
       const match = SETUP_SCRIPT.match(
-        new RegExp(`installer_set_lmstudio_context_default "\\$LMSTUDIO_CLI" "\\$${varName}" (\\d+)`),
+        new RegExp(`installer_set_lmstudio_context_default "\\$LMSTUDIO_CLI" "\\$${varName}" (\\d+|"\\$LLM_LOAD_CTX")`),
       );
       expect(match).not.toBeNull();
-      expect(Number(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
+      expect(ctxOf(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
     });
   }
 

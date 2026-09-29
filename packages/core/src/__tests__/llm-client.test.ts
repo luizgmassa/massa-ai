@@ -86,7 +86,7 @@ import {
   _resolveLlmConfig,
   _resetLlmFailureStreaksForTesting,
 } from "../services/memory/llm-client.js";
-import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
+import { INFERENCE_PROVIDERS, INFERENCE_ROLE_DEFAULTS } from "@massa-ai/shared/inference-providers";
 import { z } from "zod";
 
 const sampleSchema = z.object({
@@ -973,6 +973,28 @@ describe("llm-client — _resolveLlmConfig seam-derived fallbacks (T05)", () => 
     expect(result.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.coding);
   });
 
+  test("one model serving both roles gets one context window, the larger", () => {
+    const shared = { model: "m", codeModel: "m", contextWindow: 16384, codeContextWindow: 32768 };
+    expect(_resolveLlmConfig(shared, "instruct", null).contextWindow).toBe(32768);
+    expect(_resolveLlmConfig(shared, "code", null).contextWindow).toBe(32768);
+    const flipped = { ...shared, contextWindow: 65536 };
+    expect(_resolveLlmConfig(flipped, "code", null).contextWindow).toBe(65536);
+  });
+
+  test("distinct models keep their own context windows", () => {
+    const split = { model: "a", codeModel: "b", contextWindow: 16384, codeContextWindow: 32768 };
+    expect(_resolveLlmConfig(split, "instruct", null).contextWindow).toBe(16384);
+    expect(_resolveLlmConfig(split, "code", null).contextWindow).toBe(32768);
+  });
+
+  test("the shared default model resolves one context window on both roles", () => {
+    const instruct = _resolveLlmConfig(undefined, "instruct", null);
+    const code = _resolveLlmConfig(undefined, "code", null);
+    expect(instruct.model).toBe(code.model);
+    expect(instruct.contextWindow).toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+    expect(code.contextWindow).toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+  });
+
   test("disableThink follows the resolved provider's injectsDisableThink, not a hardcoded true", () => {
     const ollamaResult = _resolveLlmConfig(undefined, "instruct", null);
     expect(ollamaResult.disableThink).toBe(INFERENCE_PROVIDERS.ollama.injectsDisableThink);
@@ -1000,8 +1022,9 @@ describe("llm-client — _resolveLlmConfig seam-derived fallbacks (T05)", () => 
   });
 
   test("per-role context window resolves from INFERENCE_ROLE_DEFAULTS: instruct 16384, coding 32768", () => {
-    expect(_resolveLlmConfig(undefined, "instruct", null).contextWindow).toBe(16384);
-    expect(_resolveLlmConfig(undefined, "code", null).contextWindow).toBe(32768);
+    const split = { model: "a", codeModel: "b" };
+    expect(_resolveLlmConfig(split, "instruct", null).contextWindow).toBe(16384);
+    expect(_resolveLlmConfig(split, "code", null).contextWindow).toBe(32768);
   });
 
   test("config values win over every role-table/seam default (PDM-12 AC-2 shape)", () => {
@@ -1093,7 +1116,7 @@ describe("llm-client — buildProvider sends per-role num_ctx (T06 / PDM-08, PDM
     _setJsonSchemaSupportedForTesting(false);
   });
 
-  test("ollama: instruct role's chat request carries options.num_ctx = 16384", async () => {
+  test("ollama: the shared default model's instruct request carries the coding num_ctx = 32768", async () => {
     let captured: any = null;
     const origFetch = globalThis.fetch;
     (globalThis as any).fetch = async (_input: any, init?: any) => {
@@ -1108,7 +1131,7 @@ describe("llm-client — buildProvider sends per-role num_ctx (T06 / PDM-08, PDM
         body: JSON.stringify({ messages: [] }),
       });
       const parsed = JSON.parse(captured.body);
-      expect(parsed.options.num_ctx).toBe(16384);
+      expect(parsed.options.num_ctx).toBe(32768);
     } finally {
       globalThis.fetch = origFetch;
     }

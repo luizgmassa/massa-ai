@@ -771,9 +771,8 @@ export const defaultConfig: ServerConfig = {
     // content channel can come back empty when thinking consumes the token
     // budget. disableThink (a) asks Ollama to stop thinking (best-effort) and
     // (b) enables the reasoning-channel fallback in llm-client.ts. Default "1".
-    // NB: with the pure-instruct default model there is no reasoning channel,
-    // so this fallback is dormant — kept as a safety net for any Ollama shape
-    // shift or an env override back to a thinking model.
+    // The default models think, so this fallback is live wherever the
+    // provider does not honour the disable request (LM Studio today).
     disableThink: envBool(
       "MASSA_AI_LLM_DISABLE_THINK",
       fileConfig.llm?.disableThink ?? true,

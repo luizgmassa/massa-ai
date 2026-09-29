@@ -688,6 +688,16 @@ case "$out_rm_wiz" in
   *) ok "and runs none of the install steps" ;;
 esac
 check_eq "and reaches no installer tool" "" "$(cat "$TRIPWIRE_LOG")"
+
+seed_agents
+: > "$TRIPWIRE_LOG"
+out_typo="$(env -i PATH="${LC_RM_WIZ}:${TRIPWIRE_DIR}:${DARWIN_SHIM}:${PATH}" HOME="$TMP_ROOT" \
+  XDG_CONFIG_HOME="${TMP_ROOT}/xdg" MASSA_AI_NONINTERACTIVE=1 \
+  bash "${REPO_ROOT}/scripts/setup-local-first.sh" --uninstall-service 2>&1; echo rc=$?)"
+check_contains "an unknown option exits 2" "rc=2" "$out_typo"
+check_contains "and names the supported option" "--uninstall-services" "$out_typo"
+check_eq "and reaches no installer tool" "" "$(cat "$TRIPWIRE_LOG")"
+[ -e "$MLX_PLIST" ] && [ -e "$LMS_PLIST" ] && ok "and removes nothing" || fail "and removes nothing"
 rm -f "$SIBLING_PLIST"
 
 echo "── installer_ensure_mlx_runtime ──"

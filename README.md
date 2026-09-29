@@ -57,6 +57,8 @@ bun install
 #   override via LMSTUDIO_EMBEDDING_MODEL, MASSA_AI_LLM_MODEL, MASSA_AI_LLM_CODE_MODEL
 # - Creates .env with defaults
 # - Runs bun run diagnose to validate the stack
+# - On macOS, registers login agents for the LM Studio server and the MLX
+#   embedding sidecar; remove both with --uninstall-services
 
 # 3. Build and start
 bun run build
