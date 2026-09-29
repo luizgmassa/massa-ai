@@ -643,6 +643,10 @@ LC_RM2="$(make_failing_launchctl "$LOG_RM2")"
 out_rm2="$(run_lib "${LC_RM2}:${DARWIN_SHIM}" "set -e; installer_remove_launchd_agents; echo rc=\$?")"
 check_contains "a second run with nothing loaded still returns 0 under set -e" "rc=0" "$out_rm2"
 check_contains "and still boots out, tolerating 'not loaded'" "bootout" "$(cat "$LOG_RM2")"
+case "$out_rm2" in
+  *"removed"*) fail "and claims no removal when nothing was there" ;;
+  *) ok "and claims no removal when nothing was there" ;;
+esac
 [ -e "$SIBLING_PLIST" ] && ok "and still leaves the sibling alone" || fail "and still leaves the sibling alone"
 
 seed_agents
