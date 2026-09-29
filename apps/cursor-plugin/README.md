@@ -33,6 +33,12 @@ Hooks: 7 Cursor lifecycle events wired to the shared `massa-ai-hook` binary (fir
 | `preCompact` | `pre-compact` | `pre-compact` (dual-POST: observation + snapshot) |
 | `stop` | `stop` | `session-end` |
 
+No agent dispatch announcement ships for Cursor. Its `preToolUse` and
+`subagentStart` hooks document `user_message` as shown only when the action is
+denied, so there is no non-blocking way to print a line. The generated Cursor
+agents also carry `model: inherit` with no effort, so there is nothing
+massa-ai-assigned to announce.
+
 ## The historical gap is closed
 
 The massa-ai codebase previously documented that "Cursor only has 3 hook events (beforeSubmitPrompt, afterFileEdit, stop) — no SessionStart, no PreCompact." Web research (2026-07-23, `cursor.com/docs/hooks`) confirmed this is **out of date**: Cursor now documents 18+ events including `sessionStart` and `preCompact`. This plugin wires the 7 events that map cleanly to the massa-ai lifecycle kinds, closing the historical gap:

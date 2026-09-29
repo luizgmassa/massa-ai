@@ -22,10 +22,11 @@ import path from "path";
 const PLUGIN_ROOT = path.resolve(import.meta.dir, "..");
 const REPO_ROOT = path.resolve(PLUGIN_ROOT, "../..");
 
-// The 5 events wired by install.sh (merge_settings_hooks EVENTS).
+// The 6 events wired by install.sh (merge_settings_hooks EVENTS).
 const EVENTS = [
   "SessionStart",
   "UserPromptSubmit",
+  "PreToolUse",
   "PostToolUse",
   "PreCompact",
   "Stop",
@@ -71,7 +72,7 @@ describe("claude-plugin manifest", () => {
 });
 
 describe("claude-plugin hooks/hooks.json", () => {
-  test("covers exactly the 5 events install.sh wires", async () => {
+  test("covers exactly the 6 events install.sh wires", async () => {
     const cfg = await readJson(path.join(PLUGIN_ROOT, "hooks/hooks.json"));
     expect(Object.keys(cfg.hooks).sort()).toEqual([...EVENTS].sort());
   });
@@ -107,6 +108,28 @@ describe("claude-plugin hooks/hooks.json", () => {
     // authoring time would point outside the copy on every other machine.
     expect(raw).not.toContain(REPO_ROOT);
     expect(raw).not.toMatch(/"command": "[^"]*\/Users\//);
+  });
+
+  test("hooks.json, settings.json.template and install.sh agree on every event, subcommand and matcher", async () => {
+    type Row = [string, string, string | null];
+    const fromConfig = (cfg: Record<string, any>): Row[] =>
+      Object.entries(cfg.hooks as Record<string, any[]>)
+        .map(([evt, entries]): Row => [
+          evt,
+          String(entries[0].hooks[0].command).split(" ").at(-1)!,
+          entries[0].matcher ?? null,
+        ])
+        .sort();
+    const manifest = fromConfig(await readJson(path.join(PLUGIN_ROOT, "hooks/hooks.json")));
+    const template = fromConfig(await readJson(path.join(PLUGIN_ROOT, "settings.json.template")));
+    const installer = await fs.readFile(path.join(PLUGIN_ROOT, "install.sh"), "utf8");
+    const block = /const EVENTS = \[([\s\S]*?)\n\];/.exec(installer)![1]!;
+    const wired = [...block.matchAll(/\["(\w+)", "([\w-]+)"(?:, "([^"]+)")?\]/g)]
+      .map((m): Row => [m[1]!, m[2]!, m[3] ?? null])
+      .sort();
+    expect(manifest).toEqual(template);
+    expect(manifest).toEqual(wired);
+    expect(manifest).toContainEqual(["PreToolUse", "agent-start", "Agent|Task"]);
   });
 
   test("the referenced hook binary exists in the plugin dir", async () => {

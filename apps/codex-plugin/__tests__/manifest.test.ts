@@ -10,7 +10,7 @@
  *   marker-bearing generated file per live workflow (widened, workflow-commands
  *   T5, WFC-11) — the population lock a plain "6 named files exist" check
  *   could never catch drift in, since it never enumerated the directory
- * - hooks/hooks.json has exactly 6 event keys, each with an owned entry in
+ * - hooks/hooks.json has exactly 7 event keys, each with an owned entry in
  *   Codex's nested matcher-group shape
  * - no plugin-local .mcp.json and no manifest "mcp" pointer — MCP is owned
  *   solely by scripts/install-agents.sh (writes ~/.codex/config.toml)
@@ -126,12 +126,13 @@ describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
     expect(generatedFiles.sort()).toEqual(liveEntries.map((e) => `${e.stem}.md`).sort());
   });
 
-  test("hooks/hooks.json contains exactly 6 event keys (nested under hooks), each with an owned entry", async () => {
+  test("hooks/hooks.json contains exactly 7 event keys (nested under hooks), each with an owned entry", async () => {
     const cfg = await readJson(path.join(PLUGIN_ROOT, "hooks/hooks.json"));
     expect(cfg.hooks).toBeDefined();
     const expectedEvents = [
       "SessionStart",
       "UserPromptSubmit",
+      "SubagentStart",
       "PreToolUse",
       "PostToolUse",
       "PreCompact",
@@ -153,6 +154,14 @@ describe("codex-plugin manifest (T5 / CPX-01,03,04,05)", () => {
       }[];
       expect(inner[0]!.command).toContain("massa-ai-hook");
     }
+  });
+
+  test("SubagentStart runs agent-start with the codex host argument, in hooks.json and install.sh", async () => {
+    const cfg = await readJson(path.join(PLUGIN_ROOT, "hooks/hooks.json"));
+    const command = (cfg.hooks.SubagentStart as { hooks: { command: string }[] }[])[0]!.hooks[0]!.command;
+    expect(command.endsWith("massa-ai-hook agent-start codex")).toBe(true);
+    const installer = await fs.readFile(path.join(PLUGIN_ROOT, "install.sh"), "utf8");
+    expect(installer).toContain('["SubagentStart", "agent-start codex"]');
   });
 
   test("every owned hook entry uses Codex's nested matcher-group shape", async () => {

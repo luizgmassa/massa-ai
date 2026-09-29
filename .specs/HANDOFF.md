@@ -1,4 +1,19 @@
-# Handoff — e2e-feature-battery (MERGED v1.64.0 + T1b.4, T4.1, T4b.1 DELIVERED 2026-09-24; Tier A matrix run on LM Studio, all green after the bootstrap-schema fix 2026-09-25; unpushed, no PR)
+# Handoff — agent-start-hook-announcement (VALIDATED 2026-09-29; PR pending)
+
+**Branch:** `feat/agent-start-hook-announcement`, worktree
+`~/Projects/massa-ai-feat-agent-start-hook-announcement`, from `main` @ `03b61fa3` (v1.66.1).
+
+**Read `.specs/features/agent-start-hook-announcement/validation.md` first.**
+
+- Hook binary gains `agent-start [codex]`: announce-only, never POSTs, never decides permission.
+- Claude registers `PreToolUse` matcher `Agent|Task`; Codex registers `SubagentStart`; OpenCode
+  toasts from `tool.execute.before`. Cursor: none (its hooks show `user_message` only on deny).
+- Prose announcement rule removed; `workflow-harness-contract.test.ts` §14 now guards its absence.
+- After merge, users must update the plugin (new hook entries) and re-run
+  `scripts/install-skills.sh --apply` (installed `MASSA-AI.md` still carries the old rule).
+- Open: on-screen rendering is unmeasured — one live dispatch per host.
+
+## Previous handoff — e2e-feature-battery (MERGED v1.64.0 + T1b.4, T4.1, T4b.1 DELIVERED 2026-09-24; Tier A matrix run on LM Studio, all green after the bootstrap-schema fix 2026-09-25; unpushed, no PR)
 
 **Branch:** `test/e2e-feature-battery`, worktree `~/Projects/massa-ai-wt-e2e-battery`, merged
 with `main` at v1.64.0 (`802b1185`). 10 commits this session on top of the merge.

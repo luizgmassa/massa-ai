@@ -206,9 +206,9 @@ memory_delete { id: "<id>" }
 
 ### Claude Code plugin (`apps/claude-plugin/`)
 
-**What it bundles:** 6 slash commands (`/massa-ai-map`, `/massa-ai-index`, `/massa-ai-find`, `/massa-ai-def`, `/massa-ai-graph`, `/massa-ai-status`), the 7 subagent specialists, and 5 hook events auto-written into `~/.claude/settings.json`.
+**What it bundles:** 6 slash commands (`/massa-ai-map`, `/massa-ai-index`, `/massa-ai-find`, `/massa-ai-def`, `/massa-ai-graph`, `/massa-ai-status`), the 7 subagent specialists, and 6 hook events auto-written into `~/.claude/settings.json`.
 
-**Hook events (5):** `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PreCompact`, `Stop`.
+**Hook events (6):** `SessionStart`, `UserPromptSubmit`, `PreToolUse` (matcher `Agent|Task`, dispatch announcement only — see [README § Agent dispatch announcement](README.md#agent-dispatch-announcement)), `PostToolUse`, `PreCompact`, `Stop`.
 
 **Install:**
 
@@ -233,9 +233,9 @@ The two routes are mutually exclusive **for hooks**: the plugin ships `hooks/hoo
 
 ### Codex plugin (`apps/codex-plugin/`)
 
-**What it bundles:** 6 skills (`map`, `index`, `find`, `def`, `graph`, `status`) and 6 hook events. MCP registration is delegated to `scripts/install-agents.sh --agent codex`, which the installer calls for you; nothing MCP-shaped ships inside the bundle.
+**What it bundles:** 6 skills (`map`, `index`, `find`, `def`, `graph`, `status`) and 7 hook events. MCP registration is delegated to `scripts/install-agents.sh --agent codex`, which the installer calls for you; nothing MCP-shaped ships inside the bundle.
 
-**Hook events (6):** `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PreCompact`, `Stop`.
+**Hook events (7):** `SessionStart`, `UserPromptSubmit`, `SubagentStart` (dispatch announcement only), `PreToolUse`, `PostToolUse`, `PreCompact`, `Stop`.
 
 **Install:**
 
@@ -276,9 +276,9 @@ bash apps/cursor-plugin/install.sh --uninstall
 
 ### OpenCode plugin (`apps/opencode-plugin/`)
 
-**What it bundles:** hooks only (AD-017: plugins deliver, MCP serves tools, hooks observe) — 6 in-process lifecycle handlers and 7 subagent specialists. It registers zero in-process tools; the massa-ai MCP server (59 tools) is registered alongside it via `scripts/install-agents.sh --agent opencode`, same as every other host. It is published as `@massa-ai/opencode-plugin`. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai`, `profile` and `bootstrap` skill bundles plus the 7 agent charters, so a registry install needs no repository checkout.
+**What it bundles:** hooks only (AD-017: plugins deliver, MCP serves tools, hooks observe) — 7 in-process lifecycle handlers and 7 subagent specialists. It registers zero in-process tools; the massa-ai MCP server (59 tools) is registered alongside it via `scripts/install-agents.sh --agent opencode`, same as every other host. It is published as `@massa-ai/opencode-plugin`. All four plugins are now published npm packages (`@massa-ai/{claude,codex,cursor,opencode}-plugin`), each shipping its own copy of the `massa-ai`, `profile` and `bootstrap` skill bundles plus the 7 agent charters, so a registry install needs no repository checkout.
 
-**Hook events (in-process, 6 lifecycle handlers):** `session.created`, `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`, `dispose` — all registered in-process by the plugin. No external hooks file needed.
+**Hook events (in-process, 7 lifecycle handlers):** `session.created`, `tool.execute.before` (dispatch announcement toast only), `tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`, `dispose` — all registered in-process by the plugin. No external hooks file needed.
 
 **Install:**
 
@@ -308,7 +308,7 @@ All four plugins can be installed from the root `install.sh` post-install menu (
 
 ```
 1) Claude Code plugin (skills + commands + hooks auto-write)
-2) Codex plugin (6 skills, 6 hook events, MCP)
+2) Codex plugin (6 skills, 7 hook events, MCP)
 3) Cursor plugin (6 skills, 7 hook events, MCP, agents)
 4) OpenCode plugin (npm install + config snippet)
 5) All four (Claude, Codex, Cursor, OpenCode)

@@ -130,8 +130,8 @@ PLUGIN_REGISTRY="$HOME/.claude/plugins/installed_plugins.json"
 VARIANTS_SRC="$SCRIPT_DIR/agent-profiles"
 VARIANTS_DEST="$TARGET/massa-ai/agent-profiles"
 
-# The 5 Claude Code events → binary subcommands. The matcher-group entry shape:
-#   { "hooks": [{ "type": "command", "command": "bun run \"<HOOK_BIN>\" <sub>" }],
+# The 6 Claude Code events → binary subcommands. The matcher-group entry shape:
+#   { "matcher"?: "<tools>", "hooks": [{ "type": "command", "command": "bun run \"<HOOK_BIN>\" <sub>" }],
 #     "_massaAiOwned": true }
 # The merge appends one owned matcher-group entry per event array, preserving
 # any pre-existing user matcher-group entries (F5 mitigation).
@@ -164,6 +164,7 @@ const pluginRegistry = process.argv[6];
 const EVENTS = [
   ["SessionStart", "session-start"],
   ["UserPromptSubmit", "user-prompt-submit"],
+  ["PreToolUse", "agent-start", "Agent|Task"],
   ["PostToolUse", "post-tool-use"],
   ["PreCompact", "pre-compact"],
   ["Stop", "stop"],
@@ -275,7 +276,7 @@ if (mode === "uninstall") {
     if (existed) {
       fs.copyFileSync(file, `${file}.massa-ai.bak-${ts}`);
     }
-    // Every event, not just the 5 we write. The predicate identifies our
+    // Every event, not just the 6 we write. The predicate identifies our
     // commands rather than a location, so an entry parked under an event this
     // release does not use is still ours, and a user's is still not.
     for (const evt of Object.keys(hooks)) {
@@ -326,10 +327,11 @@ if (mode === "uninstall") {
   if (!cfg.hooks || typeof cfg.hooks !== "object" || Array.isArray(cfg.hooks)) {
     cfg.hooks = {};
   }
-  for (const [evt, sub] of EVENTS) {
+  for (const [evt, sub, matcher] of EVENTS) {
     if (!Array.isArray(cfg.hooks[evt])) cfg.hooks[evt] = [];
     if (!hasOwned(cfg.hooks[evt])) {
       cfg.hooks[evt].push({
+        ...(matcher ? { matcher } : {}),
         hooks: [
           {
             type: "command",
@@ -1099,9 +1101,9 @@ fi
 # Summary line in quiet mode
 if [ "${MASSA_AI_VERBOSE:-0}" != "1" ]; then
   if [[ "$PLUGIN_ROUTE" -eq 1 ]]; then
-    ok "claude plugin registered (${command_count} commands, ${specialist_count} specialists, 5 hooks) — shows in /plugin"
+    ok "claude plugin registered (${command_count} commands, ${specialist_count} specialists, 6 hooks) — shows in /plugin"
   else
-    ok "claude plugin installed (${command_count} commands, ${specialist_count} specialists, 5 hooks)"
+    ok "claude plugin installed (${command_count} commands, ${specialist_count} specialists, 6 hooks)"
     warn "claude CLI unavailable — not registered in /plugin. Register it with:"
     warn "  claude plugin marketplace add \"$PLUGIN_SOURCE_ROOT\" && claude plugin install $PLUGIN_ID"
   fi

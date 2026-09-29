@@ -28,10 +28,7 @@
 
 import { describe, test, expect } from "bun:test";
 import { promises as fs } from "fs";
-import os from "os";
 import path from "path";
-import { resolveHostLayout } from "../../packages/shared/src/profile-switch/hosts";
-import { resolveClaudeMarketplaceInstall } from "../../packages/shared/src/profile-switch/claude-marketplace";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../..");
 const SKILL_DIR = path.join(REPO_ROOT, "skills", "massa-ai");
@@ -939,213 +936,66 @@ describe("nesting prohibition retirement: references carry no spawn prohibition"
   });
 });
 
-// ── 14. Dispatch announcement contract (STI-05 / S8, S9) ──────────────────
+// ── 14. Dispatch announcement moved to a host hook ────────────────────────
 //
-// .specs/features/subagent-tool-inheritance/spec.md STI-05, design.md
-// Component 4 (Approach A). S8 guards the "exactly one canonical location"
-// property: a second announcement shape defined in another reference or
-// inside a workflow's own dispatch block could tell the orchestrator two
-// different things while both looked green. S9 guards the per-host
-// installed-agent path table in agent-orchestration.md against drift from
-// the real resolver -- re-implementing resolveHostLayout's path arithmetic
-// here would let the test and the doc rot together while both stayed green,
-// which is exactly what Approach A's mitigation exists to prevent, so this
-// group imports and calls the real function rather than re-deriving paths.
+// .specs/features/agent-start-hook-announcement/spec.md AC5: the model/effort
+// announcement is printed by each host's hook, so no prose rule may ask the
+// orchestrator to restate it. Every retired marker is swept across the
+// always-in-context contract, every reference, every workflow, and every
+// agent charter.
+describe("dispatch announcement is hook-owned, not prose (AC5)", () => {
+  const RETIRED_MARKERS = [
+    "its model, and its effort",
+    "Model/Effort Announcement",
+    "effort: inherit",
+    "model: inherit",
+    "model `<model>`",
+    "effort `<effort>`",
+  ] as const;
 
-// agents-md-bootstrap-trim AC4: the always-in-context Conversation Feedback
-// Policy must require model/effort on `Agent Started`, show it in its worked
-// example, and cite the canonical definition instead of restating it (S8).
-describe("conversation feedback policy announces model and effort (AC4)", () => {
-  async function feedbackSpan(): Promise<string> {
+  async function markdownUnder(dir: string): Promise<string[]> {
+    const out: string[] = [];
+    async function walk(current: string): Promise<void> {
+      for (const entry of await fs.readdir(current, { withFileTypes: true })) {
+        const full = path.join(current, entry.name);
+        if (entry.isDirectory()) await walk(full);
+        else if (entry.name.endsWith(".md")) out.push(full);
+      }
+    }
+    await walk(dir);
+    return out.sort();
+  }
+
+  test("no contract, reference, workflow, or charter carries a retired announcement marker", async () => {
+    const files = [
+      path.join(REPO_ROOT, "skills", "AGENTS.md"),
+      ...(await markdownUnder(SKILL_DIR)),
+      ...(await markdownUnder(path.join(REPO_ROOT, "skills", "agents"))),
+    ];
+    expect(files.length).toBeGreaterThan(60);
+    const offenders: string[] = [];
+    for (const file of files) {
+      const body = (await fs.readFile(file, "utf8")).replace(/\s+/g, " ");
+      for (const marker of RETIRED_MARKERS) {
+        if (body.includes(marker)) offenders.push(`${path.relative(REPO_ROOT, file)}: ${marker}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("the feedback policy forbids restating model or effort and names the hook", async () => {
     const body = await fs.readFile(path.join(REPO_ROOT, "skills", "AGENTS.md"), "utf8");
     const start = body.indexOf("<!-- massa-ai:rule:conversation-feedback:start -->");
     const end = body.indexOf("<!-- massa-ai:rule:conversation-feedback:end -->");
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
-    return body.slice(start, end);
-  }
-
-  test("the worked example has an Agent Started line naming a model and an effort", async () => {
-    const lines = (await feedbackSpan()).split("\n").filter((l) => l.includes("[Agent Started]"));
-    expect(lines.length).toBeGreaterThan(0);
-    for (const line of lines) expect(line).toMatch(/\bmodel \S+.*\beffort \S+/);
+    const span = body.slice(start, end).replace(/\s+/g, " ");
+    expect(span).toContain("Never restate a sub-agent's model or effort in a status update");
+    expect(span).toContain("hook");
   });
 
-  test("a rule requires model and effort and cites the canonical Model/Effort Announcement", async () => {
-    const span = (await feedbackSpan()).replace(/\s+/g, " ");
-    expect(span).toContain("Every `Agent Started` line names the agent, its model, and its effort");
-    expect(span).toContain("§Model/Effort Announcement");
-    for (const marker of ["effort: inherit", "model: inherit"]) expect(span).not.toContain(marker);
-  });
-});
-
-describe("dispatch announcement contract: single canonical shape (S8)", () => {
-  /**
-   * Substrings that together identify "a rule telling the orchestrator how
-   * to announce a sub-agent's model/effort" -- specific enough not to
-   * collide with unrelated mentions of "model" or "effort" elsewhere in the
-   * harness (Model Diversity Fallback, per-profile model resolution, etc).
-   * (`model_tier` resolution was the pre-model-catalog-revamp mechanism this
-   * example used to name; that field no longer exists — see
-   * .specs/features/model-catalog-revamp/spec.md AC1.)
-   */
-  const ANNOUNCEMENT_MARKERS = ["effort: inherit", "model: inherit"] as const;
-
-  /** Every .md file under skills/massa-ai/references/, recursively. */
-  async function referenceMarkdownFiles(): Promise<string[]> {
-    const out: string[] = [];
-    async function walk(dir: string): Promise<void> {
-      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) await walk(full);
-        else if (entry.name.endsWith(".md")) out.push(full);
-      }
-    }
-    await walk(REFERENCES_DIR);
-    return out.sort();
-  }
-
-  test("agent-orchestration.md carries the announcement contract", async () => {
+  test("agent-orchestration.md points at the hook instead of defining an announcement shape", async () => {
     const body = await readReference("agent-orchestration.md");
-    for (const marker of ANNOUNCEMENT_MARKERS) {
-      expect(body).toContain(marker);
-    }
-  });
-
-  test("no other reference file defines a competing announcement shape (S8)", async () => {
-    const files = await referenceMarkdownFiles();
-    expect(files.length).toBeGreaterThan(20); // guard the guard
-    const canonical = path.join(REFERENCES_DIR, "agent-orchestration.md");
-    const offenders: string[] = [];
-    for (const file of files) {
-      if (file === canonical) continue;
-      const body = await fs.readFile(file, "utf8");
-      for (const marker of ANNOUNCEMENT_MARKERS) {
-        if (body.includes(marker)) {
-          offenders.push(`${path.relative(REPO_ROOT, file)}: ${marker}`);
-        }
-      }
-    }
-    expect(offenders).toEqual([]);
-  });
-
-  test("no workflow dispatch block defines a competing announcement shape (S8)", async () => {
-    const offenders: string[] = [];
-    for (const rel of await listWorkflows()) {
-      const body = await readWorkflow(rel);
-      for (const marker of ANNOUNCEMENT_MARKERS) {
-        if (body.includes(marker)) offenders.push(`${rel}: ${marker}`);
-      }
-    }
-    expect(offenders).toEqual([]);
-  });
-});
-
-describe("dispatch announcement contract: per-host path table matches resolveHostLayout (S9)", () => {
-  // Fixed, non-environmental home so the assertion is machine-independent --
-  // never os.homedir(), which would make this sensor pass or fail depending
-  // on who runs it.
-  const TARGET_HOME = "/home/tester";
-
-  test("claude file route: the doc's ~/.claude/agents literal equals the resolver's home-relative path", async () => {
-    const layout = resolveHostLayout("claude", { targetHome: TARGET_HOME });
-    expect(layout.route).toBe("files");
-    if (layout.route !== "files") throw new Error("expected files route");
-    const relative = `~/${path.relative(TARGET_HOME, layout.activeDir).split(path.sep).join("/")}`;
-    expect(relative).toBe("~/.claude/agents");
-    const body = await readReference("agent-orchestration.md");
-    expect(body).toContain(relative);
-    expect(layout.activeExt).toBe(".md");
-    expect(body).toContain("| `*.md` whose first body line is `<!-- massa-ai-owned: true -->` |");
-  });
-
-  test("claude marketplace route: the doc's <marketplaceRoot>/agents pattern equals the resolver's suffix", async () => {
-    const marketRoot = "/market/massa-ai/9.9.9";
-    const layout = resolveHostLayout("claude", {
-      targetHome: TARGET_HOME,
-      marketplaceRoot: { claude: marketRoot },
-    });
-    expect(layout.route).toBe("files");
-    if (layout.route !== "files") throw new Error("expected files route");
-    const suffix = path.relative(marketRoot, layout.activeDir).split(path.sep).join("/");
-    expect(suffix).toBe("agents");
-    const body = await readReference("agent-orchestration.md");
-    expect(body).toContain("<marketplaceRoot>/agents");
-  });
-
-  test("claude directory-source marketplace: the doc's example root is the resolver's composed live root (agent-runtime-drift)", async () => {
-    // Fixed fixture (never the real home): a directory-source marketplace
-    // whose composed bundle root is <repo>/apps/claude-plugin — the exact
-    // shape the doc's example names. The host loads this root LIVE (D1,
-    // measured 2026-09-21); the doc must teach the resolver's answer, not the
-    // versioned cache snapshot.
-    const outer = await fs.mkdtemp(path.join(os.tmpdir(), "massa-ai-s9-"));
-    try {
-      const repoRoot = path.join(outer, "repo");
-      const bundleRoot = path.join(repoRoot, "apps", "claude-plugin");
-      await fs.mkdir(path.join(repoRoot, ".claude-plugin"), { recursive: true });
-      await fs.writeFile(
-        path.join(repoRoot, ".claude-plugin", "marketplace.json"),
-        JSON.stringify({ plugins: [{ name: "massa-ai", source: "./apps/claude-plugin" }] }),
-      );
-      await fs.mkdir(bundleRoot, { recursive: true });
-      await fs.mkdir(path.join(outer, "home", ".claude", "plugins"), { recursive: true });
-      await fs.writeFile(
-        path.join(outer, "home", ".claude", "plugins", "known_marketplaces.json"),
-        JSON.stringify({ "massa-ai": { source: { source: "directory" }, installLocation: repoRoot } }),
-      );
-      const install = resolveClaudeMarketplaceInstall({ targetHome: path.join(outer, "home") });
-      expect(install?.route).toBe("directory-source");
-      expect(install?.root).toBe(bundleRoot);
-      const body = await readReference("agent-orchestration.md");
-      expect(body).toContain("<repo>/apps/claude-plugin/agents");
-    } finally {
-      await fs.rm(outer, { recursive: true, force: true });
-    }
-  });
-
-  test("negative control: the cache path is the qualified fallback, never the marketplace route's definition", async () => {
-    const body = await readReference("agent-orchestration.md");
-    // The old table taught the versioned cache AS the marketplace-route root —
-    // the exact drift that made agents announce stale models. Retired wording
-    // must stay retired:
-    expect(body).not.toContain("a *versioned* bundle root, e.g.");
-    // ...while the non-directory fallback example survives, qualified:
-    expect(body).toContain("~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents");
-    expect(body).toContain("profile_list");
-  });
-
-  test("codex: the doc's ~/.codex/agents literal equals the resolver's home-relative path", async () => {
-    const layout = resolveHostLayout("codex", { targetHome: TARGET_HOME });
-    expect(layout.route).toBe("files");
-    if (layout.route !== "files") throw new Error("expected files route");
-    const relative = `~/${path.relative(TARGET_HOME, layout.activeDir).split(path.sep).join("/")}`;
-    expect(relative).toBe("~/.codex/agents");
-    const body = await readReference("agent-orchestration.md");
-    expect(body).toContain(relative);
-    expect(layout.activeExt).toBe(".toml");
-    expect(body).toContain("| `*.toml` whose first line is `# massa-ai-owned` |");
-  });
-
-  test("opencode: the doc's ~/.config/opencode/agents literal equals the resolver's home-relative path", async () => {
-    const layout = resolveHostLayout("opencode", { targetHome: TARGET_HOME });
-    expect(layout.route).toBe("files");
-    if (layout.route !== "files") throw new Error("expected files route");
-    const relative = `~/${path.relative(TARGET_HOME, layout.activeDir).split(path.sep).join("/")}`;
-    expect(relative).toBe("~/.config/opencode/agents");
-    const body = await readReference("agent-orchestration.md");
-    expect(body).toContain(relative);
-    expect(layout.activeExt).toBe(".md");
-    expect(body).toContain("| `*.md` symlinks into the massa-ai bundle |");
-  });
-
-  test("cursor: resolveHostLayout returns route skip, and the doc names no cursor installed-agent path", async () => {
-    const layout = resolveHostLayout("cursor", { targetHome: TARGET_HOME });
-    expect(layout.route).toBe("skip");
-    const body = await readReference("agent-orchestration.md");
-    expect(body).toContain("route `skip`");
-    // Negative control: a mutation that invents a resolvable cursor path
-    // must fail here.
-    expect(body).not.toMatch(/~\/\.cursor\/agents/);
+    expect(body).toContain("### Dispatch Announcement Hook");
   });
 });

@@ -5,7 +5,7 @@
  * (INS-08, INS-09) and the F5 array-append merge mitigation for Claude Code's
  * nested matcher-group + hooks[] settings.json shape:
  * - user-scope install copies commands to ~/.claude/commands/ + merges hooks
- *   into ~/.claude/settings.json with 5 events
+ *   into ~/.claude/settings.json with 6 events
  * - array-append merge preserves pre-existing user matcher-group entries
  * - uninstall removes only owned hooks entries + commands/agents, preserves
  *   user hooks and user top-level keys
@@ -81,13 +81,14 @@ async function pathExists(p: string): Promise<boolean> {
 const EXPECTED_EVENTS = [
   "SessionStart",
   "UserPromptSubmit",
+  "PreToolUse",
   "PostToolUse",
   "PreCompact",
   "Stop",
 ];
 
 describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
-  test("user-scope install copies commands + merges settings.json with 5 events", async () => {
+  test("user-scope install copies commands + merges settings.json with 6 events", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
@@ -102,7 +103,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
       await pathExists(path.join(tmp, ".claude/agents/code-explorer.md")),
     ).toBe(true);
 
-    // Hooks merged into settings.json with all 5 events
+    // Hooks merged into settings.json with all 6 events
     const cfg = await readJson(path.join(tmp, ".claude/settings.json"));
     expect(cfg).toHaveProperty("hooks");
     const hooks = cfg.hooks as Record<string, unknown[]>;
@@ -117,6 +118,14 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
       const inner = (owned!.hooks as Record<string, unknown>[])[0];
       expect(inner.type).toBe("command");
       expect(inner.command as string).toContain("massa-ai-hook.ts");
+    }
+
+    const agentStart = (hooks.PreToolUse as Record<string, unknown>[]).find((e) => e._massaAiOwned === true)!;
+    expect(agentStart.matcher).toBe("Agent|Task");
+    expect(((agentStart.hooks as Record<string, unknown>[])[0]!.command as string).endsWith(" agent-start")).toBe(true);
+    for (const evt of EXPECTED_EVENTS.filter((e) => e !== "PreToolUse")) {
+      const owned = (hooks[evt] as Record<string, unknown>[]).find((e) => e._massaAiOwned === true)!;
+      expect(owned).not.toHaveProperty("matcher");
     }
   });
 
@@ -158,7 +167,7 @@ describe("claude-plugin install.sh (T16 / INS-08,09 + F5)", () => {
     expect(owned).toBeDefined();
     // User top-level key preserved
     expect(cfg.someUserKey).toBe(true);
-    // All 5 events present (the other 4 were absent → created)
+    // All 6 events present (the other 5 were absent → created)
     const hooks = cfg.hooks as Record<string, unknown[]>;
     expect(Object.keys(hooks).sort()).toEqual(EXPECTED_EVENTS.sort());
   });

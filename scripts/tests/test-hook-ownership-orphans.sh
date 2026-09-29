@@ -226,6 +226,6 @@ MARKED="$("$RUNNER" -e '
   const blocks=Object.values(j.hooks||{}).flat();
   console.log(`${blocks.filter(b=>b._massaAiOwned===true).length}/${blocks.length}`);
 ' "$TPL")"
-assert_eq "every template hook block is marked" "$MARKED" "5/5"
+assert_eq "every template hook block is marked" "$MARKED" "6/6"
 
 summary "hook ownership orphans"
