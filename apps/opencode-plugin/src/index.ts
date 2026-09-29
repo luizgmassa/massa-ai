@@ -13,6 +13,7 @@ import {
   gitToplevelSafe,
   agentIdOf,
 } from "./session-project-pin"
+import { buildOpenCodeAgentAnnouncement, openCodeAgentDirs } from "./agent-announcement"
 
 // ---------------------------------------------------------------------------
 // Config
@@ -213,6 +214,13 @@ export const MassaAiPlugin: Plugin = async ({ project, directory, worktree, clie
         projectId,
         payload: buildSessionPayload({ cwd: projectPath }),
       })
+    },
+
+    "tool.execute.before": async (input, output) => {
+      try {
+        const line = buildOpenCodeAgentAnnouncement(input.tool, output.args, openCodeAgentDirs(directory, process.env))
+        if (line) toast(line)
+      } catch {}
     },
 
     // Capture git operations after bash execution
