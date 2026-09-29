@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.66.2] - 2026-09-29
+
 ### Fixed
 
 - **Observation consolidation timed out on almost every LLM call.** The prompt carried the raw
