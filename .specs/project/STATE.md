@@ -1,4 +1,13 @@
-## Current — E2E feature battery, merged v1.64.0; T1b.4, T4.1, T4b.1 delivered (**2026-09-24** — worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR)
+## Current — Agent dispatch announcement moved to hooks, validated (**2026-09-29** — worktree `~/Projects/massa-ai-feat-agent-start-hook-announcement`, branch `feat/agent-start-hook-announcement`)
+
+Feature workflow, Standard tier. Claude `PreToolUse` (`agent-start`, `systemMessage`), Codex
+`SubagentStart` (`agent-start codex`) and an OpenCode `tool.execute.before` toast now print each
+massa-ai agent's model and effort from its installed file; the prose rule is gone from
+`skills/AGENTS.md` and the references. Cursor skipped by user decision. Independent verify PASS
+(`.specs/features/agent-start-hook-announcement/validation.md`). Next: PR, then one live
+dispatch per host to observe the rendered line.
+
+## Previous — E2E feature battery, merged v1.64.0; T1b.4, T4.1, T4b.1 delivered (**2026-09-24** — worktree `~/Projects/massa-ai-wt-e2e-battery`; unpushed, no PR)
 
 8 Phases = 23 active Tasks plus 4 deferred. Delivered: Phases 0, 1, 1b (now 4 Tasks), 2, 4
 (T4.1, EB-CB-1..5) and 4b (LM Studio provider). Phase 5 in progress: the first Tier A matrix
