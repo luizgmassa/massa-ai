@@ -850,6 +850,53 @@ describe("llm-client — unreachable endpoint circuit breaker", () => {
     }
   });
 
+  test("connection words inside model output are not a connection failure", () => {
+    const parse = new Error('Type validation failed: Value: {"summary":"Cannot connect to API: ECONNREFUSED, fetch failed"}');
+    const noObject = Object.assign(new Error("No object generated: response did not match schema."), { cause: parse });
+    expect(_isConnectionError(noObject)).toBe(false);
+    expect(_isConnectionError(new Error("Unable to connect: ECONNREFUSED"))).toBe(false);
+  });
+
+  test("model output quoting connection errors never opens the breaker", async () => {
+    generateObjectShouldThrow = 'No object generated: could not parse the response. Text: "Cannot connect to API"';
+    for (let i = 0; i < 5; i++) await llmObject("hello", sampleSchema, { label: "a" });
+    generateObjectShouldThrow = null;
+    lastCall = null;
+    expect((await llmObject("hello", sampleSchema, { label: "a" })).ok).toBe(true);
+    expect(lastCall).not.toBeNull();
+  });
+
+  test("after the cooldown only one caller probes, and the pause warning is logged once", async () => {
+    const warnSpy = spyOn(logger, "warn");
+    generateObjectShouldThrow = connectionRefused;
+    for (let i = 0; i < 3; i++) await llmObject("hello", sampleSchema, { label: "a" });
+    const now = Date.now();
+    const clock = spyOn(Date, "now").mockReturnValue(now + 61_000);
+    try {
+      const probe = llmObject("hello", sampleSchema, { label: "a" });
+      const concurrent = await llmObject("hello", sampleSchema, { label: "b" });
+      expect(concurrent.error).toMatch(/unreachable/);
+      expect((await probe).ok).toBe(false);
+      const pauses = warnSpy.mock.calls.filter((c) => String(c[0]) === "LLM endpoint unreachable — pausing LLM calls");
+      expect(pauses.length).toBe(1);
+    } finally {
+      clock.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
+  test("each baseUrl has its own breaker", async () => {
+    _setLlmBaseUrlForTesting("http://127.0.0.1:1234/v1");
+    generateObjectShouldThrow = connectionRefused;
+    for (let i = 0; i < 3; i++) await llmObject("hello", sampleSchema, { label: "a" });
+    generateObjectShouldThrow = null;
+    expect((await llmObject("hello", sampleSchema, { label: "a" })).error).toMatch(/unreachable/);
+    _setLlmBaseUrlForTesting("http://127.0.0.1:11434/v1");
+    lastCall = null;
+    expect((await llmObject("hello", sampleSchema, { label: "a" })).ok).toBe(true);
+    expect(lastCall).not.toBeNull();
+  });
+
   test("non-connection failures and successes never open the breaker", async () => {
     generateObjectShouldThrow = "Bad Request";
     for (let i = 0; i < 5; i++) await llmObject("hello", sampleSchema, { label: "a" });

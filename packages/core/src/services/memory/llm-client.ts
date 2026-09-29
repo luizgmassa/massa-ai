@@ -521,7 +521,7 @@ export function _isConnectionError(err: unknown): boolean {
       return true;
     }
     const message = typeof cur.message === "string" ? cur.message : "";
-    if (/Cannot connect to API|Unable to connect|ECONNREFUSED|fetch failed/i.test(message)) return true;
+    if (message.startsWith("Cannot connect to API")) return true;
   }
   return false;
 }
@@ -561,7 +561,11 @@ const endpointCircuits = new Map<string, { failures: number; openUntil: number }
 
 function isEndpointCircuitOpen(baseUrl: string): boolean {
   const circuit = endpointCircuits.get(baseUrl);
-  return circuit !== undefined && Date.now() < circuit.openUntil;
+  if (!circuit || circuit.failures < ENDPOINT_FAILURE_THRESHOLD) return false;
+  const now = Date.now();
+  if (now < circuit.openUntil) return true;
+  circuit.openUntil = now + ENDPOINT_COOLDOWN_MS;
+  return false;
 }
 
 function recordEndpointOutcome(baseUrl: string, err: Error | null): void {
@@ -573,6 +577,8 @@ function recordEndpointOutcome(baseUrl: string, err: Error | null): void {
   circuit.failures++;
   if (circuit.failures >= ENDPOINT_FAILURE_THRESHOLD) {
     circuit.openUntil = Date.now() + ENDPOINT_COOLDOWN_MS;
+  }
+  if (circuit.failures === ENDPOINT_FAILURE_THRESHOLD) {
     logger.warn("LLM endpoint unreachable — pausing LLM calls", {
       provider: resolveProviderIdForLogging(baseUrl),
       consecutiveConnectionFailures: circuit.failures,

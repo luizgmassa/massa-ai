@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to ~35k, past a local model's 90 s budget and, at the top, past its loaded context (LM Studio
   answered `Bad Request`: "tokens to keep … greater than the context length"). Each observation
   is now a compact digest: bookkeeping keys dropped, long string fields cut to 400 characters,
-  and the whole observation capped at ~300 tokens. On 50 real windows the prompt went from a
-  median 38k characters (max 128k) to 7.4k (max 9.2k).
+  and each observation capped at ~300 tokens inside a ~2400-token budget for the whole window.
+  On 50 real windows the prompt went from a median 38k characters (max 128k) to 7.4k (max 9.2k).
 - **Observation consolidation runs piled up on one local model.** Every 8 hook observations
   fired a new run without waiting for the previous one, and up to 14 calls were measured
   queued at once, each waiting past its own timeout. `runOnce` is now single-flight: a run

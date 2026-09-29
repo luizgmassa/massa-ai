@@ -150,7 +150,10 @@ export class ObservationConsolidationJob {
    */
   async runOnce(projectId: string): Promise<ObservationConsolidationResult> {
     this.runCalls++;
-    if (this.running) return { consolidated: false, batchesCreated: 0 };
+    if (this.running) {
+      logger.debug("observation consolidation: skipped, a run is in flight", { projectId });
+      return { consolidated: false, batchesCreated: 0 };
+    }
     this.running = true;
     try {
       return await this.consolidateWindow(projectId);
@@ -282,10 +285,14 @@ export const observationConsolidationJob = new ObservationConsolidationJob();
  * digest of their payload JSON as the only content signal.
  */
 export function buildObservationPrompt(window: Observation[]): string {
+  const observationTokens = Math.min(
+    MAX_OBSERVATION_TOKENS,
+    Math.floor(MAX_WINDOW_TOKENS / Math.max(window.length, 1)),
+  );
   const items = window
     .map(
       (o, i) =>
-        `[${i}] id=${o.id} source=${o.source} importance=${o.importance.toFixed(2)}\n${digestPayload(o.payloadJson)}`,
+        `[${i}] id=${o.id} source=${o.source} importance=${o.importance.toFixed(2)}\n${digestPayload(o.payloadJson, observationTokens)}`,
     )
     .join("\n");
   return [
@@ -315,13 +322,14 @@ const PROMPT_BOOKKEEPING_KEYS = new Set([
 ]);
 const MAX_PROMPT_FIELD_CHARS = 400;
 const MAX_OBSERVATION_TOKENS = 300;
+const MAX_WINDOW_TOKENS = 2400;
 
-function digestPayload(payloadJson: string): string {
+function digestPayload(payloadJson: string, maxTokens: number): string {
   let payload: unknown;
   try {
     payload = JSON.parse(payloadJson);
   } catch {
-    return truncateToTokenLimit(payloadJson, MAX_OBSERVATION_TOKENS);
+    return truncateToTokenLimit(payloadJson, maxTokens);
   }
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
     payload = Object.fromEntries(
@@ -333,5 +341,5 @@ function digestPayload(payloadJson: string): string {
       ? `${value.slice(0, MAX_PROMPT_FIELD_CHARS)}…`
       : value,
   );
-  return truncateToTokenLimit(compact ?? "", MAX_OBSERVATION_TOKENS);
+  return truncateToTokenLimit(compact ?? "", maxTokens);
 }

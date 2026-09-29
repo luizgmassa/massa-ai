@@ -291,7 +291,6 @@ describe("ObservationConsolidationJob", () => {
     });
 
     const first = job.runOnce("p");
-    await sleep(5);
     const second = await job.runOnce("p");
     expect(second.consolidated).toBe(false);
     expect(surface.calls).toBe(1);
@@ -302,6 +301,30 @@ describe("ObservationConsolidationJob", () => {
     const third = await job.runOnce("p");
     expect(third.consolidated).toBe(true);
     expect(surface.calls).toBe(2);
+  });
+});
+
+describe("ObservationConsolidationJob single-flight release", () => {
+  it("releases the guard when a run throws", async () => {
+    let calls = 0;
+    const good = makeStoreWith(4);
+    const flakyStore = {
+      listRecent(projectId: string, limit: number) {
+        calls++;
+        if (calls === 1) return [{ id: "bad-1" }, { id: "bad-2" }] as any;
+        return good.listRecent(projectId, limit);
+      },
+    } as any;
+    const job = new ObservationConsolidationJob({
+      llm: enabledSurface(),
+      store: flakyStore,
+      memoryRepo: makeFakeMemoryRepo(),
+      maxWindow: 8,
+      minObservations: 1,
+      minIntervalMs: 0,
+    });
+    await expect(job.runOnce("p")).rejects.toThrow();
+    expect((await job.runOnce("p")).consolidated).toBe(true);
   });
 });
 
@@ -353,6 +376,13 @@ describe("buildObservationPrompt", () => {
     for (const key of ["session_id", "transcript_path", "cwd", "prompt_id", "tool_use_id", "hook_event_name", "permission_mode"]) {
       expect(prompt).not.toContain(`"${key}"`);
     }
+  });
+
+  it("keeps a large window inside the same total budget", () => {
+    const window = Array.from({ length: 50 }, (_, i) => observation(`obs-${i}`, hookPayload(i)));
+    const prompt = buildObservationPrompt(window);
+    expect(prompt.length).toBeLessThan(16_000);
+    expect(prompt).toContain("id=obs-49");
   });
 
   it("falls back to a capped raw payload when payloadJson is not JSON", () => {
