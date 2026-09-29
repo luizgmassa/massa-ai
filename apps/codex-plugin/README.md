@@ -1,6 +1,6 @@
 # massa-ai — Codex plugin
 
-A native Codex plugin bundle that makes massa-ai feel native in Codex CLI: semantic code search skills, the massa-ai MCP server, and passive lifecycle capture via 6 hook events.
+A native Codex plugin bundle that makes massa-ai feel native in Codex CLI: semantic code search skills, the massa-ai MCP server, and passive lifecycle capture via 6 hook events, plus a `SubagentStart` hook that prints each dispatched massa-ai agent's model and effort.
 
 ## What you get
 
@@ -19,12 +19,13 @@ Plus 36 generated workflow commands, one per massa-ai workflow (`$debug`, etc.) 
 
 MCP server: `massa-ai` (`npx @massa-ai/mcp-client` with `MASSA_AI_API_URL`) — registered into `~/.codex/config.toml` by `scripts/install-agents.sh`, which this installer calls for you. That script is the single writer of host MCP config; the plugin ships no `.mcp.json`.
 
-Hooks: 6 Codex lifecycle events wired to the shared `massa-ai-hook` binary (fire-and-forget POSTs to the tools-api):
+Hooks: 7 Codex events wired to the shared `massa-ai-hook` binary. Six are fire-and-forget POSTs to the tools-api; `SubagentStart` posts nothing and returns a `systemMessage` naming the agent, model and effort from `~/.codex/agents/<name>.toml`:
 
 | Codex event | Binary subcommand | Lifecycle kind |
 |-------------|-------------------|----------------|
 | `SessionStart` | `session-start` | `session-start` |
 | `UserPromptSubmit` | `user-prompt-submit` | `user-prompt` |
+| `SubagentStart` | `agent-start codex` | none (dispatch announcement) |
 | `PreToolUse` | `pre-tool-use` | `pre-tool-use` |
 | `PostToolUse` | `post-tool-use` | `post-tool-use` |
 | `PreCompact` | `pre-compact` | `pre-compact` (dual-POST: observation + snapshot) |

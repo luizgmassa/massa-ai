@@ -50,7 +50,7 @@ plugin can only reference files inside itself — `hooks/hooks.json` addresses t
 hook binary through `${CLAUDE_PLUGIN_ROOT}`, never an absolute repo path.
 
 Because the plugin ships hooks, running `install.sh` afterwards would wire a
-second copy of all 5 events. It doesn't: the installer checks
+second copy of all 6 events. It doesn't: the installer checks
 `~/.claude/plugins/installed_plugins.json` for a `massa-ai@*` entry and skips its
 hook merge when it finds one. The check fails open — a missing or malformed
 registry never blocks an install. Note it resolves from `$HOME` even under

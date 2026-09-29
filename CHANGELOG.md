@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Agent dispatches are announced by a hook, with model and effort.** Dispatching a massa-ai
+  specialist now prints one line such as
+  `🤖 [massa-ai] Agent dispatch: code-reviewer — model claude-opus-5-5[1m], effort high`, read
+  from the installed agent file the host loads. Claude Code gets a `PreToolUse` hook on the
+  `Agent` tool (new `agent-start` subcommand, shown as a `systemMessage`, which also flags a
+  `model` passed on the call or `CLAUDE_CODE_SUBAGENT_MODEL` as a runtime override). Codex gets
+  a `SubagentStart` hook (`agent-start codex`) that reads `~/.codex/agents/<name>.toml`.
+  OpenCode shows a TUI toast from `tool.execute.before` on the `task` tool. None of these posts
+  an observation. Cursor gets no announcement: its hooks show `user_message` only when they deny
+  the action. Re-run the plugin installer, or update the plugin, to wire the new hook.
+
+### Removed
+
+- **The prompt-level model/effort announcement rule.** `skills/AGENTS.md`,
+  `references/agent-orchestration.md` (§Model/Effort Announcement and its per-host path table),
+  and `references/conversation-feedback.md` no longer tell the orchestrator to restate a
+  sub-agent's model and effort. The new hook prints them instead. Re-run
+  `scripts/install-skills.sh --apply` so the installed `MASSA-AI.md` drops the old rule.
+
 ## [1.66.1] - 2026-09-26
 
 ### Fixed
