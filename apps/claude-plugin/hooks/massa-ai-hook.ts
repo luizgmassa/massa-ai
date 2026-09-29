@@ -13,6 +13,8 @@
  *   post-tool-use       → event: "post-tool-use"
  *   pre-compact         → SPECIAL: TWO POSTs (observation + compact-snapshot)
  *   stop                → event: "session-end"
+ *   agent-start [codex] → SPECIAL: prints the dispatched massa-ai agent's
+ *                         model/effort as a `systemMessage`; no POST
  *
  * CRITICAL (pre-mortem F3): pre-compact does TWO POSTs:
  *   (1) observation to /api/v1/hook (3s timeout, observation body
@@ -274,6 +276,149 @@ export function buildSessionStartDoctorLine(
   return lines.length ? lines.slice(0, 2).join("\n") : null;
 }
 
+// ── Agent dispatch announcement (agent-start-hook-announcement) ─────────────
+
+const OWNED_MARKER_MD = "<!-- massa-ai-owned: true -->";
+const AGENT_NAME = /^[a-z0-9][a-z0-9-]*$/;
+const SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
+
+export interface AgentAssignment {
+  model: string;
+  effort: string;
+}
+
+function frontmatterValue(frontmatter: string, key: string): string | null {
+  const match = new RegExp(`^${key}:[ \\t]*(.+?)\\r?$`, "m").exec(frontmatter);
+  const value = match?.[1]?.trim().replace(/^["']|["']$/g, "");
+  return value ? value : null;
+}
+
+export function readMarkdownAgentAssignment(raw: string): AgentAssignment | null {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([^\r\n]*)/.exec(raw);
+  if (!match || match[2]!.trim() !== OWNED_MARKER_MD) return null;
+  const frontmatter = match[1]!;
+  return {
+    model: frontmatterValue(frontmatter, "model") ?? "inherit",
+    effort: frontmatterValue(frontmatter, "effort") ?? "inherit",
+  };
+}
+
+export interface ClaudeAgentLocations {
+  pluginRoot: string;
+  home: string;
+  cwd: string;
+}
+
+export function resolveClaudeAgentFiles(subagentType: string, where: ClaudeAgentLocations): string[] {
+  const pluginPrefix = "massa-ai:";
+  if (subagentType.startsWith(pluginPrefix)) {
+    const name = subagentType.slice(pluginPrefix.length);
+    return AGENT_NAME.test(name) ? [path.join(where.pluginRoot, "agents", `${name}.md`)] : [];
+  }
+  if (!AGENT_NAME.test(subagentType)) return [];
+  return [
+    path.join(where.cwd, ".claude", "agents", `${subagentType}.md`),
+    path.join(where.home, ".claude", "agents", `${subagentType}.md`),
+  ];
+}
+
+export function buildClaudeAgentAnnouncement(
+  payload: Record<string, unknown>,
+  where: ClaudeAgentLocations,
+  env: Readonly<Record<string, string | undefined>>,
+): string | null {
+  if (typeof payload.tool_name !== "string" || !SUBAGENT_TOOLS.has(payload.tool_name)) return null;
+  const input = payload.tool_input;
+  if (!input || typeof input !== "object") return null;
+  const { subagent_type: subagentType, model: callModel } = input as Record<string, unknown>;
+  if (typeof subagentType !== "string") return null;
+
+  for (const file of resolveClaudeAgentFiles(subagentType, where)) {
+    let raw: string;
+    try {
+      raw = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+    const assignment = readMarkdownAgentAssignment(raw);
+    if (!assignment) return null;
+    const name = subagentType.replace(/^massa-ai:/, "");
+    let line = `🤖 [massa-ai] Agent dispatch: ${name} — model ${assignment.model}, effort ${assignment.effort}`;
+    const envModel = env.CLAUDE_CODE_SUBAGENT_MODEL?.trim();
+    if (envModel && envModel !== "inherit") {
+      line += ` · runtime model override: ${envModel} (CLAUDE_CODE_SUBAGENT_MODEL)`;
+    } else if (typeof callModel === "string" && callModel.trim()) {
+      line += ` · runtime model override: ${callModel.trim()} (Agent call)`;
+    }
+    return line;
+  }
+  return null;
+}
+
+function tomlStringValue(raw: string, key: string): string | null {
+  const header = raw.split('"""', 1)[0]!;
+  const match = new RegExp(`^${key}[ \\t]*=[ \\t]*"([^"\\r\\n]*)"`, "m").exec(header);
+  return match?.[1] ? match[1] : null;
+}
+
+export function readCodexAgentAssignment(raw: string, name: string): AgentAssignment | null {
+  if (!raw.startsWith("# massa-ai-owned") || tomlStringValue(raw, "name") !== name) return null;
+  return {
+    model: tomlStringValue(raw, "model") ?? "inherit",
+    effort: tomlStringValue(raw, "model_reasoning_effort") ?? "inherit",
+  };
+}
+
+export function buildCodexAgentAnnouncement(payload: Record<string, unknown>, agentsDirs: string[]): string | null {
+  const name = payload.agent_type;
+  if (typeof name !== "string" || !AGENT_NAME.test(name)) return null;
+  let raw: string | null = null;
+  for (const dir of agentsDirs) {
+    try {
+      raw = readFileSync(path.join(dir, `${name}.toml`), "utf8");
+      break;
+    } catch {
+      continue;
+    }
+  }
+  const assignment = raw === null ? null : readCodexAgentAssignment(raw, name);
+  if (!assignment) return null;
+  let line = `🤖 [massa-ai] Agent dispatch: ${name} — model ${assignment.model}, effort ${assignment.effort}`;
+  const runtimeModel = typeof payload.model === "string" ? payload.model.trim() : "";
+  if (runtimeModel && runtimeModel !== assignment.model) {
+    line += ` · runtime model: ${runtimeModel}`;
+  }
+  return line;
+}
+
+export function runAgentStart(
+  rawStdin: string,
+  where: ClaudeAgentLocations,
+  env: Readonly<Record<string, string | undefined>>,
+  host: string = "claude",
+): string | null {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(rawStdin);
+  } catch {
+    return null;
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const record = payload as Record<string, unknown>;
+  let line: string | null = null;
+  if (host === "codex") {
+    const codexHome = env.CODEX_HOME?.trim() || path.join(where.home, ".codex");
+    line = buildCodexAgentAnnouncement(record, [
+      path.resolve(where.pluginRoot, "..", "..", "agents"),
+      path.join(codexHome, "agents"),
+    ]);
+  } else if (host === "claude") {
+    const cwd = typeof record.cwd === "string" && record.cwd ? record.cwd : where.cwd;
+    line = buildClaudeAgentAnnouncement(record, { ...where, cwd }, env);
+  }
+  return line ? JSON.stringify({ systemMessage: line }) : null;
+}
+
 // ── POST helper ─────────────────────────────────────────────────────────────
 
 export function postObservation(
@@ -350,6 +495,18 @@ export function postObservation(
 
 export async function main(stdinInput?: string): Promise<void> {
   const subcommand = process.argv[2];
+  if (subcommand === "agent-start") {
+    try {
+      const output = runAgentStart(
+        stdinInput ?? readStdin(),
+        { pluginRoot: path.resolve(import.meta.dirname, ".."), home: homedir(), cwd: process.cwd() },
+        process.env,
+        process.argv[3],
+      );
+      if (output) process.stdout.write(output + "\n");
+    } catch {}
+    return;
+  }
   if (!subcommand || !EVENT_MAP[subcommand]) {
     // Unknown or missing subcommand → exit 0 (silent-degrade)
     return;
