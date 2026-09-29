@@ -228,6 +228,25 @@ else
   else
     fail "the instruct model is not loaded at LLM_LOAD_CTX"
   fi
+  if grep -qF 'installer_set_lmstudio_context_default "$LMSTUDIO_CLI" "$LLM_MODEL" "$LLM_LOAD_CTX"' "$SETUP_SCRIPT"; then
+    ok "the instruct model's LM Studio default context is LLM_LOAD_CTX"
+  else
+    fail "the instruct model's LM Studio default context is not LLM_LOAD_CTX"
+  fi
+fi
+
+ARGS_SRC="$(sed -n '/^case "\${1:-}" in$/,/^esac$/p' "$SETUP_SCRIPT")"
+if [ -z "$ARGS_SRC" ]; then
+  fail "the argument dispatch extracted from setup-local-first.sh (found nothing)"
+else
+  run_args() {
+    bash -c 'installer_remove_launchd_agents() { echo REMOVED; }; src="$1"; shift; eval "$src"; echo CONTINUED' \
+      _ "$ARGS_SRC" "$@" 2>&1
+    echo "rc=$?"
+  }
+  check_eq "no argument continues into the install" "CONTINUED rc=0" "$(run_args | tr '\n' ' ' | sed 's/ $//')"
+  check_eq "--uninstall-services removes and stops" "REMOVED rc=0" \
+    "$(run_args --uninstall-services | tr '\n' ' ' | sed 's/ $//')"
 fi
 
 # ── The caller contract the byte-identity AC does not cover ──
