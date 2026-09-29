@@ -538,6 +538,62 @@ PLISTEOF
   return 0
 }
 
+installer_register_lmstudio_server_agent() {
+  local cli="$1" url="$2"
+  local label="ai.massa.lmstudio-server"
+  local plist="${HOME}/Library/LaunchAgents/${label}.plist"
+  local log="${HOME}/.config/massa-ai/lmstudio-server.log"
+  local port port_args=""
+
+  [ "$(uname -s 2>/dev/null)" = "Darwin" ] || return 0
+  [ -d "${HOME}/Library/LaunchAgents" ] || return 0
+  [ -n "$cli" ] || return 0
+
+  port="$(printf '%s' "$url" | sed -nE 's#^[a-zA-Z][a-zA-Z0-9+.-]*://[^/]*:([0-9]+).*#\1#p')"
+  if [ -n "$port" ]; then
+    port_args="
+        <string>--port</string>
+        <string>${port}</string>"
+  fi
+
+  mkdir -p "${HOME}/.config/massa-ai"
+  cat > "$plist" <<PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>${label}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${cli}</string>
+        <string>server</string>
+        <string>start</string>${port_args}
+    </array>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+    <key>ThrottleInterval</key><integer>30</integer>
+    <key>StandardOutPath</key><string>${log}</string>
+    <key>StandardErrorPath</key><string>${log}</string>
+    <key>ProcessType</key><string>Background</string>
+</dict>
+</plist>
+PLISTEOF
+
+  local domain="gui/$(id -u)"
+  launchctl bootout "${domain}/${label}" >/dev/null 2>&1 || true
+  if launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1; then
+    launchctl enable "${domain}/${label}" >/dev/null 2>&1 || true
+    echo "  ✓ launchd agent registered: ${label} (starts the LM Studio server at login)"
+  elif launchctl load -w "$plist" >/dev/null 2>&1; then
+    echo "  ✓ launchd agent registered (legacy load): ${label}"
+  else
+    echo "  ⚠  could not register the launchd agent — the LM Studio server will not"
+    echo "     start after a reboot. Register by hand with:"
+    echo "         launchctl bootstrap ${domain} ${plist}"
+  fi
+  return 0
+}
+
 # installer_resolve_lmstudio_models
 #
 # Resolves the three LM Studio model ids AND the three specs `lms get` is

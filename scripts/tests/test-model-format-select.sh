@@ -423,6 +423,73 @@ check_contains "a refused bootstrap falls back to the legacy load" \
   "legacy load" "$out_lc2"
 check_contains "and the fallback actually ran load -w" "load -w" "$(cat "$LOG_LC2")"
 
+echo "── installer_register_lmstudio_server_agent: launchd registration ──"
+
+LMS_PLIST="${TMP_ROOT}/Library/LaunchAgents/ai.massa.lmstudio-server.plist"
+
+LOG_LMS="${TMP_ROOT}/log-launchctl-lms"; : > "$LOG_LMS"
+LC_LMS_OK="$(make_launchctl_shim 0 "$LOG_LMS")"
+out_lms="$(run_lib "${LC_LMS_OK}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost:1234/v1'; echo rc=\$?")"
+plist_lms="$(cat "$LMS_PLIST" 2>/dev/null)"
+check_contains "the LM Studio agent reports registration" \
+  "launchd agent registered: ai.massa.lmstudio-server" "$out_lms"
+check_contains "and returns 0" "rc=0" "$out_lms"
+check_contains "the plist carries the agent label" \
+  "<key>Label</key><string>ai.massa.lmstudio-server</string>" "$plist_lms"
+check_contains "the agent runs lms server start on the configured port" \
+  "<string>/opt/lms/bin/lms</string>
+        <string>server</string>
+        <string>start</string>
+        <string>--port</string>
+        <string>1234</string>" "$plist_lms"
+check_contains "the agent runs at login" "<key>RunAtLoad</key><true/>" "$plist_lms"
+check_contains "a failed start is retried by launchd" \
+  "<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>" "$plist_lms"
+check_contains "a stale registration is booted out first" \
+  "bootout gui/" "$(cat "$LOG_LMS")"
+check_contains "and the plist is bootstrapped into the gui domain" \
+  "bootstrap gui/" "$(cat "$LOG_LMS")"
+if plutil -lint "$LMS_PLIST" >/dev/null 2>&1 || ! command -v plutil >/dev/null 2>&1; then
+  ok "the plist is well-formed"
+else
+  fail "the plist is well-formed ($(plutil -lint "$LMS_PLIST" 2>&1))"
+fi
+
+rm -f "$LMS_PLIST"
+LOG_LMS_NOPORT="${TMP_ROOT}/log-launchctl-lms-noport"; : > "$LOG_LMS_NOPORT"
+LC_LMS_NOPORT="$(make_launchctl_shim 0 "$LOG_LMS_NOPORT")"
+run_lib "${LC_LMS_NOPORT}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://lmstudio.local/v1'" >/dev/null
+case "$(cat "$LMS_PLIST" 2>/dev/null)" in
+  *"<string>--port</string>"*) fail "a URL without a port adds no --port argument" ;;
+  *"<string>start</string>"*) ok "a URL without a port adds no --port argument" ;;
+  *) fail "a URL without a port still writes the plist" ;;
+esac
+
+rm -f "$LMS_PLIST"
+LOG_LMS_FB="${TMP_ROOT}/log-launchctl-lms-fallback"; : > "$LOG_LMS_FB"
+LC_LMS_FAIL="$(make_launchctl_shim 1 "$LOG_LMS_FB")"
+out_lms_fb="$(run_lib "${LC_LMS_FAIL}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost:1234/v1'")"
+check_contains "a refused bootstrap falls back to the legacy load" "legacy load" "$out_lms_fb"
+check_contains "and the fallback actually ran load -w" "load -w" "$(cat "$LOG_LMS_FB")"
+
+rm -f "$LMS_PLIST"
+LOG_LMS_LINUX="${TMP_ROOT}/log-launchctl-lms-linux"; : > "$LOG_LMS_LINUX"
+LC_LMS_LINUX="$(make_launchctl_shim 0 "$LOG_LMS_LINUX")"
+out_lms_linux="$(run_lib "${LC_LMS_LINUX}:${LINUX_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost:1234/v1'; echo rc=\$?")"
+check_contains "off macOS the agent step is a silent no-op" "rc=0" "$out_lms_linux"
+[ -f "$LMS_PLIST" ] && fail "off macOS no plist is written" || ok "off macOS no plist is written"
+[ -s "$LOG_LMS_LINUX" ] && fail "off macOS launchctl is never called" || ok "off macOS launchctl is never called"
+
+LOG_LMS_NOCLI="${TMP_ROOT}/log-launchctl-lms-nocli"; : > "$LOG_LMS_NOCLI"
+LC_LMS_NOCLI="$(make_launchctl_shim 0 "$LOG_LMS_NOCLI")"
+run_lib "${LC_LMS_NOCLI}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '' 'http://localhost:1234/v1'" >/dev/null
+[ -f "$LMS_PLIST" ] && fail "without an lms CLI no plist is written" || ok "without an lms CLI no plist is written"
+
 echo "── installer_ensure_mlx_runtime ──"
 
 # A stub lms: `runtime ls` reports whichever engine list the scenario sets, and

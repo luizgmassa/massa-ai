@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The LM Studio server now comes back after a reboot.** LM Studio restores its app at login
+  but not its HTTP server, so after a restart every LLM call fell back to the non-LLM path
+  (`Cannot connect to API`) until someone ran `lms server start` by hand. On macOS,
+  `setup-local-first.sh` now registers a launchd agent, `ai.massa.lmstudio-server`
+  (`~/Library/LaunchAgents/ai.massa.lmstudio-server.plist`), that runs
+  `lms server start --port <configured port>` at login and lets launchd retry a failed start
+  every 30 s. The run is logged to `~/.config/massa-ai/lmstudio-server.log`. It is registered
+  with `launchctl bootstrap`, falling back to `load -w`, like the MLX embedding sidecar;
+  off macOS the step is a no-op.
+
 ## [1.66.2] - 2026-09-29
 
 ### Fixed

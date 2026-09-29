@@ -168,6 +168,7 @@ setup_lmstudio() {
     lmstudio_ensure_server "$LMSTUDIO_CLI" "$LMSTUDIO_URL" \
         || die "LM Studio API not reachable at ${LMSTUDIO_URL}. Start it: ${LMSTUDIO_CLI} server start"
     echo -e "  ${GREEN}✓${NC} LM Studio API reachable at ${LMSTUDIO_URL}"
+    installer_register_lmstudio_server_agent "$LMSTUDIO_CLI" "$LMSTUDIO_URL"
 
     # PDM-13: MLX weights need LM Studio's MLX engine, which is a separate
     # runtime extension from llama.cpp. A no-op unless the MLX format was
