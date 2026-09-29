@@ -20,6 +20,17 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run \"${CLAUDE_PLUGIN_ROOT}/hooks/massa-ai-hook.ts\" agent-start"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "hooks": [

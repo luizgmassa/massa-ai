@@ -116,7 +116,7 @@ AGENTS_DIR="$CODEX_DIR/agents"
 VARIANTS_SRC="$SCRIPT_DIR/agent-profiles"
 VARIANTS_DEST="$CODEX_DIR/massa-ai/agent-profiles"
 
-# Array-append merge (F5 mitigation): for each of the 6 events, append the
+# Array-append merge (F5 mitigation): for each of the 7 events, append the
 # massa-ai hook entry to the event's array if no entry with
 # _massaAiOwned: true already exists. Backup before first write. Uses node
 # (preferred) or bun for safe JSON manipulation — bash cannot do JSON safely.
@@ -157,6 +157,7 @@ const pluginDir = process.argv[5];
 const EVENTS = [
   ["SessionStart", "session-start"],
   ["UserPromptSubmit", "user-prompt-submit"],
+  ["SubagentStart", "agent-start codex"],
   ["PreToolUse", "pre-tool-use"],
   ["PostToolUse", "post-tool-use"],
   ["PreCompact", "pre-compact"],
@@ -858,9 +859,9 @@ fi
 # Summary line in quiet mode
 if [ "${MASSA_AI_VERBOSE:-0}" != "1" ]; then
   if [[ "$CODEX_PLUGIN_ROUTE" -eq 1 ]]; then
-    ok "codex plugin installed (${skill_count} skills, ${specialist_count} specialists, 6 hooks) — shows in /plugins"
+    ok "codex plugin installed (${skill_count} skills, ${specialist_count} specialists, 7 hooks) — shows in /plugins"
   else
-    ok "codex plugin installed (${skill_count} skills, ${specialist_count} specialists, 6 hooks)"
+    ok "codex plugin installed (${skill_count} skills, ${specialist_count} specialists, 7 hooks)"
     warn "codex CLI unavailable — not registered in /plugins. Register it with:"
     warn "  codex plugin marketplace add \"$PLUGIN_SOURCE_ROOT\" && codex plugin add $CODEX_PLUGIN_ID"
   fi

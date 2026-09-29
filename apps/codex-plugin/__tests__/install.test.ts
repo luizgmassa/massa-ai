@@ -73,7 +73,7 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
-  test("user-scope install creates ~/.codex/plugins/massa-ai/ + merges hooks.json with 6 events", async () => {
+  test("user-scope install creates ~/.codex/plugins/massa-ai/ + merges hooks.json with 7 events", async () => {
     const res = runInstall(["--user"], { HOME: tmp });
     expect(res.exitCode).toBe(0);
 
@@ -85,6 +85,7 @@ describe("codex-plugin install.sh (T5 / CPX-01,02,07 + F5)", () => {
     const expectedEvents = [
       "SessionStart",
       "UserPromptSubmit",
+      "SubagentStart",
       "PreToolUse",
       "PostToolUse",
       "PreCompact",

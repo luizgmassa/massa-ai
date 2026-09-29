@@ -16,6 +16,14 @@
         "_massaAiOwned": true
       }
     ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "<PLUGIN_DIR>/hooks/massa-ai-hook agent-start codex" }
+        ],
+        "_massaAiOwned": true
+      }
+    ],
     "PreToolUse": [
       {
         "hooks": [
