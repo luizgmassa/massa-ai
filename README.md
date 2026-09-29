@@ -177,9 +177,10 @@ File: `~/.config/opencode/opencode.json`
 > Cursor's shape here — `scripts/install-agents.sh --agent opencode` writes the
 > correct one for you.
 
-**Events wired (in-process, 6 lifecycle handlers):** `session.created`,
-`tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`,
-`dispose` — all registered in-process by the plugin (no external hooks file).
+**Events wired (in-process, 7 lifecycle handlers):** `session.created`,
+`tool.execute.before`, `tool.execute.after`, `experimental.session.compacting`,
+`shell.env`, `event`, `dispose` — all registered in-process by the plugin (no
+external hooks file).
 
 ### Plugin Bundles (4-Tool Parity)
 
@@ -770,8 +771,8 @@ just print it) using array-append merge with backup + `_massaAiOwned` marker,
 so user hooks are always preserved:
 
 ```bash
-bash apps/claude-plugin/install.sh --user   # 5 events → ~/.claude/settings.json
-bash apps/codex-plugin/install.sh --user    # 6 events → ~/.codex/hooks.json
+bash apps/claude-plugin/install.sh --user   # 6 events → ~/.claude/settings.json
+bash apps/codex-plugin/install.sh --user    # 7 events → ~/.codex/hooks.json
 bash apps/cursor-plugin/install.sh --user   # 7 events → ~/.cursor/hooks.json
 ```
 
@@ -797,24 +798,26 @@ observations — zero loss across `/compact`.
 
 ### Events wired per tool
 
-**Claude Code (5 events)** — wired by `apps/claude-plugin/install.sh` into
+**Claude Code (6 events)** — wired by `apps/claude-plugin/install.sh` into
 `settings.json` (nested matcher-group + `hooks[]` form):
 
 | Claude event | Binary subcommand | Observation `source` |
 |--------------|--------------------|----------------------|
 | `SessionStart` | `session-start` | `session-start` |
 | `UserPromptSubmit` | `user-prompt-submit` | `user-prompt` |
+| `PreToolUse` (matcher `Agent\|Task`) | `agent-start` | none — prints the dispatch announcement |
 | `PostToolUse` | `post-tool-use` | `post-tool-use` |
 | `PreCompact` | `pre-compact` | `pre-compact` |
 | `Stop` | `stop` | `session-end` |
 
-**Codex (6 events)** — wired by `apps/codex-plugin/install.sh` into
+**Codex (7 events)** — wired by `apps/codex-plugin/install.sh` into
 `~/.codex/hooks.json`:
 
 | Codex event | Binary subcommand | Observation `source` |
 |-------------|--------------------|----------------------|
 | `SessionStart` | `session-start` | `session-start` |
 | `UserPromptSubmit` | `user-prompt-submit` | `user-prompt` |
+| `SubagentStart` | `agent-start codex` | none — prints the dispatch announcement |
 | `PreToolUse` | `pre-tool-use` | `pre-tool-use` |
 | `PostToolUse` | `post-tool-use` | `post-tool-use` |
 | `PreCompact` | `pre-compact` | `pre-compact` |
@@ -836,10 +839,28 @@ observations — zero loss across `/compact`.
 | `preCompact` | `pre-compact` | `pre-compact` |
 | `stop` | `stop` | `session-end` |
 
-**OpenCode (in-process, 6 lifecycle handlers)** — registered by the plugin
+**OpenCode (in-process, 7 lifecycle handlers)** — registered by the plugin
 itself (local install or `@massa-ai/opencode-plugin`), no external hooks file:
-`session.created`, `tool.execute.after`, `experimental.session.compacting`,
-`shell.env`, `event`, `dispose`.
+`session.created`, `tool.execute.before` (dispatch announcement only),
+`tool.execute.after`, `experimental.session.compacting`, `shell.env`, `event`,
+`dispose`.
+
+### Agent dispatch announcement
+
+When a massa-ai specialist is dispatched, the host prints one line naming it with
+the model and effort from its installed agent file, for example
+`🤖 [massa-ai] Agent dispatch: code-reviewer — model claude-opus-5-5[1m], effort high`.
+A hook prints it, not a prompt rule, so it appears on every dispatch. It posts nothing.
+
+| Host | Trigger | Shown as |
+|------|---------|----------|
+| Claude Code | `PreToolUse` on the `Agent` tool → `agent-start` | `systemMessage` |
+| Codex | `SubagentStart` → `agent-start codex` | `systemMessage` (`↳ Hook ·` line) |
+| OpenCode | in-process `tool.execute.before` on `task` | TUI toast |
+| Cursor | none — its hooks show `user_message` only when denying the action | — |
+
+Non-massa-ai agents stay silent. On Claude, a `model` passed on the `Agent` call or
+`CLAUDE_CODE_SUBAGENT_MODEL` is appended as a runtime override.
 
 ### Env
 

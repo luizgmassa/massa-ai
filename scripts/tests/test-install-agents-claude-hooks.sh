@@ -95,8 +95,8 @@ HOME="$H5" MASSA_AI_SKIP_PLUGIN_REGISTRY=1 bash "$PLUGIN_INSTALLER" --user >/dev
 SETTINGS5="$H5/.claude/settings.json"
 CLAUDE_JSON5="$H5/.claude.json"
 assert_file "plugin wrote settings.json" "$SETTINGS5"
-assert_eq "5 owned hook events wired" \
-  "$(jq_get "$SETTINGS5" 'Object.keys(c.hooks).length')" "5"
+assert_eq "6 owned hook events wired" \
+  "$(jq_get "$SETTINGS5" 'Object.keys(c.hooks).length')" "6"
 assert_eq "plugin install also registered MCP to .claude.json" \
   "$(jq_get "$CLAUDE_JSON5" 'c.mcpServers["massa-ai"] ? "yes" : "no"')" "yes"
 
@@ -104,6 +104,6 @@ echo ""
 echo "Scenario 6: MCP uninstall leaves the plugin's hooks alone"
 bash "$INSTALLER" --mcp-source npx --target "$H5" --agent claude-code --yes --uninstall >/dev/null 2>&1
 assert_eq "mcpServers gone from .claude.json" "$(jq_get "$CLAUDE_JSON5" 'c.mcpServers === undefined ? "gone" : "present"')" "gone"
-assert_eq "hooks still wired in settings.json" "$(jq_get "$SETTINGS5" 'Object.keys(c.hooks).length')" "5"
+assert_eq "hooks still wired in settings.json" "$(jq_get "$SETTINGS5" 'Object.keys(c.hooks).length')" "6"
 
 summary "install-agents claude-code hooks coexistence"

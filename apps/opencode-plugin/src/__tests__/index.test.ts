@@ -13,6 +13,9 @@ import "./env-setup"; // MUST stay the first import — freezes scratch XDG_CONF
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { configExists } from "@massa-ai/shared/config";
 import { MassaAiPlugin } from "../index";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
 const originalFetch = globalThis.fetch;
 
@@ -88,6 +91,7 @@ describe("MassaAiPlugin hooks-only contract (AD-017)", () => {
     const plugin: any = await setup();
     const namedHandlers = [
       "session.created",
+      "tool.execute.before",
       "tool.execute.after",
       "experimental.session.compacting",
       "shell.env",
@@ -108,6 +112,25 @@ describe("MassaAiPlugin hooks-only contract (AD-017)", () => {
 });
 
 describe("MassaAiPlugin lifecycle hooks", () => {
+  test("tool.execute.before: a massa-ai task dispatch shows a toast with model and effort", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "massa-ai-oc-before-"));
+    try {
+      fs.mkdirSync(path.join(dir, ".opencode", "agents"), { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, ".opencode", "agents", "judge.md"),
+        "---\nmodel: m\nreasoningEffort: high\n---\n<!-- massa-ai-owned: true -->\n",
+      );
+      const { input, toasts } = makePluginInput({ directory: dir });
+      mockFetchCapture();
+      const plugin = await MassaAiPlugin(input);
+      await plugin["tool.execute.before"]!({ tool: "task", sessionID: "s", callID: "c" }, { args: { subagent_type: "judge" } });
+      await plugin["tool.execute.before"]!({ tool: "bash", sessionID: "s", callID: "c" }, { args: { command: "ls" } });
+      expect(toasts).toEqual([{ message: "[massa-ai] Agent dispatch: judge — model m, effort high", variant: "info" }]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("session.created: healthy API → apiAvailable true + log", async () => {
     const { input, logs } = makePluginInput();
     mockFetchCapture();

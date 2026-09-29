@@ -270,7 +270,7 @@ Use `references/conversation-feedback.md` when subagent lifecycle visibility wou
 
 Use these labels for delegated work:
 
-- `Agent Started` when a role is launched: name the agent, its model, and its effort (see Model/Effort Announcement below), with scope and permission mode.
+- `Agent Started` when a role is launched: name the agent, with scope and permission mode. Model and effort are not part of the line — the host hook prints them deterministically on dispatch (see Dispatch Announcement Hook below).
 - `Agent Running` when waiting on a long-running role or reporting its current bounded task.
 - `Agent Done` when the role returns usable evidence, findings, implementation, or verification.
 - `Agent Blocked` when the role cannot complete its assigned scope.
@@ -280,52 +280,20 @@ Do not expose raw subagent prompts, raw logs, private reasoning, or full output 
 Example:
 
 ```md
-🤖 [Agent Started] Code Reviewer (verify mode), model `<model>`, effort `<effort>`. Scope: massa-ai references and README.
+🤖 [Agent Started] Code Reviewer (verify mode). Scope: massa-ai references and README.
 🤖 [Agent Done] Code Reviewer found no stale references. Skipped checks: none.
 ```
 
-### Model/Effort Announcement
+### Dispatch Announcement Hook
 
-Every dispatch of any of the 7 massa-ai roster specialists names the agent, its model,
-and its effort in the `Agent Started` line above, inside that line's existing 1-2 line
-budget. No exemption: this covers the three standing dispatch exceptions
-(`judge` in `plan-critique` mode, `code-reviewer` in `verify` mode, `designer`) and spec-driven batch workers exactly
-like every other dispatch.
-
-- **Source**: the *installed* agent file for the active host — never
-  `skills/model-profiles.json`. The installed file reports what the host will actually
-  load, including any local profile-switch overlay the registry cannot see.
-- **Read once per session**, for all 7 agents, and cache the result — not once per
-  dispatch.
-- Absent `effort` in the installed file announces `effort: inherit`. Absent `model`, or
-  `model: inherit`, announces `model: inherit`.
-- A missing or unreadable installed file announces `model/effort unknown`, names the
-  exact attempted path, and the dispatch proceeds — the read never blocks a dispatch.
-
-```md
-🤖 [Agent Started] Code-explorer — model opus, effort high. Scope: the four emitters.
-🤖 [Agent Started] Designer — model/effort unknown (no installed agent file at
-   <liveRoot>/agents/designer.md). Dispatching anyway.
-```
-
-That second line is a measured case, not a hypothetical: on a machine with plugin
-bundle `1.48.0` installed, `designer.md` is absent because `designer` shipped
-in `1.50.0` — a live instance of the degraded path above.
-
-Per-host installed-agent path, matching `resolveHostLayout` in
-`packages/shared/src/profile-switch/hosts.ts` — a sensor executes that resolver against
-this table so the two cannot drift silently:
-
-| Host | Installed agents directory | Owned files | Model / effort keys |
-| --- | --- | --- | --- |
-| Claude — marketplace route | `<marketplaceRoot>/agents`, where `<marketplaceRoot>` is `resolveClaudeMarketplaceInstall`'s live root: for a **directory-source** marketplace the host loads the plugin LIVE from the source bundle — e.g. `<repo>/apps/claude-plugin/agents`; for any other kind it is the *versioned* cache snapshot, e.g. `~/.claude/plugins/cache/massa-ai/massa-ai/1.48.0/agents` (a stale-able snapshot — never hardcode it; read `profile_list`'s `liveRoot`) | `*.md` whose first body line is `<!-- massa-ai-owned: true -->` | `model:` / `effort:` |
-| Claude — file route | `~/.claude/agents` | `*.md` whose first body line is `<!-- massa-ai-owned: true -->` | `model:` / `effort:` |
-| Codex | `~/.codex/agents` | `*.toml` whose first line is `# massa-ai-owned` | `model` / `model_reasoning_effort` |
-| OpenCode | `~/.config/opencode/agents` | `*.md` symlinks into the massa-ai bundle | `model:` / `reasoningEffort:` |
-| Cursor | no lookup — `resolveHostLayout` returns route `skip` | — | announce `model: inherit, effort: inherit` for every agent; Cursor publishes no resolvable model IDs |
-
-Claude's active route (`marketplace` vs `file`) comes from `install-state.json`'s
-per-platform `installRoute` field, never guessed from directory presence.
+The agent's model and effort are announced by a host hook, never by the
+orchestrator: prose cannot guarantee the line is printed, and a recalled value
+can be stale against the installed agent file. The hook reads the installed
+agent file the host actually loads and prints one line when a massa-ai roster
+agent is dispatched: Claude Code (`PreToolUse` on `Agent`), Codex
+(`SubagentStart`), and OpenCode (`tool.execute.before` toast). Cursor has none —
+its hooks show a user message only when denying the action. Do not restate
+model or effort in any status update, on any host.
 
 ## Plan-Critique Contract
 
