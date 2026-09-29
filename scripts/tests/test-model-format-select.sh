@@ -375,6 +375,7 @@ echo "── installer_start_mlx_embedding_sidecar: launchd registration ──"
 make_launchctl_shim() {
   local bootstrap_exit="$1"
   local log="$2"
+  local load_exit="${3:-0}"
   local dir="${TMP_ROOT}/lc-shim-$$-${RANDOM}"
   mkdir -p "$dir"
   cat > "${dir}/launchctl" <<LCEOF
@@ -382,7 +383,7 @@ make_launchctl_shim() {
 echo "\$*" >> '${log}'
 case "\${1:-}" in
   bootstrap) exit ${bootstrap_exit} ;;
-  load) exit 0 ;;
+  load) exit ${load_exit} ;;
 esac
 exit 0
 LCEOF
@@ -422,6 +423,143 @@ out_lc2="$(run_lib "${LC_FAIL}:${DARWIN_SHIM}" \
 check_contains "a refused bootstrap falls back to the legacy load" \
   "legacy load" "$out_lc2"
 check_contains "and the fallback actually ran load -w" "load -w" "$(cat "$LOG_LC2")"
+
+echo "── installer_register_lmstudio_server_agent: launchd registration ──"
+
+LMS_PLIST="${TMP_ROOT}/Library/LaunchAgents/ai.massa.lmstudio-server.plist"
+
+LOG_LMS="${TMP_ROOT}/log-launchctl-lms"; : > "$LOG_LMS"
+LC_LMS_OK="$(make_launchctl_shim 0 "$LOG_LMS")"
+out_lms="$(run_lib "${LC_LMS_OK}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost:1234/v1'; echo rc=\$?")"
+plist_lms="$(cat "$LMS_PLIST" 2>/dev/null)"
+check_contains "the LM Studio agent reports registration" \
+  "launchd agent registered: ai.massa.lmstudio-server" "$out_lms"
+check_contains "and returns 0" "rc=0" "$out_lms"
+check_contains "the plist carries the agent label" \
+  "<key>Label</key><string>ai.massa.lmstudio-server</string>" "$plist_lms"
+check_contains "the agent runs lms server start on the configured port" \
+  "<string>/opt/lms/bin/lms</string>
+        <string>server</string>
+        <string>start</string>
+        <string>--port</string>
+        <string>1234</string>" "$plist_lms"
+check_contains "the agent runs at login" "<key>RunAtLoad</key><true/>" "$plist_lms"
+check_contains "a failed start is retried by launchd" \
+  "<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>" "$plist_lms"
+check_contains "and launchd waits 30 s between retries" \
+  "<key>ThrottleInterval</key><integer>30</integer>" "$plist_lms"
+check_contains "the registered agent is enabled" "enable gui/" "$(cat "$LOG_LMS")"
+check_contains "a stale registration is booted out first" \
+  "bootout gui/" "$(cat "$LOG_LMS")"
+check_contains "and the plist is bootstrapped into the gui domain" \
+  "bootstrap gui/" "$(cat "$LOG_LMS")"
+if plutil -lint "$LMS_PLIST" >/dev/null 2>&1 || ! command -v plutil >/dev/null 2>&1; then
+  ok "the plist is well-formed"
+else
+  fail "the plist is well-formed ($(plutil -lint "$LMS_PLIST" 2>&1))"
+fi
+
+rm -f "$LMS_PLIST"
+LOG_LMS_NOPORT="${TMP_ROOT}/log-launchctl-lms-noport"; : > "$LOG_LMS_NOPORT"
+LC_LMS_NOPORT="$(make_launchctl_shim 0 "$LOG_LMS_NOPORT")"
+run_lib "${LC_LMS_NOPORT}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost/v1'" >/dev/null
+case "$(cat "$LMS_PLIST" 2>/dev/null)" in
+  *"<string>--port</string>"*) fail "a URL without a port adds no --port argument" ;;
+  *"<string>start</string>"*) ok "a URL without a port adds no --port argument" ;;
+  *) fail "a URL without a port still writes the plist" ;;
+esac
+
+rm -f "$LMS_PLIST"
+LOG_LMS_FB="${TMP_ROOT}/log-launchctl-lms-fallback"; : > "$LOG_LMS_FB"
+LC_LMS_FAIL="$(make_launchctl_shim 1 "$LOG_LMS_FB")"
+out_lms_fb="$(run_lib "${LC_LMS_FAIL}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost:1234/v1'")"
+check_contains "a refused bootstrap falls back to the legacy load" "legacy load" "$out_lms_fb"
+check_contains "and the fallback actually ran load -w" "load -w" "$(cat "$LOG_LMS_FB")"
+
+rm -f "$LMS_PLIST"
+LOG_LMS_LINUX="${TMP_ROOT}/log-launchctl-lms-linux"; : > "$LOG_LMS_LINUX"
+LC_LMS_LINUX="$(make_launchctl_shim 0 "$LOG_LMS_LINUX")"
+out_lms_linux="$(run_lib "${LC_LMS_LINUX}:${LINUX_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost:1234/v1'; echo rc=\$?")"
+check_contains "off macOS the agent step is a silent no-op" "rc=0" "$out_lms_linux"
+[ -f "$LMS_PLIST" ] && fail "off macOS no plist is written" || ok "off macOS no plist is written"
+[ -s "$LOG_LMS_LINUX" ] && fail "off macOS launchctl is never called" || ok "off macOS launchctl is never called"
+
+rm -f "$LMS_PLIST"
+LOG_LMS_BOTH="${TMP_ROOT}/log-launchctl-lms-both"; : > "$LOG_LMS_BOTH"
+LC_LMS_BOTH="$(make_launchctl_shim 1 "$LOG_LMS_BOTH" 1)"
+out_lms_both="$(run_lib "${LC_LMS_BOTH}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost:1234/v1'; echo rc=\$?")"
+check_contains "when bootstrap and load both fail the manual command is printed" \
+  "launchctl bootstrap gui/" "$out_lms_both"
+check_contains "and the wizard is not aborted" "rc=0" "$out_lms_both"
+
+for remote in 'http://remote-box:1234/v1' 'http://192.168.1.20:1234/v1' 'http://[fe80::1]:1234/v1'; do
+  rm -f "$LMS_PLIST"
+  LOG_LMS_REMOTE="${TMP_ROOT}/log-launchctl-lms-remote"; : > "$LOG_LMS_REMOTE"
+  LC_LMS_REMOTE="$(make_launchctl_shim 0 "$LOG_LMS_REMOTE")"
+  run_lib "${LC_LMS_REMOTE}:${DARWIN_SHIM}" \
+    "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' '${remote}'" >/dev/null
+  if [ -f "$LMS_PLIST" ] || [ -s "$LOG_LMS_REMOTE" ]; then
+    fail "a remote LM Studio URL (${remote}) registers no local agent"
+  else
+    ok "a remote LM Studio URL (${remote}) registers no local agent"
+  fi
+done
+
+lms_port_args() {
+  rm -f "$LMS_PLIST"
+  run_lib "${LC_LMS_OK}:${DARWIN_SHIM}" \
+    "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' '$1'" >/dev/null
+  tr -d ' \n' < "$LMS_PLIST" 2>/dev/null | sed -nE 's#.*<string>start</string>(<string>--port</string><string>[0-9]+</string>)?</array>.*#[\1]#p'
+}
+check_eq "IPv6 loopback with a port keeps the port" "[<string>--port</string><string>1234</string>]" \
+  "$(lms_port_args 'http://[::1]:1234/v1')"
+check_eq "IPv6 loopback without a port adds no --port" "[]" "$(lms_port_args 'http://[::1]/v1')"
+check_eq "userinfo is not mistaken for a port" "[<string>--port</string><string>1234</string>]" \
+  "$(lms_port_args 'http://user:123@127.0.0.1:1234/v1')"
+
+rm -f "$LMS_PLIST"
+run_lib "${LC_LMS_OK}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '/Users/R&D/<lms>/bin/lms' 'http://localhost:1234/v1'" >/dev/null
+check_contains "XML-special characters in the lms path are escaped" \
+  "<string>/Users/R&amp;D/&lt;lms&gt;/bin/lms</string>" "$(cat "$LMS_PLIST" 2>/dev/null)"
+if ! command -v plutil >/dev/null 2>&1 || plutil -lint "$LMS_PLIST" >/dev/null 2>&1; then
+  ok "and the plist stays well-formed"
+else
+  fail "and the plist stays well-formed ($(plutil -lint "$LMS_PLIST" 2>&1))"
+fi
+
+rm -f "$LMS_PLIST"
+chmod 555 "${TMP_ROOT}/Library/LaunchAgents"
+LOG_LMS_RO="${TMP_ROOT}/log-launchctl-lms-ro"; : > "$LOG_LMS_RO"
+LC_LMS_RO="$(make_launchctl_shim 0 "$LOG_LMS_RO")"
+out_lms_ro="$(run_lib "${LC_LMS_RO}:${DARWIN_SHIM}" \
+  "set -e; installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost:1234/v1'; echo rc=\$?")"
+chmod 755 "${TMP_ROOT}/Library/LaunchAgents"
+check_contains "an unwritable LaunchAgents dir does not abort a set -e caller" "rc=0" "$out_lms_ro"
+check_contains "and says the server will not come back after a reboot" "could not write" "$out_lms_ro"
+[ -s "$LOG_LMS_RO" ] && fail "and launchctl is never called" || ok "and launchctl is never called"
+
+mv "${TMP_ROOT}/Library/LaunchAgents" "${TMP_ROOT}/Library/LaunchAgents.away"
+LOG_LMS_NODIR="${TMP_ROOT}/log-launchctl-lms-nodir"; : > "$LOG_LMS_NODIR"
+LC_LMS_NODIR="$(make_launchctl_shim 0 "$LOG_LMS_NODIR")"
+out_lms_nodir="$(run_lib "${LC_LMS_NODIR}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '/opt/lms/bin/lms' 'http://localhost:1234/v1'")"
+check_eq "without a LaunchAgents dir the step is silent" "" "$out_lms_nodir"
+[ -e "${TMP_ROOT}/Library/LaunchAgents" ] && fail "without a LaunchAgents dir nothing is created" \
+  || ok "without a LaunchAgents dir nothing is created"
+[ -s "$LOG_LMS_NODIR" ] && fail "and launchctl is never called" || ok "and launchctl is never called"
+mv "${TMP_ROOT}/Library/LaunchAgents.away" "${TMP_ROOT}/Library/LaunchAgents"
+
+LOG_LMS_NOCLI="${TMP_ROOT}/log-launchctl-lms-nocli"; : > "$LOG_LMS_NOCLI"
+LC_LMS_NOCLI="$(make_launchctl_shim 0 "$LOG_LMS_NOCLI")"
+run_lib "${LC_LMS_NOCLI}:${DARWIN_SHIM}" \
+  "installer_register_lmstudio_server_agent '' 'http://localhost:1234/v1'" >/dev/null
+[ -f "$LMS_PLIST" ] && fail "without an lms CLI no plist is written" || ok "without an lms CLI no plist is written"
 
 echo "── installer_ensure_mlx_runtime ──"
 

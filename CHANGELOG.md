@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   OpenCode shows a TUI toast from `tool.execute.before` on the `task` tool. None of these posts
   an observation. Cursor gets no announcement: its hooks show `user_message` only when they deny
   the action. Re-run the plugin installer, or update the plugin, to wire the new hook.
+- **The LM Studio server now comes back after a reboot.** LM Studio restores its app at login
+  but not its HTTP server, so after a restart every LLM call fell back to the non-LLM path
+  (`Cannot connect to API`) until someone ran `lms server start` by hand. On macOS,
+  `setup-local-first.sh` now registers a launchd agent, `ai.massa.lmstudio-server`
+  (`~/Library/LaunchAgents/ai.massa.lmstudio-server.plist`), that runs
+  `lms server start --port <configured port>` at login and lets launchd retry a failed start
+  every 30 s. The run is logged to `~/.config/massa-ai/lmstudio-server.log`. It is registered
+  with `launchctl bootstrap`, falling back to `load -w`, like the MLX embedding sidecar.
+  It is skipped off macOS and when `LMSTUDIO_URL` points at a remote host, and a failed
+  registration only prints the manual `launchctl bootstrap` command — it never aborts the
+  wizard.
 
 ### Removed
 
@@ -27,6 +38,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `references/conversation-feedback.md` no longer tell the orchestrator to restate a
   sub-agent's model and effort. The new hook prints them instead. Re-run
   `scripts/install-skills.sh --apply` so the installed `MASSA-AI.md` drops the old rule.
+
+## [1.66.2] - 2026-09-29
+
+### Fixed
+
+- **Observation consolidation timed out on almost every LLM call.** The prompt carried the raw
+  hook payload of each of its 8 observations — full `tool_response` bodies plus session ids,
+  transcript paths and working directories — so a window measured a median ~11k tokens and up
+  to ~35k, past a local model's 90 s budget and, at the top, past its loaded context (LM Studio
+  answered `Bad Request`: "tokens to keep … greater than the context length"). Each observation
+  is now a compact digest: bookkeeping keys dropped, long string fields cut to 400 characters,
+  and each observation capped at ~300 tokens inside a ~2400-token budget for the whole window.
+  On 50 real windows the prompt went from a median 38k characters (max 128k) to 7.4k (max 9.2k).
+- **Observation consolidation runs piled up on one local model.** Every 8 hook observations
+  fired a new run without waiting for the previous one, and up to 14 calls were measured
+  queued at once, each waiting past its own timeout. `runOnce` is now single-flight: a run
+  started while one is in flight returns without calling the LLM.
+- **An unreachable LLM endpoint was retried on every call.** With the local server down, each
+  LLM call spent ~6 s in SDK retries and logged a misleading `llm reasoning-recovery empty`
+  warning. After 3 consecutive connection failures to one `llm.baseUrl`, LLM calls now
+  degrade immediately for 60 s, with one `LLM endpoint unreachable — pausing LLM calls`
+  warning; the first call after the pause probes the endpoint again. Connection failures no
+  longer run reasoning-channel recovery.
 
 ## [1.66.1] - 2026-09-26
 
