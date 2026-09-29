@@ -171,5 +171,35 @@ esac
 reset_state
 check_eq "a sidecar that never comes up reports down" "down" "$(run_sidecar "http://127.0.0.1:1235/v1" 0)"
 
+echo "setup_lmstudio registers the login agent"
+
+SETUP_SRC="$(extract setup_lmstudio)" || { echo "Results: ${PASS} passed, ${FAIL} failed"; exit 1; }
+agent_calls="$(bash -c '
+  BOLD="" GREEN="" YELLOW="" NC=""
+  LMSTUDIO_URL="http://localhost:1234/v1"
+  die() { echo "DIED:$*"; exit 1; }
+  lms_cli_path() { echo /opt/lms/bin/lms; }
+  lmstudio_ensure_server() { return 0; }
+  installer_ensure_mlx_runtime() { :; }
+  installer_register_lmstudio_server_agent() { echo "AGENT:$1|$2"; }
+  eval "$1"
+  setup_lmstudio
+' _ "$SETUP_SRC" 2>&1 | grep "^AGENT:")"
+check_eq "setup_lmstudio registers the agent with the resolved CLI and URL" \
+  "AGENT:/opt/lms/bin/lms|http://localhost:1234/v1" "$agent_calls"
+
+agent_after_failure="$(bash -c '
+  BOLD="" GREEN="" YELLOW="" NC=""
+  LMSTUDIO_URL="http://localhost:1234/v1"
+  die() { echo "DIED:$*"; exit 1; }
+  lms_cli_path() { echo /opt/lms/bin/lms; }
+  lmstudio_ensure_server() { return 1; }
+  installer_ensure_mlx_runtime() { :; }
+  installer_register_lmstudio_server_agent() { echo "AGENT:$1|$2"; }
+  eval "$1"
+  setup_lmstudio
+' _ "$SETUP_SRC" 2>&1 | grep -c "^AGENT:")"
+check_eq "an unreachable server dies before registering the agent" "0" "$agent_after_failure"
+
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
