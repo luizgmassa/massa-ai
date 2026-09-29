@@ -312,11 +312,12 @@ Every LLM-driven feature defaults **OFF** and silently degrades to a rule-based 
 via a `modelRole` option in `packages/core/src/services/memory/llm-client.ts`: 7 NL-judgment
 sites use `MASSA_AI_LLM_MODEL`, 3 code-oriented sites (bootstrap seed, reranker,
 code-compressor) use `MASSA_AI_LLM_CODE_MODEL`. Both default to **one shared thinking model**
-(Ollama `qwen3.5:9b`, LM Studio Qwen3.8-9B) so only one stays resident; thinking is switched off
-per request (`think:false` on Ollama, `chat_template_kwargs.enable_thinking=false` on LM Studio,
-which currently ignores it for Qwen3.5-family models — lmstudio-bug-tracker#1990). A thinking
-pass that is not switched off routes structured output into the reasoning channel and can burn
-the 90 s timeout; that is why `qwen3.5:9b` was swapped out once before (`0455084f`).
+(`defaultModels` in `packages/shared/src/config/inference-providers.ts`) so only one stays
+resident; thinking is switched off per request (`think:false` on Ollama,
+`chat_template_kwargs.enable_thinking=false` on LM Studio, which currently ignores it for
+these models — lmstudio-bug-tracker#1990). A thinking pass that is not switched off
+routes structured output into the reasoning channel and can burn the 90 s timeout; that is why
+the same Ollama default was swapped out once before (`0455084f`).
 
 ### Configuration
 
