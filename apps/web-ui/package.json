@@ -1,6 +1,6 @@
 {
   "name": "@massa-ai/web-ui",
-  "version": "1.66.2",
+  "version": "1.67.0",
   "private": true,
   "description": "massa-ai read-only memory + search web browser (served via Tools API)",
   "type": "module",

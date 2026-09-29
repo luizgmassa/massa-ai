@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.67.0] - 2026-09-29
+
 ### Added
 
 - **Agent dispatches are announced by a hook, with model and effort.** Dispatching a massa-ai
