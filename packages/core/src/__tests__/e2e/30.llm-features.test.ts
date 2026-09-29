@@ -11,9 +11,10 @@
  *     MASSA_AI_LLM_ENABLED=true
  *     MASSA_AI_LLM_BASE_URL=http://127.0.0.1:11435/v1
  *     MASSA_AI_LLM_API_KEY=ollama
- *     MASSA_AI_LLM_MODEL=$LLM_MODEL            (default qwen3-vl:8b)
- *     MASSA_AI_LLM_CODE_MODEL=$LLM_CODE_MODEL  (default qwen2.5-coder:7b)
- *   Both are NON-THINKING instruct models on purpose: a thinking model routes
+ *     MASSA_AI_LLM_MODEL=$LLM_MODEL            (default qwen3.5:9b)
+ *     MASSA_AI_LLM_CODE_MODEL=$LLM_CODE_MODEL  (default qwen3.5:9b)
+ *   One thinking model serves both roles, with thinking disabled per request
+ *   (think:false on Ollama). Left thinking, it routes
  *   structured output into the reasoning channel and burns the 90 s timeout
  *   (MASSA_AI_LLM_TIMEOUT_MS default 90000, packages/shared/src/config/index.ts:737)
  *   silently.
@@ -813,7 +814,7 @@ describe.skipIf(!READY)("EB-LLM-3b — the code role reads MASSA_AI_LLM_CODE_MOD
       // this would prove only "some LLM call failed". Query understanding's own
       // degradation is already asserted absent above; assert here that no
       // failure line names the INSTRUCT model.
-      const instructModel = process.env.MASSA_AI_E2E_LLM_MODEL ?? "qwen3-vl:8b";
+      const instructModel = process.env.MASSA_AI_E2E_LLM_MODEL ?? "qwen3.5:9b";
       const failureLines = apiLog
         .split("\n")
         .filter((l) => l.includes("LLM call failed") || l.includes("not found"));

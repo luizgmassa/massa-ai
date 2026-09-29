@@ -48,11 +48,12 @@ bun install
 ./scripts/setup-local-first.sh
 # - Prompts for a local inference provider (Ollama or LM Studio), or set
 #   MASSA_AI_INFERENCE_PROVIDER=ollama|lmstudio to skip the prompt
-# - Ollama: pulls qwen3-embedding:0.6b (embeddings, 1024 dims), qwen3-vl:8b
-#   (default LLM), and qwen2.5-coder:7b (code-oriented LLM sites)
+# - Ollama: pulls qwen3-embedding:0.6b (embeddings, 1024 dims) and qwen3.5:9b
+#   (one LLM for both the default and the code-oriented sites)
 # - LM Studio: installs the `lms` CLI if missing, starts the server, and fetches
-#   text-embedding-qwen3-embedding-0.6b (embeddings, 1024 dims), qwen3-vl-8b-instruct
-#   (default LLM) and qwen2.5-coder-7b-instruct (code-oriented LLM sites) —
+#   text-embedding-qwen3-embedding-0.6b (embeddings, 1024 dims) and Qwen3.8-9B
+#   (one LLM for both sites: keXjos/Qwen3.8-9B-mlx-4Bit on MLX,
+#   empero-ai/Qwen3.8-9B-Distill-GGUF on GGUF) —
 #   override via LMSTUDIO_EMBEDDING_MODEL, MASSA_AI_LLM_MODEL, MASSA_AI_LLM_CODE_MODEL
 # - Creates .env with defaults
 # - Runs bun run diagnose to validate the stack
@@ -636,8 +637,7 @@ ollama serve
 
 # Pull models
 ollama pull qwen3-embedding:0.6b  # embeddings (1024 dims)
-ollama pull qwen3-vl:8b           # default LLM (consolidation, salience, handoff, query rewrite, HyDE)
-ollama pull qwen2.5-coder:7b      # code-oriented LLM sites (bootstrap seed, reranker, code compression)
+ollama pull qwen3.5:9b            # LLM for every site (consolidation, salience, handoff, query rewrite, HyDE, bootstrap seed, reranker, code compression)
 ```
 
 ### Prerequisites (LM Studio)
@@ -694,8 +694,8 @@ status. It does not currently probe LM Studio — verify an LM Studio setup with
 MASSA_AI_LLM_ENABLED=true
 MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
 MASSA_AI_LLM_API_KEY=ollama
-MASSA_AI_LLM_MODEL=qwen3-vl:8b                # default instruct model (NL-judgment sites)
-MASSA_AI_LLM_CODE_MODEL=qwen2.5-coder:7b      # code-oriented sites (bootstrap seed, reranker, compress)
+MASSA_AI_LLM_MODEL=qwen3.5:9b                 # default instruct model (NL-judgment sites)
+MASSA_AI_LLM_CODE_MODEL=qwen3.5:9b            # code-oriented sites (bootstrap seed, reranker, compress)
 # MASSA_AI_LLM_DISABLE_THINK=true             # best-effort thinking-disable (default true; safety net)
 ```
 

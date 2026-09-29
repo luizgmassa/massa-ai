@@ -923,8 +923,8 @@ batch_execute { commands: ["rg 'function' src/", "wc -l src/*.ts"] }
 MASSA_AI_LLM_ENABLED=true
 MASSA_AI_LLM_BASE_URL=http://localhost:11434/v1
 MASSA_AI_LLM_API_KEY=ollama
-MASSA_AI_LLM_MODEL=qwen3-vl:8b                 # NL-judgment sites
-MASSA_AI_LLM_CODE_MODEL=qwen2.5-coder:7b       # code-oriented sites (bootstrap seed, reranker, compress)
+MASSA_AI_LLM_MODEL=qwen3.5:9b                  # NL-judgment sites
+MASSA_AI_LLM_CODE_MODEL=qwen3.5:9b             # code-oriented sites (bootstrap seed, reranker, compress)
 ```
 
 **How to enable (LM Studio):** point the same four variables at LM Studio's
@@ -1234,8 +1234,8 @@ rows default **OFF** and degrade silently when disabled.
 | `llm.enabled` | `MASSA_AI_LLM_ENABLED` | `false` | **OFF** |
 | `llm.baseUrl` | `MASSA_AI_LLM_BASE_URL` | `http://localhost:11434/v1` | LM Studio: `http://localhost:1234/v1` |
 | `llm.apiKey` | `MASSA_AI_LLM_API_KEY` | `ollama` | any non-empty string for either local provider |
-| `llm.model` | `MASSA_AI_LLM_MODEL` | `qwen3-vl:8b` | default instruct model (NL-judgment sites) |
-| `llm.codeModel` | `MASSA_AI_LLM_CODE_MODEL` | `qwen2.5-coder:7b` | code-oriented sites (bootstrap seed, reranker, compress) |
+| `llm.model` | `MASSA_AI_LLM_MODEL` | `qwen3.5:9b` | default instruct model (NL-judgment sites) |
+| `llm.codeModel` | `MASSA_AI_LLM_CODE_MODEL` | `qwen3.5:9b` | code-oriented sites (bootstrap seed, reranker, compress) |
 | `llm.disableThink` | `MASSA_AI_LLM_DISABLE_THINK` | `true` | best-effort thinking-disable (safety net for thinking models) |
 | `llm.temperature` | `MASSA_AI_LLM_TEMPERATURE` | `0.2` | — |
 | `llm.maxOutputTokens` | `MASSA_AI_LLM_MAX_OUTPUT_TOKENS` | `8000` | — |

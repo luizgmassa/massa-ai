@@ -499,7 +499,7 @@ const MARKDOWN_ALLOWED_PREFIXES = [".specs/", "CHANGELOG.md"];
 // class as `benchmarks/llm-judge/fixtures/known-{dup,distinct}.json` (design
 // § Must NOT change).
 const MARKDOWN_HISTORICAL_REPORTS = ["benchmarks/llm-judge/reports/llm-judge-baseline.md"];
-const MARKDOWN_MODEL_TOKEN = /qwen3-embedding|qwen3-vl|qwen2\.5-coder|text-embedding-qwen3-embedding/;
+const MARKDOWN_MODEL_TOKEN = /qwen3-embedding|qwen3-vl|qwen2\.5-coder|qwen3\.5|qwen3\.8|text-embedding-qwen3-embedding/i;
 
 describe("embedding defaults parity (EDC-06)", () => {
   let ref: { model: string; dims: string } | undefined;
@@ -972,21 +972,32 @@ describe("setup-local-first.sh lms load -c values (PDM-10 AC-3, G5)", () => {
     { role: "coding", varName: "CODE_MODEL" },
   ];
 
+  const LLM_LOAD_CTX = SETUP_SCRIPT.match(
+    /^LLM_LOAD_CTX=(\d+)\nif \[ "\$CODE_MODEL" = "\$LLM_MODEL" \]; then\n {4}LLM_LOAD_CTX=(\d+)\nfi$/m,
+  );
+  const ctxOf = (raw: string) => (raw.includes("LLM_LOAD_CTX") ? Number(LLM_LOAD_CTX?.[1]) : Number(raw));
+
+  test("a model shared by instruct and coding loads at the coding context", () => {
+    expect(LLM_LOAD_CTX).not.toBeNull();
+    expect(Number(LLM_LOAD_CTX![1])).toBe(INFERENCE_ROLE_DEFAULTS.instruct.contextWindow);
+    expect(Number(LLM_LOAD_CTX![2])).toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+  });
+
   for (const { role, varName } of LMS_LOAD_ROLES) {
     test(`the real "$LMSTUDIO_CLI" load command for the ${role} role matches INFERENCE_ROLE_DEFAULTS.${role}.contextWindow`, () => {
       const match = SETUP_SCRIPT.match(
-        new RegExp(`"\\$LMSTUDIO_CLI" load -c (\\d+) --ttl "\\$LMS_LOAD_TTL_SECONDS" "\\$${varName}"`),
+        new RegExp(`"\\$LMSTUDIO_CLI" load -c (\\d+|"\\$LLM_LOAD_CTX") --ttl "\\$LMS_LOAD_TTL_SECONDS" "\\$${varName}"`),
       );
       expect(match).not.toBeNull();
-      expect(Number(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
+      expect(ctxOf(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
     });
 
     test(`the echo fallback for the ${role} role matches INFERENCE_ROLE_DEFAULTS.${role}.contextWindow`, () => {
       const match = SETUP_SCRIPT.match(
-        new RegExp(`lms load -c (\\d+) --ttl \\$\\{LMS_LOAD_TTL_SECONDS\\} \\$\\{${varName}\\}`),
+        new RegExp(`lms load -c (\\d+|\\$\\{LLM_LOAD_CTX\\}) --ttl \\$\\{LMS_LOAD_TTL_SECONDS\\} \\$\\{${varName}\\}`),
       );
       expect(match).not.toBeNull();
-      expect(Number(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
+      expect(ctxOf(match![1])).toBe(INFERENCE_ROLE_DEFAULTS[role].contextWindow);
     });
   }
 

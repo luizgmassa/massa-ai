@@ -666,8 +666,8 @@ installer_remove_launchd_agents() {
 # wizard's source cannot observe which string reaches `lms get`.
 installer_resolve_lmstudio_models() {
   EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-qwen3-embedding-0.6b}"
-  LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
-  CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
+  LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3.8-9b}"
+  CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen3.8-9b}"
   EMBEDDING_FETCH="$EMBEDDING_MODEL"
   LLM_FETCH="$LLM_MODEL"
   CODE_FETCH="$CODE_MODEL"
@@ -687,10 +687,10 @@ installer_resolve_lmstudio_models() {
       EMBEDDING_FETCH="https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"
     fi
     if [ -z "${MASSA_AI_LLM_MODEL:-}" ]; then
-      LLM_FETCH="https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit"
+      LLM_FETCH="https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit"
     fi
     if [ -z "${MASSA_AI_LLM_CODE_MODEL:-}" ]; then
-      CODE_FETCH="https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+      CODE_FETCH="https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit"
     fi
     return 0
   fi
@@ -708,10 +708,10 @@ installer_resolve_lmstudio_models() {
     EMBEDDING_FETCH="https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF"
   fi
   if [ -z "${MASSA_AI_LLM_MODEL:-}" ]; then
-    LLM_FETCH="https://huggingface.co/lmstudio-community/Qwen3-VL-8B-Instruct-GGUF"
+    LLM_FETCH="https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF"
   fi
   if [ -z "${MASSA_AI_LLM_CODE_MODEL:-}" ]; then
-    CODE_FETCH="https://huggingface.co/lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF"
+    CODE_FETCH="https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF"
   fi
   return 0
 }

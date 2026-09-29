@@ -47,14 +47,14 @@ const KNOBS = [
     expected: "probe-instruct-model",
     // Provider-derived (T03): the ollama seam entry's instruct default, not a
     // disconnected literal — see inference-providers.ts's `defaultModels`.
-    default: "qwen3-vl:8b",
+    default: "qwen3.5:9b",
   },
   {
     suffix: "CODE_MODEL",
     probe: "probe-code-model",
     field: "codeModel",
     expected: "probe-code-model",
-    default: "qwen2.5-coder:7b",
+    default: "qwen3.5:9b",
   },
   { suffix: "TEMPERATURE", probe: "0.77", field: "temperature", expected: 0.77, default: 0.2 },
   {

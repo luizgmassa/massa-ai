@@ -329,13 +329,15 @@ function resolveProviderIdForLogging(baseUrl: string): string {
  */
 export function _wrapFetchDisableThink(
   baseFetch: typeof globalThis.fetch,
+  field = "think",
+  value: unknown = false,
 ): typeof globalThis.fetch {
   const wrapped = async (input: any, init?: any): Promise<Response> => {
     try {
       if (init?.body && typeof init.body === "string") {
         const parsed = JSON.parse(init.body);
-        if (parsed && typeof parsed === "object" && !("think" in parsed)) {
-          parsed.think = false;
+        if (parsed && typeof parsed === "object" && !(field in parsed)) {
+          parsed[field] = value;
           init = { ...init, body: JSON.stringify(parsed) };
         }
       }
@@ -387,6 +389,11 @@ function buildProvider(llm: ReturnType<typeof getLlmConfig>) {
   }
   if (llm.disableThink && spec.injectsDisableThink) {
     fetchImpl = _wrapFetchDisableThink(fetchImpl ?? globalThis.fetch);
+  }
+  if (llm.disableThink && spec.injectsChatTemplateKwargs) {
+    fetchImpl = _wrapFetchDisableThink(fetchImpl ?? globalThis.fetch, "chat_template_kwargs", {
+      enable_thinking: false,
+    });
   }
   const openai = createOpenAI({
     baseURL: llm.baseUrl,

@@ -43,6 +43,7 @@ describe("provider defaults", () => {
     expect(ollama.defaultLlmBaseUrl).toBe("http://localhost:11434/v1");
     expect(ollama.supportsOllamaVersionProbe).toBe(true);
     expect(ollama.injectsDisableThink).toBe(true);
+    expect(ollama.injectsChatTemplateKwargs).toBe(false);
   });
 
   test("lmstudio defaults", () => {
@@ -51,6 +52,7 @@ describe("provider defaults", () => {
     expect(lmstudio.defaultLlmBaseUrl).toBe("http://localhost:1234/v1");
     expect(lmstudio.supportsOllamaVersionProbe).toBe(false);
     expect(lmstudio.injectsDisableThink).toBe(false);
+    expect(lmstudio.injectsChatTemplateKwargs).toBe(true);
   });
 
   test("lmstudio knownDimensions seeds the measured nomic model at 768", () => {
@@ -109,19 +111,19 @@ describe("INFERENCE_ROLE_DEFAULTS", () => {
 });
 
 describe("per-provider defaultModels trio (PDM-01 AC-1)", () => {
-  test("ollama carries the measured trio", () => {
+  test("ollama serves instruct and coding from one qwen3.5:9b", () => {
     expect(INFERENCE_PROVIDERS.ollama.defaultModels).toEqual({
       embedding: "qwen3-embedding:0.6b",
-      instruct: "qwen3-vl:8b",
-      coding: "qwen2.5-coder:7b",
+      instruct: "qwen3.5:9b",
+      coding: "qwen3.5:9b",
     });
   });
 
-  test("lmstudio carries the measured trio", () => {
+  test("lmstudio serves instruct and coding from one Qwen3.8-9B", () => {
     expect(INFERENCE_PROVIDERS.lmstudio.defaultModels).toEqual({
       embedding: "text-embedding-qwen3-embedding-0.6b",
-      instruct: "qwen3-vl-8b-instruct",
-      coding: "qwen2.5-coder-7b-instruct",
+      instruct: "qwen3.8-9b",
+      coding: "qwen3.8-9b",
     });
   });
 
@@ -145,9 +147,10 @@ describe("per-provider mechanism fields", () => {
   });
 });
 
-// PDM-13. Every literal below was read from a live LM Studio on 2026-09-21,
-// never derived — A-02 measured that a catalog id cannot be computed from its
-// Hugging Face repo path.
+// PDM-13. The embedding literals below were read from a live LM Studio on
+// 2026-09-21; the Qwen3.8-9B id is not measured and is reconciled by the
+// installer after the fetch — A-02 measured that a catalog id cannot be
+// computed from its Hugging Face repo path.
 describe("mlxModels (PDM-13)", () => {
   test("ollama declares no MLX variants — it serves GGUF only", () => {
     expect(INFERENCE_PROVIDERS.ollama.mlxModels).toBeUndefined();
@@ -158,9 +161,12 @@ describe("mlxModels (PDM-13)", () => {
     expect(mlx).toBeDefined();
     expect(Object.keys(mlx!).sort()).toEqual(["coding", "embedding", "instruct"]);
     for (const role of ["embedding", "instruct", "coding"] as const) {
-      expect(mlx![role].repo.startsWith("mlx-community/")).toBe(true);
+      expect(`${role}=${mlx![role].repo.split("/").length}`).toBe(`${role}=2`);
       expect(mlx![role].model.length).toBeGreaterThan(0);
     }
+    expect(mlx!.embedding.repo).toBe("mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ");
+    expect(mlx!.instruct.repo).toBe("keXjos/Qwen3.8-9B-mlx-4Bit");
+    expect(mlx!.coding.repo).toBe("keXjos/Qwen3.8-9B-mlx-4Bit");
   });
 
   // Two of three roles carry ONE id across both formats. That is an assumption
@@ -225,6 +231,12 @@ describe("ggufRepos (PDM-13)", () => {
     const spec = INFERENCE_PROVIDERS.lmstudio;
     expect(spec.ggufRepos!.embedding).toBe("Qwen/Qwen3-Embedding-0.6B-GGUF");
     expect(spec.defaultModels.embedding).toBe("text-embedding-qwen3-embedding-0.6b");
+  });
+
+  test("instruct and coding fetch one Qwen3.8-9B GGUF repo", () => {
+    const repos = INFERENCE_PROVIDERS.lmstudio.ggufRepos!;
+    expect(repos.instruct).toBe("empero-ai/Qwen3.8-9B-Distill-GGUF");
+    expect(repos.coding).toBe("empero-ai/Qwen3.8-9B-Distill-GGUF");
   });
 });
 

@@ -397,8 +397,8 @@ if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
     installer_resolve_lmstudio_models
 else
     EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:0.6b}"
-    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl:8b}"
-    CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+    LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3.5:9b}"
+    CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen3.5:9b}"
     # Ollama pulls by the id itself; there is no second name to resolve.
     EMBEDDING_FETCH="$EMBEDDING_MODEL"
     LLM_FETCH="$LLM_MODEL"
@@ -437,6 +437,10 @@ fi
 # an explicit `lms unload` after each role's use) if idle memory pressure is
 # reported.
 LMS_LOAD_TTL_SECONDS=600
+LLM_LOAD_CTX=16384
+if [ "$CODE_MODEL" = "$LLM_MODEL" ]; then
+    LLM_LOAD_CTX=32768
+fi
 # Evict whatever is already resident before adding three more models to the same
 # RAM/VRAM pool. A machine that has been serving a 32B model all afternoon has
 # no room for the trio below, and LM Studio's failure mode for that is a load
@@ -462,7 +466,7 @@ if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
         if [ "$LMS_LOADS_EMBEDDING" = true ]; then
             "$LMSTUDIO_CLI" load -c 8192 --ttl "$LMS_LOAD_TTL_SECONDS" "$EMBEDDING_MODEL" || true
         fi
-        "$LMSTUDIO_CLI" load -c 16384 --ttl "$LMS_LOAD_TTL_SECONDS" "$LLM_MODEL" || true
+        "$LMSTUDIO_CLI" load -c "$LLM_LOAD_CTX" --ttl "$LMS_LOAD_TTL_SECONDS" "$LLM_MODEL" || true
         if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
             "$LMSTUDIO_CLI" load -c 32768 --ttl "$LMS_LOAD_TTL_SECONDS" "$CODE_MODEL" || true
         fi
@@ -471,7 +475,7 @@ if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
         if [ "$LMS_LOADS_EMBEDDING" = true ]; then
             echo -e "      lms load -c 8192 --ttl ${LMS_LOAD_TTL_SECONDS} ${EMBEDDING_MODEL}"
         fi
-        echo -e "      lms load -c 16384 --ttl ${LMS_LOAD_TTL_SECONDS} ${LLM_MODEL}"
+        echo -e "      lms load -c ${LLM_LOAD_CTX} --ttl ${LMS_LOAD_TTL_SECONDS} ${LLM_MODEL}"
         if [ "$CODE_MODEL" != "$LLM_MODEL" ]; then
             echo -e "      lms load -c 32768 --ttl ${LMS_LOAD_TTL_SECONDS} ${CODE_MODEL}"
         fi
@@ -636,7 +640,7 @@ ENV_FILE="${PROJECT_ROOT}/.env"
 # `inference_model_exists` echoes yes/no; the prompt only offers the LLM-gated
 # toggles when the model is genuinely pulled.
 LLM_MODEL_PRESENT=false
-if [ "$(inference_model_exists "${LLM_MODEL:-qwen3-vl:8b}")" = "yes" ]; then
+if [ "$(inference_model_exists "${LLM_MODEL:-qwen3.5:9b}")" = "yes" ]; then
     LLM_MODEL_PRESENT=true
 fi
 

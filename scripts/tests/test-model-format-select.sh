@@ -198,7 +198,7 @@ resolve() {
 # search criteria" in every format. The assertion this replaces pinned the
 # defect as the contract.
 check_eq "gguf: the ids stay ids and all three fetch by repo URL" \
-  "E=text-embedding-qwen3-embedding-0.6b|EF=https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF|L=qwen3-vl-8b-instruct|LF=https://huggingface.co/lmstudio-community/Qwen3-VL-8B-Instruct-GGUF|C=qwen2.5-coder-7b-instruct|CF=https://huggingface.co/lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF" \
+  "E=text-embedding-qwen3-embedding-0.6b|EF=https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF|L=qwen3.8-9b|LF=https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF|C=qwen3.8-9b|CF=https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF" \
   "$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf')"
 
 # Each GGUF substitution is gated on its own override, exactly as the MLX ones
@@ -207,12 +207,12 @@ gguf_emb_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf; LMSTUDIO_EMBEDDING_MOD
 check_contains "gguf + LMSTUDIO_EMBEDDING_MODEL fetches the named model" \
   "EF=my-embedder|" "$gguf_emb_override"
 check_contains "and leaves the instruct fetch on the GGUF repo" \
-  "LF=https://huggingface.co/lmstudio-community/Qwen3-VL-8B-Instruct-GGUF" "$gguf_emb_override"
+  "LF=https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF" "$gguf_emb_override"
 check_contains "gguf + MASSA_AI_LLM_CODE_MODEL fetches the named model" \
   "CF=my-coder" "$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf; MASSA_AI_LLM_CODE_MODEL=my-coder')"
 
 check_eq "mlx with no overrides: embedding id changes, all three fetch by repo URL" \
-  "E=qwen3-embedding-0.6b-dwq|EF=https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ|L=qwen3-vl-8b-instruct|LF=https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit|C=qwen2.5-coder-7b-instruct|CF=https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit" \
+  "E=qwen3-embedding-0.6b-dwq|EF=https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ|L=qwen3.8-9b|LF=https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit|C=qwen3.8-9b|CF=https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit" \
   "$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx')"
 
 emb_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx; LMSTUDIO_EMBEDDING_MODEL=text-embedding-qwen3-embedding-0.6b')"
@@ -226,7 +226,7 @@ case "$emb_override" in
 esac
 # The other two roles are untouched by an embedding override.
 check_contains "an embedding override leaves the instruct fetch on MLX" \
-  "LF=https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit" "$emb_override"
+  "LF=https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit" "$emb_override"
 
 llm_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx; MASSA_AI_LLM_MODEL=my-instruct')"
 check_contains "mlx + MASSA_AI_LLM_MODEL fetches the named model" "LF=my-instruct|" "$llm_override"
