@@ -17,7 +17,7 @@
  * project; sourceIds in the event payload are observation ids (informational).
  */
 
-import { logger, MemoryLevel, MemoryType } from "@massa-ai/shared";
+import { logger, MemoryLevel, MemoryType, truncateToTokenLimit } from "@massa-ai/shared";
 import { randomUUID } from "crypto";
 import { config } from "@massa-ai/shared";
 import { getMemoryRepository } from "../../data/memory/memory-repository-factory.js";
@@ -84,6 +84,7 @@ export class ObservationConsolidationJob {
 
   private lastRunAt = 0;
   private newSinceRun = 0;
+  private running = false;
   /** Calls observed by tests. */
   public runCalls = 0;
 
@@ -149,6 +150,19 @@ export class ObservationConsolidationJob {
    */
   async runOnce(projectId: string): Promise<ObservationConsolidationResult> {
     this.runCalls++;
+    if (this.running) {
+      logger.debug("observation consolidation: skipped, a run is in flight", { projectId });
+      return { consolidated: false, batchesCreated: 0 };
+    }
+    this.running = true;
+    try {
+      return await this.consolidateWindow(projectId);
+    } finally {
+      this.running = false;
+    }
+  }
+
+  private async consolidateWindow(projectId: string): Promise<ObservationConsolidationResult> {
     const noop: ObservationConsolidationResult = {
       consolidated: false,
       batchesCreated: 0,
@@ -267,14 +281,18 @@ export const observationConsolidationJob = new ObservationConsolidationJob();
 /**
  * Build the LLM prompt for an observation-consolidation window. Reuses the
  * Phase-1 ConsolidatedBatchSchema (same {summary,type,level,rationale,sourceIds}
- * shape) so downstream consumers are uniform. Observations carry their payload
- * JSON (capped at ingestion) as the only content signal.
+ * shape) so downstream consumers are uniform. Observations carry a compact
+ * digest of their payload JSON as the only content signal.
  */
-function buildObservationPrompt(window: Observation[]): string {
+export function buildObservationPrompt(window: Observation[]): string {
+  const observationTokens = Math.min(
+    MAX_OBSERVATION_TOKENS,
+    Math.floor(MAX_WINDOW_TOKENS / Math.max(window.length, 1)),
+  );
   const items = window
     .map(
       (o, i) =>
-        `[${i}] id=${o.id} source=${o.source} importance=${o.importance.toFixed(2)}\n${o.payloadJson}`,
+        `[${i}] id=${o.id} source=${o.source} importance=${o.importance.toFixed(2)}\n${digestPayload(o.payloadJson, observationTokens)}`,
     )
     .join("\n");
   return [
@@ -288,4 +306,40 @@ function buildObservationPrompt(window: Observation[]): string {
     "",
     "Return JSON: { summary, type, level, rationale, sourceIds }.",
   ].join("\n");
+}
+
+const PROMPT_BOOKKEEPING_KEYS = new Set([
+  "session_id",
+  "transcript_path",
+  "cwd",
+  "prompt_id",
+  "tool_use_id",
+  "agent_id",
+  "hook_event_name",
+  "permission_mode",
+  "effort",
+  "duration_ms",
+]);
+const MAX_PROMPT_FIELD_CHARS = 400;
+const MAX_OBSERVATION_TOKENS = 300;
+const MAX_WINDOW_TOKENS = 2400;
+
+function digestPayload(payloadJson: string, maxTokens: number): string {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(payloadJson);
+  } catch {
+    return truncateToTokenLimit(payloadJson, maxTokens);
+  }
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    payload = Object.fromEntries(
+      Object.entries(payload).filter(([key]) => !PROMPT_BOOKKEEPING_KEYS.has(key)),
+    );
+  }
+  const compact = JSON.stringify(payload, (_key, value) =>
+    typeof value === "string" && value.length > MAX_PROMPT_FIELD_CHARS
+      ? `${value.slice(0, MAX_PROMPT_FIELD_CHARS)}…`
+      : value,
+  );
+  return truncateToTokenLimit(compact ?? "", maxTokens);
 }

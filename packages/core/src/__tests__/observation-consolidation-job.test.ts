@@ -11,6 +11,7 @@ import { describe, expect, it, beforeEach } from "bun:test";
 import { setTimeout as sleep } from "timers/promises";
 import {
   ObservationConsolidationJob,
+  buildObservationPrompt,
 } from "../services/jobs/observation-consolidation-job.js";
 import {
   MemoryObservationStore,
@@ -264,5 +265,130 @@ describe("ObservationConsolidationJob", () => {
     job.maybeRun("p"); // second call crosses minObservations=2
     await sleep(20);
     expect(job.runCalls).toBeGreaterThan(before);
+  });
+
+  it("runOnce is single-flight: a run started while one is in flight makes no LLM call", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const surface = enabledSurface();
+    const slowSurface: LlmSurface = {
+      isEnabled: () => true,
+      async object<T>(prompt: string, schema: z.ZodSchema<T>) {
+        surface.calls++;
+        await gate;
+        return surface.object(prompt, schema);
+      },
+    };
+    const job = new ObservationConsolidationJob({
+      llm: slowSurface,
+      store,
+      memoryRepo: makeFakeMemoryRepo(),
+      maxWindow: 8,
+      minObservations: 1,
+      minIntervalMs: 0,
+    });
+
+    const first = job.runOnce("p");
+    const second = await job.runOnce("p");
+    expect(second.consolidated).toBe(false);
+    expect(surface.calls).toBe(1);
+
+    release();
+    expect((await first).consolidated).toBe(true);
+
+    const third = await job.runOnce("p");
+    expect(third.consolidated).toBe(true);
+    expect(surface.calls).toBe(2);
+  });
+});
+
+describe("ObservationConsolidationJob single-flight release", () => {
+  it("releases the guard when a run throws", async () => {
+    let calls = 0;
+    const good = makeStoreWith(4);
+    const flakyStore = {
+      listRecent(projectId: string, limit: number) {
+        calls++;
+        if (calls === 1) return [{ id: "bad-1" }, { id: "bad-2" }] as any;
+        return good.listRecent(projectId, limit);
+      },
+    } as any;
+    const job = new ObservationConsolidationJob({
+      llm: enabledSurface(),
+      store: flakyStore,
+      memoryRepo: makeFakeMemoryRepo(),
+      maxWindow: 8,
+      minObservations: 1,
+      minIntervalMs: 0,
+    });
+    await expect(job.runOnce("p")).rejects.toThrow();
+    expect((await job.runOnce("p")).consolidated).toBe(true);
+  });
+});
+
+describe("buildObservationPrompt", () => {
+  function observation(id: string, payload: Record<string, unknown>) {
+    return {
+      id,
+      projectId: "p",
+      sessionId: null,
+      source: "post-tool-use",
+      payloadJson: JSON.stringify(payload),
+      importance: 0.5,
+      createdAt: Date.now(),
+    } as any;
+  }
+
+  const hookPayload = (i: number) => ({
+    session_id: `3adaa66f-8d51-4644-a838-db58b4200a4${i}`,
+    transcript_path: `/Users/someone/.claude/projects/x/transcript-${i}.jsonl`,
+    cwd: "/Users/someone/Projects/app",
+    prompt_id: "29e16dea-b076-4d8d-9e39-b0702e347218",
+    tool_use_id: "toolu_0187jKeyXduTSrdZqtzs6jpJ",
+    hook_event_name: "PostToolUse",
+    permission_mode: "auto",
+    tool_name: "Bash",
+    tool_input: { command: `bun test packages/core/src/__tests__/file-${i}.test.ts` },
+    tool_response: { stdout: `START-${i} ` + "x".repeat(60_000), stderr: "" },
+  });
+
+  it("caps the prompt for a full window of oversized hook payloads", () => {
+    const window = Array.from({ length: 8 }, (_, i) => observation(`obs-${i}`, hookPayload(i)));
+    const prompt = buildObservationPrompt(window);
+    expect(prompt.length).toBeLessThan(12_000);
+  });
+
+  it("keeps the content signal and every source id", () => {
+    const window = Array.from({ length: 8 }, (_, i) => observation(`obs-${i}`, hookPayload(i)));
+    const prompt = buildObservationPrompt(window);
+    for (let i = 0; i < 8; i++) {
+      expect(prompt).toContain(`id=obs-${i}`);
+      expect(prompt).toContain(`file-${i}.test.ts`);
+      expect(prompt).toContain(`START-${i}`);
+    }
+    expect(prompt).toContain('"tool_name":"Bash"');
+  });
+
+  it("drops hook bookkeeping fields that carry no content", () => {
+    const prompt = buildObservationPrompt([observation("obs-a", hookPayload(1)), observation("obs-b", hookPayload(2))]);
+    for (const key of ["session_id", "transcript_path", "cwd", "prompt_id", "tool_use_id", "hook_event_name", "permission_mode"]) {
+      expect(prompt).not.toContain(`"${key}"`);
+    }
+  });
+
+  it("keeps a large window inside the same total budget", () => {
+    const window = Array.from({ length: 50 }, (_, i) => observation(`obs-${i}`, hookPayload(i)));
+    const prompt = buildObservationPrompt(window);
+    expect(prompt.length).toBeLessThan(16_000);
+    expect(prompt).toContain("id=obs-49");
+  });
+
+  it("falls back to a capped raw payload when payloadJson is not JSON", () => {
+    const raw = { ...observation("obs-raw", {}), payloadJson: "not json " + "y".repeat(50_000) };
+    const prompt = buildObservationPrompt([raw, observation("obs-b", { prompt: "hello" })]);
+    expect(prompt).toContain("not json");
+    expect(prompt.length).toBeLessThan(3_000);
   });
 });
