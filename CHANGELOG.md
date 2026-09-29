@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Observation consolidation timed out on almost every LLM call.** The prompt carried the raw
+  hook payload of each of its 8 observations — full `tool_response` bodies plus session ids,
+  transcript paths and working directories — so a window measured a median ~11k tokens and up
+  to ~35k, past a local model's 90 s budget and, at the top, past its loaded context (LM Studio
+  answered `Bad Request`: "tokens to keep … greater than the context length"). Each observation
+  is now a compact digest: bookkeeping keys dropped, long string fields cut to 400 characters,
+  and the whole observation capped at ~300 tokens. On 50 real windows the prompt went from a
+  median 38k characters (max 128k) to 7.4k (max 9.2k).
+- **Observation consolidation runs piled up on one local model.** Every 8 hook observations
+  fired a new run without waiting for the previous one, and up to 14 calls were measured
+  queued at once, each waiting past its own timeout. `runOnce` is now single-flight: a run
+  started while one is in flight returns without calling the LLM.
+- **An unreachable LLM endpoint was retried on every call.** With the local server down, each
+  LLM call spent ~6 s in SDK retries and logged a misleading `llm reasoning-recovery empty`
+  warning. After 3 consecutive connection failures to one `llm.baseUrl`, LLM calls now
+  degrade immediately for 60 s, with one `LLM endpoint unreachable — pausing LLM calls`
+  warning; the first call after the pause probes the endpoint again. Connection failures no
+  longer run reasoning-channel recovery.
+
 ## [1.66.1] - 2026-09-26
 
 ### Fixed
