@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.68.0] - 2026-09-30
+
 ### Added
 
 - **`setup-local-first.sh --uninstall-services` removes the two login agents.** Nothing used to
