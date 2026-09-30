@@ -476,7 +476,12 @@ installer_start_mlx_embedding_sidecar() {
   local plist="${HOME}/Library/LaunchAgents/ai.massa.mlx-embed.plist"
   local log="${HOME}/.config/massa-ai/mlx-embed.log"
 
-  if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && [ -d "${HOME}/Library/LaunchAgents" ]; then
+  if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && [ -d "${HOME}/Library/LaunchAgents" ] \
+    && ! { mkdir -p "${HOME}/.config/massa-ai" 2>/dev/null && : > "$plist" 2>/dev/null; }; then
+    echo "  ⚠  could not write ${plist} — starting the sidecar directly."
+    echo "     It will not come back after a reboot."
+    nohup "${venv}/bin/python" "$script" >> "$log" 2>&1 &
+  elif [ "$(uname -s 2>/dev/null)" = "Darwin" ] && [ -d "${HOME}/Library/LaunchAgents" ]; then
     cat > "$plist" <<PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -612,6 +617,24 @@ PLISTEOF
   return 0
 }
 
+installer_remove_launchd_agents() {
+  local label plist domain
+
+  [ "$(uname -s 2>/dev/null)" = "Darwin" ] || return 0
+  domain="gui/$(id -u)"
+  for label in ai.massa.mlx-embed ai.massa.lmstudio-server; do
+    plist="${HOME}/Library/LaunchAgents/${label}.plist"
+    launchctl bootout "${domain}/${label}" >/dev/null 2>&1 || true
+    [ -e "$plist" ] || [ -L "$plist" ] || continue
+    if rm -f "$plist" 2>/dev/null; then
+      echo "  ✓ launchd agent removed: ${label}"
+    else
+      echo "  ⚠  could not remove ${plist} — delete it by hand."
+    fi
+  done
+  return 0
+}
+
 # installer_resolve_lmstudio_models
 #
 # Resolves the three LM Studio model ids AND the three specs `lms get` is
@@ -643,8 +666,8 @@ PLISTEOF
 # wizard's source cannot observe which string reaches `lms get`.
 installer_resolve_lmstudio_models() {
   EMBEDDING_MODEL="${LMSTUDIO_EMBEDDING_MODEL:-text-embedding-qwen3-embedding-0.6b}"
-  LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
-  CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
+  LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3.8-9b}"
+  CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen3.8-9b}"
   EMBEDDING_FETCH="$EMBEDDING_MODEL"
   LLM_FETCH="$LLM_MODEL"
   CODE_FETCH="$CODE_MODEL"
@@ -664,10 +687,10 @@ installer_resolve_lmstudio_models() {
       EMBEDDING_FETCH="https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"
     fi
     if [ -z "${MASSA_AI_LLM_MODEL:-}" ]; then
-      LLM_FETCH="https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit"
+      LLM_FETCH="https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit"
     fi
     if [ -z "${MASSA_AI_LLM_CODE_MODEL:-}" ]; then
-      CODE_FETCH="https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
+      CODE_FETCH="https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit"
     fi
     return 0
   fi
@@ -685,10 +708,10 @@ installer_resolve_lmstudio_models() {
     EMBEDDING_FETCH="https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF"
   fi
   if [ -z "${MASSA_AI_LLM_MODEL:-}" ]; then
-    LLM_FETCH="https://huggingface.co/lmstudio-community/Qwen3-VL-8B-Instruct-GGUF"
+    LLM_FETCH="https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF"
   fi
   if [ -z "${MASSA_AI_LLM_CODE_MODEL:-}" ]; then
-    CODE_FETCH="https://huggingface.co/lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF"
+    CODE_FETCH="https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF"
   fi
   return 0
 }

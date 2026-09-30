@@ -237,8 +237,8 @@ installer_provider_defaults() {
       # on both providers; the per-provider behaviour still comes from the seam,
       # never from this literal.
       LLM_DISABLE_THINK="true"
-      LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl-8b-instruct}"
-      CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
+      LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3.8-9b}"
+      CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen3.8-9b}"
       ;;
     *)
       EMBEDDING_PROVIDER="ollama"
@@ -246,8 +246,8 @@ installer_provider_defaults() {
       LLM_BASE_URL="${OLLAMA_URL:-http://localhost:11434}/v1"
       LLM_API_KEY="ollama"
       LLM_DISABLE_THINK="true"
-      LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3-vl:8b}"
-      CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+      LLM_MODEL="${MASSA_AI_LLM_MODEL:-qwen3.5:9b}"
+      CODE_MODEL="${MASSA_AI_LLM_CODE_MODEL:-qwen3.5:9b}"
       ;;
   esac
 }

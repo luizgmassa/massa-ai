@@ -139,11 +139,13 @@ describe("MLX model parity — setup-local-first.sh vs the seam (PDM-13)", () =>
   // A regression here ships a config LM Studio cannot resolve.
   test("instruct and coding keep one id each in the resolver, not two", () => {
     const body = read(LIB);
-    for (const role of ["instruct", "coding"] as const) {
+    const roles = ["instruct", "coding"] as const;
+    for (const role of roles) {
       const id = MLX[role].model;
       expect(MLX[role].model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels[role]);
       const hits = [...body.matchAll(new RegExp(id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))];
-      expect(`${role} occurrences=${hits.length}`).toBe(`${role} occurrences=1`);
+      const sharing = roles.filter((r) => MLX[r].model === id).length;
+      expect(`${role} occurrences=${hits.length}`).toBe(`${role} occurrences=${sharing}`);
     }
   });
 

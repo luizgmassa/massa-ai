@@ -514,7 +514,7 @@ describe("renderConfig — field guide machine tokens render in <code> (T12, APU
 
   it("wraps the LLM base URL + model examples in <code>", () => {
     expect(html).toContain("<code>http://localhost:11434/v1</code>");
-    expect(html).toContain("<code>qwen3-vl:8b</code>");
+    expect(html).toContain("<code>qwen3.5:9b</code>");
   });
 
   it("wraps the capturePolicy DEFAULT_POLICY identifier in <code>", () => {

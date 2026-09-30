@@ -178,10 +178,10 @@ if [ -z "$DECISION_SRC" ]; then
 else
   ok "the :500 LLM-enable decision extracted from setup-local-first.sh"
   case "$DECISION_SRC" in
-    *'${LLM_MODEL:-qwen3-vl:8b}'*)
-      ok "the enable decision falls back to the new instruct default (qwen3-vl:8b)" ;;
+    *'${LLM_MODEL:-qwen3.5:9b}'*)
+      ok "the enable decision falls back to the new instruct default (qwen3.5:9b)" ;;
     *)
-      fail "the enable decision does not fall back to qwen3-vl:8b — retired literal or extractor rotted" ;;
+      fail "the enable decision does not fall back to qwen3.5:9b — retired literal or extractor rotted" ;;
   esac
 
   run_decision() {
@@ -204,23 +204,49 @@ else
     "false" "$(run_decision no 'custom-instruct-model')"
 fi
 
-# ── The `:344` dedup guard flip (T12, design R-09) ───────────
-# Before this feature both LM Studio chat slots defaulted to the same id
-# (qwen/qwen3-4b-2507), so `[ "$CODE_MODEL" != "$LLM_MODEL" ]` skipped the
-# second pull. The new trio gives LM Studio distinct instruct/coding ids, so
-# the guard must now read true (pull both) on that branch — asserted on the
-# actual literals the lmstudio branch resolves to, not a re-implementation of
-# the guard.
+# ── One shared chat model (instruct = coding) ────────────────
+# Both roles now default to one model, so the wizard pulls it once and loads it
+# once — at the coding role's 32k context, since LM Studio fixes context at load
+# time and a 16k instance would reject every code-role prompt past 16k.
 LMS_LLM_DEFAULT="$(grep -oE 'LLM_MODEL="\$\{MASSA_AI_LLM_MODEL:-[^}]+\}"' "$SETUP_SCRIPT" | sed -n '1p' | sed -E 's/.*:-([^}]+)\}.*/\1/')"
 LMS_CODE_DEFAULT="$(grep -oE 'CODE_MODEL="\$\{MASSA_AI_LLM_CODE_MODEL:-[^}]+\}"' "$SETUP_SCRIPT" | sed -n '1p' | sed -E 's/.*:-([^}]+)\}.*/\1/')"
-if [ -n "$LMS_LLM_DEFAULT" ] && [ -n "$LMS_CODE_DEFAULT" ]; then
-  if [ "$LMS_LLM_DEFAULT" != "$LMS_CODE_DEFAULT" ]; then
-    ok "the LM Studio dedup guard now pulls both models (${LMS_LLM_DEFAULT} != ${LMS_CODE_DEFAULT})"
-  else
-    fail "the LM Studio dedup guard still skips the code model (${LMS_LLM_DEFAULT} = ${LMS_CODE_DEFAULT})"
-  fi
+if [ -n "$LMS_LLM_DEFAULT" ] && [ "$LMS_LLM_DEFAULT" = "$LMS_CODE_DEFAULT" ]; then
+  ok "instruct and coding share one default (${LMS_LLM_DEFAULT}), so the second pull is skipped"
 else
-  fail "could not extract the LM Studio LLM_MODEL/CODE_MODEL defaults"
+  fail "instruct and coding do not share one default (${LMS_LLM_DEFAULT:-?} vs ${LMS_CODE_DEFAULT:-?})"
+fi
+
+CTX_SRC="$(sed -n '/^LLM_LOAD_CTX=16384$/,/^fi$/p' "$SETUP_SCRIPT")"
+if [ -z "$CTX_SRC" ]; then
+  fail "the shared-model load context block extracted from setup-local-first.sh (found nothing)"
+else
+  load_ctx() { LLM_MODEL="$1" CODE_MODEL="$2" bash -c 'eval "$1"; echo "$LLM_LOAD_CTX"' _ "$CTX_SRC"; }
+  check_eq "a shared instruct/coding model loads at the coding context" "32768" "$(load_ctx m m)"
+  check_eq "distinct models keep the instruct context" "16384" "$(load_ctx a b)"
+  if grep -qF 'load -c "$LLM_LOAD_CTX" --ttl "$LMS_LOAD_TTL_SECONDS" "$LLM_MODEL"' "$SETUP_SCRIPT"; then
+    ok "the instruct model is loaded at LLM_LOAD_CTX"
+  else
+    fail "the instruct model is not loaded at LLM_LOAD_CTX"
+  fi
+  if grep -qF 'installer_set_lmstudio_context_default "$LMSTUDIO_CLI" "$LLM_MODEL" "$LLM_LOAD_CTX"' "$SETUP_SCRIPT"; then
+    ok "the instruct model's LM Studio default context is LLM_LOAD_CTX"
+  else
+    fail "the instruct model's LM Studio default context is not LLM_LOAD_CTX"
+  fi
+fi
+
+ARGS_SRC="$(sed -n '/^case "\${1:-}" in$/,/^esac$/p' "$SETUP_SCRIPT")"
+if [ -z "$ARGS_SRC" ]; then
+  fail "the argument dispatch extracted from setup-local-first.sh (found nothing)"
+else
+  run_args() {
+    bash -c 'installer_remove_launchd_agents() { echo REMOVED; }; src="$1"; shift; eval "$src"; echo CONTINUED' \
+      _ "$ARGS_SRC" "$@" 2>&1
+    echo "rc=$?"
+  }
+  check_eq "no argument continues into the install" "CONTINUED rc=0" "$(run_args | tr '\n' ' ' | sed 's/ $//')"
+  check_eq "--uninstall-services removes and stops" "REMOVED rc=0" \
+    "$(run_args --uninstall-services | tr '\n' ' ' | sed 's/ $//')"
 fi
 
 # ── The caller contract the byte-identity AC does not cover ──

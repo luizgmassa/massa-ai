@@ -86,7 +86,7 @@ import {
   _resolveLlmConfig,
   _resetLlmFailureStreaksForTesting,
 } from "../services/memory/llm-client.js";
-import { INFERENCE_PROVIDERS } from "@massa-ai/shared/inference-providers";
+import { INFERENCE_PROVIDERS, INFERENCE_ROLE_DEFAULTS } from "@massa-ai/shared/inference-providers";
 import { z } from "zod";
 
 const sampleSchema = z.object({
@@ -342,13 +342,12 @@ describe("llm-client — per-task model routing (T4)", () => {
     expect(lastModel).toBe(cfgModel ?? DEFAULT_LLM_MODEL);
     // The constant itself must be the pure-instruct default of whichever
     // provider the running config is active for (per-provider-default-models
-    // T01/T03) — not the retired "qwen2.5:7b-instruct"/"qwen3.5:9b" literals.
+    // T01/T03) — not the retired "qwen2.5:7b-instruct" literal.
     // Provider-agnostic on purpose: this suite intentionally does not pin
     // embedding.provider (see docblock), and this host's own config may name
     // either provider.
     const instructDefaults = Object.values(INFERENCE_PROVIDERS).map((p) => p.defaultModels.instruct);
     expect(instructDefaults).toContain(DEFAULT_LLM_MODEL);
-    expect(DEFAULT_LLM_MODEL).not.toBe("qwen3.5:9b");
     expect(DEFAULT_LLM_MODEL).not.toBe("qwen2.5:7b-instruct");
   });
 
@@ -524,6 +523,27 @@ describe("llm-client — _wrapFetchDisableThink", () => {
     });
     const parsed = JSON.parse(capturedInit.body);
     expect(parsed.think).toBe(true); // unchanged
+  });
+
+  test("injects a caller-chosen field instead of think when given one", async () => {
+    let capturedInit: any = null;
+    const fakeFetch = async (_input: any, init?: any) => {
+      capturedInit = init;
+      return new Response("{}");
+    };
+    const wrapped = _wrapFetchDisableThink(fakeFetch as any, "chat_template_kwargs", {
+      enable_thinking: false,
+    });
+    await wrapped("http://test", { method: "POST", body: JSON.stringify({ messages: [] }) });
+    const parsed = JSON.parse(capturedInit.body);
+    expect(parsed.chat_template_kwargs).toEqual({ enable_thinking: false });
+    expect(parsed.think).toBeUndefined();
+
+    await wrapped("http://test", {
+      method: "POST",
+      body: JSON.stringify({ chat_template_kwargs: { enable_thinking: true } }),
+    });
+    expect(JSON.parse(capturedInit.body).chat_template_kwargs).toEqual({ enable_thinking: true });
   });
 
   test("leaves non-JSON body untouched (no throw)", async () => {
@@ -953,6 +973,28 @@ describe("llm-client — _resolveLlmConfig seam-derived fallbacks (T05)", () => 
     expect(result.model).toBe(INFERENCE_PROVIDERS.lmstudio.defaultModels.coding);
   });
 
+  test("one model serving both roles gets one context window, the larger", () => {
+    const shared = { model: "m", codeModel: "m", contextWindow: 16384, codeContextWindow: 32768 };
+    expect(_resolveLlmConfig(shared, "instruct", null).contextWindow).toBe(32768);
+    expect(_resolveLlmConfig(shared, "code", null).contextWindow).toBe(32768);
+    const flipped = { ...shared, contextWindow: 65536 };
+    expect(_resolveLlmConfig(flipped, "code", null).contextWindow).toBe(65536);
+  });
+
+  test("distinct models keep their own context windows", () => {
+    const split = { model: "a", codeModel: "b", contextWindow: 16384, codeContextWindow: 32768 };
+    expect(_resolveLlmConfig(split, "instruct", null).contextWindow).toBe(16384);
+    expect(_resolveLlmConfig(split, "code", null).contextWindow).toBe(32768);
+  });
+
+  test("the shared default model resolves one context window on both roles", () => {
+    const instruct = _resolveLlmConfig(undefined, "instruct", null);
+    const code = _resolveLlmConfig(undefined, "code", null);
+    expect(instruct.model).toBe(code.model);
+    expect(instruct.contextWindow).toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+    expect(code.contextWindow).toBe(INFERENCE_ROLE_DEFAULTS.coding.contextWindow);
+  });
+
   test("disableThink follows the resolved provider's injectsDisableThink, not a hardcoded true", () => {
     const ollamaResult = _resolveLlmConfig(undefined, "instruct", null);
     expect(ollamaResult.disableThink).toBe(INFERENCE_PROVIDERS.ollama.injectsDisableThink);
@@ -980,8 +1022,9 @@ describe("llm-client — _resolveLlmConfig seam-derived fallbacks (T05)", () => 
   });
 
   test("per-role context window resolves from INFERENCE_ROLE_DEFAULTS: instruct 16384, coding 32768", () => {
-    expect(_resolveLlmConfig(undefined, "instruct", null).contextWindow).toBe(16384);
-    expect(_resolveLlmConfig(undefined, "code", null).contextWindow).toBe(32768);
+    const split = { model: "a", codeModel: "b" };
+    expect(_resolveLlmConfig(split, "instruct", null).contextWindow).toBe(16384);
+    expect(_resolveLlmConfig(split, "code", null).contextWindow).toBe(32768);
   });
 
   test("config values win over every role-table/seam default (PDM-12 AC-2 shape)", () => {
@@ -1073,7 +1116,7 @@ describe("llm-client — buildProvider sends per-role num_ctx (T06 / PDM-08, PDM
     _setJsonSchemaSupportedForTesting(false);
   });
 
-  test("ollama: instruct role's chat request carries options.num_ctx = 16384", async () => {
+  test("ollama: the shared default model's instruct request carries the coding num_ctx = 32768", async () => {
     let captured: any = null;
     const origFetch = globalThis.fetch;
     (globalThis as any).fetch = async (_input: any, init?: any) => {
@@ -1088,7 +1131,7 @@ describe("llm-client — buildProvider sends per-role num_ctx (T06 / PDM-08, PDM
         body: JSON.stringify({ messages: [] }),
       });
       const parsed = JSON.parse(captured.body);
-      expect(parsed.options.num_ctx).toBe(16384);
+      expect(parsed.options.num_ctx).toBe(32768);
     } finally {
       globalThis.fetch = origFetch;
     }
@@ -1114,13 +1157,26 @@ describe("llm-client — buildProvider sends per-role num_ctx (T06 / PDM-08, PDM
     }
   });
 
-  test("lmstudio: buildProvider attaches no fetch wrapper at all — num_ctx never sent (spec A-07)", async () => {
-    _setLlmBaseUrlForTesting("http://localhost:1234/v1");
-    await llmComplete("hello", { label: "test" });
-    // LM Studio has both appliesContextPerRequest=false and
-    // injectsDisableThink=false, so no wrapped fetch is attached — the
-    // strongest available proof that num_ctx is never sent to it.
-    expect(lastProviderOpts.fetch).toBeUndefined();
+  test("lmstudio: the wrapped request never carries num_ctx (spec A-07)", async () => {
+    let captured: any = null;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (_input: any, init?: any) => {
+      captured = init;
+      return new Response("{}");
+    };
+    try {
+      _setLlmBaseUrlForTesting("http://localhost:1234/v1");
+      await llmComplete("hello", { label: "test", modelRole: "code" });
+      await lastProviderOpts.fetch("http://test", {
+        method: "POST",
+        body: JSON.stringify({ messages: [] }),
+      });
+      const parsed = JSON.parse(captured.body);
+      expect(parsed.options).toBeUndefined();
+      expect(parsed.think).toBeUndefined();
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 });
 
@@ -1147,11 +1203,49 @@ describe("llm-client — provider-aware gating (LIP-07)", () => {
     }
   });
 
-  test("lmstudio: buildProvider does NOT attach a wrapped fetch (no think:false injection)", async () => {
+  test("lmstudio: the request asks the chat template to stop thinking, not think:false", async () => {
     _setJsonSchemaSupportedForTesting(false);
     _setLlmBaseUrlForTesting("http://localhost:1234/v1");
-    await llmComplete("hello", { label: "test" });
-    expect(lastProviderOpts.fetch).toBeUndefined();
+    let captured: any = null;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (_input: any, init?: any) => {
+      captured = init;
+      return new Response("{}");
+    };
+    try {
+      await llmComplete("hello", { label: "test" });
+      await lastProviderOpts.fetch("http://test", {
+        method: "POST",
+        body: JSON.stringify({ messages: [] }),
+      });
+      const parsed = JSON.parse(captured.body);
+      expect(parsed.chat_template_kwargs).toEqual({ enable_thinking: false });
+      expect(parsed.think).toBeUndefined();
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test("ollama: the request carries think:false and no chat_template_kwargs", async () => {
+    _setJsonSchemaSupportedForTesting(false);
+    let captured: any = null;
+    const origFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (_input: any, init?: any) => {
+      captured = init;
+      return new Response("{}");
+    };
+    try {
+      await llmComplete("hello", { label: "test" });
+      await lastProviderOpts.fetch("http://test", {
+        method: "POST",
+        body: JSON.stringify({ messages: [] }),
+      });
+      const parsed = JSON.parse(captured.body);
+      expect(parsed.think).toBe(false);
+      expect(parsed.chat_template_kwargs).toBeUndefined();
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 
   test("ollama (default baseUrl): buildProvider DOES attach a wrapped fetch (think:false active)", async () => {

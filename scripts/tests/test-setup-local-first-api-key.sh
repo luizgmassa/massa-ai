@@ -250,9 +250,9 @@ mkdir -p "$(dirname "$NO_OVERRIDE_CFG")"
     installer_write_config "$NO_OVERRIDE_CFG" "$FIRST_KEY"
 )
 assert_eq "the ollama llm.model default still applies when MASSA_AI_LLM_MODEL is unset" \
-    "qwen3-vl:8b" "$(json_field "$NO_OVERRIDE_CFG" 'c.llm.model')"
+    "qwen3.5:9b" "$(json_field "$NO_OVERRIDE_CFG" 'c.llm.model')"
 assert_eq "the ollama llm.codeModel default still applies when MASSA_AI_LLM_CODE_MODEL is unset" \
-    "qwen2.5-coder:7b" "$(json_field "$NO_OVERRIDE_CFG" 'c.llm.codeModel')"
+    "qwen3.5:9b" "$(json_field "$NO_OVERRIDE_CFG" 'c.llm.codeModel')"
 
 # ---- Re-run idempotency: the whole point of the task ------------------------
 

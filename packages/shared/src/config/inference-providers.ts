@@ -59,9 +59,10 @@ export interface InferenceProviderSpec {
    * The MLX build of each `defaultModels` entry, where the provider has one.
    * Absent on Ollama, which serves GGUF only and has no MLX path at all.
    *
-   * Every `model` here is a catalog id read back from `lms ls --json` on a live
-   * install (0.3.x, Apple Silicon, 2026-09-21), keyed to the `path` field that
-   * records which repo produced it. They are NOT claims about the GGUF ids: an
+   * The embedding `model` here is a catalog id read back from `lms ls --json`
+   * on a live install (0.3.x, Apple Silicon, 2026-09-21), keyed to the `path`
+   * field that records which repo produced it; the shared instruct/coding id is
+   * not measured. None of them are claims about the GGUF ids: an
    * earlier revision of this comment cited `lms get --mlx <repo>` answering
    * "Model already downloaded. To use, run: lms load <id>" as proof that a
    * format change keeps the id — but the builds already on that disk were
@@ -98,10 +99,8 @@ export interface InferenceProviderSpec {
    *
    * Paired with `defaultModels`, which carries the ids — but only the embedding
    * one is measured (`Qwen/Qwen3-Embedding-0.6B-GGUF` → `path` prefix in
-   * `lms ls --json` → `text-embedding-qwen3-embedding-0.6b`). The two LLM ids
-   * are the MLX builds' measured ids, reused on the assumption that the format
-   * does not change the key — the assumption the retracted paragraph above once
-   * claimed to have verified. It is deliberately not load-bearing: the installer
+   * `lms ls --json` → `text-embedding-qwen3-embedding-0.6b`). The shared
+   * instruct/coding id is not measured in either format. It is deliberately not load-bearing: the installer
    * reconciles each id against `lms ls --json` after the fetch and writes what
    * LM Studio reports, so a wrong literal here costs nothing at install time.
    */
@@ -110,6 +109,7 @@ export interface InferenceProviderSpec {
   readonly embedBatchSize: number;
   readonly supportsOllamaVersionProbe: boolean;
   readonly injectsDisableThink: boolean;
+  readonly injectsChatTemplateKwargs: boolean;
   /**
    * Route structured output through `/v1/chat/completions` instead of the
    * Responses API. `@ai-sdk/openai@3` resolves the default callable
@@ -158,13 +158,14 @@ export const INFERENCE_PROVIDERS: Readonly<
     knownDimensions: KNOWN_EMBEDDING_DIMENSIONS,
     defaultModels: {
       embedding: "qwen3-embedding:0.6b",
-      instruct: "qwen3-vl:8b",
-      coding: "qwen2.5-coder:7b",
+      instruct: "qwen3.5:9b",
+      coding: "qwen3.5:9b",
     },
     appliesContextPerRequest: true,
     embedBatchSize: 64,
     supportsOllamaVersionProbe: true,
     injectsDisableThink: true,
+    injectsChatTemplateKwargs: false,
     requiresChatCompletionsApi: false,
     parseModelList: parseOllamaModelList,
   },
@@ -191,8 +192,8 @@ export const INFERENCE_PROVIDERS: Readonly<
     },
     defaultModels: {
       embedding: "text-embedding-qwen3-embedding-0.6b",
-      instruct: "qwen3-vl-8b-instruct",
-      coding: "qwen2.5-coder-7b-instruct",
+      instruct: "qwen3.8-9b",
+      coding: "qwen3.8-9b",
     },
     mlxModels: {
       embedding: {
@@ -200,23 +201,24 @@ export const INFERENCE_PROVIDERS: Readonly<
         model: "qwen3-embedding-0.6b-dwq",
       },
       instruct: {
-        repo: "mlx-community/Qwen3-VL-8B-Instruct-4bit",
-        model: "qwen3-vl-8b-instruct",
+        repo: "keXjos/Qwen3.8-9B-mlx-4Bit",
+        model: "qwen3.8-9b",
       },
       coding: {
-        repo: "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
-        model: "qwen2.5-coder-7b-instruct",
+        repo: "keXjos/Qwen3.8-9B-mlx-4Bit",
+        model: "qwen3.8-9b",
       },
     },
     ggufRepos: {
       embedding: "Qwen/Qwen3-Embedding-0.6B-GGUF",
-      instruct: "lmstudio-community/Qwen3-VL-8B-Instruct-GGUF",
-      coding: "lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF",
+      instruct: "empero-ai/Qwen3.8-9B-Distill-GGUF",
+      coding: "empero-ai/Qwen3.8-9B-Distill-GGUF",
     },
     appliesContextPerRequest: false,
     embedBatchSize: 64,
     supportsOllamaVersionProbe: false,
     injectsDisableThink: false,
+    injectsChatTemplateKwargs: true,
     requiresChatCompletionsApi: true,
     parseModelList: parseLmStudioModelList,
   },

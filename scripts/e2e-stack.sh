@@ -161,16 +161,16 @@ select_provider() {
     ollama)
       EMBED_MODEL="${MASSA_AI_E2E_EMBED_MODEL:-qwen3-embedding:0.6b}"
       EMBED_DIMS="${MASSA_AI_E2E_EMBED_DIMS:-1024}"
-      LLM_MODEL="${MASSA_AI_E2E_LLM_MODEL:-qwen3-vl:8b}"
-      LLM_CODE_MODEL="${MASSA_AI_E2E_LLM_CODE_MODEL:-qwen2.5-coder:7b}"
+      LLM_MODEL="${MASSA_AI_E2E_LLM_MODEL:-qwen3.5:9b}"
+      LLM_CODE_MODEL="${MASSA_AI_E2E_LLM_CODE_MODEL:-qwen3.5:9b}"
       INFERENCE_ORIGIN="$OLLAMA_ORIGIN"
       INFERENCE_PORT="$OLLAMA_PORT"
       ;;
     lmstudio)
       EMBED_MODEL="${MASSA_AI_E2E_EMBED_MODEL:-text-embedding-qwen3-embedding-0.6b}"
       EMBED_DIMS="${MASSA_AI_E2E_EMBED_DIMS:-1024}"
-      LLM_MODEL="${MASSA_AI_E2E_LLM_MODEL:-qwen3-vl-8b-instruct}"
-      LLM_CODE_MODEL="${MASSA_AI_E2E_LLM_CODE_MODEL:-qwen2.5-coder-7b-instruct}"
+      LLM_MODEL="${MASSA_AI_E2E_LLM_MODEL:-qwen3.8-9b}"
+      LLM_CODE_MODEL="${MASSA_AI_E2E_LLM_CODE_MODEL:-qwen3.8-9b}"
       INFERENCE_ORIGIN="$LMSTUDIO_ORIGIN"
       INFERENCE_PORT="$LMSTUDIO_PORT"
       SHARED_PORTS+=("$LMSTUDIO_PORT")

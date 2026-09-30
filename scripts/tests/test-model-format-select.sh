@@ -198,7 +198,7 @@ resolve() {
 # search criteria" in every format. The assertion this replaces pinned the
 # defect as the contract.
 check_eq "gguf: the ids stay ids and all three fetch by repo URL" \
-  "E=text-embedding-qwen3-embedding-0.6b|EF=https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF|L=qwen3-vl-8b-instruct|LF=https://huggingface.co/lmstudio-community/Qwen3-VL-8B-Instruct-GGUF|C=qwen2.5-coder-7b-instruct|CF=https://huggingface.co/lmstudio-community/Qwen2.5-Coder-7B-Instruct-GGUF" \
+  "E=text-embedding-qwen3-embedding-0.6b|EF=https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF|L=qwen3.8-9b|LF=https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF|C=qwen3.8-9b|CF=https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF" \
   "$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf')"
 
 # Each GGUF substitution is gated on its own override, exactly as the MLX ones
@@ -207,12 +207,12 @@ gguf_emb_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf; LMSTUDIO_EMBEDDING_MOD
 check_contains "gguf + LMSTUDIO_EMBEDDING_MODEL fetches the named model" \
   "EF=my-embedder|" "$gguf_emb_override"
 check_contains "and leaves the instruct fetch on the GGUF repo" \
-  "LF=https://huggingface.co/lmstudio-community/Qwen3-VL-8B-Instruct-GGUF" "$gguf_emb_override"
+  "LF=https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF" "$gguf_emb_override"
 check_contains "gguf + MASSA_AI_LLM_CODE_MODEL fetches the named model" \
   "CF=my-coder" "$(resolve 'LMSTUDIO_MODEL_FORMAT=gguf; MASSA_AI_LLM_CODE_MODEL=my-coder')"
 
 check_eq "mlx with no overrides: embedding id changes, all three fetch by repo URL" \
-  "E=qwen3-embedding-0.6b-dwq|EF=https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ|L=qwen3-vl-8b-instruct|LF=https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit|C=qwen2.5-coder-7b-instruct|CF=https://huggingface.co/mlx-community/Qwen2.5-Coder-7B-Instruct-4bit" \
+  "E=qwen3-embedding-0.6b-dwq|EF=https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ|L=qwen3.8-9b|LF=https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit|C=qwen3.8-9b|CF=https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit" \
   "$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx')"
 
 emb_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx; LMSTUDIO_EMBEDDING_MODEL=text-embedding-qwen3-embedding-0.6b')"
@@ -226,7 +226,7 @@ case "$emb_override" in
 esac
 # The other two roles are untouched by an embedding override.
 check_contains "an embedding override leaves the instruct fetch on MLX" \
-  "LF=https://huggingface.co/mlx-community/Qwen3-VL-8B-Instruct-4bit" "$emb_override"
+  "LF=https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit" "$emb_override"
 
 llm_override="$(resolve 'LMSTUDIO_MODEL_FORMAT=mlx; MASSA_AI_LLM_MODEL=my-instruct')"
 check_contains "mlx + MASSA_AI_LLM_MODEL fetches the named model" "LF=my-instruct|" "$llm_override"
@@ -424,6 +424,31 @@ check_contains "a refused bootstrap falls back to the legacy load" \
   "legacy load" "$out_lc2"
 check_contains "and the fallback actually ran load -w" "load -w" "$(cat "$LOG_LC2")"
 
+MLX_PLIST="${TMP_ROOT}/Library/LaunchAgents/ai.massa.mlx-embed.plist"
+MLX_STARTED="${TMP_ROOT}/mlx-started"
+mkdir -p "${TMP_ROOT}/venv-ro/bin"
+cat > "${TMP_ROOT}/venv-ro/bin/python" <<PYEOF
+#!/usr/bin/env bash
+: > '${MLX_STARTED}'
+PYEOF
+chmod +x "${TMP_ROOT}/venv-ro/bin/python"
+rm -f "$MLX_PLIST" "$MLX_STARTED"
+chmod 555 "${TMP_ROOT}/Library/LaunchAgents"
+LOG_LC_RO="${TMP_ROOT}/log-launchctl-mlx-ro"; : > "$LOG_LC_RO"
+LC_RO="$(make_launchctl_shim 0 "$LOG_LC_RO")"
+out_lc_ro="$(run_lib "${LC_RO}:${DARWIN_SHIM}" \
+  "set -e; installer_start_mlx_embedding_sidecar '${TMP_ROOT}/venv-ro' '${TMP_ROOT}/srv.py' 1235; echo rc=\$?")"
+chmod 755 "${TMP_ROOT}/Library/LaunchAgents"
+check_contains "an unwritable LaunchAgents dir does not abort a set -e caller" "rc=0" "$out_lc_ro"
+check_contains "and says the sidecar will not come back after a reboot" "could not write" "$out_lc_ro"
+[ -s "$LOG_LC_RO" ] && fail "and launchctl is never called" || ok "and launchctl is never called"
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  [ -e "$MLX_STARTED" ] && break
+  sleep 0.1
+done
+[ -e "$MLX_STARTED" ] && ok "and the sidecar is started directly instead" \
+  || fail "and the sidecar is started directly instead"
+
 echo "── installer_register_lmstudio_server_agent: launchd registration ──"
 
 LMS_PLIST="${TMP_ROOT}/Library/LaunchAgents/ai.massa.lmstudio-server.plist"
@@ -560,6 +585,120 @@ LC_LMS_NOCLI="$(make_launchctl_shim 0 "$LOG_LMS_NOCLI")"
 run_lib "${LC_LMS_NOCLI}:${DARWIN_SHIM}" \
   "installer_register_lmstudio_server_agent '' 'http://localhost:1234/v1'" >/dev/null
 [ -f "$LMS_PLIST" ] && fail "without an lms CLI no plist is written" || ok "without an lms CLI no plist is written"
+
+echo "── installer_remove_launchd_agents: uninstall ──"
+
+AGENTS_DIR="${TMP_ROOT}/Library/LaunchAgents"
+SIBLING_PLIST="${AGENTS_DIR}/ai.massa.other.plist"
+MASSA_DIR="${TMP_ROOT}/.config/massa-ai"
+seed_agents() {
+  mkdir -p "$AGENTS_DIR" "$MASSA_DIR"
+  echo plist > "$MLX_PLIST"
+  echo plist > "$LMS_PLIST"
+  echo plist > "$SIBLING_PLIST"
+  echo log > "${MASSA_DIR}/mlx-embed.log"
+  echo log > "${MASSA_DIR}/lmstudio-server.log"
+  echo '{}' > "${MASSA_DIR}/config.json"
+}
+make_failing_launchctl() {
+  local log="$1" dir="${TMP_ROOT}/lc-fail-$$-${RANDOM}"
+  mkdir -p "$dir"
+  cat > "${dir}/launchctl" <<LCEOF
+#!/usr/bin/env bash
+echo "\$*" >> '${log}'
+echo "Boot-out failed: 3: No such process" >&2
+exit 3
+LCEOF
+  chmod +x "${dir}/launchctl"
+  printf '%s' "$dir"
+}
+
+seed_agents
+LOG_RM="${TMP_ROOT}/log-launchctl-rm"; : > "$LOG_RM"
+LC_RM="$(make_launchctl_shim 0 "$LOG_RM")"
+out_rm="$(run_lib "${LC_RM}:${DARWIN_SHIM}" "set -e; installer_remove_launchd_agents; echo rc=\$?")"
+check_contains "removing the agents returns 0" "rc=0" "$out_rm"
+[ -e "$MLX_PLIST" ] && fail "the MLX sidecar plist is deleted" || ok "the MLX sidecar plist is deleted"
+[ -e "$LMS_PLIST" ] && fail "the LM Studio server plist is deleted" || ok "the LM Studio server plist is deleted"
+[ -e "$SIBLING_PLIST" ] && ok "another ai.massa.* plist is left alone" \
+  || fail "another ai.massa.* plist is left alone"
+if [ -e "${MASSA_DIR}/mlx-embed.log" ] && [ -e "${MASSA_DIR}/lmstudio-server.log" ] \
+  && [ -e "${MASSA_DIR}/config.json" ]; then
+  ok "logs and ~/.config/massa-ai data are kept"
+else
+  fail "logs and ~/.config/massa-ai data are kept"
+fi
+check_contains "the MLX agent is booted out by exact label" \
+  "bootout gui/$(id -u)/ai.massa.mlx-embed" "$(cat "$LOG_RM")"
+check_contains "the LM Studio agent is booted out by exact label" \
+  "bootout gui/$(id -u)/ai.massa.lmstudio-server" "$(cat "$LOG_RM")"
+case "$(cat "$LOG_RM")" in
+  *ai.massa.other*) fail "the sibling agent is never booted out" ;;
+  *) ok "the sibling agent is never booted out" ;;
+esac
+check_contains "each removal is reported" "ai.massa.lmstudio-server" "$out_rm"
+
+LOG_RM2="${TMP_ROOT}/log-launchctl-rm-again"; : > "$LOG_RM2"
+LC_RM2="$(make_failing_launchctl "$LOG_RM2")"
+out_rm2="$(run_lib "${LC_RM2}:${DARWIN_SHIM}" "set -e; installer_remove_launchd_agents; echo rc=\$?")"
+check_contains "a second run with nothing loaded still returns 0 under set -e" "rc=0" "$out_rm2"
+check_contains "and still boots out, tolerating 'not loaded'" "bootout" "$(cat "$LOG_RM2")"
+case "$out_rm2" in
+  *"removed"*) fail "and claims no removal when nothing was there" ;;
+  *) ok "and claims no removal when nothing was there" ;;
+esac
+[ -e "$SIBLING_PLIST" ] && ok "and still leaves the sibling alone" || fail "and still leaves the sibling alone"
+
+seed_agents
+LOG_RM_LINUX="${TMP_ROOT}/log-launchctl-rm-linux"; : > "$LOG_RM_LINUX"
+LC_RM_LINUX="$(make_launchctl_shim 0 "$LOG_RM_LINUX")"
+out_rm_linux="$(run_lib "${LC_RM_LINUX}:${LINUX_SHIM}" "set -e; installer_remove_launchd_agents; echo rc=\$?")"
+check_eq "off macOS removal is a silent no-op" "rc=0" "$out_rm_linux"
+[ -s "$LOG_RM_LINUX" ] && fail "off macOS launchctl is never called" || ok "off macOS launchctl is never called"
+[ -e "$MLX_PLIST" ] && [ -e "$LMS_PLIST" ] && ok "off macOS no plist is deleted" \
+  || fail "off macOS no plist is deleted"
+
+chmod 555 "$AGENTS_DIR"
+LOG_RM_RO="${TMP_ROOT}/log-launchctl-rm-ro"; : > "$LOG_RM_RO"
+LC_RM_RO="$(make_launchctl_shim 0 "$LOG_RM_RO")"
+out_rm_ro="$(run_lib "${LC_RM_RO}:${DARWIN_SHIM}" "set -e; installer_remove_launchd_agents; echo rc=\$?")"
+chmod 755 "$AGENTS_DIR"
+check_contains "an unremovable plist does not abort a set -e caller" "rc=0" "$out_rm_ro"
+check_contains "and says which plist is left behind" "could not remove ${LMS_PLIST}" "$out_rm_ro"
+
+seed_agents
+LOG_RM_WIZ="${TMP_ROOT}/log-launchctl-rm-wizard"; : > "$LOG_RM_WIZ"
+LC_RM_WIZ="$(make_launchctl_shim 0 "$LOG_RM_WIZ")"
+TRIPWIRE_DIR="${TMP_ROOT}/tripwire"
+TRIPWIRE_LOG="${TMP_ROOT}/log-tripwire"; : > "$TRIPWIRE_LOG"
+mkdir -p "$TRIPWIRE_DIR"
+for cmd in curl brew docker ollama lms uv open psql bun npm; do
+  printf '#!/usr/bin/env bash\necho "%s $*" >> %q\nexit 1\n' "$cmd" "$TRIPWIRE_LOG" > "${TRIPWIRE_DIR}/${cmd}"
+  chmod +x "${TRIPWIRE_DIR}/${cmd}"
+done
+out_rm_wiz="$(env -i PATH="${LC_RM_WIZ}:${TRIPWIRE_DIR}:${DARWIN_SHIM}:${PATH}" HOME="$TMP_ROOT" \
+  XDG_CONFIG_HOME="${TMP_ROOT}/xdg" MASSA_AI_NONINTERACTIVE=1 \
+  bash "${REPO_ROOT}/scripts/setup-local-first.sh" --uninstall-services 2>&1; echo rc=$?)"
+check_contains "setup-local-first.sh --uninstall-services exits 0" "rc=0" "$out_rm_wiz"
+[ -e "$MLX_PLIST" ] || [ -e "$LMS_PLIST" ] && fail "and removes both agent plists" \
+  || ok "and removes both agent plists"
+[ -e "$SIBLING_PLIST" ] && ok "and leaves the sibling plist alone" || fail "and leaves the sibling plist alone"
+case "$out_rm_wiz" in
+  *"[1/6]"*) fail "and runs none of the install steps" ;;
+  *) ok "and runs none of the install steps" ;;
+esac
+check_eq "and reaches no installer tool" "" "$(cat "$TRIPWIRE_LOG")"
+
+seed_agents
+: > "$TRIPWIRE_LOG"
+out_typo="$(env -i PATH="${LC_RM_WIZ}:${TRIPWIRE_DIR}:${DARWIN_SHIM}:${PATH}" HOME="$TMP_ROOT" \
+  XDG_CONFIG_HOME="${TMP_ROOT}/xdg" MASSA_AI_NONINTERACTIVE=1 \
+  bash "${REPO_ROOT}/scripts/setup-local-first.sh" --uninstall-service 2>&1; echo rc=$?)"
+check_contains "an unknown option exits 2" "rc=2" "$out_typo"
+check_contains "and names the supported option" "--uninstall-services" "$out_typo"
+check_eq "and reaches no installer tool" "" "$(cat "$TRIPWIRE_LOG")"
+[ -e "$MLX_PLIST" ] && [ -e "$LMS_PLIST" ] && ok "and removes nothing" || fail "and removes nothing"
+rm -f "$SIBLING_PLIST"
 
 echo "── installer_ensure_mlx_runtime ──"
 

@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`setup-local-first.sh --uninstall-services` removes the two login agents.** Nothing used to
+  remove `ai.massa.mlx-embed` or `ai.massa.lmstudio-server`, so an uninstalled LM Studio left
+  launchd retrying `lms server start` every 30 s forever. The flag runs
+  `launchctl bootout gui/<uid>/<label>` for each (tolerating "not loaded") and deletes exactly
+  those two plists — never another `ai.massa.*` file, never the logs or `~/.config/massa-ai`.
+  It is idempotent, a no-op off macOS, and runs none of the install steps. Any other argument
+  now exits 2 instead of silently running the full install.
+
+### Changed
+
+- **One chat model now serves both the instruct and the code role.** Two models resident at
+  once cost too much VRAM next to a development workload. New defaults: Ollama `qwen3.5:9b`;
+  LM Studio Qwen3.8-9B, fetched from `keXjos/Qwen3.8-9B-mlx-4Bit` (MLX) or
+  `empero-ai/Qwen3.8-9B-Distill-GGUF` (GGUF), with `qwen3.8-9b` as the pre-fetch id — not
+  measured; the installer still records whatever id `lms ls --json` reports after the fetch.
+  The wizard pulls the shared model once and, on LM Studio, loads it once at the coding role's
+  32k context instead of 16k; on Ollama both roles now send the larger `num_ctx` whenever they
+  resolve to the same model, so switching roles does not reload it. Embedding defaults are
+  unchanged. `MASSA_AI_LLM_MODEL` and `MASSA_AI_LLM_CODE_MODEL` still override each role, and an
+  existing `config.json` keeps its models. Re-running `install.sh` on a machine that has only the
+  old Ollama models writes the new names and leaves the LLM features off until
+  `ollama pull qwen3.5:9b`.
+- **LM Studio requests now carry `chat_template_kwargs: {enable_thinking: false}`**, the Qwen3.x
+  template switch, because both new defaults are thinking models. Ollama keeps getting
+  `think:false`. Known risk: LM Studio currently ignores this field for Qwen3.5-family models
+  ([lmstudio-bug-tracker#1990](https://github.com/lmstudio-ai/lmstudio-bug-tracker/issues/1990)),
+  so until that is fixed the reasoning-channel recovery is what keeps structured calls working,
+  and a long reasoning pass can still hit the 90 s timeout. `qwen3.5:9b` was the Ollama default
+  once before and was swapped out in July for exactly that timeout.
+
+### Fixed
+
+- **An unwritable `~/Library/LaunchAgents` no longer aborts the wizard at step 1/6 on the MLX
+  path.** `installer_start_mlx_embedding_sidecar` wrote its plist unguarded under `set -e`.
+  It now warns, skips `launchctl`, and starts the sidecar directly — the same fallback a
+  refused registration already took — so embeddings still answer for this session.
+
 ## [1.67.0] - 2026-09-29
 
 ### Added

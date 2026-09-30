@@ -191,8 +191,7 @@ export function _setLlmBaseUrlForTesting(url: string | null): void {
  * partial or missing config) and the requested role. Every fallback reads
  * the resolved provider's own seam entry (`inference-providers.ts`), never a
  * bare Ollama-shaped literal: code role falls back to `defaultModels.coding`
- * — never to the instruct model, which after this feature is a
- * vision-language model (COVERAGE #5) — and `disableThink` follows the
+ * — never to the configured instruct model — and `disableThink` follows the
  * resolved provider's `injectsDisableThink` (LIP-07) instead of a hardcoded
  * `true`.
  *
@@ -222,10 +221,9 @@ export function _resolveLlmConfig(
 ) {
   const baseUrl = baseUrlOverride ?? cfg?.baseUrl ?? INFERENCE_PROVIDERS.ollama.defaultLlmBaseUrl;
   const spec = resolveInferenceSpec(baseUrl);
-  const model =
-    role === "code"
-      ? cfg?.codeModel ?? spec.defaultModels.coding
-      : cfg?.model ?? spec.defaultModels.instruct;
+  const instructModel = cfg?.model ?? spec.defaultModels.instruct;
+  const codeModel = cfg?.codeModel ?? spec.defaultModels.coding;
+  const model = role === "code" ? codeModel : instructModel;
   const temperature =
     role === "code"
       ? cfg?.codeTemperature ?? INFERENCE_ROLE_DEFAULTS.coding.temperature
@@ -233,10 +231,14 @@ export function _resolveLlmConfig(
   // Context window per role (PDM-08/PDM-09); sent as `options.num_ctx` only
   // where `spec.appliesContextPerRequest` (buildProvider) — LM Studio applies
   // it at load time (spec A-07) and must never receive this field.
+  const instructContext = cfg?.contextWindow ?? INFERENCE_ROLE_DEFAULTS.instruct.contextWindow;
+  const codeContext = cfg?.codeContextWindow ?? INFERENCE_ROLE_DEFAULTS.coding.contextWindow;
   const contextWindow =
-    role === "code"
-      ? cfg?.codeContextWindow ?? INFERENCE_ROLE_DEFAULTS.coding.contextWindow
-      : cfg?.contextWindow ?? INFERENCE_ROLE_DEFAULTS.instruct.contextWindow;
+    instructModel === codeModel
+      ? Math.max(instructContext, codeContext)
+      : role === "code"
+        ? codeContext
+        : instructContext;
   return {
     baseUrl,
     apiKey: cfg?.apiKey ?? spec.id,
@@ -318,8 +320,9 @@ function resolveProviderIdForLogging(baseUrl: string): string {
 }
 
 /**
- * Best-effort `think:false` injection. Ollama's OpenAI-compat layer honors a
- * top-level `think` field for qwen3. Wrapped fetch keeps the SDK contract
+ * Best-effort thinking-off injection: a top-level `think:false` by default
+ * (Ollama), or any `field`/`value` pair such as LM Studio's
+ * `chat_template_kwargs`. Wrapped fetch keeps the SDK contract
  * intact and only mutates the JSON body for chat/completion POSTs.
  *
  * Typed loosely (input/init as unknown) and cast on return so it satisfies the
@@ -329,13 +332,15 @@ function resolveProviderIdForLogging(baseUrl: string): string {
  */
 export function _wrapFetchDisableThink(
   baseFetch: typeof globalThis.fetch,
+  field = "think",
+  value: unknown = false,
 ): typeof globalThis.fetch {
   const wrapped = async (input: any, init?: any): Promise<Response> => {
     try {
       if (init?.body && typeof init.body === "string") {
         const parsed = JSON.parse(init.body);
-        if (parsed && typeof parsed === "object" && !("think" in parsed)) {
-          parsed.think = false;
+        if (parsed && typeof parsed === "object" && !(field in parsed)) {
+          parsed[field] = value;
           init = { ...init, body: JSON.stringify(parsed) };
         }
       }
@@ -387,6 +392,11 @@ function buildProvider(llm: ReturnType<typeof getLlmConfig>) {
   }
   if (llm.disableThink && spec.injectsDisableThink) {
     fetchImpl = _wrapFetchDisableThink(fetchImpl ?? globalThis.fetch);
+  }
+  if (llm.disableThink && spec.injectsChatTemplateKwargs) {
+    fetchImpl = _wrapFetchDisableThink(fetchImpl ?? globalThis.fetch, "chat_template_kwargs", {
+      enable_thinking: false,
+    });
   }
   const openai = createOpenAI({
     baseURL: llm.baseUrl,
@@ -678,9 +688,7 @@ export async function llmComplete(
         recordLlmSuccess(opts.label, llm.model, llm.baseUrl);
         return { ok: true, value: reasoning };
       }
-      // #7 safety net: reasoning recovery yielded nothing. With the pure-instruct
-      // default this branch should be dormant (no reasoning channel); a hit here
-      // signals an Ollama shape shift or an env override back to a thinking model.
+      // #7 safety net: reasoning recovery yielded nothing.
       logger.warn("llm reasoning-recovery empty", {
         hasReasoning: false,
         finishReason: (result as any)?.finishReason ?? null,
@@ -807,8 +815,7 @@ export async function llmObject<T>(
           }
         }
       }
-      // #7 safety net: reasoning recovery yielded nothing. Dormant with the
-      // pure-instruct default; a hit signals a shape shift / thinking-model override.
+      // #7 safety net: reasoning recovery yielded nothing.
       logger.warn("llm reasoning-recovery empty", {
         hasReasoning: false,
         finishReason: (e as any)?.finishReason ?? null,
