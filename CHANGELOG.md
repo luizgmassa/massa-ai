@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`setup-local-first.sh` no longer re-fetches an LM Studio model that is already downloaded.**
+  The pre-fetch existence check matched only the literal id, but LM Studio renames the model key
+  per weight format — measured 2026-10-01, the MLX build of `qwen3.8-9b` indexes as
+  `qwen3.8-9b-mlx` — so a build already on disk missed the check and the wizard re-ran `lms get`,
+  dying the install whenever the Hugging Face fetch failed. `ensure_inference_model` now asks
+  `lms ls --json` for the fetched repo path first and skips the pull when a key comes back; this
+  covers the MLX and GGUF paths alike, and an unparseable or unreachable `lms ls` degrades to the
+  old fetch behavior.
+
 ## [1.68.0] - 2026-09-30
 
 ### Added

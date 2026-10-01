@@ -364,10 +364,22 @@ echo -e "${BOLD}[2/6] Pulling models...${NC}"
 # `--mlx qwen2.5-coder` the 32B. Only the repo URL pins a build. Defaults to
 # the model id, which is what every GGUF/Ollama caller wants.
 ensure_inference_model() {
-    local model="$1" note="$2" fetch="${3:-$1}"
+    local model="$1" note="$2" fetch="${3:-$1}" key
     if [ "$(inference_model_exists "$model")" = "yes" ]; then
         echo -e "  ${GREEN}✓${NC} Model ${model} already available"
         return 0
+    fi
+    # The id above is the pre-format literal, but LM Studio renames the model
+    # key per format — measured 2026-10-01, the MLX build of qwen3.8-9b indexes
+    # as qwen3.8-9b-mlx — so an already-downloaded build misses the exact-id
+    # check and the wizard re-fetches gigabytes the disk already holds. Ask
+    # `lms ls --json` by repo path; a non-empty key means it is downloaded.
+    if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
+        key="$(installer_lmstudio_model_key "${LMSTUDIO_CLI:-}" "$fetch" "")"
+        if [ -n "$key" ]; then
+            echo -e "  ${GREEN}✓${NC} Model ${model} already available (as ${key})"
+            return 0
+        fi
     fi
     echo -e "  Pulling ${model}${note}..."
     if [ "${INFERENCE_PROVIDER:-ollama}" = "lmstudio" ]; then
