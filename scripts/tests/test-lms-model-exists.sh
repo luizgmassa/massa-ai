@@ -166,6 +166,102 @@ check_eq "ollama dispatches to the /api/tags listing"    "yes" "$(run_dispatch o
 check_eq "ollama does not see LM Studio's ids"           "no"  "$(run_dispatch ollama 'text-embedding-nomic-embed-text-v1.5')"
 check_eq "an empty provider falls back to Ollama"        "yes" "$(run_dispatch '' 'qwen3-embedding:8b')"
 
+# ── ensure_inference_model: the already-downloaded, renamed modelKey ──
+# The pre-fetch existence check matches the literal id, but LM Studio renames
+# the model key per format — measured 2026-10-01, the MLX build of qwen3.8-9b
+# indexes as `qwen3.8-9b-mlx` — so a build already on disk missed the id check
+# and the wizard re-ran `lms get`, which fails when the HF fetch is
+# unreachable. The fix asks `lms ls --json` by repo path before fetching; these
+# cases run the REAL installer_lmstudio_model_key against a stub `lms` whose
+# `ls --json` payload mirrors the live output.
+EIM_SRC="$(extract ensure_inference_model)" || EIM_SRC=""
+if [ -z "$EIM_SRC" ]; then
+  fail "ensure_inference_model extracted from setup-local-first.sh (found nothing)"
+else
+  ok "ensure_inference_model extracts and parses"
+
+  cat > "${STUB_DIR}/lms" << 'STUBEOF'
+#!/usr/bin/env bash
+if [ "$1" = "ls" ]; then
+  printf '%s' "${LMS_LS_PAYLOAD:-[]}"
+  exit 0
+fi
+if [ "$1" = "get" ]; then
+  : > "${LMS_GET_MARKER:?LMS_GET_MARKER unset}"
+  exit 0
+fi
+exit 0
+STUBEOF
+  chmod +x "${STUB_DIR}/lms"
+
+  # Live-measured shape: modelKey renamed per format, path == the HF repo.
+  PAYLOAD_HIT='[{"modelKey":"qwen3.8-9b-mlx","path":"keXjos/Qwen3.8-9B-mlx-4Bit","type":"llm"}]'
+  PAYLOAD_MISS='[{"modelKey":"another-model","path":"other-publisher/other-model","type":"llm"}]'
+
+  run_eim() {
+    local payload="$1" marker="$2" model="$3" fetch="$4"
+    rm -f "$marker"
+    PATH="${STUB_DIR}:${PATH}" LMS_LS_PAYLOAD="$payload" LMS_GET_MARKER="$marker" \
+      bash -c '
+        set -e
+        . "$1/installer-shared.sh"
+        . "$1/installer-feature-prompts.sh"
+        GREEN=""; YELLOW=""; RED=""; BLUE=""; BOLD=""; NC=""
+        die() { echo "DIED:$*" >&2; exit 1; }
+        inference_model_exists() { echo no; }
+        INFERENCE_PROVIDER="lmstudio"
+        LMSTUDIO_MODEL_FORMAT="mlx"
+        LMSTUDIO_CLI="$(command -v lms)"
+        eval "$2"
+        ensure_inference_model "$3" " (instruct model)" "$4"
+      ' _ "$LIB_DIR" "$EIM_SRC" "$model" "$fetch" 2>/dev/null
+  }
+
+  EIM_URL="https://huggingface.co/keXjos/Qwen3.8-9B-mlx-4Bit"
+  EIM_MARK="${TMP_ROOT}/lms-get-marker"
+
+  out="$(run_eim "$PAYLOAD_HIT" "$EIM_MARK" 'qwen3.8-9b' "$EIM_URL")"
+  if [ -e "$EIM_MARK" ]; then
+    fail "an already-downloaded build under a renamed key is not re-fetched (lms get ran)"
+  else
+    ok "an already-downloaded build under a renamed key is not re-fetched"
+  fi
+  case "$out" in
+    *"already available (as qwen3.8-9b-mlx)"*) ok "the renamed key is reported back" ;;
+    *) fail "the renamed key is not reported back (got '${out}')" ;;
+  esac
+
+  out="$(run_eim "$PAYLOAD_MISS" "$EIM_MARK" 'qwen3.8-9b' "$EIM_URL")"
+  if [ -e "$EIM_MARK" ]; then
+    ok "an absent repo is still fetched"
+  else
+    fail "an absent repo is not fetched — the pull path regressed"
+  fi
+  case "$out" in
+    *"already available"*) fail "an absent repo was reported as already available (got '${out}')" ;;
+    *) ok "an absent repo is not reported as available" ;;
+  esac
+
+  out="$(run_eim 'not json at all' "$EIM_MARK" 'qwen3.8-9b' "$EIM_URL")"
+  if [ -e "$EIM_MARK" ]; then
+    ok "an unparseable lms ls --json degrades to the fetch"
+  else
+    fail "an unparseable lms ls --json neither matched nor fetched"
+  fi
+
+  # GGUF listings carry the weight file in path (`repo/file.gguf`), so the
+  # lookup must match the repo prefix, not exact equality. The skip branch
+  # never reads LMSTUDIO_MODEL_FORMAT, so the mlx default is irrelevant here.
+  out="$(run_eim \
+    '[{"modelKey":"qwen3.8-9b-distill","path":"empero-ai/Qwen3.8-9B-Distill-GGUF/Qwen3.8-9B-Distill-Q8_0.gguf","type":"llm"}]' \
+    "$EIM_MARK" 'qwen3.8-9b' 'https://huggingface.co/empero-ai/Qwen3.8-9B-Distill-GGUF')"
+  if [ -e "$EIM_MARK" ]; then
+    fail "a downloaded GGUF build (repo/file.gguf path) is re-fetched (lms get ran)"
+  else
+    ok "a downloaded GGUF build (repo/file.gguf path) is not re-fetched"
+  fi
+fi
+
 # ── The `:500` LLM-enable decision (T12, PDM-06 AC-3) ────────
 # `LLM_MODEL_PRESENT` gates MASSA_AI_LLM_ENABLED via installer_feature_flow:
 # when the instruct model is not actually pulled, LLM features must stay off
