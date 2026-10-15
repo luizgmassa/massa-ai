@@ -1,4 +1,18 @@
-## Current — Agent dispatch announcement moved to hooks, validated (**2026-09-29** — worktree `~/Projects/massa-ai-feat-agent-start-hook-announcement`, branch `feat/agent-start-hook-announcement`)
+## Current — Ask-first defaults (worktree + bootstrap), validated (**2026-10-15** — main checkout, branch `feat/ask-first-defaults`)
+
+Feature workflow, Standard tier, from the approved plan `~/.opencode/plan/ask-first-defaults.md`
+(Plan Challenge full pre-mortem, 5 emendas E1–E5). Workflows ask where to work before Stage 0–1
+(host-native mechanism, 3 options; Isolation Gate byte-identical in 13 workflows) and all six
+bootstrap rules default off: fresh installs render an ask-first preamble + six-rule menu +
+per-host `bootstrap-rules.md` companion path; the installer writes the companion and the plugin
+generator ships it at build time. Isolation record: user picked option 3 (current checkout, new
+branch) with the warning shown — the feature's own new recorded-override policy. Delivery hold:
+user chose commits-only, no push/PR yet. Independent verify PASS
+(`.specs/features/ask-first-defaults/validation.md`; 7/7 discrimination mutants killed). Next:
+push + PR on user go-ahead; post-merge `scripts/install-skills.sh --apply` + host restarts (the
+real home already carries one mid-session apply — see HANDOFF; keep or restore is the user's call).
+
+## Previous — Agent dispatch announcement moved to hooks, validated (**2026-09-29** — worktree `~/Projects/massa-ai-feat-agent-start-hook-announcement`, branch `feat/agent-start-hook-announcement`)
 
 Feature workflow, Standard tier. Claude `PreToolUse` (`agent-start`, `systemMessage`), Codex
 `SubagentStart` (`agent-start codex`) and an OpenCode `tool.execute.before` toast now print each

@@ -1,4 +1,26 @@
-# Handoff — agent-start-hook-announcement (VALIDATED 2026-09-29; PR pending)
+# Handoff — ask-first-defaults (VALIDATED 2026-10-15; commits local, no PR by user choice)
+
+**Branch:** `feat/ask-first-defaults` (main checkout — the user's recorded option-3 pick with
+warning shown), commits `1b58faa3` (Part A: worktree ask-first) + `36c6cb49` (Part B: bootstrap
+all-off default + companion).
+
+**Read `.specs/features/ask-first-defaults/validation.md` first.**
+
+- Workflows ask where to work before Stage 0–1 (3 options, host-native mechanism; option 3 =
+  recorded override of the branch-switch rule). Isolation Gate byte-identical in the 13
+  implementation workflows, harness-enforced both directions.
+- Bootstrap: six rules default off; fresh render = ask-first preamble + all-off notice +
+  registry-order six-rule menu + per-host `bootstrap-rules.md` path. The installer writes the
+  companion (`--target <dir>` — never a `TARGET_HOME` env var, lesson L-028); the plugin
+  generator ships it in all four host bundles at build time.
+- Delivery hold: commits only — user chose no push/PR yet. Next: push + PR on go-ahead.
+- Post-merge: `scripts/install-skills.sh --apply` + host session restarts. Existing installs
+  keep their persisted rules; the ask-first preamble reaches them only after `--apply`.
+- NOTE: the real home received one mid-session `--apply` (verification-recipe bug, L-028) — its
+  `MASSA-AI.md` now renders all-off; automatic backups exist as `MASSA-AI.md.massa-ai.bak-*`
+  if the user wants the previous render restored.
+
+## Previous handoff — agent-start-hook-announcement (VALIDATED 2026-09-29; PR pending)
 
 **Branch:** `feat/agent-start-hook-announcement`, worktree
 `~/Projects/massa-ai-feat-agent-start-hook-announcement`, from `main` @ `03b61fa3` (v1.66.1).
