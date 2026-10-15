@@ -276,15 +276,17 @@ describe("targetHome threading", () => {
   test("rule state comes from config.json under targetHome", () => {
     seedInstallState(["codex"]);
     seedAllWiring();
-    seedRuleState({ "conversation-feedback": false });
+    // Defaults are all-off (ask-first), so the persisted preference must
+    // switch a rule ON to prove the render follows the state file.
+    seedRuleState({ "conversation-feedback": true });
 
     apply();
 
     const contract = fs.readFileSync(bootstrapContractPath("codex", home), "utf-8");
-    expect(contract).not.toContain(ruleToken("conversation-feedback"));
-    // A sibling rule proves the omission is the persisted preference and not a
-    // render that dropped everything.
-    expect(contract).toContain(ruleToken("dedupe-guardrails"));
+    expect(contract).toContain(ruleToken("conversation-feedback"));
+    // A sibling left unpersisted proves the inclusion is the persisted
+    // preference and not a render that switched everything on.
+    expect(contract).not.toContain(ruleToken("dedupe-guardrails"));
   });
 
   test("writes land only under targetHome", () => {
@@ -670,11 +672,13 @@ describe("rule state", () => {
     seedWiring("codex");
     apply();
 
-    seedRuleState({ "dedupe-guardrails": false });
+    // Defaults are all-off (ask-first), so the persisted toggle must switch a
+    // rule ON to make the rendered contract stale.
+    seedRuleState({ "dedupe-guardrails": true });
     const report = apply();
 
     expect(statusByHost(report.rows)).toEqual({ codex: "written" });
-    expect(fs.readFileSync(bootstrapContractPath("codex", home), "utf-8")).not.toContain(
+    expect(fs.readFileSync(bootstrapContractPath("codex", home), "utf-8")).toContain(
       ruleToken("dedupe-guardrails"),
     );
   });
@@ -858,6 +862,22 @@ describe("source seam", () => {
     const contract = fs.readFileSync(bootstrapContractPath("claude", home), "utf-8");
     expect(contract).toContain("massa-ai-config bootstrap enable");
     expect(contract).not.toContain("<!-- massa-ai:rule:");
+
+    // Ask-first fresh install (ask-first-defaults AC3): the preamble asks
+    // instead of auto-activating, the header carries the all-off notice, the
+    // per-host companion path and the six-rule menu, and no rule span renders.
+    expect(contract).toContain("Do not auto-activate any rule below");
+    expect(contract).toContain("ask the user what to activate");
+    expect(contract).toContain("Every massa-ai bootstrap rule is disabled");
+    expect(contract).toContain(
+      path.join(home, ".claude", "skills", "massa-ai", "bootstrap-rules.md"),
+    );
+    for (const rule of BOOTSTRAP_RULES) {
+      expect(contract).toContain(`- \`${rule.id}\` — ${rule.description}`);
+    }
+    // A span body line unique to the router rule proves spans dropped, not
+    // merely markers stripped.
+    expect(contract).not.toContain("Activation means loading and using each available behavior");
   });
 });
 

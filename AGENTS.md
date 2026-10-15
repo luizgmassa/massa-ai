@@ -98,7 +98,9 @@ Thumbs.db
 The Conversation Feedback policy is defined **once**, in the
 `<!-- massa-ai:bootstrap -->` block of [`skills/AGENTS.md`](./skills/AGENTS.md). `scripts/install-skills.sh` copies that
 block to `<host>/AGENTS.md` (for example `~/.claude/AGENTS.md`), which is the
-copy an agent reads at runtime.
+copy an agent reads at runtime. All six bootstrap rules default to disabled
+(ask-first): the contract instructs the agent to ask the user what to activate
+instead of auto-activating.
 
 The Plan Challenge gate is not a policy block: it is fixed behavior defined once in
 [`skills/massa-ai/SKILL.md`](./skills/massa-ai/SKILL.md) §Plan Challenge Gate.

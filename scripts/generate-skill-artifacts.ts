@@ -98,6 +98,39 @@ export interface ManagedEntry {
   sourceAbsPath: string;
 }
 
+/** The managed marker pair `skills/AGENTS.md` carries (same literals
+ *  `scripts/install-skills.sh:74-75` owns on the installer route). */
+const BOOTSTRAP_BLOCK_START = "<!-- massa-ai:bootstrap:start -->";
+const BOOTSTRAP_BLOCK_END = "<!-- massa-ai:bootstrap:end -->";
+
+/**
+ * Materializes the raw bootstrap block of `skills/AGENTS.md` — the exact bytes
+ * `scripts/install-skills.sh` writes per host as the `bootstrap-rules.md`
+ * companion (ask-first-defaults B4) — into a per-process temp file, so the
+ * block can flow through the same byte-copy machinery as every other managed
+ * entry. The plugin route never runs the installer, so the bundled skill must
+ * already carry the rule bodies the contract header names (E4). The block is
+ * a byte slice of an existing source file, never re-serialized (PDO-06 AC7).
+ * The temp file is one small file per generate run; the block is ~10 KB.
+ */
+let bootstrapCompanionSourcePromise: Promise<string> | null = null;
+function bootstrapCompanionSource(): Promise<string> {
+  bootstrapCompanionSourcePromise ??= (async () => {
+    const text = await fs.readFile(path.join(SKILLS_DIR, "AGENTS.md"), "utf8");
+    const start = text.indexOf(BOOTSTRAP_BLOCK_START);
+    const end = text.indexOf(BOOTSTRAP_BLOCK_END, start);
+    if (start === -1 || end === -1) {
+      throw new Error(
+        "Bootstrap block not found in skills/AGENTS.md — cannot materialize the bootstrap-rules.md companion",
+      );
+    }
+    const target = path.join(tmpdir(), `massa-ai-bootstrap-rules-${process.pid}.md`);
+    await fs.writeFile(target, text.slice(start, end + BOOTSTRAP_BLOCK_END.length));
+    return target;
+  })();
+  return bootstrapCompanionSourcePromise;
+}
+
 /** Recursively list every file under `dir`, relative to `dir` (POSIX separators). */
 async function walkFiles(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -142,9 +175,29 @@ export async function collectSkillEntries(): Promise<ManagedEntry[]> {
     const sourceDir = path.join(SKILLS_DIR, bundleName);
     const files = await walkFiles(sourceDir);
     for (const rel of files) {
+      // The generated companion below owns this relPath: a same-named file in
+      // the source tree would silently shadow it (last copy wins), so refuse
+      // loudly instead.
+      if (bundleName === "massa-ai" && rel === "bootstrap-rules.md") {
+        throw new Error(
+          "skills/massa-ai/bootstrap-rules.md must not exist in the source tree — it is generated from the skills/AGENTS.md bootstrap block (ask-first-defaults B4)",
+        );
+      }
       entries.push({
         relPath: path.posix.join(bundleName, rel),
         sourceAbsPath: path.join(sourceDir, ...rel.split("/")),
+      });
+    }
+    if (bundleName === "massa-ai") {
+      // Companion rule-body file (ask-first-defaults E4/B4). Not a
+      // source-tree file — it IS the bootstrap block of skills/AGENTS.md,
+      // generated here because the plugin route never runs
+      // scripts/install-skills.sh. Listed as a managed entry, never written
+      // beside the bundle, or pruneManagedRoots would delete it on the next
+      // emit.
+      entries.push({
+        relPath: path.posix.join("massa-ai", "bootstrap-rules.md"),
+        sourceAbsPath: await bootstrapCompanionSource(),
       });
     }
   }

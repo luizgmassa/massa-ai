@@ -607,7 +607,7 @@ describe("reuse scan: uniform mandate across the 16 implementation workflows", (
     });
   }
 
-  test("the Reuse Scan action line is byte-identical in all 16 workflows", async () => {
+  test("the Reuse Scan action line is byte-identical in all 13 workflows", async () => {
     const lines = new Set<string>();
     for (const rel of IMPLEMENTATION_WORKFLOWS) {
       const line = (await readWorkflow(rel))

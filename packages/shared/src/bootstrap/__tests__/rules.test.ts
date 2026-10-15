@@ -85,18 +85,18 @@ describe("isBootstrapRuleId", () => {
   });
 });
 
-describe("defaults — every rule enabled except code-comments (BST-08 AC-2)", () => {
+describe("defaults — every rule disabled (ask-first, supersedes BST-08 AC-2)", () => {
   const defaults = bootstrapRuleDefaults();
 
   // Asserted per id, not by count: this table would still be 6 entries long
-  // if `code-comments` accidentally defaulted true and some other rule
-  // defaulted false instead.
+  // if some rule accidentally defaulted true and another defaulted false
+  // instead.
   const expectedDefaults: Record<string, boolean> = {
-    "massa-ai-router": true,
-    "dedupe-guardrails": true,
-    "conversation-feedback": true,
-    "indexing-hygiene": true,
-    "english-code": true,
+    "massa-ai-router": false,
+    "dedupe-guardrails": false,
+    "conversation-feedback": false,
+    "indexing-hygiene": false,
+    "english-code": false,
     "code-comments": false,
   };
 
@@ -111,9 +111,9 @@ describe("defaults — every rule enabled except code-comments (BST-08 AC-2)", (
     expect(new Set(Object.keys(defaults))).toEqual(new Set(BOOTSTRAP_RULE_IDS));
   });
 
-  test("code-comments is the only rule defaulting to disabled", () => {
+  test("every rule defaults to disabled — no exceptions", () => {
     const disabled = BOOTSTRAP_RULES.filter((r) => !r.defaultEnabled).map((r) => r.id);
-    expect(disabled).toEqual(["code-comments"]);
+    expect(disabled).toEqual([...BOOTSTRAP_RULE_IDS]);
   });
 });
 

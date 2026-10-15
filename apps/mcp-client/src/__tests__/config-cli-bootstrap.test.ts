@@ -92,16 +92,16 @@ beforeEach(() => {
 describe("bootstrap list / bootstrap show (BST-11 AC-2, AC-3)", () => {
   test("names every rule id, its current state, its default and a description", async () => {
     resolveBootstrapState.mockImplementationOnce(() => ({
-      state: fullState({ "conversation-feedback": false, "code-comments": true }),
+      state: fullState({ "conversation-feedback": true, "code-comments": true }),
       ignoredStateKeys: [],
     }));
     const r = await captureConsole(() => runCli(["bootstrap", "list"]));
     expect(r.code).toBe(0);
     for (const id of RULE_IDS) expect(r.out).toContain(`  ${id}: `);
-    // A rule switched off against an on default, and one switched on against
-    // the off default (BST-08 AC-2) — both columns are read, not just one.
+    // Both rules switched on against the all-off default (ask-first) — both
+    // columns are read, not just one.
     expect(r.out).toContain(
-      "  conversation-feedback: disabled (default: enabled) — Emit chat-visible status updates for massa-ai workflow progress.",
+      "  conversation-feedback: enabled (default: disabled) — Emit chat-visible status updates for massa-ai workflow progress.",
     );
     expect(r.out).toContain(
       "  code-comments: enabled (default: disabled) — Require API doc blocks and rationale comments on generated code, per code-annotation.md §1/§2.",
@@ -325,7 +325,7 @@ describe("the CLI works with the massa-ai MCP server unreachable (BST-11 AC-4 / 
     resolveBootstrapState.mockImplementationOnce(() => ({ state: fullState(), ignoredStateKeys: [] }));
     const r = await captureConsole(() => runCli(["bootstrap", "list"]));
     expect(r.code).toBe(0);
-    expect(r.out).toContain("  massa-ai-router: enabled");
+    expect(r.out).toContain("  massa-ai-router: disabled (default: disabled)");
     expect(fetchCalls).toBe(0);
   });
 

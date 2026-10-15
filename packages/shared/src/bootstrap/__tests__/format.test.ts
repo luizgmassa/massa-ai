@@ -49,18 +49,18 @@ describe("formatBootstrapInventory — BST-11 AC-3", () => {
     }
   });
 
-  test("a rule whose default is enabled and whose state is off reads disabled with default: enabled", () => {
+  test("a rule whose default is disabled and whose state is off reads disabled with default: disabled", () => {
     const lines = formatBootstrapInventory(state({ "conversation-feedback": false })).split("\n");
     const line = lines.find((l) => l.startsWith("  conversation-feedback: "));
     expect(line).toBe(
-      "  conversation-feedback: disabled (default: enabled) — Emit chat-visible status updates for massa-ai workflow progress.",
+      "  conversation-feedback: disabled (default: disabled) — Emit chat-visible status updates for massa-ai workflow progress.",
     );
   });
 
-  test("code-comments switched on reads enabled while still naming its disabled default (BST-08 AC-2)", () => {
-    const lines = formatBootstrapInventory(state({ "code-comments": true })).split("\n");
-    const line = lines.find((l) => l.startsWith("  code-comments: "));
-    expect(line).toContain("code-comments: enabled (default: disabled)");
+  test("a rule switched on reads enabled while naming its disabled default (ask-first)", () => {
+    const lines = formatBootstrapInventory(state({ "conversation-feedback": true })).split("\n");
+    const line = lines.find((l) => l.startsWith("  conversation-feedback: "));
+    expect(line).toContain("conversation-feedback: enabled (default: disabled)");
   });
 
   test("the default is named on every row, including rows that agree with it", () => {

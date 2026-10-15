@@ -53,7 +53,7 @@ for d in "$PROJECT_ROOT"/skills/*/; do
   SKILL_COUNT=$((SKILL_COUNT + 1))
   target="$H1/.claude/skills/$name"
   check "copy for $name is a real directory, not a symlink" "$([ -d "$target" ] && [ ! -L "$target" ] && echo 0 || echo 1)"
-  check "copy for $name matches the source byte-for-byte" "$(diff -rq "$PROJECT_ROOT/skills/$name" "$target" >/dev/null 2>&1; echo $?)"
+  check "copy for $name matches the source byte-for-byte" "$(diff -rq --exclude bootstrap-rules.md "$PROJECT_ROOT/skills/$name" "$target" >/dev/null 2>&1; echo $?)"
   check "ownership marker written for $name" "$([ -f "$H1/.claude/skills/.massa-ai-owned-$name" ] && echo 0 || echo 1)"
 done
 check "at least one skill was discovered" "$([ "$SKILL_COUNT" -gt 0 ] && echo 0 || echo 1)"
@@ -117,7 +117,7 @@ ln -s "$ROOT/decoy" "$H3/.claude/skills/$FIRST_SKILL"
 run_apply "$H3" >/dev/null
 TARGET3="$H3/.claude/skills/$FIRST_SKILL"
 check "legacy symlink was replaced with a real directory" "$([ -d "$TARGET3" ] && [ ! -L "$TARGET3" ] && echo 0 || echo 1)"
-check "migrated copy matches the source" "$(diff -rq "$PROJECT_ROOT/skills/$FIRST_SKILL" "$TARGET3" >/dev/null 2>&1; echo $?)"
+check "migrated copy matches the source" "$(diff -rq --exclude bootstrap-rules.md "$PROJECT_ROOT/skills/$FIRST_SKILL" "$TARGET3" >/dev/null 2>&1; echo $?)"
 
 echo ""
 echo "Scenario 6: a foreign regular file at a target aborts BEFORE any mutation"
@@ -170,7 +170,7 @@ cat > "$H6/.config/massa-ai/install-state.json" <<EOF
 EOF
 run_apply "$H6" >/dev/null
 TARGET6="$H6/.claude/skills/massa-ai"
-check "the plugin copy was replaced with the repo copy" "$([ -d "$TARGET6" ] && diff -rq "$PROJECT_ROOT/skills/massa-ai" "$TARGET6" >/dev/null 2>&1; echo $?)"
+check "the plugin copy was replaced with the repo copy" "$([ -d "$TARGET6" ] && diff -rq --exclude bootstrap-rules.md "$PROJECT_ROOT/skills/massa-ai" "$TARGET6" >/dev/null 2>&1; echo $?)"
 OWNER6="$("$RUNNER" - "$H6/.config/massa-ai/install-state.json" <<'NODE'
 const fs = require("fs");
 const s = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));

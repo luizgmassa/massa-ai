@@ -331,7 +331,9 @@ variable; copy it to `.env` and edit there.
 `skills/` holds the repo-local skills (`massa-ai` router, `bootstrap`, `agents/`);
 `skills/AGENTS.md` is the registry for the 7 sub-agent specialists **and** the single
 source of the Conversation Feedback policy (the
-`<!-- massa-ai:bootstrap -->` block the installer copies to `<host>/AGENTS.md`). MCP tool
+`<!-- massa-ai:bootstrap -->` block the installer copies to `<host>/AGENTS.md`; all six
+bootstrap rules default to disabled — ask-first: the agent asks what to activate instead
+of auto-activating). MCP tool
 contracts and the Synapse lifecycle live in `skills/massa-ai/references/mcp-tools.md` and
 `references/synapse-policy.md` — the former standalone `massa-ai-memory` and
 `synapse-usage` skills were folded into those two references and deleted. `apps/{claude,codex,cursor,opencode}-plugin/` ship those same 7

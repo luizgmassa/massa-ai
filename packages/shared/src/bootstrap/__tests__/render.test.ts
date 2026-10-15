@@ -48,6 +48,7 @@ import {
   BootstrapRenderError,
   bootstrapContractPath,
   bootstrapStateFilePath,
+  CONTRACT_FILENAME,
   renderBootstrap,
   ruleMarker,
   wrapBootstrapBlock,
@@ -351,6 +352,23 @@ describe("always-rendered header region (BST-10 AC-9, spec Edge Cases)", () => {
     expect(render(ALL_OFF).contract).toContain("Every massa-ai bootstrap rule is disabled");
   });
 
+  test("the header names the per-host bootstrap-rules.md companion path", () => {
+    for (const host of HOSTS) {
+      const root = bootstrapContractPath(host, TARGET_HOME).replace(`/${CONTRACT_FILENAME}`, "");
+      expect(render(DEFAULTS, host).contract).toContain(
+        `${root}/skills/massa-ai/bootstrap-rules.md`,
+      );
+    }
+  });
+
+  test("the header lists the six-rule menu, in registry order", () => {
+    const { contract } = render(ALL_OFF);
+    const menu = BOOTSTRAP_RULES.map((rule) => `- \`${rule.id}\` — ${rule.description}`);
+    const positions = menu.map((line) => contract.indexOf(line));
+    for (const position of positions) expect(position).toBeGreaterThanOrEqual(0);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  });
+
   test("that statement is absent whenever any rule is enabled", () => {
     for (const rule of BOOTSTRAP_RULES) {
       const contract = render(stateOf(false, { [rule.id]: true })).contract;
@@ -358,11 +376,25 @@ describe("always-rendered header region (BST-10 AC-9, spec Edge Cases)", () => {
     }
   });
 
-  test("the header carries no timestamp, version, or host name", () => {
-    // Any of the three would make a re-render differ and would report as
-    // permanent installer drift rather than as a failure.
-    const perHost = HOSTS.map((host) => render(DEFAULTS, host).contract);
-    for (const contract of perHost) expect(contract).toBe(perHost[0]);
+  test("the header carries no timestamp or version; hosts differ only in their config paths", () => {
+    // A clock or version stamp would make a re-render differ and would report
+    // as permanent installer drift rather than as a failure. The per-host
+    // `bootstrap-rules.md` companion path is the one intended cross-host
+    // variation (ask-first-defaults E4); the pointer block already carried the
+    // same one. Normalizing each host's config root makes every host's header
+    // text identical again.
+    const ROOTS: Readonly<Record<Host, string>> = {
+      claude: `${TARGET_HOME}/.claude`,
+      codex: `${TARGET_HOME}/.codex`,
+      cursor: `${TARGET_HOME}/.cursor`,
+      opencode: `${TARGET_HOME}/.config/opencode`,
+    };
+    const [first, ...rest] = HOSTS;
+    const baseline = render(DEFAULTS, first)
+      .contract.replaceAll(ROOTS[first], "@ROOT@");
+    for (const host of rest) {
+      expect(render(DEFAULTS, host).contract.replaceAll(ROOTS[host], "@ROOT@")).toBe(baseline);
+    }
   });
 });
 
@@ -874,7 +906,10 @@ describe("refusals", () => {
       ruleMarker("dedupe-guardrails", "start"),
       `${ruleMarker("dedupe-guardrails", "start")}\n${ruleMarker("not-a-rule", "start")}`,
     );
-    const error = caught(() => render(DEFAULTS, "codex", source));
+    // The unknown marker must sit inside a span that actually renders, or an
+    // all-off state would drop it together with its span and the refusal
+    // would never fire.
+    const error = caught(() => render(ALL_ON, "codex", source));
     expect(error.name).toBe("UnknownRuleMarkerError");
     expect(error.details).toEqual([ruleMarker("not-a-rule", "start")]);
   });

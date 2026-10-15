@@ -1354,7 +1354,7 @@ The repo ships repo-local skills plus a unified bash installer that copies them 
 
 `skills/AGENTS.md` contains two sections:
 
-1. **Bootstrap contract** (top, between `<!-- massa-ai:bootstrap:start -->` and `<!-- massa-ai:bootstrap:end -->` markers): the coding session startup contract that activates the skill stack. Six individually-toggleable rules — `massa-ai-router`, `dedupe-guardrails`, `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments`. The Plan Challenge gate is not a rule: it is fixed router behavior in `skills/massa-ai/SKILL.md` §Plan Challenge Gate.
+1. **Bootstrap contract** (top, between `<!-- massa-ai:bootstrap:start -->` and `<!-- massa-ai:bootstrap:end -->` markers): the coding session startup contract that activates the skill stack. Six individually-toggleable rules — `massa-ai-router`, `dedupe-guardrails`, `conversation-feedback`, `indexing-hygiene`, `english-code`, `code-comments` — all defaulting to disabled (ask-first): a fresh install renders an ask-first preamble instead of any rule span, and the agent must ask the user what to activate rather than auto-activating. The Plan Challenge gate is not a rule: it is fixed router behavior in `skills/massa-ai/SKILL.md` §Plan Challenge Gate.
 
 2. **Sub-agent registry** (bottom): the 7 reusable sub-agent specialist registry (senior-engineer, code-explorer, code-reviewer, designer, judge, product-manager, test-engineer), pointing to the capability packet and output contract definitions in `agent-orchestration.md`.
 
