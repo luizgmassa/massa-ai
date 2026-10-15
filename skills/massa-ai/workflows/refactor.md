@@ -14,7 +14,7 @@ Load `references/project-context.md` (intake sweep) before the first substantive
 
 Before the first repository mutation, load `references/implementation-delivery.md` (delivery chain: worktree, atomic commits, PR, CI watch, merge gate) and `references/code-annotation.md` (doc blocks, rationale, test coverage). After two consecutive failed fixes on one symptom, stop editing and load `references/root-cause-scripts.md`.
 
-**Isolation Gate — before the first file edit:** execute `references/implementation-delivery.md` Stage 0–1 now (fetch base, create the worktree + branch, work inside it) and record the worktree path + branch — or one of Stage 1's two legal skip reasons, verbatim — before any repository mutation.
+**Isolation Gate — before the first file edit:** ask the user where to work per `references/implementation-delivery.md` Stage 1 (host-native question mechanism; ask once per session and reuse the recorded answer), then execute the confirmed Stage 0–1 path and record the worktree path + branch — or the recorded decline, verbatim — before any repository mutation.
 
 1. Resolve/reuse `workflowSessionId`: `refactor-[entity]`
 **Reuse Scan — before writing new implementation code:** run the mandatory reuse scan per `references/code-reuse-scan.md` (separate read-only subagents; the reuse map's use/extend/new decisions are consumed before new code is planned or written) — or record its inline-fallback reason, verbatim.
