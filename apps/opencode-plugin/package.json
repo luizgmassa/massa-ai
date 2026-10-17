@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts src/config-cli.ts --outdir=dist --target=bun",
+    "build": "bun build src/index.ts src/v2.ts src/config-cli.ts --outdir=dist --target=bun",
     "type-check": "tsc --noEmit",
     "pretest": "bun ../../scripts/generate-skill-artifacts.ts && bun ../../scripts/generate-subagent-artifacts.ts",
     "test": "bun test __tests__ src/__tests__"
@@ -28,6 +28,7 @@
     "@massa-ai/shared": "workspace:*"
   },
   "devDependencies": {
+    "@opencode/plugin": "2.0.28",
     "@types/node": "^22.10.5",
     "typescript": "^5.8.3"
   },

@@ -129,6 +129,31 @@ describe("opencode-plugin install.sh", () => {
     );
   });
 
+  for (const [version, entry] of [
+    ["opencode v2.0.32", "v2.js"],
+    ["2.1.0", "v2.js"],
+    ["1.18.32", "index.js"],
+    ["not a version", "index.js"],
+  ] as const) {
+    test(`host reporting "${version}" installs dist/${entry} as the plugin copy`, async () => {
+      const binDir = path.join(tmp, "fake-bin");
+      await fs.mkdir(binDir);
+      await fs.writeFile(path.join(binDir, "opencode"), `#!/bin/sh\necho "${version}"\n`, {
+        mode: 0o755,
+      });
+      const res = runInstall(["--user"], {
+        HOME: tmp,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH}`,
+      });
+      expect(res.exitCode).toBe(0);
+      const pluginPath = path.join(tmp, ".config/opencode/plugins/massa-ai/index.js");
+      const distJs = path.join(REPO_ROOT, "apps/opencode-plugin/dist", entry);
+      expect(await fs.readFile(pluginPath, "utf8")).toBe(await fs.readFile(distJs, "utf8"));
+      const cfg = await readJson(path.join(tmp, ".config/opencode/opencode.jsonc"));
+      expect((cfg.plugin as string[]).includes("./plugins/massa-ai/index.js")).toBe(true);
+    });
+  }
+
   test("plugin entry in opencode.jsonc is idempotent", async () => {
     runInstall(["--user"], { HOME: tmp });
     const afterFirst = await fs.readFile(
