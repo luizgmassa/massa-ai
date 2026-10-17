@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.70.0] - 2026-10-17
+
 ### Added
 
 - **The OpenCode plugin now supports OpenCode 2.x alongside 1.x.** OpenCode 2 loads a different
