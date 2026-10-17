@@ -39,3 +39,29 @@ These fail on a stash of the feature diff exactly as with it; none touch the dif
 ## Lessons recorded
 
 - `ac_gap`: the plan's verification recipe used `TARGET_HOME=<scratch>` as an env var; `install-skills.sh` only honors `--target` (`:82` pins it to `$HOME`), so the recipe's first run installed into the real home. Recorded via `lessons.ts`.
+
+## Review round (2026-10-17)
+
+The patch was applied on a fresh `feat/ask-first-defaults` from `main` @ `5bead653` and
+reviewed before the PR. Three defects found and fixed:
+
+- **Lessons store destroyed.** The patch's `.specs/lessons.json` kept 4 of 23 lessons (the
+  known `lessons.ts` rewrite defect). Restored `main`'s store byte-identical and appended
+  only L-028 (24 lessons, `next_id` 29).
+- **Preamble overrode persisted choices.** The always-rendered preamble said "Do not
+  auto-activate any rule below" unconditionally, so a rule the user persisted with
+  `massa-ai-config bootstrap enable` still rendered but was never activated and the ask
+  repeated every session — the persist option had no effect. The preamble now activates
+  rendered rules and asks only when no rule section renders; sensed by
+  `bootstrap-source-contract.test.ts` (residue test) and `engine.test.ts`.
+- **Generator temp-file leak.** `generate-skill-artifacts.ts` left one
+  `massa-ai-bootstrap-rules-<pid>.md` in the temp dir per run; it is now removed on exit.
+
+Also excluded from the PR: the unrelated `apps/opencode-plugin/*` + `bun.lock` migration the
+patch's first commit carried (user decision; kept as a local stash).
+
+Evidence: `bun test packages/shared` 998/0; bootstrap/installer shell suites 152/0 and 36/0;
+`bun run test:plugins` 224/0; `lint`, `build`, `type-check` green; companion bytes
+`cmp`-identical between the installer and the generated Claude bundle. `bun run test:scripts`
+2225/17 — the 14 stable reds (npm pack ×5, subagent profile drift ×7, `generate:artifacts`
+drift ×2) fail identically on `main`; the other 3 passed when re-run in isolation.

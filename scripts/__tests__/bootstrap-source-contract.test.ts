@@ -233,6 +233,20 @@ describe("bootstrap source contract: no rule leaks outside every span", () => {
     const nameLeaks = ACTIVATION_NAMES.filter((name) => residue.includes(name));
     expect(nameLeaks).toEqual([]);
   });
+
+  test("the residue activates rendered rules and asks only when none renders (ask-first-defaults)", async () => {
+    // A persisted `bootstrap enable` renders its span; an unconditional
+    // "ask, do not activate" preamble would override that choice every session.
+    const content = await read(AGENTS_MD);
+    const block = content.slice(
+      content.indexOf(BOOTSTRAP_START),
+      content.indexOf(BOOTSTRAP_END) + BOOTSTRAP_END.length,
+    );
+    const residue = stripAllRuleSpans(block).replace(/\s+/g, " ");
+    expect(residue).toContain("Activate, in the order they appear, the rules whose sections are rendered below");
+    expect(residue).toContain("Do not auto-activate any rule whose section is absent");
+    expect(residue).toMatch(/When no rule section is rendered below[^.]*ask the user what to activate/);
+  });
 });
 
 /**

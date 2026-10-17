@@ -1,4 +1,4 @@
-# Handoff — ask-first-defaults (VALIDATED 2026-10-15; commits local, no PR by user choice)
+# Handoff — ask-first-defaults (VALIDATED 2026-10-15; review round + PR 2026-10-17)
 
 **Branch:** `feat/ask-first-defaults` (main checkout — the user's recorded option-3 pick with
 warning shown), commits `1b58faa3` (Part A: worktree ask-first) + `36c6cb49` (Part B: bootstrap
@@ -13,7 +13,8 @@ all-off default + companion).
   registry-order six-rule menu + per-host `bootstrap-rules.md` path. The installer writes the
   companion (`--target <dir>` — never a `TARGET_HOME` env var, lesson L-028); the plugin
   generator ships it in all four host bundles at build time.
-- Delivery hold: commits only — user chose no push/PR yet. Next: push + PR on go-ahead.
+- Delivery: review round 2026-10-17 (see validation.md §Review round) applied the patch on a
+  fresh `feat/ask-first-defaults`, opened the PR and merged on green CI at the user's request.
 - Post-merge: `scripts/install-skills.sh --apply` + host session restarts. Existing installs
   keep their persisted rules; the ask-first preamble reaches them only after `--apply`.
 - NOTE: the real home received one mid-session `--apply` (verification-recipe bug, L-028) — its

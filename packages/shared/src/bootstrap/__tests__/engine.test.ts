@@ -866,7 +866,8 @@ describe("source seam", () => {
     // Ask-first fresh install (ask-first-defaults AC3): the preamble asks
     // instead of auto-activating, the header carries the all-off notice, the
     // per-host companion path and the six-rule menu, and no rule span renders.
-    expect(contract).toContain("Do not auto-activate any rule below");
+    expect(contract).toContain("Do not auto-activate any rule whose section is absent");
+    expect(contract).toContain("When no rule section is rendered below");
     expect(contract).toContain("ask the user what to activate");
     expect(contract).toContain("Every massa-ai bootstrap rule is disabled");
     expect(contract).toContain(

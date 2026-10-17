@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **All six bootstrap rules now default to disabled (ask-first).** A fresh install renders a
+  contract with no rule section: the agent asks the user what to activate (all, none, pick, or
+  persist via `massa-ai-config bootstrap enable <id>`) instead of auto-activating the stack.
+  Rules the user persisted as enabled still render and activate without an ask. The contract
+  header now lists the six-rule menu and names a per-host `skills/massa-ai/bootstrap-rules.md`
+  companion carrying every rule body, written by `install-skills.sh --apply` (covered by
+  `--check`) and shipped in all four plugin bundles. Existing installs with no persisted rule
+  state flip to all-off on their next `--apply`; re-enable with `massa-ai-config bootstrap enable`.
+- **Implementation workflows ask where to work before isolating.** The Isolation Gate in the
+  13 implementation workflows now asks once per session — isolated worktree + new branch
+  (recommended), current checkout on the current branch, or current checkout on a new branch
+  (with a shared-checkout warning) — instead of always creating a worktree. Subagents inherit
+  the parent's answer; a non-git target still skips isolation without asking.
+
 ## [1.68.1] - 2026-10-01
 
 ### Fixed

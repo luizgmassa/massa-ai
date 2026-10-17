@@ -36,7 +36,7 @@
  *   bun run scripts/generate-skill-artifacts.ts --check  # drift gate
  */
 
-import { promises as fs } from "fs";
+import { promises as fs, rmSync } from "fs";
 import path from "path";
 import { tmpdir } from "os";
 import { HOSTS, capabilitiesFor, type Host, type HostCapabilities } from "./lib/host-capabilities.ts";
@@ -111,7 +111,7 @@ const BOOTSTRAP_BLOCK_END = "<!-- massa-ai:bootstrap:end -->";
  * entry. The plugin route never runs the installer, so the bundled skill must
  * already carry the rule bodies the contract header names (E4). The block is
  * a byte slice of an existing source file, never re-serialized (PDO-06 AC7).
- * The temp file is one small file per generate run; the block is ~10 KB.
+ * The temp file is removed when the process exits.
  */
 let bootstrapCompanionSourcePromise: Promise<string> | null = null;
 function bootstrapCompanionSource(): Promise<string> {
@@ -126,6 +126,7 @@ function bootstrapCompanionSource(): Promise<string> {
     }
     const target = path.join(tmpdir(), `massa-ai-bootstrap-rules-${process.pid}.md`);
     await fs.writeFile(target, text.slice(start, end + BOOTSTRAP_BLOCK_END.length));
+    process.once("exit", () => rmSync(target, { force: true }));
     return target;
   })();
   return bootstrapCompanionSourcePromise;

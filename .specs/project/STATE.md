@@ -6,10 +6,10 @@ Feature workflow, Standard tier, from the approved plan `~/.opencode/plan/ask-fi
 bootstrap rules default off: fresh installs render an ask-first preamble + six-rule menu +
 per-host `bootstrap-rules.md` companion path; the installer writes the companion and the plugin
 generator ships it at build time. Isolation record: user picked option 3 (current checkout, new
-branch) with the warning shown — the feature's own new recorded-override policy. Delivery hold:
-user chose commits-only, no push/PR yet. Independent verify PASS
+branch) with the warning shown — the feature's own new recorded-override policy. Review round
+2026-10-17: PR opened and merged on green CI at the user's request. Independent verify PASS
 (`.specs/features/ask-first-defaults/validation.md`; 7/7 discrimination mutants killed). Next:
-push + PR on user go-ahead; post-merge `scripts/install-skills.sh --apply` + host restarts (the
+post-merge `scripts/install-skills.sh --apply` + host restarts (the
 real home already carries one mid-session apply — see HANDOFF; keep or restore is the user's call).
 
 ## Previous — Agent dispatch announcement moved to hooks, validated (**2026-09-29** — worktree `~/Projects/massa-ai-feat-agent-start-hook-announcement`, branch `feat/agent-start-hook-announcement`)
