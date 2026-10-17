@@ -10,13 +10,13 @@
  *      SURVIVED. A blunt "delete everything named handoff" would fail here.
  *   3. Universal intake — every workflow on disk loads project-context. The set
  *      is derived from the filesystem, so a NEW workflow cannot skip it.
- *   4. Mutation-scoped references — exactly the 16 implementation workflows load
- *      the delivery/annotation/root-cause references, and the 24 read-only ones
+ *   4. Mutation-scoped references — exactly the 13 implementation workflows load
+ *      the delivery/annotation/root-cause references, and the 23 read-only ones
  *      provably do NOT. Both directions are asserted; a one-line deletion in any
  *      single workflow flips exactly one assertion.
  *   5. Invariant correctness — not that the references EXIST, but that the
  *      decisions they encode still say what was decided: the circling threshold
- *      is two, merge requires approval, isolation has no size exemption, the
+ *      is two, merge requires approval, isolation asks first, the
  *      rationale block has all three fields, precedence puts the nearest
  *      ancestor above the repo root. A reference shipping the wrong threshold
  *      passes a presence check and fails this one.
@@ -256,10 +256,11 @@ describe("delivery scope: only mutating workflows carry the delivery contract", 
     expect(leaked).toEqual([]);
   });
 
-  test("the Isolation Gate line is byte-identical in all 16 workflows and names its mechanism", async () => {
+  test("the Isolation Gate line is byte-identical in all 13 workflows and names its mechanism", async () => {
     // Single-source discipline: the policy lives in implementation-delivery.md;
     // the per-workflow line only invokes it. Drift between copies, or a rewrite
-    // that keeps the label but drops Stage 0–1 / evidence recording, fails here.
+    // that keeps the label but drops the ask / Stage 0–1 / evidence recording,
+    // fails here.
     const lines = new Set<string>();
     for (const rel of IMPLEMENTATION_WORKFLOWS) {
       const line = (await readWorkflow(rel))
@@ -270,9 +271,13 @@ describe("delivery scope: only mutating workflows carry the delivery contract", 
     }
     expect(lines.size).toBe(1);
     const [gate] = [...lines];
-    expect(gate).toContain("`references/implementation-delivery.md` Stage 0–1");
+    expect(gate).toContain(
+      "ask the user where to work per `references/implementation-delivery.md` Stage 1",
+    );
+    expect(gate).toContain("ask once per session and reuse the recorded answer");
+    expect(gate).toContain("execute the confirmed Stage 0–1 path");
     expect(gate).toContain("record the worktree path + branch");
-    expect(gate).toContain("two legal skip reasons, verbatim");
+    expect(gate).toContain("the recorded decline, verbatim");
   });
 
   test("read-only workflows do NOT load the delivery reference", async () => {
@@ -319,18 +324,42 @@ describe("invariants: the references still encode the decisions that were made",
     );
   });
 
-  test("implementation-delivery.md grants worktree isolation no size exemption", async () => {
+  test("implementation-delivery.md Stage 1 asks where to work before Stage 0–1", async () => {
+    // Ask-first (ask-first-defaults): the agent asks via the host's native
+    // question mechanism; only the user's answer can skip isolation.
     const body = await readReference("implementation-delivery.md");
-    expect(body).toMatch(/no\s+size\s+exemption/i);
-    expect(body).toMatch(/only two legal skip reasons/i);
+    expect(body).toMatch(/ask the user where to work/i);
+    expect(body).toMatch(/host's native question\s+mechanism/i);
+    expect(body).toMatch(/exactly\s+three\s+options/i);
+    expect(body).toMatch(/Current checkout on a new branch/i);
+    expect(body).toMatch(/The target is not a git\s+repository/i);
+    expect(body).toMatch(/--skip-declined/);
+  });
+
+  test("implementation-delivery.md records the ask answer once per session and has subagents inherit it", async () => {
+    const body = await readReference("implementation-delivery.md");
+    expect(body).toMatch(/ask once per session/i);
+    expect(body).toMatch(/reuse it for every subsequent Stage 0–1/i);
+    expect(body).toMatch(/Subagents never ask/i);
+    expect(body).toMatch(/inherit the parent\s+lane's recorded answer/i);
+  });
+
+  test("implementation-delivery.md allows a branch switch only via a recorded user override", async () => {
+    const body = await readReference("implementation-delivery.md");
+    expect(body).toMatch(
+      /Never switch branches in a\s+checkout another session may share without an explicit, recorded user override/i,
+    );
+    expect(body).toMatch(/the ask's option 3, with the warning shown/i);
   });
 
   test("implementation-delivery.md Stage 1 records isolation evidence and forbids shared-checkout branch switches", async () => {
     // AC4 (worktree-isolation-gate): the cross-session rule the Isolation Gate
     // line invokes. Distinct from agent-orchestration.md's cross-subagent rule.
     const body = await readReference("implementation-delivery.md");
-    expect(body).toContain("Record the isolation evidence immediately after creation");
-    expect(body).toMatch(/Never switch branches in a\s+checkout another session may share/i);
+    expect(body).toContain("Record the isolation evidence immediately after Stage 1");
+    expect(body).toMatch(
+      /Never switch branches in a\s+checkout another session may share without an explicit, recorded user override/i,
+    );
     expect(body).toMatch(/cross-\*\*session\*\*/);
   });
 
@@ -578,7 +607,7 @@ describe("reuse scan: uniform mandate across the 16 implementation workflows", (
     });
   }
 
-  test("the Reuse Scan action line is byte-identical in all 16 workflows", async () => {
+  test("the Reuse Scan action line is byte-identical in all 13 workflows", async () => {
     const lines = new Set<string>();
     for (const rel of IMPLEMENTATION_WORKFLOWS) {
       const line = (await readWorkflow(rel))

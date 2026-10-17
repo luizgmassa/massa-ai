@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 28,
+  "next_id": 29,
   "lessons": [
     {
       "id": "L-001",
@@ -510,6 +510,29 @@
       "created": "2026-09-23T06:20:49Z",
       "last_seen": "2026-09-23T06:20:49Z",
       "confidence": 0.53
+    },
+    {
+      "id": "L-028",
+      "key": "ac_gap::install skills sh takes target not a target home env var target home dir prefixed to the command is silently ignored and the run installs into the real home",
+      "text": "install-skills.sh takes --target, not a TARGET_HOME env var; TARGET_HOME=<dir> prefixed to the command is silently ignored and the run installs into the real home.",
+      "signal": "ac_gap",
+      "scope": "",
+      "status": "candidate",
+      "features": [
+        "ask-first-defaults"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification recipe / install-skills.sh:82"
+      ],
+      "created": "2026-10-15T05:07:54Z",
+      "last_seen": "2026-10-15T05:07:54Z",
+      "confidence": 0.53,
+      "project": "massa-ai",
+      "session": "feature-ask-first-defaults",
+      "workflow": "spec-driven",
+      "entity": "ask-first-defaults"
     }
   ],
   "trust_threshold": 30,

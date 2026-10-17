@@ -250,14 +250,17 @@ describe("rule state resolution and the BST-10 AC-10b degrade", () => {
 
   test("a readable preference is honoured, so the degrade case is not vacuous", () => {
     const home = scratch("state-honoured");
+    // Defaults are all-off (ask-first), so the persisted preference must
+    // switch a rule ON to prove the render honours it rather than following
+    // the default.
     const configPath = writeConfig(
       home,
-      JSON.stringify({ bootstrap: { rules: { "conversation-feedback": false } } }),
+      JSON.stringify({ bootstrap: { rules: { "conversation-feedback": true } } }),
     );
     const resolved = resolveRuleStateForRender(api, configPath, () => {});
     expect(resolved.degraded).toBe(false);
-    expect(resolved.state["conversation-feedback"]).toBe(false);
-    expect(resolved.state["dedupe-guardrails"]).toBe(true);
+    expect(resolved.state["conversation-feedback"]).toBe(true);
+    expect(resolved.state["dedupe-guardrails"]).toBe(false);
   });
 
   test("an unregistered persisted id is reported, not fatal (BST-10 AC-12)", () => {
@@ -344,8 +347,14 @@ describe("rendering for the installer", () => {
     // Omitting it is still the old default, so this is a thread-through rather
     // than a swap of one hardcoded root for another.
     expect(withoutRoot.pointer).toContain(path.join(home, ".codex", "MASSA-AI.md"));
-    // The contract body is host-independent (assumption A4) and must not move.
-    expect(withRoot.contract).toBe(withoutRoot.contract);
+    // The contract body is host-independent (assumption A4). The header also
+    // names the per-host `bootstrap-rules.md` companion under the resolved
+    // root (ask-first-defaults E4) — the same host-root variation the pointer
+    // carries — so normalizing each render's own root makes the two
+    // contracts identical again.
+    expect(withRoot.contract.replaceAll(fallbackRoot, "@ROOT@")).toBe(
+      withoutRoot.contract.replaceAll(path.join(home, ".codex"), "@ROOT@"),
+    );
   });
 
   test("main forwards --host-root through to the pointer", async () => {

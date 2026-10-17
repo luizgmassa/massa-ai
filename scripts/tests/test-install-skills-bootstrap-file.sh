@@ -1345,6 +1345,36 @@ assert_file "claude is still wired after the sibling abort (BST-03 AC-11)" \
   "$H15/.claude/CLAUDE.md"
 
 echo ""
+echo "Scenario 16: the bootstrap-rules.md companion (ask-first-defaults AC4)"
+# The rendered all-off contract drops every rule span, so rule bodies ship as
+# a companion inside the installed massa-ai skill copy: written on apply,
+# byte-identical to the source block, idempotent on re-apply, covered by
+# --check drift, and removed with the wholesale skill dir on uninstall.
+bootstrap_block() {
+  # The installer's slice is indexOf-inclusive with NO trailing newline; sed's
+  # line printing appends one, so drop exactly the final byte.
+  local block
+  block="$(sed -n '/^<!-- massa-ai:bootstrap:start -->$/,/^<!-- massa-ai:bootstrap:end -->$/p' "$1")"
+  printf '%s' "${block%$'\n'}"
+}
+H16="$ROOT/h16"; mkdir -p "$H16"
+apply "$H16" claude >/dev/null
+COMPANION="$H16/.claude/skills/massa-ai/bootstrap-rules.md"
+assert_file "the companion is written on apply (ask-first-defaults AC4)" "$COMPANION"
+assert_eq "the companion is the raw bootstrap block byte-for-byte" "0" \
+  "$(bootstrap_block "$PROJECT_ROOT/skills/AGENTS.md" | cmp -s - "$COMPANION"; echo $?)"
+assert_contains "a re-apply over an unchanged companion is a no-op (ask-first-defaults AC4)" \
+  "$(apply "$H16" claude)" "up to date"
+rm "$COMPANION"
+CHECK16="$(bash "$INSTALLER" --check --platform claude --target "$H16" --repo-root "$PROJECT_ROOT" --yes 2>&1)"
+assert_contains "--check reports a missing companion as drift (ask-first-defaults AC4)" \
+  "$CHECK16" "bootstrap-rules.md companion missing or stale"
+apply "$H16" claude >/dev/null
+uninstall "$H16" claude >/dev/null
+assert_no_file "uninstall removes the companion with the skill dir (ask-first-defaults AC4)" \
+  "$COMPANION"
+
+echo ""
 echo "Scenario 9: the developer's real home was never touched"
 assert_eq "the real home's contract paths are unchanged" "$(real_home_probe)" "$REAL_PROBE_BEFORE"
 

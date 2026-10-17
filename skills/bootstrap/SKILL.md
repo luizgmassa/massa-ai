@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: Inspect or toggle the massa-ai startup-contract rules (massa-ai-router, dedupe-guardrails, conversation-feedback, indexing-hygiene, english-code, code-comments) that the installed MASSA-AI.md delivers to this host. Use when the user asks which startup rules are active, asks to turn one on or off, or asks why a rule is or is not being applied. Do NOT use for editing the rule text itself (that is a massa-ai repository change, not a runtime toggle) and do NOT claim a toggle is live before the user restarts the host session.
+description: Inspect or toggle the massa-ai startup-contract rules (massa-ai-router, dedupe-guardrails, conversation-feedback, indexing-hygiene, english-code, code-comments) that the installed MASSA-AI.md delivers to this host. Use when the user asks which startup rules are active, asks to turn one on or off, or asks why a rule is or is not being applied. Do NOT use for editing the rule text itself (that is a massa-ai repository change, not a runtime toggle) and do NOT claim a toggle is live before the user restarts the host session. All six rules default to disabled (ask-first): the startup contract instructs the agent to ask the user what to activate instead of auto-activating.
 license: MIT
 metadata:
   author: Luiz Massa
@@ -33,13 +33,13 @@ Run `bootstrap list` before any toggle, so the reported change is against a stat
 `--target <dir>` exists for scratch homes and requires `--yes`; it redirects only where the contract is *rendered*. The preference itself is always persisted to `~/.config/massa-ai/config.json`, so under a redirected target the CLI names both paths on stderr. Do not pass `--target` unless the user asked for a specific directory.
 
 ## The Rule Ids
-Exactly six ids exist, and only these are accepted. There is no protected subset — every one of them can be switched both ways, including `massa-ai-router`.
+Exactly six ids exist, and only these are accepted. There is no protected subset — every one of them can be switched both ways, including `massa-ai-router`. All six default to disabled (ask-first): the startup contract instructs the agent to ask the user what to activate at the start of each coding or planning conversation instead of auto-activating anything, and one option of that ask persists a choice through this CLI.
 
-- `massa-ai-router` — load the massa-ai skill as the workflow router before substantive work. Default: enabled.
-- `dedupe-guardrails` — reuse already-loaded massa-ai context instead of bulk-loading workflows or references. Default: enabled.
-- `conversation-feedback` — emit chat-visible status updates for massa-ai workflow progress. Default: enabled.
-- `indexing-hygiene` — ignore build output, dependency, and secret paths during indexing and context loading. Default: enabled.
-- `english-code` — write generated code, identifiers, comments, and commit-facing artifacts in English regardless of conversational language. Default: enabled.
+- `massa-ai-router` — load the massa-ai skill as the workflow router before substantive work. Default: **disabled**.
+- `dedupe-guardrails` — reuse already-loaded massa-ai context instead of bulk-loading workflows or references. Default: **disabled**.
+- `conversation-feedback` — emit chat-visible status updates for massa-ai workflow progress. Default: **disabled**.
+- `indexing-hygiene` — ignore build output, dependency, and secret paths during indexing and context loading. Default: **disabled**.
+- `english-code` — write generated code, identifiers, comments, and commit-facing artifacts in English regardless of conversational language. Default: **disabled**.
 - `code-comments` — require API doc blocks and rationale comments on generated code. Default: **disabled**.
 
 `caveman` and `plan-challenge` were retired: the CLI refuses them as retired, and a persisted entry for one is skipped silently. The Plan Challenge gate itself still runs — it is fixed workflow behavior in the massa-ai router, no longer a toggle.

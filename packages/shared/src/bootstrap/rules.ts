@@ -62,10 +62,11 @@ export function isBootstrapRuleId(value: unknown): value is BootstrapRuleId {
 export interface BootstrapRuleDefinition {
   readonly id: BootstrapRuleId;
   /** Whether a fresh install — or any state with no persisted entry for this
-   *  id — renders this rule's span. Every rule defaults to `true` except
-   *  `code-comments` (BST-08 AC-2), which ships disabled because turning it
-   *  on changes every future generated diff's shape, unlike the other five
-   *  rules, which only change agent process. */
+   *  id — renders this rule's span. Every rule defaults to `false`
+   *  (ask-first): the startup contract instructs the agent to ask the user
+   *  what to activate instead of auto-activating, so a fresh install renders
+   *  the ask-first preamble and no rule spans. This supersedes BST-08 AC-2
+   *  ("every rule enabled except `code-comments`"). */
   readonly defaultEnabled: boolean;
   /** One-line description surfaced by `massa-ai-config bootstrap list`
    *  (BST-11 AC-3) — kept short, not a restatement of the full rule body. */
@@ -73,33 +74,33 @@ export interface BootstrapRuleDefinition {
 }
 
 /**
- * The registry itself, in render order. `BST-09 AC-1` fixes the id set;
- * `BST-08 AC-2` fixes every default except `code-comments`.
+ * The registry itself, in render order. `BST-09 AC-1` fixes the id set; the
+ * defaults are all-off (ask-first), superseding BST-08 AC-2's five-on default.
  */
 export const BOOTSTRAP_RULES: readonly BootstrapRuleDefinition[] = [
   {
     id: "massa-ai-router",
-    defaultEnabled: true,
+    defaultEnabled: false,
     description: "Load the massa-ai skill as the workflow router before substantive work.",
   },
   {
     id: "dedupe-guardrails",
-    defaultEnabled: true,
+    defaultEnabled: false,
     description: "Reuse already-loaded massa-ai context instead of bulk-loading workflows or references.",
   },
   {
     id: "conversation-feedback",
-    defaultEnabled: true,
+    defaultEnabled: false,
     description: "Emit chat-visible status updates for massa-ai workflow progress.",
   },
   {
     id: "indexing-hygiene",
-    defaultEnabled: true,
+    defaultEnabled: false,
     description: "Ignore build output, dependency, and secret paths during indexing and context loading.",
   },
   {
     id: "english-code",
-    defaultEnabled: true,
+    defaultEnabled: false,
     description:
       "Write generated code, identifiers, comments, and commit-facing artifacts in English regardless of conversational language.",
   },

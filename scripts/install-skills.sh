@@ -922,7 +922,7 @@ apply_platform() {
     marker="$(skill_marker_path "$skills_dir" "$name")"
     installed="${installed}${installed:+,}${name}"
 
-    if [ -d "$target" ] && [ ! -L "$target" ] && diff -rq "$source" "$target" >/dev/null 2>&1; then
+    if [ -d "$target" ] && [ ! -L "$target" ] && diff -rq --exclude bootstrap-rules.md "$source" "$target" >/dev/null 2>&1; then
       continue   # already correct — idempotent
     fi
 
@@ -939,6 +939,30 @@ apply_platform() {
     vinfo "Copied: $source -> $target"
     record "changed" "$p" "$target" "Copied: $source -> $target"
   done
+
+  # Companion rule-body file (ask-first-defaults B4): the rendered all-off
+  # contract drops every rule span, so rule bodies must stay readable
+  # somewhere the agent can reach — the raw bootstrap block, written inside
+  # the installed massa-ai skill copy whose absolute path the contract header
+  # names. Only when this installer owns the skills directory: a plugin
+  # tarball owns its own bundle (D3/PDO-09). Up to date records nothing, the
+  # same discipline bootstrap_note follows. Excluded from the copy diffs here
+  # and in check_platform, or an unchanged companion would re-copy the skill
+  # (or report drift) on every run.
+  if [ "$owner" != "plugin" ]; then
+    local companion="$skills_dir/massa-ai/bootstrap-rules.md"
+    if [ ! -f "$companion" ] || ! cmp -s "$companion" "$BOOTSTRAP_FILE"; then
+      if [ "$DRY_RUN" = "1" ]; then
+        vinfo "Would write companion: $companion"
+        record "would-change" "$p" "$companion" "Would write bootstrap-rules.md companion"
+      else
+        mkdir -p "$skills_dir/massa-ai"
+        cp "$BOOTSTRAP_FILE" "$companion"
+        vinfo "Wrote companion: $companion"
+        record "changed" "$p" "$companion" "Wrote bootstrap-rules.md companion"
+      fi
+    fi
+  fi
 
   # D3/PDO-09: a "plugin"-owned record means a plugin tarball install claimed
   # this platform's skills directory, not this repo installer — never remove
@@ -1306,12 +1330,23 @@ check_platform() {
         record "drift" "$p" "$target" "$name exists but is not a directory"
         continue
       fi
-      if ! diff -rq "$source" "$target" >/dev/null 2>&1; then
+      if ! diff -rq --exclude bootstrap-rules.md "$source" "$target" >/dev/null 2>&1; then
         vinfo "$name copy differs from $source"
         drift_count=$((drift_count + 1))
         record "drift" "$p" "$target" "$name copy differs from $source"
       fi
     done
+
+    # Companion rule-body file (ask-first-defaults B4): missing or stale is
+    # drift by the same definition the plan verdicts use — what --apply would
+    # write differs from what is on disk. Guarded on the skill copy existing
+    # so a wholly missing massa-ai skill reports once above, not twice.
+    local companion="$skills_dir/massa-ai/bootstrap-rules.md"
+    if [ -d "$skills_dir/massa-ai" ] && { [ ! -f "$companion" ] || ! cmp -s "$companion" "$BOOTSTRAP_FILE"; }; then
+      vinfo "bootstrap-rules.md companion missing or stale in $skills_dir/massa-ai"
+      drift_count=$((drift_count + 1))
+      record "drift" "$p" "$companion" "bootstrap-rules.md companion missing or stale"
+    fi
 
     # Stale: tracked in state, no longer a repo skill, still massa-ai-owned.
     for name in $(state_skills_for "$p"); do

@@ -1629,6 +1629,25 @@
       "spec": ".specs/features/agent-start-hook-announcement/spec.md",
       "validation": ".specs/features/agent-start-hook-announcement/validation.md",
       "notes": "VALIDATED 2026-09-29 via feature workflow (Standard). Independent code-reviewer verify: AC1-AC5 PASS; 34 mutants, 3 blocking + 3 advisory survivors closed with new sensors, 6/6 re-killed by exit code. Cursor skipped by user decision D4 (hooks show user_message only on deny). Residual: on-screen rendering unmeasured; needs one live dispatch per host."
+    },
+    {
+      "id": "ask-first-defaults",
+      "slug": "ask-first-defaults",
+      "title": "Ask-first defaults — workflows ask where to work before isolation; bootstrap rules all-off with a startup ask and a bootstrap-rules.md companion",
+      "status": "complete",
+      "priority": "P2",
+      "phases": {
+        "specify": true,
+        "design": false,
+        "tasks": false,
+        "execute": "complete"
+      },
+      "branch": "feat/ask-first-defaults",
+      "created": "2026-10-15",
+      "depends_on": [],
+      "spec": ".specs/features/ask-first-defaults/spec.md",
+      "validation": ".specs/features/ask-first-defaults/validation.md",
+      "notes": "VALIDATED 2026-10-15 via feature workflow (Standard) from the approved plan ~/.opencode/plan/ask-first-defaults.md (Plan Challenge full pre-mortem, 5 emendas E1-E5). Diff audit: 1 blocking + 4 advisory, all closed. Independent verify: static AC1-AC4 PASS; dynamic suites + 7/7 discrimination mutants executed by the main agent (subagent MCP shell bridge down, fallback recorded). Delivery hold: commits local, no PR by user choice. Residual: E1 passive-notice compliance is best-effort; ensure_worktree.ts docstring still says '16 implementation workflows' (file frozen by plan constraint)."
     }
   ],
   "active_feature": "e2e-feature-battery"

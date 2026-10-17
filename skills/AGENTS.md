@@ -1,14 +1,26 @@
 <!-- massa-ai:bootstrap:start -->
 # Coding Session Startup Contract
 
-## Required Coding Bootstrap
+## Startup Contract
 
-For every new conversation involving coding, planning before coding, debugging,
-code review, refactoring, or implementation, activate the rules below in the
-order they appear. Each rule can be switched off individually through
-`massa-ai-config bootstrap`; a disabled rule's section is absent from the
-rendered contract, and the remaining rules still activate in their own
-relative order.
+Activate, in the order they appear, the rules whose sections are rendered below:
+each one is a choice the user persisted with `massa-ai-config bootstrap enable
+<id>`, so it needs no ask. Do not auto-activate any rule whose section is absent.
+
+When no rule section is rendered below (the all-off fresh-install default), at
+the start of each new coding or planning conversation ask the user what to
+activate, using the host's native question mechanism (Claude Code
+`AskUserQuestion`, OpenCode `question` tool; a plain chat question where none
+exists). Offer: activate all, activate none, pick rules — plus one option that
+persists the choice with `massa-ai-config bootstrap enable <id>` (state:
+`~/.config/massa-ai/config.json`, key `bootstrap.rules`; takes effect after the
+next render, which needs a host session restart). Record the user's answer as
+session evidence in the first visible reply: what was activated, what stays off.
+
+When the user activates a rule whose body is absent from this rendered file (the
+all-off default drops every rule span), read that rule's body from
+`bootstrap-rules.md` in the skill base directory named in this file's generated
+header.
 
 <!-- massa-ai:rule:massa-ai-router:start -->
 ### `massa-ai`

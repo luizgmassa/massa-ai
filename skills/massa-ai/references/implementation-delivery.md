@@ -29,32 +29,48 @@ human chose to merge it".
 | 6 | Repair | fix on the branch, commit, return to stage 5 | Capped at 3 iterations, then stop as `Blocked` |
 | 7 | **Ask** | report the PR URL and the green check list, then **stop** | — |
 
-### Stage 1 — worktree isolation is mandatory
+### Stage 1 — ask first, then isolate
 
-Every implementation task runs in its own git worktree. **Mandatory worktree
-creation is the rule, not a preference:** a one-line typo fix is isolated
-exactly like a twelve-file feature. There is **no size exemption**. The reason
-is that the exemption, not the ceremony, is what costs time — "this one is too
-small to isolate" is the judgment call that puts half-finished work on a shared
-branch. Worktree creation happens **before the first repository mutation**, not
-after implementation.
+Before Stage 0–1, **ask the user where to work** using the host's native question
+mechanism (Claude Code: `AskUserQuestion` tool; OpenCode: `question` tool; hosts
+without one: a plain chat question). The **ask** has **no size exemption** — the
+ask always happens, from a one-line typo fix to a twelve-file feature, because
+"this one is too small to ask about" is the judgment call that puts half-finished
+work on a shared branch; only the user's answer can skip isolation. Offer exactly
+three options:
 
-The only two legal skip reasons:
+1. **Isolated git worktree + new branch** (recommended) → run `ensure_worktree.ts`
+   Stage 0–1 as tabled above.
+2. **Current checkout, current branch** → record the decline with
+   `ensure_worktree.ts --skip-declined` and work in place.
+3. **Current checkout on a new branch** → allowed only by an explicit user pick,
+   and the ask text must carry this warning verbatim: **switching branches in a
+   checkout another session may share can move each other's HEAD mid-run.** The
+   pick is the recorded user override of the branch-switch rule below; the
+   delivery report records the pick and that the warning was shown (mechanically:
+   `ensure_worktree.ts --skip-declined` plus `git checkout -b <type>/<slug>`; the
+   script itself is unchanged).
 
-1. The target is not a git repository.
-2. The user explicitly declined isolation for this task.
+The only auto-skip that happens without asking: **the target is not a git
+repository.** A user decline is no longer a reason the agent may assume — it is
+the outcome of the ask, recorded via the explicit `--skip-declined` flag. Record
+the outcome verbatim in the completion report. `ensure_worktree.ts` emits exactly
+the two skip strings and no third: it detects "not a git repository" from the
+tree, and takes the decline only from `--skip-declined`, because a script cannot
+observe a user declining anything.
 
-Record the skip reason verbatim in the completion report. Any other reason is a
-protocol violation, not a shortcut. `ensure_worktree.ts` emits exactly these two
-strings and no third: it detects reason 1 from the tree, and takes reason 2 only
-from an explicit `--skip-declined`, because a script cannot observe a user
-declining anything.
+**Re-ask policy:** ask once per session; record the answer as session evidence
+and reuse it for every subsequent Stage 0–1 in that session. Re-ask only on
+explicit contradiction — the user changes course, or the work moves to a
+different base repository. **Subagents never ask** — they inherit the parent
+lane's recorded answer.
 
-**Record the isolation evidence immediately after creation:** the worktree path
+**Record the isolation evidence immediately after Stage 1:** the worktree path
 and branch name go into the session status the moment Stage 1 completes, and
 every subsequent edit happens under that path. **Never switch branches in a
-checkout another session may share** — two sessions sharing one checkout can
-move each other's HEAD mid-run and land commits on the wrong branch (recorded
+checkout another session may share without an explicit, recorded user override**
+(the ask's option 3, with the warning shown) — two sessions sharing one checkout
+can move each other's HEAD mid-run and land commits on the wrong branch (recorded
 incident, `.specs/project/STATE.md` 2026-08-05). This is a cross-**session**
 rule; the cross-**subagent** git-safety rule for concurrently-dispatched agents
 is owned by `references/agent-orchestration.md` and is not restated here.
