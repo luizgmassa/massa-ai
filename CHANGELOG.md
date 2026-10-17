@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The OpenCode plugin now supports OpenCode 2.x alongside 1.x.** OpenCode 2 loads a different
+  plugin API (`{ id, setup }` with hooks registered on context domains), so the package ships a
+  second entry, `dist/v2.js`, next to the unchanged 1.x `dist/index.js`. `install.sh` reads
+  `opencode --version` and installs `v2.js` for a 2.x host and `index.js` otherwise (1.x, or no
+  `opencode` on PATH); either lands at `plugins/massa-ai/index.js`, so the config entry is
+  unchanged. `@opencode/plugin` is a type-only dev dependency, so the 2.x bundle carries no copy
+  of `effect`, which OpenCode 2 requires to be its own instance. Verified against a real
+  OpenCode 2.0.32 host: the plugin loads and injects `MASSA_AI_PROJECT_ID` into session shells.
+
 ## [1.69.0] - 2026-10-17
 
 ### Changed

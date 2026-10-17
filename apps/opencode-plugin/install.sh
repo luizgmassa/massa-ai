@@ -601,11 +601,27 @@ mkdir -p "$PLUGINS_DIR"
 # and by install-skills.sh's real-copy contract. Dev-loop cost: after
 # `bun run build`, re-run this installer (or the harness) to refresh the
 # installed copy.
-resolved_plugin_js="$PLUGIN_SOURCE_ROOT/apps/opencode-plugin/dist/index.js"
+#
+# OpenCode 2.x loads a different plugin API than 1.x, so the host's major
+# version picks the entry: dist/v2.js for 2.x, dist/index.js otherwise (1.x,
+# or no `opencode` on PATH — 1.x is still the stable channel). 2.x prints
+# `opencode v2.0.32`, 1.x a bare `1.18.32`. Either entry lands
+# as index.js, so the config entry below never changes.
+opencode_major="$(command -v opencode &>/dev/null && opencode --version 2>/dev/null | sed -n 's/^[^0-9]*\([0-9][0-9]*\)\..*/\1/p' | head -n 1 || true)"
+plugin_entry="index.js"
+if [[ "$opencode_major" =~ ^[0-9]+$ ]] && (( opencode_major >= 2 )); then
+  plugin_entry="v2.js"
+fi
+resolved_plugin_js="$PLUGIN_SOURCE_ROOT/apps/opencode-plugin/dist/$plugin_entry"
 if [[ ! -f "$resolved_plugin_js" ]]; then
   # The marketplace copy is made before `bun run build` has necessarily run in
   # that tree; the checkout's dist is the only other place it can come from.
-  resolved_plugin_js="$REPO_ROOT/apps/opencode-plugin/dist/index.js"
+  resolved_plugin_js="$REPO_ROOT/apps/opencode-plugin/dist/$plugin_entry"
+fi
+if [[ ! -f "$resolved_plugin_js" ]]; then
+  echo "Error: plugin bundle not found at $resolved_plugin_js" >&2
+  echo "  Run: bun run build" >&2
+  exit 1
 fi
 
 # A pre-fix install left a symlink here; remove it first so cp writes a new
