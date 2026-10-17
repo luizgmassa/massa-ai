@@ -154,6 +154,25 @@ describe("opencode-plugin install.sh", () => {
     });
   }
 
+  test("no opencode on PATH installs dist/index.js and does not trip set -e", async () => {
+    // Mirror every PATH executable except `opencode` into one dir: dropping a
+    // whole PATH dir could also drop bun/node when they share it.
+    const binDir = path.join(tmp, "no-opencode-bin");
+    await fs.mkdir(binDir);
+    for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+      const names = await fs.readdir(dir).catch(() => [] as string[]);
+      for (const name of names) {
+        if (name === "opencode") continue;
+        await fs.symlink(path.join(dir, name), path.join(binDir, name)).catch(() => {});
+      }
+    }
+    const res = runInstall(["--user"], { HOME: tmp, PATH: binDir });
+    expect(res.exitCode).toBe(0);
+    const pluginPath = path.join(tmp, ".config/opencode/plugins/massa-ai/index.js");
+    const distJs = path.join(REPO_ROOT, "apps/opencode-plugin/dist/index.js");
+    expect(await fs.readFile(pluginPath, "utf8")).toBe(await fs.readFile(distJs, "utf8"));
+  }, 60_000);
+
   test("plugin entry in opencode.jsonc is idempotent", async () => {
     runInstall(["--user"], { HOME: tmp });
     const afterFirst = await fs.readFile(

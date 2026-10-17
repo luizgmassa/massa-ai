@@ -607,7 +607,7 @@ mkdir -p "$PLUGINS_DIR"
 # or no `opencode` on PATH — 1.x is still the stable channel). 2.x prints
 # `opencode v2.0.32`, 1.x a bare `1.18.32`. Either entry lands
 # as index.js, so the config entry below never changes.
-opencode_major="$(command -v opencode &>/dev/null && opencode --version 2>/dev/null | sed -n 's/^[^0-9]*\([0-9][0-9]*\)\..*/\1/p' | head -n 1)"
+opencode_major="$(command -v opencode &>/dev/null && opencode --version 2>/dev/null | sed -n 's/^[^0-9]*\([0-9][0-9]*\)\..*/\1/p' | head -n 1 || true)"
 plugin_entry="index.js"
 if [[ "$opencode_major" =~ ^[0-9]+$ ]] && (( opencode_major >= 2 )); then
   plugin_entry="v2.js"
